@@ -27,26 +27,26 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: "4.22"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cluster-kube-apiserver-operator
 promotion:
   to:
@@ -95,7 +95,7 @@ tests:
     workflow: openshift-kubernetes-e2e-gcp-serial
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-gcp-operator
   steps:
@@ -147,7 +147,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: e2e-gcp-operator-encryption-rotation-aescbc
   optional: true
@@ -218,7 +218,7 @@ tests:
 - as: e2e-aws-ovn-serial
   shard_count: 2
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
 - as: e2e-metal-single-node-live-iso
   optional: true
@@ -228,12 +228,12 @@ tests:
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-operator-disruptive-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -428,14 +428,14 @@ tests:
   as: e2e-short-cert-rotation
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-cert-rotation-short-aws
   timeout: 8h0m0s
 - always_run: false
   as: e2e-short-cert-rotation-azure
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     workflow: openshift-e2e-cert-rotation-short-azure
   timeout: 8h0m0s
 - as: e2e-tests-extension

@@ -73,6 +73,11 @@ VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 if [[ $(${VIRSH} pool-list | grep ${POOL_NAME}) ]]; then
   echo "Storage pool ${POOL_NAME} already exists. Skipping..."
 else
+  if [[ $(${VIRSH} pool-list --all | grep ${POOL_NAME}) ]]; then
+    echo "Storage pool ${POOL_NAME} already exists in inactive state. Deleting it.."
+    ${VIRSH} pool-destroy "${POOL_NAME}"
+    ${VIRSH} pool-undefine "${POOL_NAME}"
+  fi
   echo "Creating storage pool..."
   ${VIRSH} pool-define-as \
     --name ${POOL_NAME} \
