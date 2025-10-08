@@ -49,6 +49,22 @@ start_capture_window() {
   mkdir -p "$out"
   log "Starting capture window -> $out"
 
+
+  oc -n openshift-ovn-kubernetes logs -l name=ovnkube-master --tail=2000 \
+    > "${out}/ovn-master.log" 2>&1 || true
+  oc -n openshift-ovn-kubernetes logs -l name=ovnkube-node --tail=2000 \
+    > "${out}/ovn-node.log" 2>&1 || true
+
+  # Node watch (time-align taints/NotReady transitions)
+  ( set +e
+    oc get node -w | while read -r l; do
+      echo "[$(date -u +%FT%TZ)] $l"
+    done > "${out}/node-watch.log"
+  ) & echo $! > "${out}/.pid-node-watch"
+
+  # Cluster events snapshot (for quick correlation)
+  oc get events -A --sort-by=.lastTimestamp > "${out}/events-all.txt" 2>&1 || true
+
   # EndpointSlice watch (timestamped)  — NOTE plural: endpointslices
   (
     set +e
@@ -136,6 +152,7 @@ YAML
   oc apply -f "${out}/curl-v2-watch.yaml" >/dev/null 2>&1 || true
 
   echo "$out"
+
 }
 
 stop_capture_window() {
@@ -218,17 +235,39 @@ YAML
   oc -n default delete job "${jobname}" --ignore-not-found >/dev/null 2>&1 || true
 
   # KAS basics
-  oc get co kube-apiserver -o yaml >"${outdir}/co-kas.yaml" || true
-  oc -n openshift-kube-apiserver get pods -o wide >"${outdir}/kas-pods.txt" || true
+  oc get co kube-apiserver -o yaml > "${outdir}/co-kas.yaml" || true
+  oc -n openshift-kube-apiserver get pods -o wide > "${outdir}/kas-pods.txt" || true
+
+  # Restarts summary
   oc -n openshift-kube-apiserver get pod \
     -o custom-columns=NAME:.metadata.name,RESTARTS:.status.containerStatuses[*].restartCount,PHASE:.status.phase,READY:.status.containerStatuses[*].ready \
-    >"${outdir}/kas-restarts.txt" 2>/dev/null || true
-  oc -n openshift-kube-apiserver get pods -o name >"${outdir}/kas-pod-names.txt" || true
+    > "${outdir}/kas-restarts.txt" 2>/dev/null || true
+
+  # Per-pod logs (all containers), include previous if restarted
+  oc -n openshift-kube-apiserver get pods -o name > "${outdir}/kas-pod-names.txt" || true
   while read -r p; do
     [[ -z "$p" ]] && continue
-    oc -n openshift-kube-apiserver logs "$p" --all-containers --tail=300 >"${outdir}/kas-logs-$(basename "$p").txt" 2>&1 || true
-  done <"${outdir}/kas-pod-names.txt"
 
+    # Container list for this pod
+    mapfile -t _containers < <(oc -n openshift-kube-apiserver get "$p" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null | tr ' ' '\n')
+    for c in "${_containers[@]}"; do
+      # Current logs (last 30m; adjust as needed)
+      oc -n openshift-kube-apiserver logs "$p" -c "$c" --since=30m --tail=-1 \
+        > "${outdir}/kas-logs-$(basename "$p")-${c}.txt" 2>&1 || true
+
+      # If container restarted, also capture previous
+      rc="$(oc -n openshift-kube-apiserver get "$p" -o jsonpath="{.status.containerStatuses[?(@.name=='$c')].restartCount}" 2>/dev/null || echo 0)"
+      [[ -z "$rc" ]] && rc=0
+      if [[ "$rc" -gt 0 ]]; then
+        oc -n openshift-kube-apiserver logs "$p" -c "$c" --previous --tail=-1 \
+          > "${outdir}/kas-logs-$(basename "$p")-${c}.previous.txt" 2>&1 || true
+      fi
+    done
+
+    # Events section (reason strings, probe failures, etc.)
+    oc -n openshift-kube-apiserver describe "$p" | sed -n '/^Events:/,$p' \
+      > "${outdir}/kas-describe-$(basename "$p").txt" 2>/dev/null || true
+  done < "${outdir}/kas-pod-names.txt"
   # /readyz burst
   for i in {1..10}; do
     echo "TIME=$(date -u +%FT%TZ)"
@@ -254,6 +293,15 @@ YAML
   grep -E -ni 'timeout|deadline|connection reset|i/o timeout|context deadline|transport is closing' \
     "${outdir}"/kas-logs-*.txt "${outdir}/ocm-logs-tail.txt" "${outdir}/imageregistry-logs.txt" \
     >"${outdir}/timeouts-grep.txt" 2>/dev/null || true
+# OVN (Service LB programming) – helps if endpoints flip but traffic still fails
+  oc -n openshift-ovn-kubernetes logs -l name=ovnkube-master --tail=2000 > "$out/ovn-master.log" 2>&1 || true
+  oc -n openshift-ovn-kubernetes logs -l name=ovnkube-node --tail=2000 > "$out/ovn-node.log" 2>&1 || true
+
+# Node object + cluster events (timestamps of taints/NotReady transitions)
+  oc get node -w | while read -r l; do echo "[$(date -u +%FT%TZ)] $l"; done > "$out/node-watch.log" &
+  oc get events -A --sort-by=.lastTimestamp > "$out/events-all.txt" 2>&1 || true
+
+  
 }
 
 snapshot_cluster() {
