@@ -18,6 +18,13 @@ MEMORY=${MEMORY:-64}
 OUTPUT_CONNECTION_DIR=${SHARED_DIR:-"/workspace"}
 TIMEOUT=${TIMEOUT:-10m}
 
+# Check that required secret files exist
+ls -l /tmp/secrets
+if [ ! -f /tmp/secrets/.awscred ]; then
+  echo "Error: AWS credentials file not found"
+  exit 1
+fi
+
 # AWS credentials
 CRED_FILE="/tmp/secrets/.awscred"
 AWS_ACCESS_KEY_ID=$(awk -v profile="openshift-service-mesh-dev" -v key="aws_access_key_id" '
