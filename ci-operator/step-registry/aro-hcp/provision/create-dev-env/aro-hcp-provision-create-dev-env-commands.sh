@@ -33,4 +33,9 @@ unset GOFLAGS
 make install-tools
 PATH=$(go env GOPATH)/bin:$PATH
 export PATH
-make infra.all deployall
+if make entrypoint/Region; then
+    cp timing.yaml "${ARTIFACT_DIR}/" || true
+else
+    cp timing.yaml "${ARTIFACT_DIR}/" || true
+    exit 1
+fi

@@ -34,6 +34,9 @@ unset GOFLAGS
 make install-tools
 PATH=$(go env GOPATH)/bin:$PATH
 export PATH
-make infra.svc.clean
-make infra.mgmt.clean
-make infra.region.clean
+if make entrypoint/Region.Delete; then
+    cp timing.yaml "${ARTIFACT_DIR}/" || true
+else
+    cp timing.yaml "${ARTIFACT_DIR}/" || true
+    exit 1
+fi
