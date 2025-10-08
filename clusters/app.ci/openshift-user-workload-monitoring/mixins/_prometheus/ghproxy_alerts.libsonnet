@@ -25,7 +25,7 @@
               severity: 'warning',
             },
             annotations: {
-              message: '{{ $value | humanize }}%% of all requests for {{ $labels.path }} through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/%s/github-cache?orgId=1&refresh=1m&fullscreen&viewPanel=9|grafana>' % $._config.grafanaDashboardIDs['ghproxy.json'],
+              message: '{{ $value | humanize }}%% of all requests for {{ $labels.path }} through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/%s/github-cache?orgId=1&refresh=1m&fullscreen&viewPanel=9|grafana>' % $._config.grafanaDashboardIDs['ghproxy.json'],
             },
           },
           {
@@ -37,7 +37,7 @@
               severity: 'warning',
             },
             annotations: {
-              message: '{{ $value | humanize }}%% of all API requests through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/%s/github-cache?orgId=1&fullscreen&viewPanel=8|grafana>' % $._config.grafanaDashboardIDs['ghproxy.json'],
+              message: '{{ $value | humanize }}%% of all API requests through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/%s/github-cache?orgId=1&fullscreen&viewPanel=8|grafana>' % $._config.grafanaDashboardIDs['ghproxy.json'],
             },
           },
           {
@@ -50,7 +50,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: '{{ $labels.login }} may run out of API quota before the next reset. Check the <https://grafana-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>',
+              message: '{{ $labels.login }} may run out of API quota before the next reset. Check the <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>',
             },
           },
           {
@@ -63,7 +63,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: '{{ $labels.token_hash }} may run out of API quota before the next reset. Check the <https://grafana-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>',
+              message: '{{ $labels.token_hash }} may run out of API quota before the next reset. Check the <https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>',
             },
           },
           {
@@ -77,7 +77,7 @@
             },
             annotations: {
               message: |||
-                {{ $labels.token_hash }} uses 90% of the available inode (<https://grafana-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?viewPanel=5&orgId=1|dashboard>)
+                {{ $labels.token_hash }} uses 90% of the available inode (<https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?viewPanel=5&orgId=1|dashboard>)
 
                 Resolve by pruning the cache inside the ghproxy pod:
 
