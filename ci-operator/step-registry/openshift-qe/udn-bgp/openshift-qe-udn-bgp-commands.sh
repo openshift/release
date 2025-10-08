@@ -1,23 +1,36 @@
 #!/bin/bash
 set -x
 
-oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+   shellcheck disable=SC1090
+   source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+
+# Patch network operator to enable FRR
+PATCH_NETWORK_OPERATOR_SCRIPT="patch_network_operator_script.sh"
+cat > $PATCH_NETWORK_OPERATOR_SCRIPT << 'EOF'
+   export KUBECONFIG=/root/vmno/kubeconfig
+   oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
+EOF
+chmod +x $PATCH_NETWORK_OPERATOR_SCRIPT
+ssh ${SSH_ARGS} root@$bastion 'bash -s' < $PATCH_NETWORK_OPERATOR_SCRIPT
+sleep 10
+rm -f $PATCH_NETWORK_OPERATOR_SCRIPT
 # Wait 30 minutes for FRR to be enabled
 sleep 1800
 
-SSH_ARGS="-i /bm/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
-bastion="$(cat /bm/address)"
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
-
 echo "LAB is $LAB_CLOUD"
 LOGIN=password
 
-SCRIPT_FILE="remote_script.sh"
 
 # This script is run on the bastion host. It sshs into the hypervisor creates a VM
 # and then spawns external BGP server on the VM.
+SCRIPT_FILE="remote_script.sh"
 cat > $SCRIPT_FILE << 'EOF'
 #!/bin/bash
 set -x
@@ -79,7 +92,7 @@ NAME=eth0
 __EOF__'
 
 virsh start "$VM_NAME"
-sleep 90
+sleep 180
 _EOF_
 
 echo "Script '$CREATE_VM_SCRIPT' created. Now you can use it with SSH."
@@ -163,10 +176,12 @@ sshpass -p "$LOGIN" ssh ${SSH_ARGS} root@${VM_IP} 'bash -s' < $PREPATE_SERVER_SC
 echo $VM_IP
 EOF
 
+chmod +x $SCRIPT_FILE
 VM_IP=$(ssh ${SSH_ARGS} root@$bastion 'bash -s --' "$LAB_CLOUD" < $SCRIPT_FILE)
+sleep 10
+rm -f $SCRIPT_FILE
 
 VARS_FILE="vars.sh"
-
 cat > $VARS_FILE << EOF
 export ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 export ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
@@ -181,8 +196,9 @@ export LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-be
 export TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 EOF
 
-sshpass -p "$LOGIN" scp ./vars.sh root@${VM_IP}:~/
-rm -f ./vars.sh
+sshpass -p "$LOGIN" scp $VARS_FILE root@${VM_IP}:~/
+sleep 10
+rm -f $VARS_FILE
 
 # Run the workload on the VM where external BGP server is running
 RUN_WORKLOAD_SCRIPT="run_workload_script.sh"
@@ -199,8 +215,11 @@ export WORKLOAD=udn-bgp
 export ITERATIONS=72
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 ./run.sh
+sleep 10
 rm -f /root/vars.sh
 EOF
 
 chmod +x $RUN_WORKLOAD_SCRIPT
 sshpass -p "$LOGIN" ssh ${SSH_ARGS} root@${VM_IP} 'bash -s' < $RUN_WORKLOAD_SCRIPT
+sleep 10
+rm -f $RUN_WORKLOAD_SCRIPT
