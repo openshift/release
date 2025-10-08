@@ -66,6 +66,10 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
 fi
 
 # Archive the sources, potentially including MicroShift RPMs from brew
+#TODO. temporary for testing.
+rm -rf /go/src/github.com/openshift/microshift
+git clone "https://github.com/pacevedom/microshift.git" -b "USHIFT-5339" /go/src/github.com/openshift/microshift
+
 tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \
