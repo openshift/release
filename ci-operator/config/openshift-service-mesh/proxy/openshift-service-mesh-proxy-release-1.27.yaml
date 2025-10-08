@@ -340,6 +340,30 @@ tests:
   - mount_path: /creds-github
     name: ossm-github-simple-job
   timeout: 8h0m0s
+- as: update-envoy
+  commands: |
+    git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator-main.sh \
+    --org=openshift-service-mesh \
+    --repo=proxy \
+    --branch=release-1.27 \
+    --token-path=/creds-github/token \
+    '--title=[$AUTOMATOR_BRANCH] Automator: Update Envoy' \
+    "--labels=auto-merge,tide/merge-method-merge" \
+    --modifier=update_envoy_1.27 \
+    '--cmd=make ossm-update-everything'
+  container:
+    from: src
+  cron: 00 0,3,6,9,12,15,18,21 * * 1-5
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
+  timeout: 2h0m0s
 zz_generated_metadata:
   branch: release-1.27
   org: openshift-service-mesh
