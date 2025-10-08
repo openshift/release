@@ -178,7 +178,8 @@ check_prerequisites() {
 
 check_vm_exists() {
     if ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
-        local phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        local phase
+        phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
         log_info "VM ${VM_NAME} exists with phase: ${phase}"
         return 0
     else
@@ -194,7 +195,8 @@ wait_for_vm_running() {
     local interval=5
 
     while [ ${elapsed} -lt ${TIMEOUT} ]; do
-        local phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        local phase
+        phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
 
         case ${phase} in
             "Running")
@@ -296,9 +298,12 @@ check_hco_status() {
     fi
 
     # Check for Available condition using jq
-    local available=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Available") | .status' 2>/dev/null || echo "")
-    local progressing=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Progressing") | .status' 2>/dev/null || echo "")
-    local degraded=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Degraded") | .status' 2>/dev/null || echo "")
+    local available
+    available=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Available") | .status' 2>/dev/null || echo "")
+    local progressing
+    progressing=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Progressing") | .status' 2>/dev/null || echo "")
+    local degraded
+    degraded=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Degraded") | .status' 2>/dev/null || echo "")
 
     if [[ "${available}" == "True" ]]; then
         log_success "HCO is Available"
@@ -321,7 +326,8 @@ check_hco_status() {
     fi
 
     # Show HCO version if available
-    local hco_version=$(${KUBECTL_CMD} get hco -A -o jsonpath='{.items[0].status.versions}' 2>/dev/null || echo "")
+    local hco_version
+    hco_version=$(${KUBECTL_CMD} get hco -A -o jsonpath='{.items[0].status.versions}' 2>/dev/null || echo "")
     if [[ -n "${hco_version}" ]]; then
         log_info "HCO version info available"
     fi
@@ -339,7 +345,8 @@ check_csv_status() {
     fi
 
     # Get CSVs in the specified namespace
-    local csvs=$(${KUBECTL_CMD} get csv -n "${CSV_NAMESPACE}" --no-headers 2>/dev/null || echo "")
+    local csvs
+    csvs=$(${KUBECTL_CMD} get csv -n "${CSV_NAMESPACE}" --no-headers 2>/dev/null || echo "")
 
     if [[ -z "${csvs}" ]]; then
         log_error "No CSVs found in namespace ${CSV_NAMESPACE}"
@@ -385,7 +392,8 @@ check_ssh_connectivity() {
     fi
 
     # Get VM IP address first
-    local vm_ip=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || echo "")
+    local vm_ip
+    vm_ip=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || echo "")
 
     if [[ -z "${vm_ip}" ]]; then
         log_error "Could not get VM IP address for SSH test"
@@ -403,7 +411,8 @@ check_ssh_connectivity() {
     local ssh_test_result=""
 
     # Clean up any existing known_hosts entry for this VM to avoid host key conflicts
-    local vm_host="vmi.${VM_NAME}.${NAMESPACE}"
+    local vm_host
+    vm_host="vmi.${VM_NAME}.${NAMESPACE}"
     if [[ -f ~/.ssh/known_hosts ]]; then
         ssh-keygen -R "${vm_host}" 2>/dev/null || true
     fi

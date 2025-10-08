@@ -154,7 +154,8 @@ deploy_vm() {
 
     # Check if VM already exists
     if ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
-        local current_phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        local current_phase
+        current_phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
 
         if [[ "${MODE}" == "pre-upgrade" ]]; then
             log_warning "VM ${VM_NAME} already exists with phase: ${current_phase}. Cleaning up for fresh deployment..."
@@ -177,7 +178,8 @@ deploy_vm() {
 
 check_vm_exists() {
     if ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
-        local phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        local phase
+        phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
         log_info "VM ${VM_NAME} exists with phase: ${phase}"
         return 0
     else
@@ -193,7 +195,8 @@ wait_for_vm_running() {
     local interval=5
 
     while [ ${elapsed} -lt ${TIMEOUT} ]; do
-        local phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        local phase
+        phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
 
         case ${phase} in
             "Running")
@@ -295,9 +298,12 @@ check_hco_status() {
     fi
 
     # Check for Available condition using jq
-    local available=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Available") | .status' 2>/dev/null || echo "")
-    local progressing=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Progressing") | .status' 2>/dev/null || echo "")
-    local degraded=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Degraded") | .status' 2>/dev/null || echo "")
+    local available
+    available=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Available") | .status' 2>/dev/null || echo "")
+    local progressing
+    progressing=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Progressing") | .status' 2>/dev/null || echo "")
+    local degraded
+    degraded=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Degraded") | .status' 2>/dev/null || echo "")
 
     if [[ "${available}" == "True" ]]; then
         log_success "HCO is Available"
@@ -338,7 +344,8 @@ check_csv_status() {
     fi
 
     # Get CSVs in the specified namespace
-    local csvs=$(${KUBECTL_CMD} get csv -n "${CSV_NAMESPACE}" --no-headers 2>/dev/null || echo "")
+    local csvs
+    csvs=$(${KUBECTL_CMD} get csv -n "${CSV_NAMESPACE}" --no-headers 2>/dev/null || echo "")
 
     if [[ -z "${csvs}" ]]; then
         log_error "No CSVs found in namespace ${CSV_NAMESPACE}"
