@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-# Set the LEASED_RESOURCE as the CLUSTER_TYPE in case of 
+# Set the LEASED_RESOURCE as the CLUSTER_TYPE in case of
 # using openstack-vh-bm-rhos static pool of resources
 # https://issues.redhat.com/browse/OSASINFRA-3795
 [[ "${LEASED_RESOURCE:-}" == openstack* ]] && CLUSTER_TYPE="${LEASED_RESOURCE}"
@@ -11,23 +11,23 @@ CLUSTER_TYPE="${CLUSTER_TYPE_OVERRIDE:-$CLUSTER_TYPE}"
 
 declare -A external_network=(
 	['openstack-vexxhost']='public'
-        ['openstack-operators-vexxhost']='public'
+	['openstack-operators-vexxhost']='public'
 	['openstack-vh-mecha-central']='external'
 	['openstack-vh-mecha-az0']='external'
 	['openstack-nfv']='intel-dpdk'
 	['openstack-hwoffload']='external'
 	['openstack-nerc-dev']='provider'
-	)
+)
 
 declare -A controlplane_flavor=(
 	['openstack-vexxhost']='ci.m1.xlarge'
-        ['openstack-operators-vexxhost']='ci.m1.large'
+	['openstack-operators-vexxhost']='ci.m1.large'
 	['openstack-vh-mecha-central']='m1.xlarge'
 	['openstack-vh-mecha-az0']='m1.xlarge'
 	['openstack-nfv']='m1.xlarge'
 	['openstack-hwoffload']='m1.xlarge'
 	['openstack-nerc-dev']='cpu-su.4'
-	)
+)
 
 declare -A controlplane_flavor_alternate=(
 	['openstack-vexxhost']='ci.m2.xlarge'
@@ -35,37 +35,37 @@ declare -A controlplane_flavor_alternate=(
 	['openstack-vh-mecha-az0']='m1.xlarge.2'
 	['openstack-nfv']='m1.xlarge.2'
 	['openstack-hwoffload']='m1.xlarge.2'
-	)
+)
 
 declare -A compute_flavor=(
 	['openstack-vexxhost']='ci.m1.xlarge'
-        ['openstack-operators-vexxhost']='ci.m1.large'
+	['openstack-operators-vexxhost']='ci.m1.large'
 	['openstack-vh-mecha-central']='m1.xlarge'
 	['openstack-vh-mecha-az0']='m1.xlarge'
 	['openstack-nfv']='m1.xlarge.nfv'
 	['openstack-hwoffload']='m1.xlarge'
 	['openstack-nerc-dev']='cpu-su.4'
-	)
+)
 
 declare -A compute_azs=(
 	['openstack-vexxhost']=''
-        ['openstack-operators-vexxhost']=''
+	['openstack-operators-vexxhost']=''
 	['openstack-vh-mecha-central']=''
 	['openstack-vh-mecha-az0']='nova'
 	['openstack-nfv']=''
 	['openstack-hwoffload']=''
 	['openstack-nerc-dev']='nova'
-	)
+)
 
 declare -A bastion_flavor=(
 	['openstack-vexxhost']='1vcpu_2gb'
-        ['openstack-operators-vexxhost']='ci.m1.small'
+	['openstack-operators-vexxhost']='ci.m1.small'
 	['openstack-vh-mecha-central']='m1.small'
 	['openstack-vh-mecha-az0']='m1.small'
 	['openstack-nfv']='m1.small'
 	['openstack-hwoffload']='m1.small'
 	['openstack-nerc-dev']='cpu-su.4'
-	)
+)
 
 if [[ -z "${OPENSTACK_EXTERNAL_NETWORK:-}" ]]; then
 	if [[ -z "${CLUSTER_TYPE:-}" ]]; then
