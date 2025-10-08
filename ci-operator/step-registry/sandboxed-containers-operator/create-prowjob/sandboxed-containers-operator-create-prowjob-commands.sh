@@ -279,7 +279,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.20"
+    tag: "4.21"
   upi-installer:
     name: "${OCP_VERSION}"
     namespace: ocp
