@@ -263,11 +263,14 @@ curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
 oc whoami --show-console
 HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
 
-# TODO: We might need to re-import all the images to utlize the new default storage class.
-# oc get sc
-# setDefaultStorageClass 'ocs-storagecluster-ceph-rbd-virtualization'
-# oc get sc
-# cnv::reimport_datavolumes
+TODO: We might need to re-import all the images to utlize the new default storage class.
+oc get sc
+setDefaultStorageClass 'ocs-storagecluster-ceph-rbd-virtualization'
+oc get sc
+cnv::reimport_datavolumes
+
+oc whoami --show-console
+HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
 
 rc=0
 uv run --verbose --cache-dir /tmp/uv-cache pytest  \
@@ -278,9 +281,27 @@ uv run --verbose --cache-dir /tmp/uv-cache pytest  \
     --data-collector --data-collector-output-dir="${ARTIFACT_DIR}/" \
     --junitxml "${JUNIT_RESULTS_FILE}" \
     --html="${HTML_RESULTS_FILE}" --self-contained-html \
+    --tb=native \
+    --tc default_storage_class:ocs-storagecluster-ceph-rbd-virtualization \
+    --tc default_volume_mode:Block \
+    --tc "hco_subscription:${HCO_SUBSCRIPTION}" \
+    --latest-rhel \
+    --storage-class-matrix=ocs-storagecluster-ceph-rbd-virtualization \
     --leftovers-collector \
-    --upgrade ocp \
-    --ocp-image "${IMAGE_DIGEST}" || rc=$?
+    -m smoke || rc=$?
+
+# rc=0
+# uv run --verbose --cache-dir /tmp/uv-cache pytest  \
+#     -s \
+#     -o log_cli=true \
+#     -o cache_dir=/tmp/pytest-cache \
+#     --pytest-log-file "${ARTIFACT_DIR}/tests.log" \
+#     --data-collector --data-collector-output-dir="${ARTIFACT_DIR}/" \
+#     --junitxml "${JUNIT_RESULTS_FILE}" \
+#     --html="${HTML_RESULTS_FILE}" --self-contained-html \
+#     --leftovers-collector \
+#     --upgrade ocp \
+#     --ocp-image "${IMAGE_DIGEST}" || rc=$?
 
 # TODO: Fix junit, spyglass still show "nil" for failed jobs.
 #       (This attempt didn't work)

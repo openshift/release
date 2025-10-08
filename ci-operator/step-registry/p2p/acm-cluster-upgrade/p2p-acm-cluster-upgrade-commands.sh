@@ -105,7 +105,7 @@ upgrade_cluster "${HUB_KUBECONFIG}" "hub"
 wait_for_completed "${HUB_KUBECONFIG}" "hub" "${TARGET_VERSION}"
 
 #spoke upgrade
-# upgrade_cluster "${SPOKE_KUBECONFIG}" "spoke"
-# wait_for_completed "${SPOKE_KUBECONFIG}" "spoke" "${TARGET_VERSION}"
+upgrade_cluster "${SPOKE_KUBECONFIG}" "spoke"
+wait_for_completed "${SPOKE_KUBECONFIG}" "spoke" "${TARGET_VERSION}"
 
 echo "All selected clusters are at latest RCs"
