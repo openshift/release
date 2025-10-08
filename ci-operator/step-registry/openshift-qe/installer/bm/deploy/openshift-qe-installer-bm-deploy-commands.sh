@@ -243,7 +243,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/clean-resources.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
-   if [[ ! -z \"$NUM_HYBRID_WORKER_NODES\" ]]; then
+   if [[ ! -z \"$NUM_HYBRID_WORKER_NODES\" || \"$TYPE\" == \"vmno\" ]]; then
      export ANSIBLE_HOST_KEY_CHECKING=False
      ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/hv-setup.yml -v | tee /tmp/ansible-hv-setup-$(date +%s)
      ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/hv-vm-create.yml -v | tee /tmp/ansible-hv-vm-create-$(date +%s)
