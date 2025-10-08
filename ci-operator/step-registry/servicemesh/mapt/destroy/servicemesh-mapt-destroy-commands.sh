@@ -7,7 +7,8 @@ set -e
 
 # Configuration variables
 PROJECT_NAME=${PROJECT_NAME:-"servicemesh"}
-BUCKET_NAME=${BUCKET_NAME}
+BUCKET_NAME=$(cat ${SHARED_DIR}/bucket_name)
+echo "Using S3 bucket: ${BUCKET_NAME}"
 
 # AWS credentials
 AWS_ACCESS_KEY_ID=$(cat /tmp/secrets/AWS_ACCESS_KEY_ID)
