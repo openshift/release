@@ -28,10 +28,13 @@ operator:
 releases:
   latest:
     release:
+      architecture: multi
       channel: stable
       version: "4.18"
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 200m
       memory: 200Mi
@@ -56,24 +59,31 @@ tests:
 - as: opendatahub-operator-e2e
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$
   steps:
-    cluster_profile: gcp-opendatahub
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-opendatahub
     dependencies:
       OO_BUNDLE: opendatahub-operator-bundle
     env:
-      COMPUTE_NODE_TYPE: n2-standard-8
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.18.22-multi
+      HYPERSHIFT_NODE_COUNT: "3"
+      OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: openshift-operators
+      USE_HOSTED_KUBECONFIG: "true"
     test:
     - as: e2e
       cli: latest
       commands: |
         unset GOFLAGS
-        make e2e-test -e OPERATOR_NAMESPACE=openshift-operators
+        make e2e-test -e E2E_TEST_FLAGS="-timeout 60m" -e OPERATOR_NAMESPACE=openshift-operators
       from: src
       resources:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: optional-operators-ci-operator-sdk-gcp
+    workflow: opendatahub-io-hypershift
 zz_generated_metadata:
   branch: stable-2.x
   org: opendatahub-io
