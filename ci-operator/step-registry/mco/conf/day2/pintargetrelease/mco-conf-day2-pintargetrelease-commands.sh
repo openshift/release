@@ -19,10 +19,10 @@ fi
 
 # Currently the PinnedImageSet feature is only available through TechPreviewNoUpgrade featureset.
 # Remove this check once the PinnedImageSet feature becomes GA
-if [ "$(oc get featuregate cluster -ojsonpath='{.spec.featureSet}')" != "TechPreviewNoUpgrade" ]; then
-    echo "This step can only be executed in clusters with TechPreviewUpgrade featureset"
-    exit 255
-fi
+# if [ "$(oc get featuregate cluster -ojsonpath='{.spec.featureSet}')" != "TechPreviewNoUpgrade" ]; then
+#     echo "This step can only be executed in clusters with TechPreviewUpgrade featureset"
+#     exit 255
+# fi
 
 # If it's serial upgrades then override-upgrade file will store the release and overrides OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
 # upgrade-edge file expects a comma separated releases list like target_release1,target_release2,...
