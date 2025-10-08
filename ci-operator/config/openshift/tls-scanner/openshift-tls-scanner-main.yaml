@@ -41,43 +41,23 @@ tests:
       cli: latest
       commands: |
         oc create namespace "${NAMESPACE}"
-        oc adm policy add-scc-to-user privileged -z default -n "${NAMESPACE}"
+        oc create serviceaccount tls-scanner -n "${NAMESPACE}"
+        oc adm policy add-scc-to-user privileged -z tls-scanner -n "${NAMESPACE}"
         cat <<EOF | oc apply -f -
-        apiVersion: rbac.authorization.k8s.io/v1
-        kind: ClusterRole
-        metadata:
-          name: tls-scanner-role-${NAMESPACE}
-        rules:
-        - apiGroups: [""]
-          resources: ["pods"]
-          verbs: ["get", "list"]
-        - apiGroups: [""]
-          resources: ["pods/exec"]
-          verbs: ["create"]
-        - apiGroups: ["operator.openshift.io"]
-          resources: ["ingresscontrollers"]
-          verbs: ["get"]
-        - apiGroups: ["config.openshift.io"]
-          resources: ["apiservers"]
-          verbs: ["get"]
-        - apiGroups: ["machineconfiguration.openshift.io"]
-          resources: ["kubeletconfigs"]
-          verbs: ["list"]
-        ---
         apiVersion: rbac.authorization.k8s.io/v1
         kind: ClusterRoleBinding
         metadata:
-          name: tls-scanner-binding-${NAMESPACE}
+          name: tls-scanner-admin-${NAMESPACE}
         subjects:
         - kind: ServiceAccount
-          name: default
+          name: tls-scanner
           namespace: "${NAMESPACE}"
         roleRef:
           kind: ClusterRole
-          name: tls-scanner-role-${NAMESPACE}
+          name: cluster-admin
           apiGroup: rbac.authorization.k8s.io
         EOF
-        sleep 15
+        sleep 30
         mkdir -p "${ARTIFACT_DIR}/tls-scanner"
         /usr/local/bin/tls-scanner -all-pods -csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv" -limit-ips 4
       from: tls-scanner-tool
