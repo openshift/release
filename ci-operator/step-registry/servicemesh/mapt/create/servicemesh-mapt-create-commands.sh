@@ -19,25 +19,24 @@ OUTPUT_CONNECTION_DIR=${SHARED_DIR:-"/workspace"}
 TIMEOUT=${TIMEOUT:-10m}
 
 # Check that required secret files exist
-ls -l /tmp/secrets
-if [ ! -f /tmp/secrets/.awscred ]; then
-  echo "Error: AWS credentials file not found"
+echo "Contents of secrets directory:"
+ls -la /tmp/secrets/
+
+# Look for AWS credentials file - check both possible names
+CRED_FILE=""
+if [ -f "/tmp/secrets/.awscred" ]; then
+  CRED_FILE="/tmp/secrets/.awscred"
+elif [ -f "/tmp/secrets/config" ]; then
+  CRED_FILE="/tmp/secrets/config"
+else
+  echo "Error: AWS credentials file not found (looked for .awscred and config)"
   exit 1
 fi
 
-# AWS credentials
-CRED_FILE="/tmp/secrets/.awscred"
-AWS_ACCESS_KEY_ID=$(awk -v profile="openshift-service-mesh-dev" -v key="aws_access_key_id" '
-  $0 ~ "\\["profile"\\]" { in_profile=1; next }
-  in_profile && $0 ~ "^\\[" { in_profile=0 }
-  in_profile && $1 == key "=" { print $3; exit }
-' "$CRED_FILE")
-AWS_SECRET_ACCESS_KEY=$(awk -v profile="openshift-service-mesh-dev" -v key="aws_secret_access_key" '
-  $0 ~ "\\["profile"\\]" { in_profile=1; next }
-  in_profile && $0 ~ "^\\[" { in_profile=0 }
-  in_profile && $1 == key "=" { print $3; exit }
-' "$CRED_FILE")
-export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+echo "Using credentials file: ${CRED_FILE}"
+
+# Use the standard AWS_SHARED_CREDENTIALS_FILE pattern (most common in CI-Operator)
+export AWS_SHARED_CREDENTIALS_FILE="${CRED_FILE}"
 AWS_REGION=${AWS_REGION:-"us-east-1"}
 export AWS_REGION
 
