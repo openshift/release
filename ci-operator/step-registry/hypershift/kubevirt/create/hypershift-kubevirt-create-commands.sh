@@ -4,6 +4,7 @@ set -exuo pipefail
 
 HCP_CLI="/usr/bin/hcp"
 
+CPO_IMAGE=${CPO_IMAGE:-"quay.io/mgencur/cpo:OCPBUGS-61245"}
 MCE=${MCE_VERSION:-""}
 CLUSTER_NAME=$(echo -n "${PROW_JOB_ID}"|sha256sum|cut -c-20)
 if [[ -n ${MCE} ]] ; then
@@ -85,7 +86,7 @@ EXTRA_ARGS="${EXTRA_ARGS} --infra-storage-class-mapping=gp3-csi/gp3-csi \
 --infra-storage-class-mapping=a-gp3-csi/a-gp3-csi \
 --infra-volumesnapshot-class-mapping=csi-aws-vsc/csi-aws-vsc \
 --infra-volumesnapshot-class-mapping=a-csi-aws-vsc/a-csi-aws-vsc \
---annotations=hypershift.openshift.io/control-plane-operator-image=quay.io/mgencur/cpo:OCPBUGS-61245"
+--annotations=hypershift.openshift.io/control-plane-operator-image=${CPO_IMAGE}"
 
 if [ "$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')" == "AWS" ]; then
   if [ -z "$ETCD_STORAGE_CLASS" ]; then
