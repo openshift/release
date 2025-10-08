@@ -39,6 +39,8 @@ BUCKET_NAME="mapt-${TEST_NAME}-$(date +%s)-$RANDOM$RANDOM"
 export BUCKET_NAME
 echo "Creating S3 bucket: ${BUCKET_NAME}"
 aws s3api create-bucket --bucket ${BUCKET_NAME} --region $AWS_REGION
+# Save the bucket name in SHARED_DIR for use in destroy step
+echo ${BUCKET_NAME} > ${SHARED_DIR}/bucket_name
 echo "S3 bucket ${BUCKET_NAME} created"
 
 # Create pull secret
