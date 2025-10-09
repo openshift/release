@@ -112,7 +112,6 @@ spec:
   installPlanApproval: Automatic
   name: kubevirt-hyperconverged
   source: ${CNV_SUBSCRIPTION_SOURCE}
-  startingCSV: ${STARTING_CSV}
   sourceNamespace: openshift-marketplace
 EOF
 
