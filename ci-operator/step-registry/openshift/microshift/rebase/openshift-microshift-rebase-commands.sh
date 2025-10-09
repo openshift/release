@@ -14,4 +14,7 @@ cp /secrets/import-secret/.dockerconfigjson ${HOME}/.pull-secret.json
 
 cd /go/src/github.com/openshift/microshift/
 DEST_DIR=${HOME}/.local/bin ./scripts/fetch_tools.sh yq
+
+sleep 3600
+
 ./scripts/auto-rebase/rebase_job_entrypoint.sh
