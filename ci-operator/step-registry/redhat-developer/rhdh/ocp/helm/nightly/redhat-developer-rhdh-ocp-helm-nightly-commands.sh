@@ -8,6 +8,11 @@ export OPENSHIFT_PASSWORD
 export OPENSHIFT_API
 export OPENSHIFT_USERNAME
 
+export IS_OPENSHIFT="true"
+echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
+export CONTAINER_PLATFORM="ocp"
+echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
+
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' "$KUBECONFIG")"
 OPENSHIFT_USERNAME="kubeadmin"
 
@@ -38,6 +43,12 @@ echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
 
 echo "Note: This cluster will be automatically deleted 4 hours after being claimed."
 echo "To debug issues or log in to the cluster manually, use the script: .ibm/pipelines/ocp-cluster-claim-login.sh"
+
+if command -v oc &> /dev/null; then
+    CONTAINER_PLATFORM_VERSION=$(oc version 2> /dev/null | grep "Server Version:" | cut -d' ' -f3 | cut -d'.' -f1,2 || echo "unknown")
+    export CONTAINER_PLATFORM_VERSION
+    echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
+fi
 
 oc create serviceaccount tester-sa-2 -n default
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
