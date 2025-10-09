@@ -135,7 +135,7 @@ check_prerequisites() {
     fi
 
     # Check if KubeVirt is installed
-    if ! ${KUBECTL_CMD} api-resources | grep -q kubevirt.io; then
+    if ! ${KUBECTL_CMD} api-resources | grep kubevirt.io; then
         log_error "KubeVirt API resources not found. Please ensure KubeVirt is installed in the cluster."
         exit 1
     fi
