@@ -12,6 +12,9 @@ set -o pipefail
 
 export KUBECONFIG="${SHARED_DIR}/managed-cluster-kubeconfig"
 
+curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /tmp/jq
+chmod +x /tmp/jq
+
 
 # Configuration
 VM_NAME="vmi-ephemeral"
@@ -278,7 +281,7 @@ check_hco_status() {
     log_info "Checking HyperConverged Operator (HCO) status..."
 
     # Check if jq is available
-    if ! command -v jq &> /dev/null; then
+    if ! command -v /tmp/jq &> /dev/null; then
         log_error "jq command not found - required for HCO status parsing"
         return 1
     fi
@@ -299,11 +302,11 @@ check_hco_status() {
 
     # Check for Available condition using jq
     local available
-    available=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Available") | .status' 2>/dev/null || echo "")
+    available=$(echo "${hco_conditions}" | /tmp/jq -r '.[] | select(.type=="Available") | .status' 2>/dev/null || echo "")
     local progressing
-    progressing=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Progressing") | .status' 2>/dev/null || echo "")
+    progressing=$(echo "${hco_conditions}" | /tmp/jq -r '.[] | select(.type=="Progressing") | .status' 2>/dev/null || echo "")
     local degraded
-    degraded=$(echo "${hco_conditions}" | jq -r '.[] | select(.type=="Degraded") | .status' 2>/dev/null || echo "")
+    degraded=$(echo "${hco_conditions}" | /tmp/jq -r '.[] | select(.type=="Degraded") | .status' 2>/dev/null || echo "")
 
     if [[ "${available}" == "True" ]]; then
         log_success "HCO is Available"
