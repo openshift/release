@@ -42,7 +42,6 @@ else
 fi
 
 # Installing hypershift cli
-MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -o jsonpath="{.status.currentVersion}" | awk -F. '{print $1"."$2}')
 HYPERSHIFT_CLI_NAME=hcp
 echo "$(date) Installing hypershift cli"
 mkdir /tmp/${HYPERSHIFT_CLI_NAME}_cli
