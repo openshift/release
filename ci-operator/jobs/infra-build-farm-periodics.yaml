@@ -173,6 +173,114 @@ periodics:
     workdir: true
   interval: 5m
   labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-ipi-deprovision-aws-4
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@aws-ci-admin Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View
+        logs>'
+  spec:
+    containers:
+    - command:
+      - ./core-services/ipi-deprovision/aws.sh
+      env:
+      - name: HOME
+        value: /tmp
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /aws/.awscred
+      - name: CLUSTER_TTL
+        value: 30 minutes ago
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ipi-deprovision_latest
+      imagePullPolicy: Always
+      name: ipi-deprovision
+      resources:
+        requests:
+          cpu: "1"
+          memory: 600Mi
+      volumeMounts:
+      - mountPath: /aws
+        name: cluster-secrets-aws
+    nodeSelector:
+      beta.kubernetes.io/arch: amd64
+    serviceAccountName: ipi-deprovisioner
+    volumes:
+    - name: cluster-secrets-aws
+      secret:
+        items:
+        - key: .awscred
+          path: .awscred
+        secretName: cluster-secrets-aws-4
+- agent: kubernetes
+  cluster: build04
+  decorate: true
+  decoration_config:
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
+  interval: 5m
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-ipi-deprovision-aws-5
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '@aws-ci-admin Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View
+        logs>'
+  spec:
+    containers:
+    - command:
+      - ./core-services/ipi-deprovision/aws.sh
+      env:
+      - name: HOME
+        value: /tmp
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /aws/.awscred
+      - name: CLUSTER_TTL
+        value: 30 minutes ago
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ipi-deprovision_latest
+      imagePullPolicy: Always
+      name: ipi-deprovision
+      resources:
+        requests:
+          cpu: "1"
+          memory: 600Mi
+      volumeMounts:
+      - mountPath: /aws
+        name: cluster-secrets-aws
+    nodeSelector:
+      beta.kubernetes.io/arch: amd64
+    serviceAccountName: ipi-deprovisioner
+    volumes:
+    - name: cluster-secrets-aws
+      secret:
+        items:
+        - key: .awscred
+          path: .awscred
+        secretName: cluster-secrets-aws-5
+- agent: kubernetes
+  cluster: build04
+  decorate: true
+  decoration_config:
+    timeout: 8h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
+  interval: 5m
+  labels:
     ci.openshift.io/role: cloud-gcp
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   max_concurrency: 1
@@ -360,6 +468,12 @@ periodics:
       - mountPath: /cluster-profiles/aws-3
         name: aws-3-token
         readOnly: true
+      - mountPath: /cluster-profiles/aws-4
+        name: aws-4-token
+        readOnly: true
+      - mountPath: /cluster-profiles/aws-5
+        name: aws-5-token
+        readOnly: true
       - mountPath: /kubeconfig
         name: hive
         readOnly: true
@@ -373,6 +487,58 @@ periodics:
     - name: aws-3-token
       secret:
         secretName: cluster-secrets-aws-3
+    - name: aws-4-token
+      secret:
+        secretName: cluster-secrets-aws-4
+    - name: aws-5-token
+      secret:
+        secretName: cluster-secrets-aws-5
     - name: hive
       secret:
         secretName: hypershift-workload-credentials
+- agent: kubernetes
+  cluster: build04
+  cron: '@daily'
+  decorate: true
+  decoration_config:
+    timeout: 1h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-openshift-dptp-4552-clusterpool-pruner
+  reporter_config:
+    slack:
+      channel: '#team-hive-alert'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        succeeded. <!subteam^team-hive-info>{{else}} :failed: Job *{{.Spec.Job}}*
+        failed with *{{.Status.State}}*{{end}} <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - command:
+      - ./core-services/ipi-deprovision/clusterpool-pruner.sh
+      env:
+      - name: KUBECONFIG
+        value: /kubeconfig/kubeconfig
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-yq_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /kubeconfig
+        name: kc
+        readOnly: true
+    serviceAccountName: clusterpool-manager
+    volumes:
+    - name: kc
+      secret:
+        secretName: clusterpool-manager-credentials

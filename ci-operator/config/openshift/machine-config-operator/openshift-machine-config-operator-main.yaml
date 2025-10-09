@@ -112,7 +112,6 @@ tests:
   as: e2e-agent-compact-ipv4
   cluster: build05
   optional: true
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
@@ -172,28 +171,26 @@ tests:
   as: e2e-azure-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
-- as: e2e-azure-ovn-upgrade-out-of-change
+- always_run: false
+  as: e2e-azure-ovn-upgrade-out-of-change
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
 - always_run: false
   as: e2e-aws-serial
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
 - as: verify
   commands: |
@@ -283,9 +280,9 @@ tests:
       timeout: 1h40m0s
     workflow: ipi-gcp
   timeout: 4h0m0s
-- as: e2e-gcp-op-ocl
+- always_run: false
+  as: e2e-gcp-op-ocl
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp
     env:
@@ -320,13 +317,13 @@ tests:
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws-3
-    workflow: openshift-upgrade-aws
-- as: e2e-aws-ovn-upgrade-out-of-change
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
-  steps:
     cluster_profile: aws-2
+    workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-aws-ovn-upgrade-out-of-change
+  optional: true
+  steps:
+    cluster_profile: aws-3
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
@@ -335,7 +332,7 @@ tests:
   as: e2e-aws-ovn-upgrade-ipsec
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-upgrade-ipsec
@@ -343,7 +340,7 @@ tests:
   as: e2e-aws-ovn-serial-ipsec
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws-2
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
@@ -352,7 +349,7 @@ tests:
   as: e2e-aws-workers-rhel8
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws-2
     env:
       PLATFORM_VERSION: "8.10"
     workflow: openshift-e2e-aws-workers-rhel
@@ -360,7 +357,7 @@ tests:
   as: e2e-aws-ovn-workers-rhel8
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws-2
     env:
       PLATFORM_VERSION: "8.10"
     workflow: openshift-e2e-aws-ovn-workers-rhel
@@ -368,7 +365,7 @@ tests:
   as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-disruption
 - always_run: false
   as: e2e-vsphere-ovn-upi
@@ -420,7 +417,7 @@ tests:
   as: e2e-aws-proxy
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-proxy
 - always_run: false
   as: e2e-vsphere
@@ -438,7 +435,7 @@ tests:
   as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-metal-assisted
@@ -463,7 +460,7 @@ tests:
   as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-gcp-rt
@@ -505,7 +502,7 @@ tests:
   as: e2e-aws-upgrade-single-node
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws
     workflow: openshift-upgrade-aws-single-node
 - always_run: false
   as: e2e-openstack
@@ -582,7 +579,7 @@ tests:
   as: e2e-aws-ovn-upgrade-ocb-techpreview
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -630,7 +627,7 @@ tests:
   as: e2e-aws-ovn-ocb-techpreview
   optional: true
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -680,27 +677,27 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
-- as: e2e-aws-ovn-windows
+- always_run: false
+  as: e2e-aws-ovn-windows
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws-2
     env:
       CUSTOM_VXLAN_PORT: "true"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
-- as: e2e-aws-mco-disruptive
+- always_run: false
+  as: e2e-aws-mco-disruptive
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws-5
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: openshift-e2e-aws
-- as: e2e-gcp-mco-disruptive
+- always_run: false
+  as: e2e-gcp-mco-disruptive
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp-3
     env:
