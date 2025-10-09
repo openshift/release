@@ -78,7 +78,6 @@ spec:
     registryPoll:
       interval: 8h
 EOF
-
 fi
 
 oc apply -f - <<EOF
