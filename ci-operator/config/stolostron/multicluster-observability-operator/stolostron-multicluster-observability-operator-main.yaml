@@ -233,17 +233,15 @@ tests:
     test:
     - as: e2e
       commands: |
-        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
-        # kubectl config use-context --kubeconfig ${SHARED_DIR}/hub-1.kc
+        kubectl config use-context --kubeconfig ${SHARED_DIR}/hub-1.kc
         HUB_TOKEN=$(clusteradm get token --use-bootstrap-token)
         HUB_API_SERVER=$(oc whoami --show-server)
         echo "HUB_API_SERVER: ${HUB_API_SERVER}"
-        # HUB_CLUSTER_NAME=hub-1
-        # MANAGED_CLUSTER_NAME=managed-1
-        # kubectl config use-context --kubeconfig ${SHARED_DIR}/managed-1.kc
-        # clusteradm join --hub-token ${HUB_TOKEN} --hub-api-server ${HUB_API_SERVER} --cluster-name ${MANAGED_CLUSTER_NAME}
-        # kubectl config use-context --kubeconfig ${SHARED_DIR}/hub-1.kc
-        # clusteradm accept --clusters ${MANAGED_CLUSTER_NAME}
+        MANAGED_CLUSTER_NAME=spoke
+        kubectl config use-context --kubeconfig ${SHARED_DIR}/managed-1.kc
+        clusteradm join --hub-token ${HUB_TOKEN} --hub-api-server ${HUB_API_SERVER} --cluster-name ${MANAGED_CLUSTER_NAME}
+        kubectl config use-context --kubeconfig ${SHARED_DIR}/hub-1.kc
+        clusteradm accept --clusters ${MANAGED_CLUSTER_NAME}
         echo "ENDPOINT_MONITORING_OPERATOR_IMAGE_REF=$ENDPOINT_MONITORING_OPERATOR_IMAGE_REF"
         echo "GRAFANA_DASHBOARD_LOADER_IMAGE_REF=$GRAFANA_DASHBOARD_LOADER_IMAGE_REF"
         echo "METRICS_COLLECTOR_IMAGE_REF=$METRICS_COLLECTOR_IMAGE_REF"
