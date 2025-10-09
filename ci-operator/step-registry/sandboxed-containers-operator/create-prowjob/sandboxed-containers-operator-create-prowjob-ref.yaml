@@ -1,0 +1,108 @@
+ref:
+  as: sandboxed-containers-operator-create-prowjob
+  # Provides prowjob configuration generation utilities
+  from: upi-installer
+  commands: sandboxed-containers-operator-create-prowjob-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: OCP_VERSION
+    default: "4.19"
+    documentation: |-
+      OpenShift Container Platform version for which to generate the prowjob
+      configuration. Must be in X.Y format (e.g., 4.19, 4.20).
+  - name: AWS_REGION_OVERRIDE
+    default: "us-east-2"
+    documentation: |-
+      AWS region to use for AWS. CoCo requires specific instances no in every region.
+  - name: CUSTOM_AZURE_REGION
+    default: "eastus"
+    documentation: |-
+        Azure region to use for Azure. CoCo requires specific instances no in every region.
+  - name: EXPECTED_OSC_VERSION
+    default: "1.10.1"
+    documentation: |-
+      Expected version of the OpenShift Sandboxed Containers operator from the csv of the operator
+  - name: INSTALL_KATA_RPM
+    default: "true"
+    documentation: |-
+      Whether to install the Kata containers RPM on worker nodes after kataconfig is applied during the test.
+      Set to "false" to skip uploading an rpm and use existing rpm.
+  - name: KATA_RPM_VERSION
+    default: "3.17.0-3.rhaos4.19.el9"
+    documentation: |-
+      Specific version of the Kata containers RPM to upload to worker nodes so it can be installed after kataconfig is applied.
+      INSTALL_KATA_RPM must be true.
+  - name: OSC_CATALOG_TAG
+    default: ""
+    documentation: |-
+      Specific OSC catalog tag to use for Pre-GA testing. If not provided,
+      the script will automatically discover the latest tag matching the
+      pattern X.Y[.Z]-epoch_time from the Quay registry.
+  - name: PROW_RUN_TYPE
+    default: "candidate"
+    documentation: |-
+      Type of Prow job configuration to generate. Use "candidate" for
+      development builds or "release" for production release testing.
+      Valid values: candidate, release.
+  - name: SLEEP_DURATION
+    default: "0h"
+    documentation: |-
+      How long to keep the test cluster alive after tests complete, useful
+      for debugging. Must be 0-12 followed by 'h' (e.g., 2h, 8h).
+  - name: TEST_RELEASE_TYPE
+    default: "Pre-GA"
+    documentation: |-
+      Release type for testing configuration. "Pre-GA" enables development
+      catalog sources and image mirroring for testing unreleased builds.
+      "GA" uses production catalog sources for released versions.
+      Valid values: Pre-GA, GA.
+  - name: TEST_TIMEOUT
+    default: "90"
+    documentation: |-
+      Maximum time in minutes to allow tests to run before terminating the
+      cluster and marking the test as failed. Should be numeric value only.
+      Setting this lower can increase failures on Azure
+  - name: TRUSTEE_CATALOG_SOURCE_IMAGE
+    default: ""
+    documentation: |-
+      Specific Trustee operator catalog image to use for Pre-GA testing.
+      If not provided for Pre-GA, the script will automatically discover
+      the latest image & tag from the Quay registry.
+  - name: TRUSTEE_CATALOG_SOURCE_NAME
+    default: "trustee-catalog"
+    documentation: |-
+      Name of the catalog source for the Trustee operator when using Pre-GA
+      testing. For GA testing, defaults to "redhat-operators".
+  documentation: |-
+    The sandboxed-containers-operator-create-prowjob step generates OpenShift CI
+    prowjob configuration files for the Sandboxed Containers Operator. It creates
+    comprehensive test configurations for multiple cloud providers (AWS, Azure)
+    and workload types (Kata, Peer Pods, Confidential Computing).
+
+    This step is typically used during CI configuration updates to generate new
+    prowjob files when operator versions change, new OCP versions are released,
+    or testing parameters need to be updated.
+
+    The generated configuration includes:
+    - Azure IPI tests for kata, peer-pods, and confidential computing workloads
+    - AWS IPI tests for peer-pods and confidential computing workloads
+    - Automatic catalog source management for Pre-GA vs GA testing
+    - Dynamic discovery of latest catalog tags from Quay registry
+    - Comprehensive environment variable configuration for all test scenarios
+
+    For Pre-GA testing, the step automatically:
+    - Queries Quay API for the latest OSC and Trustee catalog tags
+    - Configures custom catalog sources for development builds
+    - Sets up image mirroring for unreleased operator versions
+
+    For GA testing, the step:
+    - Uses production catalog sources (redhat-operators)
+    - Configures stable, released operator versions
+    - Skips development-specific catalog source creation
+
+    The generated prowjob configuration file must be moved to the appropriate
+    ci-operator config directory and CI configurations must be regenerated
+    using the standard OpenShift release tooling.

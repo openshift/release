@@ -30,7 +30,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.63.4
+    tag: v1.64.8
   nested-environment-builder:
     name: nested-environment-builder
     namespace: ci
@@ -83,10 +83,6 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: installer-kube-apiserver-artifacts
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
@@ -123,9 +119,6 @@ images:
     ocp_4.20_installer-kube-apiserver-artifacts:
       as:
       - registry.ci.openshift.org/ocp/4.20:installer-kube-apiserver-artifacts
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
@@ -141,9 +134,9 @@ images:
     ocp_4.17_hyperkube:
       as:
       - registry.ci.openshift.org/ocp/4.17:hyperkube
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci
   inputs:
@@ -159,9 +152,9 @@ images:
     ocp_4.17_installer-kube-apiserver-artifacts:
       as:
       - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
   inputs:
@@ -177,9 +170,9 @@ images:
     ocp_4.17_installer-kube-apiserver-artifacts:
       as:
       - registry.ci.openshift.org/ocp/4.17:installer-kube-apiserver-artifacts
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   inputs:
@@ -201,9 +194,6 @@ images:
     ocp_4.20_hyperkube:
       as:
       - registry.ci.openshift.org/ocp/4.20:hyperkube
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
@@ -245,8 +235,7 @@ images:
   to: virtctl
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - src-oc
     name: "4.20"
     namespace: ocp
@@ -277,10 +266,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-  aro-unit:
-    requests:
-      cpu: "3"
-      memory: 5Gi
   baremetal-installer:
     requests:
       cpu: "3"
@@ -321,11 +306,6 @@ tests:
   container:
     from: test-bin
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
-- as: aro-unit
-  commands: go test ./pkg/... -tags=aro
-  container:
-    from: src
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^pkg/asset/agent/)
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
   container:
@@ -425,15 +405,22 @@ tests:
     - chain: cucushift-installer-check-cluster-health
   timeout: 4h0m0s
 - always_run: false
-  as: e2e-aws-ovn-user-provisioned-dns
+  as: e2e-aws-custom-dns-techpreview
   optional: true
+  run_if_changed: aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-qe
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
+        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
+        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
+        for a Gateway object \| The HAProxy router should pass the http2 tests \|
+        The HAProxy router should pass the gRPC interoperability tests \| Services
+        should fail health check node port if there are only terminating endpoints
       USER_PROVISIONED_DNS: "yes"
-    workflow: openshift-e2e-aws
+    workflow: openshift-e2e-aws-custom-dns
   timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-upi-proxy
@@ -442,7 +429,8 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-upi-proxy
   timeout: 6h0m0s
-- as: e2e-aws-ovn-shared-vpc-custom-security-groups
+- always_run: false
+  as: e2e-aws-ovn-shared-vpc-custom-security-groups
   optional: true
   run_if_changed: aws
   steps:
@@ -529,7 +517,8 @@ tests:
     cluster_profile: aws-3
     workflow: openshift-installer-manifests-aws-edge-zones
   timeout: 3h0m0s
-- as: e2e-aws-ovn-imdsv2
+- always_run: false
+  as: e2e-aws-ovn-imdsv2
   optional: true
   run_if_changed: aws
   steps:
@@ -607,24 +596,32 @@ tests:
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-gcp-custom-dns
+  as: e2e-gcp-custom-dns-techpreview
   optional: true
+  run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp-qe
     env:
-      FEATURE_GATES: '["GCPClusterHostedDNS=true"]'
-      FEATURE_SET: CustomNoUpgrade
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
+        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
+        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
+        for a Gateway object \| The HAProxy router should pass the http2 tests \|
+        The HAProxy router should pass the gRPC interoperability tests \| Services
+        should fail health check node port if there are only terminating endpoints
       USER_PROVISIONED_DNS: "yes"
     workflow: openshift-e2e-gcp-custom-dns
   timeout: 6h0m0s
-- as: e2e-gcp-secureboot
+- always_run: false
+  as: e2e-gcp-secureboot
   optional: true
   run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-secureboot
   timeout: 6h0m0s
-- as: e2e-gcp-ovn-byo-vpc
+- always_run: false
+  as: e2e-gcp-ovn-byo-vpc
   optional: true
   run_if_changed: (gcp|google)
   steps:
@@ -672,7 +669,8 @@ tests:
         keyC valueC
     workflow: openshift-e2e-azure
   timeout: 6h0m0s
-- as: e2e-azure-ovn-shared-vpc
+- always_run: false
+  as: e2e-azure-ovn-shared-vpc
   optional: true
   run_if_changed: azure
   steps:
@@ -681,7 +679,8 @@ tests:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-sharednetwork
   timeout: 6h0m0s
-- as: e2e-azure-ovn-resourcegroup
+- always_run: false
+  as: e2e-azure-ovn-resourcegroup
   optional: true
   steps:
     cluster_profile: azure4
@@ -723,21 +722,32 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upi
   timeout: 6h0m0s
-- as: e2e-gcp-upi-xpn
+- always_run: false
+  as: e2e-gcp-upi-xpn
   optional: true
   run_if_changed: ^(upi/gcp/.*)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upi-xpn
   timeout: 6h0m0s
-- as: e2e-gcp-ovn-xpn
+- always_run: false
+  as: e2e-gcp-xpn-dedicated-dns-project
+  optional: true
+  run_if_changed: (gcp|google)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-xpn-dedicated-dns-project
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-gcp-ovn-xpn
   optional: true
   run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-xpn
   timeout: 6h0m0s
-- as: e2e-azure-ovn-upi
+- always_run: false
+  as: e2e-azure-ovn-upi
   optional: true
   run_if_changed: ^(upi/(azure|azurestack)/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
@@ -769,7 +779,8 @@ tests:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing
   timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn
+- always_run: false
+  as: e2e-metal-ipi-ovn
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -781,7 +792,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-swapped-hosts
+- always_run: false
+  as: e2e-metal-ipi-ovn-swapped-hosts
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -805,7 +817,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-dualstack
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -817,7 +830,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-virtualmedia
+- always_run: false
+  as: e2e-metal-ipi-ovn-virtualmedia
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -834,7 +848,8 @@ tests:
       CONFIG_TYPE: minimal
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
-- as: e2e-openstack-dualstack-upi
+- always_run: false
+  as: e2e-openstack-dualstack-upi
   optional: true
   run_if_changed: (^images/openstack/)|(^docs/user/openstack/install_upi\.md$)|(^upi/openstack/)
   steps:
@@ -857,7 +872,8 @@ tests:
     cluster_profile: openstack-hwoffload
     workflow: openshift-e2e-openstack-singlestackv6
   timeout: 6h0m0s
-- as: e2e-openstack-proxy
+- always_run: false
+  as: e2e-openstack-proxy
   optional: true
   run_if_changed: openstack
   steps:
@@ -932,13 +948,15 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-externallb-ovn
+- always_run: false
+  as: e2e-vsphere-externallb-ovn
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-externallb
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-techpreview
+- always_run: false
+  as: e2e-vsphere-ovn-techpreview
   optional: true
   run_if_changed: vsphere
   steps:
@@ -949,32 +967,26 @@ tests:
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-host-groups-ovn-custom-no-upgrade
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-vsphere-host-groups
-- as: e2e-vsphere-static-ovn
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: openshift-e2e-vsphere-staticip
-  timeout: 6h0m0s
-- as: e2e-vsphere-ovn-multi-network-techpreview
+- always_run: false
+  as: e2e-vsphere-host-groups-ovn-techpreview
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      MULTI_NIC_IPI: "true"
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-multi-network
+    workflow: openshift-e2e-vsphere-host-groups
+- always_run: false
+  as: e2e-vsphere-static-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-staticip
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-ovn-multi-network
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -984,15 +996,25 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-multi-disk
+- always_run: false
+  as: e2e-vsphere-ovn-multi-disk
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_DISK: "true"
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-ovn-disk-setup-techpreview
   optional: true
   run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
       ADDITIONAL_DISK: "true"
-      FEATURE_GATES: '["VSphereMultiDisk=true"]'
-      FEATURE_SET: CustomNoUpgrade
+      DISK_SETUP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi
@@ -1001,23 +1023,25 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-upi-zones
+- always_run: false
+  as: e2e-vsphere-ovn-upi-zones
   optional: true
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-zones
+- always_run: false
+  as: e2e-vsphere-ovn-zones
   optional: true
   run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-zones-techpreview
+- always_run: false
+  as: e2e-vsphere-ovn-zones-techpreview
   optional: true
-  run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -1043,9 +1067,13 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
+      CSI_MANAGEMENT_REMOVED: "true"
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
+      PERSISTENT_MONITORING: "false"
+      SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
+      TEST_SKIPS: \[sig-storage\]\|\[sig-arch\]\[Early\] Operators low level operators
     workflow: openshift-e2e-vsphere-hybrid-env
   timeout: 6h0m0s
 - always_run: false
@@ -1055,7 +1083,8 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-crc
   timeout: 6h0m0s
-- as: e2e-metal-assisted
+- always_run: false
+  as: e2e-metal-assisted
   cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
@@ -1063,21 +1092,24 @@ tests:
     cluster_profile: packet-assisted
     workflow: assisted-ofcir-baremetal
   timeout: 6h0m0s
-- as: e2e-aws-ovn-single-node
+- always_run: false
+  as: e2e-aws-ovn-single-node
   optional: true
   run_if_changed: aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
   timeout: 6h0m0s
-- as: e2e-metal-single-node-live-iso
+- always_run: false
+  as: e2e-metal-single-node-live-iso
   optional: true
   run_if_changed: (baremetal|metal3|ironic)
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
   timeout: 6h0m0s
-- as: e2e-aws-ovn-fips
+- always_run: false
+  as: e2e-aws-ovn-fips
   optional: true
   run_if_changed: aws
   steps:
@@ -1092,7 +1124,8 @@ tests:
     - ref: openshift-e2e-test
     workflow: ipi-aws
   timeout: 6h0m0s
-- as: e2e-azurestack
+- always_run: false
+  as: e2e-azurestack
   cluster: build01
   optional: true
   run_if_changed: (azure|azurestack)
@@ -1100,7 +1133,8 @@ tests:
     cluster_profile: azurestack-dev
     workflow: openshift-e2e-azurestack
   timeout: 6h0m0s
-- as: e2e-azurestack-upi
+- always_run: false
+  as: e2e-azurestack-upi
   cluster: build01
   optional: true
   run_if_changed: ^(upi/(azure|azurestack)/.*)
@@ -1108,14 +1142,16 @@ tests:
     cluster_profile: azurestack-dev
     workflow: openshift-e2e-azurestack-upi
   timeout: 6h0m0s
-- as: e2e-ibmcloud-ovn
+- always_run: false
+  as: e2e-ibmcloud-ovn
   optional: true
   run_if_changed: ibmcloud
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
   timeout: 6h0m0s
-- as: e2e-nutanix-ovn
+- always_run: false
+  as: e2e-nutanix-ovn
   cluster: build01
   optional: true
   run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
@@ -1177,7 +1213,8 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
-- as: e2e-agent-compact-ipv4-none-platform
+- always_run: false
+  as: e2e-agent-compact-ipv4-none-platform
   cluster: build05
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
@@ -1190,7 +1227,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
-- as: e2e-agent-compact-ipv4-appliance-diskimage
+- always_run: false
+  as: e2e-agent-compact-ipv4-appliance-diskimage
   cluster: build05
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
@@ -1199,7 +1237,8 @@ tests:
     cluster_profile: packet-assisted
     workflow: agent-e2e-appliance-ipv4
   timeout: 6h0m0s
-- as: e2e-agent-sno-ipv6
+- always_run: false
+  as: e2e-agent-sno-ipv6
   cluster: build05
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
@@ -1207,7 +1246,8 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-sno-ipv6
   timeout: 6h0m0s
-- as: e2e-agent-sno-ipv4-pxe
+- always_run: false
+  as: e2e-agent-sno-ipv4-pxe
   cluster: build05
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
@@ -1219,7 +1259,8 @@ tests:
         AGENT_E2E_TEST_BOOT_MODE=PXE
     workflow: agent-e2e-generic
   timeout: 6h0m0s
-- as: e2e-agent-ha-dualstack
+- always_run: false
+  as: e2e-agent-ha-dualstack
   cluster: build05
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
@@ -1227,7 +1268,8 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-ha-dualstack
   timeout: 6h0m0s
-- as: e2e-agent-4control-ipv4
+- always_run: false
+  as: e2e-agent-4control-ipv4
   cluster: build05
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
@@ -1239,7 +1281,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: agent-e2e-generic
   timeout: 6h0m0s
-- as: e2e-agent-5control-ipv4
+- always_run: false
+  as: e2e-agent-5control-ipv4
   cluster: build05
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
@@ -1251,7 +1294,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: agent-e2e-generic
   timeout: 6h0m0s
-- as: e2e-agent-compact-ipv6-minimaliso
+- always_run: false
+  as: e2e-agent-compact-ipv6-minimaliso
   cluster: build05
   optional: true
   run_if_changed: ^(cmd|pkg|data).*/agent/
@@ -1264,7 +1308,17 @@ tests:
         AGENT_MINIMAL_ISO=true
     workflow: agent-e2e-generic
   timeout: 6h0m0s
-- as: e2e-aws-ovn-public-subnets
+- always_run: false
+  as: e2e-agent-compact-ipv4-iso-no-registry
+  cluster: build05
+  optional: true
+  run_if_changed: ^(cmd|pkg|data).*/agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4-iso-no-registry
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-aws-ovn-public-subnets
   optional: true
   run_if_changed: /aws/subnet.go
   steps:
@@ -1324,7 +1378,13 @@ tests:
     post:
     - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-private-provision
+    - ref: gcp-provision-vpc
+    - ref: ignition-bastionhost
+    - ref: gcp-provision-bastionhost
+    - ref: proxy-config-generate
+    - chain: ipi-conf-gcp
+    - chain: ipi-install
+    - ref: cucushift-installer-check-gcp-private
     test:
     - chain: cucushift-installer-check-cluster-health
   timeout: 6h0m0s
@@ -1375,7 +1435,8 @@ tests:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
   timeout: 6h0m0s
-- as: e2e-aws-ovn-heterogeneous
+- always_run: false
+  as: e2e-aws-ovn-heterogeneous
   optional: true
   run_if_changed: aws
   steps:
@@ -1456,13 +1517,14 @@ tests:
       OUTBOUND_TYPE: NATGatewaySingleZone
     workflow: openshift-e2e-azure
   timeout: 6h0m0s
-- as: e2e-gcp-custom-endpoints
+- always_run: false
+  as: e2e-gcp-custom-endpoints
   optional: true
   run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp
     env:
-      FEATURE_GATES: '["GCPCustomAPIEndpoints=true"]'
+      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-gcp-custom-endpoints
   timeout: 6h0m0s

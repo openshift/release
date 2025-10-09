@@ -59,7 +59,10 @@ items:
       app: prow
       component: payload-testing-prow-plugin
     annotations:
-      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"payload-testing-prow-plugin:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"payload-testing-prow-plugin\")].image"}]'
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 5m"
     namespace: ci
   spec:
     replicas: 1
@@ -86,6 +89,7 @@ items:
           - --depth=1
           - --link=release
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          imagePullPolicy: Always
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
@@ -101,6 +105,7 @@ items:
           - --max-failures=3
           - --link=release
           image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          imagePullPolicy: Always
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
@@ -109,7 +114,8 @@ items:
               memory: "1Gi"
               cpu: "0.5"
         - name: payload-testing-prow-plugin
-          image: ' '
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_payload-testing-prow-plugin_latest
+          imagePullPolicy: Always
           args:
           - --endpoint=/
           - --hmac-secret-file=/etc/webhook/hmac.yaml
@@ -120,6 +126,7 @@ items:
           - --github-app-private-key-path=/etc/github/cert
           - --ci-op-config-dir=/var/repo/release/ci-operator/config
           - --log-level=debug
+          - --trusted-app=openshift-pr-manager[bot]
           env:
           - name: GITHUB_APP_ID
             valueFrom:

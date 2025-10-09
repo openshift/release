@@ -181,6 +181,12 @@ else
 	declare -g OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP
 	OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP=""
 fi
+# For ppc64le s2s leases, generate Infra ID truncates the cluster name, which also removes the lease identifier.
+# To ensure the lease name is preserved for post-cleanup, this workaround replaces the new truncated value with the original lease value.
+if [[ "${LEASED_RESOURCE}" == *ppc64le* ]]; then
+	pattern="$(echo "$LEASED_RESOURCE" | sed 's/-[^-]*$/-/')[a-zA-Z0-9]{5}"
+	find "$dir" -type f -exec sed -i -E "s/${pattern}/${LEASED_RESOURCE}/g" {} +
+fi
 
 RCFILE=$(mktemp)
 {

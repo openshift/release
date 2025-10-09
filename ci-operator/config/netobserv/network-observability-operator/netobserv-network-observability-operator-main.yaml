@@ -1,4 +1,8 @@
 base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
   flowlogs-pipeline:
     name: flowlogs-pipeline
     namespace: netobserv
@@ -11,10 +15,6 @@ base_images:
     name: network-observability-console-plugin
     namespace: netobserv
     tag: ci
-  operator-sdk:
-    name: "4.18"
-    namespace: origin
-    tag: operator-sdk
   ubi:
     name: ubi-minimal
     namespace: ocp
@@ -48,7 +48,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -60,18 +60,19 @@ tests:
 - as: e2e-operator
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    dependencies:
+      OO_BUNDLE: noo-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-netobserv-operator
+      OO_SECURITY_CONTEXT: restricted
     test:
     - as: install
       cli: latest
       commands: |
-        oc create ns openshift-netobserv-operator
-        operator-sdk run bundle "$OO_BUNDLE" -n openshift-netobserv-operator --verbose --security-context-config restricted
         oc wait deployment --for condition=Available --timeout=120s netobserv-controller-manager -n openshift-netobserv-operator
-      dependencies:
-      - env: OO_BUNDLE
-        name: noo-bundle
-      from: operator-sdk
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -84,9 +85,11 @@ tests:
         if ! which kubectl; then
           ln -s "$(which oc)" ${HOME}/kubectl
         fi
+        # patch as Downstream to scrape metrics
+        echo "====> Patching CSV to scrape metrics"
+        CSV=$(oc get csv -n openshift-netobserv-operator | grep -E "net.*observ" | awk '{print $1}')
+        oc patch csv/$CSV -n openshift-netobserv-operator --type='json' -p='[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/4/value", "value": "true"}]'
 
-        export CSV=$(oc get csv -n openshift-netobserv-operator | grep -E "net.*observ" | awk '{print $1}')
-        make set-release-kind-downstream
         export NAMESPACE=netobserv
         PORT_FWD=false make deploy-loki
         oc apply -f /go/src/github.com/netobserv/network-observability-operator/config/samples/flows_v1beta2_flowcollector.yaml
@@ -114,7 +117,7 @@ tests:
         timeout=0
         rc=1
         while [ $timeout -lt 180 ]; do
-          status=$(oc get flowcollector/cluster -o jsonpath='{.status.conditions[0].reason}' -n netobserv)
+          status=$(oc get flowcollector/cluster -o jsonpath='{.status.conditions[0].reason}')
           if [[ $status == "Ready" ]]; then
             rc=0
             break
@@ -127,13 +130,34 @@ tests:
           exit $rc
         fi
 
+
+        # Query metrics from Prometheus using in-cluster service URL
+        THANOS_URL=$(oc get route thanos-querier -n openshift-monitoring -o jsonpath='{.spec.host}')
+
+        timeout=0
+        rc=1
+        while [ $timeout -lt 180 ]; do
+          result=$(curl -s -k -H "Authorization: Bearer $(oc create token prometheus-k8s -n openshift-monitoring)" "https://${THANOS_URL}/api/v1/query?query=netobserv_ingest_flows_processed" | jq -r '.data.result[0].value[1]')
+          if [[ -n "$result" && "$result" != "null" ]]; then
+            echo "Metric netobserv_ingest_flows_processed found: $result"
+            rc=0
+            break
+          fi
+          sleep 10
+          timeout=$((timeout+10))
+        done
+        if [ "${rc}" == 1 ]; then
+          echo "Metric netobserv_ingest_flows_processed not found after 180 secs!!!"
+          exit $rc
+        fi
+
         echo "====> Deleting flowcollector"
         oc delete flowcollector/cluster
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: netobserv

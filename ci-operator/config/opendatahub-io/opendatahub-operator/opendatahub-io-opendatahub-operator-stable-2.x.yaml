@@ -1,0 +1,90 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+  ubi:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.20
+images:
+- context_dir: .
+  dockerfile_path: Dockerfiles/Dockerfile
+  from: ubi
+  to: opendatahub-operator
+operator:
+  bundles:
+  - as: opendatahub-operator-bundle
+    dockerfile_path: Dockerfiles/bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: REPLACE_IMAGE:latest
+    with: pipeline:opendatahub-operator
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: opendatahub-operator-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: opendatahub-operator
+    env:
+      IMAGE_REPO: opendatahub-operator
+    workflow: opendatahub-io-ci-image-mirror
+- as: opendatahub-operator-image-mirror
+  postsubmit: true
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: opendatahub-operator
+    env:
+      IMAGE_REPO: opendatahub-operator
+      RELEASE_VERSION: stable-2.x
+    workflow: opendatahub-io-ci-image-mirror
+- as: opendatahub-operator-e2e
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-opendatahub
+    dependencies:
+      OO_BUNDLE: opendatahub-operator-bundle
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.18.22-multi
+      HYPERSHIFT_NODE_COUNT: "3"
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-operators
+      USE_HOSTED_KUBECONFIG: "true"
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        make e2e-test -e E2E_TEST_FLAGS="-timeout 60m" -e OPERATOR_NAMESPACE=openshift-operators
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: opendatahub-io-hypershift
+zz_generated_metadata:
+  branch: stable-2.x
+  org: opendatahub-io
+  repo: opendatahub-operator

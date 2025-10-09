@@ -26,8 +26,7 @@ images:
   to: openshift-controller-manager
 promotion:
   to:
-  - disabled: true
-    name: "4.20"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -73,15 +72,15 @@ tests:
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-builds
-- as: e2e-aws-ovn-proxy
+- always_run: false
+  as: e2e-aws-ovn-proxy
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
-- as: openshift-e2e-aws-ovn-builds-techpreview
+- always_run: false
+  as: openshift-e2e-aws-ovn-builds-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-3
     env:
@@ -113,6 +112,21 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- as: e2e-tests-extension
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: tests-extension
+      commands: |
+        echo "Build binary openshift-controller-manager-tests-ext"
+        make tests-ext-build
+        echo "Running ./openshift-controller-manager-tests-ext with suite"
+        ./openshift-controller-manager-tests-ext run-suite openshift/openshift-controller-manager/all -j ${ARTIFACT_DIR}/junit_$(shell date +%Y%m%d-%H%M%S).xml
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-serial
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

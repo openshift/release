@@ -3,6 +3,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: installer
+  previous-lca:
+    name: "4.19"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -31,11 +35,13 @@ releases:
     integration:
       name: "4.20"
       namespace: ocp
+      reference_policy: Local
   latest:
     integration:
       include_built_images: true
       name: "4.20"
       namespace: ocp
+      reference_policy: Local
 resources:
   '*':
     limits:
@@ -100,10 +106,11 @@ tests:
   optional: true
   skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     dependencies:
       LCA_PULL_REF: lifecycle-agent-operator
       OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
+      TARGET_LCA_REF: pipeline:previous-lca
     env:
       OCP_BASE_IMAGE_SOURCE: ci
       OCP_BASE_VERSION: "4.20"
@@ -123,7 +130,7 @@ tests:
       OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
     env:
       OCP_BASE_IMAGE_SOURCE: ci
-      OCP_BASE_VERSION: "4.19"
+      OCP_BASE_VERSION: "4.20"
       SEED_IMAGE_TAG_FORMAT: presubmit
       SEED_IMAGE_TAG_PREFIX: ibi
     workflow: openshift-image-based-install

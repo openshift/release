@@ -26,7 +26,8 @@ images:
   to: custom-metrics-autoscaler-tests
 promotion:
   to:
-  - name: 4.21-priv
+  - disabled: true
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
@@ -58,6 +59,7 @@ tests:
   commands: env && GOFLAGS="" hack/cma-verify-history.sh
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: clientset-verify
   commands: mkdir /tmp/codecopy && cp -a . /tmp/codecopy && cd /tmp/codecopy && make
     clientset-generate
@@ -71,11 +73,11 @@ tests:
     env:
       PROJECT_NAME: kedacore-keda
     workflow: openshift-ci-security
-- as: keda-e2e-aws-ovn
+- always_run: false
+  as: keda-e2e-aws-ovn
   optional: true
-  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     pre:
     - chain: ipi-aws-pre
     test:

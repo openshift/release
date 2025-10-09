@@ -3,40 +3,40 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.20_base-rhel9:
-    name: 4.20-priv
+  ocp_4.21_base-rhel9:
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   from_repository: true
 canonical_go_repository: github.com/metal3-io/baremetal-operator
 images:
 - dockerfile_path: Dockerfile.ocp
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: baremetal-operator
 promotion:
   to:
-  - name: 4.20-priv
+  - name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -59,7 +59,8 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(docs|examples)/)|(\.md$)|((^|/)OWNERS$)
-- as: e2e-metal-ipi-bm
+- always_run: false
+  as: e2e-metal-ipi-bm
   cluster: build05
   optional: true
   steps:
@@ -67,31 +68,36 @@ tests:
     env:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ovn-ipv4
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ipv4
   cluster: build05
   skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
-- as: e2e-metal-ipi-ovn-dualstack
+  timeout: 5h0m0s
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
   cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-virtualmedia
   cluster: build05
   skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
+  timeout: 5h0m0s
 - as: verify-deps
   steps:
     env:

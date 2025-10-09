@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: base
   base-machine:
@@ -8,19 +8,19 @@ base_images:
     namespace: openshift
     tag: stream9
   cli:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: cli
   cloud-provider-aws-rpms:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: cloud-provider-aws-rpms
   cloud-provider-azure-rpms:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: cloud-provider-azure-rpms
   cloud-provider-gcp-rpms:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: cloud-provider-gcp-rpms
   commitchecker:
@@ -40,27 +40,35 @@ base_images:
     namespace: hypershift
     tag: latest
   oc-rpms:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: oc-rpms
   ocp_4.20_base-rhel9:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_4.20_tools:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: tools
+  ocp_4.21_base-rhel9:
+    name: 4.21-priv
+    namespace: ocp-private
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
   rhel-coreos-base:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: rhel-coreos
   tools:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: tools
 binary_build_commands: openshift-hack/build-go.sh
@@ -127,9 +135,15 @@ images:
     ocp_4.20_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: pod
 - dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
   inputs:
@@ -146,7 +160,7 @@ promotion:
       artifacts: artifacts
     excluded_images:
     - rhel-coreos
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
   - additional_images:
       artifacts: artifacts
@@ -209,12 +223,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -297,7 +311,8 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-kubernetes-e2e-gcp
-- as: k8s-e2e-gcp-five-control-plane-replicas
+- always_run: false
+  as: k8s-e2e-gcp-five-control-plane-replicas
   optional: true
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -311,68 +326,79 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-kubernetes-e2e-gcp-serial
-- as: k8s-e2e-aws
-  optional: true
-  steps:
-    cluster_profile: aws-2
-    workflow: openshift-kubernetes-e2e-aws
-- as: k8s-e2e-aws-ovn-serial
-  optional: true
-  steps:
-    cluster_profile: aws-2
-    workflow: openshift-kubernetes-e2e-aws-serial
-- as: e2e-aws
+- always_run: false
+  as: k8s-e2e-aws
   optional: true
   steps:
     cluster_profile: aws-3
+    workflow: openshift-kubernetes-e2e-aws
+- always_run: false
+  as: k8s-e2e-aws-ovn-serial
+  optional: true
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-kubernetes-e2e-aws-serial
+- always_run: false
+  as: e2e-aws
+  optional: true
+  steps:
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-gcp
   steps:
     cluster_profile: gcp-3
     workflow: openshift-e2e-gcp
-- as: e2e-aws-ovn
-  optional: true
-  steps:
-    cluster_profile: aws-3
-    workflow: openshift-e2e-aws-ovn
-- as: e2e-aws-ovn-techpreview
+- always_run: false
+  as: e2e-aws-ovn
   optional: true
   steps:
     cluster_profile: aws-2
+    workflow: openshift-e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-techpreview-serial
+- always_run: false
+  as: e2e-aws-ovn-techpreview-serial
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-serial
   timeout: 6h0m0s
-- as: e2e-azure
+- always_run: false
+  as: e2e-azure
   optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
-- as: e2e-agnostic-ovn-cmd
+- always_run: false
+  as: e2e-agnostic-ovn-cmd
   optional: true
   steps:
     cluster_profile: azure4
     env:
       TEST_SUITE: openshift/test-cmd
     workflow: openshift-e2e-azure
-- as: e2e-aws-disruptive
+- always_run: false
+  as: e2e-aws-disruptive
   optional: true
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws-disruption
-- as: e2e-aws-jenkins
+- always_run: false
+  as: e2e-aws-jenkins
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws-jenkins
-- as: e2e-gcp-ovn-upgrade
+- always_run: false
+  as: e2e-gcp-ovn-upgrade
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     observers:
@@ -387,12 +413,12 @@ tests:
 - as: e2e-azure-ovn-upgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     workflow: openshift-upgrade-azure
 - as: e2e-aws-ovn-downgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
@@ -402,12 +428,14 @@ tests:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws-serial
   timeout: 5h0m0s
-- as: e2e-aws-csi
+- always_run: false
+  as: e2e-aws-csi
   optional: true
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-csi
-- as: e2e-vsphere
+- always_run: false
+  as: e2e-vsphere
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -416,7 +444,7 @@ tests:
     workflow: openshift-e2e-vsphere
 - as: k8s-e2e-conformance-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       cli: latest
@@ -428,7 +456,6 @@ tests:
     workflow: ipi-aws
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
-  optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -436,7 +463,9 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-ovn-dualstack
+  timeout: 5h30m0s
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
   cluster: build05
   optional: true
   steps:
@@ -446,9 +475,10 @@ tests:
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: configmap-scale
+- always_run: false
+  as: configmap-scale
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-perfscale-e2e-configmap-scale
 - as: e2e-aws-ovn-fips
   steps:
@@ -467,12 +497,14 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-single-node
+- always_run: false
+  as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-single-node
-- as: e2e-openstack
+- always_run: false
+  as: e2e-openstack
   optional: true
   run_if_changed: ^(staging/src/k8s.io/legacy-cloud-providers/openstack)
   steps:
@@ -482,19 +514,21 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-csi-cinder
+- always_run: false
+  as: e2e-openstack-csi-cinder
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-csi-cinder
-- as: e2e-openstack-csi-manila
+- always_run: false
+  as: e2e-openstack-csi-manila
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-csi-manila
 - as: e2e-aws-ovn-cgroupsv2
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-cgroupsv2
 - as: e2e-aws-ovn-crun
   steps:
@@ -505,6 +539,7 @@ tests:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws-runc
 - as: e2e-aws-crun-wasm
+  skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|SECURITY_CONTACTS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-crun-wasm

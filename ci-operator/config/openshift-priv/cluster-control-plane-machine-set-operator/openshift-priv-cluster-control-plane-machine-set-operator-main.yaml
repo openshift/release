@@ -1,6 +1,6 @@
 base_images:
   ocp_4.20_base-rhel9:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
@@ -28,7 +28,7 @@ promotion:
   to:
   - additional_images:
       cluster-control-plane-machine-set-tests: src
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   arm64-latest:
@@ -36,15 +36,15 @@ releases:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
   initial:
     integration:
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -81,23 +81,23 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-serial
   shard_count: 2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     test:
     - as: test
       commands: |
@@ -112,7 +112,7 @@ tests:
 - as: e2e-aws-operator-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -126,11 +126,12 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 6h0m0s
-- as: e2e-aws-periodic-pre
+- always_run: false
+  as: e2e-aws-periodic-pre
   optional: true
   run_if_changed: .*periodic.*
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       commands: |
@@ -142,11 +143,12 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 6h0m0s
-- as: e2e-aws-periodic-pre-techpreview
+- always_run: false
+  as: e2e-aws-periodic-pre-techpreview
   optional: true
   run_if_changed: .*periodic.*
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -160,7 +162,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 6h0m0s
-- as: e2e-azure-operator
+- always_run: false
+  as: e2e-azure-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*azure.*
   steps:
@@ -176,7 +179,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-azure
   timeout: 6h0m0s
-- as: e2e-azure-periodic-pre
+- always_run: false
+  as: e2e-azure-periodic-pre
   optional: true
   run_if_changed: .*periodic.*|.*azure.*
   steps:
@@ -192,7 +196,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-azure
   timeout: 6h0m0s
-- as: e2e-azure-periodic-pre-techpreview
+- always_run: false
+  as: e2e-azure-periodic-pre-techpreview
   optional: true
   run_if_changed: .*periodic.*|.*azure.*
   steps:
@@ -210,7 +215,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-azure
   timeout: 6h0m0s
-- as: e2e-gcp-operator
+- always_run: false
+  as: e2e-gcp-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*gcp.*
   steps:
@@ -226,7 +232,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-gcp
   timeout: 6h0m0s
-- as: e2e-gcp-periodic-pre
+- always_run: false
+  as: e2e-gcp-periodic-pre
   optional: true
   run_if_changed: .*periodic.*|.*gcp.*
   steps:
@@ -242,7 +249,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-gcp
   timeout: 6h0m0s
-- as: e2e-gcp-periodic-pre-techpreview
+- always_run: false
+  as: e2e-gcp-periodic-pre-techpreview
   optional: true
   run_if_changed: .*periodic.*|.*gcp.*
   steps:
@@ -260,7 +268,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-gcp
   timeout: 6h0m0s
-- as: e2e-vsphere-operator
+- always_run: false
+  as: e2e-vsphere-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
@@ -276,7 +285,8 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-multi-zone-operator
+- always_run: false
+  as: e2e-vsphere-multi-zone-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
@@ -292,7 +302,8 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
-- as: e2e-vsphere-multi-vcenter-operator
+- always_run: false
+  as: e2e-vsphere-multi-vcenter-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
@@ -311,7 +322,8 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-vsphere-multi-vcenter
   timeout: 6h0m0s
-- as: e2e-vsphere-operator-periodic-pre
+- always_run: false
+  as: e2e-vsphere-operator-periodic-pre
   optional: true
   run_if_changed: .*periodic.*|.*vsphere.*
   steps:
@@ -327,7 +339,8 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-vsphere-operator-periodic-pre-techpreview
+- always_run: false
+  as: e2e-vsphere-operator-periodic-pre-techpreview
   optional: true
   run_if_changed: .*periodic.*|.*vsphere.*
   steps:
@@ -345,7 +358,8 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
-- as: e2e-openstack-operator
+- always_run: false
+  as: e2e-openstack-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*
   steps:
@@ -362,7 +376,8 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
-- as: e2e-openstack-operator-zone
+- always_run: false
+  as: e2e-openstack-operator-zone
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*
   steps:
@@ -380,7 +395,8 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
-- as: e2e-openstack-periodic-pre
+- always_run: false
+  as: e2e-openstack-periodic-pre
   optional: true
   run_if_changed: .*periodic.*|.*openstack.*
   steps:
@@ -397,7 +413,8 @@ tests:
       timeout: 4h0m0s
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
-- as: e2e-openstack-periodic-pre-techpreview
+- always_run: false
+  as: e2e-openstack-periodic-pre-techpreview
   optional: true
   run_if_changed: .*periodic.*|.*openstack.*
   steps:
@@ -419,27 +436,31 @@ tests:
 - as: e2e-aws-ovn-etcd-scaling
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-etcd-scaling
-- as: e2e-gcp-ovn-etcd-scaling
+- always_run: false
+  as: e2e-gcp-ovn-etcd-scaling
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*gcp.*
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-etcd-scaling
-- as: e2e-azure-ovn-etcd-scaling
+- always_run: false
+  as: e2e-azure-ovn-etcd-scaling
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*azure.*
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-etcd-scaling
-- as: e2e-vsphere-ovn-etcd-scaling
+- always_run: false
+  as: e2e-vsphere-ovn-etcd-scaling
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
-- as: e2e-nutanix-ovn
+- always_run: false
+  as: e2e-nutanix-ovn
   cluster: build01
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*nutanix.*
@@ -460,7 +481,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       TEST_FILTERS: NonHyperShiftHOST&;cpms;CPMS
       TEST_SCENARIOS: Cluster_Infrastructure
@@ -469,12 +490,6 @@ tests:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 7h30m0s
-- as: security
-  steps:
-    env:
-      PROJECT_NAME: cluster-control-plane-machineset-operator
-    workflow: openshift-ci-security
-  timeout: 7h45m0s
 - as: verify-deps
   steps:
     env:

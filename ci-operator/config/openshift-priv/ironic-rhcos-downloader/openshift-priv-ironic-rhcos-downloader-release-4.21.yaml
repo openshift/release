@@ -7,10 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-base-openshift-4.14
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ironic-rhcos-downloader
@@ -18,13 +18,14 @@ images:
 - dockerfile_path: Dockerfile.ocp
   from: ocp_builder_rhel-9-base-openshift-4.14
   inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: ironic-machine-os-downloader
 promotion:
   to:
-  - name: 4.21-priv
+  - disabled: true
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
@@ -48,32 +49,36 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv4
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ipv4
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
-- as: e2e-metal-ipi-ovn-dualstack
+  timeout: 5h0m0s
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
   cluster: build05
   optional: true
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-virtualmedia
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
+  timeout: 5h0m0s
 - as: verify-deps
   steps:
     env:

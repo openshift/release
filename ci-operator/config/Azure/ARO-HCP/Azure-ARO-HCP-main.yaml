@@ -1,3 +1,8 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 binary_build_commands: make -C backend backend
 build_root:
   image_stream_tag:
@@ -14,6 +19,27 @@ images:
     RUN dnf install -y azure-cli libicu
   from: src
   to: src-plus-az
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    USER root
+    # allow anyone to create content in GOPATH so we can go install stuff
+    RUN chmod 777 /opt/app-root
+    RUN dnf install -y git go make
+    RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+    RUN dnf install -y pass || true
+    RUN dnf install -y qrencode || true
+    RUN dnf install -y net-tools || true
+    RUN dnf install -y https://rpmfind.net/linux/centos-stream/9-stream/BaseOS/x86_64/os/Packages/tree-1.8.0-10.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-libs-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/p/pass-1.7.4-16.el9.noarch.rpm || true
+    RUN dnf clean all
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/Azure/ARO-HCP
+  to: nested-podman-src
 resources:
   '*':
     limits:
@@ -23,20 +49,77 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make test-compile
 tests:
+- always_run: true
+  as: frontend-simulation
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  steps:
+    test:
+    - ref: aro-hcp-frontend-run-simulation-tests
 - always_run: false
   as: create-aro-hcp-in-integration
   run_if_changed: ^(demo)
   steps:
     env:
       CLUSTER_NAME: premerge-integration-cluster-2
-      CUSTOMER_RG_NAME: premerge-integration-customer-rg
+      CUSTOMER_RESOURCE_GROUP_PREFIX: premerge-integration-customer-rg
       LOCATION: uksouth
       SUBSCRIPTION: ARO SRE Team - INT (EA Subscription 3)
     post:
     - ref: aro-hcp-provision-aro-hcp-gather-extra
     - chain: aro-hcp-provision-teardown-cluster
+    pre:
+    - ref: aro-hcp-provision-generate-resource-group-name
     test:
     - chain: aro-hcp-provision-create-functional-cluster
+- always_run: false
+  as: create-aro-hcp-in-stage
+  optional: true
+  run_if_changed: ^(demo)
+  steps:
+    env:
+      CLUSTER_NAME: premerge-stage-cluster
+      CUSTOMER_RESOURCE_GROUP_PREFIX: premerge-stage-customer-rg
+      LOCATION: uksouth
+      SUBSCRIPTION: ARO HCP - STAGE testing (EA Subscription)
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    pre:
+    - ref: aro-hcp-provision-generate-resource-group-name
+    test:
+    - chain: aro-hcp-provision-create-functional-cluster
+- always_run: false
+  as: create-aro-hcp-in-prod
+  optional: true
+  run_if_changed: ^(demo)
+  steps:
+    env:
+      CLUSTER_NAME: premerge-prod-cluster
+      CUSTOMER_RESOURCE_GROUP_PREFIX: premerge-prod-customer-rg
+      LOCATION: uksouth
+      SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    pre:
+    - ref: aro-hcp-provision-generate-resource-group-name
+    test:
+    - chain: aro-hcp-provision-create-functional-cluster
+- always_run: false
+  as: skip-cleanup-integration-e2e-parallel
+  optional: true
+  steps:
+    env:
+      ARO_E2E_SKIP_CLEANUP: "true"
+      ARO_HCP_SUITE_NAME: integration/parallel
+      CUSTOMER_SUBSCRIPTION: ARO SRE Team - INT (EA Subscription 3)
+      LOCATION: uksouth
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    test:
+    - ref: aro-hcp-tests-run-aro-hcp-tests
 - always_run: false
   as: integration-e2e-parallel
   optional: true
@@ -48,6 +131,35 @@ tests:
       LOCATION: uksouth
     post:
     - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    test:
+    - ref: aro-hcp-tests-run-aro-hcp-tests
+- always_run: false
+  as: stage-e2e-parallel
+  optional: true
+  run_if_changed: ^(test|demo)
+  steps:
+    env:
+      ARO_HCP_SUITE_NAME: stage/parallel
+      CUSTOMER_SUBSCRIPTION: ARO HCP - STAGE testing (EA Subscription)
+      LOCATION: uksouth
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
+    test:
+    - ref: aro-hcp-tests-run-aro-hcp-tests
+- always_run: false
+  as: prod-e2e-parallel
+  optional: true
+  run_if_changed: ^(test|demo)
+  steps:
+    env:
+      ARO_HCP_SUITE_NAME: prod/parallel
+      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+      LOCATION: uksouth
+    post:
+    - ref: aro-hcp-provision-aro-hcp-gather-extra
+    - chain: aro-hcp-provision-teardown-cluster
     test:
     - ref: aro-hcp-tests-run-aro-hcp-tests
 zz_generated_metadata:

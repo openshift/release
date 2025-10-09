@@ -17,7 +17,7 @@ function queue() {
 
 function deprovision() {
   WORKDIR="${1}"
-  timeout --signal=SIGQUIT 60m openshift-install --dir "${WORKDIR}" --log-level error destroy cluster && touch "${WORKDIR}/success" || touch "${WORKDIR}/failure"
+  timeout --signal=SIGTERM 60m openshift-install --dir "${WORKDIR}" --log-level error destroy cluster && touch "${WORKDIR}/success" || touch "${WORKDIR}/failure"
 }
 
 logdir="${ARTIFACTS}/deprovision"
@@ -52,6 +52,9 @@ for network in $( gcloud --project="${GCP_PROJECT}" compute networks list --filt
 EOF
   echo "will deprovision GCE cluster ${infraID} in region ${region}"
 done
+
+# log installer version for debugging purposes
+openshift-install version
 
 clusters=$( find "${logdir}" -mindepth 1 -type d )
 for workdir in $(shuf <<< ${clusters}); do

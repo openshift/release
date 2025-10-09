@@ -15,14 +15,14 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.19_base-rhel9:
+  ocp_4.20_base-rhel9:
     name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
   tests-private:
     name: tests-private
     namespace: ci
@@ -34,17 +34,16 @@ canonical_go_repository: sigs.k8s.io/cluster-api-provider-aws
 images:
 - dockerfile_path: openshift/Dockerfile.openshift
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: aws-cluster-api-controllers
 promotion:
   to:
-  - disabled: true
-    name: 4.20-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -69,9 +68,9 @@ tests:
   commands: openshift/unit-tests.sh
   container:
     from: src
-- as: e2e-aws-capi-techpreview
+- always_run: false
+  as: e2e-aws-capi-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     env:
@@ -89,9 +88,9 @@ tests:
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-techpreview
+- always_run: false
+  as: e2e-aws-ovn-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-3
     env:
@@ -127,11 +126,6 @@ tests:
   container:
     from: commitchecker
   optional: true
-- as: security
-  steps:
-    env:
-      PROJECT_NAME: cluster-api-provider-aws
-    workflow: openshift-ci-security
 - as: verify-deps
   steps:
     env:

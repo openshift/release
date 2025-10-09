@@ -1,0 +1,118 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.21_base-rhel9:
+    name: "4.21"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.24-openshift-4.20
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.21"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-ipi-ovn-dualstack-bgp
+  cluster: build05
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      ENABLE_DEBUG_CONSOLE: "true"
+      ENABLE_DEBUG_CONSOLE_GATHER: "true"
+    workflow: baremetalds-e2e-ovn-bgp-dualstack
+  timeout: 6h0m0s
+- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
+  cluster: build05
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      ENABLE_DEBUG_CONSOLE: "true"
+      ENABLE_DEBUG_CONSOLE_GATHER: "true"
+    workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
+  timeout: 6h0m0s
+- as: e2e-metal-ipi-ovn-bgp-virt-dualstack
+  cluster: build05
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CNV_PRERELEASE_LATEST_CHANNEL: "true"
+    workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
+  timeout: 6h0m0s
+- as: e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
+  cluster: build05
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CNV_PRERELEASE_LATEST_CHANNEL: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
+  timeout: 6h0m0s
+- as: e2e-metal-ipi-ovn-bgp-virt-ipv4-techpreview
+  cluster: build05
+  cron: 0 7 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CNV_PRERELEASE_LATEST_CHANNEL: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-bgp-virt-ipv4
+  timeout: 6h0m0s
+- as: e2e-metal-ipi-ovn-bgp-virt-ipv4
+  cluster: build05
+  cron: 0 7 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CNV_PRERELEASE_LATEST_CHANNEL: "true"
+    workflow: baremetalds-e2e-ovn-bgp-virt-ipv4
+  timeout: 6h0m0s
+- as: downstream-merge
+  cron: 0 * * * *
+  steps:
+    env:
+      DEFAULT_BRANCH: master
+      DOWNSTREAM_REPO: openshift/ovn-kubernetes
+      MIN_COMMITS: "5"
+      RELEASE: "4.21"
+      UPSTREAM_REPO: ovn-kubernetes/ovn-kubernetes
+    test:
+    - ref: github-downstream-sync
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: ovn-kubernetes
+  variant: periodics

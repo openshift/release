@@ -59,6 +59,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/check-gh-automation
   to: check-gh-automation
+- context_dir: images/gsm-secret-sync/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/gsm-secret-sync
+  to: gsm-secret-sync
 - context_dir: images/check-cluster-profiles-config/
   from: os
   inputs:
@@ -173,6 +181,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/multi-pr-prow-plugin
   to: multi-pr-prow-plugin
+- context_dir: images/ai-plugin/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ai-plugin
+  to: ai-plugin
 - context_dir: images/pj-rehearse/
   from: os
   inputs:
@@ -408,12 +424,14 @@ images:
 - additional_architectures:
   - arm64
   context_dir: images/tide-config-manager
-  from: os
+  from: centos9
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/bin/tide-config-manager
+      - destination_dir: .
+        source_path: /go/bin/determinize-prow-config
   to: tide-config-manager
 - additional_architectures:
   - arm64
@@ -816,13 +834,26 @@ tests:
     from: test-bin
   node_architecture: arm64
 - always_run: false
+  as: integration-optional-test
+  commands: make integration
+  container:
+    from: test-bin
+  node_architecture: arm64
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+- always_run: false
   as: e2e
-  cluster: build11
   steps:
     test:
     - as: e2e
       commands: |
-        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig HIVE_KUBECONFIG=/tmp/hive/kubeconfig MANIFEST_TOOL_SECRET=/secrets/manifest-tool/.dockerconfigjson LOCAL_REGISTRY_DNS=image-registry.openshift-image-registry.svc:5000 make e2e
+        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json \
+        REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret \
+        LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret \
+        KUBECONFIG=/auth/kubeconfig \
+        HIVE_KUBECONFIG=/tmp/hive/kubeconfig \
+        MANIFEST_TOOL_SECRET=/secrets/manifest-tool/.dockerconfigjson \
+        LOCAL_REGISTRY_DNS=image-registry.openshift-image-registry.svc:5000 \
+        make e2e
       credentials:
       - collection: ""
         mount_path: /auth
@@ -844,6 +875,10 @@ tests:
         mount_path: /tmp/gcs
         name: gce-sa-credentials-gcs-publisher
         namespace: test-credentials
+      - collection: test-platform-infra
+        mount_path: /tmp/gcp-creds
+        name: gsm-e2e-test-sa-key
+        namespace: test-credentials
       - collection: ""
         mount_path: /tmp/hive
         name: hive-hive-credentials
@@ -852,13 +887,26 @@ tests:
         mount_path: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         namespace: test-credentials
+      env:
+      - default: openshift-ci-secrets-dev
+        documentation: The GCP project ID to use for GSM e2e test
+        name: GCP_DEV_PROJECT_ID
+      - default: "636987594243"
+        documentation: The GCP project number to use for GSM e2e test
+        name: GCP_DEV_PROJECT_NUMBER
+      - default: /tmp/gcp-creds/gsm-e2e-test-sa-key
+        documentation: The GCP service account credentials file
+        name: GCP_SECRETS_DEV_CREDENTIALS_FILE
+      - default: e2e-test-lock-bucket
+        documentation: The GCS bucket where the lock object is created
+        name: GCS_E2E_LOCK_BUCKET
       from: test-bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: e2e-oo
-  cluster: build11
+- always_run: false
+  as: e2e-oo
   optional: true
   pipeline_run_if_changed: pkg/steps/(index|bundle).*.go
   steps:
@@ -897,7 +945,6 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: e2e-oo-post
-  cluster: build11
   postsubmit: true
   steps:
     test:

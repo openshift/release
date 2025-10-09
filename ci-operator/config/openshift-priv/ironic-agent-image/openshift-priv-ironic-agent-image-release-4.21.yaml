@@ -16,13 +16,14 @@ images:
   to: ironic-agent
 promotion:
   to:
-  - name: 4.21-priv
+  - disabled: true
+    name: 4.21-priv
     namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
       #NOTE(elfosardo): use ironic repos, cause we're special
-      curl http://base-4-20-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.art/ci/base-4-20-rhel-9-server-ironic.repo
+      curl http://base-4-21-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.art/ci/base-4-21-rhel-9-server-ironic.repo
     from: ocp_4.20_base-rhel9
     to: ironic-agent-base
 releases:
@@ -49,6 +50,7 @@ tests:
     env:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ovn-ipv4
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ipv4
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
@@ -62,19 +64,22 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
-- as: e2e-metal-ipi-ovn-dualstack
+  timeout: 5h0m0s
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
   cluster: build05
   optional: true
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
+  timeout: 5h0m0s
 - as: check-requirements
   commands: |-
     #!/bin/bash

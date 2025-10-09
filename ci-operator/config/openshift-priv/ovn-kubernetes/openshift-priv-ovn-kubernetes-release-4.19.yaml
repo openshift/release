@@ -7,18 +7,18 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.19_base-rhel9:
-    name: 4.19-priv
+  ocp_4.20_base-rhel9:
+    name: 4.20-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.23-openshift-4.19
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    tag: rhel-8-golang-1.24-openshift-4.20
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
   tests-private:
     name: tests-private
     namespace: ci
@@ -32,26 +32,26 @@ canonical_go_repository: github.com/openshift/ovn-kubernetes
 images:
 - dockerfile_path: Dockerfile.base
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
   to: ovn-kubernetes-base
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-8-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ovn-kubernetes-microshift
 promotion:
   to:
@@ -73,10 +73,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-ovn-clusternetwork-cidr-expansion
+- always_run: false
+  as: e2e-aws-ovn-clusternetwork-cidr-expansion
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-cidr-expansion
@@ -93,17 +94,18 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn-edge-zones
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-edge-zones
 - as: e2e-aws-ovn-local-gateway
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-ipv4
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv4
   cluster: build05
   optional: true
   steps:
@@ -128,17 +130,18 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-dualstack
   timeout: 6h0m0s
-- as: e2e-ovn-hybrid-step-registry
+- always_run: false
+  as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-hybrid
   timeout: 6h0m0s
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
@@ -157,7 +160,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       CUSTOM_VXLAN_PORT: "true"
       EXTRA_MG_ARGS: --host-network
@@ -165,7 +168,8 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid-toggle
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn
+- always_run: false
+  as: e2e-vsphere-ovn
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -173,7 +177,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-vsphere-ovn
   timeout: 6h0m0s
-- as: e2e-azure-ovn
+- always_run: false
+  as: e2e-azure-ovn
   optional: true
   steps:
     cluster_profile: azure4
@@ -183,30 +188,32 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
   timeout: 5h30m0s
-- as: e2e-aws-ovn-upgrade-ipsec
+- always_run: false
+  as: e2e-aws-ovn-upgrade-ipsec
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-upgrade-ipsec
-- as: e2e-aws-ovn-serial-ipsec
+- always_run: false
+  as: e2e-aws-ovn-serial-ipsec
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
   timeout: 6h0m0s
 - as: e2e-aws-ovn-upgrade-local-gateway
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
@@ -217,7 +224,6 @@ tests:
   steps:
     cluster_profile: azure-2
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -244,7 +250,8 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
   timeout: 6h0m0s
-- as: e2e-openstack-ovn
+- always_run: false
+  as: e2e-openstack-ovn
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -265,13 +272,14 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-dualstack-local-gateway
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-local-gateway
   cluster: build05
   optional: true
   steps:
@@ -287,22 +295,16 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-dualstack-bgp-techpreview
+- as: e2e-metal-ipi-ovn-dualstack-bgp
   cluster: build05
-  optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack
   timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
+- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
   cluster: build05
-  optional: true
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
   timeout: 5h0m0s
 - as: e2e-aws-ovn-hypershift
@@ -334,12 +336,13 @@ tests:
     from: src
 - as: e2e-aws-ovn-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 6h0m0s
-- as: e2e-aws-ovn-hypershift-kubevirt
+- always_run: false
+  as: e2e-aws-ovn-hypershift-kubevirt
   optional: true
   steps:
     cluster_profile: aws-3
@@ -373,7 +376,7 @@ tests:
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
   timeout: 3h30m0s
-- always_run: true
+- always_run: false
   as: qe-perfscale-aws-ovn-small-udn-density-l3
   optional: true
   steps:
@@ -412,7 +415,8 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-udn-density-pods
   timeout: 8h0m0s
-- as: e2e-aws-ovn-techpreview
+- always_run: false
+  as: e2e-aws-ovn-techpreview
   optional: true
   steps:
     cluster_profile: aws-3
@@ -421,16 +425,18 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
-- as: e2e-aws-ovn-single-node-techpreview
+- always_run: false
+  as: e2e-aws-ovn-single-node-techpreview
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-single-node
   timeout: 6h0m0s
-- as: e2e-aws-ovn-hypershift-conformance-techpreview
+- always_run: false
+  as: e2e-aws-ovn-hypershift-conformance-techpreview
   optional: true
   steps:
     cluster_profile: hypershift
@@ -438,7 +444,8 @@ tests:
       GUEST_FEATURE_SET: TechPreviewNoUpgrade
     workflow: hypershift-aws-conformance
   timeout: 6h0m0s
-- as: e2e-azure-ovn-techpreview
+- always_run: false
+  as: e2e-azure-ovn-techpreview
   optional: true
   steps:
     cluster_profile: azure4
@@ -456,7 +463,8 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp-ovn
   timeout: 6h0m0s
-- as: openshift-e2e-gcp-ovn-techpreview-upgrade
+- always_run: false
+  as: openshift-e2e-gcp-ovn-techpreview-upgrade
   optional: true
   steps:
     cluster_profile: gcp
@@ -465,7 +473,8 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp-upgrade
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-techpreview
+- always_run: false
+  as: e2e-metal-ipi-ovn-techpreview
   cluster: build05
   optional: true
   steps:
@@ -477,7 +486,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipv4
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-ipv6-techpreview
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6-techpreview
   cluster: build05
   optional: true
   steps:
@@ -489,7 +499,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipv6
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-dualstack-techpreview
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-techpreview
   cluster: build05
   optional: true
   steps:
@@ -501,7 +512,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-dualstack
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
   cluster: build05
   optional: true
   steps:
@@ -515,7 +527,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-techpreview
+- always_run: false
+  as: e2e-vsphere-ovn-techpreview
   optional: true
   steps:
     cluster_profile: vsphere-elastic

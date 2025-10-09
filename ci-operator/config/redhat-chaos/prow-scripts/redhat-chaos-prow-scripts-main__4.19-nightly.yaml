@@ -98,12 +98,9 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: redhat-chaos-krkn-hub-node-tests
+    test:
+    - chain: redhat-chaos-krkn-hub-node-tests
+    workflow: redhat-chaos-installer-aws
   timeout: 6h0m0s
 - as: krkn-hub-tests-udn
   cron: 0 4 * * 1
@@ -170,16 +167,9 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: ovn-conf
-    - ref: ovn-conf-ipsec-manifest
-    - chain: ipi-install
-    - chain: create-infra-move-ingress-monitoring-registry
     test:
     - chain: redhat-chaos-krkn-hub-tests
+    workflow: redhat-chaos-installer-aws-ipsec
   timeout: 6h0m0s
 - as: krkn-hub-node-tests-aws-ipsec
   cron: 0 4 29 * *
@@ -198,17 +188,9 @@ tests:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-conf-aws
-    - ref: ovn-conf
-    - ref: ovn-conf-ipsec-manifest
-    - chain: ipi-install
-    - chain: create-infra-move-ingress-monitoring-registry
     test:
-    - ref: redhat-chaos-start-krkn
-    workflow: redhat-chaos-krkn-hub-node-tests
+    - chain: redhat-chaos-krkn-hub-node-tests
+    workflow: redhat-chaos-installer-aws-ipsec
   timeout: 6h0m0s
 - as: krkn-hub-tests-udn-aws-ipsec
   cron: 0 4 * * 1
@@ -232,7 +214,7 @@ tests:
     - chain: redhat-chaos-krkn-hub-console-tests
     - chain: redhat-chaos-krkn-hub-ovn-disruption
     - chain: redhat-chaos-krkn-hub-prometheus-tests
-    workflow: openshift-qe-installer-aws-ovn-ipsec
+    workflow: redhat-chaos-installer-aws-ipsec
   timeout: 6h0m0s
 - as: krkn-hub-node-tests-udn-aws-ipsec
   cron: 0 4 * * 1
@@ -255,7 +237,7 @@ tests:
     - chain: redhat-chaos-krkn-hub-cluster-disruption
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests
-    workflow: openshift-qe-installer-aws-ovn-ipsec
+    workflow: redhat-chaos-installer-aws-ipsec
   timeout: 6h0m0s
 - as: gcp-fipsetcd-krkn-hub-tests
   cron: 0 4 28 * *
@@ -617,10 +599,15 @@ tests:
     cluster_profile: ibmcloud-qe
     env:
       CHURN: "true"
+      COMPUTE_NODE_TYPE: bx2-4x16
       EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "11"
+      SET_ENV_BY_PLATFORM: custom
+      SIZE_VARIANT: large
       TELEMETRY_GROUP: prow-ocp-4.19
+      WAIT_DURATION: "600"
+      WORKERS: "3"
     observers:
       enable:
       - redhat-chaos-cerberus
@@ -636,15 +623,22 @@ tests:
     cluster_profile: ibmcloud-qe
     env:
       CHURN: "true"
+      COMPUTE_NODE_TYPE: bx2-4x16
+      DISABLE_SSL_VERIFICATION: "True"
       EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "11"
+      SET_ENV_BY_PLATFORM: custom
+      SIZE_VARIANT: large
       TELEMETRY_GROUP: prow-ocp-4.19
+      WAIT_DURATION: "600"
+      WORKERS: "3"
     observers:
       enable:
       - redhat-chaos-cerberus
       - openshift-qe-cluster-density-v2-observer
     test:
+    - ref: ibmcloud-provision-blockstorage
     - ref: redhat-chaos-start-krkn
     - chain: redhat-chaos-krkn-hub-control-plane-tests
     - chain: redhat-chaos-krkn-hub-worker-node-tests

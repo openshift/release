@@ -43,7 +43,8 @@ images:
   to: azure-cluster-api-controllers
 promotion:
   to:
-  - name: 4.21-priv
+  - disabled: true
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
@@ -96,9 +97,9 @@ tests:
       ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS: "true"
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
-- as: e2e-azure-techpreview
+- always_run: false
+  as: e2e-azure-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     env:
@@ -127,7 +128,6 @@ tests:
   as: e2e-azurestack-ipi
   cluster: build01
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azurestack-dev
     workflow: openshift-e2e-azurestack
@@ -138,18 +138,13 @@ tests:
   container:
     from: commitchecker
   optional: true
-- as: security
-  steps:
-    env:
-      PROJECT_NAME: cluster-api-provider-azure
-    workflow: openshift-ci-security
 - as: hypershift-e2e-aks
   steps:
     cluster_profile: hypershift
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      HYPERSHIFT_AZURE_LOCATION: eastus2
+      HYPERSHIFT_AZURE_LOCATION: uksouth
     workflow: hypershift-azure-aks-e2e
 - as: verify-deps
   steps:

@@ -30,7 +30,8 @@ images:
   to: cluster-cloud-controller-manager-operator
 promotion:
   to:
-  - name: "4.21"
+  - disabled: true
+    name: "4.21"
     namespace: ocp
 releases:
   initial:
@@ -89,20 +90,26 @@ tests:
     cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - always_run: false
+  as: e2e-aws-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ccm-techpreview
+- always_run: false
   as: e2e-azure-manual-oidc
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
-- as: e2e-azure-ovn
+- always_run: false
+  as: e2e-azure-ovn
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     workflow: openshift-e2e-azure
-- as: e2e-azure-ovn-upgrade
+- always_run: false
+  as: e2e-azure-ovn-upgrade
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
@@ -110,7 +117,7 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     env:
       TEST_FILTERS: ~ChkUpgrade&;LEVEL0
       TEST_SCENARIOS: Cluster_Infrastructure
@@ -118,37 +125,38 @@ tests:
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-azure-ipi-proxy
-- as: e2e-gcp-ovn
+- always_run: false
+  as: e2e-gcp-ovn
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-ovn-upgrade
+- always_run: false
+  as: e2e-gcp-ovn-upgrade
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upgrade
-- as: e2e-ibmcloud-ovn
+- always_run: false
+  as: e2e-ibmcloud-ovn
   optional: true
   run_if_changed: ibm
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
   timeout: 6h0m0s
-- as: e2e-openstack-ovn
+- always_run: false
+  as: e2e-openstack-ovn
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-vsphere-ovn
+- always_run: false
+  as: e2e-vsphere-ovn
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
@@ -164,18 +172,14 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-vsphere-ipi
-- as: e2e-nutanix-ovn
+- always_run: false
+  as: e2e-nutanix-ovn
   cluster: build01
   optional: true
   run_if_changed: .*nutanix.*
   steps:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix
-- as: security
-  steps:
-    env:
-      PROJECT_NAME: cluster-cloud-controller-manager-operator
-    workflow: openshift-ci-security
 - as: verify-deps
   steps:
     env:

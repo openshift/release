@@ -23,9 +23,9 @@ releases:
       channel: fast
       version: "4.18"
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      architecture: amd64
+      channel: fast
       version: "4.19"
 resources:
   '*':
@@ -39,20 +39,23 @@ resources:
       cpu: "3"
       memory: 5Gi
 tests:
-- as: platform-none-vsphere
-  cron: 0 0 * * 6
-  steps:
-    cluster_profile: vsphere-elastic
-    workflow: opct-test-platform-none-vsphere
-  timeout: 6h0m0s
 - as: platform-external-vsphere
-  cron: 0 10 * * 6
+  cron: 0 10 * * 1
   steps:
     cluster_profile: vsphere-elastic
     env:
       PLATFORM_NAME: vsphere
     workflow: opct-test-platform-external-vsphere
   timeout: 6h0m0s
+- as: platform-external-vsphere-upgrade
+  cron: 0 15 * * 1
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      OPCT_RUN_MODE: upgrade
+      UPGRADE_TO_CHANNEL_TYPE: candidate
+    workflow: opct-test-platform-external-vsphere
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-openshift-ecosystem

@@ -85,51 +85,54 @@ tests:
 - as: microshift-metal-tests
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh|.*\.ks\.template)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_AMI: ami-0d5b3039c1132e1b2
       EC2_INSTANCE_TYPE: c5.metal
+      SCENARIO_TYPE: presubmits
     workflow: openshift-microshift-e2e-metal-tests
 - as: rebase-on-nightlies
-  cron: 0 4 * * 1,4
+  cron: 23 19 24 * *
   steps:
     workflow: openshift-microshift-rebase
 - as: metal-periodic-test
   run_if_changed: (.*periodic.*|^test/bin/.*)
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       EC2_AMI: ami-0d5b3039c1132e1b2
       EC2_INSTANCE_TYPE: c5.metal
+      SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-metal-nightly
-  cron: 0 4 * * *
+  cron: 22 21 18 9 *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_AMI: ami-0d5b3039c1132e1b2
       EC2_INSTANCE_TYPE: c5.metal
+      SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-conformance-nightly
-  cron: 0 13 * * *
+  cron: 59 2 28 4 *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       BRANCH: release-4.14
       EC2_AMI: ami-0d5b3039c1132e1b2
     workflow: openshift-microshift-e2e-conformance-from-source
 - as: clusterbot
-  cron: 0 3 * * *
+  cron: 51 19 2 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       MICROSHIFT_ARCH: x86_64
       MICROSHIFT_OS: rhel-9.2
     workflow: openshift-microshift-clusterbot
 - as: e2e-aws-nvidia-device-plugin-nightly
-  cron: 0 3 * * *
+  cron: 8 6 25 10 *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_INSTANCE_TYPE: g4dn.xlarge
       MICROSHIFT_OS: rhel-9.2

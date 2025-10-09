@@ -10,7 +10,7 @@ STS=${STS:-true}
 HOSTED_CP=${HOSTED_CP:-false}
 COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
-CHANNEL_GROUP=${CHANNEL_GROUP}
+EC_BUILD=${EC_BUILD:-false}
 MULTI_AZ=${MULTI_AZ:-false}
 EC2_METADATA_HTTP_TOKENS=${EC2_METADATA_HTTP_TOKENS:-"optional"}
 ENABLE_AUTOSCALING=${ENABLE_AUTOSCALING:-false}
@@ -26,7 +26,6 @@ FIPS=${FIPS:-false}
 PRIVATE=${PRIVATE:-false}
 PRIVATE_LINK=${PRIVATE_LINK:-false}
 PRIVATE_SUBNET_ONLY="false"
-CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 ENABLE_SHARED_VPC=${ENABLE_SHARED_VPC:-"no"}
 CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
 ADDITIONAL_SECURITY_GROUP=${ADDITIONAL_SECURITY_GROUP:-false}
@@ -35,7 +34,94 @@ CONFIGURE_CLUSTER_AUTOSCALER=${CONFIGURE_CLUSTER_AUTOSCALER:-false}
 CLUSTER_PREFIX=$(head -n 1 "${SHARED_DIR}/cluster-prefix")
 
 log(){
-    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
+    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
+}
+
+get_channel_versions() {
+  local channel="$1"
+  local cmd="rosa list versions --channel-group ${channel} -o json"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    cmd="$cmd --hosted-cp"
+  fi
+
+  if [[ ${AVAILABLE_UPGRADE} == "yes" ]] ; then
+    cmd="$cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
+  else
+
+    cmd="$cmd | jq -r '.[].raw_id'"
+  fi
+  eval $cmd
+}
+
+find_version_in_channel() {
+  local channel="$1"
+  local target_version="$2"
+  local search_type="$3"
+
+  log "Checking ${channel} channel${target_version:+ for ${search_type} version ${target_version}}..."
+
+  local channel_versions
+  channel_versions=$(get_channel_versions "${channel}")
+
+  if [[ -z "${channel_versions}" ]]; then
+    log "No versions found in ${channel} channel"
+    return 1
+  fi
+
+  log "Found versions in ${channel} channel"
+
+  local found_version=""
+  case "${search_type}" in
+    "latest")
+      if [[ "$EC_BUILD" == "true" ]]; then
+        found_version=$(echo "$channel_versions" | grep -i ec | head -1 || true)
+      else
+        found_version=$(echo "$channel_versions" | head -1 || true)
+      fi
+      ;;
+    "pattern")
+      if [[ "$EC_BUILD" == "true" ]]; then
+        found_version=$(echo "$channel_versions" | grep -E "^${target_version}" | grep -i ec | head -1 || true)
+      else
+        found_version=$(echo "$channel_versions" | grep -E "^${target_version}" | head -1 || true)
+      fi
+      ;;
+    "exact")
+      found_version=$(echo "$channel_versions" | grep -x "${target_version}" || true)
+      ;;
+  esac
+
+  if [[ -n "$found_version" ]]; then
+    echo "$found_version"
+    return 0
+  else
+    case "${search_type}" in
+      "latest") log "No suitable version found in ${channel} channel" ;;
+      "pattern") log "Version pattern ${target_version} not found in ${channel} channel" ;;
+      "exact") log "Exact version ${target_version} not found in ${channel} channel" ;;
+    esac
+    return 1
+  fi
+}
+
+# Multi-channel version search
+search_across_channels() {
+  local target_version="$1"
+  local search_type="$2"
+
+  IFS=',' read -r -a CHANNEL_GROUP_ARRAY <<< "${CHANNEL_GROUP// /}"
+
+  for GROUP in "${CHANNEL_GROUP_ARRAY[@]}"; do
+    if found_version=$(find_version_in_channel "${GROUP}" "${target_version}" "${search_type}"); then
+      OPENSHIFT_VERSION="$found_version"
+      CHANNEL_GROUP="${GROUP}"
+      log "Proceeding with ${GROUP} channel group"
+      return 0
+    fi
+  done
+
+  log "Error: No versions found in any of the specified channel groups: ${CHANNEL_GROUP_ARRAY[*]}"
+  exit 1
 }
 
 # Record Cluster Configurations
@@ -218,20 +304,11 @@ if [[ "$OPENSHIFT_VERSION" = "release:latest" ]]; then
 fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
-  if [[ "$EC_BUILD" == "true" ]]; then
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
-  else
-    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
-  fi
+  search_across_channels "" "latest"
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-  if [[ "$EC_BUILD" == "true" ]]; then
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
-  else
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
-  fi
+  search_across_channels "$OPENSHIFT_VERSION" "pattern"
 else
-  # Match the whole line
-  OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
+  search_across_channels "$OPENSHIFT_VERSION" "exact"
 fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
@@ -509,15 +586,15 @@ if [[ "$STS" == "true" ]]; then
   echo -e "Get the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
 
   roleARNFile="${SHARED_DIR}/account-roles-arns"
-  account_intaller_role_arn=$(cat "$roleARNFile" | { grep "Installer-Role" || true; })
+  account_installer_role_arn=$(cat "$roleARNFile" | { grep "Installer-Role" || true; })
   account_support_role_arn=$(cat "$roleARNFile" | { grep "Support-Role" || true; })
   account_worker_role_arn=$(cat "$roleARNFile" | { grep "Worker-Role" || true; })
-  if [[ -z "${account_intaller_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
+  if [[ -z "${account_installer_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
     echo -e "One or more account roles with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
     exit 1
   fi
-  ACCOUNT_ROLES_SWITCH="--role-arn ${account_intaller_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
-  record_cluster "aws.sts" "role_arn" $account_intaller_role_arn
+  ACCOUNT_ROLES_SWITCH="--role-arn ${account_installer_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
+  record_cluster "aws.sts" "role_arn" $account_installer_role_arn
   record_cluster "aws.sts" "support_role_arn" $account_support_role_arn
   record_cluster "aws.sts" "worker_role_arn" $account_worker_role_arn
 
@@ -544,14 +621,14 @@ fi
 
 SHARED_VPC_SWITCH=""
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
-  SAHRED_VPC_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hosted_zone_id")
-  SAHRED_VPC_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")
-  SAHRED_VPC_BASE_DOMAIN=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")
-  SHARED_VPC_SWITCH="--base-domain ${SAHRED_VPC_BASE_DOMAIN} --private-hosted-zone-id ${SAHRED_VPC_HOSTED_ZONE_ID} --shared-vpc-role-arn ${SAHRED_VPC_ROLE_ARN}"
+  SHARED_VPC_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hosted_zone_id")
+  SHARED_VPC_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")
+  SHARED_VPC_BASE_DOMAIN=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")
+  SHARED_VPC_SWITCH="--base-domain ${SHARED_VPC_BASE_DOMAIN} --private-hosted-zone-id ${SHARED_VPC_HOSTED_ZONE_ID} --shared-vpc-role-arn ${SHARED_VPC_ROLE_ARN}"
 
-  record_cluster "aws.sts" "private_hosted_zone_id" ${SAHRED_VPC_HOSTED_ZONE_ID}
-  record_cluster "aws.sts" "private_hosted_zone_role_arn" ${SAHRED_VPC_ROLE_ARN}
-  record_cluster "dns" "base_domain" ${SAHRED_VPC_BASE_DOMAIN}
+  record_cluster "aws.sts" "private_hosted_zone_id" ${SHARED_VPC_HOSTED_ZONE_ID}
+  record_cluster "aws.sts" "private_hosted_zone_role_arn" ${SHARED_VPC_ROLE_ARN}
+  record_cluster "dns" "base_domain" ${SHARED_VPC_BASE_DOMAIN}
 fi
 
 DRY_RUN_SWITCH=""
@@ -563,7 +640,6 @@ NO_CNI_SWITCH=""
 if [[ "$NO_CNI" == "true" ]]; then
   NO_CNI_SWITCH="--no-cni"
 fi
-
 
 # Save the cluster config to ARTIFACT_DIR
 cat "${SHARED_DIR}/cluster-config" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${ARTIFACT_DIR}/cluster-config"
@@ -602,12 +678,12 @@ echo "  Config cluster autoscaler: ${CONFIGURE_CLUSTER_AUTOSCALER}"
 
 echo "  Enable Shared VPC: ${ENABLE_SHARED_VPC}"
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
-  echo "    SAHRED_VPC_HOSTED_ZONE_ID: ${SAHRED_VPC_HOSTED_ZONE_ID}"
-  echo "    SAHRED_VPC_ROLE_ARN: ${SAHRED_VPC_ROLE_ARN}" | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
-  echo "    SAHRED_VPC_BASE_DOMAIN: ${SAHRED_VPC_BASE_DOMAIN}"
+  echo "    SHARED_VPC_HOSTED_ZONE_ID: ${SHARED_VPC_HOSTED_ZONE_ID}"
+  echo "    SHARED_VPC_ROLE_ARN: ${SHARED_VPC_ROLE_ARN}" | sed "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK}/g"
+  echo "    SHARED_VPC_BASE_DOMAIN: ${SHARED_VPC_BASE_DOMAIN}"
 fi
 
-#Record installation start time
+# Record installation start time
 record_cluster "timers" "global_start" "$(date +'%s')"
 
 # Provision cluster
@@ -659,8 +735,44 @@ fi
 
 echo "$cmdout"
 CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
-eval "${cmd}" > "${CLUSTER_INFO_WITHOUT_MASK}"
-exit_code=$?
+
+# Retry logic for command execution
+retry_count=0
+max_retries=3
+exit_code=1
+
+while [ $retry_count -lt $max_retries ]; do
+  echo "Attempt $((retry_count + 1)) of $max_retries..."
+
+  # Execute command and capture both output and exit code
+  cmd_output=$(eval "${cmd}" 2>&1)
+  exit_code=$?
+
+  # Write output to temp file
+  echo "$cmd_output" > "${CLUSTER_INFO_WITHOUT_MASK}"
+
+  # Check if output contains a retryable error message
+  # If you find yourself here in the future for other errors another possible
+  # option would be to check for non zero return code within some short period
+  # of time like 10 seconds, but that would require some understanding of what
+  # may have happened on the backend that may preclude retrying with the same inputs.
+  # Successful provision calls seem to vary in duration considerably, from 40s to 8min
+  if [[ "$cmd_output" == *"dose not have release image for"* ]]; then
+    echo "Error detected: 'dose not have release image for' found in output"
+    retry_count=$((retry_count + 1))
+
+    if [ $retry_count -lt $max_retries ]; then
+      echo "Sleeping for 10 minutes before retry..."
+      sleep 600  # 10 minutes = 600 seconds
+    else
+      echo "Max retries reached. Continuing with last attempt result."
+    fi
+  else
+    # Success or different error - break out of retry loop
+    echo "Command completed without the specific error. Exit code: $exit_code"
+    break
+  fi
+done
 
 # Used by gather steps to generate JUnit
 echo $exit_code > "${SHARED_DIR}/install-status.txt"

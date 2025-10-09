@@ -1,21 +1,22 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ci
   inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cluster-api-actuator-pkg-test
 promotion:
   to:
   - additional_images:
       cluster-api-actuator-pkg: src
+    disabled: true
     excluded_images:
     - cluster-api-actuator-pkg-test
     name: "4.21"
@@ -53,7 +54,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       cli: latest
@@ -63,11 +64,12 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-capi-techpreview
+- always_run: false
+  as: e2e-aws-capi-techpreview
   optional: true
   run_if_changed: pkg/capi/aws\.go
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -105,7 +107,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
-- as: e2e-azure-capi-techpreview
+- always_run: false
+  as: e2e-azure-capi-techpreview
   optional: true
   run_if_changed: pkg/capi/azure\.go
   steps:
@@ -121,9 +124,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
-- as: e2e-gcp-operator
+- always_run: false
+  as: e2e-gcp-operator
   optional: true
-  skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     test:
@@ -136,7 +139,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-gcp-capi-techpreview
+- always_run: false
+  as: e2e-gcp-capi-techpreview
   optional: true
   run_if_changed: pkg/capi/gcp\.go
   steps:
@@ -153,9 +157,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-openstack-operator
+- always_run: false
+  as: e2e-openstack-operator
   optional: true
-  skip_if_only_changed: ^pkg/(capi|framework)/|^docs/|^testutils/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -184,9 +188,35 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-operator-periodic
+  interval: 72h
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - always_run: false
   as: e2e-vsphere-operator-periodic-pre
   optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-operator-periodic
+  interval: 72h
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -212,12 +242,58 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: e2e-azure-operator-periodic
+  interval: 72h
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-azure
 - always_run: false
   as: e2e-gcp-periodic-pre
   optional: true
   steps:
     cluster_profile: gcp
     test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-periodic
+  interval: 72h
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-multi-operator-periodic
+  interval: 72h
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      ADDITIONAL_WORKERS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
+    test:
+    - ref: ipi-install-heterogeneous
     - as: test
       cli: latest
       commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
@@ -243,12 +319,21 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
-- as: security
-  optional: true
+- as: e2e-openstack-operator-periodic
+  minimum_interval: 72h
   steps:
+    cluster_profile: openstack-vexxhost
     env:
-      PROJECT_NAME: cluster-api-actuator-pkg
-    workflow: openshift-ci-security
+      USE_RAMFS: "false"
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.21
   org: openshift

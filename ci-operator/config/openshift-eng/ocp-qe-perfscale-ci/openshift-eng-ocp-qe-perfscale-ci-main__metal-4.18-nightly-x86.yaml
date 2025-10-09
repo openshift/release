@@ -1,3 +1,12 @@
+base_images:
+  cerberus:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
@@ -23,7 +32,6 @@ tests:
   steps:
     cluster_profile: metal-perscale-cpt
     env:
-      BAREMETAL: "true"
       CONFIG: config/standard-scalelab.yml
       INFRA: "true"
       RUN_CERBERUS: "false"
@@ -42,7 +50,6 @@ tests:
   steps:
     cluster_profile: metal-perscale-cpt
     env:
-      BAREMETAL: "true"
       CONFIG: config/standard-scalelab.yml
       INFRA: "true"
       VM: "true"
@@ -50,6 +57,7 @@ tests:
       VMS_PER_NODE: "200"
     test:
     - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-prereqs
     - ref: openshift-qe-installer-bm-deploy
     - ref: openshift-qe-installer-bm-day2-cnv
     - ref: openshift-qe-cluster-health
@@ -86,7 +94,6 @@ tests:
   steps:
     cluster_profile: metal-perscale-cpt
     env:
-      BAREMETAL: "true"
       KUBE_BURNER_VERSION: 1.2.9
       RUN_CERBERUS: "false"
     test:
@@ -101,7 +108,6 @@ tests:
   steps:
     cluster_profile: metal-perscale-cpt
     env:
-      BAREMETAL: "true"
       CONFIG: config/standard-scalelab.yml
       INFRA: "true"
       RUN_CERBERUS: "false"
@@ -119,11 +125,11 @@ tests:
   steps:
     cluster_profile: metal-perscale-cpt
     env:
-      BAREMETAL: "true"
       KUBE_BURNER_VERSION: 1.2.9
       PUBLIC_VLAN: "false"
     test:
     - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-prereqs
     - ref: openshift-qe-installer-bm-deploy
     - ref: openshift-qe-installer-bm-day2-label
     - ref: openshift-qe-installer-bm-day2-sriov
@@ -136,13 +142,13 @@ tests:
   steps:
     cluster_profile: metal-perscale-cpt
     env:
-      BAREMETAL: "true"
       KUBE_BURNER_VERSION: 1.2.9
       LIMIT_COUNT: "1"
       PUBLIC_VLAN: "false"
       WORKLOAD: web-burner-cluster-density
     test:
     - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-prereqs
     - ref: openshift-qe-installer-bm-deploy
     - ref: openshift-qe-installer-bm-day2-label
     - ref: openshift-qe-installer-bm-day2-sriov

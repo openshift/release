@@ -7,10 +7,18 @@ base_images:
     name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
+  ocp_4.21_base-rhel9:
+    name: 4.21-priv
+    namespace: ocp-private
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/operator-framework-operator-controller
@@ -20,18 +28,30 @@ images:
     ocp_4.20_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: olm-catalogd
 - dockerfile_path: openshift/operator-controller.Dockerfile
   inputs:
     ocp_4.20_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: olm-operator-controller
 - dockerfile_path: openshift/registry.Dockerfile
   inputs:
@@ -44,7 +64,8 @@ images:
   to: e2e-test-registry
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - e2e-test-registry
     name: 4.21-priv
     namespace: ocp-private
@@ -104,7 +125,7 @@ tests:
 - as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: upstream-e2e
       cli: latest
@@ -118,11 +139,11 @@ tests:
           cpu: 100m
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
-- as: openshift-e2e-aws-techpreview
+- always_run: false
+  as: openshift-e2e-aws-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -183,7 +204,7 @@ tests:
           cpu: 100m
 - as: e2e-aws-techpreview-olmv1-ext
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --monitor=watch-namespaces

@@ -357,7 +357,7 @@ else
         run_command "az network public-ip create --resource-group ${bastion_rg} --name ${bastion_name}PublicIPv6 --sku Standard --version IPv6"
         run_command "az network nic ip-config create --resource-group ${bastion_rg} --name ${bastion_name}IPv6config --nic-name ${bastion_name}NIC --private-ip-address-version IPv6 --vnet-name ${bastion_vnet_name} --subnet ${bastion_subnet} --public-ip-address ${bastion_name}PublicIPv6"
     fi
-    run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --public-ip-sku 'Standard' --os-disk-size-gb 199 --nics ${bastion_name}NIC --size 'Standard_DS1_v2' --debug --custom-data '${bastion_ignition_file}' | tee '${SHARED_DIR}/${bastion_name}_output.json'"
+    run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --public-ip-sku 'Standard' --os-disk-size-gb 199 --nics ${bastion_name}NIC --size ${BASTION_VM_SIZE} --debug --custom-data '${bastion_ignition_file}' | tee '${SHARED_DIR}/${bastion_name}_output.json'"
 fi
 
 # sleep for a while to wait registry/proxy image get pulled and services boot up after vm is running

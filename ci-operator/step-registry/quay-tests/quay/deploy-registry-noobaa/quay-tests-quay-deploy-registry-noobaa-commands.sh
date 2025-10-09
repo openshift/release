@@ -39,6 +39,7 @@ TAG_EXPIRATION_OPTIONS:
   - 4w
   - 1d
   - 1h
+FEATURE_SUPERUSER_CONFIGDUMP: true
 EOF
 
 oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret

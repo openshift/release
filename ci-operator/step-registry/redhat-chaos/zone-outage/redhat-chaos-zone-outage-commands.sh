@@ -7,8 +7,8 @@ oc config view --flatten > /tmp/config
 export KUBECONFIG=/tmp/config
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 
-ES_PASSWORD=$(cat "/secret/es/password" || "")
-ES_USERNAME=$(cat "/secret/es/username" || "")
+ES_PASSWORD=$(cat "/secret/es/password" || true)
+ES_USERNAME=$(cat "/secret/es/username" || true)
 
 export ES_PASSWORD
 export ES_USERNAME

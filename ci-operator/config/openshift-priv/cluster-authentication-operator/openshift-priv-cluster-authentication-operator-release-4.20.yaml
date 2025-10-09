@@ -27,8 +27,7 @@ images:
   to: cluster-authentication-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.20-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -70,7 +69,8 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
-- as: e2e-agnostic-ipv6
+- always_run: false
+  as: e2e-agnostic-ipv6
   cluster: build05
   optional: true
   steps:
@@ -170,7 +170,8 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-gcp
-- as: e2e-aws-single-node
+- always_run: false
+  as: e2e-aws-single-node
   optional: true
   steps:
     cluster_profile: aws-3
@@ -181,6 +182,23 @@ tests:
   container:
     from: src
   optional: true
+- always_run: false
+  as: e2e-metal-ovn-ipv4-external-oidc-configure-techpreview
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_ARGS: ' --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+        --cluster-stability=Disruptive '
+      TEST_SKIPS: \[OCPFeatureGate:ExternalOIDCWithUIDAndExtraClaimMappings\]\|\[OCPFeatureGate:ExternalOIDC\]
+        reverting to IntegratedOAuth
+      TEST_SUITE: openshift/auth/external-oidc
+    workflow: baremetalds-e2e
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv
