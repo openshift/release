@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-gatewayapi-conformance
     decorate: true
     decoration_config:
@@ -15,7 +15,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-4
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-ingress-operator-master-e2e-aws-gatewayapi-conformance
@@ -88,7 +88,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-operator
     decorate: true
     decoration_config:
@@ -98,7 +98,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-5
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-ingress-operator-master-e2e-aws-operator
@@ -171,7 +171,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-operator-techpreview
     decorate: true
     decoration_config:
@@ -181,14 +181,13 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-5
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-ingress-operator-master-e2e-aws-operator-techpreview
     optional: true
     path_alias: github.com/openshift/cluster-ingress-operator
     rerun_command: /test e2e-aws-operator-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -255,7 +254,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -421,8 +420,8 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build11
-    context: ci/prow/e2e-aws-ovn-serial
+    cluster: build10
+    context: ci/prow/e2e-aws-ovn-serial-1of2
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -432,12 +431,12 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-ingress-operator-master-e2e-aws-ovn-serial
+    name: pull-ci-openshift-priv-cluster-ingress-operator-master-e2e-aws-ovn-serial-1of2
     path_alias: github.com/openshift/cluster-ingress-operator
-    rerun_command: /test e2e-aws-ovn-serial
+    rerun_command: /test e2e-aws-ovn-serial-1of2
     skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
@@ -445,6 +444,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 1"
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
@@ -499,13 +499,98 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-1of2,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build11
+    cluster: build10
+    context: ci/prow/e2e-aws-ovn-serial-2of2
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 5h0m0s
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-ingress-operator-master-e2e-aws-ovn-serial-2of2
+    path_alias: github.com/openshift/cluster-ingress-operator
+    rerun_command: /test e2e-aws-ovn-serial-2of2
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 2"
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-serial
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-2of2,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-single-node
     decorate: true
     decoration_config:
@@ -515,14 +600,13 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-3
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-ingress-operator-master-e2e-aws-ovn-single-node
     optional: true
     path_alias: github.com/openshift/cluster-ingress-operator
     rerun_command: /test e2e-aws-ovn-single-node
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -589,7 +673,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-techpreview
     decorate: true
     decoration_config:
@@ -599,14 +683,13 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-4
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-ingress-operator-master-e2e-aws-ovn-techpreview
     optional: true
     path_alias: github.com/openshift/cluster-ingress-operator
     rerun_command: /test e2e-aws-ovn-techpreview
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -673,7 +756,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     decoration_config:
@@ -683,7 +766,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-ingress-operator-master-e2e-aws-ovn-upgrade
@@ -766,7 +849,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-ingress-operator-master-e2e-azure-manual-oidc
@@ -849,7 +932,7 @@ presubmits:
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-ingress-operator-master-e2e-azure-operator
@@ -939,7 +1022,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-ingress-operator
     rerun_command: /test e2e-azure-ovn
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -1106,7 +1188,6 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-ingress-operator
     rerun_command: /test e2e-gcp-ovn
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -1339,7 +1420,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build11
+    cluster: build10
     context: ci/prow/e2e-openstack-operator
     decorate: true
     decoration_config:

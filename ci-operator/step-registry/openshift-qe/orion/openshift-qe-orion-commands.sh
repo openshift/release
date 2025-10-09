@@ -74,9 +74,19 @@ if [[ -n "$ORION_CONFIG" ]]; then
 fi
 
 if [[ -n "$ACK_FILE" ]]; then
-    # Download the latest ACK file
-    curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
-    EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
+    if [[ "$ACK_FILE" =~ ^https?:// ]]; then
+        fileBasename="${ACK_FILE##*/}"
+        ackFilePath="$ARTIFACT_DIR/$fileBasename"
+        if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then
+            echo "Error: Failed to download $ACK_FILE" >&2
+            exit 1
+        fi
+    else
+        # Download the latest ACK file
+        ackFilePath="$ARTIFACT_DIR/$ACK_FILE"
+        curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} -o "$ackFilePath"
+    fi
+    EXTRA_FLAGS+=" --ack $ackFilePath"
 fi
 
 if [ ${COLLAPSE} == "true" ]; then

@@ -38,6 +38,9 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 BASE_DOMAIN="${LEASED_RESOURCE}.ci"
 CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+if [[ "${LEASED_RESOURCE}" == *ppc64le* ]]; then
+  CLUSTER_NAME="${LEASED_RESOURCE}"
+fi
 CLUSTER_SUBNET="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".subnet" "${CLUSTER_PROFILE_DIR}/leases")"
 if [[ -z "${CLUSTER_SUBNET}" ]]; then
   echo "Failed to lookup subnet"

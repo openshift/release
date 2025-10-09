@@ -1,0 +1,62 @@
+build_root:
+  image_stream_tag:
+    name: eco-ci-cd
+    namespace: telcov10n-ci
+    tag: eco-ci-cd
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: cnf-network-functional-tests
+  capabilities:
+  - intranet
+  cron: 0 14 * * 5
+  restrict_network_access: false
+  steps:
+    env:
+      CNF_TESTS_PERF_PROFILE: performance-profile-dpdk
+      CNF_TESTS_SKIP: reconcile
+      DISCONNECTED: "true"
+      ENABLE_INTERNAL_REGISTRY: "true"
+      FEATURES_TO_TEST: sctp|sriov|dpdk|vrf|ovs_qos|metallb|fec|multinetworkpolicy
+      JOB_NAME: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-network-phase2-4.20-cnf-network-functional-tests
+      JOB_TYPE: "1"
+      OPERATORS: |
+        [
+          {"name":"sriov-network-operator","catalog":"redhat-operators-sriov-art","fbc_iib_repo":"ose-sriov-network-rhel9-operator","nsname":"openshift-sriov-network-operator","channel":"stable","deploy_default_config":true, "og_name":"sriov-network-operators","subscription_name":"sriov-network-operator-subscription"},
+          {"name":"ptp-operator","catalog":"redhat-operators-ptp-art","fbc_iib_repo":"ose-ptp-rhel9-operator","nsname":"openshift-ptp","channel":"stable","ns_labels":{"workload.openshift.io/allowed":"management","name":"openshift-ptp"}},
+          {"name":"kubernetes-nmstate-operator","catalog":"redhat-operators-nmstate-art","fbc_iib_repo":"kubernetes-nmstate-rhel9-operator","nsname":"openshift-nmstate","channel":"stable","deploy_default_config":true},
+          {"name":"sriov-fec","catalog":"certified-operators","nsname":"vran-acceleration-operators","channel":"stable"},
+          {"name":"metallb-operator","catalog":"redhat-operators-metallb-art","fbc_iib_repo":"metallb-rhel9-operator","nsname":"metallb-system","channel":"stable","og_spec":{},"deploy_default_config":false},
+          {"name":"pf-status-relay-operator","catalog":"redhat-operators-pf-relay-art","fbc_iib_repo":"pf-status-relay-rhel9-operator","nsname":"openshift-pf-status-relay-operator","channel":"stable","og_spec":{},"ns_labels":{"openshift.io/run-level":"1"}}
+        ]
+      RELEASE_AGE_MAX_DAYS: "10"
+      VERSION: "4.20"
+    pre:
+    - ref: telcov10n-functional-cnf-network-schedule-job
+    - ref: telcov10n-functional-cnf-network-setup-cluster-env
+    - ref: telcov10n-functional-cnf-network-switch-config
+    - ref: telcov10n-functional-cnf-network-ocp-deploy
+    - ref: telcov10n-functional-cnf-network-ocp-operators
+    - ref: telcov10n-functional-cnf-network-cnf-config
+    test:
+    - ref: telcov10n-functional-cnf-network-metrics-daemon-tests
+    - ref: telcov10n-functional-cnf-network-cnf-tests
+    - ref: telcov10n-functional-cnf-network-cnf-gotests
+    - ref: telcov10n-functional-cnf-network-store-artifacts-on-bastion
+    - ref: telcov10n-functional-cnf-network-trigger-job
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: cnf-network-phase1-4.20

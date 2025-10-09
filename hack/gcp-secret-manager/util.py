@@ -26,6 +26,10 @@ INDEX_SECRET_NAME = "__index"
 # The string reserved for the service account secret associated with each collection.
 UPDATER_SA_SECRET_NAME = "updater-service-account"
 
+# GCP limit for a secret name is 255 chars, 200 should be plenty
+# (we must also take into account the collection).
+SECRET_NAME_MAX_LENGTH = 200
+
 
 def ensure_authentication():
     """
@@ -44,8 +48,9 @@ def ensure_authentication():
 
 def validate_collection(_ctx, _param, value):
     if not re.fullmatch("[a-z0-9-]*", value):
+        invalid_chars = set(re.findall(r"[^a-z0-9-]", value))
         raise click.BadParameter(
-            "May only contain lowercase letters, numbers or dashes."
+            f"May only contain lowercase letters, numbers or dashes. Invalid characters: {', '.join(repr(c) for c in sorted(invalid_chars))}"
         )
     return value
 
@@ -60,7 +65,12 @@ def validate_secret_name(_ctx, _param, value):
             f"The name '{UPDATER_SA_SECRET_NAME}' is reserved for internal use and cannot be used as a secret name."
         )
     if not re.fullmatch("[A-Za-z0-9-]+", value):
-        raise click.BadParameter("May only contain letters, numbers or dashes.")
+        invalid_chars = set(re.findall(r"[^A-Za-z0-9-]", value))
+        raise click.BadParameter(
+            f"May only contain letters, numbers or dashes. Invalid characters: {', '.join(repr(c) for c in sorted(invalid_chars))}"
+        )
+    if len(value) > SECRET_NAME_MAX_LENGTH:
+        raise click.BadParameter(f"Secret name must be less than {SECRET_NAME_MAX_LENGTH} characters.")
     return value
 
 
