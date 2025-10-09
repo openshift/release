@@ -24,8 +24,8 @@ source "${SHARED_DIR}/govc.sh"
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
-echo "Installing from initial release $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
-oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" \
+#echo "Installing from initial release $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
+oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" quay.io/openshift-release-dev/ocp-release:4.19.14-x86_64 \
   --command=openshift-install --to=/tmp
 
 echo "Creating agent image..."
