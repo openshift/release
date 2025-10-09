@@ -271,6 +271,8 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
     echo "ocpversion: ${ocpVersion}"
     if [[ -n "${ocpVersion:-}" ]]; then
         set +oex
+        tmpDir=$(mktemp -d)
+        cd ${tmpDir}
         tag=$(oc adm release info "${ocpVersion}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
         echo "Extracting oc-mirror from ${ocpVersion}"
         set -x
@@ -279,6 +281,8 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
         chmod +x ./oc-mirror
         ./oc-mirror version --output yaml
         cp ./oc-mirror /usr/local/bin/
+        cd /tmp/output
+        echo "oc mirror version:"
         oc mirror version --v2 --output yaml
         set +x
     fi
