@@ -1,0 +1,46 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: step-1
+  capabilities:
+  - intranet
+  cron: 0 6 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: metal-redhat-gs
+    env:
+      TIMEOUT: 30 min
+    test:
+    - ref: redhat-chaos-start-krkn
+    - ref: redhat-chaos-pod-scenarios-kube-apiserver-disruption
+    - ref: wait
+    workflow: external-cluster
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: lp-chaos
+  variant: ocp4.19-weiliu-gs
