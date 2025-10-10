@@ -1,0 +1,47 @@
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/python-312
+
+      USER root
+
+      ENV GO_VERSION=1.24.3
+      ENV PATH="/usr/local/go/bin:$PATH"
+
+      RUN dnf install -y tar gzip git gpgme gpgme-devel pkgconfig make && \
+          curl -Ls https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz | tar -C /usr/local -xz && \
+          python -m pip install --no-cache-dir uv && \
+          dnf clean all && rm -rf /var/cache/dnf /tmp/*
+
+      # Prow expects to be able to check out a repo under /go
+      RUN mkdir -p /go && \
+      chown 1001:1001 /go && \
+      chmod 755 /go
+
+      WORKDIR /go
+      USER 1001:1001
+canonical_go_repository: github.com/migtools/rebasebot
+images:
+- dockerfile_path: Containerfile.oadp
+  to: rebasebot-oadp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make deps
+tests:
+- as: unit
+  commands: make deps && make unittests
+  container:
+    from: src
+- as: lint
+  commands: make deps && make lint
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: rebasebot
