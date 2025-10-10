@@ -311,7 +311,7 @@ CONFIG = {
     'nutanix-qe-flow-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
-        'default': 18,
+        'default': 8,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,
@@ -427,7 +427,7 @@ CONFIG = {
         'us-east-1': 10,
     },
     'hypershift-hive-quota-slice': {
-        'default': 80
+        'default': 20
     },
     'aws-virtualization-quota-slice': {
         'us-east-1': 5,
