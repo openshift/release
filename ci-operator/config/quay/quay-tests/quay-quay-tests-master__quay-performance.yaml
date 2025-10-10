@@ -65,14 +65,19 @@ tests:
       COLLAPSE: "true"
       COMPUTE_NODE_REPLICAS: "5"
       COMPUTE_NODE_TYPE: m6a.8xlarge
+      CUSTOM_BUILD_IMAGE: quay.io/vchalla/bugzooka:latest
       ES_METADATA_INDEX: perf_scale_ci*
       ES_TYPE: quay-qe
       LOOKBACK: "180"
       LOOKBACK_SIZE: "15"
+      METRIC_PROFILES: ' --metrics-profile=https://raw.githubusercontent.com/quay/quay-performance-scripts/refs/heads/metric-profiles/assets/profiles/metrics-timeseries.yaml,https://raw.githubusercontent.com/quay/quay-performance-scripts/refs/heads/metric-profiles/assets/profiles/metrics-report.yaml'
       ORION_CONFIG: examples/quay-load-test-stable-stage.yaml
       ORION_ENVS: ocp_version=4.18,quay_version=stable-stage,quay_load_test_index=quay-vegeta-results*,quay_image_push_pull_index=quay-push-pull*
       OUTPUT_FORMAT: JUNIT
       RUN_ORION: "true"
+      TEST_BATCH_SIZE: "1"
+    post:
+    - ref: openshift-qe-kube-burner-index
     test:
     - ref: quay-tests-test-stage-performance
     - ref: openshift-qe-orion
