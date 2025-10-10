@@ -33,8 +33,7 @@ source "${SHARED_DIR}/packet-conf.sh"
 # SSH to the packet system and degrade the second node
 echo "Connecting to packet system to degrade ostest_master_1..."
 
-timeout -s 9 5m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.*auths.*/*** 
-PULL_SECRET ***/g'
+timeout -s 9 5m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 set -xeo pipefail
 set -o nounset
 set -o errexit
