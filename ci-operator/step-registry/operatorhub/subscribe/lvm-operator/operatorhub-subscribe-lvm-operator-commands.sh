@@ -4,9 +4,23 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Auto-detect namespace based on cluster version if not explicitly set
 if [[ -z "${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
-  echo "ERROR: INSTALL_NAMESPACE is not defined"
-  exit 1
+  CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
+  MINOR_VERSION=$(echo $CLUSTER_VERSION | cut -d. -f2)
+
+  echo "Detected OpenShift version: ${CLUSTER_VERSION}"
+
+  # For OpenShift 4.20+, use openshift-lvm-storage, otherwise use openshift-storage
+  if [[ ${MINOR_VERSION} -ge 20 ]]; then
+    LVM_OPERATOR_SUB_INSTALL_NAMESPACE="openshift-lvm-storage"
+  else
+    LVM_OPERATOR_SUB_INSTALL_NAMESPACE="openshift-storage"
+  fi
+
+  echo "Auto-detected namespace: ${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
+else
+  echo "Using explicitly set namespace: ${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
 fi
 
 if [[ -z "${LVM_OPERATOR_SUB_PACKAGE}" ]]; then

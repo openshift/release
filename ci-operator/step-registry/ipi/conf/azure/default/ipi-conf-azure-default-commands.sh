@@ -19,9 +19,16 @@ if [[ ${OCP_ARCH} != "amd64" ]] && [[ ${OCP_ARCH} != "arm64" ]]; then
   exit 1
 fi
 
+if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+  echo "Using default value: ${BASE_DOMAIN}"
+  AZURE_BASE_DOMAIN="${BASE_DOMAIN}"
+else
+  AZURE_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
+fi
+
 PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
 cat > "${PATCH}" << EOF
-baseDomain: ${BASE_DOMAIN}
+baseDomain: ${AZURE_BASE_DOMAIN}
 platform:
   azure:
     baseDomainResourceGroupName: ${BASE_DOMAIN_RESOURCE_GROUP}
