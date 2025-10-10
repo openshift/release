@@ -270,16 +270,17 @@ fi
 if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
     echo "ocpversion: ${ocpVersion}"
     if [[ -n "${ocpVersion:-}" ]]; then
-        set +oe
-        tmp=$(mktemp -d)
-        cd ${tmp}
+        set +oex
         tag=$(oc adm release info "${ocpVersion}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
         echo "Extracting oc-mirror from ${ocpVersion}"
+        set -x
         oc image extract "${tag}" --path=/usr/bin/oc-mirror:. -a "${CLUSTER_PROFILE_DIR}/pull-secret"
+        ls -la ./oc-mirror
         chmod +x ./oc-mirror
         ./oc-mirror version --output yaml
-        sudo "cp ./oc-mirror /usr/local/bin/"
+        cp ./oc-mirror /usr/local/bin/
         oc mirror version --v2 --output yaml
+        set +x
     fi
     echo "debug...."
     #sleep 2h
