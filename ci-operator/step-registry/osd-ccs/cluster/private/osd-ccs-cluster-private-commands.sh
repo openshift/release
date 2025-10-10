@@ -64,6 +64,7 @@ function wait_for_dns() {
   done
 
   logger "ERROR" "Expecting ${expected_num_priv_ip} dns record-sets in zone '${zone_name}' with private IP addresses, but found only ${real_num_priv_ip}."
+  sleep 7200
   return 1
 }
 
@@ -124,3 +125,4 @@ fi
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
 check_private
+
