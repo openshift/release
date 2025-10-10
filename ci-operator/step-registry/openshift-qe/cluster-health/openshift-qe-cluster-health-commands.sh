@@ -9,6 +9,6 @@ fi
 
 # Run cluster health checks locally (proxied for baremetal)
 oc version
-oc get node
+oc get node -o wide
 oc adm wait-for-stable-cluster --minimum-stable-period=${MINIMUM_STABLE_PERIOD} --timeout=${TIMEOUT}
 

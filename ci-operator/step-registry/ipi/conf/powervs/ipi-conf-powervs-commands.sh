@@ -127,7 +127,7 @@ case "${LEASED_RESOURCE}" in
       POWERVS_ZONE=eu-de-1
       VPCREGION=eu-de
    ;;
-   "lon04-powervs-8-quota-slice-1")
+   "fran-powervs-8-quota-slice-1")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_FRAN-1")
       POWERVS_REGION=eu-de
       POWERVS_ZONE=eu-de-2

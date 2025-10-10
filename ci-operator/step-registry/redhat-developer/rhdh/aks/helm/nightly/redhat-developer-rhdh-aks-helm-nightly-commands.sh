@@ -136,7 +136,7 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"
 else
     # Timeout configuration for waiting for Docker image availability
-    MAX_WAIT_TIME_SECONDS=$((55*60))    # Maximum wait time of 55 minutes
+    MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
     POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
 
     ELAPSED_TIME=0

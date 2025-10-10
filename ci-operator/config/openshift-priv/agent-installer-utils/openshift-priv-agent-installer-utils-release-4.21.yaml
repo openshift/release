@@ -3,26 +3,26 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/agent-installer-utils
 images:
 - dockerfile_path: images/Dockerfile.ocp
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: agent-installer-utils
 promotion:
   to:
@@ -66,18 +66,18 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
-- as: e2e-agent-sno-ipv6
+- always_run: false
+  as: e2e-agent-sno-ipv6
   cluster: build05
   optional: true
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-sno-ipv6
   timeout: 6h0m0s
-- as: e2e-agent-ha-dualstack
+- always_run: false
+  as: e2e-agent-ha-dualstack
   cluster: build05
   optional: true
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -86,18 +86,13 @@ tests:
         MIRROR_IMAGES=true
     workflow: agent-e2e-generic
   timeout: 6h0m0s
-- as: e2e-agent-iso-no-registry-compact-ipv4
+- always_run: false
+  as: e2e-agent-compact-ipv4-iso-no-registry
   cluster: build05
   optional: true
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
-        AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
-        AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
-    workflow: agent-e2e-generic
+    workflow: agent-e2e-compact-ipv4-iso-no-registry
   timeout: 6h0m0s
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .

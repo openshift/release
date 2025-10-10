@@ -148,6 +148,19 @@ function get_pinned_image_file() {
     echo "${ARTIFACT_DIR}/pinnedimageset-${MCP}.yaml"
 }
 
+function get_pinnedimageset_api_version() {
+    # Check if v1alpha1 API is available
+    if oc api-resources --api-group=machineconfiguration.openshift.io | grep -q "pinnedimagesets.*v1alpha1"; then
+        echo "machineconfiguration.openshift.io/v1alpha1"
+    else
+        echo "machineconfiguration.openshift.io/v1"
+    fi
+}
+
+# Detect the appropriate API version
+PINNEDIMAGESET_API_VERSION=$(get_pinnedimageset_api_version)
+echo "Using PinnedImageSet API version: ${PINNEDIMAGESET_API_VERSION}"
+
 # Writing the PinnedImageSet files
 for MACHINE_CONFIG_POOL in ${MCO_CONF_DAY2_PINTARGETRELEASE_MCPS}; do
     file=$(get_pinned_image_file "${MACHINE_CONFIG_POOL}")
@@ -155,7 +168,7 @@ for MACHINE_CONFIG_POOL in ${MCO_CONF_DAY2_PINTARGETRELEASE_MCPS}; do
 
 
     cat << EOF >> "${file}"
-apiVersion: machineconfiguration.openshift.io/v1alpha1
+apiVersion: ${PINNEDIMAGESET_API_VERSION}
 kind: PinnedImageSet
 metadata:
   labels:

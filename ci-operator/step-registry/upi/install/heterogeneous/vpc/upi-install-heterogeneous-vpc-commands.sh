@@ -1,6 +1,8 @@
 #!/bin/bash
 
+set -o errexit
 set -o nounset
+set -o pipefail
 
 error_handler() {
   echo "Error: (${1}) occurred on (${2})"
