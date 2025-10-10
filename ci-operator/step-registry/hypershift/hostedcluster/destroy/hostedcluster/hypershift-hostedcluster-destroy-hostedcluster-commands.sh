@@ -41,18 +41,28 @@ else
   echo "$HOSTED_CLUSTER_FILE does not exist. Defaulting to the default cluster name: $CLUSTER_NAME."
 fi
 
-createdAt=`oc -n clusters get hostedclusters $CLUSTER_NAME -o jsonpath='{.metadata.annotations.created-at}'`
-if [ -z $createdAt ]; then
-  echo Cluster is broken.
-  oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "broken=true"
-  if [ "$HYPERSHIFT_KEEP_BROKEN_CLUSTER" == "true" ]; then
-    echo "Keeping broken cluster"
-    exit 0
+set +e
+clusterExists=$(oc -n clusters get hostedclusters $CLUSTER_NAME -o name 2>/dev/null)
+clusterExitCode=$?
+set -e
+
+if [ $clusterExitCode -eq 0 ] && [ -n "$clusterExists" ]; then
+  echo "Hosted cluster $CLUSTER_NAME exists, checking creation status"
+  createdAt=$(oc -n clusters get hostedclusters $CLUSTER_NAME -o jsonpath='{.metadata.annotations.created-at}' 2>/dev/null || echo "")
+  if [ -z "$createdAt" ]; then
+    echo "Cluster is broken (no created-at annotation)"
+    oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "broken=true" --overwrite
+    if [ "$HYPERSHIFT_KEEP_BROKEN_CLUSTER" == "true" ]; then
+      echo "Keeping broken cluster"
+      exit 0
+    else
+      echo "Deleting broken cluster"
+    fi
   else
-    echo "Deleting broken cluster"
+    echo "Cluster was successfully created at $createdAt"
   fi
 else
-  echo Cluster was successfully created at $createdAt
+  echo "Hosted cluster $CLUSTER_NAME not found in management cluster, will attempt to clean up any orphaned infrastructure resources"
 fi
 
 echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
