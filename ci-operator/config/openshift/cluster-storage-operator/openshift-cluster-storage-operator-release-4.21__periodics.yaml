@@ -3,6 +3,14 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: cluster-storage-operator-test
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 releases:
@@ -22,6 +30,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: periodic-e2e-vsphere-ovn-upgrade-check-dev-symlinks
+  cron: '@daily'
+  steps:
+    cluster_profile: vsphere-elastic
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-vsphere-storage-symlinks
 - as: periodic-e2e-aws-ovn-upgrade-check-dev-symlinks
   cron: '@daily'
   steps:
