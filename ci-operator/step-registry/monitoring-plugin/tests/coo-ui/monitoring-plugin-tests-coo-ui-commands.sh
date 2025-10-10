@@ -140,4 +140,6 @@ ls -ltr
 npm install
 
 # Run the Cypress tests
-npm run test-cypress-coo-bvt
+npm run test-cypress-coo
+npm run test-cypress-incidents
+npm run test-cypress-monitoring

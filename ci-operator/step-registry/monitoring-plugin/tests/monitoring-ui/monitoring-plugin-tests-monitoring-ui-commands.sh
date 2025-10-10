@@ -141,5 +141,3 @@ npm install
 
 # Run the Cypress tests
 npm run test-cypress-monitoring
-sleep 1h
-npm run test-cypress-coo-bvt
