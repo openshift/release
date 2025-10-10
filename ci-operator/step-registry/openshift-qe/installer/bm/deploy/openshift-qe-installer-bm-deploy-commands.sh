@@ -6,6 +6,14 @@ set -x
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+target_bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+
+# Check if target bastion is in maintenance mode
+if ssh ${SSH_ARGS} -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p root@${bastion}" root@${target_bastion} 'test -f /root/pause'; then
+  echo "The cluster is on maintenance mode. Remove the file /root/pause in the bastion host when the maintenance is over"
+  exit 1
+fi
+
 CRUCIBLE_URL=$(cat ${CLUSTER_PROFILE_DIR}/crucible_url)
 JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
