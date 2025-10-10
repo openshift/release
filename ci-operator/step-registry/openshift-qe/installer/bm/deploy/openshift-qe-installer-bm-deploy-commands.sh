@@ -31,7 +31,8 @@ QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
-
+HOSTNAME=$(cat ${CLUSTER_PROFILE_DIR}/hostname)
+HV_HW_NAME=$(echo $HOSTNAME | awk -F'[-.]' '{print $4}')
 
 echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
 
@@ -98,6 +99,45 @@ oc --kubeconfig=${SHARED_DIR}/kubeconfig config set-cluster "$(oc config current
 
 trap 'cleanup_ssh' EXIT
 PROXY_EOF
+fi
+
+if [[ ${TYPE} == 'vmno' ]]; then
+  cat <<EOF >>/tmp/all.yml
+hv_ssh_pass: $LOGIN
+hv_ip_offset: 0
+hv_vm_ip_offset: 20
+compact_cluster_dns_count: 0
+standard_cluster_dns_count: 0
+EOF
+fi
+
+if [[ ${TYPE} == 'vmno' && $VMNO_HV_VM_JETLAG_DEFAULTS == "false" ]]; then
+  cat <<EOF >>/tmp/all.yml
+hv_vm_cpu_count: $HV_VM_CPU_COUNT
+hv_vm_memory_size: $HV_VM_MEMORY_SIZE
+hv_vm_disk_size: $HV_VM_DISK_SIZE
+hw_vm_counts:
+  $LAB:
+    $HV_HW_NAME:
+      $HV_VM_DISK1_CONFIG
+      $HV_VM_DISK2_CONFIG
+      $HV_VM_DISK3_CONFIG
+EOF
+fi
+
+if [[ ${TYPE} == 'vmno' ]]; then
+  cat <<EOF >>/tmp/hv.yml
+install_tc: true
+lab: $LAB
+ssh_public_key_file: ~/.ssh/id_rsa.pub
+setup_coredns: false
+use_bastion_registry: false
+setup_hv_vm_dhcp: false
+compact_cluster_dns_count: 0
+standard_cluster_dns_count: 0
+hv_vm_generate_manifests: true
+sno_cluster_count: 0
+EOF
 fi
 
 if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
@@ -211,12 +251,16 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/clean-resources.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
-   if [[ ! -z \"$NUM_HYBRID_WORKER_NODES\" ]]; then
+   if [[ ! -z \"$NUM_HYBRID_WORKER_NODES\" || \"$TYPE\" == \"vmno\" ]]; then
      export ANSIBLE_HOST_KEY_CHECKING=False
      ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/hv-setup.yml -v | tee /tmp/ansible-hv-setup-$(date +%s)
      ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/hv-vm-create.yml -v | tee /tmp/ansible-hv-vm-create-$(date +%s)
    fi
-   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
+   if [[ \"$TYPE\" == \"vmno\" ]]; then
+     ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/mno-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
+   else
+     ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
+   fi
    mkdir -p /root/$LAB/$LAB_CLOUD/$TYPE
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=${KUBECONFIG_SRC} dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig flat=true'
    deactivate
