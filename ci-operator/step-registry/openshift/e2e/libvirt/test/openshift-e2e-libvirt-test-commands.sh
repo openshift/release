@@ -15,6 +15,7 @@ libvirt-ppc64le*|libvirt-s390x*|powervs*)
     exit 1
     ;;
 esac
+sleep 60m
 
 function upgrade() {
     set -x
