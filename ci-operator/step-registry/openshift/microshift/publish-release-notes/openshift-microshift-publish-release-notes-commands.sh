@@ -14,5 +14,7 @@ APP_ID="$(cat /secrets/pr-creds/app_id)"
 export APP_ID
 export CLIENT_KEY=/secrets/pr-creds/key.pem
 
+sleep 3600
+
 cd /go/src/github.com/openshift/microshift/
 ./scripts/release-notes/gen_ec_release_notes.sh ${DRY_RUN}
