@@ -1,0 +1,61 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: liliu-external-aws
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      KCFG_SRC_SFX: liliu--chaos-test
+      TIMEOUT: 30 min
+    test:
+    - as: liliu-check
+      commands: |
+        set +eu
+        shopt -s expand_aliases
+        set -x
+        shopt -op; shopt -p
+        printenv
+        pwd
+        ps faux
+        ls -laF
+        ls -laF "${SHARED_DIR}/"
+        ls -laF "${CLUSTER_PROFILE_DIR}/"
+        type oc
+        which oc
+        # alias oc='oc --kubeconfig="${CLUSTER_PROFILE_DIR}/kubeconfig"'
+        oc get Nodes,ClusterVersion
+        e=10; while ((e--)); do { [ -e /tmp/debug.done ] && break; sleep 60; }; done
+        true
+      from: cli
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: wait
+    - ref: redhat-chaos-start-krkn
+    - ref: redhat-chaos-pod-scenarios-kube-apiserver-disruption
+    workflow: external-cluster
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: lp-chaos
+  variant: ocp4.19-liliu-aws
