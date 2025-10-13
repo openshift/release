@@ -31,22 +31,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: database
-  capabilities:
-  - nested-podman
-  commands: |
-    unset GOFLAGS
-    podman run --env POSTGRES_PASSWORD=foobar-bizz-buzz --env POSTGRES_USER=access_transparency_service --publish 5432 --detach docker.io/postgres:17 -c log_destination=stderr -c log_statement=all -c logging_collector=off
-  container:
-    from: golang-plus
-  nested_podman: true
-- as: unit-temp
+- as: unit-temp-2
   capabilities:
   - nested-podman
   commands: |
     unset GOFLAGS
     echo "Go Version: $(go version)"
-    make ci-test-unit
+    make db/setup
+    make test
   container:
     from: golang-plus
   nested_podman: true
