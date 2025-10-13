@@ -48,6 +48,9 @@ chain:
     - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION
       default: ""
       documentation: "The Azure Marketplace image version."
+    - name: HYPERSHIFT_AZURE_SELF_MANAGED
+      default: "false"
+      documentation: "If true , a self-managed HCP will be installed in azure cloud provider."
     - name: HYPERSHIFT_ETCD_ENCRYPTION
       default: "false"
       documentation: |-
@@ -324,6 +327,10 @@ chain:
         COMMAND+=(--additional-trust-bundle "${SHARED_DIR}/${ADDITIONAL_CA_BUNDLE_FILE}")
       fi
 
+      if [[ $HYPERSHIFT_AZURE_SELF_MANAGED == "true" ]]; then
+          COMMAND+=(--workload-identities-file "/etc/hypershift-selfmanaged-azurecreds/workload-identities.json")
+      fi
+
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         COMMAND+=(--render)
         if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE == "true" ]]; then
@@ -385,6 +392,9 @@ chain:
     - mount_path: /etc/hypershift-aro-azurecreds
       name: hypershift-aro-azurecreds
       namespace: test-credentials
+    - mount_path: /etc/hypershift-selfmanaged-azurecreds
+      name: hypershift-selfmanaged-azurecreds
+      namespace: test-credentials  
     dependencies:
     - name: "release:latest"
       env: RELEASE_IMAGE_LATEST
