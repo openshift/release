@@ -16,7 +16,7 @@ mapt aws eks create \
   --project-name "eks" \
   --backed-url "s3://${AWS_S3_BUCKET}/eks-${CORRELATE_MAPT}" \
   --conn-details-output "${SHARED_DIR}" \
-  --version 1.31 \
+  --version 1.33 \
   --workers-max 3 \
   --workers-desired 3 \
   --cpus 2 \
