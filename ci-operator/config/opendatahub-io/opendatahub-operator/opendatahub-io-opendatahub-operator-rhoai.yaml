@@ -1,8 +1,4 @@
 base_images:
-  cli-operator-sdk:
-    name: cli-operator-sdk
-    namespace: ocp
-    tag: v1.39.2
   ubi:
     name: ubi-minimal
     namespace: ocp
@@ -19,22 +15,17 @@ images:
   to: opendatahub-operator
 operator:
   bundles:
-  - as: opendatahub-operator-bundle
-    dockerfile_path: Dockerfiles/bundle.Dockerfile
-    skip_building_index: true
+  - dockerfile_path: Dockerfiles/bundle.Dockerfile
   substitutions:
   - pullspec: REPLACE_IMAGE:latest
     with: pipeline:opendatahub-operator
 releases:
   latest:
     release:
-      architecture: multi
       channel: stable
       version: "4.19"
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 200m
       memory: 200Mi
@@ -59,19 +50,13 @@ tests:
 - as: opendatahub-operator-e2e
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$
   steps:
-    allow_best_effort_post_steps: true
-    cluster_profile: aws-opendatahub
-    dependencies:
-      OO_BUNDLE: opendatahub-operator-bundle
+    cluster_profile: gcp-opendatahub
     env:
-      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
-      COMPUTE_NODE_TYPE: m5.2xlarge
-      HYPERSHIFT_AWS_REGION: us-west-2
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.19.15-multi
-      HYPERSHIFT_NODE_COUNT: "3"
-      OO_INSTALL_MODE: AllNamespaces
-      OO_INSTALL_NAMESPACE: redhat-ods-operator
-      USE_HOSTED_KUBECONFIG: "true"
+      COMPUTE_NODE_TYPE: n2-standard-8
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: rhods-operator
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: e2e
       cli: latest
@@ -83,7 +68,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: opendatahub-io-hypershift
+    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: rhoai
   org: opendatahub-io

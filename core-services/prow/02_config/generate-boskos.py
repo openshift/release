@@ -111,6 +111,10 @@ CONFIG = {
     'metal-perfscale-telco-quota-slice': {
         'metal-perfscale-telco-rdu2': 1,
     },
+    'aws-restricted-qe-quota-slice': {
+        'us-east-1': 5,
+        'ap-northeast-1': 5,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
@@ -311,7 +315,7 @@ CONFIG = {
     'nutanix-qe-flow-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
-        'default': 18,
+        'default': 8,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,
@@ -427,7 +431,7 @@ CONFIG = {
         'us-east-1': 10,
     },
     'hypershift-hive-quota-slice': {
-        'default': 20
+        'default': 5,
     },
     'aws-virtualization-quota-slice': {
         'us-east-1': 5,
