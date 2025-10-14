@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: multi-arch-builder-controller
+  namespace: ci
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: multi-arch-builder-controller
+  template:
+    metadata:
+      labels:
+        app: multi-arch-builder-controller
+    spec:
+      containers:
+      - args:
+        - --dry-run=false
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_multi-arch-builder-controller_latest
+        imagePullPolicy: Always
+        name: multi-arch-builder-controller
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - mountPath: /.docker/config.json
+          name: docker-config
+          readOnly: true
+          subPath: .dockerconfigjson
+      nodeSelector:
+        kubernetes.io/arch: amd64
+      serviceAccountName: multi-arch-builder-controller
+      volumes:
+      - name: docker-config
+        secret:
+          secretName: multi-arch-builder-controller-build10-registry-credentials

@@ -3,14 +3,14 @@ base_images:
     name: cluster-api-actuator-pkg-test
     namespace: ci
     tag: latest
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: "4.21"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
   tests-private:
     name: tests-private
     namespace: ci
@@ -20,12 +20,12 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.rhel
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: azure-machine-controllers
 promotion:
   to:
@@ -65,9 +65,9 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-azure-ovn
+- always_run: false
+  as: e2e-azure-ovn
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
@@ -84,9 +84,9 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
-- as: e2e-azure-ovn-upgrade
+- always_run: false
+  as: e2e-azure-ovn-upgrade
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
@@ -94,7 +94,6 @@ tests:
   as: e2e-azurestack-ipi
   cluster: build01
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$
   steps:
     cluster_profile: azurestack-dev
     workflow: openshift-e2e-azurestack

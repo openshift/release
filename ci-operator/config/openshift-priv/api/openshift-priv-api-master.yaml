@@ -7,14 +7,14 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -22,12 +22,12 @@ canonical_go_repository: github.com/openshift/api
 images:
 - dockerfile_path: Dockerfile.ocp
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cluster-config-api
 promotion:
   to:
@@ -115,13 +115,13 @@ tests:
   as: e2e-aws-ovn
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: aws-5
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-techpreview
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
@@ -130,14 +130,14 @@ tests:
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   shard_count: 2
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-aws-serial-techpreview
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   shard_count: 2
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
@@ -153,19 +153,19 @@ tests:
   as: e2e-azure
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-upgrade
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-upgrade-out-of-change
   pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
   steps:
-    cluster_profile: aws-4
+    cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
