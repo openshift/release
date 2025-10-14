@@ -112,6 +112,33 @@ echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
+echo "Setting up long-running GKE cluster..."
+DIR="$(pwd)/.ibm/pipelines"
+export DIR
+echo "Sourcing gcloud.sh"
+# shellcheck disable=SC1091
+source "${DIR}/cluster/gke/gcloud.sh"
+echo "Ingesting GKE secrets"
+GKE_SERVICE_ACCOUNT_NAME=$(cat /tmp/secrets/GKE_SERVICE_ACCOUNT_NAME)
+GKE_CLUSTER_NAME=$(cat /tmp/secrets/GKE_CLUSTER_NAME)
+GKE_CLUSTER_REGION=$(cat /tmp/secrets/GKE_CLUSTER_REGION)
+GOOGLE_CLOUD_PROJECT=$(cat /tmp/secrets/GOOGLE_CLOUD_PROJECT)
+GKE_CERT_NAME=$(cat /tmp/secrets/GKE_CERT_NAME)
+GKE_INSTANCE_DOMAIN_NAME=$(cat /tmp/secrets/GKE_INSTANCE_DOMAIN_NAME)
+echo "Authenticating with GKE"
+gcloud_auth "${GKE_SERVICE_ACCOUNT_NAME}" "/tmp/secrets/GKE_SERVICE_ACCOUNT_KEY"
+echo "Getting GKE credentials"
+gcloud_gke_get_credentials "${GKE_CLUSTER_NAME}" "${GKE_CLUSTER_REGION}" "${GOOGLE_CLOUD_PROJECT}"
+echo "Creating GKE SSL certificate"
+gcloud_ssl_cert_create "$GKE_CERT_NAME" "$GKE_INSTANCE_DOMAIN_NAME" "$GOOGLE_CLOUD_PROJECT"
+echo "Getting GKE cluster URL"
+K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+export K8S_CLUSTER_URL
+echo "Sourcing k8s-utils.sh"
+# shellcheck disable=SC1091
+source "${DIR}/cluster/k8s/k8s-utils.sh"
+re_create_k8s_service_account_and_get_token
+
 echo "Setting platform environment variables:"
 export IS_OPENSHIFT="false"
 echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
