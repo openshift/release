@@ -163,5 +163,13 @@ echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
+echo "Platform environment variables:"
+export IS_OPENSHIFT="true"
+echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
+export CONTAINER_PLATFORM="ocp"
+echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
+CONTAINER_PLATFORM_VERSION=$(oc version 2> /dev/null | grep "Server Version:" | cut -d' ' -f3 | cut -d'.' -f1,2 || echo "unknown")
+export CONTAINER_PLATFORM_VERSION
+echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
