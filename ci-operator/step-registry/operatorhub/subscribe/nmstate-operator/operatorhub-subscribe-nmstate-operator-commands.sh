@@ -89,4 +89,25 @@ if [[ "$i" == "max" ]]; then
   exit 1
 fi
 
+# Instantiate the operator
+cat <<EOF | oc create -f -
+apiVersion: nmstate.io/v1
+kind: NMState
+metadata:
+  namespace: ${NMSTATE_OPERATOR_SUB_TARGET_NAMESPACES}
+  name: nmstate
+EOF
+
+if [ $? == 0 ]; then
+    echo "Successfully instantiated NMstate CR"
+else
+    echo "Error: Failed to create NMstate CR"
+    return 1
+fi
+
+# (mko) Because of some mysterious issues we get rid of console plugin.
+#       Ref.: https://redhat-internal.slack.com/archives/CP7329Z5Z/p1760432914245089
+sleep 10
+oc -n ${NMSTATE_OPERATOR_SUB_TARGET_NAMESPACES} delete deployment nmstate-console-plugin
+
 echo "successfully installed ${NMSTATE_OPERATOR_SUB_PACKAGE}"
