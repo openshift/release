@@ -1,0 +1,69 @@
+base_images:
+  ubi8: 
+    namespace: ocp
+    name: ubi8
+    tag: "8"
+build_root:
+  image_stream_tag:
+    namespace: openshift
+    name: release
+    tag: golang-1.21
+canonical_go_import: github.com/redhat-developer/rhdh
+images:
+- context_dir: .
+  dockerfile_path: docker/Dockerfile
+  from: ubi8
+  inputs:
+    ubi8:
+      as:
+      - ubi8
+  to: rhdh
+promotion:
+  name: rhdh-1.8.0
+  namespace: redhat-developer
+releases:
+  latest:
+    integration:
+      name: "4.16"
+      namespace: ocp
+tests:
+- as: unit
+  commands: |
+    #!/bin/bash
+    set -euo pipefail
+    source $(dirname ${BASH_SOURCE})/lib.sh
+    
+    # Install dependencies
+    yarn install --frozen-lockfile
+    
+    # Run unit tests
+    yarn test:unit
+    
+    # Run linting
+    yarn lint
+    
+  container:
+    from: ubi8
+  steps:
+    test:
+    - ref: ubi8
+    - run: |
+        #!/bin/bash
+        set -euo pipefail
+        source $(dirname ${BASH_SOURCE})/lib.sh
+        
+        # Install Node.js
+        curl -fsSL https://rpm.nodesource.com/setup_18.x | bash -
+        yum install -y nodejs
+        
+        # Install yarn
+        npm install -g yarn
+        
+        # Install dependencies
+        yarn install --frozen-lockfile
+        
+        # Run unit tests
+        yarn test:unit
+        
+        # Run linting
+        yarn lint

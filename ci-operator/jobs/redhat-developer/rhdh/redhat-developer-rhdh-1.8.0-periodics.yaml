@@ -1,0 +1,68 @@
+- as: rhdh-1.8.0-unit
+  cron: "0 2 * * 1-5"
+  always_run: false
+  optional: true
+  agent: kubernetes
+  branches:
+  - release-1.8
+  - main
+  cluster: build01
+  decoration_config:
+    skip_cloning: true
+  labels:
+    ci-operator.openshift.io/prowgen-controlled: "true"
+    pj-rehearse.openshift.io/can-rehearse: "true"
+  max_concurrency: 1
+  name: periodic-ci-redhat-developer-rhdh-1.8.0-unit
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/etc/gcs/credentials
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/etc/ci-operator
+      - --target=unit
+      - --give-pr-author-access-to-namespace=true
+      - --append-suffix
+      - --target-version=1.8.0
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: build01
+      - name: JOB_NAME_SAFE
+        value: rhdh-1.8.0-unit
+      - name: JOB_NAME
+        value: periodic-ci-redhat-developer-rhdh-1.8.0-unit
+      - name: JOB_SPEC
+        value: '{"type":"periodic","job":"periodic-ci-redhat-developer-rhdh-1.8.0-unit","buildid":"0","prowjobid":"","refs":{},"extra_refs":null,"report":true,"reporter_config":{"slack":{"channel":"#forum-ocp-testplatform","job_states_to_report":["failure"],"report_template":"Job {{.Spec.Job}} ended with state {{.Status.State}}. <{{.Status.URL}}|View logs>"}},"max_concurrency":1,"agent":"kubernetes","cluster":"build01","namespace":"ci","decoration_config":{"skip_cloning":true},"labels":{"ci-operator.openshift.io/prowgen-controlled":"true","pj-rehearse.openshift.io/can-rehearse":"true"},"cron":"0 2 * * 1-5","always_run":false,"optional":true,"branches":["release-1.8","main"]}'
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+          memory: 40Mi
+      volumeMounts:
+      - mountPath: /etc/ci-operator
+        name: ci-operator
+      - mountPath: /etc/gcs
+        name: gcs-credentials
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+      - mountPath: /etc/report
+        name: result-aggregator
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-operator
+      secret:
+        secretName: ci-operator
+    - name: gcs-credentials
+      secret:
+        secretName: gcs-credentials
+    - name: pull-secret
+      secret:
+        secretName: pull-secret
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
