@@ -5,7 +5,7 @@ set -u
 set -o pipefail
 
 echo "[$(date -u --rfc-3339=seconds)] Resolving latest bundle image..."
-BUNDLE_REPO="quay.io/redhat-user-workloads/kueue-operator-tenant/kueue-bundle-1-0"
+BUNDLE_REPO="quay.io/redhat-user-workloads/kueue-operator-tenant/${BUNDLE_COMPONENT}"
 BUNDLE_IMAGE=$(skopeo list-tags docker://$BUNDLE_REPO | jq -r '.Tags[]' | grep -E '^[a-f0-9]{40}$' | while read -r tag; do
     created=$(skopeo inspect docker://$BUNDLE_REPO:$tag 2>/dev/null | jq -r '.Created')
     if [ "$created" != "null" ] && [ -n "$created" ]; then echo "$created $tag"; fi

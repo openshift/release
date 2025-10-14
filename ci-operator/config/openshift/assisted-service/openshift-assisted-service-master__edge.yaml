@@ -80,11 +80,6 @@ images:
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   to: assisted-service
-- build_args:
-  - name: RHEL_VERSION
-    value: "8"
-  dockerfile_path: Dockerfile.assisted-service
-  to: assisted-service-el8
 - dockerfile_path: Dockerfile.assisted-service-debug
   to: assisted-service-debug
 - dockerfile_literal: |
@@ -105,8 +100,6 @@ operator:
   substitutions:
   - pullspec: quay.io/edge-infrastructure/assisted-service:latest
     with: assisted-service
-  - pullspec: quay.io/edge-infrastructure/assisted-service-el8:latest
-    with: assisted-service-el8
   - pullspec: quay.io/edge-infrastructure/assisted-installer:latest
     with: assisted-installer
   - pullspec: quay.io/edge-infrastructure/assisted-installer-agent:latest
@@ -151,29 +144,11 @@ tests:
       SOURCE_IMAGE_REF: assisted-service
     test:
     - ref: assisted-baremetal-images-publish
-- as: mirror-nightly-image-el8
-  cron: '@daily'
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: assisted-service-el8
-    env:
-      IMAGE_REPO: assisted-service-el8
-    test:
-    - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-service
-    test:
-    - ref: assisted-baremetal-images-publish
-- as: mirror-vcsref-image-el8
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: assisted-service-el8
-    env:
-      IMAGE_REPO: assisted-service-el8
     test:
     - ref: assisted-baremetal-images-publish
 - as: operator-publish

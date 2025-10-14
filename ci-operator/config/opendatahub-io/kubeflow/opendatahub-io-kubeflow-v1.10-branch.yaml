@@ -94,13 +94,18 @@ tests:
       RELEASE_VERSION: "1.10"
     workflow: opendatahub-io-ci-image-mirror
 - as: odh-notebook-controller-e2e
+  run_if_changed: ^(components/common/.*|components/notebook-controller/.*|components/odh-notebook-controller/.*)
   steps:
     cluster_profile: aws-opendatahub
     env:
       BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: c5.xlarge
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_CP_AVAILABILITY_POLICY: SingleReplica
       HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.18.2-multi
+      HYPERSHIFT_INFRA_AVAILABILITY_POLICY: SingleReplica
+      HYPERSHIFT_NODE_COUNT: "2"
     test:
     - as: e2e
       cli: latest

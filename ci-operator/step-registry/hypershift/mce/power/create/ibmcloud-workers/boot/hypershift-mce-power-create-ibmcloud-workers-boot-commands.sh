@@ -7,12 +7,7 @@ HOSTED_CLUSTER_NAME="$(printf $PROW_JOB_ID | sha256sum | cut -c-20)"
 export HOSTED_CLUSTER_NAME
 export HOSTED_CONTROL_PLANE_NAMESPACE="${CLUSTERS_NAMESPACE}-${HOSTED_CLUSTER_NAME}"
 
-MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HYPERSHIFT_CLI_NAME=hcp
-if (($(echo "$MCE_VERSION < 2.4" | bc -l))); then
-	echo "MCE version is less than 2.4, use hypershift command"
-	HYPERSHIFT_CLI_NAME=hypershift
-fi
 
 # Fetching Bastion related details
 if [[ -z "${BASTION_CI_SCRIPTS_DIR}" ]]; then

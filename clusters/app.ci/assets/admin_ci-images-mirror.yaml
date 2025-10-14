@@ -51,7 +51,7 @@ metadata:
     keel.sh/policy: force
     keel.sh/matchTag: "true"
     keel.sh/trigger: poll
-    keel.sh/pollSchedule: "@every 1h"
+    keel.sh/pollSchedule: "@every 5m"
   labels:
     app: ci-images-mirror
   name: ci-images-mirror
@@ -79,6 +79,7 @@ spec:
         - --depth=1
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -94,6 +95,7 @@ spec:
         - --max-failures=3
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -103,6 +105,7 @@ spec:
             cpu: "0.5"
       - image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-images-mirror_latest
         name: ci-images-mirror
+        imagePullPolicy: Always
         args:
         - --leader-election-namespace=ci
         - --release-repo-git-sync-path=/var/repo/release

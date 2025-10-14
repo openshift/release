@@ -45,4 +45,4 @@ oc_wait_for_pods() {
 oc_wait_for_pods "redhat-ods-applications"
 
 sleep 300
-echo "OpenShfit AI Operator is deployed successfully"
+echo "OpenShift AI Operator is deployed successfully"
