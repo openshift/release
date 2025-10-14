@@ -35,7 +35,7 @@ oc get vmis -A
 
 export KUBE_VIRT_NAMESPACE=$TARGET_NAMESPACE
 ./kubevirt-outage/prow_run.sh || rc=$?
-
+rc=$?
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
     cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 fi
