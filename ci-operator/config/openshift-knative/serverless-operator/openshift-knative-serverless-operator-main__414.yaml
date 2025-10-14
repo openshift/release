@@ -1,12 +1,8 @@
 base_images:
-  ocp_4.14_cli-artifacts:
-    name: "4.14"
+  ocp_4.16_cli-artifacts:
+    name: "4.16"
     namespace: ocp
     tag: cli-artifacts
-  ocp_ubi-minimal_8:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
   ocp_ubi-minimal_9:
     name: ubi-minimal
     namespace: ocp
@@ -27,10 +23,10 @@ base_images:
     name: knative-serving-src
     namespace: openshift
     tag: knative-v1.17
-  openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.23-openshift-4.19
+    tag: rhel-9-release-golang-1.23-openshift-4.19
   origin_scos-4.20_cli-artifacts:
     name: scos-4.20
     namespace: origin
@@ -45,19 +41,19 @@ build_root:
 images:
 - dockerfile_path: knative-operator/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    ocp_ubi-minimal_9:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: serverless-knative-operator
 - dockerfile_path: must-gather/Dockerfile
   inputs:
-    ocp_4.14_cli-artifacts:
+    ocp_4.16_cli-artifacts:
       as:
       - $CLI_ARTIFACTS
-    ocp_ubi-minimal_8:
+    ocp_ubi-minimal_9:
       as:
       - $RUNTIME
   to: serverless-must-gather
@@ -72,16 +68,16 @@ images:
   to: serverless-index
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    ocp_ubi-minimal_9:
       as:
       - $GO_RUNTIME
   to: serverless-bundle
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    ocp_ubi-minimal_9:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: serverless-openshift-knative-operator
@@ -106,19 +102,19 @@ images:
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    ocp_ubi-minimal_9:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: serverless-ingress
 - dockerfile_path: serving/metadata-webhook/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    ocp_ubi-minimal_9:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: serverless-metadata-webhook
@@ -141,7 +137,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: kitchensink-e2e
+- always_run: false
+  as: kitchensink-e2e
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -227,7 +224,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: kitchensink-e2e-c
+- always_run: false
+  as: kitchensink-e2e-c
   cron: 23 1 * * 1,5
   steps:
     allow_best_effort_post_steps: true
@@ -313,7 +311,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: kitchensink-upgrade
+- always_run: false
+  as: kitchensink-upgrade
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -399,7 +398,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: kitchensink-upgrade-c
+- always_run: false
+  as: kitchensink-upgrade-c
   cron: 43 1 * * 1,5
   steps:
     allow_best_effort_post_steps: true
@@ -485,7 +485,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: mesh-e2e
+- always_run: false
+  as: mesh-e2e
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -571,7 +572,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: mesh-e2e-c
+- always_run: false
+  as: mesh-e2e-c
   cron: 4 1 * * 1,5
   steps:
     allow_best_effort_post_steps: true
@@ -657,7 +659,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: mesh-upgrade
+- always_run: false
+  as: mesh-upgrade
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -743,7 +746,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: operator-e2e
+- always_run: false
+  as: operator-e2e
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -828,7 +832,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: operator-e2e-c
+- always_run: false
+  as: operator-e2e-c
   cron: 16 5 * * 1,5
   steps:
     allow_best_effort_post_steps: true
@@ -914,7 +919,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: test-soak
+- always_run: false
+  as: test-soak
   optional: true
   run_if_changed: test/soak
   steps:
@@ -1001,7 +1007,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: test-soak-c
+- always_run: false
+  as: test-soak-c
   cron: 41 0 * * 1,5
   steps:
     allow_best_effort_post_steps: true
@@ -1087,7 +1094,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: test-upgrade
+- always_run: false
+  as: test-upgrade
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -1172,7 +1180,8 @@ tests:
       timeout: 1h30m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: test-upgrade-c
+- always_run: false
+  as: test-upgrade-c
   cron: 35 4 * * 1,5
   steps:
     allow_best_effort_post_steps: true
@@ -1258,7 +1267,8 @@ tests:
       timeout: 1h30m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: ui-e2e
+- always_run: false
+  as: ui-e2e
   optional: true
   run_if_changed: test/ui
   steps:
@@ -1345,7 +1355,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: ui-e2e-c
+- always_run: false
+  as: ui-e2e-c
   cron: 42 1 * * 1,5
   steps:
     allow_best_effort_post_steps: true
@@ -1431,7 +1442,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: upstream-e2e
+- always_run: false
+  as: upstream-e2e
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -1517,7 +1529,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: upstream-e2e-kafka
+- always_run: false
+  as: upstream-e2e-kafka
   optional: true
   steps:
     allow_best_effort_post_steps: true
@@ -1603,7 +1616,8 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: upstream-e2e-kafka-c
+- always_run: false
+  as: upstream-e2e-kafka-c
   cron: 6 5 * * 1,5
   steps:
     allow_best_effort_post_steps: true

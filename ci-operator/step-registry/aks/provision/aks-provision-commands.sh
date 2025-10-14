@@ -29,15 +29,7 @@ RESOURCE_NAME_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
 
 CLUSTER_AUTOSCALER_ARGS=""
 if [[ "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
-    CLUSTER_AUTOSCALER_ARGS="--enable-cluster-autoscaler"
-fi
-
-if [[ "${AKS_CLUSTER_AUTOSCALER_MIN_NODES:-}" != "" ]]; then
-    CLUSTER_AUTOSCALER_ARGS+=" --min-count ${AKS_CLUSTER_AUTOSCALER_MIN_NODES}"
-fi
-
-if [[ "${AKS_CLUSTER_AUTOSCALER_MAX_NODES:-}" != "" ]]; then
-    CLUSTER_AUTOSCALER_ARGS+=" --max-count ${AKS_CLUSTER_AUTOSCALER_MAX_NODES}"
+    CLUSTER_AUTOSCALER_ARGS=" --cluster-autoscaler-profile balance-similar-node-groups=true"
 fi
 
 CERT_ROTATION_ARGS=""
@@ -60,7 +52,6 @@ AKS_CREATE_COMMAND=(
     az aks create
     --name "$CLUSTER"
     --resource-group "$RESOURCEGROUP"
-    --node-count "$AKS_NODE_COUNT"
     --load-balancer-sku "$AKS_LB_SKU"
     --os-sku "$AKS_OS_SKU"
     "${CLUSTER_AUTOSCALER_ARGS:-}"
@@ -92,16 +83,50 @@ if [[ "$AKS_ENABLE_FIPS_IMAGE" == "true" ]]; then
     AKS_CREATE_COMMAND+=(--enable-fips-image)
 fi
 
-if [[ -n "$AKS_NODE_VM_SIZE" ]]; then
-    AKS_CREATE_COMMAND+=(--node-vm-size "$AKS_NODE_VM_SIZE")
-fi
-
-if [[ -n "$AKS_ZONES" ]]; then
-    AKS_CREATE_COMMAND+=(--zones "$AKS_ZONES")
-fi
-
 echo "Creating AKS cluster"
 eval "${AKS_CREATE_COMMAND[*]}"
+
+echo "Waiting for AKS cluster to be ready"
+az aks wait --created --name "$CLUSTER" --resource-group "$RESOURCEGROUP" --interval 30
+
+if [[ -n "$AKS_ZONES" ]]; then
+    echo "Creating zone-specific node pools"
+    read -ra ZONE_ARRAY <<< "$AKS_ZONES"
+    
+    for zone in "${ZONE_ARRAY[@]}"; do
+        echo "Creating node pool for zone $zone"
+        NODEPOOL_NAME="npz${zone}"
+        
+        NODEPOOL_CMD=(
+            az aks nodepool add
+            --resource-group "$RESOURCEGROUP"
+            --cluster-name "$CLUSTER"
+            --name "$NODEPOOL_NAME"
+            --zones "$zone"
+            --max-pods 250
+            --node-count "$((AKS_NODE_COUNT / ${#ZONE_ARRAY[@]}))"
+        )
+
+        if [[ -n "$AKS_NODE_VM_SIZE" ]]; then
+            NODEPOOL_CMD+=(--node-vm-size "$AKS_NODE_VM_SIZE")
+        fi
+
+        if [[ "${ENABLE_CLUSTER_AUTOSCALER:-}" == "true" ]]; then
+            NODEPOOL_CMD+=(--enable-cluster-autoscaler)
+            
+            if [[ "${AKS_CLUSTER_AUTOSCALER_MIN_NODES:-}" != "" ]]; then
+                NODEPOOL_CMD+=(--min-count "$((AKS_CLUSTER_AUTOSCALER_MIN_NODES))")
+            fi
+            
+            if [[ "${AKS_CLUSTER_AUTOSCALER_MAX_NODES:-}" != "" ]]; then
+                NODEPOOL_CMD+=(--max-count "$((AKS_CLUSTER_AUTOSCALER_MAX_NODES))")
+            fi
+        fi
+
+        echo "Executing node pool creation command for zone $zone"
+        eval "${NODEPOOL_CMD[*]}"
+    done
+fi
 
 echo "Saving cluster info"
 echo "$CLUSTER" > "${SHARED_DIR}/cluster-name"

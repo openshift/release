@@ -39,6 +39,9 @@ chain:
     - name: ENABLE_ICSP
       default: "false"
       documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
+    - name: PUBLIC_ONLY
+      default: "false"
+      documentation: "If true, only public subnets are created (requires release version 4.16 or higher)"
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
       default: ""
       documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
@@ -77,6 +80,9 @@ chain:
     - name: HYPERSHIFT_AUTONODE
       default: "false"
       documentation: "If set to true, it sets the --auto-node flag to true"
+    - name: HC_DISABLED_CAPS
+      default: ""
+      documentation: "Disabling Capabilities in Hosted Cluster,format: 'Console,ImageRegistry...' detail see https://issues.redhat.com/browse/MGMT-20628"
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -100,6 +106,7 @@ chain:
       COMMAND=(
         /usr/bin/hypershift create cluster aws
         --name ${CLUSTER_NAME}
+        --infra-id ${CLUSTER_NAME}
         --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT}
         --instance-type ${HYPERSHIFT_INSTANCE_TYPE}
@@ -123,6 +130,10 @@ chain:
       
       if [[ $ENABLE_ICSP == "true" ]]; then
         COMMAND+=(--image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml")
+      fi
+
+      if [[ $PUBLIC_ONLY == "true" ]]; then
+        COMMAND+=(--public-only)
       fi
       
       if [[ $GUEST_FEATURE_SET == "TechPreviewNoUpgrade" ]]; then
@@ -158,6 +169,11 @@ chain:
         exit 0
       fi
       
+      # Disabling Hosted Cluster capabilities
+      if [[ -n "$HC_DISABLED_CAPS" ]]; then
+        COMMAND+=(--disable-cluster-capabilities "$HC_DISABLED_CAPS")
+      fi
+
       # add cluster-info tags if exists
       hosted_cluster_info_file=${SHARED_DIR}/hosted_cluster_info_file
       if [[ -f "${hosted_cluster_info_file}" ]] ; then

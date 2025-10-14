@@ -49,6 +49,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       QBO_CHANNEL: stable-3.13
       QUAY_OPERATOR_CHANNEL: stable-3.13
+      QUAY_VERSION: "3.13"
       USER_TAGS: |
         scenario quay
     test:
@@ -80,6 +81,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       QBO_CHANNEL: stable-3.12
       QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_VERSION: "3.12"
       USER_TAGS: |
         scenario quay
     test:
@@ -99,6 +101,7 @@ tests:
       QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:886942
       QUAY_OPERATOR_CHANNEL: stable-3.13
       QUAY_OPERATOR_SOURCE: brew-operator-catalog
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-resource-provisioning-storage-odf
@@ -119,6 +122,7 @@ tests:
       QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:894318
       QUAY_OPERATOR_CHANNEL: stable-3.13
       QUAY_OPERATOR_SOURCE: brew-operator-catalog
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-resource-provisioning-storage-odf
@@ -139,6 +143,7 @@ tests:
       QUAY_OPERATOR_CHANNEL: stable-3.13
       QUAY_OPERATOR_SOURCE: brew-operator-catalog
       QUAY_STORAGE_PROVIDER: awssts
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-resource-provisioning-storage-aws-sts-s3
@@ -148,7 +153,7 @@ tests:
     - ref: quay-tests-deprovisioning-aws-gcp-azure-storage-buckets
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: quay-acs-violations-check-quay313
-  cron: 0 22 26 * *
+  cron: '@yearly'
   steps:
     cluster_profile: aws-qe
     env:
@@ -166,6 +171,29 @@ tests:
     - ref: quay-tests-quay-deploy-operator
     - ref: quay-tests-quay-deploy-registry-noobaa
     - ref: quay-tests-quay-acs
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-ceph-ocp417-quay315
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.17
+      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:1046361
+      QUAY_OPERATOR_CHANNEL: stable-3.15
+      QUAY_OPERATOR_SOURCE: brew-operator-catalog
+      QUAY_VERSION: "3.15"
+      ZONES_COUNT: "3"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-resource-provisioning-storage-ceph
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-ceph
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-test-quay-e2e
     workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master

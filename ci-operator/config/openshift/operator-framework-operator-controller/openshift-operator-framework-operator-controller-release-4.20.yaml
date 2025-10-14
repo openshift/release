@@ -43,8 +43,7 @@ images:
   to: e2e-test-registry
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - e2e-test-registry
     name: "4.20"
     namespace: ocp
@@ -118,9 +117,9 @@ tests:
           cpu: 100m
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
-- as: openshift-e2e-aws-techpreview
+- always_run: false
+  as: openshift-e2e-aws-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
     cluster_profile: aws-2
     env:
@@ -167,32 +166,30 @@ tests:
       resources:
         requests:
           cpu: 100m
-- as: tests-extension-verify
+- as: tests-extension
   run_if_changed: ^(openshift/tests-extension/)
   steps:
     test:
-    - as: tests-extension-verify
+    - as: sanity
       commands: |
         cd openshift/tests-extension
         make verify
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-- as: tests-extension
-  steps:
-    test:
-    - as: tests-extension
-      commands: |
-        echo "Build binary olmv1-tests-ext"
-        cd openshift/tests-extension
         make build
-        echo "Running olmv1-tests-ext with all tests"
-        ./bin/olmv1-tests-ext run-suite olmv1/all
+        make verify-metadata
       from: src
       resources:
         requests:
           cpu: 100m
+- as: e2e-aws-techpreview-olmv1-ext
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/all
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

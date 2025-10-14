@@ -9,27 +9,43 @@ ls
 
 function cerberus_cleanup() {
 
-  curl_status=$(curl -X GET http://0.0.0.0:8080)
+  curl_status=$(curl -X GET http://0.0.0.0:8080 2>/dev/null || cat /tmp/cerberus_status 2>/dev/null)
   echo "killing cerberus observer"
-  kill -15 ${cerberus_pid}
-  
-  # c_status=$(cat /tmp/cerberus_status)
+  kill ${cerberus_pid}
+
+  if [[ -z $curl_status ]]; then
+    if [ ! -f "${KUBECONFIG}" ]; then
+      # Setting status to true because kubeconfig never was set and cerberus didn't run
+      curl_status=True
+    else 
+      curl_status=False
+    fi
+  fi
   date
   ls 
   oc get ns
-
-  oc get pods -n $TEST_NAMESPACE
-
+  jobs -l
+  
   oc cluster-info
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
   echo '{"cerberus": '$curl_status'}' >> test.json
-  
-  CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE --no-headers | awk '{print $1}')
 
-  oc cp -n $TEST_NAMESPACE test.json $CREATED_POD_NAME:/tmp/test.json 
-  output=$(oc rsh -n $TEST_NAMESPACE $CREATED_POD_NAME cat /tmp/test.json)
-  echo "pod rsh $output"
+  pods=$(oc get pods -n $TEST_NAMESPACE --no-headers 2>/dev/null)
+  if [[ -n $pods ]]; then 
+
+    CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE --no-headers | awk '{print $1}')
+
+    oc cp -n $TEST_NAMESPACE test.json $CREATED_POD_NAME:/tmp/test.json 
+    output=$(oc rsh -n $TEST_NAMESPACE $CREATED_POD_NAME cat /tmp/test.json)
+    echo "pod rsh $output"
+    status_bool=$(echo $output | grep '"cerberus":' | sed 's/.*: //; s/[{},]//g')
+
+    echo "$status_bool staus bool "
+  fi
+
+  replaced_str=$(echo $curl_status | sed "s/True/0/g" | sed "s/False/1/g" )
+  exit $((replaced_str))
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
 

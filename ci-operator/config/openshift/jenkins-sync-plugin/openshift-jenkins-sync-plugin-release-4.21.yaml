@@ -22,6 +22,7 @@ promotion:
   to:
   - additional_images:
       jenkins-sync-plugin-e2e: src
+    disabled: true
     excluded_images:
     - jenkins
     - jenkins-maven-builder
@@ -50,6 +51,24 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e-aws-jenkins-sync-plugin
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      dependencies:
+      - env: JENKINS_IMAGE
+        name: pipeline:jenkins
+      - env: JENKINS_AGENT_BASE_IMAGE
+        name: jenkins-agent-base
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-jenkins-sync-plugin-continuous
+  cron: 0 */12 * * *
   steps:
     cluster_profile: aws
     test:

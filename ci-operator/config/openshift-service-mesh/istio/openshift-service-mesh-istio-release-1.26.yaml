@@ -410,6 +410,26 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-hypershift
+- as: update-istio-module
+  commands: |
+    export BUILD_WITH_CONTAINER="0"
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    ./tools/automator.sh \
+      -o openshift-service-mesh \
+      -r sail-operator \
+      -f /creds-github/token \
+      "-c go mod edit -replace="istio.io/istio=github.com/openshift-service-mesh/istio@release-1.26";go mod tidy;make gen" \
+      '-t [release-3.1] Automator: Update Istio module' \
+      -m bump-istio-mod-1.26 \
+      -b release-3.1
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
+  timeout: 1h0m0s
 zz_generated_metadata:
   branch: release-1.26
   org: openshift-service-mesh

@@ -20,8 +20,10 @@ export INSTALLER_BINARY="openshift-install"
 if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
   CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
   CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"
-  echo "Extracting installer from ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+  echo "Extracting installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
   --command=openshift-install --to="/tmp" || exit 1
   export INSTALLER_BINARY="/tmp/openshift-install"
 fi
@@ -175,7 +177,7 @@ function compose_expected_err_msg()
     if [[ "${expected_err_msg}" != "" ]]; then
       expected_err_msg="${expected_err_msg}, "
     fi
-    expected_err_msg="${expected_err_msg}controlPlane.platform.gcp.type: Invalid value: \"${instance_type1}\": Machine type do not support ${cc_type1}. Machine types supporting ${cc_type1}: ${cc_type_machine_series_dict[${cc_type1}]}"
+    expected_err_msg="${expected_err_msg}controlPlane.platform.gcp.type: Invalid value: \"${instance_type1}\": Machine type does not support a Confidential Compute value of ${cc_type1}. Machine types supporting ${cc_type1}: ${cc_type_machine_series_dict[${cc_type1}]}"
   fi
 
   if [[ "${on_host_maintenance2}" != "Terminate" ]]; then
@@ -189,7 +191,7 @@ function compose_expected_err_msg()
     if [[ "${expected_err_msg}" != "" ]]; then
       expected_err_msg="${expected_err_msg}, "
     fi
-    expected_err_msg="${expected_err_msg}compute[0].platform.gcp.type: Invalid value: \"${instance_type2}\": Machine type do not support ${cc_type2}. Machine types supporting ${cc_type2}: ${cc_type_machine_series_dict[${cc_type2}]}"
+    expected_err_msg="${expected_err_msg}compute[0].platform.gcp.type: Invalid value: \"${instance_type2}\": Machine type does not support a Confidential Compute value of ${cc_type2}. Machine types supporting ${cc_type2}: ${cc_type_machine_series_dict[${cc_type2}]}"
   fi
   set -o errexit
 }

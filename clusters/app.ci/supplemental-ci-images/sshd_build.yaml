@@ -1,79 +1,62 @@
-kind: List
-apiVersion: v1
-items:
-- apiVersion: image.openshift.io/v1
-  kind: ImageStream
-  metadata:
-    name: sshd
-    namespace: ci
-  spec:
-    lookupPolicy:
-      local: true
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  name: sshd
+  namespace: ci
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_sshd_latest
+  source:
+    dockerfile: |
+      FROM quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_7
 
-- kind: BuildConfig
-  apiVersion: build.openshift.io/v1
-  metadata:
-    name: sshd
-    namespace: ci
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
-        kind: ImageStreamTag
-        name: sshd:latest
-    source:
-      dockerfile: |
-        FROM quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_7
-
-        RUN yum -y update && yum -y install openssh-server && yum clean all
-      type: Dockerfile
-    strategy:
-      dockerStrategy:
-        from:
-          kind: DockerImage
-          name: quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_7
-        imageOptimizationPolicy: SkipLayers
-    triggers:
-    - type: ConfigChange
-
-- apiVersion: image.openshift.io/v1
-  kind: ImageStream
-  metadata:
-    name: coredns
-    namespace: ci
-  spec:
-    lookupPolicy:
-      local: true
-
-- kind: BuildConfig
-  apiVersion: build.openshift.io/v1
-  metadata:
-    name: coredns
-    namespace: ci
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
-        kind: ImageStreamTag
-        name: coredns:latest
-    source:
-      dockerfile: |
-        FROM quay-proxy.ci.openshift.org/openshift/ci:openshift_release_golang-1.16 as builder
-        RUN git clone https://github.com/coredns/coredns.git /coredns
-        WORKDIR /coredns
-        RUN go mod vendor && make all
-        FROM registry.access.redhat.com/ubi8/ubi-minimal:latest as ubi
-        COPY --from=builder /coredns/coredns /coredns
-        EXPOSE 53 53/udp
-        ENTRYPOINT ["/coredns"]
-      type: Dockerfile
-    strategy:
-      dockerStrategy:
-        from:
-          kind: DockerImage
-          name: registry.access.redhat.com/ubi8/ubi-minimal:latest
-        imageOptimizationPolicy: SkipLayers
-    triggers:
-    - type: ConfigChange
+      RUN yum -y update && yum -y install openssh-server && yum clean all
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: DockerImage
+        name: quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_7
+      imageOptimizationPolicy: SkipLayers
+  triggers:
+  - type: ConfigChange
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  name: coredns
+  namespace: ci
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_coredns_latest
+  source:
+    dockerfile: |
+      FROM quay-proxy.ci.openshift.org/openshift/ci:openshift_release_golang-1.16 as builder
+      RUN git clone https://github.com/coredns/coredns.git /coredns
+      WORKDIR /coredns
+      RUN go mod vendor && make all
+      FROM registry.access.redhat.com/ubi8/ubi-minimal:latest as ubi
+      COPY --from=builder /coredns/coredns /coredns
+      EXPOSE 53 53/udp
+      ENTRYPOINT ["/coredns"]
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: DockerImage
+        name: registry.access.redhat.com/ubi8/ubi-minimal:latest
+      imageOptimizationPolicy: SkipLayers
+  triggers:
+  - type: ConfigChange

@@ -22,8 +22,7 @@ images:
   to: cluster-olm-operator
 promotion:
   to:
-  - disabled: true
-    name: "4.20"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -57,12 +56,26 @@ tests:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: openshift-e2e-aws-techpreview
-  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
     cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
+- as: openshift-e2e-aws-devpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: DevPreviewNoUpgrade
+    workflow: openshift-e2e-aws
+- as: openshift-e2e-aws-customnoupgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_GATES: '[NewOLMWebhookProviderOpenshiftServiceCA=true]'
+      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws
 - as: verify-deps
   steps:

@@ -8,11 +8,11 @@ base_images:
     namespace: ci
     tag: latest
   cli:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: cli
   upi-installer:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: upi-installer
 binary_build_commands: make go-mod-tidy;make all
@@ -52,7 +52,7 @@ promotion:
   - excluded_images:
     - tests-private-ui
     - tests-private-pr
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   arm64-latest:
@@ -60,12 +60,12 @@ releases:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -83,6 +83,7 @@ tests:
   commands: make name-check
   container:
     from: src
+  skip_if_only_changed: OWNERS$
 - as: bindata-check
   commands: |
     make update
@@ -96,6 +97,7 @@ tests:
     fi
   container:
     from: src
+  skip_if_only_changed: ^images/|OWNERS$
 - as: code-check
   commands: |
     unset GOFLAGS
@@ -104,11 +106,13 @@ tests:
     make check-code
   container:
     from: src
-- as: e2e-aws
+  skip_if_only_changed: OWNERS$
+- always_run: false
+  as: e2e-aws
   optional: true
-  skip_if_only_changed: ^frontend/|^images/|^pipeline/|^test/extended/(cluster_operator/hive|disaster_recovery|hypershift|kata|ocm_terraform|psap/hypernto|rosacli|testdata|util|winc)/|include\.go$
   steps:
-    cluster_profile: aws
+    allow_skip_on_success: true
+    cluster_profile: aws-2
     test:
     - ref: enable-qe-catalogsource
     - as: pr-test
@@ -136,7 +140,8 @@ tests:
           cpu: "1"
           memory: 1Gi
     workflow: ipi-aws
-- as: e2e-console
+- always_run: false
+  as: e2e-console
   optional: true
   run_if_changed: frontend/tests/.*.cy.ts
   steps:

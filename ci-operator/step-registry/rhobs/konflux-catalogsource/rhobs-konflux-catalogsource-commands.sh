@@ -7,7 +7,15 @@ declare -r KONFLUX_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.
 
 declare ICSP_NAME=${ICSP_NAME}
 declare CATALOG_SOURCE=${COO_CATALOG_SOURCE}
-declare COO_INDEX_IMAGE=${COO_INDEX_IMAGE}
+declare COO_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE}
+
+# Check if COO_INDEX_IMAGE is not empty
+if [[ -z "$COO_INDEX_IMAGE" ]]; then
+    echo "Error: COO_INDEX_IMAGE is empty or not set"
+    exit 1
+else
+    echo "COO_INDEX_IMAGE is set to: $COO_INDEX_IMAGE"
+fi
 
 set_proxy() {
 	[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {

@@ -4,7 +4,11 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   ocp_4.20_base-rhel9:
-    name: "4.20"
+    name: "4.21"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.21_base-rhel9:
+    name: "4.21"
     namespace: ocp
     tag: base-rhel9
 build_root:
@@ -13,31 +17,31 @@ images:
 - dockerfile_path: Dockerfile.ocp
   from: prevalidation-base
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
   to: ironic
 promotion:
   to:
   - disabled: true
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
       #NOTE(elfosardo): use ironic repos, cause we're special
-      curl http://base-4-20-rhel-9-ironic-prevalidation.ocp.svc > /etc/yum.repos.art/ci/base-4-20-rhel-9-ironic-prevalidation.repo
+      curl http://base-4-21-rhel-9-ironic-prevalidation.ocp.svc > /etc/yum.repos.art/ci/base-4-21-rhel-9-ironic-prevalidation.repo
     from: ocp_4.20_base-rhel9
     to: prevalidation-base
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':

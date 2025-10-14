@@ -22,7 +22,7 @@ KUBECONFIG="" oc --loglevel=8 registry login
 
 valid_channels=("fast" "stable" "candidate" "eus")
 valid_channel="false"
-for channel in ${valid_channels[*]}; do
+for channel in "${valid_channels[@]}"; do
     if [[ "${UPGRADE_CHANNEL}" == "${channel}" ]]; then
         valid_channel="true" 
         break

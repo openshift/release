@@ -40,5 +40,12 @@ az role assignment create \
 
 echo "Granting ServicePrincipal permissions to the KeyVault"
 SP_ID=$(az ad sp show --id "$AZURE_AUTH_CLIENT_ID" --query id -o tsv)
-KV_ID=$(az keyvault show --name "$KV_NAME" -g "$KV_RG_NAME" --query id -o tsv)
-az role assignment create --assignee "$SP_ID" --scope "$KV_ID" --role "Key Vault Administrator"
+SCOPE=$(az keyvault show --name "$KV_NAME" -g "$KV_RG_NAME" --query id -o tsv)
+ROLE="Key Vault Administrator"
+
+if [ -z "$(az role assignment list --assignee $SP_ID --role "$ROLE" --scope $SCOPE -o tsv)" ]; then
+    echo "ServicePrincipal permissions to the KeyVault does not exist. Creating..."
+    az role assignment create --assignee $SP_ID --role "$ROLE" --scope $SCOPE
+else
+    echo "ServicePrincipal permissions to the KeyVault already exists. Skipping."
+fi

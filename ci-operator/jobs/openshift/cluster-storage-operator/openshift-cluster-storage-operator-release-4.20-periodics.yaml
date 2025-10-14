@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build10
-  cron: 49 23 * * *
+  cron: 36 22 * * *
   decorate: true
   extra_refs:
   - base_ref: release-4.20
@@ -10,17 +10,19 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-cluster-storage-operator-release-4.20-e2e-aws-ovn-upgrade-check-dev-symlinks
+  name: periodic-ci-openshift-cluster-storage-operator-release-4.20-periodics-periodic-e2e-aws-ovn-upgrade-check-dev-symlinks
   reporter_config:
     slack:
       channel: '#forum-ocp-storage'
       job_states_to_report:
       - failure
       - error
-      report_template: ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
+      report_template: |
+        ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -29,10 +31,11 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-aws-ovn-upgrade-check-dev-symlinks
+      - --target=periodic-e2e-aws-ovn-upgrade-check-dev-symlinks
+      - --variant=periodics
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:
@@ -78,19 +81,29 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build08
+  cron: 43 23 * * *
   decorate: true
   extra_refs:
   - base_ref: release-4.20
     org: openshift
     repo: cluster-storage-operator
-  interval: 24h
   labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-3
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp
+    ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-cluster-storage-operator-release-4.20-e2e-aws-selinux-alpha
+  name: periodic-ci-openshift-cluster-storage-operator-release-4.20-periodics-periodic-e2e-gcp-ovn-upgrade-check-dev-symlinks
+  reporter_config:
+    slack:
+      channel: '#forum-ocp-storage'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: |
+        ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -99,10 +112,11 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-aws-selinux-alpha
+      - --target=periodic-e2e-gcp-ovn-upgrade-check-dev-symlinks
+      - --variant=periodics
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:

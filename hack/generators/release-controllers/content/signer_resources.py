@@ -52,7 +52,10 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
             'name': 'release-controller-signer',
             'namespace': 'ci',
             'annotations': {
-                'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\\"controller\\\")].image"}]'
+                'keel.sh/policy': 'force',
+                'keel.sh/matchTag': 'true',
+                'keel.sh/trigger': 'poll',
+                'keel.sh/pollSchedule': '@every 5m'
             }
         },
         'spec': {
@@ -88,7 +91,8 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                     }],
                     'containers': [{
                         'name': 'controller',
-                        'image': 'release-controller:latest',
+                        'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest',
+                        'imagePullPolicy': 'Always',
                         'volumeMounts': [{
                             'name': 'publisher',
                             'mountPath': '/etc/release-controller/publisher',

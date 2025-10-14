@@ -22,8 +22,7 @@ images:
   to: cluster-openshift-controller-manager-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.20-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -77,9 +76,9 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
-- as: openshift-e2e-aws-builds-techpreview
+- always_run: false
+  as: openshift-e2e-aws-builds-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     env:
@@ -97,6 +96,21 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- as: e2e-tests-extension
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: tests-extension
+      commands: |
+        echo "Build binary cluster-openshift-controller-manager-operator-tests-ext"
+        make tests-ext-build
+        echo "Running ./cluster-openshift-controller-manager-operator-tests-ext with suite"
+        ./cluster-openshift-controller-manager-operator-tests-ext run-suite openshift/cluster-openshift-controller-manager-operator/all -j ${ARTIFACT_DIR}/junit_$(shell date +%Y%m%d-%H%M%S).xml
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-serial
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

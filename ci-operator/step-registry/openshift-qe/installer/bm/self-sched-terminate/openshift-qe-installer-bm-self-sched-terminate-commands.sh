@@ -4,9 +4,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-# Fix UID issue (from Telco QE Team)
-~/fix_uid.sh
-
 quads_pwd=$(cat "${CLUSTER_PROFILE_DIR}/quads_pwd")
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 

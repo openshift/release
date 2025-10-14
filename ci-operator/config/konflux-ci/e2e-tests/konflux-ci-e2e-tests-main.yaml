@@ -21,7 +21,7 @@ releases:
     release:
       architecture: amd64
       channel: fast
-      version: "4.16"
+      version: "4.17"
 resources:
   '*':
     limits:
@@ -30,7 +30,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: redhat-appstudio-e2e
+- always_run: false
+  as: redhat-appstudio-e2e
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -39,7 +40,7 @@ tests:
     owner: konflux
     product: ocp
     timeout: 1h0m0s
-    version: "4.16"
+    version: "4.17"
   optional: true
   steps:
     test:
@@ -82,8 +83,8 @@ tests:
       SCENARIO: ci-1u
     workflow: redhat-appstudio-load-test
   timeout: 8h0m0s
-- as: load-test-ci-daily-10u
-  cron: 0 4 * * *
+- always_run: false
+  as: load-test-ci-daily-10u
   steps:
     cluster_profile: aws-rhtap-performance
     env:
@@ -119,6 +120,12 @@ tests:
   steps:
     test:
     - ref: konflux-ci-rosa-cleanup
+  timeout: 1h0m0s
+- as: mapt-clusters-resources-cleanup
+  cron: 0 */4 * * *
+  steps:
+    test:
+    - ref: konflux-ci-mapt-cleanup
   timeout: 1h0m0s
 zz_generated_metadata:
   branch: main

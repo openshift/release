@@ -67,7 +67,7 @@ function networkToSubnetsJson() {
 
   jq -r '.[.spec.primaryRouterHostname] = .[.spec.vlanId] |
   .[.spec.primaryRouterHostname][.spec.vlanId] = .spec |
-  .[.spec.primaryRouterHostname][.spec.vlanId].dnsServer = .spec.gateway |
+  .[.spec.primaryRouterHostname][.spec.vlanId].dnsServer = .spec.nameservers[0] |
   .[.spec.primaryRouterHostname][.spec.vlanId].mask = .spec.netmask |
   .[.spec.primaryRouterHostname][.spec.vlanId].StartIPv6Address= .spec.startIPv6Address |
   .[.spec.primaryRouterHostname][.spec.vlanId].CidrIPv6 = .spec.cidrIPv6' "${NETWORK_CACHE_PATH}" > "${TMPSUBNETSJSON}"
@@ -274,6 +274,30 @@ fi
 
 POOLS=${POOLS:-}
 IFS=" " read -r -a pools <<< "${POOLS}"
+
+# Jobs are now using vault to provide dynamic overrides of configs.  Jobs can still provide their core counts as an
+# override; however, we will calculate based on vault config if not provided.
+SPEC_CONFIG="/var/run/vault/vsphere-ibmcloud-config/vm-specs.json"
+if [[ "${OPENSHIFT_REQUIRED_CORES}" -eq "" ]]; then
+  # add cores for control plane
+  OPENSHIFT_REQUIRED_CORES=$(( CONTROL_PLANE_REPLICAS * $(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG}) ))
+  # add cores for compute
+  OPENSHIFT_REQUIRED_CORES=$(( OPENSHIFT_REQUIRED_CORES + ( COMPUTE_NODE_REPLICAS * $(jq -r '.spec.compute.cpus' ${SPEC_CONFIG}) ) ))
+  # add cores for bootstrap.  currently bootstrap is configured like a control plane vm.
+  OPENSHIFT_REQUIRED_CORES=$(( OPENSHIFT_REQUIRED_CORES + $(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG}) ))
+fi
+
+if [[ "${OPENSHIFT_REQUIRED_MEMORY}" -eq "" ]]; then
+  # add memory for control plane
+  OPENSHIFT_REQUIRED_MEMORY=$(( CONTROL_PLANE_REPLICAS * $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG}) ))
+  # add memory for compute
+  OPENSHIFT_REQUIRED_MEMORY=$(( OPENSHIFT_REQUIRED_MEMORY + ( COMPUTE_NODE_REPLICAS * $(jq -r '.spec.compute.memoryMB' ${SPEC_CONFIG}) ) ))
+  # add memory for bootstrap.  currently bootstrap is configured like a control plane vm.
+  OPENSHIFT_REQUIRED_MEMORY=$(( OPENSHIFT_REQUIRED_MEMORY + $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG}) ))
+
+  # Vault has memory in MB due to install-config using MB, but leases uses GB
+  OPENSHIFT_REQUIRED_MEMORY=$(( OPENSHIFT_REQUIRED_MEMORY / 1024 ))
+fi
 
 OPENSHIFT_REQUIRED_CORES=${OPENSHIFT_REQUIRED_CORES:-24}
 OPENSHIFT_REQUIRED_MEMORY=${OPENSHIFT_REQUIRED_MEMORY:-96}

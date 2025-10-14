@@ -28,20 +28,20 @@ releases:
       stream: nightly
       version: "4.20"
   multi-initial:
-    prerelease:
-      architecture: multi
-      product: ocp
-      version_bounds:
-        lower: 4.20.0-0
-        stream: 4-dev-preview
-        upper: 4.21.0-0
-  multi-latest:
     candidate:
       architecture: multi
       product: ocp
       relative: 1
       stream: nightly
       version: "4.20"
+  multi-latest:
+    prerelease:
+      architecture: multi
+      product: ocp
+      version_bounds:
+        lower: 4.20.0-0
+        stream: 4-stable
+        upper: 4.21.0-0
 resources:
   '*':
     requests:
@@ -49,13 +49,13 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-arm64-deploy-cnv
-  interval: 24h
+  interval: 168h
   steps:
-    cluster_profile: aws-1-qe
+    cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c8g.metal-24xl
       KUBEVIRT_RELEASE: v1.4.0
       KUBEVIRT_STORAGECLASS_NAME: gp3-csi
@@ -73,11 +73,11 @@ tests:
 - as: e2e-aws-arm64-upgrade-cnv
   interval: 168h
   steps:
-    cluster_profile: aws-1-qe
+    cluster_profile: aws
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c8g.metal-24xl
       KUBEVIRT_RELEASE: v1.4.0
       KUBEVIRT_STORAGECLASS_NAME: gp3-csi
@@ -96,8 +96,6 @@ tests:
   interval: 24h
   steps:
     cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     observers:
       enable:
       - observers-resource-watch
@@ -140,8 +138,6 @@ tests:
   interval: 168h
   steps:
     cluster_profile: azure-2
-    env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     observers:
       enable:
       - observers-resource-watch

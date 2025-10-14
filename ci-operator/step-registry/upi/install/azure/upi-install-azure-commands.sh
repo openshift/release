@@ -12,24 +12,6 @@ export PATH=/tmp:${PATH}
 INSTALL_DIR=/tmp/installer
 mkdir ${INSTALL_DIR}
 
-function backoff() {
-    local attempt=0
-    local failed=0
-    while true; do
-        "$@" && failed=0 || failed=1
-        if [[ $failed -eq 0 ]]; then
-            break
-        fi
-        attempt=$(( attempt + 1 ))
-        if [[ $attempt -gt 5 ]]; then
-            break
-        fi
-        echo "command failed, retrying in $(( 2 ** $attempt )) seconds"
-        sleep $(( 2 ** $attempt ))
-    done
-    return $failed
-}
-
 function populate_artifact_dir()
 {
   set +e
@@ -215,7 +197,7 @@ AZURE_AUTH_CLIENT_ID=$(cat $AZURE_AUTH_LOCATION | jq -r .clientId)
 AZURE_AUTH_CLIENT_SECRET=$(cat $AZURE_AUTH_LOCATION | jq -r .clientSecret)
 AZURE_AUTH_TENANT_ID=$(cat $AZURE_AUTH_LOCATION | jq -r .tenantId)
 AZURE_SUBSCRIPTION_ID=$(cat $AZURE_AUTH_LOCATION | jq -r .subscriptionId)
-az login --service-principal -u $AZURE_AUTH_CLIENT_ID -p "$AZURE_AUTH_CLIENT_SECRET" --tenant $AZURE_AUTH_TENANT_ID --output none
+az login --service-principal -u $AZURE_AUTH_CLIENT_ID -p="$AZURE_AUTH_CLIENT_SECRET" --tenant $AZURE_AUTH_TENANT_ID --output none
 az account set --subscription ${AZURE_SUBSCRIPTION_ID}
 
 echo ${AZURE_SUBSCRIPTION_ID} >> ${SHARED_DIR}/AZURE_SUBSCRIPTION_ID

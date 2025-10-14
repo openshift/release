@@ -16,7 +16,7 @@ mkdir -p /tmp/go/bin $GOCACHE \
 
 git clone https://github.com/IshwarKanse/tempo-operator.git /tmp/tempo-tests
 cd /tmp/tempo-tests
-git checkout rhosdt-3.6
+git checkout rhosdt-3.7
 make build
 
 #Enable user workload monitoring.

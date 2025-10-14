@@ -1,0 +1,29 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: "ci-scheduling.ci.openshift.io"
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+webhooks:
+  - name: "ci-schedulding.ci.openshift.io"
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+        scope: "Namespaced"
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["UPDATE"]
+        resources: ["nodes"]
+    clientConfig:
+      service:
+        namespace: "ci-scheduling-webhook"
+        name: "ci-scheduling-admission-webhook"
+        path: "/mutate"
+    admissionReviewVersions: ["v1"]
+    reinvocationPolicy: "IfNeeded"
+    sideEffects: None
+    timeoutSeconds: 5
+    failurePolicy: Ignore

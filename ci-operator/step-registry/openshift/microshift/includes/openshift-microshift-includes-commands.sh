@@ -159,6 +159,7 @@ EXIT_CODE_RPM_INSTALL_FAILURE=6
 EXIT_CODE_CONFORMANCE_SETUP_FAILURE=7
 EXIT_CODE_PCP_FAILURE=8
 EXIT_CODE_WAIT_CLUSTER_FAILURE=9
+EXIT_CODE_REBASE_FAILURE=10
 
 function trap_install_status_exit_code() {
     local -r code=$1
@@ -306,6 +307,33 @@ EOF
     # Re-enable tracing and glob expansion
     set -x
     shopt -u nullglob
+}
+
+# Implement scenario directory check with fallbacks. Simplify or remove the
+# function when the structure is homogenised in all the active releases.
+function get_source_dir() {
+  declare -A SCENARIO_DIRS=(
+    [bootc-upstream]="scenarios-bootc/upstream:scenarios-bootc"
+    [bootc-releases]="scenarios-bootc/releases:scenarios-bootc"
+    [bootc-presubmits]="scenarios-bootc/presubmits:scenarios-bootc"
+    [bootc-periodics]="scenarios-bootc/periodics:scenarios-bootc"
+    [releases]="scenarios/releases:scenarios"
+    [presubmits]="scenarios/presubmits:scenarios"
+    [periodics]="scenarios/periodics:scenarios-periodics"
+  )
+  local -r scenario_type=$1
+  local -r base="/home/${HOST_USER}/microshift/test"
+  local -r dirs="${SCENARIO_DIRS[$scenario_type]}"
+  local -r ndir="${base}/$(echo "$dirs" | cut -d: -f1)"
+  local -r fdir="${base}/$(echo "$dirs" | cut -d: -f2)"
+
+  # We need the variable to expand on the client side
+  # shellcheck disable=SC2029
+  if ssh "${INSTANCE_PREFIX}" "[ -d \"${ndir}\" ]" ; then
+    echo "${ndir}"
+  else
+    echo "${fdir}"
+  fi
 }
 
 #

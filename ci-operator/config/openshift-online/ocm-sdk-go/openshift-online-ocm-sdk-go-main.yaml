@@ -1,0 +1,64 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+images:
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY /src /opt/app-root/src
+    WORKDIR /opt/app-root/src/ocm-sdk-go
+    USER root
+    RUN dnf install -y git go make
+    RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+    RUN dnf install -y pass || true
+    RUN dnf install -y qrencode || true
+    RUN dnf install -y https://rpmfind.net/linux/centos-stream/9-stream/BaseOS/x86_64/os/Packages/tree-1.8.0-10.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-libs-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/p/pass-1.7.4-16.el9.noarch.rpm || true
+    RUN dnf clean all
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/openshift-online/ocm-sdk-go
+  to: golang-plus-pass
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    make test
+  container:
+    from: golang-plus-pass
+  nested_podman: true
+- as: examples
+  commands: |
+    unset GOFLAGS
+    make examples
+  container:
+    from: src
+- as: verify
+  commands: |
+    unset GOFLAGS
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.61.0
+    HOME=${ARTIFACT_DIR} make verify
+  container:
+    from: src
+  optional: true
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: ocm-sdk-go

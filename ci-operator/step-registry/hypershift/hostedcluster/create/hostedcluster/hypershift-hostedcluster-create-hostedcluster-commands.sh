@@ -109,7 +109,7 @@ case "${PLATFORM}" in
       ARGS+=( "--multi-arch" )
     fi
 
-    if [[ "${HYPERSHFIT_SKIP_VERSION_VALIDATION}" == "true" ]]; then
+    if [[ "${HYPERSHIFT_SKIP_VERSION_VALIDATION}" == "true" ]]; then
       ARGS+=( --annotations "hypershift.openshift.io/skip-release-image-validation=true" )
     fi
 
@@ -170,7 +170,6 @@ case "${PLATFORM}" in
       --processors ${POWERVS_PROCESSORS} \
       --cloud-instance-id ${POWERVS_GUID} \
       --vpc ${POWERVS_VPC} \
-      --power-edge-router true \
       --transit-gateway ${POWERVS_TRANSIT_GATEWAY} \
       --transit-gateway-location ${TRANSIT_GATEWAY_LOCATION} \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
@@ -203,9 +202,11 @@ done
 
 # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
 echo "Waiting for cluster to become available"
-oc wait --timeout=120m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME} || {
+oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME} || {
   echo "Cluster did not become available"
-  oc get hostedcluster --namespace=clusters -o yaml ${CLUSTER_NAME}
+  echo "Collect minimal required cluster information"
+  mkdir -p $ARTIFACT_DIR/hypershift-snapshot
+  oc get hostedcluster ${CLUSTER_NAME} --namespace=clusters -o yaml > $ARTIFACT_DIR/hypershift-snapshot/hostedcluster_failed.yaml
   exit 1
 }
 echo "Cluster became available, creating kubeconfig"

@@ -10,5 +10,7 @@ unset VERSION
 export HOME=/tmp
 export PATH=${PATH}:/tmp
 git clone https://github.com/cloud-bulldozer/cluster-perf-ci --depth=1
+sed -i 's/enabled: true/enabled: false/' cluster-perf-ci/configmap-scale.yml
+cat cluster-perf-ci/configmap-scale.yml
 pushd cluster-perf-ci
 ./run.sh

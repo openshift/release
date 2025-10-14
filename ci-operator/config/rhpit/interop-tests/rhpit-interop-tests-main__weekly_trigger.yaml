@@ -82,6 +82,30 @@ tests:
       WATCHER_BOT_JOB_GROUP_NAME: OCP Self Managed Layered Product Scenarios - FIPS
     test:
     - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
+- as: rosa-hypershift-layered-product-interop-419
+  cron: 0 6 * * 3
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":[{"step": "trigger-jobs", "failure_type": "all", "classification": "Rosa-hypershift Trigger Failure", "jira_additional_labels": ["4.19-lp","rosa-hypershift-lp","weekly-trigger-lp"]}]
+        }
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      JSON_TRIGGER_LIST: rosa-hypershift-lp-interop-jobs-419
+    post:
+    - ref: firewatch-report-issues
+    test:
+    - ref: trigger-jobs
+- as: rosa-hypershift-lp-watcher-bot-message-419
+  cron: 0 14 * * 3
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      WATCHER_BOT_JOB_FILE: rosa-hypershift-lp-interop-jobs-419
+      WATCHER_BOT_JOB_GROUP_NAME: ROSA Hypershift Layered Product Scenarios
+    test:
+    - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
 - as: rosa-sts-hypershift-layered-product-interop-416
   cron: 0 23 31 2 *
   steps:

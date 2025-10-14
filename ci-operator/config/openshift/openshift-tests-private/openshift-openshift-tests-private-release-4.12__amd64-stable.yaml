@@ -7,14 +7,14 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: cli
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
   openstack-installer:
     name: "4.12"
     namespace: ocp
@@ -58,10 +58,9 @@ resources:
       memory: 4Gi
 tests:
 - as: aws-c2s-ipi-disc-priv-fips-f60
-  capabilities:
-  - intranet
   cron: 6 4 16 1,3,5,7,9,11 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-c2s-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -70,10 +69,9 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
 - as: aws-ipi-disc-priv-sts-ep-fips-f60
-  capabilities:
-  - intranet
   cron: 58 18 22 2,4,6,8,10,12 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -82,10 +80,9 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
 - as: aws-ipi-proxy-sts-f60
-  capabilities:
-  - intranet
   cron: 25 22 5 2,4,6,8,10,12 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -93,10 +90,9 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: azure-ipi-disc-fullyprivate-f60
-  capabilities:
-  - intranet
   cron: 4 23 30 1,3,5,7,9,11 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
@@ -104,10 +100,9 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 - as: azure-ipi-fullyprivate-proxy-f60
-  capabilities:
-  - intranet
   cron: 49 2 16 1,3,5,7,9,11 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
@@ -118,6 +113,7 @@ tests:
   cluster: build05
   cron: 47 0 2 1,3,5,7,9,11 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: equinix-ocp-metal-qe
     env:
       DEVSCRIPTS_CONFIG: |
@@ -128,10 +124,9 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: gcp-ipi-proxy-private-mini-perm-f60
-  capabilities:
-  - intranet
   cron: 16 11 16 2,4,6,8,10,12 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
@@ -141,6 +136,7 @@ tests:
 - as: ibmcloud-ipi-private-fips-f60
   cron: 31 21 12 1,3,5,7,9,11 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
     env:
       FIPS_ENABLED: "true"
@@ -151,6 +147,7 @@ tests:
   cluster: build01
   cron: 2 11 4 2,4,6,8,10,12 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: nutanix-qe-dis
     env:
       FIPS_ENABLED: "true"
@@ -158,8 +155,9 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: vsphere-ipi-disc-f60
-  cron: 54 12 1 1,3,5,7,9,11 *
+  cron: 10 19 24 9 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: vsphere-dis-2
     leases:
     - env: VSPHERE_BASTION_LEASED_RESOURCE
@@ -168,8 +166,9 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
 - as: vsphere-ipi-proxy-fips-f60
-  cron: 52 10 1 1,3,5,7,9,11 *
+  cron: 3 5 2 2 *
   steps:
+    allow_skip_on_success: true
     cluster_profile: vsphere-dis-2
     env:
       FIPS_ENABLED: "true"

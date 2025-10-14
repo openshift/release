@@ -43,8 +43,8 @@ function run_cmd_with_retries_save_output()
 
 function run_cmd_with_retries()
 {
-    local cmd="$1" retries="${2}" print_cmd="${3:-${cmd}}"
-    local try=0 ret=0
+	local cmd="$1" try=0 ret=0
+    local retries="${2}" print_cmd="${3:-${cmd}}"
     [[ -z ${retries} ]] && max="20" || max=${retries}
     echo "Trying ${max} times max to run '${print_cmd}'"
 
@@ -109,7 +109,7 @@ if [[ -z "${sp_list}" ]]; then
 fi
 
 for sp_type in ${sp_list}; do
-    az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+    az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p="${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
     az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
     sp_name="${CLUSTER_NAME}-sp-${sp_type}"
@@ -156,6 +156,6 @@ EOF
 
     # ensure that new service principal can be login successfully
     echo "Login with new service principal to ensure that new SP works well"
-    cmd="az login --service-principal -u ${sp_app_id} -p ${sp_password} --tenant ${sp_tenant}"
+    cmd="az login --service-principal -u '${sp_app_id}' -p='${sp_password}' --tenant '${sp_tenant}'"
     run_cmd_with_retries "${cmd}" 10 "az login --service-principal"
 done

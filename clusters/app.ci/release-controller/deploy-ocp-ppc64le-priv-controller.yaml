@@ -24,7 +24,7 @@ spec:
   tags:
   - from:
       kind: DockerImage
-      name: image-registry.openshift-image-registry.svc:5000/ocp/4.19:tools
+      name: image-registry.openshift-image-registry.svc:5000/ocp/4.21:tools
     importPolicy:
       scheduled: true
     name: tools
@@ -140,7 +140,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
   name: release-controller-ocp-ppc64le-priv
   namespace: ci
 spec:
@@ -230,7 +233,8 @@ spec:
           value: /tmp/home
         - name: XDG_RUNTIME_DIR
           value: /tmp/home/run
-        image: release-controller:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
@@ -365,7 +369,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller-api:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
   name: release-controller-api-ocp-ppc64le-priv
   namespace: ci
 spec:
@@ -427,7 +434,8 @@ spec:
           value: /tmp/home
         - name: XDG_RUNTIME_DIR
           value: /tmp/home/run
-        image: release-controller-api:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz

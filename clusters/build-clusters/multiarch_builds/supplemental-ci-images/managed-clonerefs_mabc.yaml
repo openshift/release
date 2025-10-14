@@ -1,0 +1,36 @@
+apiVersion: ci.openshift.io/v1
+kind: MultiArchBuildConfig
+metadata:
+  name: managed-clonerefs
+  namespace: ci
+spec:
+  build_spec:
+    output:
+      pushSecret:
+        name: registry-push-credentials-ci-images-mirror
+      to:
+        kind: DockerImage
+        name: quay.io/openshift/ci:ci_managed-clonerefs_latest
+    postCommit: {}
+    resources:
+      requests:
+        cpu: 100m
+        memory: 200Mi
+    runPolicy: Serial
+    source:
+      dockerfile: |-
+        FROM quay.io/openshift/ci:ci_git_latest
+        ADD ./clonerefs /clonerefs
+      images:
+      - from:
+          kind: DockerImage
+          name: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20251007-99d79e92a
+        paths:
+        - destinationDir: .
+          sourcePath: /ko-app/clonerefs
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        imageOptimizationPolicy: SkipLayers
+        noCache: true
+      type: Docker

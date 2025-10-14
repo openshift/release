@@ -7,6 +7,7 @@ workflow:
       HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
       HYPERSHIFT_DISK_ENCRYPTION: "true"
       HYPERSHIFT_ETCD_ENCRYPTION: "true"
+      HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
     pre:
       - ref: aws-provision-kms-key
       - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-provision
@@ -14,6 +15,7 @@ workflow:
       - ref: cucushift-hypershift-extended-capacity-reservation-create
       - ref: hypershift-aws-create-nodepool
       - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+      - ref: cucushift-hypershift-extended-ovn-ipv4
       - ref: cucushift-hypershift-extended-enable-guest
       - ref: cucushift-installer-reportportal-marker
     post:
@@ -21,7 +23,7 @@ workflow:
       - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-deprovision
       - ref: cucushift-hypershift-extended-capacity-reservation-cancel
       - ref: aws-deprovision-kms-key
-      - ref: junit2reportportal
+      - ref: send-results-to-reportportal
   documentation: |-
     This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow.
     The hosted cluster default storage will use the aws efs csi.

@@ -11,6 +11,7 @@ vars=(
   CYPRESS_KONFLUX_COO_BUNDLE_IMAGE
   CYPRESS_CUSTOM_COO_BUNDLE_IMAGE
   CYPRESS_DT_CONSOLE_IMAGE
+  CYPRESS_COO_NAMESPACE
 )
 
 # Loop through each variable.
@@ -22,6 +23,20 @@ for var in "${vars[@]}"; do
     echo "$var is set to '${!var}'"
   fi
 done
+
+# Read kubeadmin password from file
+if [[ -z "${KUBEADMIN_PASSWORD_FILE:-}" ]]; then
+  echo "Error: KUBEADMIN_PASSWORD_FILE variable is not set"
+  exit 1
+fi
+
+if [[ ! -f "${KUBEADMIN_PASSWORD_FILE}" ]]; then
+  echo "Error: Kubeadmin password file ${KUBEADMIN_PASSWORD_FILE} does not exist"
+  exit 1
+fi
+
+kubeadmin_password=$(cat "${KUBEADMIN_PASSWORD_FILE}")
+echo "Successfully read kubeadmin password from ${KUBEADMIN_PASSWORD_FILE}"
 
 # Set proxy vars.
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -87,23 +102,36 @@ echo "authentication operator finished updating"
 # Copy the artifacts to the aritfact directory at the end of the test run.
 trap copyArtifacts EXIT
 
+# Validate KUBECONFIG
+if [[ -z "${KUBECONFIG:-}" ]]; then
+  echo "Error: KUBECONFIG variable is not set"
+  exit 1
+fi
+
+if [[ ! -f "${KUBECONFIG}" ]]; then
+  echo "Error: Kubeconfig file ${KUBECONFIG} does not exist"
+  exit 1
+fi
+
 # Set Kubeconfig var for Cypress.
-cp -L $KUBECONFIG /tmp/kubeconfig && export CYPRESS_KUBECONFIG_PATH=/tmp/kubeconfig
+export CYPRESS_KUBECONFIG_PATH=$KUBECONFIG
 
 # Set Cypress base URL var.
 console_route=$(oc get route console -n openshift-console -o jsonpath='{.spec.host}')
 export CYPRESS_BASE_URL=https://$console_route
 
 # Set Cypress authentication username and password.
-export CYPRESS_LOGIN_IDP=uiauto-htpasswd-idp
-export CYPRESS_LOGIN_USERS=${users}
+# Use the IDP once issue https://issues.redhat.com/browse/OCPBUGS-59366 is fixed.
+#export CYPRESS_LOGIN_IDP=uiauto-htpasswd-idp
+#export CYPRESS_LOGIN_USERS=${users}
+export CYPRESS_LOGIN_IDP=kube:admin
+export CYPRESS_LOGIN_USERS=kubeadmin:${kubeadmin_password}
 
 # Run the Cypress tests.
 export NO_COLOR=1
 export CYPRESS_CACHE_FOLDER=/tmp/Cypress
 
 # Install npm modules
-ls -ltr
 npm install
 
 # Run the Cypress tests

@@ -4,6 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
+# to be able to SSH.
+if ! whoami &> /dev/null; then
+    if [[ -w /etc/passwd ]]; then
+        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    else
+        echo "/etc/passwd is not writeable, and user matching this uid is not found."
+        exit 1
+    fi
+fi
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -12,8 +23,20 @@ set -o pipefail
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' EXIT TERM
 
+function run_ssh_cmd() {
+    local sshkey=$1
+    local user=$2
+    local host=$3
+    local remote_cmd=$4
+
+    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=300 -o ServerAliveCountMax=10 "
+    cmd="ssh ${options} -i \"${sshkey}\" ${user}@${host} \"${remote_cmd}\""
+    eval "$cmd" || return 2
+}
+
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
+SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
 if [[ ! -f "${bastion_ignition_file}" ]]; then
   echo "'${bastion_ignition_file}' not found, abort." && exit 1
@@ -195,3 +218,38 @@ rm -rf "${workdir}"
 
 echo "Sleeping 5 mins, make sure that the bastion host is fully started."
 sleep 300
+
+if [[ -f "${SHARED_DIR}/gcp_custom_endpoint" ]]; then
+  gcp_custom_endpoint=$(< "${SHARED_DIR}/gcp_custom_endpoint")
+  gcp_custom_endpoint_ip_address=$(< "${SHARED_DIR}/gcp_custom_endpoint_ip_address")
+
+  echo "$(date -u --rfc-3339=seconds) - Ensure GCP custom endpoint '${gcp_custom_endpoint}' is accessible..."
+
+  declare -a services=("compute" "container" "dns" "file" "iam" "serviceusage" "cloudresourcemanager" "storage")
+  test_cmd=""
+  for service_name in "${services[@]}"
+  do
+    test_cmd="${test_cmd} dig +short ${service_name}-${gcp_custom_endpoint}.p.googleapis.com;"
+  done
+  count=0
+  dig_result=""
+
+  set +e
+  for i in {1..20}
+  do
+    dig_result=$(run_ssh_cmd "${SSH_PRIV_KEY_PATH}" core "${bastion_public_ip}" "${test_cmd}")
+    count=$(echo "${dig_result}" | grep -c "${gcp_custom_endpoint_ip_address}")
+    if [[ ${count} -eq "${#services[@]}" ]]; then
+      echo "$(date -u --rfc-3339=seconds) - [$i] The custom endpoint turns accessible."
+      break
+    else
+      echo "$(date -u --rfc-3339=seconds) - [$i] Waiting for another 60 seconds..."
+      sleep 60s
+    fi
+  done
+  set -e
+
+  if [[ ${count} -ne "${#services[@]}" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to wait for the custom endpoint turning into accessible, abort. " && exit 1
+  fi
+fi

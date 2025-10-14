@@ -57,7 +57,7 @@ done
 echo "Create host_vars directory"
 mkdir /eco-ci-cd/inventories/ocp-deployment/host_vars
 
-if [[ "$CLUSTER_NAME" == "hlxcl3" ]]; then
+if [[ "$CLUSTER_NAME" == "hlxcl3" || "$CLUSTER_NAME" == "hlxcl7" ]]; then
   mkdir /tmp/"${CLUSTER_NAME}"
   cp -r "${MOUNTED_HOST_INVENTORY}"/hlxcl2/hypervisor /tmp/"${CLUSTER_NAME}"/hypervisor
   cp -r "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/"* /tmp/"${CLUSTER_NAME}"/
@@ -78,8 +78,13 @@ if [[ -f "${SHARED_DIR}/set_ocp_net_vars.sh" ]]; then
 fi
 
 cd /eco-ci-cd
-ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME} kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
+ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml \
+  -i ./inventories/ocp-deployment/build-inventory.py \
+  -e release="${VERSION}" \
+  -e cluster_name="${CLUSTER_NAME}" \
+  -e kubeconfig="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig" \
+  -e release_age_max_days="${RELEASE_AGE_MAX_DAYS}" \
+  -e internal_registry="${ENABLE_INTERNAL_REGISTRY}"
 
 echo "Store inventory in SHARED_DIR"
 cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/

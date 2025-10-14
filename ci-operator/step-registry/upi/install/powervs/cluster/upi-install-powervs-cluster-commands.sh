@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -o errexit
 set -o nounset
 set -o pipefail
 
@@ -60,6 +61,7 @@ echo "${VPC_ZONE}" > "${SHARED_DIR}"/VPC_ZONE
 
 WORKSPACE_NAME="multi-arch-p-px-${LEASED_RESOURCE}-1"
 export WORKSPACE_NAME
+echo "IC Workspace name: ${WORKSPACE_NAME}"
 
 # PATH Override
 export PATH="${IBMCLOUD_HOME}"/ocp-install-dir/:"${PATH}"
@@ -234,6 +236,7 @@ function cleanup_prior() {
 }
 
 # creates the var file
+# Note: kdump_enable is false so that is simplifies the setup of one MCP
 function configure_terraform() {
     IBMCLOUD_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IBMCLOUD_API_KEY
@@ -314,6 +317,8 @@ ibm_cloud_cis_crn          = "${IBMCLOUD_CIS_CRN}"
 ibm_cloud_tgw              = "${WORKSPACE_NAME}-tg"
 
 dns_forwarders = "161.26.0.10; 161.26.0.11"
+
+kdump_enable = false
 EOF
 
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars "${SHARED_DIR}"/var-multi-arch-upi.tfvars
@@ -345,29 +350,57 @@ function build_upi_cluster() {
                     OUTPUT="yes"
                     fi
                 done
-    echo "Running apply"
-    "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ apply \
-        -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color \
-        -state="${SHARED_DIR}"/terraform.tfstate \
-        | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
-                while read LINE
-                do
-                    if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
-                    then
-                    OUTPUT=""
-                    fi
-                    if [ ! -z "${OUTPUT}" ]
-                    then
-                        echo "${LINE}"
-                    fi
-                    if [[ "${LINE}" == "END RSA PRIVATE KEY" ]]
-                    then
-                    OUTPUT="yes"
-                    fi
-                done
+    echo "Running apply - will attempt up to 3 times until successful"
+
+    MAX_ATTEMPTS=3
+    ATTEMPT=1
+    APPLY_SUCCESS=false
+    while [ $ATTEMPT -le $MAX_ATTEMPTS ] && [ "$APPLY_SUCCESS" != "true" ]; do
+        echo "Terraform apply attempt $ATTEMPT of $MAX_ATTEMPTS"
+        set +e  # Don't exit on error
+        "${IBMCLOUD_HOME_FOLDER}"/ocp-install-dir/terraform -chdir="${IBMCLOUD_HOME}"/ocp4-upi-powervs/ apply \
+            -var-file="${SHARED_DIR}"/var-multi-arch-upi.tfvars -auto-approve -no-color \
+            -state="${SHARED_DIR}"/terraform.tfstate \
+            | sed '/.client-certificate-data/d; /.token/d; /.client-key-data/d; /- name: /d; /Login to the console with user/d' | \
+                    while read LINE
+                    do
+                        if [[ "${LINE}" == "BEGIN RSA PRIVATE KEY" ]]
+                        then
+                        OUTPUT=""
+                        fi
+                        if [ ! -z "${OUTPUT}" ]
+                        then
+                            echo "${LINE}"
+                        fi
+                        if [[ "${LINE}" == "END RSA PRIVATE KEY" ]]
+                        then
+                        OUTPUT="yes"
+                        fi
+                    done
+        APPLY_EXIT_CODE=$?
+        set -e  # Re-enable exit on error
+
+        if [ $APPLY_EXIT_CODE -eq 0 ]; then
+            echo "Terraform apply succeeded on attempt $ATTEMPT"
+            APPLY_SUCCESS=true
+        else
+            echo "Terraform apply failed on attempt $ATTEMPT with exit code $APPLY_EXIT_CODE"
+            if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+                echo "Waiting 60 seconds before next attempt..."
+                sleep 60
+            else
+                echo "All $MAX_ATTEMPTS attempts failed. Exiting with error."
+                exit $APPLY_EXIT_CODE
+            fi
+        fi
+        ATTEMPT=$((ATTEMPT+1))
+    done
     echo "Finished Running"
 
-    echo "Extracting the terraformm output from the state file"
+    echo "Build finished: $(date)"
+    echo "Retrieving data from built cluster"
+
+    echo "Extracting the terraform output from the state file"
     "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${SHARED_DIR}"/terraform.tfstate \
         -raw -no-color bastion_private_ip > "${SHARED_DIR}"/BASTION_PRIVATE_IP
     "${IBMCLOUD_HOME}"/ocp-install-dir/terraform output -state "${SHARED_DIR}"/terraform.tfstate \
@@ -383,6 +416,8 @@ function build_upi_cluster() {
         echo "Unexpected it's blank"
         exit 77
     fi
+
+    set +o pipefail # avoid problems with unexpected fails after this step.
 
     echo "Retrieving the SSH key"
     scp -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa root@"${BASTION_PUBLIC_IP}":~/openstack-upi/auth/kubeconfig  "${IBMCLOUD_HOME}"/ocp-install-dir/
@@ -407,6 +442,7 @@ function build_upi_cluster() {
 
 trap 'error_handler $? $LINENO' ERR
 
+echo "Start '$(date)'"
 
 report_build
 setup_home
@@ -418,6 +454,15 @@ configure_terraform
 cleanup_prior
 fix_user_permissions
 build_upi_cluster
+echo "Finished, starting cleanup '$(date)'"
 
-echo "Successfully created the PowerVS cluster"
-exit 0
+# Kill any running processes
+pkill terraform || true
+pkill ibmcloud || true
+pkill curl || true
+pkill ssh || true
+pkill scp || true
+
+echo "Remaining Processes"
+ps -ef || true
+echo "Done, cleanup '$(date)'"

@@ -121,7 +121,7 @@ EOF
 
 cat <(echo "$INCL") > "${SHARED_DIR}/test-list"
 
-# List of additional test cases (from openshfit/conformance/[parallel|serial] suites), to be used only for 4.7+ branches. This is
+# List of additional test cases (from openshift/conformance/[parallel|serial] suites), to be used only for 4.7+ branches. This is
 # just a temporary approach for smoothly migrating to the full execution of openshift/conformance suite
 
 read -d '#' INCL_EXT << EOF

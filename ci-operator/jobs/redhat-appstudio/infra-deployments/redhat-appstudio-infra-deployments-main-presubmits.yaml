@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build09
     context: ci/prow/appstudio-e2e-tests
     decorate: true
     decoration_config:
@@ -15,7 +15,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-appstudio-infra-deployments-main-appstudio-e2e-tests
     rerun_command: /test appstudio-e2e-tests
-    skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
+    skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
     spec:
       containers:
       - args:
@@ -27,7 +27,7 @@ presubmits:
         - --target=appstudio-e2e-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -75,7 +75,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build09
     context: ci/prow/appstudio-hac-e2e-tests
     decorate: true
     decoration_config:
@@ -97,7 +97,7 @@ presubmits:
         - --target=appstudio-hac-e2e-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -169,7 +169,7 @@ presubmits:
         - --target=appstudio-load-test
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -220,7 +220,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build09
     context: ci/prow/appstudio-upgrade-tests
     decorate: true
     decoration_config:
@@ -231,7 +231,7 @@ presubmits:
     name: pull-ci-redhat-appstudio-infra-deployments-main-appstudio-upgrade-tests
     optional: true
     rerun_command: /test appstudio-upgrade-tests
-    skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
+    skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
     spec:
       containers:
       - args:
@@ -243,7 +243,7 @@ presubmits:
         - --target=appstudio-upgrade-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -287,21 +287,22 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )appstudio-upgrade-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build03
-    context: ci/prow/konflux-e2e-v416-optional
+    cluster: build09
+    context: ci/prow/konflux-e2e-v418-optional
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-appstudio-infra-deployments-main-konflux-e2e-v416-optional
+    name: pull-ci-redhat-appstudio-infra-deployments-main-konflux-e2e-v418-optional
     optional: true
-    rerun_command: /test konflux-e2e-v416-optional
+    rerun_command: /test konflux-e2e-v418-optional
+    skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
     spec:
       containers:
       - args:
@@ -310,10 +311,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=konflux-e2e-v416-optional
+        - --target=konflux-e2e-v418-optional
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -355,4 +356,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )konflux-e2e-v416-optional,?($|\s.*)
+    trigger: (?m)^/test( | .* )konflux-e2e-v418-optional,?($|\s.*)

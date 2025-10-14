@@ -1,0 +1,46 @@
+ref:
+  as: github-downstream-sync
+  from: dev-scripts
+  commands: github-downstream-sync-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  credentials:
+    - namespace: test-credentials
+      name: openshift-pr-manager-app-private-key
+      mount_path: /secrets/openshift-ovnk-bot
+  timeout: 15m0s
+  grace_period: 1m0s
+  env:
+    - name: DEFAULT_BRANCH
+      default: master
+      documentation: |-
+        The upstream branch to merge from
+    - name: RELEASE
+      default: ""
+      documentation: |-
+        The X.Y release string to be used to run /payload jobs with a github comment (e.g. /payload 4.20 ci blocking)
+    - name: UPSTREAM_REPO
+      default: ""
+      documentation: |-
+        The upstream repo to merge from
+    - name: DOWNSTREAM_REPO
+      default: ""
+      documentation: |-
+        The downstream repo to merge in to
+    - name: MIN_COMMITS
+      default: ""
+      documentation: |-
+        The minumum number of new commits needed in order to create a new sync PR
+    - name: GITHUB_APP_ID
+      default: "1460951"
+      documentation: |-
+        The GitHub App ID needed to create the install token which is used to make API requests.
+        https://github.com/settings/apps/openshift-pr-manager
+    - name: GITHUB_APP_PRIVATE_KEY_FILE
+      default: "/secrets/openshift-ovnk-bot/openshift-pr-manager-app-private-key"
+      documentation: |-
+        The name of the file containing the GitHub App private key needed to create an API Token.
+  documentation: |-
+    Check if a "DownStream Merge [MM-DD-YYYY]" PR is needed, and create one if so.

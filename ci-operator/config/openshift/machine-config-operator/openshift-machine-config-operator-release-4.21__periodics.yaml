@@ -1,0 +1,220 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.20_base-rhel9:
+    name: "4.20"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.24-openshift-4.20
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.rhel7
+  inputs:
+    ocp_4.20_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: machine-config-operator
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.21"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  target:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-mco-disruptive
+  interval: 72h
+  steps:
+    cluster_profile: aws-3
+    env:
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- as: e2e-azure-mco-disruptive
+  interval: 72h
+  steps:
+    cluster_profile: azure4
+    env:
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: openshift-e2e-azure
+  timeout: 6h0m0s
+- as: e2e-gcp-mco-disruptive
+  interval: 72h
+  steps:
+    cluster_profile: gcp-3
+    env:
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: openshift-e2e-gcp
+  timeout: 6h0m0s
+- as: e2e-vsphere-mco-disruptive
+  cron: 0 6 */3 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- as: e2e-metal-ipi-ovn-ipv4-mco-disruptive
+  cluster: build05
+  cron: 0 6 */3 * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: baremetalds-e2e-ovn-ipv4
+  timeout: 6h0m0s
+- as: e2e-metal-ipi-ovn-ipv6-mco-disruptive
+  cluster: build05
+  cron: 0 6 */3 * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: baremetalds-e2e-ovn-ipv6
+  timeout: 6h0m0s
+- as: e2e-metal-ipi-ovn-dualstack-mco-disruptive
+  cluster: build05
+  cron: 0 6 */3 * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: baremetalds-e2e-ovn-dualstack
+  timeout: 6h0m0s
+- as: e2e-aws-mco-disruptive-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- as: e2e-azure-mco-disruptive-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: openshift-e2e-azure
+  timeout: 6h0m0s
+- as: e2e-gcp-mco-disruptive-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: gcp-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: openshift-e2e-gcp
+  timeout: 6h0m0s
+- as: e2e-vsphere-mco-disruptive-techpreview
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- as: e2e-metal-ipi-ovn-ipv4-mco-disruptive-techpreview
+  cluster: build05
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: baremetalds-e2e-ovn-ipv4
+  timeout: 6h0m0s
+- as: e2e-metal-ipi-ovn-ipv6-mco-disruptive-techpreview
+  cluster: build05
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: baremetalds-e2e-ovn-ipv6
+  timeout: 6h0m0s
+- as: e2e-metal-ipi-ovn-dualstack-mco-disruptive-techpreview
+  cluster: build05
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: baremetalds-e2e-ovn-dualstack
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-ocl
+  interval: 168h
+  steps:
+    cluster_profile: aws-3
+    env:
+      MCO_CONF_DAY2_OCL_POOLS: master worker
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: mco-conf-day2-enable-ocl
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-upgrade-ocl
+  interval: 168h
+  steps:
+    cluster_profile: aws-3
+    env:
+      MCO_CONF_DAY2_OCL_POOLS: master worker
+      TEST_TYPE: upgrade-conformance
+    test:
+    - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
+    - ref: mco-conf-day2-enable-ocl
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-upgrade
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: machine-config-operator
+  variant: periodics

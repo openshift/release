@@ -16,7 +16,10 @@ metadata:
   name: helpdesk-faq
   namespace: ci
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"helpdesk-faq:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"helpdesk-faq\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
 spec:
   replicas: 2
   selector:
@@ -34,6 +37,7 @@ spec:
         - --log-level=debug
         name: helpdesk-faq
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_helpdesk-faq_latest
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /api/health

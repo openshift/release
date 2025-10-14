@@ -3,7 +3,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Deploying a StorageCluster"
+echo "Wait for StorageCluster CRD to be created"
+timeout 5m bash -c '
+  until oc get crd storageclusters.ocs.openshift.io &>/dev/null; do
+    sleep 5
+  done
+'
+
+echo "Deploying StorageCluster"
 cat <<EOF | oc apply -f -
 apiVersion: ocs.openshift.io/v1
 kind: StorageCluster

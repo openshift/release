@@ -9,70 +9,96 @@ ref:
       memory: 100Mi
   env:
   - name: CATALOG_SOURCE_IMAGE
-    default: "quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest"
+    default: ""
     documentation: |-
-      The OSC operator index image in the form of "name:tag"
-      This value is only used in the new catalog source when TEST_RELEASE_TYPE="Pre-GA"
+      Requires TEST_RELEASE_TYPE==Pre-GA; creates a catalog source for
+      ose-osc-tenant which might be used by openshift-tests-private to
+      deploy the osc operator. Example:
+      quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
   - name: CATALOG_SOURCE_NAME
     default: "redhat-operators"
     documentation: |-
-      The OSC operator catalog source name.
-      You should set a value if TEST_RELEASE_TYPE="Pre-GA".
+      Configures a special openshift-tests-private configmap to install
+      OSC operator from this catalog; particularly useful for
+      TEST_RELEASE_TYPE=Pre-GA which creates custom catalogs.
   - name: ENABLEGPU
     default: "false"
-    documentation: "When enabled, podvm image will include Nvidia GPU drivers"
+    documentation: |-
+      Configures a special openshift-tests-private configmap to include
+      Nvidia GPU drivers in podvm image
   - name: ENABLEPEERPODS
     default: "false"
+    documentation: |-
+      Configures a special openshift-tests-private configmap to enablePeerPods
   - name: EXPECTED_OPERATOR_VERSION
     default: ""
-    documentation: |
-      The OSC operator version in the form of "x.y.z" that is expected to be installed.
+    documentation: |-
+      Configures a special openshift-tests-private configmap to ensure the
+      deployed osc operator is of this version
   - name: INSTALL_KATA_RPM
     default: "false"
+    documentation: |-
+      Configures a special openshift-tests-private configmap to enable
+      installation of "/var/local/kata-containers.rpm" on each worker
+      node
   - name: MUST_GATHER_IMAGE
     default: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
     documentation: |-
-      The must-gather image to be tested
+      Configures a special openshift-tests-private configmap to use
+      test this must-gather image
   - name: OPERATOR_UPDATE_CHANNEL
     default: "stable"
-    documentation: "The operator subscription update channel"
+    documentation: |-
+      Configures a special openshift-tests-private configmap to use
+      this osc operator subscription update channel
   - name: PODVM_IMAGE_URL
     default: ""
     documentation: |
-      By the default the OSC operator will build a podvm image at the time kataconfig is
-      deployed, however, you can override it by passing the URL from where it can
-      download an already built image.
+      Configures a special openshift-tests-private configmap to import
+      podvm image from URL instead of building it from scratch
   - name: RUNTIMECLASS
     default: "kata"
     documentation: |-
-      The Kubernetes runtime class used for test workloads.
-      Set either "kata" or "kata-remote" (for peer pods or CoCo)
+      Configures a special openshift-tests-private configmap to use
+      this runtime class for testing; set either "kata" or "kata-remote"
+      (for peer pods or CoCo)
   - name: TEST_RELEASE_TYPE
     default: "GA"
-    documentation: "The testing that is being carried out is for GA builds or Pre-GA builds"
+    documentation: |-
+      When TEST_RELEASE_TYPE==Pre-GA the osc operator and trustee development
+      repositories are being mirrored into production ones to allow pre-release
+      testing; other values do currently nothing.
   - name: TRUSTEE_CATALOG_SOURCE_IMAGE
     default: ""
     documentation: |-
-      The Trustee operator index image in the form of "name:tag".
-      This value is only used in the new catalog source when TEST_RELEASE_TYPE="Pre-GA"
+      Requires TEST_RELEASE_TYPE==Pre-GA; creates a catalog source for
+      the Trustee operator which might be used by openshift-tests-private to
+      deploy the osc operator. Example:
+      quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee:latest
   - name: TRUSTEE_CATALOG_SOURCE_NAME
     default: "redhat-operators"
     documentation: |-
-      The Trustee operator catalog source name.
-      You should set a value if TEST_RELEASE_TYPE="Pre-GA".
+      Configures a special openshift-tests-private configmap to install
+      Trustee operator from this catalog; particularly useful for
+      TEST_RELEASE_TYPE=Pre-GA which creates custom catalogs.
   - name: TRUSTEE_URL
     default: ""
     documentation: |-
-      The URL for an external Trustee instance
+      Configures a special openshift-tests-private configmap to point
+      the osc operator to an existing external Trustee instance
   - name: WORKLOAD_IMAGE
     default: "quay.io/openshift/origin-hello-openshift"
     documentation: |-
-      The image for test workloads
+      Configures a special openshift-tests-private configmap to use this image
+      for test workloads
   - name: WORKLOAD_TO_TEST
     default: "kata"
     documentation: |-
-      The type of workload that will be tested.
-      You should set RUNTIMECLASS and ENABLEPEERPODS accordingly.
-      Set either "kata", "peer-pods" or, "coco".
+      Configures a special openshift-tests-private configmap to select
+      a workload to test; you also need to specify RUNTIMECLASS
+      and ENABLEPEERPODS accordingly; supported values: "kata",
+      "peer-pods" or "coco"
   documentation: |-
-    Creates the env-cm configmap
+    Creates the env-cm configmap used by openshift-tests-private when executing
+    "[sig-kata]" group of tests; mainly used to tweak Openshift Sandboxed
+    Containers Operator deployment/configuration or to tweak it's testing
