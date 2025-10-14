@@ -1899,7 +1899,14 @@ periodics:
       - --vault-prefix=kv/dptp
       - --bootstrap-config=/etc/ci-secret-bootstrap/_config.yaml
       - --config=/etc/ci-secret-generator/_config.yaml
+      - --enable-gsm-sync=true
+      - --gsm-credentials-file=/etc/gcp-credentials/key.json
       - --dry-run=false
+      env:
+      - name: GCP_PROJECT_ID
+        value: openshift-ci-secrets
+      - name: GCP_PROJECT_NUMBER
+        value: "384486694155"
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-generator_latest
       imagePullPolicy: Always
       name: ci-secret-generator
@@ -1914,6 +1921,9 @@ periodics:
         readOnly: true
       - mountPath: /etc/ci-secret-generator
         name: ci-secret-generator
+      - mountPath: /etc/gcp-credentials
+        name: gcp-sa-key
+        readOnly: true
     serviceAccountName: secret-generator
     volumes:
     - configMap:
@@ -1925,6 +1935,9 @@ periodics:
     - name: build-farm-credentials
       secret:
         secretName: config-updater
+    - name: gcp-sa-key
+      secret:
+        secretName: gsm-secrets-reconciler-sa-credentials
 - agent: kubernetes
   cluster: app.ci
   decorate: true
