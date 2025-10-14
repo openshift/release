@@ -1,26 +1,23 @@
 base_images:
   base:
-    name: "4.19"
+    name: "4.21"
     namespace: ocp
-    tag: base
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.24
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/tls-scanner/.
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21: {}
   to: tls-scanner-tool
-promotion:
-  to:
-  - name: "4.19"
-    namespace: ocp
 releases:
   initial:
     integration:
@@ -33,6 +30,8 @@ releases:
       namespace: ocp
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -51,17 +50,15 @@ tests:
         oc adm policy add-cluster-role-to-user cluster-admin -z tls-scanner -n "${NAMESPACE}"
 
         echo "Waiting for permissions to propagate for sa/tls-scanner..."
-        if ! timeout 30s bash -c "while ! oc auth can-i list pods --all-namespaces --as=\"system:serviceaccount:${NAMESPACE}:tls-scanner\"; do echo \"... permissions not ready, waiting ...\"; sleep 2; done"; then
+        if ! timeout 60s bash -c "while ! oc auth can-i list pods --all-namespaces --as=\"system:serviceaccount:${NAMESPACE}:tls-scanner\"; do echo \"... permissions not ready, waiting ...\"; sleep 3; done"; then
             echo "Timed out waiting for permissions to propagate."
+            oc auth can-i --list --as="system:serviceaccount:${NAMESPACE}:tls-scanner" || true
             exit 1
         fi
         echo "Permissions are ready for sa/tls-scanner."
 
         mkdir -p "${ARTIFACT_DIR}/tls-scanner"
-        /usr/local/bin/tls-scanner \
-          --all-pods \
-          --output-format csv \
-          --output-file "${ARTIFACT_DIR}/tls-scanner/report.csv"
+        /usr/local/bin/tls-scanner -all-pods -csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv" -limit-ips 4
       from: tls-scanner-tool
       resources:
         requests:
