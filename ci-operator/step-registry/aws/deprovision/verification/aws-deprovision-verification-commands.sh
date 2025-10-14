@@ -42,8 +42,19 @@ function verify_arn_exists() {
 
             case "$resource_type" in
                 instance)
-                    aws ec2 describe-instances --region "$check_region" --instance-ids "$resource_id" &>/dev/null
-                    return $?
+                    local output
+                    output=$(aws ec2 describe-instances --region "$check_region" --instance-ids "$resource_id" 2>/dev/null)
+                    local exit_code=$?
+                    if [[ $exit_code -ne 0 ]]; then
+                        return 1
+                    fi
+                    # Check if Reservations array is empty (happens when instance is deleted)
+                    local reservation_count
+                    reservation_count=$(echo "$output" | jq -r '.Reservations | length')
+                    if [[ "$reservation_count" -eq 0 ]]; then
+                        return 1
+                    fi
+                    return 0
                     ;;
                 volume)
                     aws ec2 describe-volumes --region "$check_region" --volume-ids "$resource_id" &>/dev/null
@@ -284,9 +295,6 @@ if [[ "$TOTAL_LEAKED" -gt 0 ]]; then
         echo "$DNS_RECORDS" | jq -r '.[] | .Name' | sed 's/\\052/*/g' >&2
     fi
 
-    jq -n --argjson arns "$LEAKED_ARNS" --argjson dns "${DNS_RECORDS:-[]}" '{arns: $arns, dns_records: $dns}' > leaked_resources.json
-    echo "" >&2
-    echo "Resources written to leaked_resources.json" >&2
     exit 1
 else
     echo "No leaked resources found"
