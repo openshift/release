@@ -38,4 +38,3 @@ fi
 --namespace ${HOSTED_CLUSTER_NS} \
 --dump-guest-cluster=true \
 --name="${CLUSTER_NAME}"
-
