@@ -42,7 +42,8 @@ if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]]; then
 fi
 
 createFlowCollector ${PARAMETERS}
-
+export EBPFAGENT_PR_IMAGE="quay.io/jotak/netobserv-ebpf-agent:1.24.4"
+export FLP_PR_IMAGE="quay.io/jotak/flowlogs-pipeline:1.24.4"
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
     patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"
 fi
