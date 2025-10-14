@@ -1,17 +1,20 @@
-postsubmits:
+presubmits:
   psalajova/test:
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
-    cluster: build08
+    - ^master-
+    cluster: build05
+    context: ci/prow/test-credentials
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-psalajova-test-master-test-credentials
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-psalajova-test-master-test-credentials
+    rerun_command: /test test-credentials
     spec:
       containers:
       - args:
@@ -52,3 +55,4 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )test-credentials,?($|\s.*)
