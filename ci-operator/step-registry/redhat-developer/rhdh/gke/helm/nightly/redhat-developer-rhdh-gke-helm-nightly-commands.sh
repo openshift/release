@@ -112,11 +112,11 @@ echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
-echo "Platform environment variables:"
 export IS_OPENSHIFT="false"
 echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
 export CONTAINER_PLATFORM="gke"
 echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
+echo "Getting container platform version"
 CONTAINER_PLATFORM_VERSION=$(kubectl version 2> /dev/null | grep "Server Version:" | cut -d' ' -f3 | sed 's/^v//' | cut -d'.' -f1,2 || echo "unknown")
 export CONTAINER_PLATFORM_VERSION
 echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
