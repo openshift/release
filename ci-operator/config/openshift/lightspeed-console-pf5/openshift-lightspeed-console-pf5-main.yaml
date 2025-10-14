@@ -1,0 +1,72 @@
+base_images:
+  ubi-9-nginx-120:
+    name: nginx
+    namespace: openshift
+    tag: 1.20-ubi9
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8/nodejs-18:latest
+      USER root
+      RUN mkdir /go && chmod 777 /go
+      USER 1001
+images:
+- dockerfile_path: Dockerfile
+  from: ubi-9-nginx-120
+  to: lightspeed-console-plugin-pf5
+promotion:
+  to:
+  - namespace: ols
+    tag: latest
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  steps:
+    test:
+    - as: lint
+      commands: npm install && npm run lint
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: i18n
+  steps:
+    test:
+    - as: i18n
+      commands: npm install && npm run i18n
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
+- as: fips-image-scan-service
+  skip_if_only_changed: ^docs/|\.md$|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    dependencies:
+      SCAN_IMAGE: lightspeed-console-plugin-pf5
+    test:
+    - ref: fips-check-image-scan
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: lightspeed-console-pf5
