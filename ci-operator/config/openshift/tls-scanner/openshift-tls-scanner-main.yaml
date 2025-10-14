@@ -4,17 +4,15 @@ base_images:
     namespace: ocp
     tag: base
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.24
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.24:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.24
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/tls-scanner/.
   to: tls-scanner-tool
 promotion:
   to:
@@ -60,7 +58,7 @@ tests:
         /usr/local/bin/tls-scanner \
           --all-pods \
           --output-format csv \
-          --output-file "${ARTI-FACT_DIR}/tls-scanner/report.csv"
+          --output-file "${ARTIFACT_DIR}/tls-scanner/report.csv"
       from: tls-scanner-tool
       resources:
         requests:
