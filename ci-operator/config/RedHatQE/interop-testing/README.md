@@ -52,13 +52,12 @@ Tests the IBM Fusion Access Operator integration with OpenShift, including IBM S
 - IBM Storage Scale v5.2.3.1
 
 **Test Flow:**
-1. Provision a test cluster on AWS with custom security groups
-2. Install Fusion Access Operator
-3. Deploy IBM Storage Scale cluster
-4. Create EBS filesystem resources
-5. Execute Fusion Access tests
-6. Collect custom IBM must-gather
-7. Archive results and deprovision cluster
+1. Provision test cluster on AWS (via ipi-aws-pre chain)
+2. **Environment Setup Chain**: Configure AWS security groups, install Fusion Access Operator, deploy IBM Storage Scale cluster
+3. **EBS Integration Chain**: Create and attach EBS volumes, create LocalDisk resources, create and verify EBS filesystem
+4. **CNV Test Chain**: Deploy CNV, create shared filesystem, configure and test CNV shared storage integration
+5. Collect custom IBM must-gather (post-step)
+6. Deprovision cluster and archive results (via ipi-aws-post chain)
 
 ## Process
 
@@ -119,12 +118,20 @@ The Fusion Access Operator test execution includes the following individual step
 - [`interop-tests-fusion-access-check-nodes`](../../../step-registry/interop-tests/fusion-access/check-nodes/interop-tests-fusion-access-check-nodes-ref.yaml) - Check node readiness
 - [`interop-tests-fusion-access-label-nodes`](../../../step-registry/interop-tests/fusion-access/label-nodes/interop-tests-fusion-access-label-nodes-ref.yaml) - Label nodes for Storage Scale
 - [`interop-tests-fusion-access-configure-aws-security-groups`](../../../step-registry/interop-tests/fusion-access/configure-aws-security-groups/interop-tests-fusion-access-configure-aws-security-groups-ref.yaml) - Configure AWS security groups
+- [`interop-tests-fusion-access-prepare-worker-nodes`](../../../step-registry/interop-tests/fusion-access/prepare-worker-nodes/interop-tests-fusion-access-prepare-worker-nodes-ref.yaml) - Prepare worker nodes for Storage Scale
 - [`interop-tests-fusion-access-create-cluster`](../../../step-registry/interop-tests/fusion-access/create-cluster/interop-tests-fusion-access-create-cluster-ref.yaml) - Create IBM Storage Scale cluster
 - [`interop-tests-fusion-access-verify-cluster`](../../../step-registry/interop-tests/fusion-access/verify-cluster/interop-tests-fusion-access-verify-cluster-ref.yaml) - Verify Storage Scale cluster
 
 **EBS Filesystem Steps:**
+- [`interop-tests-fusion-access-create-local-disks`](../../../step-registry/interop-tests/fusion-access/create-local-disks/interop-tests-fusion-access-create-local-disks-ref.yaml) - Create LocalDisk resources for EBS volumes
 - [`interop-tests-fusion-access-create-ebs-filesystem`](../../../step-registry/interop-tests/fusion-access/create-ebs-filesystem/interop-tests-fusion-access-create-ebs-filesystem-ref.yaml) - Create EBS filesystem
 - [`interop-tests-fusion-access-verify-ebs-filesystem`](../../../step-registry/interop-tests/fusion-access/verify-ebs-filesystem/interop-tests-fusion-access-verify-ebs-filesystem-ref.yaml) - Verify EBS filesystem
+
+**CNV Integration Steps:**
+- [`interop-tests-fusion-access-create-shared-filesystem`](../../../step-registry/interop-tests/fusion-access/create-shared-filesystem/interop-tests-fusion-access-create-shared-filesystem-ref.yaml) - Create shared filesystem for CNV
+- [`interop-tests-fusion-access-configure-cnv-shared-storage`](../../../step-registry/interop-tests/fusion-access/configure-cnv-shared-storage/interop-tests-fusion-access-configure-cnv-shared-storage-ref.yaml) - Configure CNV shared storage
+- [`interop-tests-fusion-access-test-cnv-shared-storage`](../../../step-registry/interop-tests/fusion-access/test-cnv-shared-storage/interop-tests-fusion-access-test-cnv-shared-storage-ref.yaml) - Test CNV shared storage
+- [`interop-tests-fusion-access-verify-shared-storage`](../../../step-registry/interop-tests/fusion-access/verify-shared-storage/interop-tests-fusion-access-verify-shared-storage-ref.yaml) - Verify shared storage functionality
 
 ## Prerequisites
 
@@ -180,6 +187,6 @@ The Fusion Access Operator test execution includes the following individual step
 ### Fusion Access Operator Configurations
 
 - **OCP 4.20**: `RedHatQE-interop-testing-master__fusion-access-operator-ocp4.20-lp-interop.yaml`
-  - Monthly execution schedule
+  - Weekly execution schedule (Mondays at 11 PM)
   - Custom security group configuration
   - IBM Storage Scale integration
