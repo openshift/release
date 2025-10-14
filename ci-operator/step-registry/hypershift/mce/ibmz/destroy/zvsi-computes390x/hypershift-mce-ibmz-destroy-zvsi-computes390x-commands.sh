@@ -174,7 +174,7 @@ else
 fi
 
 echo "Waiting for all the resources to get deleted before deleting the resource group"
-sleep 300 
+sleep 700
 
 echo "Triggering the $infra_name-rg resource group deletion in the $IC_REGION region."
 ibmcloud resource group-delete $infra_name-rg -f
