@@ -466,15 +466,26 @@ function droute_send() {
                                 --wait
                    2>&1
                   '
-  for (( i=1; i<=10; i++ ))
+  sendSucceeded='false'
+  tries=10
+  for (( i=1; i<=$tries; i++ ))
   do
     if [[ "$(eval $droute_send_cmd)" =~ 'status: OK' ]]
     then
+      sendSucceeded='true'
       break
     fi
-    echo "Retry 'droute send' after sleep 2 minutes"
-    sleep 2m
+    if [[ "$i" -le "$tries" ]]
+    then
+      echo "Retry 'droute send' after sleep 2 minutes"
+      sleep 2m
+    fi
   done
+  if [[ "$sendSucceeded" = 'false' ]]
+  then
+    echo "'droute send' failed after $tries tries"
+    exit 1
+  fi
 }
 
 export INSTALL_RESULT="fail"
