@@ -81,6 +81,8 @@ collect_imageregistry() {
   # Imagestreams (cluster-wide inventory)
   oc get is -A -o wide > "${outdir}/imagestreams-wide.txt" 2>&1 || true
   oc get is -A -o json > "${outdir}/imagestreams.json" 2>&1 || true
+
+  oc get co > "${outdir}/cluster-operators.json" 2>&1 || true
 }
 
 # --------------------------------------------------------------------
