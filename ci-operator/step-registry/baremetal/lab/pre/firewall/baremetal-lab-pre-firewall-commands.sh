@@ -64,7 +64,12 @@ else
   IPI_BOOTSTRAP_IP="UPI"
 fi
 
-fw_ip=("${INTERNAL_NET_CIDR}" "${BMC_NETWORK}" "${IPI_BOOTSTRAP_IP}" "${IP_ARRAY[@]}")
+declare -a PROW_BUILDFARM_IPS
+PROW_BUILDFARM_IPS=$(getent hosts ${RELEASE_IMAGE_LATEST%%/*} | cut -d' ' -f1)
+
+echo "Prow buildfarm ips: $PROW_BUILDFARM_IPS"
+
+fw_ip=("${INTERNAL_NET_CIDR}" "${BMC_NETWORK}" "${IPI_BOOTSTRAP_IP}" "${IP_ARRAY[@]}" "${PROW_BUILDFARM_IPS[@]}")
 
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}" <<'EOF'
   set -o nounset
@@ -73,12 +78,17 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
   BMC_NETWORK="${2}"
   IPI_BOOTSTRAP_IP="${3}"
   IP_ARRAY=("${@:4}")
+  PROW_BUILDFARM_IPS=("${@:5}")
+  
   for ip in "${IP_ARRAY[@]}"; do
     # TODO: change to firewalld or nftables
     if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
       iptables -A FORWARD -s "${ip}" -d "${BMC_NETWORK}" -j ACCEPT
     fi
     iptables -A FORWARD -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
+    for buildfarm_ip in "${PROW_BUILDFARM_IPS[@]}"; do
+      iptables -A FORWARD -s "${ip}" ! -d "${buildfarm_ip}" -j DROP
+    done
   done
   if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
     iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" -d "${BMC_NETWORK}" -j ACCEPT
