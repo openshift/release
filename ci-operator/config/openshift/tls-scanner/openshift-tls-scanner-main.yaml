@@ -46,38 +46,18 @@ tests:
         set -euo pipefail
 
         echo "--- RBAC Debugging: Initial State ---"
-        echo "CI pod running as: $(oc whoami)"
-        echo "Target namespace: ${NAMESPACE}"
+        CURRENT_SA=$(oc whoami)
+        echo "CI pod running as: ${CURRENT_SA}"
         echo "-----------------------------------------"
 
-        oc create serviceaccount tls-scanner -n "${NAMESPACE}"
-        oc adm policy add-scc-to-user privileged -z tls-scanner -n "${NAMESPACE}"
-        CRB_NAME="tls-scanner-admin-${NAMESPACE}"
-        oc create clusterrolebinding "${CRB_NAME}" --clusterrole=cluster-admin --serviceaccount="${NAMESPACE}:tls-scanner"
-        echo "Created ServiceAccount, added privileged SCC, and created ClusterRoleBinding '${CRB_NAME}'"
-
-        echo "--- Waiting for permissions to propagate for sa/tls-scanner ---"
-        if ! timeout 60s bash -c "while ! oc auth can-i list pods --all-namespaces --as=\"system:serviceaccount:${NAMESPACE}:tls-scanner\"; do echo \"... permissions not ready, waiting ...\"; sleep 3; done"; then
+        echo "--- Waiting for permissions to propagate for current ServiceAccount ---"
+        # The ipi-install-rbac step in the 'pre' phase should have already granted cluster-admin
+        if ! timeout 120s bash -c "while ! oc auth can-i list pods --all-namespaces; do echo \"... permissions not ready, waiting ...\"; sleep 5; done"; then
             echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-            echo "Error: Timed out waiting for permissions to propagate."
+            echo "Error: Timed out waiting for permissions to propagate for SA '${CURRENT_SA}'."
             echo "--- Start Final RBAC Debug Info ---"
-            echo "Final permissions list for system:serviceaccount:${NAMESPACE}:tls-scanner:"
-            oc auth can-i --list --as="system:serviceaccount:${NAMESPACE}:tls-scanner" || echo "Warning: Failed to list permissions for SA."
-
-            echo "---"
-            echo "Checking specific resource permissions that failed previously:"
-            for resource in pods ingresscontrollers apiservers kubeletconfigs; do
-              printf "Can list %-20s: " "${resource}"
-              if oc auth can-i list "${resource}" --all-namespaces --as="system:serviceaccount:${NAMESPACE}:tls-scanner" &> /dev/null; then
-                echo "YES"
-              else
-                echo "NO"
-              fi
-            done
-            echo "---"
-
-            echo "Describing ClusterRoleBinding '${CRB_NAME}':"
-            oc get clusterrolebinding "${CRB_NAME}" -o yaml || echo "Warning: Failed to get ClusterRoleBinding."
+            echo "Final permissions list for ${CURRENT_SA}:"
+            oc auth can-i --list || echo "Warning: Failed to list permissions for SA."
             echo "--- End Final RBAC Debug Info ---"
             echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
             exit 1
