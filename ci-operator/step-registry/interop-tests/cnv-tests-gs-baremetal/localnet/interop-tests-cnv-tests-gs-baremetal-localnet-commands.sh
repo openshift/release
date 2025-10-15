@@ -4,14 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-dnf install -y zip
-zip -r "${ARTIFACT_DIR}/data.zip" /secrets/ /var/run/cnv-ci-brew-pull-secret/ /bw/
-set -nv
 start_time=$SECONDS
 
 # --- Trap definition ---
 # This trap will be executed when the script exits for any reason (successful, error, or signal).
-: trap 'debug_on_exit' EXIT
+trap 'debug_on_exit' EXIT
 
 # shellcheck disable=SC2329
 debug_on_exit() {
@@ -215,7 +212,7 @@ oc get sc
 cnv::reimport_datavolumes
 
 rc=0
-: uv run --verbose --cache-dir /tmp/uv-cache pytest  \
+uv run --verbose --cache-dir /tmp/uv-cache pytest  \
     -s \
     -o log_cli=true \
     -o cache_dir=/tmp/pytest-cache \
