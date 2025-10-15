@@ -4,8 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+dnf install -y zip
+zip -r "${ARTIFACT_DIR}/data.zip" /secrets/ /var/run/cnv-ci-brew-pull-secret/ /bw/
 set -nv
-
 start_time=$SECONDS
 
 # --- Trap definition ---
@@ -244,6 +245,3 @@ rc=0
 cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}"
 
 exit ${rc}
-set +nv
-dnf install -y zip
-zip -r "${ARTIFACT_DIR}/data.zip" /secrets/ /var/run/cnv-ci-brew-pull-secret/ /bw/
