@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Exports
+export JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_results.xml"
+export HTML_RESULTS_FILE="${ARTIFACT_DIR}/report.html"
+
+oc whoami --show-console
+typeset HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
+
 echo uv run --verbose --cache-dir /tmp/uv-cache pytest  \
     -s \
     -o log_cli=true \
@@ -19,4 +26,5 @@ echo uv run --verbose --cache-dir /tmp/uv-cache pytest  \
     --latest-rhel \
     --storage-class-matrix=ocs-storagecluster-ceph-rbd-virtualization \
     --leftovers-collector \
-    -m smoke || rc=$?
+    --collect-only \
+    -m tests/network/localnet/test_default_bridge.py
