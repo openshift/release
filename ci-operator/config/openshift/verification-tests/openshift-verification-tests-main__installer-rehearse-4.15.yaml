@@ -26,6 +26,7 @@ base_images:
 releases:
   latest:
     candidate:
+      architecture: multi
       product: ocp
       stream: nightly
       version: "4.15"
@@ -41,14 +42,11 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      COMPUTE_NODE_REPLICAS: "0"
-      CONTROL_PLANE_REPLICAS: "1"
-      SLEEP_DURATION: 10m
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-proxy-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-proxy-provision
+      BOOTSTRAP_NODE_TYPE: t2a-standard-4
+      COMPUTE_NODE_TYPE: t2a-standard-2
+      CONTROL_PLANE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    workflow: cucushift-installer-rehearse-gcp-upi-private-xpn-ingress-glb
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
