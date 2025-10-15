@@ -96,4 +96,4 @@ EOF
 # mirror-images-by-oc-adm will run only if a specific file is found, see step code
 #cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"
 
-echo ${RELEASE_IMAGE_LATEST%%/*} >> "${SHARED_DIR}/mirror_registry_url"
+echo "${RELEASE_IMAGE_LATEST%%/*}:5000" >> "${SHARED_DIR}/mirror_registry_url"
