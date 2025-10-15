@@ -10,6 +10,9 @@ images:
 - context_dir: .
   dockerfile_path: ./packages/model-registry/Dockerfile.workspace
   to: odh-mod-arch-model-registry-image
+- context_dir: .
+  dockerfile_path: ./packages/gen-ai/Dockerfile.workspace
+  to: odh-mod-arch-gen-ai-image
 promotion:
   to:
   - namespace: opendatahub-io
@@ -58,6 +61,22 @@ tests:
       SOURCE_IMAGE_REF: odh-mod-arch-model-registry-image
     env:
       IMAGE_REPO: odh-mod-arch-modular-architecture
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-gen-ai-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-gen-ai-image
+    env:
+      IMAGE_REPO: odh-mod-arch-gen-ai
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-gen-ai-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-gen-ai-image
+    env:
+      IMAGE_REPO: odh-mod-arch-gen-ai
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
