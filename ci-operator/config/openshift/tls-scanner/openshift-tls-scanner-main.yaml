@@ -45,26 +45,39 @@ tests:
       commands: |
         set -euo pipefail
 
-        echo "--- RBAC Debugging: Initial State ---"
-        CURRENT_SA=$(oc whoami)
-        echo "CI pod running as: ${CURRENT_SA}"
-        echo "-----------------------------------------"
+        # The tls-scanner tool is hardcoded to use a ServiceAccount named 'tls-scanner'.
+        # We create it here in the 'default' namespace, which is guaranteed to exist
+        # on the ephemeral cluster.
+        TEST_NAMESPACE="default"
+        TEST_SA="tls-scanner"
 
-        echo "--- Waiting for permissions to propagate for current ServiceAccount ---"
-        # The ipi-install-rbac step in the 'pre' phase should have already granted cluster-admin
-        if ! timeout 120s bash -c "while ! oc auth can-i list pods --all-namespaces; do echo \"... permissions not ready, waiting ...\"; sleep 5; done"; then
+        echo "--- Creating ServiceAccount '${TEST_SA}' in namespace '${TEST_NAMESPACE}' ---"
+        oc create serviceaccount "${TEST_SA}" -n "${TEST_NAMESPACE}"
+        oc adm policy add-scc-to-user privileged -z "${TEST_SA}" -n "${TEST_NAMESPACE}"
+
+        CRB_NAME="tls-scanner-cluster-admin"
+        oc create clusterrolebinding "${CRB_NAME}" --clusterrole=cluster-admin --serviceaccount="${TEST_NAMESPACE}:${TEST_SA}"
+        echo "--- Created ServiceAccount and bound cluster-admin role ---"
+
+        SA_USER="system:serviceaccount:${TEST_NAMESPACE}:${TEST_SA}"
+        echo "--- Waiting for permissions to propagate for '${SA_USER}' ---"
+        if ! timeout 120s bash -c "while ! oc auth can-i list pods --all-namespaces --as='${SA_USER}'; do echo '... permissions not ready, waiting ...'; sleep 5; done"; then
             echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-            echo "Error: Timed out waiting for permissions to propagate for SA '${CURRENT_SA}'."
+            echo "Error: Timed out waiting for permissions to propagate for SA '${SA_USER}'."
             echo "--- Start Final RBAC Debug Info ---"
-            echo "Final permissions list for ${CURRENT_SA}:"
-            oc auth can-i --list || echo "Warning: Failed to list permissions for SA."
+            echo "Final permissions list for ${SA_USER}:"
+            oc auth can-i --list --as="${SA_USER}" || echo "Warning: Failed to list permissions for SA."
             echo "--- End Final RBAC Debug Info ---"
             echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
             exit 1
         fi
         echo "--- Permissions are ready. Proceeding with scan. ---"
 
-        mkdir -p "${ARTIFACT_DIR}/tls-scanner"
+        # The scanner tool appears to need the KUBECONFIG to be pointed at a token for the specific SA it uses.
+        # We will generate a temporary kubeconfig for it.
+        SERVICEACCOUNT_TOKEN=$(oc sa get-token ${TEST_SA} -n ${TEST_NAMESPACE})
+        oc login --token="$SERVICEACCOUNT_TOKEN" --server="$(oc config view --minify -o jsonpath='{.clusters[0].cluster.server}')" --insecure-skip-tls-verify=true
+
         /usr/local/bin/tls-scanner -all-pods -csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv" -limit-ips 4
       from: tls-scanner-tool
       resources:
