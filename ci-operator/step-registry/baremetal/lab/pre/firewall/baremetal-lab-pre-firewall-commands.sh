@@ -67,7 +67,7 @@ fi
 declare -a PROW_BUILDFARM_IPS
 PROW_BUILDFARM_IPS=$(getent hosts ${RELEASE_IMAGE_LATEST%%/*} | cut -d' ' -f1)
 
-echo "Prow buildfarm ips: $PROW_BUILDFARM_IPS"
+echo "Prow buildfarm ips: ${PROW_BUILDFARM_IPS[@]}"
 
 fw_ip=("${INTERNAL_NET_CIDR}" "${BMC_NETWORK}" "${IPI_BOOTSTRAP_IP}" "${IP_ARRAY[@]}" "${PROW_BUILDFARM_IPS[@]}")
 
@@ -79,7 +79,7 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
   IPI_BOOTSTRAP_IP="${3}"
   IP_ARRAY=("${@:4}")
   PROW_BUILDFARM_IPS=("${@:5}")
-  
+
   for ip in "${IP_ARRAY[@]}"; do
     # TODO: change to firewalld or nftables
     if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
@@ -97,5 +97,6 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
 EOF
 
 # mirror-images-by-oc-adm will run only if a specific file is found, see step code
-cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"
+#cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"
 
+echo ${RELEASE_IMAGE_LATEST%%/*} >> "${SHARED_DIR}/mirror_registry_url"
