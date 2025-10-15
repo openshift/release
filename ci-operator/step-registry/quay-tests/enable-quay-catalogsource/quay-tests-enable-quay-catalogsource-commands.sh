@@ -65,7 +65,7 @@ function wait_mcp_ready () {
 #ImageContentSourcePolicy is deprecated, will change to ImageDigestMirrorSet after 4.12 EOL
 function create_icsp () {
   cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
+apiVersion: config.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
 metadata:
   name: konflux-quay-registry
