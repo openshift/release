@@ -58,14 +58,19 @@ PROXY_EOF
     fi
     ;;
   (vault)
-    typeset e=
+    typeset srcFile='' tgtFile=''
 
-    for e in kube{admin-password,config}; do
-        [ -r "${CLUSTER_PROFILE_DIR}/${e}" ] && cp "${CLUSTER_PROFILE_DIR}/${e}" "${SHARED_DIR}/"
-        [ "${e}" = kubeconfig ] && cp "${CLUSTER_PROFILE_DIR}/${e}" "${SHARED_DIR}/${e}-minimal"
+    for tgtFile in kube{admin-password,config}; do
+        srcFile="${tgtFile}${KCFG_SRC_SFX:+"--${KCFG_SRC_SFX}"}"
+        if [ -r "${CLUSTER_PROFILE_DIR}/${srcFile}" ]; then
+            cp "${CLUSTER_PROFILE_DIR}/${srcFile}" "${SHARED_DIR}/${tgtFile}"
+            [ "${tgtFile}" = kubeconfig ] && cp "${CLUSTER_PROFILE_DIR}/${srcFile}" "${SHARED_DIR}/${tgtFile}-minimal"
+        fi
     done
     ;;
   (*)
     echo "Unsupported setting \`KUBECONFIG_ORIGIN=${KUBECONFIG_ORIGIN@Q}\`."
     ;;
 esac
+
+exit 0
