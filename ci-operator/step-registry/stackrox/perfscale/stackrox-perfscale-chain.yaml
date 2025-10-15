@@ -1,12 +1,28 @@
-
 chain:
   as: stackrox-perfscale
   steps:
   - chain: openshift-qe-cluster-density-v2
-  - chain: openshift-qe-node-density
+  #- chain: openshift-qe-node-density
   # TODO: fix scanner failing in cni and reenable:
   # - chain: openshift-qe-node-density-cni
-  - chain: openshift-qe-crd-scale
+  #- chain: openshift-qe-crd-scale
+  - ref: openshift-qe-orion
+  env:
+  - name: BASE_DOMAIN
+    default: perfscale.rox.systems
+  - name: ES_SECRETS_PATH
+    default: /secret_stackrox
+  - name: EXTRA_FLAGS
+    default: --churn-duration=0m --timeout=2h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
+  - name: ORION_CONFIG
+    default: https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/orion-acs-cluster-density-v2.yml
+  - name: ROX_SCANNER_V4_ENABLED
+    default: "true"
+  - name: RUN_ORION
+    default: "true"
+  - name: USER_TAGS
+    default: |
+      TicketId 382
+      RoxProject PerfScale
   documentation: |-
-    Base set of perf&scale workloads for stackrox on ocp:
-    node density
+    perf&scale workloads for stackrox on ocp
