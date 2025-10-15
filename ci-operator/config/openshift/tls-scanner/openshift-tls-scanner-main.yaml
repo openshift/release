@@ -73,11 +73,16 @@ tests:
         fi
         echo "--- Permissions are ready. Proceeding with scan. ---"
 
-        # The scanner tool appears to need the KUBECONFIG to be pointed at a token for the specific SA it uses.
-        # We will generate a temporary kubeconfig for it.
+        # Force the tls-scanner to use the correct identity by setting KUBECONFIG.
+        # The Kubernetes client-go library prioritizes this env var over the default in-cluster config.
+        export KUBECONFIG="/tmp/kubeconfig"
         SERVICEACCOUNT_TOKEN=$(oc create token ${TEST_SA} -n ${TEST_NAMESPACE})
         oc login --token="$SERVICEACCOUNT_TOKEN" --server="$(oc config view --minify -o jsonpath='{.clusters[0].cluster.server}')" --insecure-skip-tls-verify=true
 
+        # Create the artifact directory before running the scanner
+        mkdir -p "${ARTIFACT_DIR}/tls-scanner"
+
+        echo "--- Running scanner with KUBECONFIG=${KUBECONFIG} ---"
         /usr/local/bin/tls-scanner -all-pods -csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv" -limit-ips 4
       from: tls-scanner-tool
       resources:
