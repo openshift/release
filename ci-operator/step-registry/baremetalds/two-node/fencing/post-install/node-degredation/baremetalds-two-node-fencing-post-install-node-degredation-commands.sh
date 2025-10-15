@@ -108,7 +108,9 @@ source "${SHARED_DIR}/packet-conf.sh"
 # --------------------------------------------------------------------
 # Pre-degradation capture
 # --------------------------------------------------------------------
+sleep 1200
 collect_imageregistry "pre-degradation"
+
 
 # --------------------------------------------------------------------
 # Degrade the node (keep logic unchanged)
