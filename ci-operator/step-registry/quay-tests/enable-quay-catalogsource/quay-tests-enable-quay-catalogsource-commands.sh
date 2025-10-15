@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Merge the konflux prod secrets into the current ocp global pull secret
+# Merge the konflux prod auth into the current ocp global pull secret
 function update_pull_secret () {
     cat /var/run/quay-qe-konflux-auth/quay-v3-10-pull > "${SHARED_DIR}"/quay-v3-10-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-11-pull > "${SHARED_DIR}"/quay-v3-11-pull.json
@@ -65,7 +65,7 @@ function wait_mcp_ready () {
 #ImageContentSourcePolicy is deprecated, will change to ImageDigestMirrorSet after 4.12 EOL
 function create_icsp () {
   cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1alpha1
+apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
 metadata:
   name: konflux-quay-registry
