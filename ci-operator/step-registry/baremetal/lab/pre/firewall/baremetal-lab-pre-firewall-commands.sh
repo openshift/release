@@ -65,7 +65,9 @@ else
 fi
 
 declare -a PROW_BUILDFARM_IPS
-PROW_BUILDFARM_IPS=$(getent hosts ${RELEASE_IMAGE_LATEST%%/*} | cut -d' ' -f1)
+PROW_BUILDFARM_IPS="$(getent hosts ${RELEASE_IMAGE_LATEST%%/*} | cut -d' ' -f1)"
+
+echo "Prow buildfarm ips: ${PROW_BUILDFARM_IPS[@]}"
 
 fw_ip=("${INTERNAL_NET_CIDR}" "${BMC_NETWORK}" "${IPI_BOOTSTRAP_IP}" "${IP_ARRAY[@]}" "${PROW_BUILDFARM_IPS[@]}")
 
