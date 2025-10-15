@@ -308,6 +308,7 @@ tests:
   steps:
     cluster_profile: gcp-qe
     test:
+    - ref: openshift-extended-k8sgpt
     - chain: openshift-e2e-test-olm-qe-stress
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: aws-ipi-tp-ocl-f7
@@ -320,6 +321,7 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       MCO_CONF_DAY2_OCL_POOLS: master worker
     test:
+    - ref: openshift-extended-k8sgpt
     - ref: mco-conf-day2-add-mcoqe-robot-to-pull-secret
     - ref: mco-conf-day2-enable-ocl
     - chain: openshift-e2e-test-qe
@@ -838,6 +840,20 @@ tests:
       PUBLIC_ONLY: "true"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: aws-ipi-ovn-hypershift-mgmt-longduration-f14
+  cron: 12 18 7,14,23,30 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
+      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
+      HYPERSHIFT_NODE_COUNT: "1"
+      PUBLIC_ONLY: "true"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
 - as: aws-ipi-ovn-hypershift-private-guest-f7
   cron: 52 22 4,11,20,27 * *
@@ -4066,6 +4082,38 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-dual-stack
+- as: baremetal-upi-ovn-ipsec-dualstack-fips-f14
+  capabilities:
+  - intranet
+  cron: 16 16 9,23 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      IPSEC_OVN: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi-dual-stack
+- as: baremetal-upi-ovn-ipsec-ipv6-fips-f14
+  capabilities:
+  - intranet
+  cron: 16 16 9,23 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      IPSEC_OVN: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi-ipv6-static
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

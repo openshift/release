@@ -15,7 +15,7 @@ echo "export NAMESPACE_NAME=${NAMESPACE_NAME}; export BUCKET_NAME=${BUCKET_NAME}
 CLUSTER_NAME=$(<"${SHARED_DIR}"/cluster-name.txt)
 BASE_DOMAIN=$(<"${SHARED_DIR}"/base-domain.txt)
 
-machineNetwork=$( [ "${ISCSI:-false}" == "true" ] && echo "10.0.32.0/20" || echo "10.0.16.0/20" )
+machineNetwork="10.0.16.0/20"
 
 yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
 baseDomain: ${BASE_DOMAIN}
@@ -115,7 +115,7 @@ EOF
 )
 
 if [ "${ISCSI:-false}" = "true" ]; then
-    VARIABLES=$(echo "${VARIABLES}" | jq '. + {control_plane_shape:"BM.Standard2.52",compute_shape:"BM.Standard3.64",rendezvous_ip:"10.0.32.20"}')
+    VARIABLES=$(echo "${VARIABLES}" | jq '. + {control_plane_shape:"BM.Standard2.52",compute_shape:"BM.Standard3.64",rendezvous_ip:"10.0.16.20"}')
 fi
 
 echo "Updating Stack Variables"

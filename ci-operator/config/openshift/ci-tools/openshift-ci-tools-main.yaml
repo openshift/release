@@ -834,8 +834,14 @@ tests:
     from: test-bin
   node_architecture: arm64
 - always_run: false
+  as: integration-optional-test
+  commands: make integration
+  container:
+    from: test-bin
+  node_architecture: arm64
+  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+- always_run: false
   as: e2e
-  cluster: build11
   steps:
     test:
     - as: e2e
@@ -891,6 +897,9 @@ tests:
       - default: /tmp/gcp-creds/gsm-e2e-test-sa-key
         documentation: The GCP service account credentials file
         name: GCP_SECRETS_DEV_CREDENTIALS_FILE
+      - default: e2e-test-lock-bucket
+        documentation: The GCS bucket where the lock object is created
+        name: GCS_E2E_LOCK_BUCKET
       from: test-bin
       resources:
         requests:
@@ -898,7 +907,6 @@ tests:
           memory: 200Mi
 - always_run: false
   as: e2e-oo
-  cluster: build11
   optional: true
   pipeline_run_if_changed: pkg/steps/(index|bundle).*.go
   steps:
@@ -937,7 +945,6 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: e2e-oo-post
-  cluster: build11
   postsubmit: true
   steps:
     test:

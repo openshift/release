@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build03
     context: ci/prow/create-aro-hcp-in-integration
     decorate: true
     decoration_config:
@@ -61,7 +61,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build03
     context: ci/prow/create-aro-hcp-in-prod
     decorate: true
     decoration_config:
@@ -118,7 +118,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build03
     context: ci/prow/create-aro-hcp-in-stage
     decorate: true
     decoration_config:
@@ -171,11 +171,123 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )create-aro-hcp-in-stage,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/create-dev-env
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-create-dev-env
+    optional: true
+    rerun_command: /test create-dev-env
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=create-dev-env
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )create-dev-env,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build02
+    context: ci/prow/frontend-simulation
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/nested-podman: nested-podman
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-Azure-ARO-HCP-main-frontend-simulation
+    rerun_command: /test frontend-simulation
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=frontend-simulation
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )frontend-simulation,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -230,7 +342,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build03
     context: ci/prow/integration-e2e-parallel
     decorate: true
     decoration_config:
@@ -287,7 +399,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build03
     context: ci/prow/periodic-images
     decorate: true
     decoration_config:
@@ -344,7 +456,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build03
     context: ci/prow/prod-e2e-parallel
     decorate: true
     decoration_config:
@@ -401,7 +513,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build03
     context: ci/prow/skip-cleanup-integration-e2e-parallel
     decorate: true
     decoration_config:
@@ -457,7 +569,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build03
     context: ci/prow/stage-e2e-parallel
     decorate: true
     decoration_config:

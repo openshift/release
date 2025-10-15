@@ -55,6 +55,7 @@ while true; do
   fi
 done
 
+
 # Config htpasswd idp
 # The expected time for the htpasswd idp configuaration is in 1 minute. But actually, we met the waiting time
 # is over 10 minutes, so we give a loop to wait for the configuration to be active before timeout. 
@@ -105,15 +106,25 @@ done
 
 echo "Waiting for cluster-admin ready..."
 start_time=$(date +"%s")
+
 while true; do
   sleep 30
   echo "Attempt to get cluster-admins group..."
-  cluster_admin=$(oc get group cluster-admins -o json | jq -r '.users[0]' || true)
-  if [[ "${cluster_admin}" == "${IDP_USER}" ]]; then
-    echo "cluster-admin is granted succesffully on the user ${cluster_admin}"
-    break
-  fi
 
+  cluster_admin_users=$(oc get group cluster-admins -o json | jq -r '.users[]')
+  user_found=false
+  for user in ${cluster_admin_users}; do
+    if [[ "${user}" == "${IDP_USER}" ]]; then
+       user_found=true
+      break
+    fi
+  done
+
+  if [[ "${user_found}" == "true" ]]; then
+   echo "cluster-admin is granted succesffully on the user ${IDP_USER}"
+   break
+  fi
+  
   if (( $(date +"%s") - $start_time >= $IDP_TIMEOUT )); then
     echo "error: Timed out while waiting for cluster-admin to be granted"
     exit 1
