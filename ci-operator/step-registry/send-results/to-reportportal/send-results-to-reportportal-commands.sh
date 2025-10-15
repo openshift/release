@@ -41,13 +41,15 @@ repo="$(jq -r 'if .extra_refs then .extra_refs[0].repo
 # shellcheck disable=SC2076
 if ! [[ "${ALLOWED_REPOS[*]}" =~ "$org/$repo" ]]
 then
-    echo "Skip repository: $org/$repo"
-    exit 0
+  echo "Skip repository: $org/$repo"
+  exit 0
 fi
 
 LOGS_PATH='logs'
 if [[ "$(jq -r '.type' <<< ${JOB_SPEC})" = 'presubmit' ]]
 then
+  echo "Skip presubmit jobs"
+  exit 0
   pr_number="$(jq -r '.refs.pulls[0].number' <<< $JOB_SPEC)"
   if [[ -z "$pr_number" ]]
   then
