@@ -67,7 +67,7 @@ if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   --aws-private-region="${HYPERSHIFT_AWS_REGION}" \
   --external-dns-provider=aws \
   --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
-  --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
+  --external-dns-domain-filter=service2.ci.hypershift.devcluster.openshift.com \
   --wait-until-available \
   ${EXTRA_ARGS}
 fi
