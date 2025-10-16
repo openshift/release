@@ -87,11 +87,13 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
   fi
 EOF
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${IP_ARRAY[@]}" "${RELEASE_IMAGE_LATEST}" <<'EOF'
+# every passed variable after a bash array gets merged into the same array
+# this is the reason why RELEASE_IMAGE_LATEST is passed as 1st variable and this is a separated script
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${RELEASE_IMAGE_LATEST}" "${IP_ARRAY[@]}" <<'EOF'
   set -o nounset
   set -o errexit
-  IP_ARRAY=("${@:1}")
-  RELEASE_IMAGE_LATEST="${2}"
+  RELEASE_IMAGE_LATEST="${1}"
+  IP_ARRAY=("${@:2}")
 
   IFS=$'\n' PROW_BUILDFARM_IPS=($(getent hosts ${RELEASE_IMAGE_LATEST%%/*} | cut -d' ' -f1))
 
