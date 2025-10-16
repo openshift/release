@@ -999,12 +999,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
   cron: 0 6 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 3h0m0s
+    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: stackrox
@@ -1016,7 +1015,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-stackrox-stackrox-master-perf-scale-4nodes-scale
+  name: periodic-ci-stackrox-stackrox-master-perf-scale-24nodes-scale-test
+  reporter_config:
+    slack:
+      channel: '#acs-perfscale'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -1025,7 +1035,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=4nodes-scale
+      - --target=24nodes-scale-test
       - --variant=perf-scale
       command:
       - ci-operator
