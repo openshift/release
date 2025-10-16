@@ -74,19 +74,22 @@ tests:
   steps:
     cluster_profile: aws-2
     workflow: openshift-upgrade-aws
-- as: e2e-tests-extension
+- as: e2e-aws-operator-tests-extension
+  optional: true
   steps:
+    cluster_profile: aws
     test:
     - as: tests-extension
       commands: |
         echo "Build binary service-ca-operator-tests-ext"
         make tests-ext-build
-        echo "Running ./service-ca-operator-tests-ext with sanity test"
-        ./service-ca-operator-tests-ext run-test -n "[Jira:service-ca][sig-api-machinery] sanity test should always pass [Suite:openshift/service-ca-operator/conformance/parallel]"
+        echo "Running ./service-ca-operator-tests-ext run-suite openshift/service-ca-operator/conformance/parallel"
+        ./service-ca-operator-tests-ext run-suite "openshift/service-ca-operator/conformance/parallel" -j ${ARTIFACT_DIR}/junit_$(shell date +%Y%m%d-%H%M%S).xml
       from: src
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.22
   org: openshift-priv
