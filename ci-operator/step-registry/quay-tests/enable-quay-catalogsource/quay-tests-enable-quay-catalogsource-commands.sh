@@ -6,37 +6,34 @@ set -o pipefail
 
 # Merge the konflux prod auth into the current ocp global pull secret
 function update_pull_secret () {
-    cat /var/run/quay-qe-konflux-auth/quay-v3-10-pull > "${SHARED_DIR}"/quay-v3-10-pull.json
-    cat /var/run/quay-qe-konflux-auth/quay-v3-11-pull > "${SHARED_DIR}"/quay-v3-11-pull.json
-    cat /var/run/quay-qe-konflux-auth/quay-v3-12-pull > "${SHARED_DIR}"/quay-v3-12-pull.json
-    cat /var/run/quay-qe-konflux-auth/quay-v3-13-pull > "${SHARED_DIR}"/quay-v3-13-pull.json
-    cat /var/run/quay-qe-konflux-auth/quay-v3-14-pull > "${SHARED_DIR}"/quay-v3-14-pull.json
-    cat /var/run/quay-qe-konflux-auth/quay-v3-15-pull > "${SHARED_DIR}"/quay-v3-15-pull.json
-    cat /var/run/quay-qe-konflux-auth/quay-v3-16-pull > "${SHARED_DIR}"/quay-v3-16-pull.json
-
     
-    # if ! command -v jq &> /dev/null
-    # then
-    #     echo "jq could not be found, installing..."
-    #     curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq && chmod +x /tmp/jq
-    #     export PATH=$PATH:/tmp
-    # fi
+    temp_dir=$(mktemp -d)
+    cat /var/run/quay-qe-konflux-auth/quay-v3-10-pull > "${temp_dir}"/quay-v3-10-pull.json
+    cat /var/run/quay-qe-konflux-auth/quay-v3-11-pull > "${temp_dir}"/quay-v3-11-pull.json
+    cat /var/run/quay-qe-konflux-auth/quay-v3-12-pull > "${temp_dir}"/quay-v3-12-pull.json
+    cat /var/run/quay-qe-konflux-auth/quay-v3-13-pull > "${temp_dir}"/quay-v3-13-pull.json
+    cat /var/run/quay-qe-konflux-auth/quay-v3-14-pull > "${temp_dir}"/quay-v3-14-pull.json
+    cat /var/run/quay-qe-konflux-auth/quay-v3-15-pull > "${temp_dir}"/quay-v3-15-pull.json
+    cat /var/run/quay-qe-konflux-auth/quay-v3-16-pull > "${temp_dir}"/quay-v3-16-pull.json
 
     oc get secret/pull-secret -n openshift-config \
-      --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${SHARED_DIR}"/global_pull_secret.json
+      --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${temp_dir}"/global_pull_secret.json
 
     jq -s 'map(.auths) | add | {auths: .}' \
-      "${SHARED_DIR}"/global_pull_secret.json \
-      "${SHARED_DIR}"/quay-v3-10-pull.json \
-      "${SHARED_DIR}"/quay-v3-11-pull.json \
-      "${SHARED_DIR}"/quay-v3-12-pull.json \
-      "${SHARED_DIR}"/quay-v3-13-pull.json \
-      "${SHARED_DIR}"/quay-v3-14-pull.json \
-      "${SHARED_DIR}"/quay-v3-15-pull.json \
-      "${SHARED_DIR}"/quay-v3-16-pull.json \
-      > "${SHARED_DIR}"/merged_pull_secret.json
+      "${temp_dir}"/global_pull_secret.json \
+      "${temp_dir}"/quay-v3-10-pull.json \
+      "${temp_dir}"/quay-v3-11-pull.json \
+      "${temp_dir}"/quay-v3-12-pull.json \
+      "${temp_dir}"/quay-v3-13-pull.json \
+      "${temp_dir}"/quay-v3-14-pull.json \
+      "${temp_dir}"/quay-v3-15-pull.json \
+      "${temp_dir}"/quay-v3-16-pull.json \
+      > "${temp_dir}"/merged_pull_secret.json
 
-    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${SHARED_DIR}"/merged_pull_secret.json
+    oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${temp_dir}"/merged_pull_secret.json
+
+    #Remove temp_dir 
+    rm -rf "${temp_dir}"
 }
 
 function wait_mcp_ready () {
