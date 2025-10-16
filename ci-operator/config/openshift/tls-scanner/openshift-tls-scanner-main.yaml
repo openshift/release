@@ -44,16 +44,9 @@ tests:
       cli: latest
       commands: |
         set -euo pipefail
-
-        # The tls-scanner binary has been updated to use the standard client-go authentication
-        # loading rules. It will now automatically inherit the cluster-admin kubeconfig
-        # provided by the CI environment to the test pod. No RBAC manipulation is needed.
-
         echo "--- Running scanner with inherited cluster-admin privileges to scan all pods ---"
-
-        # Create the artifact directory before running the scanner
+        ARTIFACT_DIR="/logs/artifacts"
         mkdir -p "${ARTIFACT_DIR}/tls-scanner"
-
         /usr/local/bin/tls-scanner \
           --all-pods \
           --csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv"
