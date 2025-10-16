@@ -25,22 +25,25 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: 4nodes-scale
+- as: 24nodes-scale-test
   cron: 0 6 * * *
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-stackrox
     env:
       BASE_DOMAIN: perfscale.rox.systems
-      COMPUTE_NODE_REPLICAS: "4"
+      COMPUTE_NODE_REPLICAS: "24"
+      ROX_SCANNER_V4_ENABLED: "true"
+      SCANNER_V4_MATCHER_READINESS: vulnerability
+      SCANNER_V4_MATCHER_READINESS_MAX_WAIT: "3600"
       USER_TAGS: |
         TicketId 382
         RoxProject PerfScale
-      ZONES_COUNT: "1"
+      ZONES_COUNT: "3"
     test:
     - chain: stackrox-perfscale
     workflow: stackrox-install-helm
-  timeout: 3h0m0s
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: master
   org: stackrox
