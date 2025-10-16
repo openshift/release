@@ -96,4 +96,18 @@ EOF
 # mirror-images-by-oc-adm will run only if a specific file is found, see step code
 #cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"
 
-echo "${RELEASE_IMAGE_LATEST%%/*}:5000" >> "${SHARED_DIR}/mirror_registry_url"
+echo "${RELEASE_IMAGE_LATEST%%/*}" >> "${SHARED_DIR}/mirror_registry_url"
+
+install_config_mirror_patch="${SHARED_DIR}/install-config-mirror.yaml.patch"
+
+imcs="
+imageContentSources:
+  - mirrors:
+      - ${RELEASE_IMAGE_LATEST%%@*}
+    source: ${RELEASE_IMAGE_LATEST%%@*}
+  - mirrors:
+      - ${RELEASE_IMAGE_LATEST%%@*}
+    source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+"
+
+echo "${imcs}" >> "${install_config_mirror_patch}"
