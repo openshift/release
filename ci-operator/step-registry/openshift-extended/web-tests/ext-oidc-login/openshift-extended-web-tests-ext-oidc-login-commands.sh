@@ -2,10 +2,6 @@
 
 set -euo pipefail
 
-#if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
-#    source "${SHARED_DIR}/proxy-conf.sh"
-#fi
-
 pwd && ls -ltr
 cd frontend
 pwd && ls -ltr
@@ -20,6 +16,32 @@ echo "Making sure that the active cluster is using external OIDC"
 if ! (oc get authentication cluster -o=jsonpath='{.spec.type}' --kubeconfig="${KUBECONFIG}" | grep OIDC); then
     echo "The active cluster is not using external OIDC, exiting"
     exit 1
+fi
+
+SERVICE_NETWORK=$(oc get network.config.openshift.io cluster -o jsonpath='{.spec.serviceNetwork[0]}' --kubeconfig="${KUBECONFIG}" || echo "")
+if [[ "$SERVICE_NETWORK" == *":"* ]]; then
+    echo "IPv6 cluster detected. Modifying /etc/hosts for console access."
+    echo "Adding console URL to /etc/hosts for baremetal environment"
+    CONSOLE_HOST=$(oc get route console -n openshift-console -o jsonpath='{.spec.host}' --kubeconfig="${KUBECONFIG}" || echo "")
+    INGRESS_IP=$(oc get service -n openshift-ingress router-default -o jsonpath='{.status.loadBalancer.ingress[0].ip}' --kubeconfig="${KUBECONFIG}" || echo "")
+
+    if [[ -n "$CONSOLE_HOST" && -n "$INGRESS_IP" ]]; then
+        echo "Found console host: ${CONSOLE_HOST} and ingress IP: ${INGRESS_IP}"
+        if grep -q "${CONSOLE_HOST}" /etc/hosts; then
+            echo "Entry for ${CONSOLE_HOST} already exists in /etc/hosts"
+        else
+            echo "Adding new entry to /etc/hosts"
+            echo "${INGRESS_IP} ${CONSOLE_HOST}" | sudo tee -a /etc/hosts
+        fi
+        echo "Current /etc/hosts:"
+        cat /etc/hosts
+    else
+        echo "Could not determine console host or ingress IP, skipping /etc/hosts modification."
+        echo "CONSOLE_HOST: '${CONSOLE_HOST}'"
+        echo "INGRESS_IP: '${INGRESS_IP}'"
+    fi
+else
+    echo "Not an IPv6 cluster, skipping /etc/hosts modification."
 fi
 
 echo "Exporting external-oidc-related environment variables"
