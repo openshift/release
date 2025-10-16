@@ -107,10 +107,14 @@ EOF
 # mirror-images-by-oc-adm will run only if a specific file is found, see step code
 #cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"
 
+# RELEASE_IMAGE_LATEST=registry.build06.ci.openshift.org/ci-op-3vpg3xwh/release@sha256:5591b23351d40563417fb22339dbf7125e5d4659752f5a2a6a44a355c9f1201a
+
+# take the part before the first occurrence of '/', i.e. 'registry.build06.ci.openshift.org'
 echo "${RELEASE_IMAGE_LATEST%%/*}" >> "${SHARED_DIR}/mirror_registry_url"
 
 install_config_mirror_patch="${SHARED_DIR}/install-config-mirror.yaml.patch"
 
+# take the part before the first occurrence of '@', i.e. 'registry.build06.ci.openshift.org/ci-op-3vpg3xwh/release'
 imcs="
 imageContentSources:
   - mirrors:
