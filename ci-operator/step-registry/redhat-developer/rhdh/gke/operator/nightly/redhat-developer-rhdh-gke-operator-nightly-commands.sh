@@ -4,9 +4,39 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
-NAME_SPACE="showcase-k8s-ci-nightly"
-NAME_SPACE_RBAC="showcase-rbac-k8s-ci-nightly"
-export NAME_SPACE NAME_SPACE_RBAC
+echo "Setting up long-running GKE cluster..."
+DIR="$(pwd)/.ibm/pipelines"
+export DIR
+echo "Sourcing gcloud.sh"
+# shellcheck disable=SC1091
+source "${DIR}/cluster/gke/gcloud.sh"
+echo "Ingesting GKE secrets"
+GKE_SERVICE_ACCOUNT_NAME=$(cat /tmp/secrets/GKE_SERVICE_ACCOUNT_NAME)
+GKE_CLUSTER_NAME=$(cat /tmp/secrets/GKE_CLUSTER_NAME)
+GKE_CLUSTER_REGION=$(cat /tmp/secrets/GKE_CLUSTER_REGION)
+GOOGLE_CLOUD_PROJECT=$(cat /tmp/secrets/GOOGLE_CLOUD_PROJECT)
+echo "Authenticating with GKE"
+gcloud_auth "${GKE_SERVICE_ACCOUNT_NAME}" "/tmp/secrets/GKE_SERVICE_ACCOUNT_KEY"
+echo "Getting GKE credentials"
+gcloud_gke_get_credentials "${GKE_CLUSTER_NAME}" "${GKE_CLUSTER_REGION}" "${GOOGLE_CLOUD_PROJECT}"
+echo "Getting GKE cluster URL"
+K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+export K8S_CLUSTER_URL
+
+echo "Sourcing k8s-utils.sh"
+# shellcheck disable=SC1091
+source "${DIR}/cluster/k8s/k8s-utils.sh"
+re_create_k8s_service_account_and_get_token
+
+echo "Setting platform environment variables:"
+export IS_OPENSHIFT="false"
+echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
+export CONTAINER_PLATFORM="gke"
+echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
+echo "Getting container platform version"
+CONTAINER_PLATFORM_VERSION=$(kubectl version --output json 2> /dev/null | jq -r '.serverVersion.major + "." + .serverVersion.minor' || echo "unknown")
+export CONTAINER_PLATFORM_VERSION
+echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
 
 # Prepare to git checkout
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
@@ -112,37 +142,8 @@ echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
-echo "Setting up long-running GKE cluster..."
-DIR="$(pwd)/.ibm/pipelines"
-export DIR
-echo "Sourcing gcloud.sh"
-# shellcheck disable=SC1091
-source "${DIR}/cluster/gke/gcloud.sh"
-echo "Ingesting GKE secrets"
-GKE_SERVICE_ACCOUNT_NAME=$(cat /tmp/secrets/GKE_SERVICE_ACCOUNT_NAME)
-GKE_CLUSTER_NAME=$(cat /tmp/secrets/GKE_CLUSTER_NAME)
-GKE_CLUSTER_REGION=$(cat /tmp/secrets/GKE_CLUSTER_REGION)
-GOOGLE_CLOUD_PROJECT=$(cat /tmp/secrets/GOOGLE_CLOUD_PROJECT)
-echo "Authenticating with GKE"
-gcloud_auth "${GKE_SERVICE_ACCOUNT_NAME}" "/tmp/secrets/GKE_SERVICE_ACCOUNT_KEY"
-echo "Getting GKE credentials"
-gcloud_gke_get_credentials "${GKE_CLUSTER_NAME}" "${GKE_CLUSTER_REGION}" "${GOOGLE_CLOUD_PROJECT}"
-echo "Getting GKE cluster URL"
-K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
-export K8S_CLUSTER_URL
-echo "Sourcing k8s-utils.sh"
-# shellcheck disable=SC1091
-source "${DIR}/cluster/k8s/k8s-utils.sh"
-re_create_k8s_service_account_and_get_token
-
-echo "Setting platform environment variables:"
-export IS_OPENSHIFT="false"
-echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
-export CONTAINER_PLATFORM="gke"
-echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
-echo "Getting container platform version"
-CONTAINER_PLATFORM_VERSION=$(kubectl version --output json 2> /dev/null | jq -r '.serverVersion.major + "." + .serverVersion.minor' || echo "unknown")
-export CONTAINER_PLATFORM_VERSION
-echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
+NAME_SPACE="showcase-k8s-ci-nightly"
+NAME_SPACE_RBAC="showcase-rbac-k8s-ci-nightly"
+export NAME_SPACE NAME_SPACE_RBAC
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh

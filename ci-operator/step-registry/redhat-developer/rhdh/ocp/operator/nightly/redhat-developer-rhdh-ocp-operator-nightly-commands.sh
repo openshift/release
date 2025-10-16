@@ -42,11 +42,18 @@ echo "To debug issues or log in to the cluster manually, use the script: .ibm/pi
 oc create serviceaccount tester-sa-2 -n default
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
 K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default --duration=4h)
-oc logout
 
-NAME_SPACE="showcase-operator-nightly"
-NAME_SPACE_RBAC="showcase-op-rbac-nightly"
-export NAME_SPACE NAME_SPACE_RBAC
+echo "Setting platform environment variables:"
+export IS_OPENSHIFT="true"
+echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
+export CONTAINER_PLATFORM="ocp"
+echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
+echo "Getting container platform version"
+CONTAINER_PLATFORM_VERSION=$(oc version --output json 2> /dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
+export CONTAINER_PLATFORM_VERSION
+echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
+
+oc logout
 
 # Prepare to git checkout
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
@@ -152,14 +159,8 @@ echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
-echo "Setting platform environment variables:"
-export IS_OPENSHIFT="true"
-echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
-export CONTAINER_PLATFORM="ocp"
-echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
-echo "Getting container platform version"
-CONTAINER_PLATFORM_VERSION=$(oc version --output json 2> /dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
-export CONTAINER_PLATFORM_VERSION
-echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
+NAME_SPACE="showcase-operator-nightly"
+NAME_SPACE_RBAC="showcase-op-rbac-nightly"
+export NAME_SPACE NAME_SPACE_RBAC
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh

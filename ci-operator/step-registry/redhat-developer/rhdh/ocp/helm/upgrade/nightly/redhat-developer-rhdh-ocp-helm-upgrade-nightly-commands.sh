@@ -42,18 +42,18 @@ echo "To debug issues or log in to the cluster manually, use the script: .ibm/pi
 oc create serviceaccount tester-sa-2 -n default
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
 K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default --duration=4h)
+
+echo "Setting platform environment variables:"
+export IS_OPENSHIFT="true"
+echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
+export CONTAINER_PLATFORM="ocp"
+echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
+echo "Getting container platform version"
+CONTAINER_PLATFORM_VERSION=$(oc version --output json 2> /dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
+export CONTAINER_PLATFORM_VERSION
+echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
+
 oc logout
-
-echo "OC_CLIENT_VERSION: $OC_CLIENT_VERSION"
-
-mkdir -p /tmp/openshift-client
-# Download and Extract the oc binary
-wget -O /tmp/openshift-client/openshift-client-linux-$OC_CLIENT_VERSION.tar.gz https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$OC_CLIENT_VERSION/openshift-client-linux.tar.gz
-tar -C /tmp/openshift-client -xvf /tmp/openshift-client/openshift-client-linux-$OC_CLIENT_VERSION.tar.gz
-export PATH=/tmp/openshift-client:$PATH
-oc version
-
-export NAME_SPACE="showcase-upgrade-nightly"
 
 # Prepare to git checkout
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
@@ -159,14 +159,6 @@ echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
-echo "Setting platform environment variables:"
-export IS_OPENSHIFT="true"
-echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
-export CONTAINER_PLATFORM="ocp"
-echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
-echo "Getting container platform version"
-CONTAINER_PLATFORM_VERSION=$(oc version --output json 2> /dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
-export CONTAINER_PLATFORM_VERSION
-echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
+export NAME_SPACE="showcase-upgrade-nightly"
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
