@@ -76,7 +76,7 @@ notify_slack_if_failure() {
 }
 
 if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
+    LATEST_TAG=$(curl -s "https://api.github.com/repos/chentex/orion/releases/latest" | jq -r '.tag_name');
 else
     LATEST_TAG=$TAG
 fi
@@ -141,7 +141,7 @@ fi
 
 if [[ ! -z "$ACK_FILE" ]]; then
     # Download the latest ACK file
-    curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
+    curl -sL https://raw.githubusercontent.com/chentex/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
     export EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
 fi
 
