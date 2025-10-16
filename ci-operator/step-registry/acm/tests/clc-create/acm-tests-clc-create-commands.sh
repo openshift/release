@@ -48,4 +48,4 @@ bash +x ./execute_clc_interop_commands.sh
 
 cp -r reports $ARTIFACT_DIR/
 
-sleep 8h
+echo "Done"
