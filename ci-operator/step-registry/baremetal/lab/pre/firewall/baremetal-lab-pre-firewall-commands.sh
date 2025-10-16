@@ -64,9 +64,7 @@ else
   IPI_BOOTSTRAP_IP="UPI"
 fi
 
-IFS=$'\n' PROW_BUILDFARM_IPS=($(getent hosts ${RELEASE_IMAGE_LATEST%%/*} | cut -d' ' -f1))
-
-fw_ip=("${INTERNAL_NET_CIDR}" "${BMC_NETWORK}" "${IPI_BOOTSTRAP_IP}" "${IP_ARRAY[@]}" "${PROW_BUILDFARM_IPS[@]}")
+fw_ip=("${INTERNAL_NET_CIDR}" "${BMC_NETWORK}" "${IPI_BOOTSTRAP_IP}" "${IP_ARRAY[@]}")
 
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}" <<'EOF'
   set -o nounset
@@ -75,7 +73,6 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
   BMC_NETWORK="${2}"
   IPI_BOOTSTRAP_IP="${3}"
   IP_ARRAY=("${@:4}")
-  PROW_BUILDFARM_IPS=("${@:5}")
 
   for ip in "${IP_ARRAY[@]}"; do
     # TODO: change to firewalld or nftables
@@ -83,14 +80,26 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
       iptables -A FORWARD -s "${ip}" -d "${BMC_NETWORK}" -j ACCEPT
     fi
     iptables -A FORWARD -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
-    for buildfarm_ip in "${PROW_BUILDFARM_IPS[@]}"; do
-      iptables -A FORWARD -s "${ip}" -d "${buildfarm_ip}" -j ACCEPT
-    done
   done
   if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
     iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" -d "${BMC_NETWORK}" -j ACCEPT
     iptables -A FORWARD -s "${IPI_BOOTSTRAP_IP}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
   fi
+EOF
+
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${IP_ARRAY[@]}" "${RELEASE_IMAGE_LATEST}" <<'EOF'
+  set -o nounset
+  set -o errexit
+  IP_ARRAY=("${@:1}")
+  RELEASE_IMAGE_LATEST="${2}"
+
+  IFS=$'\n' PROW_BUILDFARM_IPS=($(getent hosts ${RELEASE_IMAGE_LATEST%%/*} | cut -d' ' -f1))
+
+  for ip in "${IP_ARRAY[@]}"; do
+    for buildfarm_ip in "${PROW_BUILDFARM_IPS[@]}"; do
+      iptables -A FORWARD -s "${ip}" -d "${buildfarm_ip}" -j ACCEPT
+    done
+  done
 EOF
 
 # mirror-images-by-oc-adm will run only if a specific file is found, see step code
@@ -111,3 +120,5 @@ imageContentSources:
 "
 
 echo "${imcs}" >> "${install_config_mirror_patch}"
+
+sleep 300
