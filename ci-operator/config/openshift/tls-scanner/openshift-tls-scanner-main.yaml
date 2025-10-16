@@ -45,29 +45,18 @@ tests:
       commands: |
         set -euo pipefail
 
-        # The tls-scanner binary uses the pod's default service account. We need to grant that SA
-        # cluster-admin privileges. The context running this script (from ipi-install-rbac)
-        # has the power to create this binding.
-        CURRENT_USER=$(oc whoami)
-        echo "--- Granting cluster-admin to the current user: ${CURRENT_USER} ---"
-        oc create clusterrolebinding self-admin --clusterrole=cluster-admin --user="${CURRENT_USER}"
+        # The tls-scanner binary has been updated to use the standard client-go authentication
+        # loading rules. It will now automatically inherit the cluster-admin kubeconfig
+        # provided by the CI environment to the test pod. No RBAC manipulation is needed.
 
-        echo "--- Waiting for permissions to propagate for '${CURRENT_USER}' ---"
-        if ! timeout 120s bash -c "while ! oc auth can-i list pods --all-namespaces; do echo '... waiting for permissions ...'; sleep 5; done"; then
-            echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-            echo "Error: Timed out waiting for permissions to propagate for user '${CURRENT_USER}'."
-            echo "--- Start Final RBAC Debug Info ---"
-            oc auth can-i --list || echo "Warning: Failed to list permissions."
-            echo "--- End Final RBAC Debug Info ---"
-            echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-            exit 1
-        fi
-        echo "--- Permissions are ready. Proceeding with scan. ---"
+        echo "--- Running scanner with inherited cluster-admin privileges to scan all pods ---"
 
         # Create the artifact directory before running the scanner
         mkdir -p "${ARTIFACT_DIR}/tls-scanner"
 
-        /usr/local/bin/tls-scanner -all-pods -csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv" -limit-ips 4
+        /usr/local/bin/tls-scanner \
+          --all-pods \
+          --csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv"
       from: tls-scanner-tool
       resources:
         requests:
