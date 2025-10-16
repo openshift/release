@@ -122,5 +122,3 @@ imageContentSources:
 "
 
 echo "${imcs}" >> "${install_config_mirror_patch}"
-
-sleep 300
