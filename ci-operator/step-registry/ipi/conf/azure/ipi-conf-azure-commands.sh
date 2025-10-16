@@ -43,6 +43,13 @@ echo "get ocp version: ${version}"
 rm pull-secret
 popd
 
+if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+  echo "Using default value: ${BASE_DOMAIN}"
+  AZURE_BASE_DOMAIN="${BASE_DOMAIN}"
+else
+  AZURE_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
+fi
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 REGION="${LEASED_RESOURCE}"
@@ -80,7 +87,7 @@ echo "Using compute node replicas: ${workers}"
 echo "Using controlPlane node replicas: ${master_replicas}"
 
 cat >> "${CONFIG}" << EOF
-baseDomain: ${BASE_DOMAIN}
+baseDomain: ${AZURE_BASE_DOMAIN}
 platform:
   azure:
     region: ${REGION}
