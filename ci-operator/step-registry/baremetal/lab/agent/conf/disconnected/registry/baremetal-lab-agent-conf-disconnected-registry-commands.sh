@@ -43,4 +43,4 @@ echo "${imcs}" >> "${install_config_mirror_patch}"
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 # imageContentSources patch
-yq-go m -x -i "${CONFIG}" "${install_config_mirror_patch}"
+yq -i "${CONFIG}" "${install_config_mirror_patch}"
