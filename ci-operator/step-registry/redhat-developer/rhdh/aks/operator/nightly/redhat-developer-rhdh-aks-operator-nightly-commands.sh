@@ -4,10 +4,6 @@ HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
-NAME_SPACE="showcase-k8s-ci-nightly"
-NAME_SPACE_RBAC="showcase-rbac-k8s-ci-nightly"
-export NAME_SPACE NAME_SPACE_RBAC
-
 # use kubeconfig from mapt
 chmod 600 "${SHARED_DIR}/kubeconfig"
 KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -66,6 +62,16 @@ EOF
 fi
 K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
 export K8S_CLUSTER_TOKEN K8S_CLUSTER_URL
+
+echo "Setting platform environment variables:"
+export IS_OPENSHIFT="false"
+echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
+export CONTAINER_PLATFORM="aks"
+echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
+echo "Getting container platform version"
+CONTAINER_PLATFORM_VERSION=$(kubectl version --output json 2> /dev/null | jq -r '.serverVersion.major + "." + .serverVersion.minor' || echo "unknown")
+export CONTAINER_PLATFORM_VERSION
+echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
 
 # Prepare to git checkout
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
@@ -171,14 +177,8 @@ echo "############## Current branch ##############"
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
-echo "Setting platform environment variables:"
-export IS_OPENSHIFT="false"
-echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
-export CONTAINER_PLATFORM="aks"
-echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
-echo "Getting container platform version"
-CONTAINER_PLATFORM_VERSION=$(kubectl version --output json 2> /dev/null | jq -r '.serverVersion.major + "." + .serverVersion.minor' || echo "unknown")
-export CONTAINER_PLATFORM_VERSION
-echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
+NAME_SPACE="showcase-k8s-ci-nightly"
+NAME_SPACE_RBAC="showcase-rbac-k8s-ci-nightly"
+export NAME_SPACE NAME_SPACE_RBAC
 
 bash ./.ibm/pipelines/openshift-ci-tests.sh
