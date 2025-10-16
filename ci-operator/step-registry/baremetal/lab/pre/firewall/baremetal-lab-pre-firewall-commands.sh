@@ -84,7 +84,7 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
     fi
     iptables -A FORWARD -s "${ip}" ! -d "${INTERNAL_NET_CIDR}" -j DROP
     for buildfarm_ip in "${PROW_BUILDFARM_IPS[@]}"; do
-      iptables -A FORWARD -s "${ip}" ! -d "${buildfarm_ip}" -j DROP
+      iptables -A FORWARD -s "${ip}" -d "${buildfarm_ip}" -j ACCEPT
     done
   done
   if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
