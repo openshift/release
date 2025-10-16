@@ -186,7 +186,7 @@ echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
 export CONTAINER_PLATFORM="eks"
 echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
 echo "Getting container platform version"
-CONTAINER_PLATFORM_VERSION=$(kubectl version 2> /dev/null | grep "Server Version:" | cut -d' ' -f3 | cut -d'.' -f1,2 || echo "unknown")
+CONTAINER_PLATFORM_VERSION=$(kubectl version --output json 2> /dev/null | jq -r '.serverVersion.major + "." + .serverVersion.minor' || echo "unknown")
 export CONTAINER_PLATFORM_VERSION
 echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
 
