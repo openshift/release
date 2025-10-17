@@ -27,7 +27,7 @@ fi
 # Check if LVM_OPERATOR_INDEX_IMAGE is not empty and skip the step if it is
 if [[ -z "${LVM_OPERATOR_INDEX_IMAGE:-}" ]]; then
     echo "WARNING: LVM_OPERATOR_INDEX_IMAGE is empty or not set"
-    echo "Skipping LVM Operator Konflux catalogsource step"
+    echo "Skipping LVM Operator catalogsource step"
     exit 0
 else
     echo "LVM_OPERATOR_INDEX_IMAGE is set to: $LVM_OPERATOR_INDEX_IMAGE"
@@ -230,7 +230,7 @@ EOF
 }
 
 function main {
-	echo "Enabling LVM Operator Konflux catalogsource"
+	echo "Enabling LVM Operator catalogsource"
 	set_proxy
 
 	run "oc whoami"
