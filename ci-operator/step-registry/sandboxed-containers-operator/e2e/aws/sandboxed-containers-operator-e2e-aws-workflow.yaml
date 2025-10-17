@@ -1,5 +1,6 @@
 workflow:
   as: sandboxed-containers-operator-e2e-aws
+  timeout: 24h0m0s
   steps:
     env:
       TEST_PARALLEL: 1
@@ -13,6 +14,7 @@ workflow:
       MUST_GATHER_TIMEOUT: "35m"
       ENABLE_MUST_GATHER: "true"
       MUST_GATHER_ON_FAILURE_ONLY: "true"
+    allow_best_effort_post_steps: true
     pre:
     - chain: ipi-conf-aws
     - chain: aws-provision-iam-user-minimal-permission
@@ -22,10 +24,12 @@ workflow:
     post:
     - ref: sandboxed-containers-operator-gather-must-gather
     - ref: cucushift-installer-wait
+      timeout: 12h10m0s
     - ref: sandboxed-containers-operator-post
     - chain: ipi-aws-post
     test:
     - ref: openshift-extended-test
+    timeout: 24h0m0s
   documentation: |-
     This workflow run openshift-extented-test on an AWS cluster with
     the sandboxed containers deployed.
