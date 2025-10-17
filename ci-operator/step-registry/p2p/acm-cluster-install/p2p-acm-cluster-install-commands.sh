@@ -57,6 +57,8 @@ spec:
   clusterSet: ${CLUSTER_NAME}-set
 EOF
 
+
+# extract aws credentials from cluster profile to store it as secret on test cluster so that it is discoverable by ACM
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 # PULL_SECRET_JSON="$(jq -c . < ${CLUSTER_PROFILE_DIR}/config.json)"
 AWS_ACCESS_KEY_ID=$(cat "${AWSCRED}" | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2)
@@ -76,16 +78,19 @@ oc label secret acm-aws-secret \
   -n "${CLUSTER_NAME}" --overwrite \
   --dry-run=client -o yaml | oc apply -f -
 
+# create pull-secret required by cluster deployment
 oc -n "${CLUSTER_NAME}" create secret generic pull-secret\
       --type=kubernetes.io/dockerconfigjson \
       --from-file=.dockerconfigjson="${CLUSTER_PROFILE_DIR}/config.json" \
       --dry-run=client -o yaml | oc apply -f -
 
+# create ssh-public-key secret required by cluster deployment
 oc -n "${CLUSTER_NAME}" create secret generic ssh-public-key\
     --type=Opaque \
     --from-file=ssh-publickey="${CLUSTER_PROFILE_DIR}/ssh-publickey" \
     --dry-run=client -o yaml | oc apply -f -
 
+# create ssh-private-key secret required by cluster deployment
 oc -n "${CLUSTER_NAME}" create secret generic ssh-private-key\
     --type=Opaque \
     --from-file=ssh-privatekey="${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
@@ -133,7 +138,7 @@ sshKey: |-
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 EOF
 
-# create install-config secret
+# create install-config secret to be referenced in cluster deployment 
 oc -n ${CLUSTER_NAME} create secret generic install-config \
    --type Opaque \
    --from-file install-config.yaml=/tmp/install-config.yaml \

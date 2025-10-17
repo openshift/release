@@ -123,8 +123,9 @@ echo "deprovision-pod: $POD"
 while true; do
 #start or switch log stream if a provision pod exists
   
-  
+  POD="$(pick_deprovision_pod)"
   state="$(state_from_cd)"
+  echo "CD state: $state"
   case "$state" in 
     completed)
        echo 
@@ -146,7 +147,6 @@ while true; do
     [[ -n "${STREAM_PID}" ]] && kill "$STREAM_PID" 2>dev/null || true
     exit 3
   fi
-  POD="$(pick_deprovision_pod)"
   if [[ -n "$POD" ]] ; then
     echo "[INFO] Streaming logs from deprovision pod"
     oc -n "$NAMESPACE" logs "$POD" -f --since="${LOG_SINCE}" 2>&1  &  
