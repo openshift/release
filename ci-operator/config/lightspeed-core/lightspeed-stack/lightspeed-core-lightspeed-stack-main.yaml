@@ -43,11 +43,12 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: "echo \"ECHO VLLM KEY\"\nls /var/run/vllm\nls
-        /var/run/huggingface\nexport HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/hf-token-ces-lcore-test)\nexport
-        VLLM_API_KEY=$(cat /var/run/vllm/vllm-api-key-lcore-test)\necho $VLLM_API_KEY\necho
-        \"ECHO END\"\n\nls -A\noc version\noc whoami\noc help\necho \"Test\"\noc get
-        pods -A\n\necho \"===== DEPLOY vLLM ======\"\n\ngit clone https://github.com/are-ces/lightspeed-stack.git\ncd
+      commands: "export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/hf-token-ces-lcore-test)\nexport
+        VLLM_API_KEY=$(cat /var/run/vllm/vllm-api-key-lcore-test)\n[ -n \"$HUGGING_FACE_HUB_TOKEN\"
+        ] && echo \"HUGGING_FACE_HUB_TOKEN is set\" || echo \"HUGGING_FACE_HUB_TOKEN
+        is NOT set\"\n[ -n \"$VLLM_API_KEY\" ] && echo \"VLLM_API_KEY is set\" ||
+        echo \"VLLM_API_KEY is NOT set\"\n\nls -A\noc version\noc whoami\noc get pods
+        -A\n\necho \"===== DEPLOY vLLM ======\"\n\ngit clone https://github.com/are-ces/lightspeed-stack.git\ncd
         lightspeed-stack\ngit checkout e2e-rhoai\ncd tests/e2e-prow/rhoai\n\noc create
         namespace e2e-rhoai-dsc\n\noc create secret generic hf-token-secret \\\n    --from-literal=token=\"$HUGGING_FACE_HUB_TOKEN\"
         \\\n    -n e2e-rhoai-dsc || echo \"Secret exists\"\n\noc create secret generic
@@ -60,7 +61,8 @@ tests:
         $VLLM_API_KEY\" \\\n  -d '{\n      \"model\": \"meta-llama/Llama-3.2-1B-Instruct\",\n
         \     \"prompt\": \"You are a helpful assistant. Who won the world series
         in 2020?\",\n      \"max_new_tokens\": 100\n  }' \\\n  \"$KSVC_URL/v1/completions\"\n\ncd
-        ../../..\nls\npodman compose up\n"
+        ../../..\nls\npodman compose up\n\npodman compose logs\nopenshift-install
+        destroy cluster --dir=\"$OPENSHIFT_WORKDIR\"\n"
       credentials:
       - collection: ""
         mount_path: /var/run/huggingface
