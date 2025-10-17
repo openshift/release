@@ -20,7 +20,7 @@ if [[ ${MINOR_VERSION} -ge 20 ]]; then
 fi
 
 # Allow overriding the LVM_OPERATOR_INDEX_IMAGE with the Gangway API
-if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_INDEX_IMAGE}" ]]; then
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_INDEX_IMAGE:-}" ]]; then
   LVM_OPERATOR_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_INDEX_IMAGE}
 fi
 
@@ -28,18 +28,19 @@ fi
 if [[ -z "${LVM_OPERATOR_INDEX_IMAGE:-}" ]]; then
     echo "WARNING: LVM_OPERATOR_INDEX_IMAGE is empty or not set"
     echo "Skipping LVM Operator Konflux catalogsource step"
-    return 0
+    exit 0
 else
     echo "LVM_OPERATOR_INDEX_IMAGE is set to: $LVM_OPERATOR_INDEX_IMAGE"
 fi
 
 function set_proxy {
-	[[ -f "${SHARED_DIR}/proxy-conf.sh" ]] && {
+	if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
 		echo "setting the proxy"
 		echo "source ${SHARED_DIR}/proxy-conf.sh"
 		source "${SHARED_DIR}/proxy-conf.sh"
-	}
-	echo "no proxy setting. skipping this step"
+	else
+		echo "no proxy setting. skipping this step"
+	fi
 	return 0
 }
 
@@ -49,7 +50,7 @@ function run {
 	eval "$cmd"
 }
 
-function apply_image_config() {
+function apply_image_config {
     # Check if the configmap already exists
     if oc get configmap registry-config -n openshift-config > /dev/null 2>&1; then
         echo "Configmap registry-config already exists, continuing with the script..."
@@ -121,14 +122,14 @@ function update_global_auth {
 # create IDMS for connected env.
 function create_idms_connected {
 
-	cat <<EOF | oc apply -f - || {
+	cat <<EOF | oc apply -f -
   apiVersion: config.openshift.io/v1
   kind: ImageDigestMirrorSet
   metadata:
     name: $IDMS_NAME
   spec:
     imageDigestMirrors:
-	- mirrors:
+    - mirrors:
       - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator
       - registry.stage.redhat.io/lvms4/lvms-rhel9-operator
       source: registry.redhat.io/lvms4/lvms-rhel9-operator
@@ -141,9 +142,11 @@ function create_idms_connected {
       - registry.stage.redhat.io/lvms4/lvms-must-gather-rhel9
       source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
 EOF
-		echo "!!! fail to create the IDMS"
+
+	if [ $? -ne 0 ]; then
+		echo "!!! failed to create the IDMS"
 		return 1
-	}
+	fi
 
 	echo "IDMS $IDMS_NAME created successfully"
 	return 0
@@ -188,7 +191,7 @@ EOF
 		node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource="$CATALOG_SOURCE" -o=jsonpath='{.items[0].spec.nodeName}')
 		run "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false \
       pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
-		run "oc -n debug-qe debug node/$node_name -- chroot /host podman pull --authfile /var/lib/kubelet/config.json $COO_INDEX_IMAGE"
+		run "oc -n debug-qe debug node/$node_name -- chroot /host podman pull --authfile /var/lib/kubelet/config.json $LVM_OPERATOR_INDEX_IMAGE"
 
 		run "oc get mcp,node"
 		run "oc get mcp worker -o yaml"
