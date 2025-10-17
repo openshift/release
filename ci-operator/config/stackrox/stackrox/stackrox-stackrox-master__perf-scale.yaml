@@ -26,6 +26,23 @@ resources:
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: 24nodes-scale-test
+  cron: 0 6 6,20 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_REPLICAS: "24"
+      ROX_SCANNER_V4_ENABLED: "false"
+      USER_TAGS: |
+        TicketId 382
+        RoxProject PerfScale
+      ZONES_COUNT: "3"
+    test:
+    - chain: stackrox-perfscale
+    workflow: stackrox-install-helm
+  timeout: 8h0m0s
+- as: 24nodes-scale-scannerv4-test
   cron: 0 6 * * *
   steps:
     allow_skip_on_success: true
