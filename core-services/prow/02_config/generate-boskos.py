@@ -111,6 +111,10 @@ CONFIG = {
     'metal-perfscale-telco-quota-slice': {
         'metal-perfscale-telco-rdu2': 1,
     },
+    'aws-restricted-qe-quota-slice': {
+        'us-east-1': 5,
+        'ap-northeast-1': 5,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
@@ -120,7 +124,7 @@ CONFIG = {
     },
     'aws-sustaining-autorelease-412-quota-slice': {
         # We can re-configure later as per requirement
-        'us-east-1': 25,
+        'us-east-1': 32,
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
@@ -231,7 +235,7 @@ CONFIG = {
         'usgovtexas': 5
     },
     'azure-sustaining-autorelease-412-quota-slice': {
-        'eastus': 25,
+        'eastus': 32,
     },
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
@@ -241,6 +245,9 @@ CONFIG = {
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
+    },
+    'aws-sandboxed-containers-operator-quota-slice': {
+        'us-east-2': 10,
     },
     'oex-aws-qe-quota-slice': {
         'default': 40,
@@ -267,7 +274,7 @@ CONFIG = {
         'us-central1': 7,
     },
     'gcp-sustaining-autorelease-412-quota-slice': {
-        'us-east1': 25,
+        'us-east1': 32,
     },
     'gcp-quota-slice': {
         'us-central1': 70,
@@ -308,7 +315,7 @@ CONFIG = {
     'nutanix-qe-flow-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
-        'default': 18,
+        'default': 8,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,
@@ -389,6 +396,7 @@ CONFIG = {
     'powervs-5-quota-slice': {},
     'powervs-6-quota-slice': {},
     'powervs-7-quota-slice': {},
+    'powervs-8-quota-slice': {},
     'powervs-multi-1-quota-slice': {
         'wdc06': 2,
     },
@@ -423,7 +431,7 @@ CONFIG = {
         'us-east-1': 10,
     },
     'hypershift-hive-quota-slice': {
-        'default': 80
+        'default': 10,
     },
     'aws-virtualization-quota-slice': {
         'us-east-1': 5,
@@ -576,6 +584,9 @@ CONFIG = {
     'aws-lp-chaos-quota-slice': {
         'us-west-2': 10,
     },
+    'metal-redhat-gs-quota-slice': {
+        'default': 1,
+    },
 }
 
 for i in range(2,7):
@@ -637,6 +648,9 @@ for i in range(4):
 
 for i in range(4):
     CONFIG['powervs-7-quota-slice']['lon06-powervs-7-quota-slice-{}'.format(i)] = 1
+
+for i in range(2):
+    CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
 
 
 config = {

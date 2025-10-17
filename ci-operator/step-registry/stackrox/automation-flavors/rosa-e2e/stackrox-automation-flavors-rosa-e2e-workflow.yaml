@@ -5,11 +5,22 @@ workflow:
     - ref: stackrox-stackrox-begin
     - as: rosa-create
       commands: |
+        export WAIT_FOR_NODES_TRIES=30
+        if [[ ! -z "${OCP_VERSION:-}" ]]; then
+          export ROSA_ARGS="--version=${OCP_VERSION}"
+        fi
         /usr/bin/openshift-ci.sh create rosa
       credentials:
       - mount_path: /tmp/vault/stackrox-automation-flavors
         name: stackrox-automation-flavors
         namespace: test-credentials
+      env:
+      - name: FIPS_ENABLED
+        default: "false"
+      - name: INSTANCE_TYPE
+        default: ""
+      - name: NODE_COUNT
+        default: "3"
       from: rosa
       resources:
         requests:

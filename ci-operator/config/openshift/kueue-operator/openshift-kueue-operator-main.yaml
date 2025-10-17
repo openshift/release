@@ -154,6 +154,25 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
+- as: test-e2e-4-20
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  minimum_interval: 96h
+  presubmit: true
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e
 - as: test-e2e-4-19-hypershift
   minimum_interval: 96h
   steps:
@@ -165,6 +184,24 @@ tests:
     test:
     - chain: kueue-operator-test-e2e-dev-bundle
     workflow: hypershift-hostedcluster-workflow
+- always_run: false
+  as: perfscale-payload-kueue-operator-9nodes
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BUNDLE_COMPONENT: kueue-bundle-main
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+      ZONES_COUNT: "3"
+    test:
+    - chain: kueue-operator-test-perfscale
+    workflow: openshift-qe-installer-aws
+  timeout: 3h30m0s
 zz_generated_metadata:
   branch: main
   org: openshift

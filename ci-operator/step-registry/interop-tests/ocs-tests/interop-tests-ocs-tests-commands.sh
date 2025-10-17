@@ -111,6 +111,9 @@ set +x
 # Map tests if needed for related use cases
 mapTestsForComponentReadiness "${CLUSTER_PATH}/junit.xml"
 
+# Send junit file to shared dir for Data Router Reporter step
+cp "${CLUSTER_PATH}/junit.xml" "${SHARED_DIR}"
+
 if [[ ${DIFF_TIME} -le 1800 ]]; then
     echo ""
     echo " 🚨  The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give us time to debug"

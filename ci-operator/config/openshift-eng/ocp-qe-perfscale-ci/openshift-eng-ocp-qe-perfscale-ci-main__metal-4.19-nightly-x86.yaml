@@ -32,7 +32,6 @@ tests:
   steps:
     cluster_profile: metal-perscale-cpt
     env:
-      BAREMETAL: "true"
       CNV_VERSION: "4.19"
       CONFIG: config/standard-scalelab.yml
       INFRA: "true"
@@ -56,7 +55,6 @@ tests:
   steps:
     cluster_profile: metal-perscale-cpt
     env:
-      BAREMETAL: "true"
       CONFIG: config/standard-scalelab.yml
       INFRA: "true"
       RUN_CERBERUS: "false"
@@ -87,75 +85,6 @@ tests:
       TYPE: sno
     workflow: openshift-qe-installer-bm-deploy
   timeout: 7h0m0s
-- always_run: false
-  as: node-density-heavy-6nodes
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    cluster_profile: metal-perscale-cpt
-    env:
-      BAREMETAL: "true"
-      RUN_CERBERUS: "false"
-    test:
-    - chain: openshift-qe-node-density-heavy
-    workflow: openshift-qe-installer-bm-deploy
-  timeout: 7h0m0s
-- always_run: false
-  as: data-path-6nodes
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    cluster_profile: metal-perscale-cpt
-    env:
-      BAREMETAL: "true"
-      CONFIG: config/standard-scalelab.yml
-      INFRA: "true"
-      RUN_CERBERUS: "false"
-      TELCO: "false"
-    test:
-    - ref: openshift-qe-installer-bm-day2-label
-    - chain: openshift-qe-data-path-tests
-    workflow: openshift-qe-installer-bm-deploy
-  timeout: 7h55m0s
-- always_run: false
-  as: web-burner-node-density-6nodes
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    cluster_profile: metal-perscale-cpt
-    env:
-      BAREMETAL: "true"
-      PUBLIC_VLAN: "false"
-    test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-prereqs
-    - ref: openshift-qe-installer-bm-deploy
-    - ref: openshift-qe-installer-bm-day2-label
-    - ref: openshift-qe-installer-bm-day2-sriov
-    - ref: openshift-qe-web-burner
-- always_run: false
-  as: web-burner-cluster-density-6nodes
-  capabilities:
-  - intranet
-  restrict_network_access: false
-  steps:
-    cluster_profile: metal-perscale-cpt
-    env:
-      BAREMETAL: "true"
-      KUBE_BURNER_VERSION: 1.2.9
-      LIMIT_COUNT: "1"
-      PUBLIC_VLAN: "false"
-      WORKLOAD: web-burner-cluster-density
-    test:
-    - ref: openshift-qe-installer-bm-ping
-    - ref: openshift-qe-installer-bm-prereqs
-    - ref: openshift-qe-installer-bm-deploy
-    - ref: openshift-qe-installer-bm-day2-label
-    - ref: openshift-qe-installer-bm-day2-sriov
-    - ref: openshift-qe-web-burner
 zz_generated_metadata:
   branch: main
   org: openshift-eng

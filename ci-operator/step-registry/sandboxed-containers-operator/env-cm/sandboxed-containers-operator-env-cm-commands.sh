@@ -54,115 +54,10 @@ latest_catsrc_image_tag() {
 }
 
 mirror_konflux() {
-  local mirror_path="${SHARED_DIR:-$(pwd)}/mirror_konflux.yaml"
-
   echo "Create mirror for konflux images"
-
-cat<<EOF | tee "${mirror_path}"
----
-apiVersion: config.openshift.io/v1
-kind: ImageTagMirrorSet
-metadata:
-  name: osc-registry
-spec:
-  imageTagMirrors:
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-monitor
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-monitor-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-caa
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-cloud-api-adaptor-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-caa-webhook
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-cloud-api-adaptor-webhook-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-podvm-builder
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-podvm-builder-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-podvm-payload
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-podvm-payload-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-rhel9-operator
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-must-gather
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator-bundle
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-operator-bundle
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-dm-verity-image
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-dm-verity-image
-
----
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: osc-registry
-spec:
-  imageDigestMirrors:
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-monitor
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-monitor-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-caa
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-cloud-api-adaptor-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-caa-webhook
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-cloud-api-adaptor-webhook-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-podvm-builder
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-podvm-builder-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-podvm-payload
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-podvm-payload-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-rhel9-operator
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-must-gather
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-operator-bundle
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-operator-bundle
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/osc-dm-verity-image
-      source: registry.redhat.io/openshift-sandboxed-containers/osc-dm-verity-image
----
-apiVersion: config.openshift.io/v1
-kind: ImageTagMirrorSet
-metadata:
-  name: trustee-registry
-spec:
-  imageTagMirrors:
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9-operator
----
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
-metadata:
-  name: trustee-registry
-spec:
-  imageDigestMirrors:
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9
-    - mirrors:
-        - quay.io/redhat-user-workloads/ose-osc-tenant/trustee/trustee-operator
-      source: registry.redhat.io/confidential-compute-attestation-tech-preview/trustee-rhel9-operator
-EOF
-
-  oc apply -f "${mirror_path}"
+  # create the mirror set for the sandboxed-containers-operator and trustee-fbc devel branches
+  oc apply -f "https://raw.githubusercontent.com/openshift/sandboxed-containers-operator/refs/heads/devel/.tekton/images-mirror-set.yaml"
+  oc apply -f "https://raw.githubusercontent.com/openshift/trustee-fbc/refs/heads/main/.tekton/images-mirror-set.yaml"
 }
 
 if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
@@ -193,7 +88,7 @@ data:
   catalogsourcename: "${CATALOG_SOURCE_NAME}"
   operatorVer: "${EXPECTED_OPERATOR_VERSION}"
   channel: "${OPERATOR_UPDATE_CHANNEL}"
-  redirectNeeded: "true"
+  redirectNeeded: "false"
   exists: "true"
   labelSingleNode: "false"
   eligibility: "false"
