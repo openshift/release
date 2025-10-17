@@ -78,7 +78,7 @@ set +e
 set -o pipefail
 echo "Start orion test"
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-ES_IDX=${ES_METADATA_INDEX} ES_SERVER=${ES_SERVER} orion cmd --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
+ES_IDX=${ES_METADATA_INDEX} ES_SERVER=${ES_SERVER} orion --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 
