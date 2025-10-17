@@ -53,7 +53,7 @@ hack/ci-test-e2e.sh -test.v \
   ${PKI_RECONCILIATION_PARAMS:-} \
   --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
   --e2e.aws-endpoint-access=PublicAndPrivate \
-  --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com \
+  --e2e.external-dns-domain=ci.hypershift.devcluster.openshift.com \
   ${AWS_MULTI_ARCH_PARAMS:-} \
   ${REQUEST_SERVING_COMPONENT_PARAMS:-} &
 wait $!
