@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eu -o pipefail
+set -euo pipefail
 # Define the paths to the JSON files
 declare -r KONFLUX_CA_BUNDLE="/var/run/vault/dt-secrets/stage-registry-cert.pem"
 declare -r KONFLUX_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.json"
@@ -103,17 +103,7 @@ function update_global_auth {
 }
 
 # create ICSP for connected env.
-function create_icsp_connected {
-
-	#Delete any existing ImageContentSourcePolicy
-	oc delete imagecontentsourcepolicies brew-registry --ignore-not-found=true || {
-		echo "failed to delete existing imagecontentsourcepolicies"
-		return 1
-	}
-	oc delete catalogsource qe-app-registry -n openshift-marketplace --ignore-not-found=true || {
-		echo "failed to delete existing catalogsource"
-		return 1
-	}
+function create_idms_connected {
 
 	cat <<EOF | oc apply -f - || {
   apiVersion: config.openshift.io/v1
@@ -233,7 +223,7 @@ function main {
 	}
 	echo "sleeping for 5s"
 	sleep 5
-	create_icsp_connected || {
+	create_idms_connected || {
 		echo "failed to create imagecontentsourcepolicies. resolve the above errors"
 		return 1
 	}
@@ -246,7 +236,7 @@ function main {
 		return 1
 	}
 
-	#support hypershift config guest cluster's icsp
+	#support hypershift config guest cluster's idms
 	oc get ImageDigestMirrorSet -oyaml >/tmp/mgmt_idms.yaml && yq-go r /tmp/mgmt_idms.yaml 'items[*].spec.imageDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml
 	return 0
 }
