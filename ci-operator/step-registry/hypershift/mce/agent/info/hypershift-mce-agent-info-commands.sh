@@ -6,6 +6,10 @@ if [ -f "${SHARED_DIR}/packet-conf.sh" ] ; then
   source "${SHARED_DIR}/packet-conf.sh"
 fi
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 echo "**MGMT cluster**"
 echo "HyperShift repo commit id"
 oc logs -n hypershift -l app=operator --tail=-1 | head -1
