@@ -7,9 +7,24 @@ declare -r KONFLUX_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.
 
 declare IDMS_NAME=${IDMS_NAME}
 declare CATALOG_SOURCE=${LVM_OPERATOR_CATALOG_SOURCE}
-declare LVM_OPERATOR_INDEX_IMAGE=${LVM_OPERATOR_INDEX_IMAGE:-${MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_INDEX_IMAGE}}
+declare LVM_OPERATOR_INDEX_IMAGE
 
-# Check if LVM_OPERATOR_INDEX_IMAGE is not empty
+CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
+MINOR_VERSION=$(echo "$CLUSTER_VERSION" | cut -d. -f2)
+
+echo "Detected OpenShift version: ${CLUSTER_VERSION}"
+
+# For OpenShift 4.20+, use Konflux catalogsource index image by default
+if [[ ${MINOR_VERSION} -ge 20 ]]; then
+  LVM_OPERATOR_INDEX_IMAGE="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"
+fi
+
+# Allow overriding the LVM_OPERATOR_INDEX_IMAGE with the Gangway API
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_INDEX_IMAGE}" ]]; then
+  LVM_OPERATOR_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_INDEX_IMAGE}
+fi
+
+# Check if LVM_OPERATOR_INDEX_IMAGE is not empty and skip the step if it is
 if [[ -z "${LVM_OPERATOR_INDEX_IMAGE:-}" ]]; then
     echo "WARNING: LVM_OPERATOR_INDEX_IMAGE is empty or not set"
     echo "Skipping LVM Operator Konflux catalogsource step"
@@ -103,7 +118,7 @@ function update_global_auth {
 	return 0
 }
 
-# create ICSP for connected env.
+# create IDMS for connected env.
 function create_idms_connected {
 
 	cat <<EOF | oc apply -f - || {
