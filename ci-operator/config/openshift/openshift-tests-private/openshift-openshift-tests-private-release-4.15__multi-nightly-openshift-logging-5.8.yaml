@@ -58,7 +58,7 @@ tests:
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@logging5.8'
+      E2E_RUN_TAGS: '@logging5.8 AND @console'
       FILTERS_ADDITIONAL: ""
       LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.8
       OCP_ARCH: arm64
@@ -82,6 +82,40 @@ tests:
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: baremetalds-ipi-ovn-ipv6-fips-f60-logging
+  cluster: build05
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEBUG: "true"
+      DEVSCRIPTS_CONFIG: |
+        FIPS_MODE=true
+        IP_STACK=v6
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      E2E_RUN_TAGS: '@logging5.8 and @console'
+      FILTERS_ADDITIONAL: ""
+      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:v1.28
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "loki-operator", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "qe-app-registry", "channel": "stable-5.8", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
+        ]
+      TEST_ADDITIONAL: ""
+      TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&
+      TEST_IMPORTANCE: LEVEL0
+      TEST_PARALLEL: "3"
+      TEST_ROSA_LOGIN_ENV: ""
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "15"
+    test:
+    - ref: install-operators
+    - ref: enable-qe-catalogsource-logging
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
