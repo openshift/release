@@ -103,14 +103,14 @@ function update_global_auth {
 	run "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=$new_dockerconfig" || ret=$?
 	if [[ $ret -eq 0 ]]; then
 		apply_image_config
-		echo "update the cluster global auth successfully."
+		echo "updated the cluster global auth successfully."
 	else
 		echo "failed to add QE optional registry auth, retry and enable log..."
 		sleep 1
 		ret=0
 		run "oc --loglevel=10 set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
 		if [[ $ret -eq 0 ]]; then
-			echo "update the cluster global auth successfully after retry."
+			echo "updated the cluster global auth successfully after retry."
 		else
 			echo "still fail to add QE optional registry auth after retry"
 			return 1
@@ -123,24 +123,24 @@ function update_global_auth {
 function create_idms_connected {
 
 	cat <<EOF | oc apply -f -
-  apiVersion: config.openshift.io/v1
-  kind: ImageDigestMirrorSet
-  metadata:
-    name: $IDMS_NAME
-  spec:
-    imageDigestMirrors:
-    - mirrors:
-      - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator
-      - registry.stage.redhat.io/lvms4/lvms-rhel9-operator
-      source: registry.redhat.io/lvms4/lvms-rhel9-operator
-    - mirrors:
-      - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle
-      - registry.stage.redhat.io/lvms4/lvms-operator-bundle
-      source: registry.redhat.io/lvms4/lvms-operator-bundle
-    - mirrors:
-      - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather
-      - registry.stage.redhat.io/lvms4/lvms-must-gather-rhel9
-      source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: $IDMS_NAME
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator
+    - registry.stage.redhat.io/lvms4/lvms-rhel9-operator
+    source: registry.redhat.io/lvms4/lvms-rhel9-operator
+  - mirrors:
+    - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-bundle
+    - registry.stage.redhat.io/lvms4/lvms-operator-bundle
+    source: registry.redhat.io/lvms4/lvms-operator-bundle
+  - mirrors:
+    - quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvms-must-gather
+    - registry.stage.redhat.io/lvms4/lvms-must-gather-rhel9
+    source: registry.redhat.io/lvms4/lvms-must-gather-rhel9
 EOF
 
 	if [ $? -ne 0 ]; then
