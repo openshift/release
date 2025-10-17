@@ -82,9 +82,25 @@ function runMustGather() {
 #   * status - true / false
 function cnv::toggle_common_boot_image_import () {
   local status="${1}"
+
+  case $(
+      oc -n openshift-cnv get Subscriptions/hco-operatorhub -o jsonpath='{.status.currentCSV}'|
+      sed -E 's/.+v([0-9]+\.[0-9]+).*/\1/'
+  ) in
+    (4.19*|4.[2-9]+([0-9])*|@([5-9]|[1-9]+([0-9])).*)
+      typeset comImgFeatFlagPath="$(
+        openshift-virtualization-tests]# yq -n -o json -I 0 eval ".spec.enableCommonBootImageImport = ${status}"
+      )"
+      ;;
+    (*)
+      typeset comImgFeatFlagPath="$(
+        openshift-virtualization-tests]# yq -n -o json -I 0 eval ".spec.featureGates.enableCommonBootImageImport = ${status}"
+      )"
+      ;;
+  esac
   oc patch hco kubevirt-hyperconverged -n openshift-cnv \
     --type=merge \
-    -p "{\"spec\":{\"enableCommonBootImageImport\": ${status}}}"
+    -p "${comImgFeatFlagPath}"
 
     # In some edge cases, the HCO deployment will be scaled down, and not scale up.
     oc scale deployment hco-operator --replicas 1 -n openshift-cnv
