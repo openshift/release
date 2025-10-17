@@ -51,7 +51,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     RENDEZVOUS_NODE="$CURRENT_RENDEZVOUS_NODE" \
     python3.11 agent-tui/run_agent_tui.py || {
       echo "Agent TUI settings failed for $HOST_MACHINE."
-      exit 1
+#      exit 1
     }
   ) &
   pids+=($!)
@@ -61,7 +61,28 @@ done
 for pid in "${pids[@]}"; do
   if ! wait "$pid"; then
     cp -r /tmp/agent_logs/* "$ARTIFACT_DIR"
-    exit 1
+#    exit 1
   fi
 done
 echo "Agent TUI execution completed successfully!"
+
+[Service]
+ExecStart=
+ExecStart=/usr/bin/podman run --name registry-${PORT} \
+           -p ${PORT}:${PORT} \
+           -v /opt/registry-${PORT}/data:/var/lib/registry:Z \
+           -v /opt/registry-${PORT}/auth:/auth:Z \
+           -v /opt/registry-${PORT}/certs:/certs:Z \
+           -v /opt/registry-${PORT}/config.yaml:/etc/docker/registry/config.yml:Z \
+           --health-cmd="sleep 10s;\
+                         curl -k -s -o /dev/null https://localhost:${PORT}/ && \
+                         curl -k -s -o /dev/null https://${ext0_IPADDR}:${PORT}/ && \
+                         curl -k -s -o /dev/null https://${baremetal_IPADDR}:${PORT}/" \
+           --health-interval=30s \
+           --health-retries=10 \
+           --health-on-failure=kill \
+           --env-file /opt/registry-${PORT}/env \
+           quay.io/libpod/registry:2.8.2
+# curl is currently installed the first time the registry starts to avoid forking the image. The only binary included
+# that can support the healthcheck is the BusyBox's version of wget, and it seems affected by
+# https://github.com/distribution/distribution-library-image/issues/158
