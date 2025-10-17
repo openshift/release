@@ -54,6 +54,21 @@ if [[ -n "$ORION_CONFIG" ]]; then
     fi
 fi
 
+if [[ -n "$ACK_FILE" ]]; then
+    if [[ "$ACK_FILE" =~ ^https?:// ]]; then
+        ackBasename="${ACK_FILE##*/}"
+        if curl -fsSL "$ACK_FILE" -o "$ARTIFACT_DIR/$ackBasename"; then
+            export ACK="$ARTIFACT_DIR/$ackBasename"
+        else
+            echo "Error: Failed to download $ACK_FILE" >&2
+            exit 1
+        fi
+    else
+        export ACK="$ACK_FILE"
+    fi
+    EXTRA_FLAGS+=" --ack ${ACK}"
+fi
+
 
 if [ ${COLLAPSE} == "true" ]; then
     export EXTRA_FLAGS+=" --collapse"
