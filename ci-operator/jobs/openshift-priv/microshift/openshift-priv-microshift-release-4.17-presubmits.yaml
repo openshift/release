@@ -1,7 +1,90 @@
 presubmits:
   openshift-priv/microshift:
   - agent: kubernetes
-    always_run: false
+    always_run: true
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    context: ci/prow/e2e-aws-nvidia-device-plugin
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-microshift-release-4.17-e2e-aws-nvidia-device-plugin
+    path_alias: github.com/openshift/microshift
+    rerun_command: /test e2e-aws-nvidia-device-plugin
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-nvidia-device-plugin
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-nvidia-device-plugin,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -20,7 +103,6 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-release-4.17-footprint-and-performance
     path_alias: github.com/openshift/microshift
     rerun_command: /test footprint-and-performance
-    run_if_changed: ^(scripts/ci-footprint-and-performance/.*)$
     spec:
       containers:
       - args:
@@ -152,7 +234,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -171,7 +253,6 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-release-4.17-metal-bootc-periodic-test
     path_alias: github.com/openshift/microshift
     rerun_command: /test metal-bootc-periodic-test
-    run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
     spec:
       containers:
       - args:
@@ -237,7 +318,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )metal-bootc-periodic-test,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -256,7 +337,6 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-release-4.17-metal-bootc-periodic-test-arm
     path_alias: github.com/openshift/microshift
     rerun_command: /test metal-bootc-periodic-test-arm
-    run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
     spec:
       containers:
       - args:
@@ -322,7 +402,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )metal-bootc-periodic-test-arm,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -341,7 +421,6 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-release-4.17-metal-bootc-test
     path_alias: github.com/openshift/microshift
     rerun_command: /test metal-bootc-test
-    run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
     spec:
       containers:
       - args:
@@ -407,7 +486,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )metal-bootc-test,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -426,7 +505,6 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-release-4.17-metal-bootc-test-arm
     path_alias: github.com/openshift/microshift
     rerun_command: /test metal-bootc-test-arm
-    run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
     spec:
       containers:
       - args:
@@ -492,7 +570,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )metal-bootc-test-arm,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -511,7 +589,6 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-release-4.17-metal-periodic-test
     path_alias: github.com/openshift/microshift
     rerun_command: /test metal-periodic-test
-    run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
     spec:
       containers:
       - args:
@@ -577,7 +654,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )metal-periodic-test,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -596,7 +673,6 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-release-4.17-metal-periodic-test-arm
     path_alias: github.com/openshift/microshift
     rerun_command: /test metal-periodic-test-arm
-    run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
     spec:
       containers:
       - args:
@@ -662,7 +738,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )metal-periodic-test-arm,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -681,7 +757,6 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-release-4.17-microshift-metal-cache
     path_alias: github.com/openshift/microshift
     rerun_command: /test microshift-metal-cache
-    run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
     spec:
       containers:
       - args:
@@ -747,7 +822,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )microshift-metal-cache,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -766,7 +841,6 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-release-4.17-microshift-metal-cache-arm
     path_alias: github.com/openshift/microshift
     rerun_command: /test microshift-metal-cache-arm
-    run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
     spec:
       containers:
       - args:
@@ -832,7 +906,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )microshift-metal-cache-arm,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -851,7 +925,6 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-release-4.17-microshift-metal-tests
     path_alias: github.com/openshift/microshift
     rerun_command: /test microshift-metal-tests
-    run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
     spec:
       containers:
       - args:
@@ -917,7 +990,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )microshift-metal-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -936,7 +1009,6 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-release-4.17-microshift-metal-tests-arm
     path_alias: github.com/openshift/microshift
     rerun_command: /test microshift-metal-tests-arm
-    run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
     spec:
       containers:
       - args:
@@ -1002,26 +1074,24 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )microshift-metal-tests-arm,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build10
-    context: ci/prow/ocp-conformance-rhel-eus
+    context: ci/prow/ocp-conformance-with-optional-rpms-rhel-eus-nightly
     decorate: true
     decoration_config:
       skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-3
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-microshift-release-4.17-ocp-conformance-rhel-eus
+    name: pull-ci-openshift-priv-microshift-release-4.17-ocp-conformance-with-optional-rpms-rhel-eus-nightly
     path_alias: github.com/openshift/microshift
-    rerun_command: /test ocp-conformance-rhel-eus
-    run_if_changed: ^(assets/.*|etcd/.*|vendor/.*)$
+    rerun_command: /test ocp-conformance-with-optional-rpms-rhel-eus-nightly
     spec:
       containers:
       - args:
@@ -1031,7 +1101,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=ocp-conformance-rhel-eus
+        - --target=ocp-conformance-with-optional-rpms-rhel-eus-nightly
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -1085,28 +1155,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-conformance-rhel-eus,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-conformance-with-optional-rpms-rhel-eus-nightly,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build10
-    context: ci/prow/ocp-conformance-rhel-eus-arm
+    context: ci/prow/ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm
     decorate: true
     decoration_config:
       skip_cloning: true
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-microshift-release-4.17-ocp-conformance-rhel-eus-arm
+    name: pull-ci-openshift-priv-microshift-release-4.17-ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm
     path_alias: github.com/openshift/microshift
-    rerun_command: /test ocp-conformance-rhel-eus-arm
-    run_if_changed: ^(assets/.*|etcd/.*|vendor/.*)$
+    rerun_command: /test ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm
     spec:
       containers:
       - args:
@@ -1116,7 +1184,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=ocp-conformance-rhel-eus-arm
+        - --target=ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -1170,9 +1238,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-conformance-rhel-eus-arm,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -1191,7 +1259,6 @@ presubmits:
     name: pull-ci-openshift-priv-microshift-release-4.17-ocp-full-conformance-rhel-eus
     path_alias: github.com/openshift/microshift
     rerun_command: /test ocp-full-conformance-rhel-eus
-    run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
     spec:
       containers:
       - args:
