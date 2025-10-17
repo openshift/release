@@ -7,12 +7,13 @@ declare -r KONFLUX_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.
 
 declare IDMS_NAME=${IDMS_NAME}
 declare CATALOG_SOURCE=${LVM_OPERATOR_CATALOG_SOURCE}
-declare LVM_OPERATOR_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_INDEX_IMAGE}
+declare LVM_OPERATOR_INDEX_IMAGE=${LVM_OPERATOR_INDEX_IMAGE:-${MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_INDEX_IMAGE}}
 
 # Check if LVM_OPERATOR_INDEX_IMAGE is not empty
-if [[ -z "$LVM_OPERATOR_INDEX_IMAGE" ]]; then
-    echo "Error: LVM_OPERATOR_INDEX_IMAGE is empty or not set"
-    exit 1
+if [[ -z "${LVM_OPERATOR_INDEX_IMAGE:-}" ]]; then
+    echo "WARNING: LVM_OPERATOR_INDEX_IMAGE is empty or not set"
+    echo "Skipping LVM Operator Konflux catalogsource step"
+    return 0
 else
     echo "LVM_OPERATOR_INDEX_IMAGE is set to: $LVM_OPERATOR_INDEX_IMAGE"
 fi
