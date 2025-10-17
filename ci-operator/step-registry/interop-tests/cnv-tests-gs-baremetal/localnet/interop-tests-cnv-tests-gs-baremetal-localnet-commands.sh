@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+shopt -s extglob
 
 start_time=$SECONDS
 
@@ -89,12 +90,12 @@ function cnv::toggle_common_boot_image_import () {
   ) in
     (4.19*|4.[2-9]+([0-9])*|@([5-9]|[1-9]+([0-9])).*)
       typeset comImgFeatFlagPath="$(
-        openshift-virtualization-tests]# yq -n -o json -I 0 eval ".spec.enableCommonBootImageImport = ${status}"
+        yq -n -o json -I 0 eval ".spec.enableCommonBootImageImport = ${status}"
       )"
       ;;
     (*)
       typeset comImgFeatFlagPath="$(
-        openshift-virtualization-tests]# yq -n -o json -I 0 eval ".spec.featureGates.enableCommonBootImageImport = ${status}"
+        yq -n -o json -I 0 eval ".spec.featureGates.enableCommonBootImageImport = ${status}"
       )"
       ;;
   esac
