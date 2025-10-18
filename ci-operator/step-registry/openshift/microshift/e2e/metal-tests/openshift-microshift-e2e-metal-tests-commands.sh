@@ -16,9 +16,9 @@ trap 'finalize' EXIT
 # Determine the tests to run depending on the job name and type.
 # Exclude long-running tests from presubmit jobs.
 EXCLUDE_CNCF_CONFORMANCE=false
-if [ "${JOB_TYPE}" == "presubmit" ]; then
-  EXCLUDE_CNCF_CONFORMANCE=true
-fi
+# if [ "${JOB_TYPE}" == "presubmit" ]; then
+#   EXCLUDE_CNCF_CONFORMANCE=true
+# fi
 
 SCENARIO_SOURCES=$(get_source_dir "${SCENARIO_TYPE}")
 
