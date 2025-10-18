@@ -10,6 +10,8 @@ env > "${ARTIFACT_DIR}/prow-ci-env.log"
 
 job_type="${JOB_TYPE:-}"
 
+sleep 7200
+
 user=""
 pull_number=""
 if [[ "${job_type}" == "presubmit" ]]; then
