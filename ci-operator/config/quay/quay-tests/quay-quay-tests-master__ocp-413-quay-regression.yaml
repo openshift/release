@@ -1,0 +1,79 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: quay-acs-violations-check-quay310
+  cron: 0 20 24 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      ACS_OPERATOR_CHANNEL: stable
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.13
+      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:1042176
+      QUAY_OPERATOR_CHANNEL: stable-3.10
+      QUAY_OPERATOR_SOURCE: brew-operator-catalog
+      QUAY_VERSION: 3.10.15
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-noobaa
+    - ref: quay-tests-quay-acs
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay310-ocp413-aws-s3-cloudfront
+  cron: 0 22 23 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "4"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:1042176
+      QUAY_OPERATOR_CHANNEL: stable-3.10
+      QUAY_OPERATOR_SOURCE: brew-operator-catalog
+      QUAY_STORAGE_PROVIDER: S3CloudFront
+      QUAY_VERSION: 3.10.15
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-s3cloudfront
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-awss3cloudfront
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-deprovisioning-aws-gcp-azure-storage-buckets
+    workflow: cucushift-installer-rehearse-aws-ipi
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-tests
+  variant: ocp-413-quay-regression
