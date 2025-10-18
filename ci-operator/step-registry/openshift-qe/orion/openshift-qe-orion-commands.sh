@@ -11,7 +11,7 @@ python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
+    LATEST_TAG=$(curl -s "https://api.github.com/repos/chentex/orion/releases/latest" | jq -r '.tag_name');
 else
     LATEST_TAG=$TAG
 fi
@@ -84,7 +84,7 @@ if [[ -n "$ACK_FILE" ]]; then
     else
         # Download the latest ACK file
         ackFilePath="$ARTIFACT_DIR/$ACK_FILE"
-        curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} -o "$ackFilePath"
+        curl -sL https://raw.githubusercontent.com/chentex/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} -o "$ackFilePath"
     fi
     EXTRA_FLAGS+=" --ack $ackFilePath"
 fi
