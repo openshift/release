@@ -53,7 +53,7 @@ if [[ "${CAPI_PLATFORM}" == "powervs" ]]; then
   CAPI_PLATFORM=ibmpower
 fi
 
-queue ${ARTIFACT_DIR}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
+queue ${ARTIFACT_DIR}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io,authentication.config.openshift.io,build.config.openshift.io,console.config.openshift.io,dns.config.openshift.io,featuregate.config.openshift.io,image.config.openshift.io,infrastructure.config.openshift.io,ingress.config.openshift.io,network.config.openshift.io,oauth.config.openshift.io,project.config.openshift.io,scheduler.config.openshift.io -o json
 queue ${ARTIFACT_DIR}/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
 queue ${ARTIFACT_DIR}/oc_cmds/apiservices oc --insecure-skip-tls-verify --request-timeout=5s get apiservices
 queue ${ARTIFACT_DIR}/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
