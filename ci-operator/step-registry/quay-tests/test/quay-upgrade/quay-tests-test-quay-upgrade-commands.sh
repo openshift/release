@@ -9,14 +9,14 @@ echo "Quay upgrade test..."
 #export env variabels for Go test cases
 export QUAY_OPERATOR_CHANNEL=${QUAY_OPERATOR_CHANNEL}
 export QUAY_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
-export CSO_INDEX_IMAGE_BUILD=${CSO_INDEX_IMAGE_BUILD}
+export CSO_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
+export QBO_INDEX_IMAGE_BUILD=${QUAY_INDEX_IMAGE_BUILD}
 export QUAY_VERSION=${QUAY_VERSION}
 
 #qbo upgrade
 QUAY_REGISTRY_ROUTE=$([ -f "${SHARED_DIR}/quayroute" ] && cat "$SHARED_DIR"/quayroute || echo "") #https://quayhostname
 QUAY_ACCESS_TOKEN=$([ -f "${SHARED_DIR}/quay_oauth2_token" ] && cat "$SHARED_DIR"/quay_oauth2_token || echo "")
 
-export QBO_INDEX_IMAGE_BUILD
 export QUAY_REGISTRY_ROUTE
 export QUAY_ACCESS_TOKEN
 
