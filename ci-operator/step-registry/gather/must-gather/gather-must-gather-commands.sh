@@ -265,6 +265,10 @@ fi
 
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
 
+# Download the binary from mirror
+curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+chmod +x /tmp/mco-sanitize
+
 set -x # log the MG commands
 echo "Running must-gather..."
 mkdir -p ${ARTIFACT_DIR}/must-gather
@@ -276,7 +280,12 @@ if oc adm must-gather --help 2>&1 | grep -q -- '--volume-percentage'; then
    VOLUME_PERCENTAGE_FLAG="--volume-percentage=100"
 fi
 oc --insecure-skip-tls-verify adm must-gather $VOLUME_PERCENTAGE_FLAG --timeout="$MUST_GATHER_TIMEOUT" --dest-dir "${ARTIFACT_DIR}/must-gather" ${EXTRA_MG_ARGS} > "${ARTIFACT_DIR}/must-gather/must-gather.log"
+
+# Run MCO sanitizer (under test)
+/tmp/mco-sanitize --input="${ARTIFACT_DIR}/must-gather" --output="${ARTIFACT_DIR}/must-gather.tar.gz.gpg"
+
 find "${ARTIFACT_DIR}/must-gather" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
+
 [ -f "${ARTIFACT_DIR}/must-gather/event-filter.html" ] && cp "${ARTIFACT_DIR}/must-gather/event-filter.html" "${ARTIFACT_DIR}/event-filter.html"
 installCamgi
 /tmp/camgi "${ARTIFACT_DIR}/must-gather" > "${ARTIFACT_DIR}/must-gather/camgi.html"
