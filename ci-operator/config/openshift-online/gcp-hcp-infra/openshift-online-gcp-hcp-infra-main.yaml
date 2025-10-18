@@ -1,0 +1,30 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: terraform-fmt
+  commands: make terraform-fmt
+  container:
+    from: src
+- as: terraform-validate
+  commands: make terraform-validate
+  container:
+    from: src
+- as: terraform-test
+  commands: make terraform-test
+  container:
+    from: src
+  optional: true
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: gcp-hcp-infra
