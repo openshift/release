@@ -6,87 +6,172 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+log(){
+    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}"
+}
 export REGION=${REGION:-}
 export TEST_PROFILE=${TEST_PROFILE}
 export VERSION=${VERSION:-}
 export WAIT_SETUP_CLUSTER_READY=${WAIT_SETUP_CLUSTER_READY:-false}
 
-CLUSTER_SECTOR=${CLUSTER_SECTOR:-}
+ocmTempDir=$(mktemp -d)
+cd $ocmTempDir
+cat << 'EOF' > main.go
+package main
 
-log(){
-    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}"
+import (
+	"context"
+	"database/sql"
+	"fmt"
+
+	// Add the pgx driver
+	_ "github.com/jackc/pgx/v5/stdlib"
+)
+
+type User struct {
+	ID   int
+	Name string
 }
 
-source ./tests/prow_ci.sh
+type UserRepository struct {
+	db *sql.DB
+}
 
-if [[ ! -z $ROSACLI_BUILD ]]; then
-  override_rosacli_build
-fi
+func NewUserRepository(db *sql.DB) *UserRepository {
+	return &UserRepository{db: db}
+}
 
-# functions are defined in https://github.com/openshift/rosa/blob/master/tests/prow_ci.sh
-#configure aws
-aws_region=${REGION:-us-east-2}
-configure_aws "${CLUSTER_PROFILE_DIR}/.awscred" "${aws_region}"
-configure_aws_shared_vpc ${CLUSTER_PROFILE_DIR}/.awscred_shared_account
+func (r *UserRepository) FindUser(ctx context.Context, id int) (*User, error) {
+	var user User
+	err := r.db.QueryRowContext(ctx, "SELECT id, name FROM users WHERE id = $1", id).Scan(&user.ID, &user.Name)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // User not found, not an error in this case
+		}
+		return nil, fmt.Errorf("failed to find user: %w", err)
+	}
+	return &user, nil
+}
 
-# Log in to rosa/ocm
-OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-rosa_login ${OCM_LOGIN_ENV} $OCM_TOKEN
-rosa init
-AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
-AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
+// main function to make the package runnable, can be empty
+func main() {}
+EOF
 
-# Variables
-if [[ -z "$TEST_PROFILE" ]]; then
-  log "ERROR: " "TEST_PROFILE is mandatory."
-  exit 1
-fi
+cat << 'EOF' > user_repository_test.go
+package main
 
-# get shard id based on sector
-if [[ ! -z "${CLUSTER_SECTOR}" ]]; then
-  psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
-  if [[ -z "$psList" ]]; then
-    echo "no ready provision shard found, trying to find maintenance status provision shard"
-    # try to find maintenance mode SC, currently osdfm api doesn't support status in ('ready', 'maintenance') query.
-    psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('maintenance')" | jq -r '.items[].provision_shard_reference.id')
-    if [[ -z "$psList" ]]; then
-      echo "No available provision shard!"
-      exit 1
-    fi
-  fi
-  psID=$(echo "$psList" | head -n 1)
-  export PROVISION_SHARD_ID=$psID
-fi
+import (
+	"context"
+	"database/sql"
+	"log"
+	"os"
+	"testing"
+	"time"
 
-# prepare version fo hcp upgrade workflow:aws-rosa-hcp-upgrade
-if [[ "$UPGRADE_ENABLED" == "true" ]];then
-  if [[ "$CHANNEL_GROUP" == "nightly" ]]; then
-    log "It doesn't support to upgrade with nightly version now"
-    exit 1
-  fi
+	_ "github.com/jackc/pgx/v5/stdlib"
 
-  # Get the latest OCP version
-  version_cmd="rosa list version --hosted-cp --channel-group $CHANNEL_GROUP -o json"
-  filter_cmd="$version_cmd | jq -r '.[] | .raw_id'"
-  versionList=$(eval $filter_cmd)
-  echo -e "Available cluster versions:\n${versionList}"
-  target_version=$(echo "$versionList" | head -1 || true)
-  # Cluster version is OCP latest Y stream version - 4
-  filter_cmd="$version_cmd | jq -r '.[] | select(.available_upgrades!=null) .raw_id'"
-  versionList=$(eval $filter_cmd)
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
+)
 
-  if [[ "$VERSION" == "" ]];then
-    end_version_x=$(echo ${target_version} | cut -d '.' -f1)
-    end_version_y=$(echo ${target_version} | cut -d '.' -f2)
-    current_version_y=`expr $end_version_y - 4`
-    start_version=$(echo "$versionList" | grep -i $end_version_x.$current_version_y | head -5 | sort -V | head -1 || true )
-  else
-    start_version=$(echo "$versionList" | grep -i $VERSION | head -5 | sort -V | head -1 || true )
-  fi
+// Declare db and ctx at the package level so they are accessible to all tests
+var db *sql.DB
+var ctx = context.Background()
 
-  export VERSION=$start_version
-fi
+func TestMain(m *testing.M) {
+	dbName := "testdb"
+	dbUser := "user"
+	dbPassword := "password"
 
-rosatest --ginkgo.v --ginkgo.no-color \
-  --ginkgo.timeout "60m" \
-  --ginkgo.label-filter "day1" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
+	postgresContainer, err := postgres.RunContainer(ctx,
+		testcontainers.WithImage("postgres:15-alpine"),
+		postgres.WithDatabase(dbName),
+		postgres.WithUsername(dbUser),
+		postgres.WithPassword(dbPassword),
+		testcontainers.WithWaitStrategy(wait.ForLog("database system is ready to accept connections").WithOccurrence(2).WithStartupTimeout(5*time.Second)),
+	)
+	if err != nil {
+		log.Fatalf("failed to start postgres container: %v", err)
+	}
+
+	// Clean up the container
+	defer func() {
+		if err := postgresContainer.Terminate(ctx); err != nil {
+			log.Fatalf("failed to terminate container: %v", err)
+		}
+	}()
+
+	connStr, err := postgresContainer.ConnectionString(ctx, "sslmode=disable")
+	if err != nil {
+		log.Fatalf("failed to get connection string: %v", err)
+	}
+
+	// Assign the connection to the package-level db variable
+	db, err = sql.Open("pgx", connStr)
+	if err != nil {
+		log.Fatalf("failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	// **Create the necessary table schema**
+	_, err = db.ExecContext(ctx, `CREATE TABLE users (id INT PRIMARY KEY, name VARCHAR(50));`)
+	if err != nil {
+		log.Fatalf("failed to create table: %v", err)
+	}
+
+	// Run all tests and exit
+	os.Exit(m.Run())
+}
+
+func TestUserRepository(t *testing.T) {
+	// Truncate the table before each test run to ensure a clean state
+	_, err := db.ExecContext(ctx, "TRUNCATE TABLE users")
+	if err != nil {
+		t.Fatalf("failed to truncate users table: %v", err)
+	}
+	
+	repo := NewUserRepository(db)
+
+	t.Run("FindExistingUser", func(t *testing.T) {
+		// Arrange
+		_, err := db.ExecContext(ctx, "INSERT INTO users (id, name) VALUES ($1, $2)", 1, "Alice")
+		if err != nil {
+			t.Fatalf("failed to insert test user: %v", err)
+		}
+
+		// Act
+		user, err := repo.FindUser(ctx, 1)
+
+		// Assert
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if user == nil || user.Name != "Alice" {
+			t.Errorf("expected user with name Alice, got %v", user)
+		}
+	})
+
+	t.Run("FindNonExistingUser", func(t *testing.T) {
+		// Act
+		user, err := repo.FindUser(ctx, 999)
+		
+		// Assert
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if user != nil {
+			t.Errorf("expected nil user, got %v", user)
+		}
+	})
+}
+EOF
+
+chmod +x *
+sleep 1800
+go mod init my-psql-test
+
+go mod tidy
+
+go test -v ./...
+exit 0
