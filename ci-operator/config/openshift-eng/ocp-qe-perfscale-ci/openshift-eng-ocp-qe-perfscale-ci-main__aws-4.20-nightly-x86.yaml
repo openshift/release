@@ -361,6 +361,23 @@ tests:
     - ref: openshift-qe-workers-scale
     workflow: openshift-qe-udn-density-pods
   timeout: 8h0m0s
+- as: anp-density-pods-24nodes
+  cron: 0 5 * * *
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    - ref: openshift-qe-anp-density-pods
+    workflow: openshift-qe-installer-aws-ovn-ipsec
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
