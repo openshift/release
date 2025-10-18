@@ -272,6 +272,13 @@ fi
 
 log "Checking guest cluster..."
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+
+
+echo "--- check image registry config ---"
+oc get configs.imageregistry.operator.openshift.io -oyaml
+oc get validatingadmissionpolicies.admissionregistration.k8s.io -oyaml
+oc get validatingadmissionpolicybindings.admissionregistration.k8s.io -oyaml
+
 check_disabled_capability || exit 1
 print_clusterversion
 check_node_status || exit 1
