@@ -16,8 +16,11 @@ Example:
   steps:
     env:
       ARO_HCP_SUITE_NAME: prod/parallel
-      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+      SUBSCRIPTION: ARO HCP E2E
+      TENANT_ID: 93b21e64-4824-439a-b893-46c9b2a51082
       LOCATION: ${region}
+    pre:
+    - ref: aro-hcp-provision-azure-login
     post:
     - ref: aro-hcp-provision-aro-hcp-gather-extra
     - chain: aro-hcp-provision-teardown-cluster
