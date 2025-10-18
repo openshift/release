@@ -418,6 +418,9 @@ function tmp_prune_disruptive_resource() {
 main() {
   echo "Enabling konflux catalogsource"
   set_proxy
+  if [ -f "${SHARED_DIR}/nested_kubeconfig" ]; then
+    export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+  fi
 
   run "oc whoami"
   run "oc version -o yaml"
@@ -476,14 +479,18 @@ main() {
       echo "failed to check mcp status. resolve the above errors"
     }
   else
-    create_icsp_connected || {
-      echo "failed to create imagecontentsourcepolicies. resolve the above errors"
-      return 1
-    }
+	# Skip ICSP creation if nested_kubeconfig exists (for hypershift scenarios)
+	if [ ! -f "${SHARED_DIR}/nested_kubeconfig" ]; then
+	  create_icsp_connected || {
+	    echo "failed to create imagecontentsourcepolicies. resolve the above errors"
+	    return 1
+	  }
 
-    check_mcp_status || {
-      echo "failed to check mcp status. resolve the above errors"
-    }
+	  check_mcp_status || {
+		echo "failed to check mcp status. resolve the above errors"
+	  }
+	fi
+
     check_marketplace || {
       echo "failed to check marketplace. resolve the above errors"
       return 1
