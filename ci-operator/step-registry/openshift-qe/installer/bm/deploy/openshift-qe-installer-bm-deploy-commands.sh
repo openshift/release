@@ -58,9 +58,6 @@ payload_url: "${RELEASE_IMAGE_LATEST}"
 image_type: "minimal-iso"
 EOF
 
-echo "This is the all.yml file:"
-cat /tmp/all.yml
-
 if [[ $PUBLIC_VLAN == "false" ]]; then
   echo "Private network deployment"
   echo -e "enable_bond: $BOND" >> /tmp/all.yml
