@@ -16,7 +16,7 @@ debug_on_exit() {
   local exit_code=$?
   local end_time=$SECONDS
   local execution_time=$((end_time - start_time))
-  local debug_threshold=1200 # 20 minutes in seconds
+  local debug_threshold=1800 # 30 minutes in seconds
   local hco_namespace=openshift-cnv
 
   if [[ (${execution_time} -lt ${debug_threshold}) || ${exit_code} -ne 0 ]]; then
@@ -24,8 +24,6 @@ debug_on_exit() {
     echo "--------------------------------------------------------"
     echo " SCRIPT EXITED PREMATURELY (runtime: ${execution_time}s) "
     echo "--------------------------------------------------------"
-    echo "Entering 2-hour debug sleep. Press Ctrl+C to terminate."
-    echo "You can now inspect the system state."
     echo "PID: $$"
     echo "Exit Code: ${exit_code}"
     echo "--------------------------------------------------------"
@@ -89,19 +87,19 @@ function cnv::toggle_common_boot_image_import () {
       sed -E 's/.+v([0-9]+\.[0-9]+).*/\1/'
   ) in
     (4.19*|4.[2-9]+([0-9])*|@([5-9]|[1-9]+([0-9])).*)
-      typeset comImgFeatFlagPath="$(
+      local commonBootImageFeatFlagPath="$(
         yq -n -o json -I 0 eval ".spec.enableCommonBootImageImport = ${status}"
       )"
       ;;
     (*)
-      typeset comImgFeatFlagPath="$(
+      local commonBootImageFeatFlagPath="$(
         yq -n -o json -I 0 eval ".spec.featureGates.enableCommonBootImageImport = ${status}"
       )"
       ;;
   esac
   oc patch hco kubevirt-hyperconverged -n openshift-cnv \
     --type=merge \
-    -p "${comImgFeatFlagPath}"
+    -p "${commonBootImageFeatFlagPath}"
 
     # In some edge cases, the HCO deployment will be scaled down, and not scale up.
     oc scale deployment hco-operator --replicas 1 -n openshift-cnv
@@ -187,6 +185,7 @@ function install_yq_if_not_exists() {
          -o /tmp/bin/yq && chmod +x /tmp/bin/yq
     fi
 }
+install_yq_if_not_exists
 
 BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
 OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
