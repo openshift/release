@@ -44,4 +44,3 @@ WORKLOAD=full-run.yaml ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 mv $folder_name/index_data.json ${SHARED_DIR}/index_data-pod.json
-sleep 3600
