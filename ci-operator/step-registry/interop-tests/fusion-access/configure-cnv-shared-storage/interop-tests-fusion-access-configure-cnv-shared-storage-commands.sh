@@ -258,7 +258,7 @@ then
   
   # Wait for PVC to be bound
   echo "  ⏳ Waiting for PVC to be bound..."
-  if oc wait pvc test-shared-storage-pvc -n "${CNV_NAMESPACE}" --for=condition=Bound --timeout=5m 2>/dev/null; then
+  if oc wait pvc test-shared-storage-pvc -n "${CNV_NAMESPACE}" --for=condition=Bound --timeout=5m; then
     echo "  ✅ PVC bound successfully to shared storage"
     
     # Check PVC status

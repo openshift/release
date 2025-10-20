@@ -142,7 +142,7 @@ then
   
   # Wait for CNV PVC to be bound
   echo "  ⏳ Waiting for CNV PVC to be bound..."
-  if oc wait pvc cnv-shared-storage-pvc -n "${TEST_NAMESPACE}" --for=condition=Bound --timeout=5m 2>/dev/null; then
+  if oc wait pvc cnv-shared-storage-pvc -n "${TEST_NAMESPACE}" --for=condition=Bound --timeout=5m; then
     echo "  ✅ CNV PVC bound successfully"
     test_status="passed"
   else
@@ -190,7 +190,7 @@ then
   
   # Wait for pod to be running
   echo "  ⏳ Waiting for CNV data writer pod to be running..."
-  if oc wait pod cnv-data-writer -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=2m 2>/dev/null; then
+  if oc wait pod cnv-data-writer -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=2m; then
     echo "  ✅ CNV data writer pod is running"
     
     # Wait a bit for data to be written
@@ -245,7 +245,7 @@ then
   
   # Wait for Fusion Access PVC to be bound
   echo "  ⏳ Waiting for Fusion Access PVC to be bound..."
-  if oc wait pvc fusion-shared-storage-pvc -n "${TEST_NAMESPACE}" --for=condition=Bound --timeout=5m 2>/dev/null; then
+  if oc wait pvc fusion-shared-storage-pvc -n "${TEST_NAMESPACE}" --for=condition=Bound --timeout=5m; then
     echo "  ✅ Fusion Access PVC bound successfully"
     test_status="passed"
   else
@@ -293,7 +293,7 @@ then
   
   # Wait for pod to be running
   echo "  ⏳ Waiting for Fusion Access data reader pod to be running..."
-  if oc wait pod fusion-data-reader -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=2m 2>/dev/null; then
+  if oc wait pod fusion-data-reader -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=2m; then
     echo "  ✅ Fusion Access data reader pod is running"
     
     # Wait a bit for data processing

@@ -158,7 +158,7 @@ then
   
   # Wait for DataVolume to be ready
   echo "  ⏳ Waiting for DataVolume to be ready..."
-  if oc wait datavolume test-shared-storage-dv -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=10m 2>/dev/null; then
+  if oc wait datavolume test-shared-storage-dv -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=10m; then
     echo "  ✅ DataVolume is ready"
     test_status="passed"
   else
@@ -221,7 +221,7 @@ then
   
   # Start the VM
   echo "  🚀 Starting VM..."
-  if oc patch vm test-shared-storage-vm -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}' 2>/dev/null; then
+  if oc patch vm test-shared-storage-vm -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}'; then
     echo "  ✅ VM start command sent"
     
     # Wait for VM to be running
@@ -275,7 +275,7 @@ then
   
   # Wait for PVC to be bound
   echo "  ⏳ Waiting for PVC to be bound..."
-  if oc wait pvc test-simple-shared-pvc -n "${TEST_NAMESPACE}" --for=condition=Bound --timeout=5m 2>/dev/null; then
+  if oc wait pvc test-simple-shared-pvc -n "${TEST_NAMESPACE}" --for=condition=Bound --timeout=5m; then
     echo "  ✅ PVC bound successfully"
     
     # Create a pod to test the storage
@@ -306,7 +306,7 @@ EOF
       
       # Wait for pod to be running
       echo "  ⏳ Waiting for test pod to be running..."
-      if oc wait pod test-shared-storage-pod -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=2m 2>/dev/null; then
+      if oc wait pod test-shared-storage-pod -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=2m; then
         echo "  ✅ Test pod is running"
         
         # Check pod logs
