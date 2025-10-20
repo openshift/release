@@ -56,7 +56,6 @@ install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 payload_url: "${RELEASE_IMAGE_LATEST}"
 image_type: "minimal-iso"
-enable_bond: $BOND
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
