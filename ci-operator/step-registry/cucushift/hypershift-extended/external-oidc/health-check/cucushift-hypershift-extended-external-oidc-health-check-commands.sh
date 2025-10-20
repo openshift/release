@@ -24,10 +24,10 @@ AUTH_TYPE=$(oc get -n clusters hostedcluster/"${cluster_name}" -o jsonpath='{.sp
 if [[ $AUTH_TYPE == "OIDC" ]]; then
     CONSOLE_CLIENT_STATUS=$(oc get -n clusters hostedcluster/"${cluster_name}" -o jsonpath='{.status.configuration.authentication.oidcClients}' | jq -r '[.[] | select(.componentName == "console") | .conditions[] | select(.reason == "OIDCConfigAvailable") | .status] | join("|")')
     CLI_CLIENT_STATUS=$(oc get -n clusters hostedcluster/"${cluster_name}" -o jsonpath='{.status.configuration.authentication.oidcClients}' | jq -r '[.[] | select(.componentName == "cli") | .conditions[] | select(.reason == "CLIOIDCClientStatus") | .status] | join("|")')
-    if [[ $CONSOLE_CLIENT_STATUS != "False|False|True" || $CLI_CLIENT_STATUS != "False|False|False" ]]; then
+    if [[ $CONSOLE_CLIENT_STATUS != "False|False|True" || $CLI_CLIENT_STATUS != "False|False|True" ]]; then
         echo "The OIDC authentication status is not correct."
         echo "Current console status: $CONSOLE_CLIENT_STATUS (expected: False|False|True)"
-        echo "Current cli status: $CLI_CLIENT_STATUS (expected: False|False|False)"
+        echo "Current cli status: $CLI_CLIENT_STATUS (expected: False|False|True)"
         exit 1
     fi
     echo "The OIDC authentication status is correct."
