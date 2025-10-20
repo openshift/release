@@ -141,7 +141,7 @@ fi
 
 if [[ ! -z "$ACK_FILE" ]]; then
     # Download the latest ACK file
-    curl -sL https://raw.githubusercontent.com/chentex/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
+    curl -sL https://raw.githubusercontent.com/chentex/orion/refs/heads/pr-feat/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
     export EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
 fi
 

@@ -84,7 +84,7 @@ if [[ -n "$ACK_FILE" ]]; then
     else
         # Download the latest ACK file
         ackFilePath="$ARTIFACT_DIR/$ACK_FILE"
-        curl -sL https://raw.githubusercontent.com/chentex/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} -o "$ackFilePath"
+        curl -sL https://raw.githubusercontent.com/chentex/orion/refs/heads/pr-feat/ack/${VERSION}_${ACK_FILE} -o "$ackFilePath"
     fi
     EXTRA_FLAGS+=" --ack $ackFilePath"
 fi
