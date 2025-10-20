@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# sleep 3h for debugging the failure
+sleep 3h
+
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
@@ -509,7 +512,7 @@ function handle_result {
         echo "replacing file is not ok"
         rm -fr ${resultfile}
         return
-    fi 
+    fi
     rm -fr ${resultfile}
 
     echo ${newresultfile}
