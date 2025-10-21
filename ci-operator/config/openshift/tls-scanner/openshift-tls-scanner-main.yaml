@@ -13,11 +13,17 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.21
 images:
-- dockerfile_path: Dockerfile
-  from: base
+- from: golang:1.21
+  to: tls-scanner-base
+- dockerfile_path: Dockerfile.ci
+  from: tls-scanner-base
   inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21: {}
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/tls-scanner/.
   to: tls-scanner-tool
+promotion: {}
 releases:
   initial:
     integration:
@@ -30,28 +36,98 @@ releases:
       namespace: ocp
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: tls-scanner
+- as: run-scanner-on-cluster
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
   steps:
-    cluster_profile: aws
     test:
-    - as: run-scanner-on-cluster
-      cli: latest
+    - as: run-scanner
       commands: |
         set -euo pipefail
-        echo "--- Running scanner with inherited cluster-admin privileges to scan all pods ---"
+
+        # The CI system automatically collects artifacts from this directory
+        # in the main test container.
         ARTIFACT_DIR="/logs/artifacts"
-        mkdir -p "${ARTIFACT_DIR}/tls-scanner"
-        /usr/local/bin/tls-scanner \
-          --all-pods \
-          --csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv" \
-          --log-file "${ARTIFACT_DIR}/tls-scanner/scanner.log"
+        SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
+        mkdir -p "${SCANNER_ARTIFACT_DIR}"
+
+        # We must run the scanner in a pod with hostNetwork: true to bypass the
+        # pod-to-pod NetworkPolicies that are blocking nmap's TCP connections.
+        echo "--- Creating scanner pod with hostNetwork: true ---"
+        SCANNER_POD_NAME="tls-scanner-$(date +%s)" # Use timestamp for a unique name
+        NAMESPACE=$(oc project -q)
+
+        # The 'tls-scanner-tool' is the image that contains our binary.
+        # The 'default' service account is used because we've already granted it cluster-admin.
+        cat <<EOF | oc apply -f -
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: ${SCANNER_POD_NAME}
+          namespace: ${NAMESPACE}
+        spec:
+          # This is the key change to bypass pod network isolation
+          hostNetwork: true
+          # We must use the default service account which has been granted cluster-admin
+          serviceAccountName: default
+          restartPolicy: Never
+          containers:
+          - name: scanner-container
+            image: tls-scanner-tool
+            command: ["/usr/local/bin/tls-scanner"]
+            args: [
+              "--all-pods",
+              "--csv-file=/tmp/tls-scanner-output/report.csv",
+              "--log-file=/tmp/tls-scanner-output/scanner.log"
+            ]
+            volumeMounts:
+            - name: scanner-output
+              mountPath: /tmp/tls-scanner-output
+          volumes:
+          - name: scanner-output
+            emptyDir: {}
+        EOF
+
+        # Ensure the pod is deleted even if the script fails mid-way
+        trap "echo '--- Deleting scanner pod ---'; oc delete pod ${SCANNER_POD_NAME} --ignore-not-found" EXIT
+
+        echo "--- Waiting for scanner pod to start ---"
+        oc wait pod/${SCANNER_POD_NAME} --for=condition=Initialized --timeout=5m
+
+        echo "--- Streaming logs from scanner pod ---"
+        oc logs -f pod/${SCANNER_POD_NAME}
+
+        echo "--- Waiting for scanner pod to complete ---"
+        # The pod will go to Succeeded or Failed state. We wait for that.
+        until [[ "$(oc get pod ${SCANNER_POD_NAME} -o jsonpath='{.status.phase}')" =~ ^(Succeeded|Failed)$ ]]; do
+            sleep 5
+            echo "Waiting for pod to finish..."
+        done
+
+        FINAL_STATUS=$(oc get pod ${SCANNER_POD_NAME} -o jsonpath='{.status.phase}')
+        echo "--- Scanner pod finished with status: ${FINAL_STATUS} ---"
+
+        echo "--- Copying artifacts from scanner pod ---"
+        # The pod is complete, but its filesystem still exists. We copy the results
+        # from the pod's internal directory to the main test container's artifact
+        # directory, so Prow can collect them.
+        oc cp "${SCANNER_POD_NAME}:/tmp/tls-scanner-output" "${ARTIFACT_DIR}/tls-scanner"
+
+        if [ "${FINAL_STATUS}" == "Failed" ]; then
+          echo "Scanner pod failed. Exiting with error."
+          exit 1
+        fi
       from: tls-scanner-tool
+      grace_period: 1m0s
       resources:
         requests:
           cpu: 100m
