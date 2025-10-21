@@ -1,0 +1,106 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_path: Dockerfile
+  to: amd-ci
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-amd-ci
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    env:
+      OCP_CLUSTER_VERSION: "4.18"
+      REMOTE_HOST: edge-05.edge.lab.eng.rdu2.redhat.com
+    post:
+    - as: e2e-amd-ci-post
+      commands: |
+        export PULL_SECRET_PATH=/var/run/amd-ci/pull-secret
+        export SSH_KEY_PATH=/var/run/amd-ci/id_rsa
+        make sno-delete
+      credentials:
+      - collection: ""
+        mount_path: /var/run/amd-ci
+        name: amd-ci-credentials
+        namespace: test-credentials
+      env:
+      - name: OCP_CLUSTER_VERSION
+      - name: REMOTE_HOST
+      from: amd-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    pre:
+    - as: e2e-amd-ci-pre
+      commands: |
+        set -x
+        echo "==== Debugging SSH connectivity ===="
+        echo "Checking SSH key file..."
+        ls -la /var/run/amd-ci/id_rsa || echo "SSH key not found!"
+
+        echo "Getting SSH key fingerprint (safe to display)..."
+        ssh-keygen -l -f /var/run/amd-ci/id_rsa || echo "Failed to get key fingerprint"
+
+        echo "Testing network connectivity to remote host..."
+        ping -c 3 10.1.178.14 || echo "Ping failed (may be blocked by firewall)"
+
+        echo "Checking if SSH port is reachable..."
+        timeout 5 bash -c "</dev/tcp/10.1.178.14/22" && echo "Port 22 is open" || echo "Port 22 is not reachable"
+
+        echo "Attempting SSH connection with verbose output..."
+        ssh -vvv -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -i /var/run/amd-ci/id_rsa root@10.1.178.14 "echo 'SSH connection successful!'" 2>&1 | tail -50
+        SSH_EXIT=$?
+        echo "SSH exit code: $SSH_EXIT"
+
+        echo "==== End of SSH debugging ===="
+
+        export PULL_SECRET_PATH=/var/run/amd-ci/pull-secret
+        export SSH_KEY_PATH=/var/run/amd-ci/id_rsa
+        make sno-deploy
+      credentials:
+      - collection: ""
+        mount_path: /var/run/amd-ci
+        name: amd-ci-credentials
+        namespace: test-credentials
+      env:
+      - name: OCP_CLUSTER_VERSION
+      - name: REMOTE_HOST
+      from: amd-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    test:
+    - as: e2e-amd-ci-test
+      commands: |
+        echo "TODO: Run tests"
+      credentials:
+      - collection: ""
+        mount_path: /var/run/amd-ci
+        name: amd-ci-credentials
+        namespace: test-credentials
+      env:
+      - name: OCP_CLUSTER_VERSION
+      - name: REMOTE_HOST
+      from: amd-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: amd-ci
+  variant: 4.18-stable
