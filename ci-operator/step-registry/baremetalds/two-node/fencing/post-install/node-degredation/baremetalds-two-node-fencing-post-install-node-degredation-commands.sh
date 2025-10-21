@@ -4,7 +4,6 @@ set -o nounset -o errexit -o pipefail
 # Variables
 PROBE_NS="openshift-image-registry"               # fallback to operators later if missing
 GLOBAL_DEADLINE=$(( $(date +%s) + 1200 ))         # 20 minutes global timebox
-HOST_NET="ostestbm"                               # fixed network name on hypervisor
 SURV=""                                           # will be detected
 SKIP_HOST_SSH=0
 
