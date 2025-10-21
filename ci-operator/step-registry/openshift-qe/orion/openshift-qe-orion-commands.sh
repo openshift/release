@@ -42,7 +42,7 @@ esac
 export ES_SERVER
 
 pip install .
-EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
+EXTRA_FLAGS=""
 
 if [[ ! -z "$UUID" ]]; then
     EXTRA_FLAGS+=" --uuid ${UUID}"
@@ -111,7 +111,7 @@ fi
 set +e
 set -o pipefail
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
+es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=4.21 orion --config examples/trt-payload-cluster-density.yaml --lookback 40d --hunter-analyze --input-vars='{"repository": "kubernetes","organization": "openshift","jobtype": "pull","pull_number": "2394"}' ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 
