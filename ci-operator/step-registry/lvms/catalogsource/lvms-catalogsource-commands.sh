@@ -16,7 +16,7 @@ echo "Detected OpenShift version: ${CLUSTER_VERSION}"
 
 # For OpenShift 4.20+, use Konflux catalogsource index image by default
 if [[ ${MINOR_VERSION} -ge 20 ]]; then
-  LVM_INDEX_IMAGE="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-catalog:v${CLUSTER_VERSION}"
+  LVM_INDEX_IMAGE="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"
 fi
 
 # Allow overriding the LVM_INDEX_IMAGE with the Gangway API
