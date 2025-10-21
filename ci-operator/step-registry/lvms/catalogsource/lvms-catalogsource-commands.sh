@@ -6,8 +6,8 @@ declare -r KONFLUX_CA_BUNDLE="/var/run/vault/dt-secrets/stage-registry-cert.pem"
 declare -r KONFLUX_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.json"
 
 declare IDMS_NAME=${IDMS_NAME}
-declare CATALOG_SOURCE=${LVM_OPERATOR_CATALOG_SOURCE}
-declare LVM_OPERATOR_INDEX_IMAGE
+declare CATALOG_SOURCE=${LVM_CATALOG_SOURCE}
+declare LVM_INDEX_IMAGE
 
 CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
 MINOR_VERSION=$(echo "$CLUSTER_VERSION" | cut -d. -f2)
@@ -16,21 +16,21 @@ echo "Detected OpenShift version: ${CLUSTER_VERSION}"
 
 # For OpenShift 4.20+, use Konflux catalogsource index image by default
 if [[ ${MINOR_VERSION} -ge 20 ]]; then
-  LVM_OPERATOR_INDEX_IMAGE="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"
+  LVM_INDEX_IMAGE="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-catalog:v${CLUSTER_VERSION}"
 fi
 
-# Allow overriding the LVM_OPERATOR_INDEX_IMAGE with the Gangway API
-if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_INDEX_IMAGE:-}" ]]; then
-  LVM_OPERATOR_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_INDEX_IMAGE}
+# Allow overriding the LVM_INDEX_IMAGE with the Gangway API
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE:-}" ]]; then
+  LVM_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE}
 fi
 
-# Check if LVM_OPERATOR_INDEX_IMAGE is not empty and skip the step if it is
-if [[ -z "${LVM_OPERATOR_INDEX_IMAGE:-}" ]]; then
-    echo "WARNING: LVM_OPERATOR_INDEX_IMAGE is empty or not set"
-    echo "Skipping LVM Operator catalogsource step"
+# Check if LVM_INDEX_IMAGE is not empty and skip the step if it is
+if [[ -z "${LVM_INDEX_IMAGE:-}" ]]; then
+    echo "WARNING: LVM_INDEX_IMAGE is empty or not set"
+    echo "Skipping LVM CatalogSource step"
     exit 0
 else
-    echo "LVM_OPERATOR_INDEX_IMAGE is set to: $LVM_OPERATOR_INDEX_IMAGE"
+    echo "LVM_INDEX_IMAGE is set to: $LVM_INDEX_IMAGE"
 fi
 
 function set_proxy {
@@ -154,7 +154,7 @@ EOF
 
 function create_catalog_sources {
 	local node_name
-	echo "creating catalogsource: $CATALOG_SOURCE using index image: $LVM_OPERATOR_INDEX_IMAGE"
+	echo "creating catalogsource: $CATALOG_SOURCE using index image: $LVM_INDEX_IMAGE"
 
 	cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
@@ -163,9 +163,9 @@ metadata:
   name: $CATALOG_SOURCE
   namespace: openshift-marketplace
 spec:
-  displayName: LVM Operator Konflux
-  image: $LVM_OPERATOR_INDEX_IMAGE
-  publisher: OpenShift QE
+  displayName: LVM CatalogSource
+  image: $LVM_INDEX_IMAGE
+  publisher: OpenShift LVM
   sourceType: grpc
   updateStrategy:
     registryPoll:
@@ -191,7 +191,7 @@ EOF
 		node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource="$CATALOG_SOURCE" -o=jsonpath='{.items[0].spec.nodeName}')
 		run "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false \
       pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
-		run "oc -n debug-qe debug node/$node_name -- chroot /host podman pull --authfile /var/lib/kubelet/config.json $LVM_OPERATOR_INDEX_IMAGE"
+		run "oc -n debug-qe debug node/$node_name -- chroot /host podman pull --authfile /var/lib/kubelet/config.json $LVM_INDEX_IMAGE"
 
 		run "oc get mcp,node"
 		run "oc get mcp worker -o yaml"
@@ -230,7 +230,7 @@ EOF
 }
 
 function main {
-	echo "Enabling LVM Operator catalogsource"
+	echo "Enabling LVM CatalogSource"
 	set_proxy
 
 	run "oc whoami"
