@@ -690,6 +690,26 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: aws-ipi-ovn-hypershift-fips-guest-f999-compliance
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CATALOG_SOURCE_NAME: compliance-operator
+      EXTRA_ARGS: --fips
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-19@sha256:ebc2dc91d610fe67e12b7e2cad2365871f89a89816afc27d1c4a469b9ac7490b
+      TEST_FILTERS: ~HyperShiftMGMT&;~NonHyperShiftHOST&;~DEPRECATED&;~ROSA&
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "20"
+    test:
+    - ref: compliance-idms-hypershift-hosted
+    - ref: file-integrity-konflux-catalogsource
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-hypershift-fips-mgmt-f14
   cron: 6 2 9,23 * *
   steps:
