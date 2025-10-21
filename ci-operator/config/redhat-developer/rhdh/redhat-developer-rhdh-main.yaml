@@ -11,7 +11,7 @@ releases:
       channel: fast
       version: "4.15"
 resources:
-  '*':
+  "*":
     limits:
       cpu: "2"
       memory: 5Gi
@@ -19,364 +19,447 @@ resources:
       cpu: "2"
       memory: 2Gi
 tests:
-- as: e2e-ocp-helm
-  capabilities:
-  - gcp
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhdh
-    product: ocp
+  - as: e2e-ocp-helm
+    cluster_claim:
+      architecture: amd64
+      cloud: aws
+      labels:
+        region: us-east-2
+      owner: rhdh
+      product: ocp
+      timeout: 1h0m0s
+      version: "4.18"
+    skip_if_only_changed: ^docs/|showcase-docs/|^\.changeset/|CONTRIBUTING\.md|OWNERS|README\.md|USAGE_DATA\.md|^scripts/|^\.github/|\.threatmodel/|^ui/|\.md|\\.mdc|\\.toml$
+    steps:
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - chain: gather
+      test:
+        - ref: redhat-developer-rhdh-ocp-helm
+      workflow: generic-claim
+  - as: e2e-ocp-helm-refactored
+    cluster_claim:
+      architecture: amd64
+      cloud: aws
+      labels:
+        region: us-east-2
+      owner: rhdh
+      product: ocp
+      timeout: 1h0m0s
+      version: "4.18"
+    optional: true
+    skip_if_only_changed: ^docs/|showcase-docs/|^\.changeset/|CONTRIBUTING\.md|OWNERS|README\.md|USAGE_DATA\.md|^scripts/|^\.github/|\.threatmodel/|^ui/|\.md|\\.mdc|\\.toml$
+    steps:
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - chain: gather
+      test:
+        - ref: redhat-developer-rhdh-ocp-helm-refactored
+      workflow: generic-claim
+  - always_run: false
+    as: e2e-ocp-helm-nightly
+    cluster_claim:
+      architecture: amd64
+      cloud: aws
+      labels:
+        region: us-east-2
+      owner: rhdh
+      product: ocp
+      timeout: 1h0m0s
+      version: "4.18"
+    cron: 0 7 * * *
+    optional: true
+    presubmit: true
+    steps:
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+        - chain: gather
+      test:
+        - ref: redhat-developer-rhdh-ocp-helm-nightly
+      workflow: generic-claim
+  - always_run: false
+    as: e2e-ocp-helm-nightly-refactored
+    cluster_claim:
+      architecture: amd64
+      cloud: aws
+      labels:
+        region: us-east-2
+      owner: rhdh
+      product: ocp
+      timeout: 1h0m0s
+      version: "4.18"
+    cron: 0 7 * * *
+    optional: true
+    presubmit: true
+    steps:
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+        - chain: gather
+      test:
+        - ref: redhat-developer-rhdh-ocp-helm-nightly-refactored
+      workflow: generic-claim
+  - always_run: false
+    as: e2e-ocp-v4-17-helm-nightly
+    cluster_claim: &id001
+      architecture: amd64
+      cloud: aws
+      labels:
+        region: us-east-2
+      owner: rhdh
+      product: ocp
+      timeout: 1h0m0s
+      version: "4.17"
+    cron: 0 9 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id002
+      env:
+        OC_CLIENT_VERSION: stable-4.16
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+        - chain: gather
+      test:
+        - ref: redhat-developer-rhdh-ocp-helm-nightly-v4-17-refactored
+      workflow: generic-claim
+  - always_run: false
+    as: e2e-ocp-v4-19-helm-nightly
+    cluster_claim: &id003
+      architecture: amd64
+      cloud: aws
+      labels:
+        region: us-east-2
+      owner: rhdh
+      product: ocp
+      timeout: 1h0m0s
+      version: "4.19"
+    cron: 0 8 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id004
+      env:
+        OC_CLIENT_VERSION: stable-4.19
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+        - chain: gather
+      test:
+        - ref: redhat-developer-rhdh-ocp-helm-nightly-v4-19-refactored
+      workflow: generic-claim
+  - always_run: false
+    as: e2e-aks-helm-nightly
+    cron: 50 6 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id013
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+        - ref: redhat-developer-rhdh-aks-mapt-destroy
+      test:
+        - ref: redhat-developer-rhdh-aks-helm-nightly-refactored
+      workflow: redhat-developer-rhdh-aks-mapt
+  - always_run: false
+    as: e2e-aks-operator-nightly
+    cron: 0 7 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id014
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+        - ref: redhat-developer-rhdh-aks-mapt-destroy
+      test:
+        - ref: redhat-developer-rhdh-aks-operator-nightly-refactored
+      workflow: redhat-developer-rhdh-aks-mapt
+  - always_run: false
+    as: e2e-eks-helm-nightly
+    cron: 0 7 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id015
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+        - ref: redhat-developer-rhdh-eks-mapt-destroy
+      test:
+        - ref: redhat-developer-rhdh-eks-helm-nightly-refactored
+      workflow: redhat-developer-rhdh-eks-mapt
+  - always_run: false
+    as: e2e-eks-operator-nightly
+    cron: 0 7 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id016
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+        - ref: redhat-developer-rhdh-eks-mapt-destroy
+      test:
+        - ref: redhat-developer-rhdh-eks-operator-nightly-refactored
+      workflow: redhat-developer-rhdh-eks-mapt
+  - always_run: false
+    as: e2e-gke-helm-nightly
+    cron: 0 7 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id017
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+      test:
+        - ref: redhat-developer-rhdh-gke-helm-nightly-refactored
+  - always_run: false
+    as: e2e-gke-operator-nightly
+    cron: 0 9 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id018
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+      test:
+        - ref: redhat-developer-rhdh-gke-operator-nightly-refactored
+  - always_run: false
+    as: e2e-ocp-operator-nightly
+    cluster_claim: &id005
+      architecture: amd64
+      cloud: aws
+      labels:
+        region: us-east-2
+      owner: rhdh
+      product: ocp
+      timeout: 1h0m0s
+      version: "4.18"
+    cron: 0 8 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id006
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+        - chain: gather
+      test:
+        - ref: redhat-developer-rhdh-ocp-operator-nightly-refactored
+      workflow: generic-claim
+  - always_run: false
+    as: cleanup-mapt-destroy-orphaned-aks-clusters
+    cron: 0 2 * * SUN
+    optional: true
+    presubmit: true
+    steps: &id021
+      pre:
+        - ref: redhat-developer-rhdh-aks-mapt-orphaned-get
+      test:
+        - ref: redhat-developer-rhdh-cleanup-aks-refactored
+  - always_run: false
+    as: cleanup-mapt-destroy-orphaned-eks-clusters
+    cron: 0 2 * * SUN
+    optional: true
+    presubmit: true
+    steps: &id022
+      pre:
+        - ref: redhat-developer-rhdh-eks-mapt-orphaned-get
+      test:
+        - ref: redhat-developer-rhdh-cleanup-eks-refactored
+  - always_run: false
+    as: e2e-osd-gcp-helm-nightly
+    cron: 30 10 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id019
+      env:
+        OSD_VERSION: 4.17.12
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+        - ref: redhat-developer-rhdh-osd-gcp-claim-cluster-delete
+      test:
+        - ref: redhat-developer-rhdh-osd-gcp-helm-nightly-refactored
+      workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
+    timeout: 3h40m0s
+  - always_run: false
+    as: e2e-osd-gcp-operator-nightly
+    cron: 30 8 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id020
+      env:
+        OSD_VERSION: 4.17.12
+      post:
+        - ref: redhat-developer-rhdh-send-data-router
+        - ref: redhat-developer-rhdh-send-alert
+        - ref: redhat-developer-rhdh-osd-gcp-claim-cluster-delete
+      test:
+        - ref: redhat-developer-rhdh-osd-gcp-operator-nightly-refactored
+      workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
+    timeout: 3h40m0s
+  - as: cleanup-osd-gcp-cluster
+    cron: 0 17 * * *
+    steps:
+      test:
+        - ref: redhat-developer-rhdh-osd-gcp-claim-cluster-cleanup
     timeout: 1h0m0s
-    version: "4.18"
-  skip_if_only_changed: ^docs/|showcase-docs/|^\.changeset/|CONTRIBUTING\.md|OWNERS|README\.md|USAGE_DATA\.md|^scripts/|^\.github/|\.threatmodel/|^ui/|\.md|\\.mdc|\\.toml$
-  steps:
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - chain: gather
-    test:
-    - ref: redhat-developer-rhdh-ocp-helm
-    workflow: generic-claim
-- always_run: false
-  as: e2e-ocp-helm-nightly
-  capabilities:
-  - gcp
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhdh
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
-  cron: 0 7 * * *
-  optional: true
-  presubmit: true
-  steps:
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    - chain: gather
-    test:
-    - ref: redhat-developer-rhdh-ocp-helm-nightly
-    workflow: generic-claim
-- always_run: false
-  as: e2e-ocp-v4-17-helm-nightly
-  capabilities:
-  - gcp
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhdh
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.17"
-  cron: 0 9 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    env:
-      OC_CLIENT_VERSION: stable-4.16
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    - chain: gather
-    test:
-    - ref: redhat-developer-rhdh-ocp-helm-nightly
-    workflow: generic-claim
-- always_run: false
-  as: e2e-ocp-v4-19-helm-nightly
-  capabilities:
-  - gcp
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhdh
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.19"
-  cron: 0 8 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    env:
-      OC_CLIENT_VERSION: stable-4.19
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    - chain: gather
-    test:
-    - ref: redhat-developer-rhdh-ocp-helm-nightly
-    workflow: generic-claim
-- always_run: false
-  as: e2e-ocp-v4-20-helm-nightly
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhdh
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.20"
-  cron: 0 8 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    env:
-      OC_CLIENT_VERSION: stable-4.20
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    - chain: gather
-    test:
-    - ref: redhat-developer-rhdh-ocp-helm-nightly
-    workflow: generic-claim
-- always_run: false
-  as: e2e-aks-helm-nightly
-  capabilities:
-  - gcp
-  cron: 50 6 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    - ref: redhat-developer-rhdh-aks-mapt-destroy
-    test:
-    - ref: redhat-developer-rhdh-aks-helm-nightly
-    workflow: redhat-developer-rhdh-aks-mapt
-- always_run: false
-  as: e2e-aks-operator-nightly
-  capabilities:
-  - gcp
-  cron: 0 7 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    - ref: redhat-developer-rhdh-aks-mapt-destroy
-    test:
-    - ref: redhat-developer-rhdh-aks-operator-nightly
-    workflow: redhat-developer-rhdh-aks-mapt
-- always_run: false
-  as: e2e-eks-helm-nightly
-  capabilities:
-  - gcp
-  cron: 0 7 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    - ref: redhat-developer-rhdh-eks-mapt-destroy
-    test:
-    - ref: redhat-developer-rhdh-eks-helm-nightly
-    workflow: redhat-developer-rhdh-eks-mapt
-- always_run: false
-  as: e2e-eks-operator-nightly
-  capabilities:
-  - gcp
-  cron: 0 7 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    - ref: redhat-developer-rhdh-eks-mapt-destroy
-    test:
-    - ref: redhat-developer-rhdh-eks-operator-nightly
-    workflow: redhat-developer-rhdh-eks-mapt
-- always_run: false
-  as: e2e-gke-helm-nightly
-  capabilities:
-  - gcp
-  cron: 0 7 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    test:
-    - ref: redhat-developer-rhdh-gke-helm-nightly
-- always_run: false
-  as: e2e-gke-operator-nightly
-  capabilities:
-  - gcp
-  cron: 0 9 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    test:
-    - ref: redhat-developer-rhdh-gke-operator-nightly
-- always_run: false
-  as: e2e-ocp-operator-nightly
-  capabilities:
-  - gcp
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhdh
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
-  cron: 0 8 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    - chain: gather
-    test:
-    - ref: redhat-developer-rhdh-ocp-operator-nightly
-    workflow: generic-claim
-- always_run: false
-  as: cleanup-mapt-destroy-orphaned-aks-clusters
-  capabilities:
-  - gcp
-  cron: 0 2 * * SUN
-  optional: true
-  presubmit: true
-  steps:
-    pre:
-    - ref: redhat-developer-rhdh-aks-mapt-orphaned-get
-    test:
-    - ref: redhat-developer-rhdh-aks-mapt-orphaned-destroy
-- always_run: false
-  as: cleanup-mapt-destroy-orphaned-eks-clusters
-  capabilities:
-  - gcp
-  cron: 0 2 * * SUN
-  optional: true
-  presubmit: true
-  steps:
-    pre:
-    - ref: redhat-developer-rhdh-eks-mapt-orphaned-get
-    test:
-    - ref: redhat-developer-rhdh-eks-mapt-orphaned-destroy
-- always_run: false
-  as: e2e-osd-gcp-helm-nightly
-  capabilities:
-  - gcp
-  cron: 30 10 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    env:
-      OSD_VERSION: 4.17.12
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    - ref: redhat-developer-rhdh-osd-gcp-claim-cluster-delete
-    test:
-    - ref: redhat-developer-rhdh-osd-gcp-helm-nightly
-    workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
-  timeout: 3h40m0s
-- always_run: false
-  as: e2e-osd-gcp-operator-nightly
-  capabilities:
-  - gcp
-  cron: 30 8 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    env:
-      OSD_VERSION: 4.17.12
-    post:
-    - ref: redhat-developer-rhdh-send-data-router
-    - ref: redhat-developer-rhdh-send-alert
-    - ref: redhat-developer-rhdh-osd-gcp-claim-cluster-delete
-    test:
-    - ref: redhat-developer-rhdh-osd-gcp-helm-nightly
-    workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
-  timeout: 3h40m0s
-- as: cleanup-osd-gcp-cluster
-  capabilities:
-  - gcp
-  cron: 0 17 * * *
-  steps:
-    test:
-    - ref: redhat-developer-rhdh-osd-gcp-claim-cluster-cleanup
-  timeout: 1h0m0s
-- always_run: false
-  as: e2e-ocp-operator-auth-providers-nightly
-  capabilities:
-  - gcp
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhdh
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
-  cron: 0 7 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    test:
-    - ref: redhat-developer-rhdh-ocp-operator-nightly
-    workflow: generic-claim
-- always_run: false
-  as: e2e-ocp-helm-upgrade-nightly
-  capabilities:
-  - gcp
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhdh
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
-  cron: 0 7 * * TUE,THU,SAT,SUN
-  optional: true
-  presubmit: true
-  steps:
-    test:
-    - ref: redhat-developer-rhdh-ocp-helm-upgrade-nightly
-    workflow: generic-claim
-- always_run: false
-  as: e2e-ocp-helm-sealights-nightly
-  capabilities:
-  - gcp
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-2
-    owner: rhdh
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
-  cron: 0 7 * * *
-  optional: true
-  presubmit: true
-  steps:
-    test:
-    - ref: redhat-developer-rhdh-ocp-helm-nightly
-    workflow: generic-claim
+  - always_run: false
+    as: e2e-ocp-operator-auth-providers-nightly
+    cluster_claim: &id007
+      architecture: amd64
+      cloud: aws
+      labels:
+        region: us-east-2
+      owner: rhdh
+      product: ocp
+      timeout: 1h0m0s
+      version: "4.18"
+    cron: 0 7 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id008
+      test:
+        - ref: redhat-developer-rhdh-ocp-operator-auth-providers-nightly-refactored
+      workflow: generic-claim
+  - always_run: false
+    as: e2e-ocp-helm-upgrade-nightly
+    cluster_claim: &id009
+      architecture: amd64
+      cloud: aws
+      labels:
+        region: us-east-2
+      owner: rhdh
+      product: ocp
+      timeout: 1h0m0s
+      version: "4.18"
+    cron: 0 7 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: &id010
+      test:
+        - ref: redhat-developer-rhdh-ocp-helm-upgrade-nightly-refactored
+      workflow: generic-claim
+  - always_run: false
+    as: e2e-ocp-helm-sealights-nightly
+    cluster_claim: &id011
+      architecture: amd64
+      cloud: aws
+      labels:
+        region: us-east-2
+      owner: rhdh
+      product: ocp
+      timeout: 1h0m0s
+      version: "4.18"
+    cron: 0 7 * * *
+    optional: true
+    presubmit: true
+    steps: &id012
+      test:
+        - ref: redhat-developer-rhdh-ocp-helm-sealights-nightly-refactored
+      workflow: generic-claim
+  - always_run: false
+    as: e2e-ocp-v4-17-helm-nightly-refactored
+    cluster_claim: *id001
+    cron: 0 9 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id002
+  - always_run: false
+    as: e2e-ocp-v4-19-helm-nightly-refactored
+    cluster_claim: *id003
+    cron: 0 8 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id004
+  - always_run: false
+    as: e2e-ocp-operator-nightly-refactored
+    cluster_claim: *id005
+    cron: 0 8 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id006
+  - always_run: false
+    as: e2e-ocp-operator-auth-nightly-refactored
+    cluster_claim: *id007
+    cron: 0 7 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id008
+  - always_run: false
+    as: e2e-ocp-helm-upgrade-nightly-refactored
+    cluster_claim: *id009
+    cron: 0 7 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id010
+  - always_run: false
+    as: e2e-ocp-helm-sealights-nightly-refactored
+    cluster_claim: *id011
+    cron: 0 7 * * *
+    optional: true
+    presubmit: true
+    steps: *id012
+  - always_run: false
+    as: e2e-aks-helm-nightly-refactored
+    cron: 50 6 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id013
+  - always_run: false
+    as: e2e-aks-operator-nightly-refactored
+    cron: 0 7 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id014
+  - always_run: false
+    as: e2e-eks-helm-nightly-refactored
+    cron: 0 7 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id015
+  - always_run: false
+    as: e2e-eks-operator-nightly-refactored
+    cron: 0 7 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id016
+  - always_run: false
+    as: e2e-gke-helm-nightly-refactored
+    cron: 0 7 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id017
+  - always_run: false
+    as: e2e-gke-operator-nightly-refactored
+    cron: 0 9 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id018
+  - always_run: false
+    as: e2e-osd-gcp-helm-nightly-refactored
+    cron: 30 10 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id019
+    timeout: 3h40m0s
+  - always_run: false
+    as: e2e-osd-gcp-operator-nightly-refactored
+    cron: 30 8 * * TUE,THU,SAT,SUN
+    optional: true
+    presubmit: true
+    steps: *id020
+    timeout: 3h40m0s
+  - always_run: false
+    as: cleanup-aks-refactored
+    cron: 0 2 * * SUN
+    optional: true
+    presubmit: true
+    steps: *id021
+  - always_run: false
+    as: cleanup-eks-refactored
+    cron: 0 2 * * SUN
+    optional: true
+    presubmit: true
+    steps: *id022
 zz_generated_metadata:
   branch: main
   org: redhat-developer
