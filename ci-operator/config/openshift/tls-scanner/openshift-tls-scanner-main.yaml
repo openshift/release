@@ -49,6 +49,13 @@ tests:
       commands: |
         set -euo pipefail
 
+        # The CI system injects the test namespace into this variable.
+        # We add a check to ensure it's set before proceeding.
+        if [ -z "${NAMESPACE:-}" ]; then
+          echo "Error: The NAMESPACE environment variable is not set." >&2
+          exit 1
+        fi
+
         # The CI system automatically collects artifacts from this directory
         # in the main test container.
         ARTIFACT_DIR="/logs/artifacts"
@@ -57,9 +64,8 @@ tests:
 
         # We must run the scanner in a pod with hostNetwork: true to bypass the
         # pod-to-pod NetworkPolicies that are blocking nmap's TCP connections.
-        echo "--- Creating scanner pod with hostNetwork: true ---"
+        echo "--- Creating scanner pod with hostNetwork: true in namespace ${NAMESPACE} ---"
         SCANNER_POD_NAME="tls-scanner-$(date +%s)" # Use timestamp for a unique name
-        NAMESPACE=$(oc project -q)
 
         # The 'tls-scanner-tool' is the image that contains our binary.
         # The 'default' service account is used because we've already granted it cluster-admin.
