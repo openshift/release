@@ -42,15 +42,15 @@ function verify_arn_exists() {
 
             case "$resource_type" in
                 instance)
-                    local output
-                    output=$(aws ec2 describe-instances --region "$check_region" --instance-ids "$resource_id" 2>/dev/null)
+                    local instances
+                    instances=$(aws ec2 describe-instances --region "$check_region" --instance-ids "$resource_id" --filters "Name=instance-state-name,Values=running" 2>/dev/null)
                     local exit_code=$?
                     if [[ $exit_code -ne 0 ]]; then
                         return 1
                     fi
                     # Check if Reservations array is empty (happens when instance is deleted)
                     local reservation_count
-                    reservation_count=$(echo "$output" | jq -r '.Reservations | length')
+                    reservation_count=$(echo "$instances" | jq -r '.Reservations | length')
                     if [[ "$reservation_count" -eq 0 ]]; then
                         return 1
                     fi
@@ -85,8 +85,19 @@ function verify_arn_exists() {
                     return $?
                     ;;
                 natgateway)
-                    aws ec2 describe-nat-gateways --region "$check_region" --nat-gateway-ids "$resource_id" &>/dev/null
-                    return $?
+                    local natgws
+                    natgws=$(aws ec2 describe-nat-gateways --region "$check_region" --nat-gateway-ids "$resource_id" 2>/dev/null)
+                    local exit_code=$?
+                    if [[ $exit_code -ne 0 ]]; then
+                        return 1
+                    fi
+                    # Check if NatGateways array is empty (happens when NAT gateway is deleted)
+                    local nat_gateway_count
+                    nat_gateway_count=$(echo "$natgws" | jq -r '.NatGateways | length')
+                    if [[ "$nat_gateway_count" -eq 0 ]]; then
+                        return 1
+                    fi
+                    return 0
                     ;;
                 elastic-ip)
                     aws ec2 describe-addresses --region "$check_region" --allocation-ids "$resource_id" &>/dev/null
@@ -173,11 +184,6 @@ function verify_arn_exists() {
             local fs_id
             fs_id=$(echo "$resource_part" | cut -d/ -f2)
             aws efs describe-file-systems --region "$check_region" --file-system-id "$fs_id" &>/dev/null
-            return $?
-            ;;
-        kms)
-            # KMS keys
-            aws kms describe-key --region "$check_region" --key-id "$arn" &>/dev/null
             return $?
             ;;
         *)
