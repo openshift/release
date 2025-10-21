@@ -1,12 +1,12 @@
 base_images:
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: 4.22-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -14,12 +14,12 @@ canonical_go_repository: github.com/openshift/service-ca-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: service-ca-operator
 promotion:
   to:
@@ -84,7 +84,7 @@ tests:
         echo "Build binary service-ca-operator-tests-ext"
         make tests-ext-build
         echo "Running ./service-ca-operator-tests-ext run-suite openshift/service-ca-operator/conformance/parallel"
-        ./service-ca-operator-tests-ext run-suite "openshift/service-ca-operator/conformance/parallel" -j ${ARTIFACT_DIR}/junit_$(shell date +%Y%m%d-%H%M%S).xml
+        ./service-ca-operator-tests-ext run-suite "openshift/service-ca-operator/conformance/parallel" -j ${ARTIFACT_DIR}/junit_$(date +%Y%m%d-%H%M%S).xml
       from: src
       resources:
         requests:
