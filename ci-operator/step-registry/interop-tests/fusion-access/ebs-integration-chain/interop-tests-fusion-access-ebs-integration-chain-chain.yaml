@@ -4,8 +4,10 @@ chain:
   - ref: storage-create-aws-extra-disks
   - ref: interop-tests-fusion-access-create-local-disks
   - ref: interop-tests-fusion-access-create-ebs-filesystem
-  - ref: interop-tests-fusion-access-verify-ebs-filesystem
   - ref: interop-tests-fusion-access-verify-cluster
+  - ref: interop-tests-fusion-access-verify-operator
+  - ref: interop-tests-fusion-access-verify-ebs-filesystem
+  - ref: interop-tests-fusion-access-diagnose-init-containers
   env:
   - name: NODE_ROLE
     default: "worker"
@@ -26,10 +28,17 @@ chain:
     - EBS volume creation: Creates and attaches 3x100GB gp3 EBS volumes per worker node
     - LocalDisk creation: Creates LocalDisk resources representing the shared EBS volumes
     - Filesystem creation: Creates IBM Storage Scale filesystem using LocalDisk references
-    - Filesystem verification: Validates filesystem status and health
-    - Cluster verification: Validates IBM Storage Scale cluster status
-    - Functional testing: Runs comprehensive tests on deployed system
+    - Cluster verification: Validates IBM Storage Scale cluster status and daemon pod health (7 tests)
+    - Operator verification: Validates operator behavior, secret creation, and quorum detection (5 tests)
+    - Filesystem verification: Validates filesystem status, quorum dependencies, and LocalDisk status (6 tests)
+    - Init container diagnostics: Deep analysis of init container failures with version compatibility (5 tests)
     
+    Enhanced Verification Features:
+    - Distinguishes root cause (mmbuildgpl failures) from symptoms (missing secrets, no quorum)
+    - Provides detailed error messages with actionable recommendations
+    - Reports version compatibility information for troubleshooting
+    - Validates operator reconciliation logic is working correctly
+        
     This chain should be used after the shared deployment chain to complete
     the EBS-based Fusion Access deployment and testing.
     
