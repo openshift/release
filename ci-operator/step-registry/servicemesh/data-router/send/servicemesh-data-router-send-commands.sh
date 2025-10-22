@@ -133,6 +133,23 @@ send_results() {
 
     echo "Preparing to send test results from '${TEST_FILE_NAME}'..."
 
+    #TODO: delete this block after working send is confirmed
+    echo "DEBUG: Listing artifact directory contents:"
+    ls -lh "${ARTIFACT_DIR}"
+    echo "DEBUG: look for all the test files in artifact dir"
+    find "${ARTIFACT_DIR}" -type f -name "*.xml" -exec ls -lh {} \;
+    echo "DEBUG: End of artifact directory listing"
+    echo "DEBUG: check if SHARED_DIR is set and list its contents"
+    if [[ -n "${SHARED_DIR:-}" ]]; then
+        echo "SHARED_DIR is set to '${SHARED_DIR}'. Listing contents:"
+        ls -lh "${SHARED_DIR}"
+        echo "Listing all the files under subdirectories of SHARED_DIR:"
+        find "${SHARED_DIR}" -type f -exec ls -lh {} \;
+    else
+        echo "SHARED_DIR is not set."
+    fi
+    # End of TODO block
+
     # Verify test results file exists and is readable
     if [[ ! -f "${ARTIFACT_DIR}/${TEST_FILE_NAME}" ]]; then
         echo "ERROR: Test results file '${ARTIFACT_DIR}/${TEST_FILE_NAME}' not found." >&2
