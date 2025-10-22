@@ -71,6 +71,9 @@ tests:
         # This is idempotent and will do nothing if the namespace already exists.
         oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
+        echo "--- Granting privileged SCC to the default service account ---"
+        oc adm policy add-scc-to-user privileged -z default -n "${NAMESPACE}"
+
         # The 'tls-scanner-tool' is the image that contains our binary.
         # The 'default' service account is used because we've already granted it cluster-admin.
         cat <<EOF | oc apply -f -
