@@ -16,17 +16,32 @@ ref:
   - name: STORAGE_SCALE_CLUSTER_NAME
     documentation: The name of the IBM Storage Scale cluster
     default: "ibm-spectrum-scale"
+  - name: STORAGE_SCALE_CLIENT_CPU
+    documentation: CPU allocation for client nodes
+    default: "2"
+  - name: STORAGE_SCALE_CLIENT_MEMORY
+    documentation: Memory allocation for client nodes
+    default: "4Gi"
+  - name: STORAGE_SCALE_STORAGE_CPU
+    documentation: CPU allocation for storage nodes
+    default: "2"
+  - name: STORAGE_SCALE_STORAGE_MEMORY
+    documentation: Memory allocation for storage nodes
+    default: "8Gi"
   documentation: |-
-    Wait for FusionAccess operator to automatically create the IBM Storage Scale Cluster.
+    Create IBM Storage Scale Cluster with operator-assisted device discovery.
     
-    The FusionAccess operator with storageDeviceDiscovery enabled automatically:
-    - Detects worker nodes labeled with scale.spectrum.ibm.com/role=storage
-    - Discovers attached storage devices (EBS volumes in AWS)
-    - Creates the Cluster CR with appropriate device configuration
+    This step creates the Cluster resource WITHOUT hardcoded device paths, allowing
+    the FusionAccess operator's device discovery and the Filesystem's LocalDisk
+    references to determine the actual storage devices.
     
-    This step waits for and verifies the operator-created Cluster resource.
+    Key improvements over hardcoded paths:
+    - Works across different AWS instance types (c5n.metal, etc.)
+    - Adapts to actual EBS volume device names
+    - Uses operator device discovery data when available
+    - Devices configured via Filesystem LocalDisk references
     
     Tests performed (JUnit XML):
-    1. Cluster creation by operator (wait up to 10 minutes)
-    2. Cluster has device configuration
-    3. Devices were auto-discovered correctly
+    1. Cluster idempotency check
+    2. Cluster resource creation
+    3. Cluster existence verification

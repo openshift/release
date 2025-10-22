@@ -5,10 +5,14 @@ set -o pipefail
 
 STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
 STORAGE_SCALE_CLUSTER_NAME="${STORAGE_SCALE_CLUSTER_NAME:-ibm-spectrum-scale}"
+STORAGE_SCALE_CLIENT_CPU="${STORAGE_SCALE_CLIENT_CPU:-2}"
+STORAGE_SCALE_CLIENT_MEMORY="${STORAGE_SCALE_CLIENT_MEMORY:-4Gi}"
+STORAGE_SCALE_STORAGE_CPU="${STORAGE_SCALE_STORAGE_CPU:-2}"
+STORAGE_SCALE_STORAGE_MEMORY="${STORAGE_SCALE_STORAGE_MEMORY:-8Gi}"
 
 # JUnit XML test results configuration
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
-JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_wait_for_cluster_tests.xml"
+JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_create_cluster_tests.xml"
 TEST_START_TIME=$(date +%s)
 TESTS_TOTAL=0
 TESTS_FAILED=0
@@ -45,7 +49,7 @@ generate_junit_xml() {
   cat > "${JUNIT_RESULTS_FILE}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="Wait for Cluster Tests" tests="${TESTS_TOTAL}" failures="${TESTS_FAILED}" errors="0" time="${total_duration}">
+  <testsuite name="Create Cluster Tests" tests="${TESTS_TOTAL}" failures="${TESTS_FAILED}" errors="0" time="${total_duration}">
 ${TEST_CASES}
   </testsuite>
 </testsuites>
@@ -76,98 +80,121 @@ EOF
 # Trap to ensure JUnit XML is generated even on failure
 trap generate_junit_xml EXIT
 
-echo "⏳ Waiting for FusionAccess operator to create IBM Storage Scale Cluster..."
+echo "🏗️  Creating IBM Storage Scale Cluster..."
 
-# Test 1: Wait for Cluster to be created by operator
+# Test 1: Check if cluster already exists (idempotent)
 echo ""
-echo "🧪 Test 1: Wait for Cluster creation by FusionAccess operator..."
+echo "🧪 Test 1: Check cluster pre-existence..."
 TEST1_START=$(date +%s)
-TEST1_STATUS="failed"
+TEST1_STATUS="passed"
 TEST1_MESSAGE=""
 
-MAX_WAIT=600  # 10 minutes
-ELAPSED=0
-INTERVAL=10
-
-while [[ $ELAPSED -lt $MAX_WAIT ]]; do
-  if oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
-    echo "  ✅ Cluster ${STORAGE_SCALE_CLUSTER_NAME} created by operator"
-    TEST1_STATUS="passed"
-    break
-  fi
-  
-  echo "  ⏳ Waiting for operator to create Cluster... (${ELAPSED}s/${MAX_WAIT}s)"
-  sleep $INTERVAL
-  ELAPSED=$((ELAPSED + INTERVAL))
-done
-
-if [[ "$TEST1_STATUS" != "passed" ]]; then
-  TEST1_MESSAGE="FusionAccess operator did not create Cluster within ${MAX_WAIT}s. Check FusionAccess CR status and operator logs."
-  echo "  ❌ Timeout waiting for Cluster creation"
-  echo "  FusionAccess CR status:"
-  oc get fusionaccess -n ibm-fusion-access -o yaml || echo "Failed to get FusionAccess CR"
+if oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
+  echo "  ✅ Cluster already exists (idempotent)"
+  CLUSTER_EXISTS=true
+else
+  echo "  ℹ️  Cluster does not exist, will create"
+  CLUSTER_EXISTS=false
 fi
 
 TEST1_DURATION=$(($(date +%s) - TEST1_START))
-add_test_result "test_cluster_created_by_operator" "$TEST1_STATUS" "$TEST1_DURATION" "$TEST1_MESSAGE" "ClusterCreationTests"
+add_test_result "test_cluster_idempotency_check" "$TEST1_STATUS" "$TEST1_DURATION" "$TEST1_MESSAGE"
 
-# Test 2: Verify Cluster has device configuration
-echo ""
-echo "🧪 Test 2: Verify Cluster has device configuration..."
-TEST2_START=$(date +%s)
-TEST2_STATUS="failed"
-TEST2_MESSAGE=""
-
-if [[ "$TEST1_STATUS" == "passed" ]]; then
-  # Check if Cluster has nsdDevicesConfig
-  DEVICE_CONFIG=$(oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" \
-    -o jsonpath='{.spec.daemon.nsdDevicesConfig}' 2>/dev/null || echo "")
+# Test 2: Create Cluster resource (without hardcoded device paths)
+if [[ "$CLUSTER_EXISTS" == "false" ]]; then
+  echo ""
+  echo "🧪 Test 2: Create Cluster resource..."
+  TEST2_START=$(date +%s)
+  TEST2_STATUS="failed"
+  TEST2_MESSAGE=""
   
-  if [[ -n "$DEVICE_CONFIG" ]]; then
-    echo "  ✅ Cluster has device configuration"
-    echo "  Device config: ${DEVICE_CONFIG}"
+  # Determine quorum configuration based on worker count
+  WORKER_COUNT=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | wc -l)
+  
+  if [[ $WORKER_COUNT -ge 3 ]]; then
+    QUORUM_CONFIG="quorum:
+    autoAssign: true"
+  else
+    echo "  ⚠️  Only $WORKER_COUNT worker nodes (3 recommended for quorum)"
+    QUORUM_CONFIG=""
+  fi
+  
+  # Create cluster WITHOUT hardcoded device paths
+  # Let the operator discover devices via LocalVolumeDiscovery or use Filesystem's disk refs
+  if cat <<EOF | oc apply -f -
+apiVersion: scale.spectrum.ibm.com/v1beta1
+kind: Cluster
+metadata:
+  name: ${STORAGE_SCALE_CLUSTER_NAME}
+  namespace: ${STORAGE_SCALE_NAMESPACE}
+spec:
+  license:
+    accept: true
+    license: data-management
+  pmcollector:
+    nodeSelector:
+      scale.spectrum.ibm.com/role: storage
+  daemon:
+    nodeSelector:
+      scale.spectrum.ibm.com/role: storage
+    clusterProfile:
+      controlSetxattrImmutableSELinux: "yes"
+      enforceFilesetQuotaOnRoot: "yes"
+      ignorePrefetchLUNCount: "yes"
+      initPrefetchBuffers: "128"
+      maxblocksize: 16M
+      prefetchPct: "25"
+      prefetchTimeout: "30"
+    roles:
+    - name: client
+      resources:
+        cpu: "${STORAGE_SCALE_CLIENT_CPU}"
+        memory: ${STORAGE_SCALE_CLIENT_MEMORY}
+    - name: storage
+      resources:
+        cpu: "${STORAGE_SCALE_STORAGE_CPU}"
+        memory: ${STORAGE_SCALE_STORAGE_MEMORY}
+  ${QUORUM_CONFIG}
+EOF
+  then
+    echo "  ✅ Cluster resource created successfully"
     TEST2_STATUS="passed"
   else
-    TEST2_MESSAGE="Cluster exists but has no nsdDevicesConfig. Operator may not have completed device discovery."
-    echo "  ⚠️  No device configuration found"
+    echo "  ❌ Failed to create Cluster resource"
+    TEST2_MESSAGE="Failed to create Cluster resource via oc apply"
   fi
+  
+  TEST2_DURATION=$(($(date +%s) - TEST2_START))
+  add_test_result "test_cluster_creation" "$TEST2_STATUS" "$TEST2_DURATION" "$TEST2_MESSAGE"
 else
-  TEST2_MESSAGE="Skipped - Cluster was not created"
-  echo "  ⚠️  Skipped - Cluster not created"
+  echo ""
+  echo "  ℹ️  Skipping Cluster creation (already exists)"
 fi
 
-TEST2_DURATION=$(($(date +%s) - TEST2_START))
-add_test_result "test_cluster_has_device_config" "$TEST2_STATUS" "$TEST2_DURATION" "$TEST2_MESSAGE" "ClusterCreationTests"
-
-# Test 3: Verify devices match EBS volumes
+# Test 3: Verify Cluster resource exists
 echo ""
-echo "🧪 Test 3: Verify auto-discovered devices..."
+echo "🧪 Test 3: Verify Cluster resource..."
 TEST3_START=$(date +%s)
 TEST3_STATUS="failed"
 TEST3_MESSAGE=""
 
-if [[ "$TEST2_STATUS" == "passed" ]]; then
-  # Get configured device paths
-  DEVICE_PATHS=$(oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" \
-    -o jsonpath='{.spec.daemon.nsdDevicesConfig.localDevicePaths[*].devicePath}' 2>/dev/null || echo "")
-  
-  if [[ -n "$DEVICE_PATHS" ]]; then
-    DEVICE_COUNT=$(echo "$DEVICE_PATHS" | wc -w)
-    echo "  ✅ Found ${DEVICE_COUNT} configured devices: ${DEVICE_PATHS}"
-    TEST3_STATUS="passed"
-  else
-    TEST3_MESSAGE="No device paths found in Cluster configuration"
-    echo "  ⚠️  No device paths configured"
-  fi
+if oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
+  echo "  ✅ Cluster resource verified"
+  TEST3_STATUS="passed"
 else
-  TEST3_MESSAGE="Skipped - Cluster has no device configuration"
-  echo "  ⚠️  Skipped"
+  echo "  ❌ Cluster resource not found after creation"
+  TEST3_MESSAGE="Cluster ${STORAGE_SCALE_CLUSTER_NAME} not found in namespace ${STORAGE_SCALE_NAMESPACE}"
 fi
 
 TEST3_DURATION=$(($(date +%s) - TEST3_START))
-add_test_result "test_devices_auto_discovered" "$TEST3_STATUS" "$TEST3_DURATION" "$TEST3_MESSAGE" "ClusterCreationTests"
+add_test_result "test_cluster_exists" "$TEST3_STATUS" "$TEST3_DURATION" "$TEST3_MESSAGE"
 
-# Display final Cluster status
+# Display Cluster status
 echo ""
 echo "📊 Cluster Status:"
 oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" || echo "Cluster not found"
+
+echo ""
+echo "Note: Cluster initialization may take several minutes"
+echo "Daemon pods will discover devices via FusionAccess device discovery"
+echo "Devices will be configured from Filesystem LocalDisk references"
