@@ -215,7 +215,6 @@ if __name__ == '__main__':
         'openshift/installer',
         'openshift/machine-config-operator',
         'openshift/windows-machine-config-operator',
-        'openshift/windows-machine-config-bootstrapper',
     }
     print_counts(counts=_counts, job_steps=_job_steps, job_org_repos=_job_org_repos, stripped_workflows=_stripped_workflows, platform_specific_repositories=_platform_specific_repositories)
     #pivot_platform(jobs={_job: _job_steps[_job] for _job in _interesting_jobs}, from_platform='gcp', to_platform='agnostic', stripped_workflows=_stripped_workflows, job_files=_job_files)
