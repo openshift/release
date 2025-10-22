@@ -41,11 +41,15 @@ oc project default
 export NAMESPACE=${OPERATOR_NAMESPACE}
 
 ret_code=0
+
+mkdir ./test_artifacts
+ARTIFACTS="$(pwd)/test_artifacts"
+export ARTIFACTS
 #execute test, do not terminate when there is some failure since we want to archive junit files
 make test.e2e.ocp || ret_code=$?
 
 # the junit file name must start with 'junit'
-cp ./report.xml ${ARTIFACT_DIR}/junit-sail-e2e.xml
+cp ./test_artifacts/report.xml ${ARTIFACT_DIR}/junit-sail-e2e.xml
 
 # report saved status code from make, in case test.e2e.ocp failed with panic in some test case (and junit doesn't contain error)
 exit $ret_code
