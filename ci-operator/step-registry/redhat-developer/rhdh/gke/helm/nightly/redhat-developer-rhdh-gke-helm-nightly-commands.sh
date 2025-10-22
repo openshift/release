@@ -1,13 +1,94 @@
 #!/bin/bash
+echo "========== Workdir Setup =========="
 export HOME WORKSPACE
 HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
-NAME_SPACE="showcase-k8s-ci-nightly"
-NAME_SPACE_RBAC="showcase-rbac-k8s-ci-nightly"
-export NAME_SPACE NAME_SPACE_RBAC
+echo "========== Cluster Authentication =========="
+echo "Setting up long-running GKE cluster..."
+DIR="$(pwd)/.ibm/pipelines"
+export DIR
+echo "Ingesting GKE secrets"
+GKE_SERVICE_ACCOUNT_NAME=$(cat /tmp/secrets/GKE_SERVICE_ACCOUNT_NAME)
+GKE_CLUSTER_NAME=$(cat /tmp/secrets/GKE_CLUSTER_NAME)
+GKE_CLUSTER_REGION=$(cat /tmp/secrets/GKE_CLUSTER_REGION)
+GOOGLE_CLOUD_PROJECT=$(cat /tmp/secrets/GOOGLE_CLOUD_PROJECT)
+echo "Authenticating with GKE"
+gcloud auth activate-service-account "${GKE_SERVICE_ACCOUNT_NAME}" --key-file "/tmp/secrets/GKE_SERVICE_ACCOUNT_KEY"
+echo "Getting GKE credentials"
+gcloud container clusters get-credentials "${GKE_CLUSTER_NAME}" --region "${GKE_CLUSTER_REGION}" --project "${GOOGLE_CLOUD_PROJECT}"
+echo "Getting GKE cluster URL"
+K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+export K8S_CLUSTER_URL
 
+echo "========== Cluster Service Account and Token Management =========="
+# Create a service account and assign cluster url and token
+sa_namespace="default"
+sa_name="tester-sa-2"
+sa_binding_name="${sa_name}-binding"
+sa_secret_name="${sa_name}-secret"
+
+if token="$(kubectl get secret ${sa_secret_name} -n ${sa_namespace} -o jsonpath='{.data.token}' 2>/dev/null)"; then
+  K8S_CLUSTER_TOKEN=$(echo "${token}" | base64 --decode)
+  echo "Acquired existing token for the service account into K8S_CLUSTER_TOKEN"
+else
+  echo "Creating service account"
+  if ! kubectl get serviceaccount ${sa_name} -n ${sa_namespace} &> /dev/null; then
+    echo "Creating service account ${sa_name}..."
+    kubectl create serviceaccount ${sa_name} -n ${sa_namespace}
+    echo "Creating cluster role binding..."
+    kubectl create clusterrolebinding ${sa_binding_name} \
+        --clusterrole=cluster-admin \
+        --serviceaccount=${sa_namespace}:${sa_name}
+    echo "Service account and binding created successfully"
+  else
+    echo "Service account ${sa_name} already exists in namespace ${sa_namespace}"
+  fi
+  echo "Creating secret for service account"
+  kubectl apply --namespace="${sa_namespace}" -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${sa_secret_name}
+  namespace: ${sa_namespace}
+  annotations:
+    kubernetes.io/service-account.name: ${sa_name}
+type: kubernetes.io/service-account-token
+EOF
+
+  retries=12
+  sleep_time=5
+  for ((i=1; i <= retries; i++)); do
+    if token="$(kubectl get secret ${sa_secret_name} -n ${sa_namespace} -o jsonpath='{.data.token}' 2>/dev/null)"; then
+      echo "Successfully got token on attempt $i."
+      break
+    elif [ $i -eq $retries ]; then
+      echo "Failed to get token after $i attempts. Exiting..."
+      exit 1
+    else
+      echo "Failed to get token on attempt $i, retrying..."
+    fi
+    sleep $sleep_time
+  done
+  K8S_CLUSTER_TOKEN=$(echo "${token}" | base64 --decode)
+  echo "Acquired token for the service account into K8S_CLUSTER_TOKEN"
+fi
+K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+export K8S_CLUSTER_TOKEN K8S_CLUSTER_URL
+
+echo "========== Platform Environment Variables =========="
+echo "Setting platform environment variables:"
+export IS_OPENSHIFT="false"
+echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
+export CONTAINER_PLATFORM="gke"
+echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
+echo "Getting container platform version"
+CONTAINER_PLATFORM_VERSION=$(kubectl version --output json 2> /dev/null | jq -r '.serverVersion.major + "." + .serverVersion.minor' || echo "unknown")
+export CONTAINER_PLATFORM_VERSION
+echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
+
+echo "========== Git Repository Setup & Checkout =========="
 # Prepare to git checkout
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
@@ -28,6 +109,7 @@ git checkout "$RELEASE_BRANCH_NAME" || exit
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
+echo "========== PR Branch Handling =========="
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     # If executed as PR check of the repository, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
@@ -37,10 +119,12 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     LONG_SHA=$(echo "$GIT_PR_RESPONSE" | jq -r '.head.sha')
     SHORT_SHA=$(git rev-parse --short=8 ${LONG_SHA})
     TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
-    echo "Tag name: $TAG_NAME"
+    echo "TAG_NAME: $TAG_NAME"
     IMAGE_NAME="${QUAY_REPO}:${TAG_NAME}"
+    echo "IMAGE_NAME: $IMAGE_NAME"
 fi
 
+echo "========== Changeset Analysis =========="
 PR_CHANGESET=$(git diff --name-only $RELEASE_BRANCH_NAME)
 echo "Changeset: $PR_CHANGESET"
 
@@ -56,6 +140,9 @@ for change in $PR_CHANGESET; do
     fi
 done
 
+echo "ONLY_IN_DIRS: $ONLY_IN_DIRS"
+
+echo "========== Image Tag Resolution =========="
 if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     QUAY_REPO="rhdh/rhdh-hub-rhel9"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
@@ -64,6 +151,7 @@ if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     else
         TAG_NAME="next"
     fi
+    echo "TAG_NAME: $TAG_NAME"
 elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         QUAY_REPO="rhdh/rhdh-hub-rhel9"
@@ -77,7 +165,7 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"
 else
     # Timeout configuration for waiting for Docker image availability
-    MAX_WAIT_TIME_SECONDS=$((55*60))    # Maximum wait time of 55 minutes
+    MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
     POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
 
     ELAPSED_TIME=0
@@ -108,8 +196,17 @@ else
     done
 fi
 
-echo "############## Current branch ##############"
+echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
+echo "========== Namespace Configuration =========="
+NAME_SPACE="showcase-k8s-ci-nightly"
+NAME_SPACE_RBAC="showcase-rbac-k8s-ci-nightly"
+export NAME_SPACE NAME_SPACE_RBAC
+echo "NAME_SPACE: $NAME_SPACE"
+echo "NAME_SPACE_RBAC: $NAME_SPACE_RBAC"
+
+echo "========== Test Execution =========="
+echo "Executing openshift-ci-tests.sh"
 bash ./.ibm/pipelines/openshift-ci-tests.sh

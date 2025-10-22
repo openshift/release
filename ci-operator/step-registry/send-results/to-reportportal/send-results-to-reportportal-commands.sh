@@ -41,13 +41,15 @@ repo="$(jq -r 'if .extra_refs then .extra_refs[0].repo
 # shellcheck disable=SC2076
 if ! [[ "${ALLOWED_REPOS[*]}" =~ "$org/$repo" ]]
 then
-    echo "Skip repository: $org/$repo"
-    exit 0
+  echo "Skip repository: $org/$repo"
+  exit 0
 fi
 
 LOGS_PATH='logs'
 if [[ "$(jq -r '.type' <<< ${JOB_SPEC})" = 'presubmit' ]]
 then
+  echo "Skip presubmit jobs"
+  exit 0
   pr_number="$(jq -r '.refs.pulls[0].number' <<< $JOB_SPEC)"
   if [[ -z "$pr_number" ]]
   then
@@ -466,15 +468,26 @@ function droute_send() {
                                 --wait
                    2>&1
                   '
-  for (( i=1; i<=10; i++ ))
+  sendSucceeded='false'
+  tries=10
+  for (( i=1; i<=$tries; i++ ))
   do
     if [[ "$(eval $droute_send_cmd)" =~ 'status: OK' ]]
     then
+      sendSucceeded='true'
       break
     fi
-    echo "Retry 'droute send' after sleep 2 minutes"
-    sleep 2m
+    if [[ "$i" -le "$tries" ]]
+    then
+      echo "Retry 'droute send' after sleep 2 minutes"
+      sleep 2m
+    fi
   done
+  if [[ "$sendSucceeded" = 'false' ]]
+  then
+    echo "'droute send' failed after $tries tries"
+    exit 1
+  fi
 }
 
 export INSTALL_RESULT="fail"

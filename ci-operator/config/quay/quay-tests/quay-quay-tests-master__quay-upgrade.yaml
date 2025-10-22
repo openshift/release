@@ -40,7 +40,7 @@ resources:
       memory: 200Mi
 tests:
 - as: quay315-ocp417-upgrade
-  cron: 0 23 12 * *
+  cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
     env:
@@ -48,32 +48,34 @@ tests:
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.8xlarge
       ODF_OPERATOR_CHANNEL: stable-4.17
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:1021993
-      QUAY_OPERATOR_CHANNEL: stable-3.15
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-10-v4-17@sha256:c3f2f24ceaee363b9dcd7af56941a4043792dd5691767a8a0e0b46ade7a79a99
+      QUAY_OPERATOR_CHANNEL: stable-3.10
       QUAY_UPGRADE_TESTCASE: Quay-Upgrade-High|Quay-Upgrade-Medium
-      QUAY_VERSION: 3.15.1
+      QUAY_VERSION: 3.10.16
     test:
+    - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-resource-provisioning-storage-odf
     - ref: quay-tests-test-quay-upgrade
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 8h0m0s
 - as: cso-quay315-ocp417-upgrade
-  cron: 0 22 12 * *
+  cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.2xlarge
-      CSO_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:1019675
-      QUAY_OPERATOR_CHANNEL: stable-3.15
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-10-v4-17@sha256:c3f2f24ceaee363b9dcd7af56941a4043792dd5691767a8a0e0b46ade7a79a99
+      QUAY_OPERATOR_CHANNEL: stable-3.10
       QUAY_UPGRADE_TESTCASE: Quay-CSO-Upgrade-High
-      QUAY_VERSION: 3.15.1
+      QUAY_VERSION: 3.10.16
     test:
+    - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-test-quay-upgrade
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: qbo-quay315-ocp417-upgrade
-  cron: 0 20 12 * *
+  cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
     env:
@@ -81,12 +83,11 @@ tests:
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.8xlarge
       ODF_OPERATOR_CHANNEL: stable-4.17
-      QBO_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:1020035
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:1021993
-      QUAY_OPERATOR_CHANNEL: stable-3.15
-      QUAY_OPERATOR_SOURCE: brew-operator-catalog
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-10-v4-17@sha256:c3f2f24ceaee363b9dcd7af56941a4043792dd5691767a8a0e0b46ade7a79a99
+      QUAY_OPERATOR_CHANNEL: stable-3.10
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_UPGRADE_TESTCASE: Quay-QBO-Upgrade-High
-      QUAY_VERSION: 3.15.1
+      QUAY_VERSION: 3.10.16
     test:
     - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-resource-provisioning-storage-odf

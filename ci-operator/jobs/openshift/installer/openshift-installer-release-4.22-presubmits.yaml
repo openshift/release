@@ -1058,6 +1058,83 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
+    cluster: build05
+    context: ci/prow/e2e-agent-two-node-fencing-ipv4
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.22-e2e-agent-two-node-fencing-ipv4
+    optional: true
+    rerun_command: /test e2e-agent-two-node-fencing-ipv4
+    run_if_changed: ^(cmd|pkg|data).*/agent/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agent-two-node-fencing-ipv4
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-two-node-fencing-ipv4,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.22$
+    - ^release-4\.22-
     cluster: build01
     context: ci/prow/e2e-aws-byo-subnet-role-security-groups
     decorate: true
@@ -1147,7 +1224,6 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.22-e2e-aws-custom-dns-techpreview
     optional: true
     rerun_command: /test e2e-aws-custom-dns-techpreview
-    run_if_changed: aws
     spec:
       containers:
       - args:
@@ -3032,7 +3108,6 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.22-e2e-azure-ovn-resourcegroup
     optional: true
     rerun_command: /test e2e-azure-ovn-resourcegroup
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -6293,7 +6368,6 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.22-e2e-vsphere-externallb-ovn
     optional: true
     rerun_command: /test e2e-vsphere-externallb-ovn
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -6826,7 +6900,6 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.22-e2e-vsphere-ovn-multi-network
     optional: true
     rerun_command: /test e2e-vsphere-ovn-multi-network
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:
@@ -7288,7 +7361,6 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.22-e2e-vsphere-static-ovn
     optional: true
     rerun_command: /test e2e-vsphere-static-ovn
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
     spec:
       containers:
       - args:

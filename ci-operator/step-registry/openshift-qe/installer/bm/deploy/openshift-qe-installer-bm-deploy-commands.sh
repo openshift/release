@@ -6,6 +6,14 @@ set -x
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+target_bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+
+# Check if target bastion is in maintenance mode
+if ssh ${SSH_ARGS} -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p root@${bastion}" root@${target_bastion} 'test -f /root/pause'; then
+  echo "The cluster is on maintenance mode. Remove the file /root/pause in the bastion host when the maintenance is over"
+  exit 1
+fi
+
 CRUCIBLE_URL=$(cat ${CLUSTER_PROFILE_DIR}/crucible_url)
 JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
@@ -23,7 +31,7 @@ QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
-
+BOND=$(cat ${CLUSTER_PROFILE_DIR}/bond)
 
 echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
 
@@ -51,6 +59,8 @@ image_type: "minimal-iso"
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
+  echo "Private network deployment"
+  echo -e "enable_bond: $BOND" >> /tmp/all.yml
   echo -e "controlplane_network: 192.168.216.1/21\ncontrolplane_network_prefix: 21" >> /tmp/all.yml
 
   # Create proxy configuration for private VLAN deployments
@@ -114,6 +124,9 @@ hv_vm_generate_manifests: false
 sno_cluster_count: 0
 EOF
 fi
+
+echo "This is the final all.yml file:"
+cat /tmp/all.yml
 
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 

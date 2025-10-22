@@ -23,10 +23,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.17
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
   tools:
     name: 4.21-priv
     namespace: ocp-private
@@ -42,9 +42,9 @@ images:
     ocp_builder_rhel-9-golang-1.22-openshift-4.17:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
   inputs:
@@ -107,6 +107,10 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: go-verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
 - as: e2e-gcp-ovn
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
@@ -156,7 +160,7 @@ tests:
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     observers:
       enable:
       - observers-resource-watch
@@ -165,9 +169,8 @@ tests:
   as: e2e-azure-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     observers:
@@ -178,7 +181,7 @@ tests:
   as: e2e-agnostic-ovn-cmd
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       TEST_SUITE: openshift/test-cmd
     observers:
@@ -437,7 +440,6 @@ tests:
   as: e2e-metal-ipi-ovn
   cluster: build05
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -448,7 +450,6 @@ tests:
   as: e2e-metal-ipi-ovn-kube-apiserver-rollout
   cluster: build05
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -561,7 +562,6 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     observers:
@@ -571,7 +571,6 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-single-node-serial
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     env:
@@ -606,7 +605,6 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-single-node-upgrade
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     env:
@@ -618,7 +616,6 @@ tests:
 - always_run: false
   as: e2e-openstack-ovn
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -813,6 +810,7 @@ tests:
     workflow: upi-vsphere-platform-external-ccm
   timeout: 6h0m0s
 - as: e2e-aws-ovn-microshift
+  optional: true
   steps:
     cluster_profile: aws
     env:
@@ -822,6 +820,7 @@ tests:
     workflow: openshift-microshift-e2e-origin-conformance
   timeout: 6h0m0s
 - as: e2e-aws-ovn-microshift-serial
+  optional: true
   steps:
     cluster_profile: aws-2
     env:
