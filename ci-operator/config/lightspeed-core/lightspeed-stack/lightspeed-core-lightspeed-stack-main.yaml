@@ -69,16 +69,16 @@ tests:
         api-url-secret \\\n    --from-literal=key=\"$KSVC_URL\" \\\n    -n e2e-rhoai-dsc
         || echo \"Secret exists\"\n\noc create configmap llama-stack-config -n e2e-rhoai-dsc
         \\\n  --from-file=config/run.yaml\n\noc create configmap lightspeed-stack-config
-        -n e2e-rhoai-dsc \\\n  --from-file=config/lightspeed-stack.yaml\n\n./pipeline-services.sh\n\nexport
+        -n e2e-rhoai-dsc \\\n  --from-file=config/lightspeed-stack.yaml\n\n./pipeline-services.sh\n\noc
+        get pods -n e2e-rhoai-dsc\n\noc wait pod/lightspeed-stack-service pod/llama-stack-service
+        \\\n-n e2e-rhoai-dsc --for=condition=Ready --timeout=300s\n\nsleep 30\n\nexport
         LCS_IP=$(oc get pod lightspeed-stack-service -n e2e-rhoai-dsc -o jsonpath='{.status.podIP}')\necho
-        \"LCS IP: $LCS_IP\"\noc get pods -n e2e-rhoai-dsc\n\noc wait pod/lightspeed-stack-service
-        pod/llama-stack-service \\\n-n e2e-rhoai-dsc --for=condition=Ready --timeout=300s\n\nsleep
-        30\n\noc get pods -n e2e-rhoai-dsc\noc logs llama-stack-service -n e2e-rhoai-dsc
-        \            \noc logs lightspeed-stack-service -n e2e-rhoai-dsc             \n\n\n#
-        HEALTH CHECK\necho \"Testing basic connectivity before full test suite...\"\ncurl
-        -f http://$LCS_IP:8080/v1/models || {\n  echo \"❌ Basic connectivity failed
-        - showing logs before running full tests\"\n  exit 1\n}\n\n\ncd ../../..\nls\nmake
-        test-e2e\n"
+        \"LCS IP: $LCS_IP\"\n\noc get pods -n e2e-rhoai-dsc\noc logs llama-stack-service
+        -n e2e-rhoai-dsc             \noc logs lightspeed-stack-service -n e2e-rhoai-dsc
+        \            \n\n\n# HEALTH CHECK\necho \"Testing basic connectivity before
+        full test suite...\"\ncurl -f http://$LCS_IP:8080/v1/models || {\n  echo \"❌
+        Basic connectivity failed - showing logs before running full tests\"\n  exit
+        1\n}\n\n\ncd ../../..\nls\nmake test-e2e\n"
       credentials:
       - collection: ""
         mount_path: /var/run/huggingface
