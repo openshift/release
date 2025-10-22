@@ -71,7 +71,7 @@ fi
 
 env
 
-declare -p | grep -v "declare -a" | grep -v "BASH_ARGV" | grep -v "BASH_LINENO" | grep -v "BASH_SOURCE" | grep -v "FUNCNAME" | grep -v "LINENO" | grep -v "PPID" | grep -v "SHELLOPTS" | grep -v "UID"  | grep -v "PROW" >> local_variables.sh
+declare -p | grep -v "declare -a" | grep -v "BASH" | grep -v "FUNCNAME" | grep -v "LINENO" | grep -v "PPID" | grep -v "SHELLOPTS" | grep -v "UID" | grep -v "PROW" >> local_variables.sh
 
 grep -vxFf vars.sh local_variables.sh >> orion.sh
 
