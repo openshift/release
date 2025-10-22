@@ -105,20 +105,20 @@ tests:
             emptyDir: {}
         EOF
 
-        # Ensure the pod is deleted even if the script fails mid-way
-        trap "echo '--- Deleting scanner pod ---'; oc delete pod ${SCANNER_POD_NAME} --ignore-not-found" EXIT
+        # Ensure the pod is deleted even if the script fails mid-way.
+        # Also describe the pod on exit to gather diagnostics.
+        trap "echo '--- Deleting scanner pod ---'; oc describe pod ${SCANNER_POD_NAME} --ignore-not-found; oc delete pod ${SCANNER_POD_NAME} --ignore-not-found" EXIT
 
-        echo "--- Waiting for scanner pod to start ---"
-        oc wait pod/${SCANNER_POD_NAME} --for=condition=Initialized --timeout=5m
+        echo "--- Waiting for scanner pod to become Ready ---"
+        if ! oc wait pod/${SCANNER_POD_NAME} --for=condition=Ready --timeout=3m; then
+            echo "--- Pod did not become Ready in time, collecting diagnostics before exit. ---"
+            # The trap will also run describe, but we do it here for immediate feedback in the log.
+            oc describe pod "${SCANNER_POD_NAME}"
+            exit 1
+        fi
 
         echo "--- Streaming logs from scanner pod ---"
-        oc logs -f pod/${SCANNER_POD_NAME} || {
-          echo "--- Pod failed to start, collecting diagnostics ---"
-          oc describe pod "${SCANNER_POD_NAME}"
-          echo "--- Pod YAML ---"
-          oc get pod "${SCANNER_POD_NAME}" -o yaml
-          exit 1
-        }
+        oc logs -f pod/${SCANNER_POD_NAME}
 
         echo "--- Waiting for scanner pod to complete ---"
         # The pod will go to Succeeded or Failed state. We wait for that.
