@@ -46,33 +46,18 @@ tests:
   steps:
     test:
     - as: run-scanner
-      commands: |
-        set -euo pipefail
+      commands: |-
+        set -o nounset
+        set -o errexit
+        set -o pipefail
 
-        # The CI system injects the test namespace into this variable.
-        # We add a check to ensure it's set before proceeding.
-        if [ -z "${NAMESPACE:-}" ]; then
-          echo "Error: The NAMESPACE environment variable is not set." >&2
-          exit 1
-        fi
-
-        # The CI system automatically collects artifacts from this directory
-        # in the main test container.
-        ARTIFACT_DIR="/logs/artifacts"
-        SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
-        mkdir -p "${SCANNER_ARTIFACT_DIR}"
-
-        # We must run the scanner in a pod with hostNetwork: true to bypass the
-        # pod-to-pod NetworkPolicies that are blocking nmap's TCP connections.
         echo "--- Creating scanner pod with hostNetwork: true in namespace ${NAMESPACE} ---"
-        SCANNER_POD_NAME="tls-scanner-$(date +%s)" # Use timestamp for a unique name
-
-        # Ensure the namespace exists on the claimed test cluster before we create the pod.
-        # This is idempotent and will do nothing if the namespace already exists.
         oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
         echo "--- Granting privileged SCC to the default service account ---"
         oc adm policy add-scc-to-user privileged -z default -n "${NAMESPACE}"
+
+        SCANNER_POD_NAME="tls-scanner-$(date +%s)"
 
         # The 'tls-scanner-tool' is the image that contains our binary.
         # The 'default' service account is used because we've already granted it cluster-admin.
@@ -91,7 +76,8 @@ tests:
           containers:
           - name: scanner-container
             # We must use the full pull spec for the image from the internal registry.
-            # The CI system provides this in an environment variable.
+            # The CI system provides this in an environment variable defined in the
+            # 'dependencies' section of this test step.
             image: "${PULL_SPEC_TLS_SCANNER_TOOL}"
             command: ["/usr/local/bin/tls-scanner"]
             args: [
@@ -110,39 +96,42 @@ tests:
         # Ensure the pod is deleted even if the script fails mid-way.
         # Also describe the pod on exit to gather diagnostics. 'oc describe' doesn't
         # have '--ignore-not-found', so we add '|| true' to prevent script failure.
-        trap "echo '--- Deleting scanner pod ---'; oc describe pod ${SCANNER_POD_NAME} || true; oc delete pod ${SCANNER_POD_NAME} --ignore-not-found" EXIT
+        trap "echo '--- Deleting scanner pod ---'; oc describe pod ${SCANNER_POD_NAME} -n ${NAMESPACE} || true; oc delete pod ${SCANNER_POD_NAME} -n ${NAMESPACE} --ignore-not-found" EXIT
 
         echo "--- Waiting for scanner pod to become Ready ---"
-        if ! oc wait pod/${SCANNER_POD_NAME} --for=condition=Ready --timeout=3m; then
+        if ! oc wait pod/${SCANNER_POD_NAME} --for=condition=Ready --timeout=3m -n ${NAMESPACE}; then
             echo "--- Pod did not become Ready in time, collecting diagnostics before exit. ---"
             # The trap will also run describe, but we do it here for immediate feedback in the log.
-            oc describe pod "${SCANNER_POD_NAME}"
+            oc describe pod "${SCANNER_POD_NAME}" -n ${NAMESPACE}
             exit 1
         fi
 
         echo "--- Streaming logs from scanner pod ---"
-        oc logs -f pod/${SCANNER_POD_NAME}
+        oc logs -f pod/${SCANNER_POD_NAME} -n ${NAMESPACE}
 
         echo "--- Waiting for scanner pod to complete ---"
         # The pod will go to Succeeded or Failed state. We wait for that.
-        until [[ "$(oc get pod ${SCANNER_POD_NAME} -o jsonpath='{.status.phase}')" =~ ^(Succeeded|Failed)$ ]]; do
+        until [[ "$(oc get pod ${SCANNER_POD_NAME} -o jsonpath='{.status.phase}' -n ${NAMESPACE})" =~ ^(Succeeded|Failed)$ ]]; do
             sleep 5
             echo "Waiting for pod to finish..."
         done
 
-        FINAL_STATUS=$(oc get pod ${SCANNER_POD_NAME} -o jsonpath='{.status.phase}')
+        FINAL_STATUS=$(oc get pod ${SCANNER_POD_NAME} -o jsonpath='{.status.phase}' -n ${NAMESPACE})
         echo "--- Scanner pod finished with status: ${FINAL_STATUS} ---"
 
         echo "--- Copying artifacts from scanner pod ---"
         # The pod is complete, but its filesystem still exists. We copy the results
         # from the pod's internal directory to the main test container's artifact
         # directory, so Prow can collect them.
-        oc cp "${SCANNER_POD_NAME}:/tmp/tls-scanner-output" "${ARTIFACT_DIR}/tls-scanner"
+        oc cp "${NAMESPACE}/${SCANNER_POD_NAME}:/tmp/tls-scanner-output" "${ARTIFACT_DIR}/tls-scanner"
 
         if [ "${FINAL_STATUS}" == "Failed" ]; then
           echo "Scanner pod failed. Exiting with error."
           exit 1
         fi
+      dependencies:
+      - env: PULL_SPEC_TLS_SCANNER_TOOL
+        name: tls-scanner-tool
       from: tls-scanner-tool
       grace_period: 1m0s
       resources:
