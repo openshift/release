@@ -90,7 +90,9 @@ tests:
           restartPolicy: Never
           containers:
           - name: scanner-container
-            image: tls-scanner-tool
+            # We must use the full pull spec for the image from the internal registry.
+            # The CI system makes images built in the pipeline available at this address.
+            image: image-registry.openshift-image-registry.svc:5000/${NAMESPACE}/pipeline:tls-scanner-tool
             command: ["/usr/local/bin/tls-scanner"]
             args: [
               "--all-pods",
@@ -106,8 +108,9 @@ tests:
         EOF
 
         # Ensure the pod is deleted even if the script fails mid-way.
-        # Also describe the pod on exit to gather diagnostics.
-        trap "echo '--- Deleting scanner pod ---'; oc describe pod ${SCANNER_POD_NAME} --ignore-not-found; oc delete pod ${SCANNER_POD_NAME} --ignore-not-found" EXIT
+        # Also describe the pod on exit to gather diagnostics. 'oc describe' doesn't
+        # have '--ignore-not-found', so we add '|| true' to prevent script failure.
+        trap "echo '--- Deleting scanner pod ---'; oc describe pod ${SCANNER_POD_NAME} || true; oc delete pod ${SCANNER_POD_NAME} --ignore-not-found" EXIT
 
         echo "--- Waiting for scanner pod to become Ready ---"
         if ! oc wait pod/${SCANNER_POD_NAME} --for=condition=Ready --timeout=3m; then
