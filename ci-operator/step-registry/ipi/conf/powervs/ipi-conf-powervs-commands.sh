@@ -121,6 +121,18 @@ case "${LEASED_RESOURCE}" in
       POWERVS_REGION=dal
       VPCREGION=us-south
    ;;
+   "fran-powervs-8-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_FRAN-0")
+      POWERVS_REGION=eu-de
+      POWERVS_ZONE=eu-de-1
+      VPCREGION=eu-de
+   ;;
+   "fran-powervs-8-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_FRAN-1")
+      POWERVS_REGION=eu-de
+      POWERVS_ZONE=eu-de-2
+      VPCREGION=eu-de
+   ;;
    "lon04-powervs-6-quota-slice-0")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON04-0")
       POWERVS_REGION=lon

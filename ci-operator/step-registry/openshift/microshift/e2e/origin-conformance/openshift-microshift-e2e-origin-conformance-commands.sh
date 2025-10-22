@@ -5,11 +5,6 @@ set -xeuo pipefail
 source "${SHARED_DIR}/ci-functions.sh"
 trap_subprocesses_on_term
 
-if [[ -f "${SHARED_DIR}"/rebase_failure ]]; then
-  echo "Rebase failed, skipping origin conformance"
-  exit 0
-fi
-
 IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
 MICROSHIFT_URL="https://${IP_ADDRESS}:6443"
 CONFORMANCE_SKIP="/tmp/skip.txt"
@@ -79,8 +74,7 @@ TEST_ARGS="--max-parallel-tests 30"
 # Starting in 4.21, we will aggressively retry test failures only in
 # presubmits to determine if a failure is a flake or legitimate. This is
 # to reduce the number of retests on PR's.
-# TODO: Remove "origin" and run everywhere
-if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_REF" == "master" ) && "$REPO_NAME" == "origin" ]]; then
+if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_REF" == "master" ) ]]; then
     if openshift-tests run --help | grep -q 'retry-strategy'; then
         TEST_ARGS+=" --retry-strategy=aggressive"
     fi

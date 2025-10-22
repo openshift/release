@@ -109,7 +109,7 @@ if [[ -z "${sp_list}" ]]; then
 fi
 
 for sp_type in ${sp_list}; do
-    az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+    az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p="${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
     az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
     sp_name="${CLUSTER_NAME}-sp-${sp_type}"
@@ -156,6 +156,6 @@ EOF
 
     # ensure that new service principal can be login successfully
     echo "Login with new service principal to ensure that new SP works well"
-    cmd="az login --service-principal -u '${sp_app_id}' -p '${sp_password}' --tenant '${sp_tenant}'"
+    cmd="az login --service-principal -u '${sp_app_id}' -p='${sp_password}' --tenant '${sp_tenant}'"
     run_cmd_with_retries "${cmd}" 10 "az login --service-principal"
 done

@@ -99,17 +99,33 @@ image_index_ocp_version="${4}"
 tag_version="v${4}.0"
 
 function findout_manifest_digest {
-  res=$(curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" | jq -r '
+  # Try Release Canditates
+  res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version}-rc." | jq -r '
     [ .tags[] ]
     | sort_by(.start_ts)
     | last.manifest_digest')
 
+  # Try Engineer Canditates
   if [ "${res}" == "null" ]; then
-    res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version/.0/-}" | jq -r '
-      [ .tags[]
-      | select(has("end_ts") | not)]
+    res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version}-ec." | jq -r '
+      [ .tags[] ]
       | sort_by(.start_ts)
-      | .[-2].manifest_digest')
+      | last.manifest_digest')
+
+    if [ "${res}" == "null" ]; then
+      res=$(curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" | jq -r '
+        [ .tags[] ]
+        | sort_by(.start_ts)
+        | last.manifest_digest')
+
+      if [ "${res}" == "null" ]; then
+        res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version/.0/-}" | jq -r '
+          [ .tags[]
+          | select(has("end_ts") | not)]
+          | sort_by(.start_ts)
+          | .[-2].manifest_digest')
+      fi
+    fi
   fi
 
   echo "${res}"
@@ -228,7 +244,14 @@ EOF
   set -x
   oc -n openshift-marketplace delete catsrc ${CATALOGSOURCE_NAME} --ignore-not-found
   sed -i "s/name: .*/name: ${CATALOGSOURCE_NAME}/" ${prega_info_dir}/catalogSource.yaml
-  sed -i "s/displayName: .*/displayName: ${CATALOGSOURCE_DISPLAY_NAME}/" ${prega_info_dir}/catalogSource.yaml
+  # Add or update displayName field in catalogSource.yaml under spec section
+  if grep -q "displayName:" ${prega_info_dir}/catalogSource.yaml; then
+    # Update existing displayName
+    sed -i "s/displayName: .*/displayName: ${CATALOGSOURCE_DISPLAY_NAME}/" ${prega_info_dir}/catalogSource.yaml
+  else
+    # Add displayName field after image field in spec section
+    sed -i "/^  image: /a\  displayName: ${CATALOGSOURCE_DISPLAY_NAME}" ${prega_info_dir}/catalogSource.yaml
+  fi
   set +x
   echo "--------------------- ${ARTIFACT_DIR}/pre-ga-info/catalogSource.yaml -------------------------"
   cat ${prega_info_dir}/catalogSource.yaml

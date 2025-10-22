@@ -58,6 +58,7 @@ cluster_groups:
   - build10
   - build11
   - core-ci
+  - hosted-mgmt
   - vsphere02
   osd_global_pull_secret:
   - build05
@@ -786,8 +787,44 @@ secret_configs:
     name: cluster-secrets-osd-ephemeral
     namespace: ci
 - from:
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-libvirt-s390x-vpn
+    namespace: ci
+- from:
     .awscred:
       field: .awscred
+      item: openshift-ci-aws-credentials
+    baseDomain:
+      field: public_hosted_zone
       item: openshift-ci-aws-credentials
     insights-live.yaml:
       field: insights-live.yaml
@@ -979,11 +1016,39 @@ secret_configs:
     namespace: ci
   - cluster_groups:
     - non_app_ci
+    name: cluster-secrets-aws-perfscale-okd
+    namespace: test-credentials
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-metal-perscale-cpt
+    namespace: test-credentials
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-metal-perfscale-jetlag
+    namespace: test-credentials
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-metal-perfscale-osp
+    namespace: test-credentials
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-metal-perscale-telco
+    namespace: test-credentials
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-metal-perscale-selfsched
+    namespace: test-credentials
+  - cluster_groups:
+    - non_app_ci
     name: cluster-secrets-aws-perfscale-qe
     namespace: ci
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-aws-perfscale-lrc-qe
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-restricted-qe
     namespace: ci
   - cluster_groups:
     - non_app_ci
@@ -1075,11 +1140,23 @@ secret_configs:
     namespace: ci
   - cluster_groups:
     - non_app_ci
+    name: cluster-secrets-gcp-chaos
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-chaos
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
     name: cluster-secrets-aws-observability
     namespace: ci
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-metal-redhat-gs
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-sandboxed-containers-operator
     namespace: ci
 - from:
     pull-secret:
@@ -2768,6 +2845,9 @@ secret_configs:
     osServicePrincipal.json:
       field: osServicePrincipal.json
       item: os4-installer.openshift-ci.azure
+    baseDomain:
+      field: public_hosted_zone
+      item: os4-installer.openshift-ci.azure
     pull-secret:
       dockerconfigJSON:
       - auth_field: token_image-puller_app.ci_reg_auth_value.txt
@@ -3011,6 +3091,9 @@ secret_configs:
     osServicePrincipal.json:
       field: osServicePrincipal.json
       item: os4-installer.openshift-ci2.azure
+    baseDomain:
+      field: public_hosted_zone
+      item: os4-installer.openshift-ci2.azure
     pull-secret:
       dockerconfigJSON:
       - auth_field: token_image-puller_app.ci_reg_auth_value.txt
@@ -3207,6 +3290,18 @@ secret_configs:
     - non_app_ci
     name: hive-hive-credentials
     namespace: test-credentials
+- from:
+    kubeconfig:
+      field: sa.clusterpool-manager.hosted-mgmt.config
+      item: build_farm
+    sa.clusterpool-manager.hosted-mgmt.token.txt:
+      field: sa.clusterpool-manager.hosted-mgmt.token.txt
+      item: build_farm
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: clusterpool-manager-credentials
+    namespace: ci
 - from:
     kubeconfig:
       field: sa.hypershift-workload.hosted-mgmt.config
@@ -4444,6 +4539,10 @@ secret_configs:
     name: registry-push-credentials-ci-images-mirror
     namespace: ci
     type: kubernetes.io/dockerconfigjson
+  - cluster: app.ci
+    name: registry-push-credentials-ci-images-mirror
+    namespace: gcr-io
+    type: kubernetes.io/dockerconfigjson
 - from:
     .dockerconfigjson:
       dockerconfigJSON:
@@ -4614,6 +4713,10 @@ secret_configs:
     name: registry-pull-credentials
     namespace: keel
     type: kubernetes.io/dockerconfigjson
+  - cluster: build01
+    name: registry-pull-credentials
+    namespace: ocp
+    type: kubernetes.io/dockerconfigjson
 - from:
     .dockerconfigjson:
       dockerconfigJSON:
@@ -4657,6 +4760,10 @@ secret_configs:
   - cluster: build02
     name: registry-pull-credentials
     namespace: keel
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build02
+    name: registry-pull-credentials
+    namespace: ocp
     type: kubernetes.io/dockerconfigjson
 - from:
     .dockerconfigjson:
@@ -4702,6 +4809,10 @@ secret_configs:
     name: registry-pull-credentials
     namespace: keel
     type: kubernetes.io/dockerconfigjson
+  - cluster: build04
+    name: registry-pull-credentials
+    namespace: ocp
+    type: kubernetes.io/dockerconfigjson
 - from:
     insights-live.yaml:
       field: insights-live.yaml
@@ -4717,6 +4828,12 @@ secret_configs:
       - auth_field: push-token
         item: quay.io
         registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
   to:
   - cluster: app.ci
     name: registry-push-credentials-openshift
@@ -5796,6 +5913,51 @@ secret_configs:
     name: cluster-secrets-powervs-7
     namespace: ci
 - from:
+    insights-live.yaml:
+      field: insights-live.yaml
+      item: insights-ci-account
+    ops-mirror.pem:
+      field: cert-key.pem
+      item: mirror.openshift.com
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+    ssh-privatekey:
+      field: ssh-privatekey
+      item: openshift-ci-aws-credentials
+    ssh-publickey:
+      field: ssh-publickey
+      item: openshift-ci-aws-credentials
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-powervs-8
+    namespace: ci
+- from:
     pull-secret:
       dockerconfigJSON:
       - auth_field: token_image-puller_app.ci_reg_auth_value.txt
@@ -5940,6 +6102,10 @@ secret_configs:
   - cluster: build05
     name: registry-pull-credentials
     namespace: keel
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build05
+    name: registry-pull-credentials
+    namespace: ocp
     type: kubernetes.io/dockerconfigjson
 - from:
     kubeconfig:
@@ -6835,6 +7001,10 @@ secret_configs:
     name: registry-pull-credentials
     namespace: keel
     type: kubernetes.io/dockerconfigjson
+  - cluster: build06
+    name: registry-pull-credentials
+    namespace: ocp
+    type: kubernetes.io/dockerconfigjson
 - from:
     kubeconfig:
       field: sa.ci-operator.build06.config
@@ -7091,6 +7261,10 @@ secret_configs:
     name: registry-pull-credentials
     namespace: keel
     type: kubernetes.io/dockerconfigjson
+  - cluster: build11
+    name: registry-pull-credentials
+    namespace: ocp
+    type: kubernetes.io/dockerconfigjson
 - from:
     kubeconfig:
       field: sa.ci-operator.build11.config
@@ -7232,6 +7406,10 @@ secret_configs:
   - cluster: build07
     name: registry-pull-credentials
     namespace: keel
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build07
+    name: registry-pull-credentials
+    namespace: ocp
     type: kubernetes.io/dockerconfigjson
 - from:
     kubeconfig:
@@ -7375,6 +7553,10 @@ secret_configs:
     name: registry-pull-credentials
     namespace: keel
     type: kubernetes.io/dockerconfigjson
+  - cluster: build10
+    name: registry-pull-credentials
+    namespace: ocp
+    type: kubernetes.io/dockerconfigjson
 - from:
     kubeconfig:
       field: sa.ci-operator.build10.config
@@ -7513,6 +7695,10 @@ secret_configs:
     name: registry-pull-credentials
     namespace: test-credentials
     type: kubernetes.io/dockerconfigjson
+  - cluster: core-ci
+    name: registry-pull-credentials
+    namespace: keel
+    type: kubernetes.io/dockerconfigjson
 - from:
     kubeconfig:
       field: sa.ci-operator.core-ci.config
@@ -7634,6 +7820,10 @@ secret_configs:
   - cluster: build03
     name: registry-pull-credentials
     namespace: keel
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build03
+    name: registry-pull-credentials
+    namespace: ocp
     type: kubernetes.io/dockerconfigjson
 - from:
     kubeconfig:
@@ -7776,6 +7966,10 @@ secret_configs:
   - cluster: build09
     name: registry-pull-credentials
     namespace: keel
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build09
+    name: registry-pull-credentials
+    namespace: ocp
     type: kubernetes.io/dockerconfigjson
 - from:
     kubeconfig:
@@ -7934,6 +8128,14 @@ secret_configs:
   - cluster: build08
     name: registry-pull-credentials
     namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build08
+    name: registry-pull-credentials
+    namespace: keel
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build08
+    name: registry-pull-credentials
+    namespace: ocp
     type: kubernetes.io/dockerconfigjson
 - from:
     kubeconfig:
