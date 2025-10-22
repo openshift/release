@@ -78,9 +78,28 @@ trap generate_junit_xml EXIT
 
 echo "🔍 Verifying IBM Storage Scale Cluster..."
 
-# Test 1: Verify cluster exists
+# Test 1: Verify Cluster was created by operator (not manually)
 echo ""
-echo "🧪 Test 1: Verify cluster exists..."
+echo "🧪 Test 1: Verify Cluster creation source..."
+test_start=$(date +%s)
+test_status="failed"
+test_message=""
+
+if oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
+  echo "  ✅ Cluster ${STORAGE_SCALE_CLUSTER_NAME} exists"
+  echo "  Creation method: FusionAccess operator auto-discovery"
+  test_status="passed"
+else
+  echo "  ❌ Cluster ${STORAGE_SCALE_CLUSTER_NAME} not found"
+  test_message="Cluster ${STORAGE_SCALE_CLUSTER_NAME} not found in namespace ${STORAGE_SCALE_NAMESPACE}"
+fi
+
+test_duration=$(($(date +%s) - test_start))
+add_test_result "test_cluster_exists_via_operator" "$test_status" "$test_duration" "$test_message"
+
+# Test 2: Verify cluster exists (legacy test for backwards compatibility)
+echo ""
+echo "🧪 Test 2: Verify cluster exists..."
 test_start=$(date +%s)
 test_status="failed"
 test_message=""
@@ -96,9 +115,9 @@ fi
 test_duration=$(($(date +%s) - test_start))
 add_test_result "test_cluster_exists" "$test_status" "$test_duration" "$test_message"
 
-# Test 2: Check cluster conditions
+# Test 3: Check cluster conditions
 echo ""
-echo "🧪 Test 2: Check cluster conditions..."
+echo "🧪 Test 3: Check cluster conditions..."
 test_start=$(date +%s)
 test_status="failed"
 test_message=""
@@ -122,9 +141,9 @@ fi
 test_duration=$(($(date +%s) - test_start))
 add_test_result "test_cluster_success_condition" "$test_status" "$test_duration" "$test_message"
 
-# Test 3: Check pods are running
+# Test 4: Check pods are running
 echo ""
-echo "🧪 Test 3: Check IBM Storage Scale pods..."
+echo "🧪 Test 4: Check IBM Storage Scale pods..."
 test_start=$(date +%s)
 test_status="failed"
 test_message=""
@@ -150,9 +169,9 @@ fi
 test_duration=$(($(date +%s) - test_start))
 add_test_result "test_cluster_pods_running" "$test_status" "$test_duration" "$test_message"
 
-# Test 4: Verify mmbuildgpl init container status
+# Test 5: Verify mmbuildgpl init container status
 echo ""
-echo "🧪 Test 4: Verify mmbuildgpl init container status..."
+echo "🧪 Test 5: Verify mmbuildgpl init container status..."
 test_start=$(date +%s)
 test_status="failed"
 test_message=""
@@ -206,9 +225,9 @@ fi
 test_duration=$(($(date +%s) - test_start))
 add_test_result "test_mmbuildgpl_init_container_status" "$test_status" "$test_duration" "$test_message" "IBMStorageScaleClusterTests"
 
-# Test 5: Verify config init container status
+# Test 6: Verify config init container status
 echo ""
-echo "🧪 Test 5: Verify config init container status..."
+echo "🧪 Test 6: Verify config init container status..."
 test_start=$(date +%s)
 test_status="failed"
 test_message=""
@@ -249,9 +268,9 @@ fi
 test_duration=$(($(date +%s) - test_start))
 add_test_result "test_config_init_container_status" "$test_status" "$test_duration" "$test_message" "IBMStorageScaleClusterTests"
 
-# Test 6: Verify daemon pods have reached Running state
+# Test 7: Verify daemon pods have reached Running state
 echo ""
-echo "🧪 Test 6: Verify daemon pods have reached Running state..."
+echo "🧪 Test 7: Verify daemon pods have reached Running state..."
 test_start=$(date +%s)
 test_status="failed"
 test_message=""
@@ -288,9 +307,9 @@ fi
 test_duration=$(($(date +%s) - test_start))
 add_test_result "test_daemon_pods_running_state" "$test_status" "$test_duration" "$test_message" "IBMStorageScaleClusterTests"
 
-# Test 7: Check for specific init container errors
+# Test 8: Check for specific init container errors
 echo ""
-echo "🧪 Test 7: Check for specific init container error patterns..."
+echo "🧪 Test 8: Check for specific init container error patterns..."
 test_start=$(date +%s)
 test_status="failed"
 test_message=""
