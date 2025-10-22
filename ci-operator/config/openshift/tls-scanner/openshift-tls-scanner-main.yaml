@@ -57,6 +57,13 @@ tests:
         echo "--- Granting privileged SCC to the default service account ---"
         oc adm policy add-scc-to-user privileged -z default -n "${NAMESPACE}"
 
+        echo "--- Creating image pull secret in the test namespace ---"
+        # The CI system provides the credentials to the central registry in this secret.
+        # We create a copy of it in our new namespace and link it to the default service account
+        # so that our scanner pod can be pulled by the test cluster nodes.
+        oc create secret generic ci-pull-credentials --from-file=.dockerconfigjson=/secrets/ci-pull-credentials/.dockerconfigjson --type=kubernetes.io/dockerconfigjson -n "${NAMESPACE}"
+        oc secrets link default ci-pull-credentials --for=pull -n "${NAMESPACE}"
+
         SCANNER_POD_NAME="tls-scanner-$(date +%s)"
 
         # The 'tls-scanner-tool' is the image that contains our binary.
