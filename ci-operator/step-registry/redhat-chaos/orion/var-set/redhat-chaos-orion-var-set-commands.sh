@@ -1,6 +1,11 @@
 #!/bin/bash
 oc config view
 
+KUBECONFIG=/Users/prubenda/gcp/gcp/auth/kubeconfig
+
+env >> vars.sh
+cp vars.sh ${ARTIFACT_DIR}/orig_env.sh
+
 # set enviornment based variables if they exist
 if [ -f "${KUBECONFIG}" ]; then
     masters=0
@@ -66,4 +71,10 @@ fi
 
 env
 
-jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/orion_env.sh
+declare -p | grep -v "declare -a" | grep -v "BASH_ARGV" | grep -v "BASH_LINENO" | grep -v "BASH_SOURCE" | grep -v "FUNCNAME" | grep -v "LINENO" | grep -v "PPID" | grep -v "SHELLOPTS" | grep -v "UID"  | grep -v "PROW" >> local_variables.sh
+
+grep -vxFf vars.sh local_variables.sh >> orion.sh
+
+tr '\n' ',' < orion.sh > ${SHARED_DIR}/orion_env.sh
+
+cp ${SHARED_DIR}/orion_env.sh ${ARTIFACT_DIR}/orion_env.sh
