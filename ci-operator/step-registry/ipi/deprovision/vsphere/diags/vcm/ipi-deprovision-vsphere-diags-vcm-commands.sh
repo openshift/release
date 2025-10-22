@@ -1,6 +1,7 @@
 #!/bin/bash
 
-set -o nounset
+# Diagnostic script - continue on all errors to collect maximum data
+# set -o nounset
 
 if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
   echo "using legacy sibling of this step"
