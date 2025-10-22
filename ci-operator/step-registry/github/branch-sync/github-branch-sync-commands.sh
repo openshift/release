@@ -89,10 +89,10 @@ git push origin "$BRANCH"
 DRAFT=$( [[ "${CONFLICT:-false}" == "true" ]] && echo true || echo false )
 PAYLOAD=$(
   jq -nc \
-    --arg title "$PR_TITLE" \
-    --arg head  "$BRANCH" \
-    --arg base  "$TARGET_BRANCH" \
-    --arg body  "$PR_BODY" \
+    --arg title     "$PR_TITLE" \
+    --arg head      "$BRANCH" \
+    --arg base      "$TARGET_BRANCH" \
+    --arg body      "$PR_BODY" \
     --argjson draft "$DRAFT" \
     '{title: $title, head: $head, base: $base, body: $body, draft: $draft}'
 )
