@@ -7,12 +7,20 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: cli
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+  hco-bundle-reg:
+    name: hyperconverged-cluster-bundle
+    namespace: ci
+    tag: 1.17.0-unstable
 binary_build_commands: make install
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.20
+    tag: rhel-9-release-golang-1.24-openshift-4.21
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -30,8 +38,8 @@ releases:
 resources:
   '*':
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 500m
+      memory: 1Gi
 test_binary_build_commands: |-
   (
     cd tests
@@ -42,13 +50,20 @@ tests:
 - as: kubevirt-must-gather-e2e-azure
   steps:
     cluster_profile: azure-virtualization
+    dependencies:
+      OO_BUNDLE: hco-bundle-reg
     env:
       BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_INSTALL_TIMEOUT_MINUTES: "15"
     test:
     - as: deploy
       cli: latest
       commands: |
-        ./automation/deploy_hco.sh
+        # Create the HyperConverged resource
+        curl "https://raw.githubusercontent.com/kubevirt/hyperconverged-cluster-operator/main/deploy/hco.cr.yaml" | oc -n kubevirt-hyperconverged apply -f -
+        # Wait for the HyperConverged CR to be available
+        oc wait -n kubevirt-hyperconverged HyperConverged "kubevirt-hyperconverged" --for=condition=Available --timeout="1080s"
         ./automation/create_workloads.sh
       from: src
       resources:
@@ -120,17 +135,24 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-azure
+    workflow: optional-operators-ci-operator-sdk-azure
 - as: kubevirt-must-gather-e2e-gcp
   steps:
     cluster_profile: gcp-virtualization
+    dependencies:
+      OO_BUNDLE: hco-bundle-reg
     env:
       COMPUTE_NODE_TYPE: n2-standard-4
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_INSTALL_TIMEOUT_MINUTES: "15"
     test:
     - as: deploy
       cli: latest
       commands: |
-        ./automation/deploy_hco.sh
+        # Create the HyperConverged resource
+        curl "https://raw.githubusercontent.com/kubevirt/hyperconverged-cluster-operator/main/deploy/hco.cr.yaml" | oc -n kubevirt-hyperconverged apply -f -
+        # Wait for the HyperConverged CR to be available
+        oc wait -n kubevirt-hyperconverged HyperConverged "kubevirt-hyperconverged" --for=condition=Available --timeout="1080s"
         ./automation/create_workloads.sh
       from: src
       resources:
@@ -202,7 +224,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: optional-operators-ci-operator-sdk-gcp
 zz_generated_metadata:
   branch: main
   org: kubevirt
