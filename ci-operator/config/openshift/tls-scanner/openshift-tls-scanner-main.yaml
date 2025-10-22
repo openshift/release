@@ -67,6 +67,10 @@ tests:
         echo "--- Creating scanner pod with hostNetwork: true in namespace ${NAMESPACE} ---"
         SCANNER_POD_NAME="tls-scanner-$(date +%s)" # Use timestamp for a unique name
 
+        # Ensure the namespace exists on the claimed test cluster before we create the pod.
+        # This is idempotent and will do nothing if the namespace already exists.
+        oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+
         # The 'tls-scanner-tool' is the image that contains our binary.
         # The 'default' service account is used because we've already granted it cluster-admin.
         cat <<EOF | oc apply -f -
