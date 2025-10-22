@@ -6,11 +6,25 @@ This directory contains a robust script to generate OpenShift CI prowjob configu
 
 The `sandboxed-containers-operator-create-prowjob-commands.sh` script creates prowjob configuration files for the sandboxed containers operator CI pipeline. It supports both Pre-GA (development) and GA (production) release types with intelligent catalog source management and comprehensive parameter validation.
 
+## Commands
+
+The script supports the following commands:
+
+- `create` - Create prowjob configuration files
+- `run` - Run prowjobs from YAML configuration
+
+### Command Usage
+
+```bash
+# Show help
+./sandboxed-containers-operator-create-prowjob-commands.sh
+```
+
 ## Files
 
 - `sandboxed-containers-operator-create-prowjob-commands.sh` - Main script to generate prowjob configurations
 - The output file is created in the current directory and named `openshift-sandboxed-containers-operator-devel__downstream-${PROW_RUN_TYPE}${OCP_VERSION}.yaml`
-  - `PROW_RUN_TYPE` is based on ``TEST_RELEASE_TYPE.  It is `candidate` for `Pre-GA` and `release` otherwise
+  - `PROW_RUN_TYPE` is based on `TEST_RELEASE_TYPE`. It is `candidate` for `Pre-GA` and `release` otherwise
 - If the output file exists, it will be moved to a `.backup` file
 
 ## Key Features
@@ -31,10 +45,16 @@ The script uses environment variables exclusively for configuration:
 
 ```bash
 # Generate configuration with defaults
-ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 
 # Generate configuration with custom OCP version
-OCP_VERSION=4.17 ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+OCP_VERSION=4.17 ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
+
+# Run jobs from generated YAML file
+PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh run openshift-sandboxed-containers-operator-devel__downstream-candidate419.yaml
+
+# Run specific job
+PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh run openshift-sandboxed-containers-operator-devel__downstream-candidate419.yaml azure-ipi-kata
 ```
 
 ### Environment Variables
@@ -75,7 +95,7 @@ OCP_VERSION=4.17 ci-operator/step-registry/sandboxed-containers-operator/create-
 TEST_RELEASE_TYPE=Pre-GA \
 PROW_RUN_TYPE=candidate \
 OCP_VERSION=4.18 \
-ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
 #### GA Production Testing
@@ -84,7 +104,7 @@ ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed
 TEST_RELEASE_TYPE=GA \
 PROW_RUN_TYPE=release \
 OCP_VERSION=4.19 \
-ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
 #### Custom Regions and Timeouts
@@ -94,19 +114,19 @@ AWS_REGION_OVERRIDE=us-west-2 \
 CUSTOM_AZURE_REGION=westus2 \
 SLEEP_DURATION=2h \
 TEST_TIMEOUT=120 \
-ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
 #### Kata RPM Testing
 ```bash
 # Test without Kata RPM installation
 INSTALL_KATA_RPM=false \
-ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 
 # Test with specific Kata RPM version
 INSTALL_KATA_RPM=true \
 KATA_RPM_VERSION=3.18.0-3.rhaos4.20.el9 \
-ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh
+ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
 ## Catalog Tag Discovery
@@ -122,6 +142,34 @@ ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed
 - **Source**: `quay.io/redhat-user-workloads/ose-osc-tenant/[trustee-fbc/]trustee-fbc-{OCP_VER}`
 - **Method**: Quay API with pagination (max 50 pages)
 - **Special Case**: OCP 4.16 uses `trustee-fbc/` subfolder
+
+## Run Command
+
+The `run` command allows you to trigger ProwJobs from a generated YAML configuration file. This command requires a valid Prow API token.
+
+### Run Command Usage
+
+```bash
+# Run all jobs from a YAML file
+./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml
+
+# Run specific jobs from a YAML file
+./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml azure-ipi-kata aws-ipi-peerpods
+```
+
+### Run Command Features
+
+- **Job Name Generation**: Automatically constructs job names using the pattern `periodic-ci-{org}-{repo}-{branch}-{variant}-{job_suffix}`
+- **Metadata Extraction**: Extracts organization, repository, branch, and variant from the YAML file's `zz_generated_metadata` section
+- **API Integration**: Uses the Prow/Gangway API to trigger jobs
+- **Job Status Monitoring**: Provides job IDs and status information
+- **Flexible Job Selection**: Can run all jobs or specific jobs by name
+
+### Run Command Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PROW_API_TOKEN` | Yes | Prow API authentication token |
 
 ## Generated Test Matrix
 
@@ -206,3 +254,25 @@ yq eval '.' openshift-sandboxed-containers-operator-devel__downstream-candidate4
 - **Required**: `curl`, `jq`, `awk`, `sort`, `head`
 - **Optional**: `yq` (for YAML syntax validation)
 - **Network**: Access to `quay.io` API endpoints
+
+## Prow API Token
+
+To trigger ProwJobs via the REST API, you need an authentication token. Each SSO user is entitled to obtain a personal authentication token.
+
+### Obtaining a Token
+
+Tokens can be retrieved through the UI of the app.ci cluster at [OpenShift Console](https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com). Alternatively, if the app.ci cluster context is already configured, you may execute:
+
+```bash
+oc whoami -t
+```
+
+### Using the Token
+
+Once you have obtained a token, set it as an environment variable:
+
+```bash
+export PROW_API_TOKEN=your_token_here
+```
+
+For complete information about triggering ProwJobs via REST, including permanent tokens for automation, see the [OpenShift CI documentation](https://docs.ci.openshift.org/docs/how-tos/triggering-prowjobs-via-rest/#obtaining-an-authentication-token).

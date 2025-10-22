@@ -1,6 +1,17 @@
 #!/bin/bash
 
 set -ex
+
+function exit_with_failure() {
+  oc get pod -n openshift-marketplace > "$ARTIFACT_DIR/openshift-marketplace-pod"
+  oc get pod -n openshift-marketplace -o yaml > "$ARTIFACT_DIR/openshift-marketplace-pod-yaml"
+  oc get pod -n multicluster-engine > "$ARTIFACT_DIR/multicluster-engine-pod"
+  oc get pod -n multicluster-engine -o yaml > "$ARTIFACT_DIR/multicluster-engine-pod-yaml"
+  exit 1
+}
+
+trap 'exit_with_failure' ERR
+
 env
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -15,7 +26,7 @@ echo "$MCE_VERSION"
 
 MCE_CATALOG_PATH="acm-d/mce-custom-registry"
 _REPO="quay.io/$MCE_CATALOG_PATH"
-if [[ "$(printf '%s\n' "2.9" "$MCE_VERSION" | sort -V | head -n1)" == "2.9" ]]; then
+if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
   MCE_CATALOG_PATH="acm-d/mce-dev-catalog"
   _REPO="quay.io:443/$MCE_CATALOG_PATH"
 fi
@@ -88,7 +99,7 @@ oc wait mcp master worker --for condition=updated --timeout=30m
 
 echo "Install MCE custom catalog source"
 IMG="${_REPO}:${MCE_VERSION}-latest"
-if [[ "$(printf '%s\n' "2.9" "$MCE_VERSION" | sort -V | head -n1)" == "2.9" ]]; then
+if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
   IMG="${_REPO}:latest-${MCE_VERSION}"
 fi
 oc apply -f - <<EOF

@@ -61,6 +61,7 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
         bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 2))" "${out_path}" "zstream" || true
         bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "rc" || true
         bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "ec" || true
+        bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "nightly" || true
     fi
     popd &>/dev/null
 fi

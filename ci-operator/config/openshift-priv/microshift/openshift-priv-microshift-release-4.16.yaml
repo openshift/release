@@ -101,7 +101,6 @@ tests:
       SCENARIO_TYPE: presubmits
     workflow: openshift-microshift-e2e-metal-tests
 - as: metal-periodic-test
-  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
   steps:
     cluster_profile: aws-3
     env:
@@ -110,7 +109,6 @@ tests:
       SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: metal-periodic-test-arm
-  run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*)$
   steps:
     cluster_profile: aws-3
     env:
@@ -119,14 +117,12 @@ tests:
       SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
 - as: ocp-conformance-rhel-eus
-  run_if_changed: ^(assets/.*|etcd/.*|vendor/.*)$
   steps:
     cluster_profile: aws-3
     env:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-conformance-rhel-eus-arm
-  run_if_changed: ^(assets/.*|etcd/.*|vendor/.*)$
   steps:
     cluster_profile: aws-2
     env:
@@ -134,12 +130,19 @@ tests:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-openshift-conformance-build-and-run
 - as: ocp-full-conformance-rhel-eus
-  run_if_changed: ^(origin/.*)$
   steps:
     cluster_profile: aws-3
     env:
       MICROSHIFT_OS: rhel-9.4
     workflow: openshift-microshift-e2e-origin-conformance
+- as: e2e-aws-nvidia-device-plugin
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_INSTANCE_TYPE: g4dn.xlarge
+      MICROSHIFT_OS: rhel-9.4
+      SUITE: nvidia-device-plugin
+    workflow: openshift-microshift-e2e-bare-metal-tests
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

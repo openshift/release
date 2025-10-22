@@ -31,7 +31,7 @@ QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
-
+BOND=$(cat ${CLUSTER_PROFILE_DIR}/bond)
 
 echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
 
@@ -59,6 +59,8 @@ image_type: "minimal-iso"
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
+  echo "Private network deployment"
+  echo -e "enable_bond: $BOND" >> /tmp/all.yml
   echo -e "controlplane_network: 192.168.216.1/21\ncontrolplane_network_prefix: 21" >> /tmp/all.yml
 
   # Create proxy configuration for private VLAN deployments
@@ -122,6 +124,9 @@ hv_vm_generate_manifests: false
 sno_cluster_count: 0
 EOF
 fi
+
+echo "This is the final all.yml file:"
+cat /tmp/all.yml
 
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
