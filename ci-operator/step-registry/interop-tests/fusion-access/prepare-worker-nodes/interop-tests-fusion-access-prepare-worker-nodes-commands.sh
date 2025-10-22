@@ -3,6 +3,76 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# JUnit XML test results configuration
+ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
+JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_prepare_worker_nodes_tests.xml"
+TEST_START_TIME=$(date +%s)
+TESTS_TOTAL=0
+TESTS_FAILED=0
+TESTS_PASSED=0
+TEST_CASES=""
+
+# Function to add test result to JUnit XML
+add_test_result() {
+  local test_name="$1"
+  local test_status="$2"  # "passed" or "failed"
+  local test_duration="$3"
+  local test_message="${4:-}"
+  local test_classname="${5:-PrepareWorkerNodesTests}"
+  
+  TESTS_TOTAL=$((TESTS_TOTAL + 1))
+  
+  if [[ "$test_status" == "passed" ]]; then
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+    TEST_CASES="${TEST_CASES}
+    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\"/>"
+  else
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    TEST_CASES="${TEST_CASES}
+    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\">
+      <failure message=\"Test failed\">${test_message}</failure>
+    </testcase>"
+  fi
+}
+
+# Function to generate JUnit XML report
+generate_junit_xml() {
+  local total_duration=$(($(date +%s) - TEST_START_TIME))
+  
+  cat > "${JUNIT_RESULTS_FILE}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Prepare Worker Nodes Tests" tests="${TESTS_TOTAL}" failures="${TESTS_FAILED}" errors="0" time="${total_duration}">
+${TEST_CASES}
+  </testsuite>
+</testsuites>
+EOF
+  
+  echo ""
+  echo "📊 Test Results Summary:"
+  echo "  Total Tests: ${TESTS_TOTAL}"
+  echo "  Passed: ${TESTS_PASSED}"
+  echo "  Failed: ${TESTS_FAILED}"
+  echo "  Duration: ${total_duration}s"
+  echo "  Results File: ${JUNIT_RESULTS_FILE}"
+  
+  # Copy to SHARED_DIR for data router reporter (if available)
+  if [[ -n "${SHARED_DIR:-}" ]] && [[ -d "${SHARED_DIR}" ]]; then
+    cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}/$(basename ${JUNIT_RESULTS_FILE})"
+    echo "  ✅ Results copied to SHARED_DIR"
+  fi
+  
+  # Exit with failure if any tests failed
+  if [[ ${TESTS_FAILED} -gt 0 ]]; then
+    echo ""
+    echo "❌ Test suite failed: ${TESTS_FAILED} test(s) failed"
+    exit 1
+  fi
+}
+
+# Trap to ensure JUnit XML is generated even on failure
+trap generate_junit_xml EXIT
+
 echo "🔧 Preparing worker nodes for IBM Storage Scale..."
 
 # Get worker nodes
@@ -45,57 +115,54 @@ create_directory_on_node() {
   return 0
 }
 
-# Track failed nodes
-FAILED_NODES=()
-
 # Create required directories on each worker node
 echo "Creating required directories on worker nodes..."
 for node in $WORKER_NODES; do
+  echo ""
+  echo "🧪 Test: Prepare node ${node}..."
+  test_start=$(date +%s)
+  test_status="failed"
+  test_message=""
+  
   echo "Processing node: $node"
+  
+  # Track which directories failed
+  failed_dirs=()
   
   # Create /var/lib/firmware directory (required by mmbuildgpl for kernel module build)
   if ! create_directory_on_node "$node" "/var/lib/firmware"; then
-    FAILED_NODES+=("$node")
-    echo "  ❌ Failed to prepare node: $node"
-    echo ""
-    continue
+    failed_dirs+=("/var/lib/firmware")
   fi
   
   # Create /var/mmfs directories (required by IBM Storage Scale)
   if ! create_directory_on_node "$node" "/var/mmfs/etc"; then
-    FAILED_NODES+=("$node")
-    echo "  ❌ Failed to prepare node: $node"
-    echo ""
-    continue
+    failed_dirs+=("/var/mmfs/etc")
   fi
   
   if ! create_directory_on_node "$node" "/var/mmfs/tmp/traces"; then
-    FAILED_NODES+=("$node")
-    echo "  ❌ Failed to prepare node: $node"
-    echo ""
-    continue
+    failed_dirs+=("/var/mmfs/tmp/traces")
   fi
   
   if ! create_directory_on_node "$node" "/var/mmfs/pmcollector"; then
-    FAILED_NODES+=("$node")
-    echo "  ❌ Failed to prepare node: $node"
-    echo ""
-    continue
+    failed_dirs+=("/var/mmfs/pmcollector")
   fi
   
-  echo "  ✅ All directories created successfully on $node"
-  echo ""
+  # Check if all directories were created successfully
+  if [ ${#failed_dirs[@]} -eq 0 ]; then
+    echo "  ✅ All directories created successfully on $node"
+    test_status="passed"
+  else
+    echo "  ❌ Failed to prepare node: $node"
+    test_message="Failed to create directories on node ${node}: ${failed_dirs[*]}"
+  fi
+  
+  test_duration=$(($(date +%s) - test_start))
+  # Sanitize node name for XML (replace dots and dashes)
+  sanitized_node=$(echo "$node" | tr '.-' '__')
+  add_test_result "test_prepare_node_${sanitized_node}" "$test_status" "$test_duration" "$test_message"
 done
 
-# Check if any nodes failed
-if [ ${#FAILED_NODES[@]} -gt 0 ]; then
-  echo "❌ Failed to prepare the following nodes:"
-  printf '  - %s\n' "${FAILED_NODES[@]}"
-  echo ""
-  echo "Worker node preparation FAILED!"
-  exit 1
-fi
-
-echo "✅ Worker node preparation completed successfully!"
+echo ""
+echo "✅ Worker node preparation completed!"
 echo "All nodes are ready for IBM Storage Scale daemon deployment"
 
