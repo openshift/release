@@ -8,6 +8,8 @@ if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
   exit 0
 fi
 
+set +e
+
 echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and alerts"
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 # shellcheck source=/dev/null
