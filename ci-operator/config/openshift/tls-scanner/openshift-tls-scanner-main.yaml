@@ -112,7 +112,13 @@ tests:
         oc wait pod/${SCANNER_POD_NAME} --for=condition=Initialized --timeout=5m
 
         echo "--- Streaming logs from scanner pod ---"
-        oc logs -f pod/${SCANNER_POD_NAME}
+        oc logs -f pod/${SCANNER_POD_NAME} || {
+          echo "--- Pod failed to start, collecting diagnostics ---"
+          oc describe pod "${SCANNER_POD_NAME}"
+          echo "--- Pod YAML ---"
+          oc get pod "${SCANNER_POD_NAME}" -o yaml
+          exit 1
+        }
 
         echo "--- Waiting for scanner pod to complete ---"
         # The pod will go to Succeeded or Failed state. We wait for that.
