@@ -28,19 +28,21 @@ chain:
     - EBS volume creation: Creates and attaches 3x100GB gp3 EBS volumes per worker node
     - LocalDisk creation: Creates LocalDisk resources (for Filesystem references)
     - Filesystem creation: Creates IBM Storage Scale filesystem using LocalDisk references
-    - Cluster verification: Validates IBM Storage Scale cluster (operator-created) and daemon pods (8 tests)
+    - Cluster verification: Validates IBM Storage Scale cluster and daemon pods (9 tests including KMM)
     - Operator verification: Validates operator behavior and quorum detection (5 tests)
     - Filesystem verification: Validates filesystem status and LocalDisk status (6 tests)
-    - Init container diagnostics: Deep analysis of init container failures (5 tests)
+    - Init container diagnostics: Deep analysis of init container failures and KMM status (6 tests)
     
     Enhanced Verification Features:
     - Distinguishes root cause (mmbuildgpl failures) from symptoms (missing secrets, no quorum)
     - Provides detailed error messages with actionable recommendations
     - Reports version compatibility information for troubleshooting
     - Validates operator reconciliation logic is working correctly
+    - Validates KMM (Kernel Module Management) configuration and Module resources
     
-    Note: The Cluster resource is created automatically by the FusionAccess operator
-    via device discovery, not manually configured in this chain.
+    Note: Cluster uses /dev/disk/by-id/* device pattern for automatic discovery of
+    EBS volumes. KMM registry must be configured for kernel module building (since
+    Fusion Access v0.0.19+).
         
     This chain should be used after the shared deployment chain to complete
     the EBS-based Fusion Access deployment and testing.

@@ -322,3 +322,41 @@ fi
 test_duration=$(($(date +%s) - test_start))
 add_test_result "test_init_container_restart_pattern" "$test_status" "$test_duration" "$test_message" "IBMStorageScaleInitContainerDiagnostics"
 
+# Test 6: Verify KMM Module CRs exist
+echo ""
+echo "🧪 Test 6: Check KMM Module resources..."
+test_start=$(date +%s)
+test_status="failed"
+test_message=""
+
+# Check for Module CRs in ibm-fusion-access namespace
+MODULES=$(oc get modules.kmm.sigs.x-k8s.io -n ibm-fusion-access -o name 2>/dev/null || echo "")
+
+if [[ -n "$MODULES" ]]; then
+  MODULE_COUNT=$(echo "$MODULES" | wc -l)
+  echo "  ✅ Found ${MODULE_COUNT} KMM Module(s)"
+  
+  # Show module status
+  for mod in $MODULES; do
+    mod_name=$(basename "$mod")
+    echo "    Module: ${mod_name}"
+    
+    # Get module status
+    READY=$(oc get "$mod" -n ibm-fusion-access -o jsonpath='{.status.moduleLoader.nodesMatchingSelectorNumber}' 2>/dev/null || echo "0")
+    echo "      Nodes: ${READY}"
+  done
+  test_status="passed"
+else
+  echo "  ⚠️  No KMM Module resources found"
+  
+  # Check if kmm-image-config exists
+  if oc get configmap kmm-image-config -n ibm-fusion-access >/dev/null 2>&1; then
+    test_message="No KMM Module CRs found, but kmm-image-config exists.\nThe Fusion Access operator should create Module CRs automatically.\nThis may indicate operator has not reconciled yet, or version incompatibility.\nCheck Fusion Access operator logs for Module creation activity."
+  else
+    test_message="No KMM Module CRs found AND kmm-image-config missing.\nBoth are required for kernel module building.\nEnsure configure-kmm-registry step ran successfully."
+  fi
+fi
+
+test_duration=$(($(date +%s) - test_start))
+add_test_result "test_kmm_module_resources" "$test_status" "$test_duration" "$test_message" "KMMDiagnostics"
+

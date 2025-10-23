@@ -137,6 +137,10 @@ spec:
   daemon:
     nodeSelector:
       scale.spectrum.ibm.com/role: storage
+    nsdDevicesConfig:
+      localDevicePaths:
+      - devicePath: /dev/disk/by-id/*
+        deviceType: generic
     clusterProfile:
       controlSetxattrImmutableSELinux: "yes"
       enforceFilesetQuotaOnRoot: "yes"
@@ -189,6 +193,30 @@ fi
 TEST3_DURATION=$(($(date +%s) - TEST3_START))
 add_test_result "test_cluster_exists" "$TEST3_STATUS" "$TEST3_DURATION" "$TEST3_MESSAGE"
 
+# Test 4: Verify Cluster has correct device pattern
+echo ""
+echo "🧪 Test 4: Verify Cluster device configuration..."
+TEST4_START=$(date +%s)
+TEST4_STATUS="failed"
+TEST4_MESSAGE=""
+
+DEVICE_PATH=$(oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" \
+  -o jsonpath='{.spec.daemon.nsdDevicesConfig.localDevicePaths[0].devicePath}' 2>/dev/null || echo "")
+
+if [[ "$DEVICE_PATH" == "/dev/disk/by-id/*" ]]; then
+  echo "  ✅ Cluster configured with /dev/disk/by-id/* device pattern"
+  TEST4_STATUS="passed"
+elif [[ -n "$DEVICE_PATH" ]]; then
+  echo "  ⚠️  Cluster has device path: ${DEVICE_PATH}"
+  TEST4_MESSAGE="Cluster has unexpected device path: ${DEVICE_PATH} (expected: /dev/disk/by-id/*)"
+else
+  echo "  ⚠️  Cluster has no nsdDevicesConfig"
+  TEST4_MESSAGE="Cluster missing nsdDevicesConfig.localDevicePaths"
+fi
+
+TEST4_DURATION=$(($(date +%s) - TEST4_START))
+add_test_result "test_cluster_device_pattern" "$TEST4_STATUS" "$TEST4_DURATION" "$TEST4_MESSAGE"
+
 # Display Cluster status
 echo ""
 echo "📊 Cluster Status:"
@@ -196,5 +224,5 @@ oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" |
 
 echo ""
 echo "Note: Cluster initialization may take several minutes"
-echo "Daemon pods will discover devices via FusionAccess device discovery"
-echo "Devices will be configured from Filesystem LocalDisk references"
+echo "Daemon pods will use /dev/disk/by-id/* pattern to discover EBS volumes"
+echo "KMM will build kernel modules using Driver Toolkit"

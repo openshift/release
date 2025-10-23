@@ -367,3 +367,34 @@ fi
 
 test_duration=$(($(date +%s) - test_start))
 add_test_result "test_init_container_error_patterns" "$test_status" "$test_duration" "$test_message" "IBMStorageScaleClusterTests"
+
+# Test 9: Verify KMM configuration
+echo ""
+echo "🧪 Test 9: Verify KMM registry configuration..."
+test_start=$(date +%s)
+test_status="failed"
+test_message=""
+
+if oc get configmap kmm-image-config -n ibm-fusion-access >/dev/null 2>&1; then
+  echo "  ✅ KMM configuration exists"
+  
+  # Verify registry URL
+  REGISTRY_URL=$(oc get configmap kmm-image-config -n ibm-fusion-access \
+    -o jsonpath='{.data.kmm_image_registry_url}' 2>/dev/null || echo "")
+  REGISTRY_REPO=$(oc get configmap kmm-image-config -n ibm-fusion-access \
+    -o jsonpath='{.data.kmm_image_repo}' 2>/dev/null || echo "")
+  
+  if [[ -n "$REGISTRY_URL" ]] && [[ -n "$REGISTRY_REPO" ]]; then
+    echo "  Registry: ${REGISTRY_URL}/${REGISTRY_REPO}"
+    test_status="passed"
+  else
+    test_message="KMM config exists but missing registry URL or repo"
+    echo "  ⚠️  Incomplete KMM configuration"
+  fi
+else
+  test_message="KMM configuration not found. This is required for kernel module building since Fusion Access v0.0.19+."
+  echo "  ❌ KMM configuration missing"
+fi
+
+test_duration=$(($(date +%s) - test_start))
+add_test_result "test_kmm_configuration" "$test_status" "$test_duration" "$test_message"
