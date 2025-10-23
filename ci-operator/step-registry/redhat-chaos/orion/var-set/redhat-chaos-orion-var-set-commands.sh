@@ -67,7 +67,7 @@ fi
 
 env
 
-declare -p | grep -v "declare -a" | grep -v "BASH" | grep -v "FUNCNAME" | grep -v "LINENO" | grep -v "PPID" | grep -v "SHELLOPTS" | grep -v "UID" | grep -v "PROW" >> local_variables.sh
+declare -p | grep -v "declare -a" | grep -v "BASH" | grep -v "FUNCNAME" | grep -v "LINENO" | grep -v "PPID" | grep -v "SHELLOPTS" | grep -v "UID" | grep -v "PROW" >> ${SHARED_DIR}/local_variables.sh
 
 grep -vxFf ${SHARED_DIR}/orig_env.sh ${SHARED_DIR}/local_variables.sh >> ${SHARED_DIR}/orion.sh
 
