@@ -372,6 +372,8 @@ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-
 # wait for ClusterVersion to level, until https://bugzilla.redhat.com/show_bug.cgi?id=2009845 makes it back to all 4.9 releases being installed in CI
 oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
+# Skip readiness checks intentionally when the cluster is expected
+# to be in an unhealthy state (e.g., TNF in degraded mode)
 if [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]]; then
     echo "$(date) - skipping clusteroperators status check"
 else
