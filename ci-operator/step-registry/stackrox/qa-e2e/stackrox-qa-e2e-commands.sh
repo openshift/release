@@ -44,13 +44,13 @@ exec .openshift-ci/dispatch.sh "${job}"
 original_results="${ARTIFACT_DIR}/original_results/"
 mkdir "${original_results}"
 
-for resultfile in $(find "${ARTIFACT_DIR}" -type f -iname "*.xml"); do
+for result_file in $(find "${ARTIFACT_DIR}" -type f -iname "*.xml"); do
   # Keep a copy of all the original Junit files before modifying them
-  cp "${results_file}" "${original_results}"
+  cp "${result_file}" "${original_results}"
 
   # Map tests if needed for related use cases
-  mapTestsForComponentReadiness "${results_file}"
+  mapTestsForComponentReadiness "${result_file}"
 
   # Send junit file to shared dir for Data Router Reporter step
-  cp "${results_file}" "${SHARED_DIR}"
+  cp "${result_file}" "${SHARED_DIR}"
 done
