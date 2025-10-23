@@ -86,7 +86,7 @@ function verify_arn_exists() {
                     ;;
                 natgateway)
                     local natgws
-                    natgws=$(aws ec2 describe-nat-gateways --region "$check_region" --nat-gateway-ids "$resource_id" 2>/dev/null)
+                    natgws=$(aws ec2 describe-nat-gateways --region "$check_region" --nat-gateway-ids "$resource_id"  --filter Name=state,Values=available 2>/dev/null)
                     local exit_code=$?
                     if [[ $exit_code -ne 0 ]]; then
                         return 1
