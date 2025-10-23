@@ -55,7 +55,7 @@ tests:
         vllm-api-key-secret \\\n    --from-literal=key=\"$VLLM_API_KEY\" \\\n    -n
         e2e-rhoai-dsc || echo \"Secret exists\"\n\ncurl -L -o tool_chat_template_llama3.2_json.jinja
         \\\n  https://raw.githubusercontent.com/vllm-project/vllm/main/examples/tool_chat_template_llama3.2_json.jinja\n
-        \ \noc create configmap vllm-chat-template -n e2e-rhoai-dsc \\\n  --from-file=tool_chat_template_llama3.2_json.jinja\n\npwd\n\n./pipeline.sh\n\noc
+        \ \noc create configmap vllm-chat-template -n e2e-rhoai-dsc \\\n  --from-file=tool_chat_template_llama3.2_json.jinja\n\npwd\n\n./pipeline-vllm.sh\n\noc
         get pods\n\necho \"===== LCS POD =====\"\n\nls\n\nsource pod.env\n\noc wait
         --for=condition=Ready pod/$POD_NAME -n $NAMESPACE --timeout=300s\nsleep 30\n\nresponse=$(curl
         -sk -w \"%{http_code}\" \\\n  -H \"Content-Type: application/json\" \\\n  -H
@@ -68,17 +68,22 @@ tests:
         \ echo \"❌ Failed with HTTP $http_code\"\nfi\n\n\nls\n\noc create secret generic
         api-url-secret \\\n    --from-literal=key=\"$KSVC_URL\" \\\n    -n e2e-rhoai-dsc
         || echo \"Secret exists\"\n\noc create configmap llama-stack-config -n e2e-rhoai-dsc
-        \\\n  --from-file=config/run.yaml\n\noc create configmap lightspeed-stack-config
-        -n e2e-rhoai-dsc \\\n  --from-file=config/lightspeed-stack.yaml\n\n./pipeline-services.sh\n\noc
+        \\\n  --from-file=configs/run.yaml\n\noc create configmap lightspeed-stack-config
+        -n e2e-rhoai-dsc \\\n  --from-file=configs/lightspeed-stack.yaml\n\noc create
+        configmap test-script-cm -n e2e-rhoai-dsc \\\n  --from-file=run-tests.sh\n\n./pipeline-services.sh\n\noc
         get pods -n e2e-rhoai-dsc\n\noc wait pod/lightspeed-stack-service pod/llama-stack-service
         \\\n-n e2e-rhoai-dsc --for=condition=Ready --timeout=300s\n\nsleep 30\n\nexport
         LCS_IP=$(oc get pod lightspeed-stack-service -n e2e-rhoai-dsc -o jsonpath='{.status.podIP}')\necho
-        \"LCS IP: $LCS_IP\"\n\noc get pods -n e2e-rhoai-dsc\noc logs llama-stack-service
-        -n e2e-rhoai-dsc             \noc logs lightspeed-stack-service -n e2e-rhoai-dsc
-        \            \n\n\n# HEALTH CHECK\necho \"Testing basic connectivity before
-        full test suite...\"\ncurl -f http://$LCS_IP:8080/v1/models || {\n  echo \"❌
-        Basic connectivity failed - showing logs before running full tests\"\n  oc
-        logs llama-stack-service -n e2e-rhoai-dsc             \n  oc logs lightspeed-stack-service
+        \"LCS IP: $LCS_IP\"\n\noc create secret generic lcs-ip-secret \\\n  --from-literal=key=\"$LCS_IP\"
+        \\\n  -n e2e-rhoai-dsc || echo \"Secret exists\"\n\n./pipeline-test-pod\n\n\noc
+        get pods -n e2e-rhoai-dsc\noc logs llama-stack-service -n e2e-rhoai-dsc             \noc
+        logs lightspeed-stack-service -n e2e-rhoai-dsc             \n\necho \"RUNNING
+        NETWORK TEST\"\noc get networkpolicy -n e2e-rhoai-dsc || true\noc get authorizationpolicy
+        -n e2e-rhoai-dsc || true\noc logs lightspeed-stack-service -c istio-proxy
+        -n e2e-rhoai-dsc || true\n\n\n# HEALTH CHECK\necho \"Testing basic connectivity
+        before full test suite...\"\ncurl -f http://$LCS_IP:8080/v1/models || {\n
+        \ echo \"❌ Basic connectivity failed - showing logs before running full tests\"\n
+        \ oc logs llama-stack-service -n e2e-rhoai-dsc             \n  oc logs lightspeed-stack-service
         -n e2e-rhoai-dsc             \n  exit 1\n}\n\noc logs llama-stack-service
         -n e2e-rhoai-dsc             \noc logs lightspeed-stack-service -n e2e-rhoai-dsc
         \            \n\ncd ../../..\nls\nmake test-e2e\n"
