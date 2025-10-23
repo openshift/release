@@ -897,6 +897,9 @@ tests:
       - default: /tmp/gcp-creds/gsm-e2e-test-sa-key
         documentation: The GCP service account credentials file
         name: GCP_SECRETS_DEV_CREDENTIALS_FILE
+      - default: e2e-test-lock-bucket
+        documentation: The GCS bucket where the lock object is created
+        name: GCS_E2E_LOCK_BUCKET
       from: test-bin
       resources:
         requests:
@@ -919,43 +922,6 @@ tests:
       - collection: ""
         mount_path: /tmp/pull-secret
         name: ci-pull-credentials
-        namespace: test-credentials
-      - collection: ""
-        mount_path: /etc/push-secret
-        name: registry-push-credentials-ci-central
-        namespace: test-credentials
-      - collection: ""
-        mount_path: /tmp/import-secret
-        name: ci-pull-credentials
-        namespace: test-credentials
-      - collection: ""
-        mount_path: /tmp/gcs
-        name: gce-sa-credentials-gcs-publisher
-        namespace: test-credentials
-      - collection: ""
-        mount_path: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        namespace: test-credentials
-      from: test-bin
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: e2e-oo-post
-  postsubmit: true
-  steps:
-    test:
-    - as: e2e-oo-post
-      commands: |
-        GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig MANIFEST_TOOL_SECRET=/secrets/manifest-tool/.dockerconfigjson LOCAL_REGISTRY_DNS=image-registry.openshift-image-registry.svc:5000 make e2e TAGS=e2e_framework,optional_operators
-      credentials:
-      - collection: ""
-        mount_path: /auth
-        name: ci-operator
-        namespace: test-credentials
-      - collection: ""
-        mount_path: /tmp/pull-secret
-        name: registry-pull-credentials
         namespace: test-credentials
       - collection: ""
         mount_path: /etc/push-secret

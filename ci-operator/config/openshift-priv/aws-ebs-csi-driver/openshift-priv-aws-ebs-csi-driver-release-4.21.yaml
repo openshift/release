@@ -3,14 +3,14 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
   tests-private:
     name: tests-private
     namespace: ci
@@ -22,12 +22,12 @@ canonical_go_repository: github.com/kubernetes-sigs/aws-ebs-csi-driver
 images:
 - dockerfile_path: Dockerfile.openshift.rhel7
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: aws-ebs-csi-driver
 promotion:
   to:
@@ -73,12 +73,14 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-csi
-- as: e2e-aws-csi-extended
+- always_run: false
+  as: e2e-aws-csi-extended
   optional: true
   steps:
     cluster_profile: aws-qe
     workflow: openshift-e2e-aws-csi-extended
-- as: e2e-aws-csi-techpreview-volumeattributesclass
+- always_run: false
+  as: e2e-aws-csi-techpreview-volumeattributesclass
   optional: true
   steps:
     cluster_profile: aws

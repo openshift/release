@@ -119,6 +119,11 @@ export CYPRESS_QUAY_SUPER_USER_TOKEN=${quay_access_token}
 export CYPRESS_OCP_ENDPOINT=${ocp_endpoint}
 export CYPRESS_OCP_PASSWORD=${ocp_kubeadmin_password}
 export CYPRESS_QUAY_PROJECT=quay-enterprise
+if [[ "${QUAY_OLD_UI_DISABLED}" == "true" ]]; then
+  export CYPRESS_OLD_UI_DISABLED=true 
+else
+  export CYPRESS_OLD_UI_DISABLED=false 
+fi
 
 YARN_PATH=$(yarn global bin)
 NEW_PATH="$PATH:${YARN_PATH}"
