@@ -1,7 +1,6 @@
 #!/bin/bash
 
-env >> vars.sh
-cp vars.sh ${ARTIFACT_DIR}/orig_env.sh
+env >> ${SHARED_DIR}/orig_env.sh
 
 # set enviornment based variables if they exist
 if [ -f "${KUBECONFIG}" ]; then
@@ -70,8 +69,8 @@ env
 
 declare -p | grep -v "declare -a" | grep -v "BASH" | grep -v "FUNCNAME" | grep -v "LINENO" | grep -v "PPID" | grep -v "SHELLOPTS" | grep -v "UID" | grep -v "PROW" >> local_variables.sh
 
-grep -vxFf vars.sh local_variables.sh >> orion.sh
+grep -vxFf ${SHARED_DIR}/orig_env.sh ${SHARED_DIR}/local_variables.sh >> ${SHARED_DIR}/orion.sh
 
-tr '\n' ',' < orion.sh > ${SHARED_DIR}/orion_env.sh
+tr '\n' ',' < ${SHARED_DIR}/orion.sh > ${SHARED_DIR}/orion_env.sh
 
 cp ${SHARED_DIR}/orion_env.sh ${ARTIFACT_DIR}/orion_env.sh
