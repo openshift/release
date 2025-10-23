@@ -1,7 +1,4 @@
 #!/bin/bash
-oc config view
-
-KUBECONFIG=/Users/prubenda/gcp/gcp/auth/kubeconfig
 
 env >> vars.sh
 cp vars.sh ${ARTIFACT_DIR}/orig_env.sh
