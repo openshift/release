@@ -62,7 +62,7 @@ EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
   echo "Private network deployment"
-  echo -e "enable_bond: $BOND" >> /tmp/all.yml
+  echo -e "enable_bond: false" >> /tmp/all.yml
   echo -e "controlplane_network: 192.168.216.1/21\ncontrolplane_network_prefix: 21" >> /tmp/all.yml
 
   # Create proxy configuration for private VLAN deployments

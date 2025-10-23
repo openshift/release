@@ -1,16 +1,13 @@
 #!/bin/bash
 set -x
 
-if test -f "${SHARED_DIR}/proxy-conf.sh"; then
-   shellcheck disable=SC1090
-   source "${SHARED_DIR}/proxy-conf.sh"
-fi
-
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 
+pushd /tmp
+
 # Patch network operator to enable FRR
-PATCH_NETWORK_OPERATOR_SCRIPT="patch_network_operator_script.sh"
+PATCH_NETWORK_OPERATOR_SCRIPT="/tmp/patch_network_operator_script.sh"
 cat > $PATCH_NETWORK_OPERATOR_SCRIPT << 'EOF'
    export KUBECONFIG=/root/vmno/kubeconfig
    oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"additionalRoutingCapabilities": {"providers": ["FRR"]}, "defaultNetwork":{"ovnKubernetesConfig":{"routeAdvertisements":"Enabled"}}}}'
@@ -30,7 +27,7 @@ LOGIN=password
 
 # This script is run on the bastion host. It sshs into the hypervisor creates a VM
 # and then spawns external BGP server on the VM.
-SCRIPT_FILE="remote_script.sh"
+SCRIPT_FILE="/tmp/remote_script.sh"
 cat > $SCRIPT_FILE << 'EOF'
 #!/bin/bash
 set -x
@@ -99,6 +96,8 @@ echo "Script '$CREATE_VM_SCRIPT' created. Now you can use it with SSH."
 
 chmod +x $CREATE_VM_SCRIPT
 ssh -i /root/.ssh/id_rsa ${SSH_ARGS} root@${HV_IP} 'bash -s' < $CREATE_VM_SCRIPT
+sleep 10
+rm -f $CREATE_VM_SCRIPT
 
 ssh-keygen -R $VM_IP 2>/dev/null || true
 ssh-keyscan $VM_IP >> ~/.ssh/known_hosts
@@ -173,6 +172,8 @@ __EOF__
 _EOF_
 chmod +x $PREPATE_SERVER_SCRIPT
 sshpass -p "$LOGIN" ssh ${SSH_ARGS} root@${VM_IP} 'bash -s' < $PREPATE_SERVER_SCRIPT
+sleep 10
+rm -f $PREPATE_SERVER_SCRIPT
 echo $VM_IP
 EOF
 
@@ -181,7 +182,7 @@ VM_IP=$(ssh ${SSH_ARGS} root@$bastion 'bash -s --' "$LAB_CLOUD" < $SCRIPT_FILE)
 sleep 10
 rm -f $SCRIPT_FILE
 
-VARS_FILE="vars.sh"
+VARS_FILE="/tmp/vars.sh"
 cat > $VARS_FILE << EOF
 export ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 export ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
@@ -201,7 +202,7 @@ sleep 10
 rm -f $VARS_FILE
 
 # Run the workload on the VM where external BGP server is running
-RUN_WORKLOAD_SCRIPT="run_workload_script.sh"
+RUN_WORKLOAD_SCRIPT="/tmp/run_workload_script.sh"
 cat > $RUN_WORKLOAD_SCRIPT << 'EOF'
 #!/bin/bash
 
