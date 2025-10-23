@@ -12,7 +12,9 @@ chain:
   - ref: interop-tests-fusion-access-check-nodes
   - ref: interop-tests-fusion-access-label-nodes
   - ref: interop-tests-fusion-access-prepare-worker-nodes
+  - ref: interop-tests-fusion-access-prepare-lxtrace-files
   - ref: interop-tests-fusion-access-create-cluster
+  - ref: interop-tests-fusion-access-patch-buildgpl
   documentation: |-
     Fusion Access environment setup chain that provides the core deployment
     infrastructure for Fusion Access Operator testing.
@@ -25,18 +27,24 @@ chain:
       - AWS security group configuration for IBM Storage Scale networking
       - Fusion Access Operator installation with proper credentials
       - FusionAccess custom resource creation
-      - KMM registry configuration for kernel module building
+      - KMM registry configuration (dual-namespace: ibm-fusion-access + ibm-spectrum-scale-operator)
       - CRD validation and node readiness checks
       - Worker node labeling for storage components
       - Worker node preparation (creating required directories)
+      - lxtrace file preparation (RHCOS compatibility workaround)
       - IBM Storage Scale cluster creation (without hardcoded device paths)
+      - buildgpl ConfigMap patching (fixes v5.2.3.1 compatibility issues)
     
     After this chain completes, the environment is ready for storage-specific
     testing chains (EBS integration or CNV shared storage).
     
     Note: The Cluster uses /dev/disk/by-id/* device pattern to discover all
     attached devices automatically, avoiding instance-type-specific naming issues.
-    KMM registry configuration enables kernel module building via Driver Toolkit.
+    
+    RHCOS Compatibility: Steps include workarounds for IBM Storage Scale v5.2.3.1
+    manifests which have limited KMM support and fall back to buildgpl script with
+    bugs. These workarounds can be removed when using newer versions with proper
+    KMM/Driver Toolkit support.
     
     Prerequisites:
     - OpenShift cluster with sufficient worker nodes (minimum 3)

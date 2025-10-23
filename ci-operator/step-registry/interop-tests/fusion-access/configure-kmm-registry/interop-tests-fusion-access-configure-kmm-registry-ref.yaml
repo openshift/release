@@ -24,6 +24,10 @@ ref:
   documentation: |-
     Configure KMM (Kernel Module Management) registry for IBM Storage Scale kernel modules.
     
+    CRITICAL: This step creates kmm-image-config ConfigMap in TWO namespaces:
+    1. ibm-fusion-access - For Fusion Access operator
+    2. ibm-spectrum-scale-operator - For IBM Storage Scale operator (prevents broken buildgpl)
+    
     Fusion Access Operator v0.0.19+ uses KMM to build GPFS kernel modules (supports
     secure boot, removes machineconfig requirement). KMM requires a container registry
     to build, push, and distribute kernel module containers.
@@ -34,10 +38,14 @@ ref:
     WARNING: Do not use in-cluster registry backed by emptyDir - this breaks KMM
     when registry pod restarts.
     
+    NOTE: IBM Storage Scale v5.2.3.1 manifests have limited KMM support and may
+    fall back to kernel header compilation if headers are unavailable.
+    
     Reference: IBM Storage Scale Container Native documentation
     
     Tests performed (JUnit XML):
     1. Check for existing KMM configuration (idempotency)
-    2. Create kmm-image-config ConfigMap
+    2. Create kmm-image-config ConfigMap in ibm-fusion-access
     3. Verify ConfigMap creation and content
+    4. Create kmm-image-config ConfigMap in ibm-spectrum-scale-operator
 
