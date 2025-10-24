@@ -93,19 +93,6 @@ if [ ${COLLAPSE} == "true" ]; then
     EXTRA_FLAGS+=" --collapse"
 fi
 
-env
-
-if [[ -f "${SHARED_DIR}/orion_env.sh" ]]; then
-    ORION_ENVS=$(cat "${SHARED_DIR}/orion_env.sh" | xargs)
-    IFS=',' read -r -a env_array <<< "$ORION_ENVS"
-    for env_pair in "${env_array[@]}"; do
-      env_pair=$(echo "$env_pair" | xargs)
-      env_key=$(echo "$env_pair" | cut -d'=' -f1)
-      env_value=$(echo "$env_pair" | cut -d'=' -f2-)
-      export "$env_key"="$env_value"
-    done
-fi
-
 
 if [[ -n "${ORION_ENVS}" ]]; then
     ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
