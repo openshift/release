@@ -1,20 +1,20 @@
 base_images:
   cli:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: cli
 build_root:
   image_stream_tag:
     name: maistra-builder
     namespace: ci
-    tag: upstream-1.27
+    tag: upstream-1.24
   use_build_cache: true
 releases:
   latest:
     release:
       architecture: multi
-      channel: candidate
-      version: "4.19"
+      channel: stable
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -26,6 +26,7 @@ tests:
 - as: unit
   commands: |
     make gen test.unit \
+    VERSIONS_YAML_FILE="versions.yaml" \
     BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
@@ -38,6 +39,7 @@ tests:
 - as: integration
   commands: |
     make gen test.integration \
+    VERSIONS_YAML_FILE="versions.yaml" \
     BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
@@ -78,15 +80,15 @@ tests:
     export GOCACHE="/tmp/cache"
     export GOMODCACHE="/tmp/cache"
     export GITHUB_TOKEN_PATH=/creds-github/token
-    export MERGE_BRANCH=release-1.27
+    export MERGE_BRANCH=release-1.0
     ./tools/automator-main.sh \
     --org=openshift-service-mesh \
     --repo=sail-operator \
-    --branch=release-3.2 \
+    --branch=release-3.0 \
     --token-path=/creds-github/token \
     '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
     "--labels=auto-merge,tide/merge-method-merge" \
-    --modifier=merge_upstream_release-1.27 \
+    --modifier=merge_upstream_release-1.0 \
     --cmd=./ossm/merge_upstream.sh
   container:
     from: src
@@ -100,7 +102,7 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.27-0ef669e3326567c47323402f8af247931fce234f
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.24-f9fb31e097a085fca3995f19f051cb8f8a396837
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
@@ -123,25 +125,23 @@ tests:
     - as: e2e-ocp
       cli: latest
       commands: |
-        cleanup() {
-          echo "Copying artifacts..."
-          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-        }
-        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" <<EOF
-          export KUBECONFIG=/work/ci-kubeconfig
-          oc version
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')"
-          export BUILD_WITH_CONTAINER="0"
-          cd /work
-          entrypoint make test.e2e.ocp
-        EOF
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          sh -c "\
+          export KUBECONFIG=/work/ci-kubeconfig && \
+          oc version && \
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
+          export BUILD_WITH_CONTAINER="0" && \
+          export VERSIONS_YAML_FILE=versions.yaml && \
+          cd /work && \
+          entrypoint \
+          # generate everything using versions.yaml not ossm/versions.yaml
+          make gen test.e2e.ocp"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
-      grace_period: 30m0s
       resources:
         requests:
           cpu: 200m
@@ -154,7 +154,7 @@ tests:
     env:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.27-0ef669e3326567c47323402f8af247931fce234f
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.24-f9fb31e097a085fca3995f19f051cb8f8a396837
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       OCP_ARCH: arm64
@@ -178,25 +178,23 @@ tests:
     - as: e2e-ocp-arm
       cli: latest
       commands: |
-        cleanup() {
-          echo "Copying artifacts..."
-          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-        }
-        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" <<EOF
-          export KUBECONFIG=/work/ci-kubeconfig
-          oc version
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')"
-          export BUILD_WITH_CONTAINER="0"
-          cd /work
-          entrypoint make test.e2e.ocp
-        EOF
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          sh -c "\
+          export KUBECONFIG=/work/ci-kubeconfig && \
+          oc version && \
+          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
+          export BUILD_WITH_CONTAINER="0" && \
+          export VERSIONS_YAML_FILE=versions.yaml && \
+          cd /work && \
+          entrypoint \
+          # generate everything using versions.yaml not ossm/versions.yaml
+          make gen test.e2e.ocp"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
       from: src
-      grace_period: 30m0s
       resources:
         requests:
           cpu: 100m
@@ -209,7 +207,7 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.27-0ef669e3326567c47323402f8af247931fce234f
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:master-4d8a6668b6d46b3becc35f9b24467f841bbb020a
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
@@ -232,12 +230,13 @@ tests:
     - as: scorecard
       cli: latest
       commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" <<EOF
-          export KUBECONFIG=/work/ci-kubeconfig
-          cd /work
-          export BUILD_WITH_CONTAINER="0"
-          entrypoint make test.scorecard
-        EOF
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          sh -c \
+          "export KUBECONFIG=/work/ci-kubeconfig && \
+          cd /work && \
+          export BUILD_WITH_CONTAINER="0" && \
+          make test.scorecard"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
@@ -251,7 +250,7 @@ tests:
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-profile
 zz_generated_metadata:
-  branch: release-3.2
+  branch: release-3.0
   org: openshift-service-mesh
   repo: sail-operator
-  variant: ocp-4.19
+  variant: ocp-4.20
