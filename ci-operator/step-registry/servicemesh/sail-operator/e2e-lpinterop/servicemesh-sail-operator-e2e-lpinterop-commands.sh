@@ -30,7 +30,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-function install_yq_if_not_exists() {Add a comment on lines R7 to R32Add diff commentMarkdown input:  edit mode selected.WritePreviewAdd a suggestionHeadingBoldItalicQuoteCodeLinkUnordered listNumbered listTask listMentionReferenceSaved repliesAdd FilesPaste, drop, or click to add filesCancelCommentStart a reviewReturn to code
+function install_yq_if_not_exists() {
     # Install yq manually if not found in image
     echo "Checking if yq exists"
     cmd_yq="$(yq --version 2>/dev/null || true)"
