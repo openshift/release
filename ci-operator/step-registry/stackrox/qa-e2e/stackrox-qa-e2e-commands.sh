@@ -44,7 +44,7 @@ exec .openshift-ci/dispatch.sh "${job}"
 original_results="${ARTIFACT_DIR}/original_results/"
 mkdir "${original_results}"
 
-for result_file in $(find "${ARTIFACT_DIR}" -type f -iname "*.xml"); do
+find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
   # Keep a copy of all the original Junit files before modifying them
   cp "${result_file}" "${original_results}"
 
