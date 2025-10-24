@@ -63,13 +63,18 @@ fi
 original_results="${ARTIFACT_DIR}/original_results"
 mkdir -p "${original_results}"
 
-for result_file in $(find "${ARTIFACT_DIR}" -type f -iname "*.xml"); do
-  # Keep a copy of all the original Junit files before modifying them
-  cp "${result_file}" "${original_results}"
+# Find xml files safely (null-delimited) and process them. This avoids word-splitting
+# and is robust to filenames containing spaces/newlines.
+while IFS= read -r -d '' result_file; do
+    # Compute relative path under ARTIFACT_DIR to preserve structure in original_results
+    rel_path="${result_file#$ARTIFACT_DIR/}"
+    dest_path="${original_results}/${rel_path}"
+    mkdir -p "$(dirname "$dest_path")"
+    cp -- "$result_file" "$dest_path"
 
-  # Map tests if needed for related use cases
-  mapTestsForComponentReadiness "${result_file}"
+    # Map tests if needed for related use cases
+    mapTestsForComponentReadiness "$result_file"
 
-  # Send junit file to shared dir for Data Router Reporter step
-  cp "${result_file}" "${SHARED_DIR}"
-done
+    # Send junit file to shared dir for Data Router Reporter step (use basename to avoid overwriting files with same name)
+    cp -- "$result_file" "${SHARED_DIR}/$(basename "$result_file")"
+done < <(find "${ARTIFACT_DIR}" -type f -iname "*.xml" -print0)
