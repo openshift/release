@@ -1,0 +1,28 @@
+workflow:
+  as: hypershift-aws-e2e-crd-validation-test
+  documentation: |-
+    The HyperShift aws e2e workflow with CRD validation testing.
+    This workflow executes tests against a new ephemeral HyperShift cluster
+    using a specific nightly build to verify CRD validation bug fixes.
+    
+    The workflow:
+    1. Sets up a nested management cluster
+    2. Installs hypershift using CLI extracted from specific nightly build
+    3. Verifies CRD validation bug is fixed
+    4. Runs standard e2e tests
+    5. Cleans up resources
+    
+    This is specifically for testing the CRD validation bug fix in:
+    registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2025-10-23-225733
+  steps:
+    post:
+    - ref: hypershift-debug
+    - chain: hypershift-destroy-nested-management-cluster
+    test:
+    - ref: hypershift-aws-run-e2e-external
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: hypershift-install-metrics
+    - ref: hypershift-verify-crd-validation-fix

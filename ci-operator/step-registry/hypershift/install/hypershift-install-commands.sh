@@ -5,7 +5,23 @@ set -eux
 EXTRA_ARGS=""
 HCP_CLI="bin/hypershift"
 OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
-if [[ $HO_MULTI == "true" ]]; then
+
+# CRD Validation Test: Extract hypershift CLI from specific nightly build
+# This is for testing the CRD validation bug fix in registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2025-10-23-225733
+if [[ "${CRD_VALIDATION_TEST:-false}" == "true" ]]; then
+  echo "CRD Validation Test Mode: Extracting hypershift CLI from specific nightly build"
+  oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+  mkdir -p /tmp/hs-cli-4.21
+  NIGHTLY_BUILD="registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2025-10-23-225733"
+  echo "Extracting hypershift CLI from: $NIGHTLY_BUILD"
+  oc image extract $NIGHTLY_BUILD --path /usr/bin/hypershift:/tmp/hs-cli-4.21 --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
+  chmod +x /tmp/hs-cli-4.21/hypershift
+  HCP_CLI="/tmp/hs-cli-4.21/hypershift"
+  echo "Using hypershift CLI from nightly build: $HCP_CLI"
+  # Also update the operator image to use the same nightly build
+  OPERATOR_IMAGE=$NIGHTLY_BUILD
+  echo "Using operator image from nightly build: $OPERATOR_IMAGE"
+elif [[ $HO_MULTI == "true" ]]; then
   OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
   oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
   mkdir /tmp/hs-cli
