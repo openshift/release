@@ -11,7 +11,7 @@ python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 if [[ $TAG == "latest" ]]; then
-    LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/orion/releases/latest" | jq -r '.tag_name');
+    LATEST_TAG=$(curl -s "https://api.github.com/repos/chentex/orion/releases/latest" | jq -r '.tag_name');
 else
     LATEST_TAG=$TAG
 fi
@@ -42,7 +42,7 @@ esac
 export ES_SERVER
 
 pip install .
-EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
+EXTRA_FLAGS=""
 
 if [[ ! -z "$UUID" ]]; then
     EXTRA_FLAGS+=" --uuid ${UUID}"
@@ -84,7 +84,7 @@ if [[ -n "$ACK_FILE" ]]; then
     else
         # Download the latest ACK file
         ackFilePath="$ARTIFACT_DIR/$ACK_FILE"
-        curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} -o "$ackFilePath"
+        curl -sL https://raw.githubusercontent.com/chentex/orion/refs/heads/pr-feat/ack/${VERSION}_${ACK_FILE} -o "$ackFilePath"
     fi
     EXTRA_FLAGS+=" --ack $ackFilePath"
 fi
@@ -111,7 +111,7 @@ fi
 set +e
 set -o pipefail
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
+es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=4.21 orion --config examples/trt-payload-cluster-density.yaml --lookback 40d --hunter-analyze --input-vars='{"repository": "kubernetes","organization": "openshift","jobtype": "pull","pull_number": "2394"}' ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 
