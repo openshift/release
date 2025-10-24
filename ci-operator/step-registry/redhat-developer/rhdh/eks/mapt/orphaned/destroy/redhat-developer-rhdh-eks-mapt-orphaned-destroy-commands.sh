@@ -1,18 +1,6 @@
 #!/bin/bash
 
-OVERALL_EXIT_CODE=0
-
-# shellcheck disable=SC2317
-# shellcheck disable=SC2329
-handle_error() {
-  echo "An error occurred in command: $BASH_COMMAND"
-  echo "Exit code: $?"
-  # Additional error handling logic
-  OVERALL_EXIT_CODE=1
-}
-
-# Set the error handler function
-trap handle_error ERR
+set -e
 
 echo "Loading AWS credentials from secrets..."
 AWS_ACCESS_KEY_ID=$(cat /tmp/secrets/AWS_ACCESS_KEY_ID)
@@ -57,5 +45,3 @@ for S3_TOP_LEVEL_FOLDER in "${CORRELATE_MAPT_ARRAY[@]}"; do
 done
 
 echo "Finished processing all ${total} MAPT folders"
-
-exit $OVERALL_EXIT_CODE
