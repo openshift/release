@@ -25,8 +25,8 @@ function mapTestsForComponentReadiness() {
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
             install_yq_if_not_exists
-            echo "Mapping Test Suite Name To: ACS-lp-interop"
-            yq eval -px -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' "${results_file}"
+            echo "Mapping Test Suite Name To: MTA-lp-interop"
+            yq eval -px -ox -iI0 '.testsuite."+@name" = "MTA-lp-interop"' "${results_file}"
         fi
     fi
 }
