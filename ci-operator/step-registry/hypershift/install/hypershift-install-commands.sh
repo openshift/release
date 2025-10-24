@@ -15,10 +15,7 @@ if [[ "${CRD_VALIDATION_TEST:-false}" == "true" ]]; then
   NIGHTLY_BUILD="registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2025-10-23-225733"
   echo "Extracting hypershift CLI from: $NIGHTLY_BUILD"
   
-  # Try multiple possible locations for the hypershift CLI
-  echo "Attempting to extract hypershift CLI from various locations..."
-  
-  # First, let's see what's in the image
+  # Extract the entire image to inspect its contents
   echo "Inspecting image contents..."
   oc image extract $NIGHTLY_BUILD --path /:/tmp/image-root --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64" || true
   
@@ -53,9 +50,9 @@ if [[ "${CRD_VALIDATION_TEST:-false}" == "true" ]]; then
     echo "Using default hypershift CLI: $HCP_CLI"
   fi
   
-  # Also update the operator image to use the same nightly build
+  # Use the nightly build as the operator image for CRD validation testing
   OPERATOR_IMAGE=$NIGHTLY_BUILD
-  echo "Using operator image from nightly build: $OPERATOR_IMAGE"
+  echo "Using nightly build as operator image: $OPERATOR_IMAGE"
 elif [[ $HO_MULTI == "true" ]]; then
   OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
   oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
