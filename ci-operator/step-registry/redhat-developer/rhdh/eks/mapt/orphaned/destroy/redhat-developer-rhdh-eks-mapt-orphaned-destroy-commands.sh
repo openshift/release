@@ -32,7 +32,7 @@ current=0
 echo "Found ${total} S3 top-level folders to process"
 
 for S3_TOP_LEVEL_FOLDER in "${CORRELATE_MAPT_ARRAY[@]}"; do
-  ((current++))
+  current=$((current + 1))
   echo "Processing MAPT: ${S3_TOP_LEVEL_FOLDER} ($current/$total)"
 
   [ -z "$S3_TOP_LEVEL_FOLDER" ] && echo "Skipping empty folder name" && continue

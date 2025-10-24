@@ -36,7 +36,7 @@ echo "Found ${total} blob top-level folders to process"
 
 # Iterate over each value
 for BLOB_TOP_LEVEL_FOLDER in "${CORRELATE_MAPT_ARRAY[@]}"; do
-  ((current++))
+  current=$((current + 1))
   echo "Processing MAPT: ${BLOB_TOP_LEVEL_FOLDER} ($current/$total)"
 
   # Skip empty lines
