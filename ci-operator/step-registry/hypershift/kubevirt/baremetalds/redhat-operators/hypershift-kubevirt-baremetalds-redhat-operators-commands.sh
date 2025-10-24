@@ -49,18 +49,13 @@ function mirror_ccs() {
     echo "3: Check skopeo and registry credentials"
     if [[ ! -f /usr/bin/skopeo ]]; then
         yum install -y skopeo
-        oc -n openshift-config extract secret/pull-secret --to="/tmp" --confirm
-        set +x
-        mirror_token=$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "${mirror_registry}" '.auths[$var1]["auth"]'|base64 -d)
-        skopeo login "${mirror_registry}" -u "${mirror_token%:*}" -p "${mirror_token#*:}"
-        REGISTRY_REDHAT_IO_USER=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 1)
-        REGISTRY_REDHAT_IO_PASSWORD=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 2)
-        skopeo login registry.redhat.io -u "${REGISTRY_REDHAT_IO_USER}" -p "${REGISTRY_REDHAT_IO_PASSWORD}"
-        set -x
     fi
-
+    oc -n openshift-config extract secret/pull-secret --to="/tmp" --confirm
+    mirror_token=$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "${mirror_registry}" '.auths[$var1]["auth"]'|base64 -d)
+    skopeo login "${mirror_registry}" -u "${mirror_token%:*}" -p "${mirror_token#*:}"
+  
     echo "4: skopeo copy docker://${CCS_CATALOG_IMAGE} oci:///home/ccs-local-catalog --remove-signatures"
-    skopeo copy "docker://${CCS_CATALOG_IMAGE}" "oci:///home/ccs-local-catalog" --remove-signatures
+    skopeo copy "docker://${CCS_CATALOG_IMAGE}" "oci:///home/ccs-local-catalog" --remove-signatures --authfile=/home/pull-secret
 
     echo "5: oc-mirror"
     catalog_image="ccs-local-catalog/ccs-local-catalog"
