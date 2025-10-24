@@ -43,44 +43,10 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: "export HUGGING_FACE_HUB_TOKEN=$(cat /var/run/huggingface/hf-token-ces-lcore-test)\nexport
-        VLLM_API_KEY=$(cat /var/run/vllm/vllm-api-key-lcore-test)\n[ -n \"$HUGGING_FACE_HUB_TOKEN\"
-        ] && echo \"HUGGING_FACE_HUB_TOKEN is set\" || echo \"HUGGING_FACE_HUB_TOKEN
-        is NOT set\"\n[ -n \"$VLLM_API_KEY\" ] && echo \"VLLM_API_KEY is set\" ||
-        echo \"VLLM_API_KEY is NOT set\"\n\nls -A\noc version\noc whoami\noc get pods
-        -A\n\necho \"===== DEPLOY vLLM ======\"\n\ngit clone https://github.com/are-ces/lightspeed-stack.git\ncd
-        lightspeed-stack\ngit checkout e2e-rhoai\ncd tests/e2e-prow/rhoai\n\noc create
-        namespace e2e-rhoai-dsc\n\noc create secret generic hf-token-secret \\\n    --from-literal=token=\"$HUGGING_FACE_HUB_TOKEN\"
-        \\\n    -n e2e-rhoai-dsc || echo \"Secret exists\"\n\noc create secret generic
-        vllm-api-key-secret \\\n    --from-literal=key=\"$VLLM_API_KEY\" \\\n    -n
-        e2e-rhoai-dsc || echo \"Secret exists\"\n\ncurl -L -o tool_chat_template_llama3.2_json.jinja
-        \\\n  https://raw.githubusercontent.com/vllm-project/vllm/main/examples/tool_chat_template_llama3.2_json.jinja\n
-        \ \noc create configmap vllm-chat-template -n e2e-rhoai-dsc \\\n  --from-file=tool_chat_template_llama3.2_json.jinja\n\npwd\n\n./pipeline-vllm.sh\n\noc
-        get pods\n\necho \"===== LCS POD =====\"\n\nls\n\nsource pod.env\n\noc wait
-        --for=condition=Ready pod/$POD_NAME -n $NAMESPACE --timeout=300s\nsleep 30\n\nresponse=$(curl
-        -sk -w \"%{http_code}\" \\\n  -H \"Content-Type: application/json\" \\\n  -H
-        \"Authorization: Bearer $VLLM_API_KEY\" \\\n  -d '{\n      \"model\": \"meta-llama/Llama-3.2-1B-Instruct\",\n
-        \     \"prompt\": \"Who won the world series in 2020?\",\n      \"max_new_tokens\":
-        100\n  }' \\\n  \"$KSVC_URL/v1/completions\")\n\nhttp_code=\"${response: -3}\"\nbody=\"${response::-3}\"\n\necho
-        \"Response body:\"\necho \"$body\" | jq . 2>/dev/null || echo \"$body\"\n\nif
-        [[ \"$http_code\" == \"200\" && \"$body\" == *'\"object\":\"text_completion\"'*
-        ]]; then\n  echo \"✅ Success: API returned 200 and a text_completion object.\"\nelse\n
-        \ echo \"❌ Failed with HTTP $http_code\"\nfi\n\n\nls\n\noc create secret generic
-        api-url-secret \\\n    --from-literal=key=\"$KSVC_URL\" \\\n    -n e2e-rhoai-dsc
-        || echo \"Secret exists\"\n\noc create configmap llama-stack-config -n e2e-rhoai-dsc
-        \\\n  --from-file=configs/run.yaml\n\noc create configmap lightspeed-stack-config
-        -n e2e-rhoai-dsc \\\n  --from-file=configs/lightspeed-stack.yaml\n\noc create
-        configmap test-script-cm -n e2e-rhoai-dsc \\\n  --from-file=run-tests.sh\n\n./pipeline-services.sh\n\noc
-        get pods -n e2e-rhoai-dsc\n\noc wait pod/lightspeed-stack-service pod/llama-stack-service
-        \\\n-n e2e-rhoai-dsc --for=condition=Ready --timeout=300s\n\nsleep 30\n\nexport
-        LCS_IP=$(oc get pod lightspeed-stack-service -n e2e-rhoai-dsc -o jsonpath='{.status.podIP}')\necho
-        \"LCS IP: $LCS_IP\"\n\noc create secret generic lcs-ip-secret \\\n  --from-literal=key=\"$LCS_IP\"
-        \\\n  -n e2e-rhoai-dsc || echo \"Secret exists\"\n\noc get pods -n e2e-rhoai-dsc\noc
-        logs llama-stack-service -n e2e-rhoai-dsc             \noc logs lightspeed-stack-service
-        -n e2e-rhoai-dsc             \n\n./pipeline-test-pod.sh || true\n\noc logs
-        test-pod -n e2e-rhoai-dsc\n\noc get pods -n e2e-rhoai-dsc\noc logs llama-stack-service
-        -n e2e-rhoai-dsc             \noc logs lightspeed-stack-service -n e2e-rhoai-dsc
-        \            \n"
+      commands: "REPO_URL=\"https://github.com/are-ces/lightspeed-stack.git\" #todo:
+        change\n\necho \"===== Cloning lightspeed-stack repo =====\"\ngit clone \"$REPO_URL\"\ncd
+        lightspeed-stack\ngit checkout e2e-rhoai # todo: delete\ncd tests/e2e-prow/rhoai\n\n./pipeline.sh
+        \       \n"
       credentials:
       - collection: ""
         mount_path: /var/run/huggingface
