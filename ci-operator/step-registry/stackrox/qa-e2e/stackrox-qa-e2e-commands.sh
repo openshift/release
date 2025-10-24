@@ -46,11 +46,11 @@ mkdir "${original_results}"
 
 find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
   # Keep a copy of all the original Junit files before modifying them
-  cp "${result_file}" "${original_results}"
+  cp "${result_file}" "${original_results}/$(basename "$result_file")"
 
   # Map tests if needed for related use cases
   mapTestsForComponentReadiness "${result_file}"
 
   # Send junit file to shared dir for Data Router Reporter step
-  cp "${result_file}" "${SHARED_DIR}"
+  cp "$result_file" "${SHARED_DIR}/$(basename "$result_file")"
 done
