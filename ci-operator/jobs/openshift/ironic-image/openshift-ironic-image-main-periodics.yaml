@@ -1,0 +1,86 @@
+periodics:
+- agent: kubernetes
+  cluster: build05
+  cron: 0 14 * * 1,3,5
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: ironic-image
+    workdir: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-ironic-image-update-requirements-cachito
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        echo "Fetching latest commit hashes..."
+
+        # Fetch latest commit hash from openstack-ironic main branch
+        IRONIC_HASH=$(git ls-remote https://github.com/openstack/ironic.git refs/heads/main | awk '{print $1}')
+        echo "Latest openstack-ironic commit: ${IRONIC_HASH}"
+
+        # Fetch latest commit hash from openstack-sushy main branch
+        SUSHY_HASH=$(git ls-remote https://github.com/openstack/sushy.git refs/heads/main | awk '{print $1}')
+        echo "Latest openstack-sushy commit: ${SUSHY_HASH}"
+
+        # Check if requirements.cachito file exists
+        if [[ ! -f requirements.cachito ]]; then
+          echo "ERROR: requirements.cachito file not found"
+          exit 1
+        fi
+
+        # Update the requirements.cachito file
+        # Replace the commit hashes for ironic and sushy
+        sed -i "s|git+https://github.com/openstack/ironic.git@[a-f0-9]*|git+https://github.com/openstack/ironic.git@${IRONIC_HASH}|g" requirements.cachito
+        sed -i "s|git+https://github.com/openstack/sushy.git@[a-f0-9]*|git+https://github.com/openstack/sushy.git@${SUSHY_HASH}|g" requirements.cachito
+
+        # Check if there are any changes
+        if git diff --quiet requirements.cachito; then
+          echo "No changes needed, requirements.cachito is up to date"
+          exit 0
+        fi
+
+        echo "Changes detected, creating PR..."
+
+        # Create PR using prcreator
+        PR_MESSAGE="This is an automated update of requirements.cachito with the latest commit hashes from Ironic Openshift forks.
+
+        Updates:
+        - openstack-ironic: ${IRONIC_HASH}
+        - openstack-sushy: ${SUSHY_HASH}
+
+        /assign @elfosardo"
+
+        /usr/bin/prcreator \
+          -github-token-path=/etc/github/oauth \
+          -organization=openshift \
+          -repo=ironic-image \
+          -branch=main \
+          -pr-title="Automated update of requirements.cachito" \
+          -pr-message="${PR_MESSAGE}"
+
+        echo "PR created successfully"
+      command:
+      - /bin/bash
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_prcreator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-ironic-bot
