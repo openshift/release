@@ -29,6 +29,8 @@ curl -k --output /tmp/${HYPERSHIFT_CLI_NAME}.tar.gz ${downURL}
 tar -xvf /tmp/${HYPERSHIFT_CLI_NAME}.tar.gz -C /tmp/${HYPERSHIFT_CLI_NAME}_cli
 chmod +x /tmp/${HYPERSHIFT_CLI_NAME}_cli/${HYPERSHIFT_CLI_NAME}
 export PATH=$PATH:/tmp/${HYPERSHIFT_CLI_NAME}_cli
+echo "hcp version: eval(${HYPERSHIFT_CLI_NAME} version)"
+${HYPERSHIFT_CLI_NAME} version
 
 # Installing required tools
 echo "$(date) Installing required tools"
@@ -58,7 +60,9 @@ approve_agents() {
 	echo "$(date) Get workers hostnames"
 	IFS=' ' read -r -a HOST_NAMES <<<"${INSTANCE_NAMES}"
 
-	for ((i = 1; i <= 20; i++)); do
+	for ((i = 1; i <= 40; i++)); do
+		echo "$(date)- count $i Get agents from ${HOSTED_CONTROL_PLANE_NAMESPACE}"
+		oc get agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE}
 		agents=$(oc get agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} -o json)
 
 		while IFS= read -r agent; do
@@ -90,6 +94,12 @@ approve_agents() {
 
 	if [ $agentsApproved != ${HYPERSHIFT_NODE_COUNT} ]; then
 		echo "Approved agents does not match the num of workers count, agents approved: ${agentsApproved}, num of workers: ${HYPERSHIFT_NODE_COUNT}"
+		oc get pods -n multicluster-engine | grep assisted
+		oc get deployment assisted-service -n multicluster-engine
+		oc describe deployment assisted-service -n multicluster-engine
+		oc logs -n multicluster-engine deploy/assisted-service --tail=50
+		oc get infraenv -A
+		sleep 12h
 		echo "exiting ..."
 		exit 1
 	fi
