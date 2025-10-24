@@ -14,10 +14,45 @@ if [[ "${CRD_VALIDATION_TEST:-false}" == "true" ]]; then
   mkdir -p /tmp/hs-cli-4.21
   NIGHTLY_BUILD="registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2025-10-23-225733"
   echo "Extracting hypershift CLI from: $NIGHTLY_BUILD"
-  oc image extract $NIGHTLY_BUILD --path /usr/bin/hypershift:/tmp/hs-cli-4.21 --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
-  chmod +x /tmp/hs-cli-4.21/hypershift
-  HCP_CLI="/tmp/hs-cli-4.21/hypershift"
-  echo "Using hypershift CLI from nightly build: $HCP_CLI"
+  
+  # Try multiple possible locations for the hypershift CLI
+  echo "Attempting to extract hypershift CLI from various locations..."
+  
+  # First, let's see what's in the image
+  echo "Inspecting image contents..."
+  oc image extract $NIGHTLY_BUILD --path /:/tmp/image-root --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64" || true
+  
+  # Look for hypershift binary in common locations
+  if [[ -f "/tmp/image-root/usr/bin/hypershift" ]]; then
+    echo "Found hypershift at /usr/bin/hypershift"
+    cp /tmp/image-root/usr/bin/hypershift /tmp/hs-cli-4.21/hypershift
+  elif [[ -f "/tmp/image-root/bin/hypershift" ]]; then
+    echo "Found hypershift at /bin/hypershift"
+    cp /tmp/image-root/bin/hypershift /tmp/hs-cli-4.21/hypershift
+  elif [[ -f "/tmp/image-root/usr/local/bin/hypershift" ]]; then
+    echo "Found hypershift at /usr/local/bin/hypershift"
+    cp /tmp/image-root/usr/local/bin/hypershift /tmp/hs-cli-4.21/hypershift
+  else
+    echo "ERROR: Could not find hypershift binary in the nightly build image"
+    echo "Available files in /usr/bin:"
+    ls -la /tmp/image-root/usr/bin/ || true
+    echo "Available files in /bin:"
+    ls -la /tmp/image-root/bin/ || true
+    echo "Available files in /usr/local/bin:"
+    ls -la /tmp/image-root/usr/local/bin/ || true
+    echo "Falling back to default hypershift CLI"
+    HCP_CLI="bin/hypershift"
+  fi
+  
+  # If we found the binary, make it executable
+  if [[ -f "/tmp/hs-cli-4.21/hypershift" ]]; then
+    chmod +x /tmp/hs-cli-4.21/hypershift
+    HCP_CLI="/tmp/hs-cli-4.21/hypershift"
+    echo "Using hypershift CLI from nightly build: $HCP_CLI"
+  else
+    echo "Using default hypershift CLI: $HCP_CLI"
+  fi
+  
   # Also update the operator image to use the same nightly build
   OPERATOR_IMAGE=$NIGHTLY_BUILD
   echo "Using operator image from nightly build: $OPERATOR_IMAGE"
