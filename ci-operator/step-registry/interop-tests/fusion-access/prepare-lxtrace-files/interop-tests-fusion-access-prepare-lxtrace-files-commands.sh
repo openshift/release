@@ -20,11 +20,12 @@ for node in $WORKER_NODES; do
   
   # Create dummy lxtrace file in /var/lib/firmware
   # This is required by the buildgpl script's rsync command
-  oc debug node/$node -- chroot /host bash -c 'touch /var/lib/firmware/lxtrace-dummy && chmod 644 /var/lib/firmware/lxtrace-dummy' 2>&1 | \
+  # Note: Using -n default for debug pod namespace
+  oc debug -n default node/$node -- chroot /host bash -c 'touch /var/lib/firmware/lxtrace-dummy && chmod 644 /var/lib/firmware/lxtrace-dummy' 2>&1 | \
     grep -v "Starting pod\|Removing debug\|To use host" || true
   
   # Verify file was created
-  if oc debug node/$node -- chroot /host test -f /var/lib/firmware/lxtrace-dummy >/dev/null 2>&1; then
+  if oc debug -n default node/$node -- chroot /host test -f /var/lib/firmware/lxtrace-dummy >/dev/null 2>&1; then
     echo "  ✅ lxtrace-dummy created and verified"
   else
     echo "  ❌ Failed to create lxtrace-dummy"
