@@ -27,21 +27,14 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: ptp-operator
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21 AS builder
-    WORKDIR /go/src/github.com/k8snetworkplumbingwg/ptp-operator/must-gather
-    COPY . .
-    RUN ls -lhat 
-    RUN ls -lhat /go/src/github.com/k8snetworkplumbingwg/ptp-operator/must-gather
-    RUN ls -lhat /go/go/src/github.com
-
-    FROM registry.ci.openshift.org/ocp/4.21:must-gather
-    LABEL io.k8s.display-name="ptp-operator-must-gather" \
-          io.k8s.description="This is a PTP must-gather image that collectes PTP operator related resources."
-    COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/ptp-operator/must-gather/collection-scripts/* /usr/bin/
-    RUN chmod +x /usr/bin/gather
-
-    ENTRYPOINT /usr/bin/gather
+- dockerfile_literal: "FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+    AS builder\nWORKDIR /go/src/github.com/k8snetworkplumbingwg/ptp-operator/must-gather\nCOPY
+    . .\nRUN ls -lhat \nRUN ls -lhat /go/src/github.com/k8snetworkplumbingwg/ptp-operator/must-gather\nRUN
+    ls -lhat /go/go/src/github.com\n\nFROM registry.ci.openshift.org/ocp/4.21:must-gather\nLABEL
+    io.k8s.display-name=\"ptp-operator-must-gather\" \\\n      io.k8s.description=\"This
+    is a PTP must-gather image that collectes PTP operator related resources.\"\nCOPY
+    --from=builder /go/src/github.com/k8snetworkplumbingwg/ptp-operator/must-gather/collection-scripts/*
+    /usr/bin/\nRUN chmod +x /usr/bin/gather\n\nENTRYPOINT /usr/bin/gather\n"
   from: must_gather
   inputs:
     src:
