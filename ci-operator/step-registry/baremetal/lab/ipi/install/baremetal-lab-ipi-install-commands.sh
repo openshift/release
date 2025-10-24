@@ -64,6 +64,9 @@ INSTALL_DIR="/tmp/installer"
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="registry.build10.ci.openshift.org/ci-ln-3267dlk/release:latest"
+export MULTI_RELEASE_IMAGE="registry.build10.ci.openshift.org/ci-ln-3267dlk/release:latest"
+
 echo "[INFO] Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}..."
 echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 
