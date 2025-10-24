@@ -86,8 +86,3 @@ if grep -q "x-kubernetes-validations" /tmp/hostedclusters-crd.yaml; then
 fi
 
 echo "CRD validation fix verification completed"
-
-# Add sleep for manual verification
-echo "Sleeping for 2 hours to allow manual verification..."
-echo "You can now manually check the cluster and CRDs"
-sleep 7200
