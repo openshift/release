@@ -1,0 +1,62 @@
+base_images:
+  cli: latest
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: ocp
+    tag: golang-1.21
+
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+  target:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+
+images:
+- as: hypershift-operator
+  from: hypershift-operator
+  to: hypershift-operator:latest
+- as: hypershift-tests
+  from: hypershift-tests
+  to: hypershift-tests:latest
+
+tests:
+- as: hypershift-crd-validation-test
+  cron: 0 14 * * *  # Run daily at 14:00 UTC
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_AWS_REGION: us-east-2
+      HYPERSHIFT_NAMESPACE: local-cluster
+      ENABLE_ICSP: "true"
+      ZONES_COUNT: "3"
+      USAGE_CLUSTER_TYPE: hypershift-mgmt
+      # Use the specific nightly build mentioned in the bug report
+      OPENSHIFT_VERSION: "4.15"
+      # Override the release image to use the specific nightly build
+      RELEASE_IMAGE_LATEST: registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2025-10-23-225733
+      # Set the hosted cluster release image to the specific nightly build
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2025-10-23-225733
+      NODEPOOL_RELEASE_IMAGE_LATEST: registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2025-10-23-225733
+    test:
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-provision
+    - ref: hypershift-crd-validation-test
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-deprovision
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
