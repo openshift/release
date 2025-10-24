@@ -213,20 +213,7 @@ function wait_for_condition() {
 
 # Diagnostic functions removed - simplified logic
 
-function ssh_command() {
-    local node_ip="$1"
-    local cmd="$2"
-    local ssh_options ssh_proxy_command="" bastion_ip bastion_ssh_user
-
-    ssh_options="-o UserKnownHostsFile=/dev/null -o IdentityFile=${SSH_PRIV_KEY_PATH} -o StrictHostKeyChecking=no"
-    if [[ -f "${SHARED_DIR}/bastion_public_address" ]]; then
-        bastion_ip=$(<"${SHARED_DIR}/bastion_public_address")
-        bastion_ssh_user=$(<"${SHARED_DIR}/bastion_ssh_user")
-        ssh_proxy_command="-o ProxyCommand='ssh ${ssh_options} -W %h:%p ${bastion_ssh_user}@${bastion_ip}'"
-    fi
-
-    echo "ssh ${ssh_options} ${ssh_proxy_command} core@${node_ip} '${cmd}'" | sh -
-}
+# ssh_command function removed - not used (soft reboot commented out)
 
 function get_infra_id() {
     local infra_id=""
@@ -285,21 +272,7 @@ function get_infra_id() {
 #     return 0
 # }
 
-# Validate result and log success/error
-function validate_and_log_result() {
-    local result="$1"
-    local success_message="$2"
-    local error_message="$3"
-    
-    if [[ -z "${result}" ]]; then
-        log "ERROR: ${error_message}"
-        return 1
-    fi
-    
-    log "${success_message}: ${result}"
-    echo "${result}"
-    return 0
-}
+# validate_and_log_result function removed - not used
 
 # Get all AWS instance IDs for the cluster by INFRA_ID
 function get_all_aws_instance_ids() {
@@ -337,99 +310,15 @@ function get_all_aws_instance_ids() {
     fi
 }
 
-# Batch stop all AWS instances for the cluster
-function batch_stop_all_aws_instances() {
-    local instance_ids
-    
-    # Get all instances and stop them regardless of current state
-    if ! instance_ids=$(get_all_aws_instance_ids "any"); then
-        log "No instances found for the cluster"
-        return 1
-    fi
-    
-    log "Batch stopping all instances: ${instance_ids}"
-    
-    # Stop all instances at once (AWS will ignore already stopped instances)
-    if ! run_command "aws ec2 stop-instances --region '${AWS_REGION}' --instance-ids ${instance_ids}"; then
-        log "ERROR: Failed to stop instances"
-        return 1
-    fi
-    
-    log "Successfully initiated stop for all instances"
-    return 0
-}
+# batch_stop_all_aws_instances function removed - inlined into reboot_cluster_aws_hard
 
-# Batch start all AWS instances for the cluster
-function batch_start_all_aws_instances() {
-    local instance_ids
-    
-    # Get all instances and start them regardless of current state
-    if ! instance_ids=$(get_all_aws_instance_ids "any"); then
-        log "No instances found for the cluster"
-        return 1
-    fi
-    
-    log "Batch starting all instances: ${instance_ids}"
-
-    # Start all instances at once (AWS will ignore already running instances)
-    if ! run_command "aws ec2 start-instances --region '${AWS_REGION}' --instance-ids ${instance_ids}"; then
-        log "ERROR: Failed to start instances"
-        return 1
-    fi
-    
-    log "Successfully initiated start for all instances"
-    return 0
-}
+# batch_start_all_aws_instances function removed - inlined into reboot_cluster_aws_hard
 
 # Simplified AWS hard reboot logic - removed individual instance management functions
 
-function wait_for_all_aws_instances_to_stop() {
-    local infra_id
-    
-    infra_id=$(get_infra_id)
-    if [[ -z "${infra_id}" ]]; then
-        log "ERROR: Could not get INFRA_ID from metadata.json"
-        return 1
-    fi
-    
-    log "Waiting for all instances to stop using INFRA_ID: ${infra_id}"
-    
-    # Wait for all instances to be stopped
-    if ! wait_for_condition "all instances to stop" \
-        "[[ \$(aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -v 'stopped' | wc -l) -eq 0 ]]" \
-        "${AWS_INSTANCE_TIMEOUT}" 10 \
-        "Not all instances stopped within 5 minutes" \
-        "aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
-        return 1
-    fi
-    
-    log "All instances have stopped successfully"
-    return 0
-}
+# wait_for_all_aws_instances_to_stop function removed - inlined into reboot_cluster_aws_hard
 
-function wait_for_all_aws_instances_to_start() {
-    local infra_id
-    
-    infra_id=$(get_infra_id)
-    if [[ -z "${infra_id}" ]]; then
-        log "ERROR: Could not get INFRA_ID from metadata.json"
-        return 1
-    fi
-    
-    log "Waiting for all instances to start using INFRA_ID: ${infra_id}"
-    
-    # Wait for all instances to be running
-    if ! wait_for_condition "all instances to start" \
-        "[[ \$(aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -v 'running' | wc -l) -eq 0 ]]" \
-        "${AWS_INSTANCE_TIMEOUT}" 10 \
-        "Not all instances started within 5 minutes" \
-        "aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
-        return 1
-    fi
-    
-    log "All instances have started successfully"
-    return 0
-}
+# wait_for_all_aws_instances_to_start function removed - inlined into reboot_cluster_aws_hard
 
 # function reboot_node_soft() {
 #     local node_ip=$1 node_name=$2
@@ -465,9 +354,9 @@ function wait_for_all_aws_instances_to_start() {
 #     return 0
 # }
 
-# AWS hard reboot function - simplified logic
+# AWS hard reboot function - simplified logic with inline functions
 function reboot_cluster_aws_hard() {
-    local all_instances
+    local all_instances infra_id
     
     log "Using AWS hard reboot - simplified logic"
     
@@ -479,33 +368,51 @@ function reboot_cluster_aws_hard() {
     
     log "Found instances: ${all_instances}"
     
-    # Step 1: Stop all instances
+    # Step 1: Stop all instances (inline batch_stop_all_aws_instances)
     log "Stopping all instances..."
-    if ! batch_stop_all_aws_instances; then
+    if ! run_command "aws ec2 stop-instances --region '${AWS_REGION}' --instance-ids ${all_instances}"; then
         log "ERROR: Failed to stop instances"
         return 1
     fi
+    log "Successfully initiated stop for all instances"
     
-    # Step 2: Check stopped instances count
+    # Step 2: Check stopped instances count (inline wait_for_all_aws_instances_to_stop)
     log "Checking stopped instances count..."
-    if ! wait_for_all_aws_instances_to_stop; then
+    infra_id=$(get_infra_id)
+    if [[ -z "${infra_id}" ]]; then
+        log "ERROR: Could not get INFRA_ID from metadata.json"
+        return 1
+    fi
+    
+    if ! wait_for_condition "all instances to stop" \
+        "[[ \$(aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -v 'stopped' | wc -l) -eq 0 ]]" \
+        "${AWS_INSTANCE_TIMEOUT}" 10 \
+        "Not all instances stopped within 5 minutes" \
+        "aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
         log "ERROR: Not all instances stopped within timeout"
         return 1
     fi
+    log "All instances have stopped successfully"
     
-    # Step 3: Start all instances
+    # Step 3: Start all instances (inline batch_start_all_aws_instances)
     log "Starting all instances..."
-    if ! batch_start_all_aws_instances; then
+    if ! run_command "aws ec2 start-instances --region '${AWS_REGION}' --instance-ids ${all_instances}"; then
         log "ERROR: Failed to start instances"
         return 1
     fi
+    log "Successfully initiated start for all instances"
     
-    # Step 4: Check running instances count
+    # Step 4: Check running instances count (inline wait_for_all_aws_instances_to_start)
     log "Checking running instances count..."
-    if ! wait_for_all_aws_instances_to_start; then
+    if ! wait_for_condition "all instances to start" \
+        "[[ \$(aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -v 'running' | wc -l) -eq 0 ]]" \
+        "${AWS_INSTANCE_TIMEOUT}" 10 \
+        "Not all instances started within 5 minutes" \
+        "aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
         log "ERROR: Not all instances started within timeout"
         return 1
     fi
+    log "All instances have started successfully"
     
     log "AWS hard reboot completed successfully"
     return 0
