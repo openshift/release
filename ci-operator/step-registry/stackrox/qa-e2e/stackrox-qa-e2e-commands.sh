@@ -39,7 +39,7 @@ if [ ! -f ".openshift-ci/dispatch.sh" ];then
   cd stackrox || exit
 fi
 
-exec .openshift-ci/dispatch.sh "${job}"
+.openshift-ci/dispatch.sh "${job}"
 
 original_results="${ARTIFACT_DIR}/original_results/"
 mkdir "${original_results}"
