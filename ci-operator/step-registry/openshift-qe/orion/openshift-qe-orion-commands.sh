@@ -108,6 +108,10 @@ if [[ -n "${LOOKBACK_SIZE}" ]]; then
     EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
 fi
 
+if [[ -n "${PULL_NUMBER}" ]]; then
+    EXTRA_FLAGS+=" --input-vars='{\"jobtype\": \"pull\", \"pull_number\": \"${PULL_NUMBER}\", \"organization\": \"openshift\", \"repository\": \"${REPO_NAME}\"}'"
+fi
+
 set +e
 set -o pipefail
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
