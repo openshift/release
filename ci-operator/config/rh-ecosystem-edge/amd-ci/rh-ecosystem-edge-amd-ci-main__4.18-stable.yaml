@@ -1,0 +1,49 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.18.0-0
+        stream: 4-stable
+        upper: 4.19.0-0
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: baremetal-e2e-amd-ci
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      AUX_HOST: nvd-srv-05.nvidia.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "1"
+      workers: "0"
+    test:
+    - as: baremetal-e2e-amd-ci
+      commands: |
+        make test
+      from: amd-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: baremetal-lab-sno
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: amd-ci
+  variant: 4.18-stable
