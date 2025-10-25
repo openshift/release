@@ -1,0 +1,57 @@
+base_images:
+  cerberus:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: node-density-heavy-3nodes
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      RUN_CERBERUS: "false"
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: openshift-qe-installer-bm-deploy
+  timeout: 7h0m0s
+- always_run: false
+  as: control-plane-3nodes
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perscale-cpt
+    env:
+      RUN_CERBERUS: "false"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-bm-deploy
+  timeout: 7h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: metal-4.20-nightly-x86
