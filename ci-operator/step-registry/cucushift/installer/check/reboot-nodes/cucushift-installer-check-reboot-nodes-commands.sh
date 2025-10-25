@@ -211,9 +211,6 @@ function wait_for_condition() {
     return 1
 }
 
-# Diagnostic functions removed - simplified logic
-
-# ssh_command function removed - not used (soft reboot commented out)
 
 function get_infra_id() {
     local infra_id=""
@@ -222,57 +219,6 @@ function get_infra_id() {
     fi
     echo "${infra_id}"
 }
-
-
-# Get node list by role (master or worker) - commented out for soft reboot
-# function get_node_list_by_role() {
-#     local role="$1"  # "master" or "worker"
-#     local node_list
-#     
-#     log "Getting ${role} nodes list..." >&2
-#     node_list=$(run_command_silent "oc get node -o wide --no-headers | grep '${role}' | awk '{print \$1\":\"\$6}' | sort")
-#     
-#     if [[ -z "${node_list}" ]]; then
-#         log "ERROR: Failed to get ${role} nodes list or no ${role} nodes found" >&2
-#         return 1
-#     fi
-#     
-#     log "Found ${role} nodes: ${node_list}" >&2
-#     echo "${node_list}"
-#     return 0
-# }
-
-# Execute operation on all nodes with error handling and tracking - commented out for soft reboot
-# function execute_operation_on_nodes() {
-#     local node_info_list="$1"  # List of "node_name:node_ip" entries
-#     local function_name="$2"   # Function name to call
-#     local action_verb="$3"     # Verb for logging (should be present participle like "stopping", "starting", "rebooting")
-#     
-#     local failed_nodes=0
-#     local total_nodes=0
-#     
-#     log "${action_verb} all nodes..."
-#     for node_info in ${node_info_list}; do
-#         node_name=${node_info/:*}
-#         node_ip=${node_info#*:}
-#         total_nodes=$((total_nodes + 1))
-#         log "${action_verb} node ${node_name} (${node_ip})"
-#         if ! ${function_name} "${node_ip}" "${node_name}"; then
-#             log "ERROR: Failed to ${action_verb} node ${node_name}, continuing with other nodes..."
-#             failed_nodes=$((failed_nodes + 1))
-#         fi
-#     done
-#     
-#     log "Completed ${action_verb} ${total_nodes} nodes: ${failed_nodes} failed, $((total_nodes - failed_nodes)) succeeded"
-#     
-#     # Return error code if any nodes failed
-#     if [[ ${failed_nodes} -gt 0 ]]; then
-#         return 1
-#     fi
-#     return 0
-# }
-
-# validate_and_log_result function removed - not used
 
 # Get all AWS instance IDs for the cluster by INFRA_ID
 function get_all_aws_instance_ids() {
@@ -309,50 +255,6 @@ function get_all_aws_instance_ids() {
         return 1
     fi
 }
-
-# batch_stop_all_aws_instances function removed - inlined into reboot_cluster_aws_hard
-
-# batch_start_all_aws_instances function removed - inlined into reboot_cluster_aws_hard
-
-# Simplified AWS hard reboot logic - removed individual instance management functions
-
-# wait_for_all_aws_instances_to_stop function removed - inlined into reboot_cluster_aws_hard
-
-# wait_for_all_aws_instances_to_start function removed - inlined into reboot_cluster_aws_hard
-
-# function reboot_node_soft() {
-#     local node_ip=$1 node_name=$2
-#     
-#     log "Using SSH-based reboot for ${node_name} (${node_ip})"
-#     if ! ssh_command "${node_ip}" "sudo reboot"; then
-#         log "ERROR: Failed to reboot node ${node_name} via SSH"
-#         return 1
-#     fi
-#     log "SSH reboot command sent to ${node_name}"
-#     return 0
-# }
-
-# Get node information for reboot operations - commented out for soft reboot
-# function get_reboot_node_info() {
-#     local master_list worker_list node_info_list
-#     
-#     # Get node lists with error handling
-#     if ! master_list=$(get_node_list_by_role "master"); then
-#         return 1
-#     fi
-#     
-#     if [[ "${SIZE_VARIANT}" == "compact" ]]; then
-#         node_info_list="${master_list}"
-#     else
-#         if ! worker_list=$(get_node_list_by_role "worker"); then
-#             return 1
-#         fi
-#         node_info_list="${worker_list} ${master_list}"
-#     fi
-#     
-#     echo "${node_info_list}"
-#     return 0
-# }
 
 # AWS hard reboot function - simplified logic with inline functions
 function reboot_cluster_aws_hard() {
