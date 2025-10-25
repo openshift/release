@@ -1,0 +1,24 @@
+ref:
+  as: hypershift-jira-agent-process
+  from: hypershift-jira-agent
+  commands: hypershift-jira-agent-process-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-jira-agent-anthropic-api-key
+    mount_path: /var/run/vault/hypershift-jira-agent-anthropic-api-key
+  - namespace: test-credentials
+    name: hypershift-jira-agent-github-token
+    mount_path: /var/run/vault/hypershift-jira-agent-github-token
+  documentation: |-
+    Process step for the HyperShift Jira agent periodic job.
+    This step:
+    - Queries Jira for issues with label 'issue-for-agent'
+    - Loads state from ConfigMap to avoid reprocessing issues
+    - For each unprocessed issue, runs the /jira-solve command non-interactively
+    - Records success/failure in state
+    - Updates ConfigMap with processed issues
+    - Implements rate limiting between issues
