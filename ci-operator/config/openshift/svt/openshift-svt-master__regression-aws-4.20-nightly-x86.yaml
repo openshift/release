@@ -1,0 +1,60 @@
+base_images:
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  initial:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.20.0-0
+        upper: 4.21.0-0
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: replace-loadedworker-ocp-40557
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "30"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+      KUBE_BURNER_VERSION: default
+      PARAMETERS: aws 15 120
+      SCRIPT: perfscale_regression_ci/scripts/scalability/replace_loadedworker_nodes.sh
+      SVT_REPO: https://github.com/skordas/svt
+      SVT_REPO_BRANCH: large-instances-test
+    test:
+    - ref: openshift-svt-regression
+    workflow: openshift-qe-installer-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: svt
+  variant: regression-aws-4.20-nightly-x86
