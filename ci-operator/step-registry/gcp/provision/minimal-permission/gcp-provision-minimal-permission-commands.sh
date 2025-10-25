@@ -31,9 +31,15 @@ fi
 # The IAM service account for UPI: upi-min-permissions-sa@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com
 # Currently we only deal with IPI in Prow CI.
 
-sa_filename="ipi-min-permissions-sa.json"
 if [[ "${MINIMAL_PERMISSIONS_WITHOUT_ACT_AS}" == "yes" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Going to use the IAM service account of general minimal permissions, and without 'iam.serviceAccounts.actAs'"
   sa_filename="ipi-min-perm-without-actAs-sa.json"
+elif [[ "${GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Going to use the IAM service account of minimal permissions for CCO in Manual mode"
+  sa_filename="ipi-xpn-cco-manual-permissions.json"
+else
+  echo "$(date -u --rfc-3339=seconds) - Going to use the IAM service account of general minimal permissions"
+  sa_filename="ipi-min-permissions-sa.json"
 fi
 
 if [ -f "${CLUSTER_PROFILE_DIR}/${sa_filename}" ]; then
