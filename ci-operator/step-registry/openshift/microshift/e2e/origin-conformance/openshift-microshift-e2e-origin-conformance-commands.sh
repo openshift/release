@@ -87,3 +87,4 @@ openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-}  \
   --provider=none \
   -o "${ARTIFACT_DIR}/e2e.log" \
   --junit-dir "${ARTIFACT_DIR}/junit"
+sleep 7200
