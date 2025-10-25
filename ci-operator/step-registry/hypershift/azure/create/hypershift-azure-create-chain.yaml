@@ -84,6 +84,9 @@ chain:
     - name: HYPERSHIFT_OLM_CATALOG_PLACEMENT
       default: ""
       documentation: "OLM Catalog Placement for the HostedCluster. Options: management, guest. Defaults if empty. "
+    - name: HYPERSHIFT_MANAGED_SERVICE
+      default: ""
+      documentation: "The type of managed service the HyperShift Operator is installed on. Examples value: ARO-HCP, ROSA-HCP. If this field is left empty, a self-managed HCP will be installed."
     - name: HYPERSHIFT_NETWORK_TYPE
       default: ""
       documentation: "Specifies the cluster SDN provider."
@@ -324,6 +327,10 @@ chain:
         COMMAND+=(--additional-trust-bundle "${SHARED_DIR}/${ADDITIONAL_CA_BUNDLE_FILE}")
       fi
 
+      if [[ -z "$HYPERSHIFT_MANAGED_SERVICE" ]]; then
+          COMMAND+=(--workload-identities-file "/etc/hypershift-selfmanaged-azurecreds/workload-identities.json")
+      fi
+
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         COMMAND+=(--render)
         if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE == "true" ]]; then
@@ -385,6 +392,9 @@ chain:
     - mount_path: /etc/hypershift-aro-azurecreds
       name: hypershift-aro-azurecreds
       namespace: test-credentials
+    - mount_path: /etc/hypershift-selfmanaged-azurecreds
+      name: hypershift-selfmanaged-azurecreds
+      namespace: test-credentials  
     dependencies:
     - name: "release:latest"
       env: RELEASE_IMAGE_LATEST
