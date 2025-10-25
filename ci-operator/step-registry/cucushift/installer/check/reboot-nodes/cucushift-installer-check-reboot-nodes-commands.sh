@@ -338,7 +338,7 @@ if ! whoami &> /dev/null; then
     fi
 fi
 
-SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+# SSH_PRIV_KEY_PATH removed - not needed for AWS hard reboot
 
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
