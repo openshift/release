@@ -29,42 +29,72 @@ chain:
       default: "AWS"
       documentation: "The cloud provider to use for the management cluster"
     commands: |-
-      AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
-      DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
-      export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
-      
-      if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
-        AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-        DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+      # Set cloud-specific defaults
+      if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
+        export KUBECONFIG=/etc/hypershift-kubeconfig-azure/hypershift-ops-admin.kubeconfig
+        AZURE_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json"
+        DEFAULT_BASE_DOMAIN=hypershift.azure.devcluster.openshift.com
+        HYPERSHIFT_INSTANCE_TYPE=${HYPERSHIFT_INSTANCE_TYPE:-Standard_D4s_v4}
+        HYPERSHIFT_AZURE_LOCATION=${HYPERSHIFT_AZURE_LOCATION:-centralus}
+      else
+        AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+        DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
+        export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
+
+        if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
+          AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+          DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+        fi
       fi
+
       DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
-
       DEFAULT_RELEASE_STREAM=4-stable
-
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
-      
-      echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
-      bin/hypershift create cluster aws \
-        --annotations=hypershift.openshift.io/prow-job-id=${PROW_JOB_ID} \
-        --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-        --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
-        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-        --name=${CLUSTER_NAME} \
-        --region=us-east-1 \
-        --infra-id=${CLUSTER_NAME} \
-        --base-domain=${DOMAIN} \
-        --oidc-issuer-url=https://hypershift-ci-2-oidc.s3.us-east-1.amazonaws.com/shared-mgmt \
-        --sa-token-issuer-private-key-path=/etc/hypershift-ci-jobs-awscreds/serviceaccount-signer.private \
-        --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
-        --zones=${HYPERSHIFT_ZONES} \
-        --service-cidr=172.29.0.0/16 \
-        --cluster-cidr=10.124.0.0/14 \
-        --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
-        --node-selector=hypershift.openshift.io/control-plane=true \
-        --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
-        --release-stream=${DEFAULT_RELEASE_STREAM} \
-        --public-only \
-        --namespace=${HYPERSHIFT_NAMESPACE}
+
+      # Create the management cluster based on cloud provider
+      if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
+        echo "Creating Azure management cluster ${CLUSTER_NAME} with ${HYPERSHIFT_NODE_COUNT} nodes"
+        AZURE_WORKLOAD_IDENTITIES_FILE="/etc/hypershift-ci-jobs-self-managed-azure-e2e-mc/workload-identities.json"
+        bin/hypershift create cluster azure \
+          --annotations=hypershift.openshift.io/prow-job-id=${PROW_JOB_ID} \
+          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+          --azure-creds=${AZURE_GUEST_INFRA_CREDENTIALS_FILE} \
+          --workload-identities-file=${AZURE_WORKLOAD_IDENTITIES_FILE} \
+          --name=${CLUSTER_NAME} \
+          --location=${HYPERSHIFT_AZURE_LOCATION} \
+          --infra-id=${CLUSTER_NAME} \
+          --base-domain=${DOMAIN} \
+          --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
+          --service-cidr=172.29.0.0/16 \
+          --cluster-cidr=10.124.0.0/14 \
+          --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
+          --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
+          --release-stream=${DEFAULT_RELEASE_STREAM} \
+          --namespace=${HYPERSHIFT_NAMESPACE}
+      else
+        echo "Creating AWS management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
+        bin/hypershift create cluster aws \
+          --annotations=hypershift.openshift.io/prow-job-id=${PROW_JOB_ID} \
+          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+          --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
+          --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+          --name=${CLUSTER_NAME} \
+          --region=us-east-1 \
+          --infra-id=${CLUSTER_NAME} \
+          --base-domain=${DOMAIN} \
+          --oidc-issuer-url=https://hypershift-ci-2-oidc.s3.us-east-1.amazonaws.com/shared-mgmt \
+          --sa-token-issuer-private-key-path=/etc/hypershift-ci-jobs-awscreds/serviceaccount-signer.private \
+          --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
+          --zones=${HYPERSHIFT_ZONES} \
+          --service-cidr=172.29.0.0/16 \
+          --cluster-cidr=10.124.0.0/14 \
+          --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
+          --node-selector=hypershift.openshift.io/control-plane=true \
+          --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
+          --release-stream=${DEFAULT_RELEASE_STREAM} \
+          --public-only \
+          --namespace=${HYPERSHIFT_NAMESPACE}
+      fi
       
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=${HYPERSHIFT_NAMESPACE} hostedcluster/${CLUSTER_NAME}
@@ -104,6 +134,15 @@ chain:
       namespace: test-credentials
     - mount_path: /etc/hypershift-kubeconfig
       name: hypershift-ci-2
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-kubeconfig-azure
+      name: azure-hypershift-ci
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+      name: hypershift-ci-jobs-self-managed-azure
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure-e2e-mc
+      name: hypershift-ci-jobs-self-managed-azure-e2e-mc
       namespace: test-credentials
     from_image:
       namespace: hypershift
