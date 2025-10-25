@@ -93,6 +93,7 @@ if [ ${COLLAPSE} == "true" ]; then
     EXTRA_FLAGS+=" --collapse"
 fi
 
+
 if [[ -n "${ORION_ENVS}" ]]; then
     ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
     IFS=',' read -r -a env_array <<< "$ORION_ENVS"
@@ -108,10 +109,16 @@ if [[ -n "${LOOKBACK_SIZE}" ]]; then
     EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
 fi
 
+if [[ -n "${DEBUG+x}" && ${DEBUG} == true ]]; then
+    export EXTRA_FLAGS+=" --debug"
+fi
+
+
+cat $CONFIG
 set +e
 set -o pipefail
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
+es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${CONFIG} ${EXTRA_FLAGS} --debug | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 
