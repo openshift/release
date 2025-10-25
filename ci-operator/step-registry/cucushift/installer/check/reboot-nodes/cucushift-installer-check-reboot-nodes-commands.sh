@@ -220,9 +220,8 @@ function get_infra_id() {
     echo "${infra_id}"
 }
 
-# Get all AWS instance IDs for the cluster by INFRA_ID
+# Get all AWS instance IDs for the cluster by INFRA_ID (excluding terminating instances)
 function get_all_aws_instance_ids() {
-    local expected_state="$1"  # "running", "stopped", or "any"
     local infra_id
     
     infra_id=$(get_infra_id)
@@ -233,13 +232,9 @@ function get_all_aws_instance_ids() {
     
     log "Getting all instance IDs using INFRA_ID: ${infra_id}" >&2
     
-    # Get all instances with the INFRA_ID tag using tag-key match (more flexible)
-    local describe_cmd
-    if [[ "${expected_state}" == "any" ]]; then
-        describe_cmd="aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].InstanceId' --output text"
-    else
-        describe_cmd="aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[?State.Name==\`${expected_state}\`].InstanceId' --output text"
-    fi
+    # Get all instances with the INFRA_ID tag, excluding terminating/terminated instances
+    # This prevents including bootstrap nodes that are being deleted
+    local describe_cmd="aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' 'Name=instance-state-name,Values=running,stopped,pending,stopping' --query 'Reservations[*].Instances[*].InstanceId' --output text"
     
     local instance_ids
     instance_ids=$(run_command_silent "${describe_cmd}")
@@ -251,7 +246,7 @@ function get_all_aws_instance_ids() {
         echo "${instance_ids}"
         return 0
     else
-        log "ERROR: Could not find any ${expected_state} instances for INFRA_ID: ${infra_id}" >&2
+        log "ERROR: Could not find any instances for INFRA_ID: ${infra_id}" >&2
         return 1
     fi
 }
@@ -263,7 +258,7 @@ function reboot_cluster_aws_hard() {
     log "Using AWS hard reboot - simplified logic"
     
     # Get all instances for the cluster
-    if ! all_instances=$(get_all_aws_instance_ids "any"); then
+    if ! all_instances=$(get_all_aws_instance_ids); then
         log "ERROR: Could not find any instances for the cluster"
         return 1
     fi
