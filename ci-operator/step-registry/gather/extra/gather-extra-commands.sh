@@ -291,6 +291,7 @@ if [[ -n "${prometheus}" ]]; then
 		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
 		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
 		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
+    oc cp openshift-monitoring/${prompod}:/tmp/prometheus_queries.log ${ARTIFACT_DIR}/metrics/${FILE_NAME}-queries.log
 	done
 
 	cat >> ${SHARED_DIR}/custom-links.txt <<-EOF
