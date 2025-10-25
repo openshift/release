@@ -66,7 +66,7 @@ exit_handler() {
 trap 'exit_handler' EXIT
 
 # Configuration constants - simplified for AWS hard reboot
-readonly AWS_INSTANCE_TIMEOUT=30    # 30 attempts × 10 seconds = 5 minutes
+readonly AWS_INSTANCE_TIMEOUT=60    # 60 attempts × 10 seconds = 10 minutes
 
 # Reboot type configuration
 # HARD_REBOOT: Use cloud provider commands (AWS EC2 stop/start, etc.)
@@ -284,7 +284,7 @@ function reboot_cluster_aws_hard() {
     if ! wait_for_condition "all instances to stop" \
         "[[ \$(aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -v 'stopped' | wc -l) -eq 0 ]]" \
         "${AWS_INSTANCE_TIMEOUT}" 10 \
-        "Not all instances stopped within 5 minutes" \
+        "Not all instances stopped within 10 minutes" \
         "aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
         log "ERROR: Not all instances stopped within timeout"
         return 1
@@ -304,7 +304,7 @@ function reboot_cluster_aws_hard() {
     if ! wait_for_condition "all instances to start" \
         "[[ \$(aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -v 'running' | wc -l) -eq 0 ]]" \
         "${AWS_INSTANCE_TIMEOUT}" 10 \
-        "Not all instances started within 5 minutes" \
+        "Not all instances started within 10 minutes" \
         "aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
         log "ERROR: Not all instances started within timeout"
         return 1
