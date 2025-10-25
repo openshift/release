@@ -7,10 +7,10 @@ set -o pipefail
 echo "=== OCP ART Image Check ==="
 echo "Scanning all image definition files and checking against GitLab release data..."
 
-# Check if OCP_VERSION is provided
-if [ -z "${OCP_VERSION:-}" ]; then
-    echo "❌ Error: OCP_VERSION environment variable is required but not set"
-    echo "Please set OCP_VERSION to the target OCP version (e.g., 4.19, 4.20)"
+# Check if GROUP is provided
+if [ -z "${GROUP:-}" ]; then
+    echo "❌ Error: GROUP environment variable is required but not set"
+    echo "Please set GROUP to the target group (e.g., openshift-4.19, openshift-4.20, oadp-1.5)"
     exit 1
 fi
 
@@ -25,10 +25,24 @@ if ! command -v yq &> /dev/null; then
 fi
 
 # Fetch GitLab YAML files
-OCP_VERSION_DASH=$(echo "${OCP_VERSION}" | tr '.' '-')
-echo "Fetching GitLab release data for OCP version ${OCP_VERSION}..."
-GITLAB_STAGE_URL="https://gitlab.cee.redhat.com/releng/konflux-release-data/-/raw/main/config/kflux-ocp-p01.7ayg.p1/product/ReleasePlanAdmission/ocp-art/ocp-art-advisory-stage-${OCP_VERSION_DASH}.yaml"
-GITLAB_PROD_URL="https://gitlab.cee.redhat.com/releng/konflux-release-data/-/raw/main/config/kflux-ocp-p01.7ayg.p1/product/ReleasePlanAdmission/ocp-art/ocp-art-advisory-prod-${OCP_VERSION_DASH}.yaml"
+echo "Fetching GitLab release data for group ${GROUP}..."
+
+# Parse the group to determine the correct URL pattern
+if [[ "${GROUP}" == oadp-* ]]; then
+    # Handle OADP groups (e.g., oadp-1.5)
+    VERSION_PART=$(echo "${GROUP}" | sed 's/oadp-//' | tr '.' '-')
+    GITLAB_STAGE_URL="https://gitlab.cee.redhat.com/releng/konflux-release-data/-/raw/main/config/kflux-ocp-p01.7ayg.p1/product/ReleasePlanAdmission/art-oadp/oadp-advisory-stage-${VERSION_PART}.yaml"
+    GITLAB_PROD_URL="https://gitlab.cee.redhat.com/releng/konflux-release-data/-/raw/main/config/kflux-ocp-p01.7ayg.p1/product/ReleasePlanAdmission/art-oadp/oadp-advisory-prod-${VERSION_PART}.yaml"
+elif [[ "${GROUP}" == openshift-* ]]; then
+    # Handle OpenShift groups (e.g., openshift-4.12)
+    VERSION_PART=$(echo "${GROUP}" | sed 's/openshift-//' | tr '.' '-')
+    GITLAB_STAGE_URL="https://gitlab.cee.redhat.com/releng/konflux-release-data/-/raw/main/config/kflux-ocp-p01.7ayg.p1/product/ReleasePlanAdmission/ocp-art/ocp-art-advisory-stage-${VERSION_PART}.yaml"
+    GITLAB_PROD_URL="https://gitlab.cee.redhat.com/releng/konflux-release-data/-/raw/main/config/kflux-ocp-p01.7ayg.p1/product/ReleasePlanAdmission/ocp-art/ocp-art-advisory-prod-${VERSION_PART}.yaml"
+else
+    echo "❌ Error: Unsupported group format '${GROUP}'"
+    echo "Supported formats: openshift-X.Y (e.g., openshift-4.12) or oadp-X.Y (e.g., oadp-1.5)"
+    exit 1
+fi
 
 echo "Attempting to fetch: ${GITLAB_STAGE_URL}"
 if ! wget --quiet --timeout=30 --no-check-certificate "${GITLAB_STAGE_URL}" -O /tmp/gitlab-stage.yaml; then
