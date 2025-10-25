@@ -652,4 +652,5 @@ function create_must-gather_dir_for_case {
         # greater than 500M, if it is greater, please do not put it. or else, put must-gather into there.
     fi
 }
+sleep 28800
 run
