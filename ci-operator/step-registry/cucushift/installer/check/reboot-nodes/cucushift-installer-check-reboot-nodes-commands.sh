@@ -67,6 +67,7 @@ trap 'exit_handler' EXIT
 
 # Configuration constants - simplified for AWS hard reboot
 readonly AWS_INSTANCE_TIMEOUT=60    # 60 attempts × 10 seconds = 10 minutes
+readonly CLUSTER_RECOVERY_TIMEOUT=120  # 120 attempts × 30 seconds = 60 minutes
 
 # Reboot type configuration
 # HARD_REBOOT: Use cloud provider commands (AWS EC2 stop/start, etc.)
@@ -218,6 +219,66 @@ function get_infra_id() {
         infra_id=$(jq -r '.infraID' "${SHARED_DIR}/metadata.json")
     fi
     echo "${infra_id}"
+}
+
+# Function to wait for cluster to be fully recovered after reboot
+function wait_for_cluster_recovery() {
+    log "=========================================="
+    log "Waiting for cluster to fully recover after reboot"
+    log "=========================================="
+    
+    # Step 1: Wait for API server to be accessible
+    log "Step 1: Waiting for API server to be accessible..."
+    if ! wait_for_condition "API server connectivity" \
+        "oc whoami >/dev/null 2>&1" \
+        "${CLUSTER_RECOVERY_TIMEOUT}" 30 \
+        "API server not accessible within 60 minutes" \
+        "oc cluster-info"; then
+        log "ERROR: API server not accessible after reboot"
+        return 1
+    fi
+    log "✅ API server is accessible"
+    
+    # Step 2: Wait for all nodes to be Ready
+    log "Step 2: Waiting for all nodes to be Ready..."
+    if ! wait_for_condition "all nodes to be Ready" \
+        "oc wait nodes --all --for=condition=Ready=true --timeout=30s >/dev/null 2>&1" \
+        "${CLUSTER_RECOVERY_TIMEOUT}" 30 \
+        "Not all nodes Ready within 60 minutes" \
+        "oc get nodes 2>/dev/null || echo 'Permission denied - using alternative check'"; then
+        log "ERROR: Not all nodes are Ready after reboot"
+        return 1
+    fi
+    log "✅ All nodes are Ready"
+    
+    # Step 3: Wait for all cluster operators to be Available
+    log "Step 3: Waiting for all cluster operators to be Available..."
+    if ! wait_for_condition "all cluster operators to be Available" \
+        "oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s >/dev/null 2>&1" \
+        "${CLUSTER_RECOVERY_TIMEOUT}" 30 \
+        "Not all cluster operators Available within 60 minutes" \
+        "oc get clusteroperators 2>/dev/null || echo 'Permission denied - using alternative check'"; then
+        log "ERROR: Not all cluster operators are Available after reboot"
+        return 1
+    fi
+    log "✅ All cluster operators are Available"
+    
+    # Step 4: Wait for all pods in openshift-* namespaces to be running
+    log "Step 4: Waiting for all system pods to be running..."
+    if ! wait_for_condition "all system pods to be running" \
+        "[[ \$(oc get pods -n openshift-apiserver --no-headers 2>/dev/null | grep -v 'Running' | wc -l) -eq 0 ]] && [[ \$(oc get pods -n openshift-controller-manager --no-headers 2>/dev/null | grep -v 'Running' | wc -l) -eq 0 ]] && [[ \$(oc get pods -n openshift-scheduler --no-headers 2>/dev/null | grep -v 'Running' | wc -l) -eq 0 ]]" \
+        "${CLUSTER_RECOVERY_TIMEOUT}" 30 \
+        "Not all system pods running within 60 minutes" \
+        "oc get pods -n openshift-apiserver 2>/dev/null || echo 'Permission denied - using alternative check' && oc get pods -n openshift-controller-manager 2>/dev/null || echo 'Permission denied - using alternative check' && oc get pods -n openshift-scheduler 2>/dev/null || echo 'Permission denied - using alternative check'"; then
+        log "ERROR: Not all system pods are running after reboot"
+        return 1
+    fi
+    log "✅ All system pods are running"
+    
+    log "=========================================="
+    log "Cluster recovery completed successfully"
+    log "=========================================="
+    return 0
 }
 
 # Get all AWS instance IDs for the cluster by INFRA_ID (excluding terminating instances)
@@ -403,8 +464,22 @@ fi
 
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
+# Auto-detect kubeconfig file location (compatible with both local and CI environments)
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
+    log "Using kubeconfig: ${SHARED_DIR}/kubeconfig"
+elif [ -f "${SHARED_DIR}/auth/kubeconfig" ] ; then
+    export KUBECONFIG=${SHARED_DIR}/auth/kubeconfig
+    log "Using kubeconfig: ${SHARED_DIR}/auth/kubeconfig"
+elif [ -f "${HOME}/.kube/config" ] ; then
+    export KUBECONFIG=${HOME}/.kube/config
+    log "Using kubeconfig: ${HOME}/.kube/config"
+else
+    log "WARNING: No kubeconfig file found in expected locations"
+    log "Searched locations:"
+    log "  - ${SHARED_DIR}/kubeconfig"
+    log "  - ${SHARED_DIR}/auth/kubeconfig"
+    log "  - ${HOME}/.kube/config"
 fi
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -439,3 +514,16 @@ else
 fi
 
 log "All reboot operations completed successfully"
+
+# Wait for cluster to fully recover after reboot (applies to both HARD_REBOOT and SOFT_REBOOT)
+log "=========================================="
+log "Waiting for cluster to fully recover after reboot"
+log "=========================================="
+if ! wait_for_cluster_recovery; then
+    log "ERROR: Cluster recovery failed after reboot"
+    exit 1
+fi
+
+log "=========================================="
+log "Cluster recovery completed successfully"
+log "=========================================="
