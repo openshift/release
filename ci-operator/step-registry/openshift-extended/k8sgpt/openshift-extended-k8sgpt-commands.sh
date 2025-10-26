@@ -13,7 +13,9 @@ function set_proxy () {
 }
 
 function run_command() {
-    echo "Running Command:" "$@"
+    local safe_cmd="$*"
+    safe_cmd=$(echo "$safe_cmd" | sed -E 's/-p [^ ]+/-p [REDACTED]/g')
+    echo "Running Command:" "$safe_cmd"
     "$@"
 }
 
@@ -50,23 +52,26 @@ if [ -n "${OPTIONAL_FILTERS}" ]; then
 fi
 
 AI_FLAGS=""
-if [ -n "${AI_TOKEN_NAME}" ]; then
-    ai_token=$(<"/var/run/vault/tests-private-account/${AI_TOKEN_NAME}")
-    AI_FLAGS+=" -p ${ai_token}"
+
+if [ -n "${AI_BACKEND}" ]; then
+    AI_FLAGS+=" -b ${AI_BACKEND}"
 fi
 
 if [ -n "${AI_MODE}" ]; then
     AI_FLAGS+=" -m ${AI_MODE}"
 fi
 
-if [ -n "${AI_BACKEND}" ]; then
-    AI_FLAGS+=" -b ${AI_BACKEND}"
+if [ -n "${AI_TOKEN_NAME}" ]; then
+    ai_token=$(<"/var/run/vault/tests-private-account/${AI_TOKEN_NAME}")
+    AI_FLAGS+=" -p ${ai_token}"
 fi
 
 EXTRA_FLAGS=""
 if [ "${ENABLE_AI}" = "true" ]; then
     EXTRA_FLAGS+=" -aed"
-    run_command ${K8SGPT_DIR}/k8sgpt auth add ${AI_FLAGS} | tee -a "${ARTIFACT_DIR}/k8sgpt-result"
+    ${K8SGPT_DIR}/k8sgpt auth add ${AI_FLAGS}
+    run_command ${K8SGPT_DIR}/k8sgpt auth default -p ${AI_BACKEND}
+    run_command ${K8SGPT_DIR}/k8sgpt auth list
 fi
 
 if [ -n "${PROJECT}" ]; then
