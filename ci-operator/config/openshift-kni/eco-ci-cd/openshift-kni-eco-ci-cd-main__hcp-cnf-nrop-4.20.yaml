@@ -1,0 +1,55 @@
+base_images:
+  ansible:
+    name: "4.20"
+    namespace: ocp
+    tag: ansible
+  base:
+    name: "4.20"
+    namespace: ocp
+    tag: base
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-telcov10n-functional-hcp-cnf-nrop-stable-prod
+  capabilities:
+  - intranet
+  cron: 00 16 * * 6
+  steps:
+    env:
+      T5CI_JOB_HCP_RELEASE_TYPE: stable
+      T5CI_JOB_MGMT_RELEASE_TYPE: stable
+      T5CI_JOB_TYPE: hcp-nrop
+      T5CI_NROP_SOURCE: production
+      T5CI_VERSION: "4.20"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: telcov10n-functional-hcp-cnf-nrop
+- as: e2e-telcov10n-functional-hcp-cnf-nrop-stable-stage
+  capabilities:
+  - intranet
+  cron: 00 16 * * 6
+  steps:
+    env:
+      T5CI_JOB_HCP_RELEASE_TYPE: stable
+      T5CI_JOB_MGMT_RELEASE_TYPE: stable
+      T5CI_JOB_TYPE: hcp-nrop
+      T5CI_NROP_SOURCE: stage
+      T5CI_VERSION: "4.20"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: telcov10n-functional-hcp-cnf-nrop
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: hcp-cnf-nrop-4.20
