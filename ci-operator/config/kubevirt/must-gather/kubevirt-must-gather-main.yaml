@@ -15,15 +15,22 @@ base_images:
     name: hyperconverged-cluster-bundle
     namespace: ci
     tag: 1.17.0-unstable
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
 binary_build_commands: make install
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.21
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base
+  inputs:
+    cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:cli
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: kubevirt-must-gather
 releases:
   initial:
