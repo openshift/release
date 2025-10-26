@@ -46,7 +46,7 @@ function copyArtifacts {
     cp -r ./cypress/results/* $ARTIFACT_DIR
     for file in "$ARTIFACT_DIR"/*; do
         if [[ ! "$(basename "$file")" =~ ^"$JUNIT_PREFIX" ]]; then
-            $result_file="$ARTIFACT_DIR"/"$JUNIT_PREFIX""$(basename "$file")"
+            result_file="$ARTIFACT_DIR"/"$JUNIT_PREFIX""$(basename "$file")"
             mv "$file" $result_file
 
             if [[ $MAP_TESTS == "true" ]]; then
