@@ -23,10 +23,34 @@ function mapTestsForComponentReadiness() {
         if [ -f "${results_file}" ]; then
             install_yq_if_not_exists
             echo "Mapping Test Suite Name To: ACS-lp-interop"
-            yq eval -px -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' $results_file
+            yq eval -px -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
+
+
+# Archive results function
+function cleanup-collect() {
+    if [[ $MAP_TESTS == "true" ]]; then
+      original_results="${ARTIFACT_DIR}/original_results/"
+      mkdir "${original_results}"
+      echo "Collecting original results in ${original_results}"
+
+      find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
+        # Keep a copy of all the original Junit files before modifying them
+        cp "${result_file}" "${original_results}/$(basename "$result_file")"
+
+        # Map tests if needed for related use cases
+        mapTestsForComponentReadiness "${result_file}"
+
+        # Send junit file to shared dir for Data Router Reporter step
+        cp "$result_file" "${SHARED_DIR}/$(basename "$result_file")"
+      done
+    fi
+}
+
+# Post test execution
+trap 'cleanup-collect' SIGINT SIGTERM ERR EXIT
 
 job="${TEST_SUITE:-${JOB_NAME_SAFE#merge-}}"
 job="${job#nightly-}"
@@ -41,16 +65,3 @@ fi
 
 .openshift-ci/dispatch.sh "${job}"
 
-original_results="${ARTIFACT_DIR}/original_results/"
-mkdir "${original_results}"
-
-find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
-  # Keep a copy of all the original Junit files before modifying them
-  cp "${result_file}" "${original_results}/$(basename "$result_file")"
-
-  # Map tests if needed for related use cases
-  mapTestsForComponentReadiness "${result_file}"
-
-  # Send junit file to shared dir for Data Router Reporter step
-  cp "$result_file" "${SHARED_DIR}/$(basename "$result_file")"
-done
