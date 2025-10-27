@@ -58,7 +58,8 @@ set -x
 
 # Get oc binary
 # curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
-curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}" -o /tmp/cnv-ci.tgz
+# Get
+curl -L "https://github.com/oharan2/cnv-ci/archive/refs/heads/cnv_deploy.tar.gz" -o /tmp/cnv-ci.tgz
 mkdir -p /tmp/cnv-ci
 tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
 cd /tmp/cnv-ci || exit 1
@@ -73,6 +74,8 @@ fi
 
 # Run the tests
 make deploy_test || exit_code=$?
+
+sleep 1h
 
 set +x
 
