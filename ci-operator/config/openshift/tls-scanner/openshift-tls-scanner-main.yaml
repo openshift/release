@@ -59,10 +59,10 @@ tests:
         oc adm policy add-scc-to-user privileged -z default -n "${NAMESPACE}"
 
         echo "--- Creating image pull secret in the test namespace ---"
-        # The CI system mounts the secret specified in the 'secret' block of the test step.
+        # The CI system mounts the secret specified in the 'credentials' block of the test step.
         # We create a copy of it in our new namespace and link it to the default service account
         # so that our scanner pod can be pulled by the test cluster nodes.
-        oc create secret generic ci-pull-credentials --from-file=.dockerconfigjson=/var/run/ci-pull-credentials/.dockerconfigjson --type=kubernetes.io/dockerconfigjson -n "${NAMESPACE}"
+        oc create secret generic ci-pull-credentials --from-file=.dockerconfigjson=/var/run/vault/ci-pull-credentials/.dockerconfigjson --type=kubernetes.io/dockerconfigjson -n "${NAMESPACE}"
         oc secrets link default ci-pull-credentials --for=pull -n "${NAMESPACE}"
 
         SCANNER_POD_NAME="tls-scanner-$(date +%s)"
@@ -137,6 +137,11 @@ tests:
           echo "Scanner pod failed. Exiting with error."
           exit 1
         fi
+      credentials:
+      - collection: ""
+        mount_path: /var/run/vault/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
       dependencies:
       - env: PULL_SPEC_TLS_SCANNER_TOOL
         name: tls-scanner-tool
