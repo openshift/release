@@ -36,6 +36,9 @@ download_microshift_scripts
 git clone https://github.com/openshift/microshift.git
 cd ~/microshift
 
+git config user.name "ci-robot"
+git config user.email "ci-robot@openshift.io"
+
 # Enable all RHOCP repositories after installing git - otherwise dnf will fail.
 sudo subscription-manager config --rhsm.manage_repos=1
 
