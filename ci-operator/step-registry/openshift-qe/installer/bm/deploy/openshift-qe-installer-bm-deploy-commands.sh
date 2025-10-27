@@ -56,10 +56,11 @@ install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 payload_url: "${RELEASE_IMAGE_LATEST}"
 image_type: "minimal-iso"
-enable_bond: $BOND
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
+  echo "Private network deployment"
+  echo -e "enable_bond: $BOND" >> /tmp/all.yml
   echo -e "controlplane_network: 192.168.216.1/21\ncontrolplane_network_prefix: 21" >> /tmp/all.yml
 
   # Create proxy configuration for private VLAN deployments
@@ -123,6 +124,9 @@ hv_vm_generate_manifests: false
 sno_cluster_count: 0
 EOF
 fi
+
+echo "This is the final all.yml file:"
+cat /tmp/all.yml
 
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 

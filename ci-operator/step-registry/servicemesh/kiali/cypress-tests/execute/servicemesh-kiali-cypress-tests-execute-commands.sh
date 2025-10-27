@@ -33,12 +33,7 @@ then
   # install testing apps
   hack/istio/install-testing-demos.sh -c oc -in ${ISTIO_NAMESPACE}
   # enable monitoring in demo apps
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n alpha -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n beta -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n gamma -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n default -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n bookinfo -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n sleep -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
+  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n "alpha beta gamma default bookinfo sleep" -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
   # install custom grafana
   oc apply -n ${ISTIO_NAMESPACE} -f https://raw.githubusercontent.com/istio/istio/${ISTIO_SAMPLE_APP_VERSION}/samples/addons/grafana.yaml
   oc wait -n ${ISTIO_NAMESPACE} --for=condition=available deployment/grafana --timeout=150s
