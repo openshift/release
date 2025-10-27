@@ -264,6 +264,7 @@ if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
     oc get clusterversion version -o yaml || true
     ocpVersion=$(oc get clusterversion -o json | jq -r '.items[0].status.desired.version')
+    oc mirror version --v2 --output yaml
 fi
 
 #if OVERWRITE_OC_MIRROR then overwrite the oc-mirror from the payload
