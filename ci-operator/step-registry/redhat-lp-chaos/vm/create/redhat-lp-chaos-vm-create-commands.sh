@@ -7,6 +7,13 @@ set -euxo pipefail # Enables debug mode (-x) and strict mode (-e, -u, -o pipefai
 : "Source: ${DV_SOURCE_NAME} (NS: ${DV_SOURCE_NS})"
 : "------------------------------------"
 
+
+# ----------------------------------------------------
+# 0. Install yq & jq if needed
+# ----------------------------------------------------
+#curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+#yum install -y jq
+
 # ----------------------------------------------------
 # 1. Create Namespace
 # ----------------------------------------------------
@@ -26,7 +33,9 @@ function vm_create() {
   local currentVmName="${VM_NAME_PREFIX}-${vmIndex}"
   : "Submitting target VirtualMachine ${currentVmName}"
   # The DataVolume is automatically created via dataVolumeTemplates
-  oc apply -f- <<EOF
+  {
+    oc create -f- --dry-run=client -o yaml --save-config
+  } 0<<EOF | oc apply -f -
 apiVersion: kubevirt.io/v1
 kind: VirtualMachine
 metadata:
