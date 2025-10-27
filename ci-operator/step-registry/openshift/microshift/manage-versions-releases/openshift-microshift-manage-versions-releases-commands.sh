@@ -6,10 +6,10 @@ source "${SHARED_DIR}/ci-functions.sh"
 ci_script_prologue
 
 DRY_RUN=""
-if [[ "$JOB_NAME" == rehearse* ]]; then
-    echo "INFO: \$JOB_NAME starts with rehearse - running in DRY RUN mode"
-    DRY_RUN="-n"
-fi
+# if [[ "$JOB_NAME" == rehearse* ]]; then
+#     echo "INFO: \$JOB_NAME starts with rehearse - running in DRY RUN mode"
+#     DRY_RUN="-n"
+# fi
 
 if [ -z ${CLONEREFS_OPTIONS+x} ]; then
     # Without `src` build, there's no CLONEREFS_OPTIONS, but it can be assembled from $JOB_SPEC
