@@ -50,30 +50,32 @@ fi
 echo ""
 echo "Patching buildgpl script to fix compatibility issues..."
 
-# Create fixed buildgpl script
-FIXED_SCRIPT='#!/bin/sh
-kerv=$(uname -r)
+# Apply the patch using a here-document with YAML format (avoids JSON newline escaping issues)
+if oc patch configmap buildgpl -n "${STORAGE_SCALE_NAMESPACE}" --type=merge -p "$(cat <<EOF
+data:
+  buildgpl: |
+    #!/bin/sh
+    kerv=\$(uname -r)
 
-# Copy lxtrace files from host (created by prepare-lxtrace-files step)
-rsync -av /host/var/lib/firmware/lxtrace-* /usr/lpp/mmfs/bin/ || echo "Warning: No lxtrace files found"
+    # Copy lxtrace files from host (created by prepare-lxtrace-files step)
+    rsync -av /host/var/lib/firmware/lxtrace-* /usr/lpp/mmfs/bin/ || echo "Warning: No lxtrace files found"
 
-# Create the kernel-specific lxtrace file that init container expects
-# The init container tries to copy /usr/lpp/mmfs/bin/lxtrace-$kerv to /overlay
-touch /usr/lpp/mmfs/bin/lxtrace-$kerv
-chmod +x /usr/lpp/mmfs/bin/lxtrace-$kerv
+    # Create the kernel-specific lxtrace file that init container expects
+    # The init container tries to copy /usr/lpp/mmfs/bin/lxtrace-\$kerv to /overlay
+    touch /usr/lpp/mmfs/bin/lxtrace-\$kerv
+    chmod +x /usr/lpp/mmfs/bin/lxtrace-\$kerv
 
-# Create module files for validation
-mkdir -p /lib/modules/$kerv/extra
-echo "# This is a workaround to pass file validation on IBM container" > /lib/modules/$kerv/extra/mmfslinux.ko
-echo "# This is a workaround to pass file validation on IBM container" > /lib/modules/$kerv/extra/tracedev.ko
+    # Create module files for validation
+    mkdir -p /lib/modules/\$kerv/extra
+    echo "# This is a workaround to pass file validation on IBM container" > /lib/modules/\$kerv/extra/mmfslinux.ko
+    echo "# This is a workaround to pass file validation on IBM container" > /lib/modules/\$kerv/extra/tracedev.ko
 
-# Note: Removed broken lsmod check that expected kernel module to be loaded
-# The kernel module will be loaded by the main gpfs container, not this init container
+    # Note: Removed broken lsmod check that expected kernel module to be loaded
+    # The kernel module will be loaded by the main gpfs container, not this init container
 
-exit 0'
-
-# Apply the patch
-if oc patch configmap buildgpl -n "${STORAGE_SCALE_NAMESPACE}" --type=merge -p "{\"data\":{\"buildgpl\":\"$FIXED_SCRIPT\"}}"; then
+    exit 0
+EOF
+)"; then
   echo "✅ buildgpl ConfigMap patched successfully"
   
   # Check if daemon pods already exist
