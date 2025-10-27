@@ -23,7 +23,7 @@ function mapTestsForComponentReadiness() {
         if [ -f "${results_file}" ]; then
             install_yq_if_not_exists
             echo "Mapping Test Suite Name To: Gitops-lp-interop"
-            yq eval -px -ox -iI0 '.testsuites."+@name" = "Gitops-lp-interop"' $results_file
+            yq eval -px -ox -iI0 '.testsuites."+@name" = "Gitops-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
