@@ -27,25 +27,13 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: ptp-operator
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21 AS builder
-    RUN echo "========================================="
-    RUN echo "USING DOCKERFILE_LITERAL FROM PR #70106"
-    RUN echo "========================================="
-    WORKDIR /go/src/github.com/k8snetworkplumbingwg/ptp-operator/must-gather
-    COPY must-gather/. .
-    RUN ls -lhat
-    RUN ls -lhat /go/src/github.com/k8snetworkplumbingwg/ptp-operator/must-gather
-    RUN ls -lhat collection-scripts/
-
-    FROM registry.ci.openshift.org/ocp/4.21:must-gather
-    LABEL io.k8s.display-name="ptp-operator-must-gather" \
-          io.k8s.description="This is a PTP must-gather image that collectes PTP operator related resources."
-    COPY --from=builder /go/src/github.com/k8snetworkplumbingwg/ptp-operator/must-gather/collection-scripts/* /usr/bin/
-    RUN chmod +x /usr/bin/gather
-
-    ENTRYPOINT /usr/bin/gather
+- dockerfile_path: Dockerfile.ocp
   from: must_gather
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ptp-operator/must-gather/.
   to: ptp-operator-must-gather
 operator:
   bundles:
