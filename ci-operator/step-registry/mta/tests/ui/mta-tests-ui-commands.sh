@@ -20,15 +20,30 @@ function install_yq_if_not_exists() {
 }
 
 function mapTestsForComponentReadiness() {
-    if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${1}"
-        echo "Patching Tests Result File: ${results_file}"
-        if [ -f "${results_file}" ]; then
-            install_yq_if_not_exists
-            echo "Mapping Test Suite Name To: MTA-lp-interop"
-            yq eval -px -ox -iI0 '.testsuite."+@name" = "MTA-lp-interop"' "${results_file}"
-        fi
+    # Safely patch a JUnit XML results file to set the testsuite name to "MTA-lp-interop".
+    # This function:
+    #  - is a no-op unless MAP_TESTS=="true"
+    #  - ensures yq is available
+    #  - tries the common XML shapes (.testsuite and .testsuites.testsuite[0])
+    #  - warns on failure but does not cause the script to exit (keeps CI artifacts archiving)
+    results_file="${1:-}"
+    if [[ "${MAP_TESTS:-}" != "true" || -z "${results_file}" ]]; then
+        return 0
     fi
+
+    echo "Patching Tests Result File: ${results_file}"
+    if [ ! -f "${results_file}" ]; then
+        echo "Warning: results file not found: ${results_file}" >&2
+        return 0
+    fi
+
+    install_yq_if_not_exists
+
+    # Try to map common XML root shapes. Each attempt is allowed to fail; the final
+    # fallback prints a warning but does not fail the step (prevents errexit from aborting).
+    yq eval -px -ox -iI0 '.testsuite."+@name" = "MTA-lp-interop"' "${results_file}" \
+      || yq eval -px -ox -iI0 '.testsuites.testsuite[0]."+@name" = "MTA-lp-interop"' "${results_file}" \
+      || { echo "Warning: yq failed to map test suite name for ${results_file}; inspect file manually" >&2; }
 }
 
 # Set the TARGET_URL value using the $SHARED_DIR/console.url file
