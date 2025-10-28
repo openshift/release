@@ -88,11 +88,9 @@ TEST1_STATUS="passed"
 TEST1_MESSAGE=""
 
 if oc get configmap kmm-image-config -n "${FUSION_ACCESS_NAMESPACE}" >/dev/null 2>&1; then
-  echo "  ✅ kmm-image-config already exists (idempotent)"
-  CONFIG_EXISTS=true
+  echo "  ✅ kmm-image-config already exists (will update if needed)"
 else
   echo "  ℹ️  kmm-image-config does not exist, will create"
-  CONFIG_EXISTS=false
 fi
 
 TEST1_DURATION=$(($(date +%s) - TEST1_START))
