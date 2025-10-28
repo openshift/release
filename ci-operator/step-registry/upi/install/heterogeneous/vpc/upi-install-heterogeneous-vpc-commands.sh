@@ -161,7 +161,7 @@ function get_ready_nodes_count() {
 }
 
 # setup multi-arch vpc workspace
-function setup_multi_arch_vpc_workspace(){
+function setup_multi_arch_vpc_workspace() {
   # Before the vpc is created, download the automation code
   cd "${IBMCLOUD_HOME}" || true
   curl -sL "https://github.com/IBM/ocp4-upi-compute-powervs-ibmcloud/archive/refs/heads/main.tar.gz" -o ./ocp4-multi-arch-vpc.tar.gz
@@ -171,7 +171,7 @@ function setup_multi_arch_vpc_workspace(){
   ${IBMCLOUD_HOME}/terraform init
 }
 
-function create_multi_arch_vpc_tf_varfile(){
+function create_multi_arch_vpc_tf_varfile() {
   export PRIVATE_KEY_FILE="${CLUSTER_PROFILE_DIR}"/ssh-privatekey
   export PUBLIC_KEY_FILE="${CLUSTER_PROFILE_DIR}"/ssh-publickey
 
