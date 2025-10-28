@@ -40,6 +40,7 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 
 rm -f ${SHARED_DIR}/index.json
 
+export LOCAL=$LOCAL; export EXTERNAL_SERVER_ADDRESS=$EXTERNAL_SERVER_ADDRESS
 WORKLOAD=full-run.yaml ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)

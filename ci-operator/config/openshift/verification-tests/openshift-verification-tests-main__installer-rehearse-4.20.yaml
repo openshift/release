@@ -84,17 +84,21 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      SLEEP_DURATION: 10m
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-provision
-    test:
-    - chain: cucushift-installer-check-cluster-health
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-workload-identity
+- as: installer-rehearse-gcp2
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-users-static
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
