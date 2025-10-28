@@ -1,0 +1,272 @@
+# Experimental machinesets for build time comparison experiment
+# Testing storage backends: EBS (gp3), local NVMe instance storage, and in-memory tmpfs
+# These machinesets are isolated and won't affect production workloads
+# 
+# Cost comparison (all cheaper than current build workers m6a.4xlarge @ $0.864/hour):
+# - m6a.2xlarge: $0.432/hour (50% cheaper, EBS-only)
+# - m6id.2xlarge: $0.4536/hour (47% cheaper, includes 474GB NVMe)
+# - r6a.2xlarge: $0.605/hour (30% cheaper, high memory for tmpfs)
+
+---
+# MachineSet 1: EBS Storage Testing
+# Baseline test using standard EBS gp3 storage
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: build07-rdv8j
+  name: build07-rdv8j-builds-experiment-ebs-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build07-rdv8j
+      machine.openshift.io/cluster-api-machineset: build07-rdv8j-builds-experiment-ebs-us-east-1a
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build07-rdv8j
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build07-rdv8j-builds-experiment-ebs-us-east-1a
+        node-role.kubernetes.io/experiment: ""
+    spec:
+      metadata:
+        labels:
+          node-role.kubernetes.io: worker
+          node-role.kubernetes.io/worker: ""
+          node-role.kubernetes.io/experiment: ""
+          ci.openshift.io/experiment: "storage-performance"
+          ci.openshift.io/storage-backend: "ebs"
+          ci-workload: builds
+      taints:
+      # Standard build worker taint - RuntimeClass provides toleration
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-builds-worker
+        value: ci-builds-worker
+      providerSpec:
+        value:
+          ami:
+            id: ami-0e79bb8acc37d2696
+          apiVersion: machine.openshift.io/v1beta1
+          # m6a.2xlarge - Standard AMD instance (NO instance storage)
+          # - 8 vCPUs, 32 GiB RAM
+          # - EBS-optimized with up to 10 Gbps bandwidth
+          # - Cost: $0.432/hour (50% cheaper than m6a.4xlarge)
+          instanceType: m6a.2xlarge
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 3000
+              volumeSize: 150
+              volumeType: gp3
+              throughput: 125
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: build07-rdv8j-worker-profile
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: us-east-1a
+            region: us-east-1
+          publicIp: true
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - build07-rdv8j-lb
+          - filters:
+            - name: tag:Name
+              values:
+              - build07-rdv8j-node
+          subnet:
+            id: subnet-0c9c81d0602a48775
+          tags:
+          - name: kubernetes.io/cluster/build07-rdv8j
+            value: owned
+          - name: experiment
+            value: storage-performance-ebs
+          userDataSecret:
+            name: worker-user-data
+---
+# MachineSet 2: NVMe Instance Storage Testing
+# Test using local NVMe SSD instance storage
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: build07-rdv8j
+  name: build07-rdv8j-builds-experiment-nvme-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build07-rdv8j
+      machine.openshift.io/cluster-api-machineset: build07-rdv8j-builds-experiment-nvme-us-east-1a
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build07-rdv8j
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build07-rdv8j-builds-experiment-nvme-us-east-1a
+        node-role.kubernetes.io/experiment: ""
+    spec:
+      metadata:
+        labels:
+          node-role.kubernetes.io: worker
+          node-role.kubernetes.io/worker: ""
+          node-role.kubernetes.io/experiment: ""
+          ci.openshift.io/experiment: "storage-performance"
+          ci.openshift.io/storage-backend: "nvme"
+          ci-workload: builds
+      taints:
+      # Standard build worker taint - RuntimeClass provides toleration
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-builds-worker
+        value: ci-builds-worker
+      providerSpec:
+        value:
+          ami:
+            id: ami-0e79bb8acc37d2696
+          apiVersion: machine.openshift.io/v1beta1
+          # m6id.2xlarge - AMD instance with NVMe instance storage
+          # - 8 vCPUs, 32 GiB RAM
+          # - 1x474 GB NVMe SSD instance storage (ephemeral)
+          # - Up to 12.5 Gbps network, 10 Gbps EBS bandwidth
+          # - Cost: $0.4536/hour (47% cheaper than m6a.4xlarge)
+          instanceType: m6id.2xlarge
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 3000
+              volumeSize: 120
+              volumeType: gp3
+              throughput: 125
+          # Note: NVMe instance storage automatically attached as /dev/nvme1n1
+          # Must be formatted and mounted in experiment script
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: build07-rdv8j-worker-profile
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: us-east-1a
+            region: us-east-1
+          publicIp: true
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - build07-rdv8j-lb
+          - filters:
+            - name: tag:Name
+              values:
+              - build07-rdv8j-node
+          subnet:
+            id: subnet-0c9c81d0602a48775
+          tags:
+          - name: kubernetes.io/cluster/build07-rdv8j
+            value: owned
+          - name: experiment
+            value: storage-performance-nvme
+          userDataSecret:
+            name: worker-user-data
+---
+# MachineSet 3: In-Memory (tmpfs) Storage Testing
+# Test using RAM-based filesystem with high-memory instance
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: build07-rdv8j
+  name: build07-rdv8j-builds-experiment-tmpfs-us-east-1a
+  namespace: openshift-machine-api
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build07-rdv8j
+      machine.openshift.io/cluster-api-machineset: build07-rdv8j-builds-experiment-tmpfs-us-east-1a
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build07-rdv8j
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build07-rdv8j-builds-experiment-tmpfs-us-east-1a
+        node-role.kubernetes.io/experiment: ""
+    spec:
+      metadata:
+        labels:
+          node-role.kubernetes.io: worker
+          node-role.kubernetes.io/worker: ""
+          node-role.kubernetes.io/experiment: ""
+          ci.openshift.io/experiment: "storage-performance"
+          ci.openshift.io/storage-backend: "tmpfs"
+          ci-workload: builds
+      taints:
+      # Standard build worker taint - RuntimeClass provides toleration
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-builds-worker
+        value: ci-builds-worker
+      providerSpec:
+        value:
+          ami:
+            id: ami-0e79bb8acc37d2696
+          apiVersion: machine.openshift.io/v1beta1
+          # r6a.2xlarge - Memory-optimized AMD instance
+          # - 8 vCPUs, 64 GiB RAM (2x more than m6a.2xlarge)
+          # - High memory for large tmpfs mounts
+          # - Up to 12.5 Gbps network, 10 Gbps EBS bandwidth
+          # - Cost: $0.605/hour (30% cheaper than m6a.4xlarge)
+          instanceType: r6a.2xlarge
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 3000
+              volumeSize: 100
+              volumeType: gp3
+              throughput: 125
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: build07-rdv8j-worker-profile
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: us-east-1a
+            region: us-east-1
+          publicIp: true
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - build07-rdv8j-lb
+          - filters:
+            - name: tag:Name
+              values:
+              - build07-rdv8j-node
+          subnet:
+            id: subnet-0c9c81d0602a48775
+          tags:
+          - name: kubernetes.io/cluster/build07-rdv8j
+            value: owned
+          - name: experiment
+            value: storage-performance-tmpfs
+          userDataSecret:
+            name: worker-user-data
+
