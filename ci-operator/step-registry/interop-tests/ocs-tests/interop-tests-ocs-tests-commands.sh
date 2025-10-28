@@ -47,7 +47,7 @@ function mapTestsForComponentReadiness() {
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
             install_yq_if_not_exists
-            export $REPORTPORTAL_CMP
+            export REPORTPORTAL_CMP
             echo "Mapping Test Suite Name To: ${REPORTPORTAL_CMP}"
             yq eval -px -ox -iI0 '.testsuites.testsuite.+@name=env(REPORTPORTAL_CMP)' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
