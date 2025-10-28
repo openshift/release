@@ -117,7 +117,7 @@ set -e
 
 cp *.csv *.xml *.json *.txt "${ARTIFACT_DIR}/" 2>/dev/null || true
 
-if $orion_exit_status -eq 3; then
+if [ $orion_exit_status -eq 3]; then
   echo "Orion returned exit code 3, which means there are no results to analyze."
   echo "Exiting zero since there were no regressions found."
   exit 0
