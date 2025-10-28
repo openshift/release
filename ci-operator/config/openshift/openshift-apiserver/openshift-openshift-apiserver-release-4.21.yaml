@@ -88,14 +88,53 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-tests-extension
+  optional: true
   steps:
+    cluster_profile: aws
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
     test:
     - as: tests-extension
+      cli: latest
       commands: |
         echo "Build binary openshift-apiserver-tests-ext"
         make tests-ext-build
-        echo "Running ./openshift-apiserver-tests-ext with sanity test"
-        ./openshift-apiserver-tests-ext run-test -n "[Jira:openshift-apiserver][sig-api-machinery] sanity test should always pass [Suite:openshift/openshift-apiserver/conformance/parallel]"
+        echo "Set up cluster access"
+        export KUBECONFIG=${SHARED_DIR}/kubeconfig
+        echo "Verify cluster is accessible"
+        oc get clusterversion
+        echo "--------------"
+        echo "Running make run-suite SUITE=openshift/openshift-apiserver/conformance/parallel JUNIT_DIR=${ARTIFACT_DIR}"
+        make run-suite SUITE=openshift/openshift-apiserver/conformance/parallel JUNIT_DIR=${ARTIFACT_DIR}
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: e2e-tests-extension-serial
+  optional: true
+  steps:
+    cluster_profile: aws
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - as: tests-extension
+      cli: latest
+      commands: |
+        echo "Build binary openshift-apiserver-tests-ext"
+        make tests-ext-build
+        echo "Set up cluster access"
+        export KUBECONFIG=${SHARED_DIR}/kubeconfig
+        echo "Verify cluster is accessible"
+        oc get clusterversion
+        echo "--------------"
+        echo "Running make run-suite SUITE=openshift/openshift-apiserver/conformance/serial JUNIT_DIR=${ARTIFACT_DIR}"
+        make run-suite SUITE=openshift/openshift-apiserver/conformance/serial JUNIT_DIR=${ARTIFACT_DIR}
       from: src
       resources:
         requests:

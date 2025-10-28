@@ -440,14 +440,53 @@ tests:
     workflow: openshift-e2e-cert-rotation-short-azure
   timeout: 8h0m0s
 - as: e2e-tests-extension
+  optional: true
   steps:
+    cluster_profile: aws
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
     test:
     - as: tests-extension
+      cli: latest
       commands: |
         echo "Build binary cluster-kube-apiserver-operator-tests-ext"
         make tests-ext-build
-        echo "Running ./cluster-kube-apiserver-operator-tests-ext with sanity test"
-        ./cluster-kube-apiserver-operator-tests-ext run-test -n "[Jira:kube-apiserver][sig-api-machinery] sanity test should always pass [Suite:openshift/cluster-kube-apiserver-operator/conformance/parallel]"
+        echo "Set up cluster access"
+        export KUBECONFIG=${SHARED_DIR}/kubeconfig
+        echo "Verify cluster is accessible"
+        oc get clusterversion
+        echo "--------------"
+        echo "Running make run-suite openshift/cluster-kube-apiserver-operator/conformance/parallel JUNIT_DIR=${ARTIFACT_DIR}"
+         make run-suite openshift/cluster-kube-apiserver-operator/conformance/parallel JUNIT_DIR=${ARTIFACT_DIR}
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- as: e2e-tests-extension-serial
+  optional: true
+  steps:
+    cluster_profile: aws
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - as: tests-extension
+      cli: latest
+      commands: |
+        echo "Build binary cluster-kube-apiserver-operator-tests-ext"
+        make tests-ext-build
+        echo "Set up cluster access"
+        export KUBECONFIG=${SHARED_DIR}/kubeconfig
+        echo "Verify cluster is accessible"
+        oc get clusterversion
+        echo "--------------"
+        echo "Running make run-suite openshift/cluster-kube-apiserver-operator/conformance/serial JUNIT_DIR=${ARTIFACT_DIR}"
+        make run-suite openshift/cluster-kube-apiserver-operator/conformance/serial JUNIT_DIR=${ARTIFACT_DIR}
       from: src
       resources:
         requests:
