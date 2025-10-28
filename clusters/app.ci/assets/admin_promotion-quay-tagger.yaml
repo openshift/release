@@ -1,0 +1,40 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: promotion-quay-tagger
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: imagestream-tagger
+rules:
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreamtags
+  - imagestreams
+  verbs:
+  - create
+  - update
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: promotion-quay-tagger
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: imagestream-tagger
+subjects:
+- kind: ServiceAccount
+  name: promotion-quay-tagger
+  namespace: ci

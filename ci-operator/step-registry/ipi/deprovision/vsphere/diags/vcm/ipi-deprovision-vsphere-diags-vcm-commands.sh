@@ -1,13 +1,14 @@
 #!/bin/bash
 
-set -o nounset
-set -o errexit
-set -o pipefail
+# Diagnostic script - continue on all errors to collect maximum data
+# set -o nounset
 
 if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
   echo "using legacy sibling of this step"
   exit 0
 fi
+
+set +e
 
 echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and alerts"
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
@@ -68,7 +69,6 @@ function collect_sosreports {
 }
 
 function collect_sosreport_from_unprovisioned_machines {
-  set +e
   echo "$(date -u --rfc-3339=seconds) - checking if any machines lack a nodeRef"
 
   MACHINES=$(oc get machines.machine.openshift.io -n openshift-machine-api -o=jsonpath='{.items[*].metadata.name}')
@@ -89,11 +89,9 @@ function collect_sosreport_from_unprovisioned_machines {
       collect_sosreport $ADDRESS
     fi
   done
-  set -e
 }
 
 function collect_diagnostic_data {
-  set +e
 
   host_metrics="cpu.ready.summation
   cpu.usage.average
@@ -281,7 +279,6 @@ function collect_diagnostic_data {
 
   write_html
 
-  set -e
 }
 
 function write_html() {

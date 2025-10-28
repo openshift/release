@@ -9,9 +9,6 @@ echo "========== Cluster Authentication =========="
 echo "Setting up long-running GKE cluster..."
 DIR="$(pwd)/.ibm/pipelines"
 export DIR
-echo "Sourcing gcloud.sh"
-# shellcheck disable=SC1091
-source "${DIR}/cluster/gke/gcloud.sh"
 echo "Ingesting GKE secrets"
 GKE_SERVICE_ACCOUNT_NAME=$(cat /tmp/secrets/GKE_SERVICE_ACCOUNT_NAME)
 GKE_CLUSTER_NAME=$(cat /tmp/secrets/GKE_CLUSTER_NAME)
