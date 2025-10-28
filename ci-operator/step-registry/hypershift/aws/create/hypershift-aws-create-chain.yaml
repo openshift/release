@@ -83,6 +83,9 @@ chain:
     - name: HC_DISABLED_CAPS
       default: ""
       documentation: "Disabling Capabilities in Hosted Cluster,format: 'Console,ImageRegistry...' detail see https://issues.redhat.com/browse/MGMT-20628"
+    - name: ADDITIONAL_CA_BUNDLE_FILE
+      default: ""
+      documentation: "The additional ca bundle file name in the shared directory"
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -162,6 +165,10 @@ chain:
       
       if [[ -n $HYPERSHIFT_DYNAMIC_DNS ]]; then
         COMMAND+=(--kas-dns-name="${HYPERSHIFT_DYNAMIC_DNS}")
+      fi
+
+      if [[ -n "${ADDITIONAL_CA_BUNDLE_FILE}" ]]; then
+        COMMAND+=(--additional-trust-bundle "${SHARED_DIR}/${ADDITIONAL_CA_BUNDLE_FILE}")
       fi
 
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
