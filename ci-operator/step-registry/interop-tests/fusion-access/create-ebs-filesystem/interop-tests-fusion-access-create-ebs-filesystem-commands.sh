@@ -36,4 +36,4 @@ oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE}
 
 echo ""
 echo "Note: Filesystem initialization may take up to 1 hour"
-echo "Use verify-ebs-filesystem step to check when it's ready"
+echo "Check filesystem status with: oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE}"

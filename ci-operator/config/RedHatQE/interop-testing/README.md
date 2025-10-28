@@ -120,12 +120,10 @@ The Fusion Access Operator test execution includes the following individual step
 - [`interop-tests-fusion-access-configure-aws-security-groups`](../../../step-registry/interop-tests/fusion-access/configure-aws-security-groups/interop-tests-fusion-access-configure-aws-security-groups-ref.yaml) - Configure AWS security groups
 - [`interop-tests-fusion-access-prepare-worker-nodes`](../../../step-registry/interop-tests/fusion-access/prepare-worker-nodes/interop-tests-fusion-access-prepare-worker-nodes-ref.yaml) - Prepare worker nodes for Storage Scale
 - [`interop-tests-fusion-access-create-cluster`](../../../step-registry/interop-tests/fusion-access/create-cluster/interop-tests-fusion-access-create-cluster-ref.yaml) - Create IBM Storage Scale cluster
-- [`interop-tests-fusion-access-verify-cluster`](../../../step-registry/interop-tests/fusion-access/verify-cluster/interop-tests-fusion-access-verify-cluster-ref.yaml) - Verify Storage Scale cluster
 
 **EBS Filesystem Steps:**
 - [`interop-tests-fusion-access-create-local-disks`](../../../step-registry/interop-tests/fusion-access/create-local-disks/interop-tests-fusion-access-create-local-disks-ref.yaml) - Create LocalDisk resources for EBS volumes
 - [`interop-tests-fusion-access-create-ebs-filesystem`](../../../step-registry/interop-tests/fusion-access/create-ebs-filesystem/interop-tests-fusion-access-create-ebs-filesystem-ref.yaml) - Create EBS filesystem
-- [`interop-tests-fusion-access-verify-ebs-filesystem`](../../../step-registry/interop-tests/fusion-access/verify-ebs-filesystem/interop-tests-fusion-access-verify-ebs-filesystem-ref.yaml) - Verify EBS filesystem
 
 **CNV Integration Steps:**
 - [`interop-tests-fusion-access-create-shared-filesystem`](../../../step-registry/interop-tests/fusion-access/create-shared-filesystem/interop-tests-fusion-access-create-shared-filesystem-ref.yaml) - Create shared filesystem for CNV
