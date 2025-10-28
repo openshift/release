@@ -1,0 +1,50 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+    #images:
+    #- dockerfile_path: ci/Dockerfile.ci
+    #  to: ocp-virt-validation-checkup
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 600Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws-virtualization
+    test:
+    - ref: interop-tests-deploy-cnv
+    - as: run-validation-checkup
+      cli: latest
+      # TODO: Should be replaced by 'commands: make ci-validate'
+      # as soon as https://github.com/openshift-cnv/ocp-virt-validation-checkup/pull/14
+      # is merged
+      commands: make test
+      #      dependencies:
+      #      - env: OCP_VIRT_VALIDATION_IMAGE
+      #        name: ocp-virt-validation-checkup
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+    workflow: cnv-e2e-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift-cnv
+  repo: ocp-virt-validation-checkup
