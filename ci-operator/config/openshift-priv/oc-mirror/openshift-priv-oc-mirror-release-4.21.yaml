@@ -78,8 +78,10 @@ tests:
     make test-unit
   container:
     from: src
-- as: e2e
-  commands: make test-e2e
+- as: v1-e2e
+  commands: |
+    pushd v1 || true
+    make test-e2e
   container:
     from: src
 - as: lint
@@ -87,7 +89,7 @@ tests:
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
-    cd v2
+    pushd v2 || true
     golangci-lint version
     maj_version=$((golangci-lint version --short 2>/dev/null || golangci-lint version --format short 2>/dev/null) | cut -f1 -d.)
     if [ ${maj_version} -eq 1 ]; then
