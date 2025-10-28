@@ -50,100 +50,22 @@ tests:
         set -o nounset
         set -o errexit
         set -o pipefail
-        set -x
 
-        echo "--- Creating scanner pod with hostNetwork: true in namespace ${NAMESPACE} ---"
-        oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
-
-        echo "--- Granting privileged SCC to the default service account ---"
-        oc adm policy add-scc-to-user privileged -z default -n "${NAMESPACE}"
-
-        echo "--- Creating image pull secret in the test namespace ---"
-        # The CI system mounts the secret specified in the 'credentials' block of the test step.
-        # We create a copy of it in our new namespace and link it to the default service account
-        # so that our scanner pod can be pulled by the test cluster nodes.
-        oc create secret generic ci-pull-credentials --from-file=.dockerconfigjson=/var/run/vault/ci-pull-credentials/.dockerconfigjson --type=kubernetes.io/dockerconfigjson -n "${NAMESPACE}"
-        oc secrets link default ci-pull-credentials --for=pull -n "${NAMESPACE}"
-
-        SCANNER_POD_NAME="tls-scanner-$(date +%s)"
-
-        # The 'tls-scanner-tool' is the image that contains our binary.
-        # The 'default' service account is used because we've already granted it cluster-admin.
-        cat <<EOF | oc apply -f -
-        apiVersion: v1
-        kind: Pod
-        metadata:
-          name: ${SCANNER_POD_NAME}
-          namespace: ${NAMESPACE}
-        spec:
-          # This is the key change to bypass pod network isolation
-          hostNetwork: true
-          # We must use the default service account which has been granted cluster-admin
-          serviceAccountName: default
-          restartPolicy: Never
-          imagePullSecrets:
-          - name: ci-pull-credentials
-          containers:
-          - name: scanner-container
-            # We must use the full pull spec for the image from the internal registry.
-            # The CI system provides this in an environment variable defined in the
-            # 'dependencies' section of this test step.
-            image: "${PULL_SPEC_TLS_SCANNER_TOOL}"
-            command: ["/usr/local/bin/tls-scanner"]
-            args: [
-              "--all-pods",
-              "--csv-file=/tmp/tls-scanner-output/report.csv",
-              "--log-file=/tmp/tls-scanner-output/scanner.log"
-            ]
-            volumeMounts:
-            - name: scanner-output
-              mountPath: /tmp/tls-scanner-output
-          volumes:
-          - name: scanner-output
-            emptyDir: {}
-        EOF
-
-        # Ensure the pod is deleted even if the script fails mid-way.
-        # Also describe the pod on exit to gather diagnostics. 'oc describe' doesn't
-        # have '--ignore-not-found', so we add '|| true' to prevent script failure.
-        trap "echo '--- Deleting scanner pod ---'; oc describe pod ${SCANNER_POD_NAME} -n ${NAMESPACE} || true; oc delete pod ${SCANNER_POD_NAME} -n ${NAMESPACE} --ignore-not-found" EXIT
-
-        echo "--- Waiting for scanner pod to become Ready ---"
-        if ! oc wait pod/${SCANNER_POD_NAME} --for=condition=Ready --timeout=3m -n ${NAMESPACE}; then
-            echo "--- Pod did not become Ready in time, collecting diagnostics before exit. ---"
-            # The trap will also run describe, but we do it here for immediate feedback in the log.
-            oc describe pod "${SCANNER_POD_NAME}" -n ${NAMESPACE}
-            exit 1
-        fi
-
-        echo "--- Streaming logs from scanner pod ---"
-        oc logs -f pod/${SCANNER_POD_NAME} -n ${NAMESPACE}
-
-        echo "--- Waiting for scanner pod to complete ---"
-        # The pod will go to Succeeded or Failed state. We wait for that.
-        until [[ "$(oc get pod ${SCANNER_POD_NAME} -o jsonpath='{.status.phase}' -n ${NAMESPACE})" =~ ^(Succeeded|Failed)$ ]]; do
-            sleep 5
-            echo "Waiting for pod to finish..."
-        done
-
-        FINAL_STATUS=$(oc get pod ${SCANNER_POD_NAME} -o jsonpath='{.status.phase}' -n ${NAMESPACE})
-        echo "--- Scanner pod finished with status: ${FINAL_STATUS} ---"
-
-        echo "--- Copying artifacts from scanner pod ---"
-        # The pod is complete, but its filesystem still exists. We copy the results
-        # from the pod's internal directory to the main test container's artifact
-        # directory, so Prow can collect them.
-        oc cp "${NAMESPACE}/${SCANNER_POD_NAME}:/tmp/tls-scanner-output" "${ARTIFACT_DIR}/tls-scanner"
-
-        if [ "${FINAL_STATUS}" == "Failed" ]; then
-          echo "Scanner pod failed. Exiting with error."
+        # The CI system injects the test namespace into this variable.
+        # We add a check to ensure it's set before proceeding.
+        if [ -z "${NAMESPACE:-}" ]; then
+          echo "Error: The NAMESPACE environment variable is not set." >&2
           exit 1
         fi
-      credentials:
-      - collection: ""
-        mount_path: /var/run/vault/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
+
+        echo "--- Granting hostnetwork-v2 SCC to the default service account ---"
+        oc adm policy add-scc-to-user hostnetwork-v2 -z default -n "${NAMESPACE}"
+
+        echo "--- Running scanner ---"
+        /usr/local/bin/tls-scanner \
+          --all-pods \
+          --csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv" \
+          --log-file "${ARTIFACT_DIR}/tls-scanner/scanner.log"
       dependencies:
       - env: PULL_SPEC_TLS_SCANNER_TOOL
         name: tls-scanner-tool
