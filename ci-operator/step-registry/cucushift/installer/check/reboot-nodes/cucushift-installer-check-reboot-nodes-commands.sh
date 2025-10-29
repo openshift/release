@@ -167,14 +167,39 @@ function wait_for_cluster_recovery() {
     log "Waiting for cluster to fully recover after reboot"
     log "=========================================="
     
+    # Wait for API server to be accessible (oc wait will fail immediately if API is not available)
+    log "Waiting for API server to be accessible..."
+    local api_attempt=0
+    local max_api_attempts=120  # 120 attempts × 5 seconds = 10 minutes
+    while [[ ${api_attempt} -lt ${max_api_attempts} ]]; do
+        if oc cluster-info >/dev/null 2>&1; then
+            log "✅ API server is accessible"
+            break
+        fi
+        log "⏳ API server not accessible, waiting... (${api_attempt}/${max_api_attempts})"
+        sleep 5
+        api_attempt=$((api_attempt + 1))
+    done
+    
+    if [[ ${api_attempt} -ge ${max_api_attempts} ]]; then
+        log "ERROR: API server not accessible after 10 minutes"
+        return 1
+    fi
+    
     # Wait for all nodes to be Ready
     log "Waiting for all nodes to be Ready..."
-    oc wait nodes --all --for=condition=Ready=true --timeout=60m
+    if ! oc wait nodes --all --for=condition=Ready=true --timeout=60m; then
+        log "ERROR: Not all nodes are Ready after reboot"
+        return 1
+    fi
     log "✅ All nodes are Ready"
     
     # Wait for all cluster operators to be Available
     log "Waiting for all cluster operators to be Available..."
-    oc wait clusteroperators --all --for='condition=Available=True' --timeout=60m
+    if ! oc wait clusteroperators --all --for='condition=Available=True' --timeout=60m; then
+        log "ERROR: Not all cluster operators are Available after reboot"
+        return 1
+    fi
     log "✅ All cluster operators are Available"
     
     log "=========================================="
