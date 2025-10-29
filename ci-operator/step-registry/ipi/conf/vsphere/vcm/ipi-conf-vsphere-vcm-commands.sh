@@ -134,7 +134,8 @@ CP_PLATFORM="platform:
     vsphere:
       cpus: $(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG})
       coresPerSocket: $(jq -r '.spec.controlplane.coresPerSocket' ${SPEC_CONFIG})
-      memoryMB: $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})"
+      memoryMB: $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})
+      diskType: thick"
 W_PLATFORM="platform:
     vsphere:
       cpus: $(jq -r '.spec.compute.cpus' ${SPEC_CONFIG})
