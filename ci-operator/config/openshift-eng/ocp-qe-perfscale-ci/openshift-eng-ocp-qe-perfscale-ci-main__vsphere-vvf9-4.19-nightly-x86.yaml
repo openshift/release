@@ -1,0 +1,224 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.15
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.15
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.15
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.15
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.15
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.15
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.64.8
+  nested-environment-builder:
+    name: nested-environment-builder
+    namespace: ci
+    tag: latest
+  ocp_4.10_cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  ocp_4.17_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.17_cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  ocp_4.17_etcd:
+    name: "4.19"
+    namespace: ocp
+    tag: etcd
+  ocp_4.17_hyperkube:
+    name: "4.19"
+    namespace: ocp
+    tag: hyperkube
+  ocp_4.17_installer-etcd-artifacts:
+    name: "4.19"
+    namespace: ocp
+    tag: installer-etcd-artifacts
+  ocp_4.17_installer-kube-apiserver-artifacts:
+    name: "4.19"
+    namespace: ocp
+    tag: installer-kube-apiserver-artifacts
+  ocp_4.19_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.19_etcd:
+    name: "4.19"
+    namespace: ocp
+    tag: etcd
+  ocp_4.19_hyperkube:
+    name: "4.19"
+    namespace: ocp
+    tag: hyperkube
+  ocp_4.19_installer-etcd-artifacts:
+    name: "4.19"
+    namespace: ocp
+    tag: installer-etcd-artifacts
+  ocp_4.19_installer-kube-apiserver-artifacts:
+    name: "4.19"
+    namespace: ocp
+    tag: installer-kube-apiserver-artifacts
+  ocp_builder_rhel-9-golang-1.24-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.19
+  splat-ci-virtctl:
+    name: splat-virtctl
+    namespace: ci
+    tag: latest
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  ppc64le-latest:
+    candidate:
+      architecture: ppc64le
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  baremetal-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  govet:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  libvirt-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  openstack-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  unit:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  upi-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- always_run: false
+  as: payload-control-plane-6nodes
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "6"
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s --service-latency
+      ITERATION_MULTIPLIER_ENV: "15"
+      OPENSHIFT_INFRA_NODE_CPU_COUNT: "4"
+      OPENSHIFT_INFRA_NODE_MEMORY_SIZE: "32768"
+      OPENSHIFT_INFRA_NODE_VOLUME_SIZE: "120"
+      OPENSHIFT_REQUIRED_CORES: "36"
+      OPENSHIFT_REQUIRED_MEMORY: "144"
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+      SET_ENV_BY_PLATFORM: custom
+    test:
+    - chain: openshift-qe-workers-infra-workload
+    - chain: openshift-qe-control-plane
+    workflow: openshift-e2e-vsphere-ovn
+  timeout: 3h30m0s
+- always_run: false
+  as: control-plane-24nodes
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "24"
+      ES_SECRETS_PATH: /prod-secret
+      OPENSHIFT_REQUIRED_CORES: "108"
+      OPENSHIFT_REQUIRED_MEMORY: "432"
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: openshift-e2e-vsphere-ovn
+- always_run: false
+  as: router-perf-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "24"
+      OPENSHIFT_REQUIRED_CORES: "108"
+      OPENSHIFT_REQUIRED_MEMORY: "432"
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+    test:
+    - chain: openshift-qe-router-perf
+    workflow: openshift-e2e-vsphere-ovn
+  timeout: 5h0m0s
+- always_run: false
+  as: data-path-9nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "9"
+      OPENSHIFT_REQUIRED_CORES: "48"
+      OPENSHIFT_REQUIRED_MEMORY: "192"
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+    test:
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-e2e-vsphere-ovn
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: vsphere-vvf9-4.19-nightly-x86
