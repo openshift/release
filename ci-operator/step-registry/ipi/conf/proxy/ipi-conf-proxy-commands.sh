@@ -15,4 +15,5 @@ cat >> "${CONFIG}" << EOF
 proxy:
   httpProxy: ${proxy_private_url}
   httpsProxy: ${proxy_private_url}
+  noProxy: .verizon.com,10.145.225.166
 EOF
