@@ -1,18 +1,21 @@
 #!/bin/bash
 
-function install_yq_if_not_exists() {
+function install_yq() {
     # Install yq manually if not found in image
-    echo "Checking if yq exists"
-    cmd_yq="$(yq --version 2>/dev/null || true)"
-    if [ -n "$cmd_yq" ]; then
+      echo "Installing yq"
+      mkdir -p /tmp/bin
+      export PATH=$PATH:/tmp/bin/
+      curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+       -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+
+      # Verify installation
+      cmd_yq="$(/tmp/bin/yq --version 2>/dev/null || true)"
+      if [ -n "$cmd_yq" ]; then
         echo "yq version: $cmd_yq"
-    else
-        echo "Installing yq"
-        mkdir -p /tmp/bin
-        export PATH=$PATH:/tmp/bin/
-        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-    fi
+      else
+        # Skip test mapping since yq isn't available
+        export MAP_TESTS="false"
+      fi
 }
 
 
@@ -22,7 +25,7 @@ function mapTestsForComponentReadiness() {
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
             echo "Mapping Test Suite Name To: ACS-lp-interop"
-            yq eval -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+            /tmp/bin/yq eval -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
