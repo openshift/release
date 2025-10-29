@@ -1,0 +1,29 @@
+ref:
+  as: hypershift-aws-reboot-nodes
+  cli: latest
+  commands: hypershift-aws-reboot-nodes-commands.sh
+  credentials:
+    - mount_path: /etc/hypershift-pool-aws-credentials
+      name: hypershift-pool-aws-credentials
+      namespace: test-credentials
+  env:
+    - default: ${SHARED_DIR}/management_cluster_kubeconfig
+      name: KUBECONFIG
+      documentation: "Path to the management cluster kubeconfig"
+    - default: "300"
+      name: REBOOT_WAIT_TIME
+      documentation: "Time in seconds to wait after triggering node reboot (default: 300s / 5min)"
+    - default: "600"
+      name: RECOVERY_WAIT_TIME
+      documentation: "Time in seconds to wait for nodes to recover after reboot (default: 600s / 10min)"
+  from: test-bin
+  grace_period: 30m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 30m0s
+  documentation: |-
+    Reboots all worker nodes in the AWS management cluster and waits for recovery.
+    This simulates the OCPBUGS-61829 scenario where hosting cluster nodes reboot
+    and control plane pods need to recover without permission errors.

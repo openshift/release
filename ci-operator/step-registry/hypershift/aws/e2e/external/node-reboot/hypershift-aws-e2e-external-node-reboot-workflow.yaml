@@ -1,0 +1,31 @@
+workflow:
+  as: hypershift-aws-e2e-external-node-reboot
+  documentation: |-
+    The HyperShift AWS e2e node-reboot workflow tests recovery after management cluster node reboots.
+
+    This workflow verifies the fix for OCPBUGS-61829 by:
+    1. Creating a hosted cluster on AWS
+    2. Running initial e2e tests
+    3. Rebooting all management cluster nodes (simulating hosting cluster reboot)
+    4. Verifying hosted cluster control plane recovers without permission errors
+    5. Running validation tests to ensure openshift-apiserver and other components are healthy
+
+    This test ensures that after management cluster node reboots, the openshift-apiserver
+    initContainer properly cleans up stale files and doesn't encounter permission errors.
+
+    For questions, contact the HyperShift team:
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+
+    Learn more about HyperShift: https://github.com/openshift/hypershift
+  steps:
+    post:
+    - chain: hypershift-destroy-nested-management-cluster
+    test:
+    - ref: hypershift-aws-run-e2e-external
+    - ref: hypershift-aws-reboot-nodes
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
