@@ -50,6 +50,7 @@ fi
 systemctl restart NetworkManager.service
 virsh net-dumpxml ostestbm > /tmp/ostestbm.xml
 sed -i 's/<dns>/<dns>\n    <forwarder domain='"'"$BASEDOMAIN"'"' addr='"'"'127.0.0.1'"'"'\/>/' /tmp/ostestbm.xml
+sed -i '/<dns>/a \    <forwarder addr="8.8.8.8"/>\n    <forwarder addr="8.8.4.4"/>\n    <forwarder addr="1.1.1.1"/>' /tmp/ostestbm.xml
 virsh net-define /tmp/ostestbm.xml
 virsh net-destroy ostestbm;virsh net-start ostestbm
 systemctl restart libvirtd.service
