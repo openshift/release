@@ -58,7 +58,7 @@ set -x
 
 # Get oc binary
 # curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
-# Get
+# Get oharan2 cnv-ci repo to verify PR #126
 curl -L "https://github.com/oharan2/cnv-ci/archive/refs/heads/cnv_deploy.tar.gz" -o /tmp/cnv-ci.tgz
 mkdir -p /tmp/cnv-ci
 tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
