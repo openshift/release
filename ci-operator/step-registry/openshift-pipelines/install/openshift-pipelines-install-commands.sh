@@ -24,7 +24,6 @@ function mapTestsForComponentReadiness() {
         results_file="${1}"
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
-            install_yq_if_not_exists
             echo "Mapping Test Suite Name To: OpenshiftPipelines-lp-interop"
             yq eval -px -ox -iI0 '.testsuites.testsuite."+@name" = "OpenshiftPipelines-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
@@ -46,12 +45,15 @@ function cleanup-collect() {
         # Keep a copy of all the original Junit files before modifying them
         cp -r "${result_file}" "${original_results}/${base_dir}_${file_name}"
 
-        # Map tests if needed for related use cases
-        mapTestsForComponentReadiness "${result_file}"
-
         # Send junit file to shared dir for Data Router Reporter step
         cp -r "${result_file}" "${SHARED_DIR}/${base_dir}_${file_name}"
       done
+
+      # Remove timestamped dir to avoid spacing in filename
+      mv "${ARTIFACT_DIR}/xml-report/*/result.xml" "${ARTIFACT_DIR}/xml-report/"
+
+      # Map tests if needed for related use cases
+      mapTestsForComponentReadiness "${ARTIFACT_DIR}/xml-report/result.xml"
     fi
 }
 
