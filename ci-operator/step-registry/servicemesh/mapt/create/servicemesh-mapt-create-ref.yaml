@@ -6,21 +6,18 @@ ref:
     name: cluster-secrets-ossm-aws
     namespace: ci
   env:
-  - name: PROJECT
+  - name: PROJECT_NAME
     default: "servicemesh"
-    documentation: "Project name for the MAPT cluster. The resulting name will be PROJECT-mapt-<timestamp>"
+    documentation: "Project name for the MAPT cluster"
   - name: TEST_NAME
     default: "servicemesh-mapt"
-    documentation: "Test name used for MAPT cluster identification"
+    documentation: "Test name used for S3 bucket naming"
   - name: OCP_VERSION
-    default: "4.20.0"
+    default: "4.19.12"
     documentation: "OpenShift version to deploy"
   - name: MAPT_TAGS
     default: "ci=true,repo=openshift-servicemesh"
     documentation: "Additional tags for the AWS instance"
-  - name: MAPT_IMAGE
-    default: "quay.io/redhat-developer/mapt:v0.9.9"
-    documentation: "MAPT container image to use"
   - name: SPOT
     default: "true"
     documentation: "Use AWS spot instances for cost savings"
@@ -35,16 +32,11 @@ ref:
     documentation: "Timeout for waiting for cluster to be ready"
   - name: AWS_REGION
     default: "us-east-1"
-    documentation: "AWS region to deploy the cluster"
-  - name: BACKED_URL_TYPE
-    default: "s3"
-    documentation: "Type of backend storage for MAPT"
-  - name: LOG_LEVEL
-    default: "verbose"
-    documentation: "Log level for MAPT operations"
-  - name: CI
-    default: "true"
-    documentation: "Indicates if running in CI environment"
+    documentation: "AWS region to deploy the cluster. If spot is true, the region will be picked based on best prices"
+  from_image:
+    name: mapt
+    namespace: ci
+    tag: v0.9.6
   resources:
     limits:
       cpu: "2"
