@@ -20,7 +20,7 @@ function install_yq_if_not_exists() {
 }
 
 function mapTestsForComponentReadiness() {
-    # Safely patch a JUnit XML results file to set the testsuite name to "MTA-lp-interop".
+    # Safely patch a JUnit XML results file to set the testsuite name to "ACS-lp-interop".
     # This function:
     #  - is a no-op unless MAP_TESTS=="true"
     #  - ensures yq is available
@@ -41,8 +41,8 @@ function mapTestsForComponentReadiness() {
 
     # Try to map common XML root shapes. Each attempt is allowed to fail; the final
     # fallback prints a warning but does not fail the step (prevents errexit from aborting).
-    yq eval -px -ox -iI0 '.testsuite."+@name" = "MTA-lp-interop"' "${results_file}" \
-      || yq eval -px -ox -iI0 '.testsuites.testsuite[0]."+@name" = "MTA-lp-interop"' "${results_file}" \
+    yq eval -px -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' "${results_file}" \
+      || yq eval -px -ox -iI0 '.testsuites.testsuite[0]."+@name" = "ACS-lp-interop"' "${results_file}" \
       || { echo "Warning: yq failed to map test suite name for ${results_file}; inspect file manually" >&2; }
 }
 
