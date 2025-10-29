@@ -76,6 +76,7 @@ fi
 make deploy_test || exit_code=$?
 
 sleep 1h
+# sh-5.1$ cp /tmp/cnv-ci/junit_cnv_deploy.xml .
 
 set +x
 
