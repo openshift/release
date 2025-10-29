@@ -72,19 +72,21 @@ if [[ -n "${KUBEVIRT_TESTING_CONFIGURATION:-}" ]]; then
     echo "🔄 KUBEVIRT_TESTING_CONFIGURATION_FILE set to ${KUBEVIRT_TESTING_CONFIGURATION_FILE}"
 fi
 
+# Install yq to generate the cnv deployment xml file
+install_yq_if_not_exists
+
 # Run the tests
 make deploy_test || exit_code=$?
-
-sleep 1h
-# sh-5.1$ cp /tmp/cnv-ci/junit_cnv_deploy.xml .
 
 set +x
 
  # Map tests if needed for related use cases
  mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
 
- # Send junit file to shared dir for Data Router Reporter step
+ # Send junit files to shared dir for Data Router Reporter step
 cp "${ARTIFACT_DIR}/junit.functest.xml" "${SHARED_DIR}"
+cp "${ARTIFACT_DIR}/junit_cnv_deploy.xml" "${SHARED_DIR}"
+
 
 if [ "${exit_code:-0}" -ne 0 ]; then
     echo "deploy_test failed with exit code $exit_code"
