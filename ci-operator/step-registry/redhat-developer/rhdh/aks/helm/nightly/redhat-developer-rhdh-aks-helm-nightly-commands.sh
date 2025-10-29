@@ -6,10 +6,33 @@ WORKSPACE=$(pwd)
 cd /tmp || exit
 
 echo "========== Cluster Authentication =========="
-# use kubeconfig from mapt
-chmod 600 "${SHARED_DIR}/kubeconfig"
+echo "Verifying kubeconfig file from Mapt exists in SHARED_DIR..."
+if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
+  echo "Error: kubeconfig file not found at ${SHARED_DIR}/kubeconfig"
+  exit 1
+fi
+
+echo "Setting kubeconfig permissions..."
+if ! chmod 600 "${SHARED_DIR}/kubeconfig"; then
+  echo "Error: Failed to set kubeconfig permissions"
+  exit 1
+fi
+
+echo "Setting KUBECONFIG environment variable..."
 KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export KUBECONFIG
+
+echo "Verifying kubeconfig file..."
+if ! kubectl config view > /dev/null 2>&1; then
+  echo "Error: Invalid kubeconfig file"
+  exit 1
+fi
+
+echo "Verifying cluster connectivity..."
+if ! kubectl cluster-info > /dev/null 2>&1; then
+  echo "Error: Cannot connect to cluster."
+  exit 1
+fi
 
 echo "========== Cluster Service Account and Token Management =========="
 # Create a service account and assign cluster url and token
