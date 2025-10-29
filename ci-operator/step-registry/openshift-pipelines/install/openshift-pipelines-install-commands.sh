@@ -44,13 +44,13 @@ function cleanup-collect() {
         file_name=$(basename "${result_file}")
 
         # Keep a copy of all the original Junit files before modifying them
-        cp "${result_file}" "${original_results}/${base_dir}_${file_name}"
+        cp -r "${result_file}" "${original_results}/${base_dir}_${file_name}"
 
         # Map tests if needed for related use cases
         mapTestsForComponentReadiness "${result_file}"
 
         # Send junit file to shared dir for Data Router Reporter step
-        cp "${result_file}" "${SHARED_DIR}/${base_dir}_${file_name}"
+        cp -r "${result_file}" "${SHARED_DIR}/${base_dir}_${file_name}"
       done
     fi
 }
