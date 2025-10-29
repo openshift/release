@@ -47,6 +47,8 @@ for _ in {1..60}; do
     sleep 10
 done
 
+sleep 6h
+
 #Trigget Quay E2E Testing
 registryEndpoint="$(oc -n "$quay_ns" get quayregistry "$quay_registry" -o jsonpath='{.status.registryEndpoint}')"
 registry="${registryEndpoint#https://}"
