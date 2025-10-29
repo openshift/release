@@ -32,4 +32,3 @@ export RBAC_PASS
 # Copy the test cases results to an external directory
 cp -r test-output/cypress $ARTIFACT_DIR/
 
-sleep 7h
