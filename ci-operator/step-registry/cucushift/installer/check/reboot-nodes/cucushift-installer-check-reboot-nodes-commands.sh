@@ -65,10 +65,6 @@ exit_handler() {
 # Add EXIT trap to log script completion
 trap 'exit_handler' EXIT
 
-# Configuration constants - simplified for AWS hard reboot
-readonly AWS_INSTANCE_TIMEOUT=60    # 60 attempts × 10 seconds = 10 minutes
-readonly CLUSTER_RECOVERY_TIMEOUT=120  # 120 attempts × 30 seconds = 60 minutes
-
 # Reboot type configuration
 # HARD_REBOOT: Use cloud provider commands (AWS EC2 stop/start, etc.)
 # SOFT_REBOOT: Use SSH-based reboot (existing behavior)
@@ -87,61 +83,9 @@ log "Working directory: $(pwd)"
 log "User: $(whoami)"
 log "=========================================="
 
-# Platform detection and setup using case statement
-case "${CLUSTER_TYPE}" in
-    aws)
-        # Configure AWS credentials - support both CI and local environments
-        export AWS_REGION="${LEASED_RESOURCE}"
-        
-        # Determine AWS credentials file location
-        aws_cred_file=""
-        if [[ -n "${CLUSTER_PROFILE_DIR:-}" && -f "${CLUSTER_PROFILE_DIR}/.awscred" ]]; then
-            # CI environment
-            aws_cred_file="${CLUSTER_PROFILE_DIR}/.awscred"
-            export AWS_SHARED_CREDENTIALS_FILE="${aws_cred_file}"
-            log "Using CI environment AWS credentials: ${aws_cred_file}"
-        elif [[ -f "${HOME}/.aws/credentials" ]]; then
-            # Local environment
-            aws_cred_file="${HOME}/.aws/credentials"
-            export AWS_SHARED_CREDENTIALS_FILE="${aws_cred_file}"
-            log "Using local environment AWS credentials: ${aws_cred_file}"
-        else
-            log "ERROR: No AWS credentials file found"
-            log "Expected locations:"
-            log "  - CI environment: ${CLUSTER_PROFILE_DIR:-<unset>}/.awscred"
-            log "  - Local environment: ${HOME}/.aws/credentials"
-            exit 1
-        fi
-        
-        # Extract AWS credentials from the credential file (for CI environment)
-        if [[ "${aws_cred_file}" == *"/.awscred" ]]; then
-            AWS_ACCESS_KEY_ID=$(cat "${aws_cred_file}" | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2)
-            AWS_SECRET_ACCESS_KEY=$(cat "${aws_cred_file}" | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2)
-            export AWS_ACCESS_KEY_ID
-            export AWS_SECRET_ACCESS_KEY
-            
-            if [[ -z "${AWS_ACCESS_KEY_ID}" ]] || [[ -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
-                log "ERROR: Failed to extract AWS credentials from ${aws_cred_file}"
-                exit 1
-            fi
-        fi
-        
-        log "AWS platform detected, AWS CLI configured"
-        log "AWS Region: ${AWS_REGION}"
-        ;;
-    azure*)
-        log "Azure platform detected (${CLUSTER_TYPE}), using SSH-based reboot"
-        ;;
-    gcp)
-        log "GCP platform detected, using SSH-based reboot"
-        ;;
-    ibmcloud)
-        log "IBM Cloud platform detected, using SSH-based reboot"
-        ;;
-    *)
-        log "Unknown platform detected (${CLUSTER_TYPE}), using SSH-based reboot"
-        ;;
-esac
+# Configure AWS for HARD_REBOOT
+export AWS_REGION="${LEASED_RESOURCE}"
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 function run_command() {
     local CMD="$1"
@@ -227,53 +171,15 @@ function wait_for_cluster_recovery() {
     log "Waiting for cluster to fully recover after reboot"
     log "=========================================="
     
-    # Step 1: Wait for API server to be accessible
-    log "Step 1: Waiting for API server to be accessible..."
-    if ! wait_for_condition "API server connectivity" \
-        "oc whoami >/dev/null 2>&1" \
-        "${CLUSTER_RECOVERY_TIMEOUT}" 30 \
-        "API server not accessible within 60 minutes" \
-        "oc cluster-info"; then
-        log "ERROR: API server not accessible after reboot"
-        return 1
-    fi
-    log "✅ API server is accessible"
-    
-    # Step 2: Wait for all nodes to be Ready
-    log "Step 2: Waiting for all nodes to be Ready..."
-    if ! wait_for_condition "all nodes to be Ready" \
-        "oc wait nodes --all --for=condition=Ready=true --timeout=30s >/dev/null 2>&1" \
-        "${CLUSTER_RECOVERY_TIMEOUT}" 30 \
-        "Not all nodes Ready within 60 minutes" \
-        "oc get nodes 2>/dev/null || echo 'Permission denied - using alternative check'"; then
-        log "ERROR: Not all nodes are Ready after reboot"
-        return 1
-    fi
+    # Wait for all nodes to be Ready
+    log "Waiting for all nodes to be Ready..."
+    oc wait nodes --all --for=condition=Ready=true --timeout=60m
     log "✅ All nodes are Ready"
     
-    # Step 3: Wait for all cluster operators to be Available
-    log "Step 3: Waiting for all cluster operators to be Available..."
-    if ! wait_for_condition "all cluster operators to be Available" \
-        "oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s >/dev/null 2>&1" \
-        "${CLUSTER_RECOVERY_TIMEOUT}" 30 \
-        "Not all cluster operators Available within 60 minutes" \
-        "oc get clusteroperators 2>/dev/null || echo 'Permission denied - using alternative check'"; then
-        log "ERROR: Not all cluster operators are Available after reboot"
-        return 1
-    fi
+    # Wait for all cluster operators to be Available
+    log "Waiting for all cluster operators to be Available..."
+    oc wait clusteroperators --all --for='condition=Available=True' --timeout=60m
     log "✅ All cluster operators are Available"
-    
-    # Step 4: Wait for all pods in openshift-* namespaces to be running
-    log "Step 4: Waiting for all system pods to be running..."
-    if ! wait_for_condition "all system pods to be running" \
-        "[[ \$(oc get pods -n openshift-apiserver --no-headers 2>/dev/null | grep -v 'Running' | wc -l) -eq 0 ]] && [[ \$(oc get pods -n openshift-controller-manager --no-headers 2>/dev/null | grep -v 'Running' | wc -l) -eq 0 ]] && [[ \$(oc get pods -n openshift-scheduler --no-headers 2>/dev/null | grep -v 'Running' | wc -l) -eq 0 ]]" \
-        "${CLUSTER_RECOVERY_TIMEOUT}" 30 \
-        "Not all system pods running within 60 minutes" \
-        "oc get pods -n openshift-apiserver 2>/dev/null || echo 'Permission denied - using alternative check' && oc get pods -n openshift-controller-manager 2>/dev/null || echo 'Permission denied - using alternative check' && oc get pods -n openshift-scheduler 2>/dev/null || echo 'Permission denied - using alternative check'"; then
-        log "ERROR: Not all system pods are running after reboot"
-        return 1
-    fi
-    log "✅ All system pods are running"
     
     log "=========================================="
     log "Cluster recovery completed successfully"
@@ -315,6 +221,8 @@ function get_all_aws_instance_ids() {
 # AWS hard reboot function - simplified logic with inline functions
 function reboot_cluster_aws_hard() {
     local all_instances infra_id
+    # Local timeout configuration - 60 attempts × 10 seconds = 10 minutes
+    local aws_instance_timeout=60
     
     log "Using AWS hard reboot - simplified logic"
     
@@ -344,7 +252,7 @@ function reboot_cluster_aws_hard() {
     
     if ! wait_for_condition "all instances to stop" \
         "[[ \$(aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -v 'stopped' | wc -l) -eq 0 ]]" \
-        "${AWS_INSTANCE_TIMEOUT}" 10 \
+        "${aws_instance_timeout}" 10 \
         "Not all instances stopped within 10 minutes" \
         "aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
         log "ERROR: Not all instances stopped within timeout"
@@ -364,7 +272,7 @@ function reboot_cluster_aws_hard() {
     log "Checking running instances count..."
     if ! wait_for_condition "all instances to start" \
         "[[ \$(aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -v 'running' | wc -l) -eq 0 ]]" \
-        "${AWS_INSTANCE_TIMEOUT}" 10 \
+        "${aws_instance_timeout}" 10 \
         "Not all instances started within 10 minutes" \
         "aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
         log "ERROR: Not all instances started within timeout"
@@ -463,24 +371,7 @@ if ! whoami &> /dev/null; then
 fi
 
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
-
-# Auto-detect kubeconfig file location (compatible with both local and CI environments)
-if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
-    export KUBECONFIG=${SHARED_DIR}/kubeconfig
-    log "Using kubeconfig: ${SHARED_DIR}/kubeconfig"
-elif [ -f "${SHARED_DIR}/auth/kubeconfig" ] ; then
-    export KUBECONFIG=${SHARED_DIR}/auth/kubeconfig
-    log "Using kubeconfig: ${SHARED_DIR}/auth/kubeconfig"
-elif [ -f "${HOME}/.kube/config" ] ; then
-    export KUBECONFIG=${HOME}/.kube/config
-    log "Using kubeconfig: ${HOME}/.kube/config"
-else
-    log "WARNING: No kubeconfig file found in expected locations"
-    log "Searched locations:"
-    log "  - ${SHARED_DIR}/kubeconfig"
-    log "  - ${SHARED_DIR}/auth/kubeconfig"
-    log "  - ${HOME}/.kube/config"
-fi
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     # shellcheck source=/dev/null
