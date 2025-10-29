@@ -17,7 +17,7 @@ curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /t
 chmod +x /tmp/jq
 
 
-RESULT_FILE="${ARTIFACT_DIR}/junit-results.xml"
+RESULT_FILE="${ARTIFACT_DIR}/junit_post_upgrade_results.xml"
 SUITE_NAME="post-upgrade-test"
 
 # Initialize empty JUnit file

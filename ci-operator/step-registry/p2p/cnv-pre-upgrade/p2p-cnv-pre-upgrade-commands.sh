@@ -15,7 +15,7 @@ export KUBECONFIG="${SHARED_DIR}/managed-cluster-kubeconfig"
 curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /tmp/jq
 chmod +x /tmp/jq
 
-RESULT_FILE="${ARTIFACT_DIR}/junit-results.xml"
+RESULT_FILE="${ARTIFACT_DIR}/junit_pre_upgrader_esults.xml"
 SUITE_NAME="pre-upgrade-test"
 
 # Initialize empty JUnit file
@@ -623,26 +623,5 @@ main_pre_upgrade() {
     update_counts
 }
 
-# Main function for cleanup mode
-# main_cleanup() {
-#     log_info "=== CLEANUP MODE ==="
-#     log_info "Removing VM and cleaning up environment"
 
-#     # Run checks
-#     check_prerequisites
-
-#     # Setup minimal working environment
-#     mkdir -p ${WORK_DIR}
-#     cd ${WORK_DIR}
-
-#     # Clean up VM
-#     cleanup_vm
-
-#     # Clean up working directory
-#     cleanup_workdir
-
-#     log_success "Cleanup completed successfully!"
-# }
-
-# Run main function
 main_pre_upgrade

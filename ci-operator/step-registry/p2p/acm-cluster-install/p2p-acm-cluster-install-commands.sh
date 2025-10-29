@@ -286,7 +286,7 @@ pick_provision_pod() {
 
 echo "[INFO] $(now) Waiting up to ${INSTALL_TIMEOUT_MINUTES}m for install to complete."
 
-#============== wait logic with live logs
+#============== wait logic with live logs, keep checking for provision pod to show up
 while true; do
   #start or switch log stream if a provision pod exists
   POD="$(pick_provision_pod || true)"

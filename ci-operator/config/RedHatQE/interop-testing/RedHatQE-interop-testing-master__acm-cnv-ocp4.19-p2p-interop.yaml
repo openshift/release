@@ -7,10 +7,6 @@ base_images:
     name: "2.14"
     namespace: acm-qe
     tag: application-ui-test
-  clc-ui-e2e:
-    name: "2.14"
-    namespace: acm-qe
-    tag: clc-ui-e2e
   cli:
     name: "4.19"
     namespace: ocp
@@ -23,16 +19,8 @@ base_images:
     name: "2.14"
     namespace: acm-qe
     tag: multicluster-observability-operator-opp
-  openshift-virtualization-tests:
-    name: openshift-virtualization-tests
-    namespace: ci
-    tag: cnv-4.19
-  tests-private:
-    name: tests-private
-    namespace: ci
-    tag: "4.19"
   virtctl:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: virtctl
 build_root:
@@ -54,14 +42,6 @@ images:
     RUN dnf clean all
   from: virtctl
   to: virtctl-sshpass
-- build_args:
-  - name: OCP_VERSION
-    value: "4.19"
-  - name: OC_CLI_VERSION
-    value: latest
-  context_dir: cnv-ci
-  dockerfile_path: Dockerfile
-  to: cnv-ci
 releases:
   latest:
     release:
@@ -79,16 +59,17 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      CLOUD_PROVIDER: ipi-aws
       CLUSTER_NAME: acm-spoke
       COMPUTE_NODE_TYPE: m6a.2xlarge
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
             [
-              {"step": "cucushift-*"           , "failure_type": "all"          , "classification": "Cluster Health Check"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
+              {"step": "cucushift-*", "failure_type": "all", "classification": "Cluster Health Check", "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "p2p-acm-cluster-install"           , "failure_type": "all"          , "classification": "Spoke cluster Installation"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "p2p-acm-cluster-uninstall"           , "failure_type": "all"          , "classification": "Spoke cluster Un-Installation"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
-              {"step": "p2p-acm-cnv-additional-test-setup"           , "failure_type": "all"          , "classification": "CNV installation policy deploy"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
+              {"step": "p2p-acm-cnv-install-policy"           , "failure_type": "all"          , "classification": "CNV installation policy deploy"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "p2p-cnv-pre-upgrade"           , "failure_type": "all"          , "classification": "CNV VM deployement check pre cluster upgrade"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "p2p-cnv-post-upgrade"           , "failure_type": "all"          , "classification": "CNV VM deployement check post cluster upgrade"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
               {"step": "p2p-acm-cluster-upgrade"           , "failure_type": "all"          , "classification": "Cluster Upgrade"                  , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
