@@ -249,7 +249,7 @@ baseDomain: $base_domain
 $MACHINE_POOL_OVERRIDES
 platform:
   vsphere:
-    diskType: Thick"
+    diskType: Thick
 $(cat $SHARED_DIR/platform.yaml)
 EOF
 fi
