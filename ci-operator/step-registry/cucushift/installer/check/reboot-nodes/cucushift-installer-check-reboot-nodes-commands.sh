@@ -272,10 +272,10 @@ function reboot_cluster_aws_hard() {
     fi
     
     if ! wait_for_condition "all instances to stop" \
-        "[[ \$(aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -v 'stopped' | wc -l) -eq 0 ]]" \
+        "[[ \$(aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' 'Name=instance-state-name,Values=running,stopped,pending,stopping' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -v 'stopped' | wc -l) -eq 0 ]]" \
         "${aws_instance_timeout}" 10 \
         "Not all instances stopped within 10 minutes" \
-        "aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
+        "aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' 'Name=instance-state-name,Values=running,stopped,pending,stopping' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
         log "ERROR: Not all instances stopped within timeout"
         return 1
     fi
@@ -292,10 +292,10 @@ function reboot_cluster_aws_hard() {
     # Step 4: Check running instances count (inline wait_for_all_aws_instances_to_start)
     log "Checking running instances count..."
     if ! wait_for_condition "all instances to start" \
-        "[[ \$(aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -v 'running' | wc -l) -eq 0 ]]" \
+        "[[ \$(aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' 'Name=instance-state-name,Values=running,stopped,pending,stopping' --query 'Reservations[*].Instances[*].State.Name' --output text | grep -v 'running' | wc -l) -eq 0 ]]" \
         "${aws_instance_timeout}" 10 \
         "Not all instances started within 10 minutes" \
-        "aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
+        "aws ec2 describe-instances --region '${AWS_REGION}' --filters 'Name=tag-key,Values=kubernetes.io/cluster/${infra_id}' 'Name=instance-state-name,Values=running,stopped,pending,stopping' --query 'Reservations[*].Instances[*].[InstanceId,State.Name]' --output text"; then
         log "ERROR: Not all instances started within timeout"
         return 1
     fi
