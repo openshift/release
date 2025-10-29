@@ -15,18 +15,21 @@ mkdir -p $ARTIFACT_DIR
 original_results="${ARTIFACT_DIR}/original_results/"
 mkdir "${original_results}"
 
-function install_yq_if_not_exists() {
+function install_yq() {
     # Install yq manually if not found in image
-    echo "Checking if yq exists"
-    cmd_yq="$(yq --version 2>/dev/null || true)"
+    echo "Installing yq"
+    mkdir -p /tmp/bin
+    export PATH=$PATH:/tmp/bin/
+    curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+     -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+
+    # Verify installation
+    cmd_yq="$(/tmp/bin/yq --version 2>/dev/null || true)"
     if [ -n "$cmd_yq" ]; then
-        echo "yq version: $cmd_yq"
+      echo "yq version: $cmd_yq"
     else
-        echo "Installing yq"
-        mkdir -p /tmp/bin
-        export PATH=$PATH:/tmp/bin/
-        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+      # Skip test mapping since yq isn't available
+      export MAP_TESTS="false"
     fi
 }
 
@@ -35,9 +38,8 @@ function mapTestsForComponentReadiness() {
         results_file="${1}"
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
-            install_yq_if_not_exists
             echo "Mapping Test Suite Name To: Quay-lp-interop"
-            yq eval -px -ox -iI0 '.testsuites.+@name="Quay-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+            /tmp/bin/yq eval -px -ox -iI0 '.testsuites.+@name="Quay-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
@@ -46,6 +48,12 @@ function mapTestsForComponentReadiness() {
 function copyArtifacts {
     JUNIT_PREFIX="junit_"
     cp -r ./cypress/results/* $ARTIFACT_DIR
+
+    if [[ $MAP_TESTS == "true" ]]; then
+      # If needed, install yq before loop
+      install_yq
+    fi
+
     for file in "$ARTIFACT_DIR"/*; do
         if [[ ! "$(basename "$file")" =~ ^"$JUNIT_PREFIX" ]]; then
             result_file="$ARTIFACT_DIR"/"$JUNIT_PREFIX""$(basename "$file")"
