@@ -128,6 +128,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   power_status=$(ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" -U $bmc_user -P $bmc_pass power status)
+  echo $host $power_status
   if [[ "${power_status}" == "Chassis Power is on" ]]; then
     echo "$host supposed to be OFF but $power_status, powering it down"
     ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" -U $bmc_user -P $bmc_pass power off
@@ -135,7 +136,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
   if [[ "${arch}" == "aarch64" ]]; then
       # HPE ARM64 servers frequently hang on boot with a black screen, BMC reset seems to fix the issue
-      echo "ARM64 node, resetting BMC"
+      echo "ARM64 node, resetting BMC, warm"
       ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" \
         -U "$bmc_user" -P "$bmc_pass" mc reset warm
       # Safety sleep for BMCs reset
