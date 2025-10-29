@@ -12,6 +12,8 @@ terraform version
 #Create Artifact Directory:
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 mkdir -p $ARTIFACT_DIR
+original_results="${ARTIFACT_DIR}/original_results/"
+mkdir "${original_results}"
 
 function install_yq_if_not_exists() {
     # Install yq manually if not found in image
@@ -35,7 +37,7 @@ function mapTestsForComponentReadiness() {
         if [ -f "${results_file}" ]; then
             install_yq_if_not_exists
             echo "Mapping Test Suite Name To: Quay-lp-interop"
-            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="Quay-lp-interop"' $results_file
+            yq eval -px -ox -iI0 '.testsuites.+@name="Quay-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
@@ -50,18 +52,18 @@ function copyArtifacts {
             mv "$file" $result_file
 
             if [[ $MAP_TESTS == "true" ]]; then
-              original_results="${ARTIFACT_DIR}/original_results/"
-              mkdir "${original_results}"
               echo "Collecting original results in ${original_results}"
+              base_dir=$(basename "$(dirname "${result_file}")")
+              file_name=$(basename "${result_file}")
 
               # Keep a copy of all the original Junit files before modifying them
-              cp "${result_file}" "${original_results}/$(basename "$result_file")"
+              cp "${result_file}" "${original_results}/${base_dir}_${file_name}"
 
               # Map tests if needed for related use cases
               mapTestsForComponentReadiness "${result_file}"
 
               # Send junit file to shared dir for Data Router Reporter step
-              cp "$result_file" "${SHARED_DIR}/$(basename "$result_file")"
+              cp "$result_file" "${SHARED_DIR}/${base_dir}_${file_name}"
             fi
         fi
     done
