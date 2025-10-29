@@ -132,7 +132,6 @@ fi
 SPEC_CONFIG="/var/run/vault/vsphere-ibmcloud-config/vm-specs.json"
 CP_PLATFORM="platform:
     vsphere:
-      diskType: Thick
       cpus: $(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG})
       coresPerSocket: $(jq -r '.spec.controlplane.coresPerSocket' ${SPEC_CONFIG})
       memoryMB: $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})"
@@ -249,7 +248,6 @@ baseDomain: $base_domain
 $MACHINE_POOL_OVERRIDES
 platform:
   vsphere:
-    diskType: Thick
 $(cat $SHARED_DIR/platform.yaml)
 EOF
 fi
