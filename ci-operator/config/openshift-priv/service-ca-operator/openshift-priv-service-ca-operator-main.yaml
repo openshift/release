@@ -78,18 +78,29 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
     test:
     - as: tests-extension
+      cli: latest
       commands: |
         echo "Build binary service-ca-operator-tests-ext"
         make tests-ext-build
-        echo "Running ./service-ca-operator-tests-ext run-suite openshift/service-ca-operator/conformance/parallel"
-        ./service-ca-operator-tests-ext run-suite "openshift/service-ca-operator/conformance/parallel" -j ${ARTIFACT_DIR}/junit_$(date +%Y%m%d-%H%M%S).xml
+        echo "Set up cluster access"
+        export KUBECONFIG=${SHARED_DIR}/kubeconfig
+        echo "Verify cluster is accessible"
+        oc get clusterversion
+        echo "--------------"
+
+        echo "Running make run-suite SUITE=openshift/service-ca-operator/conformance/parallel ARTIFACT_DIR=/tmp/artifacts"
+        make run-suite SUITE=openshift/service-ca-operator/conformance/parallel ARTIFACT_DIR=${ARTIFACT_DIR}
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift-priv
