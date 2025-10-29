@@ -17,13 +17,6 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Currently the PinnedImageSet feature is only available through TechPreviewNoUpgrade featureset.
-# Remove this check once the PinnedImageSet feature becomes GA
-if [ "$(oc get featuregate cluster -ojsonpath='{.spec.featureSet}')" != "TechPreviewNoUpgrade" ]; then
-    echo "This step can only be executed in clusters with TechPreviewUpgrade featureset"
-    exit 255
-fi
-
 # If it's serial upgrades then override-upgrade file will store the release and overrides OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
 # upgrade-edge file expects a comma separated releases list like target_release1,target_release2,...
 # If those file exists we fail the execution since serial upgrades are not supported in this step
@@ -220,4 +213,17 @@ create_passed_junit "$JUNIT_SUITE" "$JUNIT_TEST"
 
 for MACHINE_CONFIG_POOL in ${MCO_CONF_DAY2_PINTARGETRELEASE_MCPS}; do
     debug "$MACHINE_CONFIG_POOL"
+done
+
+# Set ImageStreamTags to reference mode for debugging/validation purposes.
+# This forces these images to be pulled from external registry or use pinned cached versions
+# rather than the internal registry. This validates that pinned images are accessible,
+# especially after the pull-secret has been removed. Useful for debugging with tools like
+# oc debug, must-gather, and network-tools to ensure image pinning is working correctly.
+image_list=("cli" "cli-artifacts" "installer" "installer-artifacts" "tests" "tools" "must-gather" "oauth-proxy" "network-tools")
+
+for img in "${image_list[@]}"; do
+
+  oc patch imagestreamtags ${img}:latest -n openshift --type json -p '[{"op": "add", "path": "/tag/reference", "value": true}]'
+
 done
