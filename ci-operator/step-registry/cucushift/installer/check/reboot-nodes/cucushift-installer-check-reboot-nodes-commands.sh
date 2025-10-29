@@ -83,10 +83,6 @@ log "Working directory: $(pwd)"
 log "User: $(whoami)"
 log "=========================================="
 
-# Configure AWS for HARD_REBOOT
-export AWS_REGION="${LEASED_RESOURCE}"
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
@@ -381,6 +377,8 @@ fi
 if [ "${REBOOT_TYPE}" == "HARD_REBOOT" ]; then
     case "${CLUSTER_TYPE}" in
         aws)
+            export AWS_REGION="${LEASED_RESOURCE}"
+            export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
             if ! reboot_cluster_aws_hard; then
                 log "ERROR: reboot_cluster_aws_hard function failed"
                 exit 1
