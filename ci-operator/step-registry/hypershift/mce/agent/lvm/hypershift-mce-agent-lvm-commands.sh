@@ -14,12 +14,38 @@ if [ -f "${SHARED_DIR}/lvmdevice" ]; then
   LVM_DEVICE_PATH=$(<"${SHARED_DIR}/lvmdevice")
 fi
 
+# Auto-detect namespace based on cluster version if not explicitly set
+if [[ -z "${LVM_OPERATOR_SUB_INSTALL_NAMESPACE:-}" ]]; then
+  CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
+  MINOR_VERSION=$(echo $CLUSTER_VERSION | cut -d. -f2)
+
+  echo "Detected OpenShift version: ${CLUSTER_VERSION}"
+
+  # For OpenShift 4.20+, use openshift-lvm-storage, otherwise use openshift-storage
+  if [[ ${MINOR_VERSION} -ge 20 ]]; then
+    LVM_NAMESPACE="openshift-lvm-storage"
+  else
+    LVM_NAMESPACE="openshift-storage"
+  fi
+
+  echo "Auto-detected LVM namespace: ${LVM_NAMESPACE}"
+else
+  LVM_NAMESPACE="${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
+  echo "Using operator namespace: ${LVM_NAMESPACE}"
+fi
+
+# Verify namespace exists before proceeding
+if ! oc get namespace "${LVM_NAMESPACE}" &>/dev/null; then
+  echo "ERROR: Namespace ${LVM_NAMESPACE} does not exist. The LVM operator should have created it."
+  exit 1
+fi
+
 oc apply -f - <<EOF
 apiVersion: lvm.topolvm.io/v1alpha1
 kind: LVMCluster
 metadata:
   name: my-lvmcluster
-  namespace: openshift-storage
+  namespace: ${LVM_NAMESPACE}
 spec:
   storage:
     deviceClasses:
@@ -42,7 +68,7 @@ while true; do
             sleep 10
             continue 2  # Continue the outer loop
         fi
-    done < <(oc get pod -n openshift-storage | awk '/(topolvm-node-|vg-manager-)/{print $0}')
+    done < <(oc get pod -n "${LVM_NAMESPACE}" | awk '/(topolvm-node-|vg-manager-)/{print $0}')
 
     echo "All pods are running."
     break
@@ -55,4 +81,4 @@ done
 # Ensure the lvm storage class is the default one for the cluster
 oc annotate sc lvms-vg1 storageclass.kubernetes.io/is-default-class=true --overwrite
 
-#oc wait lvmcluster -n openshift-storage my-lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout=20m
+#oc wait lvmcluster -n "${LVM_NAMESPACE}" my-lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout=20m
