@@ -130,6 +130,10 @@ SPEC_YAML="
   namespace: ${TARGET_NAMESPACE}
   serviceAccount:
     name: ${EXTENSION_NAME}-installer
+  config:
+    configType: Inline
+    inline:
+      watchNamespace: ${TARGET_NAMESPACE}
 "
 if [ -n "${SOURCE_NAME:-}" ]; then
   echo "ℹ️ Using custom CatalogSource ref: ${SOURCE_NAME}"
