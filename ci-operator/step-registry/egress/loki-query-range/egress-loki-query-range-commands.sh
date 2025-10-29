@@ -27,7 +27,7 @@ oc -n "${LOKI_NAMESPACE}" wait --for=condition=Ready --timeout=300s pod -l app=l
 # Port-forward and query
 oc -n "${LOKI_NAMESPACE}" port-forward "svc/${LOKI_SERVICE}" 3100:3100 >/tmp/loki-pf.log 2>&1 &
 pf_pid=$!
-trap "kill ${pf_pid}" EXIT
+trap 'kill ${pf_pid}' EXIT
 sleep 5
 
 out_json="${ARTIFACT_DIR}/loki-query-range.json"
