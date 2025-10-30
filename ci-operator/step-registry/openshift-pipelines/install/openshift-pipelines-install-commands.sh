@@ -35,25 +35,21 @@ function cleanup-collect() {
     if [[ $MAP_TESTS == "true" ]]; then
       install_yq_if_not_exists
       original_results="${ARTIFACT_DIR}/original_results/"
-      mkdir "${original_results}"
+      mkdir "${original_results}" || true
       echo "Collecting original results in ${original_results}"
 
-      find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
-        base_dir=$(basename "$(dirname "${result_file}")")
-        file_name=$(basename "${result_file}")
-
-        # Keep a copy of all the original Junit files before modifying them
-        cp -r "${result_file}" "${original_results}/${base_dir}_${file_name}"
-
-        # Send junit file to shared dir for Data Router Reporter step
-        cp -r "${result_file}" "${SHARED_DIR}/${base_dir}_${file_name}"
-      done
+      # Keep a copy of all the original Junit files before modifying them
+      cp -r "${ARTIFACT_DIR}"/xml-report/ "${original_results}" || echo "Warning: couldn't copy original files" >&2
 
       # Remove timestamped dir to avoid spacing in filename
-      mv "${ARTIFACT_DIR}/xml-report/*/result.xml" "${ARTIFACT_DIR}/xml-report/"
+      mv "${ARTIFACT_DIR}"/xml-report/*/result.xml "${ARTIFACT_DIR}/xml-report/" || echo "Warning: couldn't move file to top level dir" >&2
 
+      result_file="${ARTIFACT_DIR}/xml-report/result.xml"
       # Map tests if needed for related use cases
-      mapTestsForComponentReadiness "${ARTIFACT_DIR}/xml-report/result.xml"
+      mapTestsForComponentReadiness $result_file
+
+      # Send modified file to shared dir for Data Router Reporter step
+      cp "${result_file}" "${SHARED_DIR}" || echo "Warning: couldn't copy files to SHARED_DIR" >&2
     fi
 }
 

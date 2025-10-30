@@ -35,21 +35,18 @@ function cleanup-collect() {
     if [[ $MAP_TESTS == "true" ]]; then
       install_yq_if_not_exists
       original_results="${ARTIFACT_DIR}/original_results/"
-      mkdir "${original_results}"
+      mkdir "${original_results}" || true
       echo "Collecting original results in ${original_results}"
 
       find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
-        base_dir=$(basename "$(dirname "${result_file}")")
-        file_name=$(basename "${result_file}")
-
         # Keep a copy of all the original Junit files before modifying them
-        cp -r "${result_file}" "${original_results}/${base_dir}_${file_name}"
+        cp "${result_file}" "${original_results}/" || echo "Warning: couldn't copy original file ${result_file}" >&2
 
         # Map tests if needed for related use cases
         mapTestsForComponentReadiness "${result_file}"
 
         # Send junit file to shared dir for Data Router Reporter step
-        cp -r "${result_file}" "${SHARED_DIR}/${base_dir}_${file_name}"
+        cp "${result_file}" "${SHARED_DIR}/" || echo "Warning: couldn't copy ${result_file} to SHARED_DIR" >&2
       done
     fi
 }
