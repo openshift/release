@@ -13,7 +13,7 @@ terraform version
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 mkdir -p $ARTIFACT_DIR
 original_results="${ARTIFACT_DIR}/original_results/"
-mkdir "${original_results}"
+mkdir "${original_results}" || true
 
 function install_yq() {
     # Install yq manually if not found in image
@@ -61,17 +61,14 @@ function copyArtifacts {
 
             if [[ $MAP_TESTS == "true" ]]; then
               echo "Collecting original results in ${original_results}"
-              base_dir=$(basename "$(dirname "${result_file}")")
-              file_name=$(basename "${result_file}")
-
               # Keep a copy of all the original Junit files before modifying them
-              cp -r "${result_file}" "${original_results}/${base_dir}_${file_name}"
+              cp -r $result_file "${original_results}" || echo "Warning: couldn't copy original file ${results_file}" >&2
 
               # Map tests if needed for related use cases
               mapTestsForComponentReadiness "${result_file}"
 
               # Send junit file to shared dir for Data Router Reporter step
-              cp -r "${result_file}" "${SHARED_DIR}/${base_dir}_${file_name}"
+              cp -r $result_file $SHARED_DIR || echo "Warning: couldn't send result file to SHARED_DIR" >&2
             fi
         fi
     done
