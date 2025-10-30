@@ -75,23 +75,58 @@ tests:
           - {}
         EOF
 
-        echo "--- DIAGNOSING NETWORK ENVIRONMENT ---"
-        echo "--> Applied NetworkPolicy:"
-        oc get networkpolicy -n "${NAMESPACE}" -o yaml
-        echo "--> Pods in test namespace:"
-        oc get pods -n "${NAMESPACE}" -o wide
-        echo "--> Checking connectivity to Kubernetes API:"
-        curl --fail -k https://kubernetes.default.svc/version
-        echo "--- END DIAGNOSING NETWORK ENVIRONMENT ---"
-
         echo "--- Preparing artifact directory ---"
         mkdir -p "${ARTIFACT_DIR}/tls-scanner"
 
         echo "--- Running scanner ---"
-        /usr/local/bin/tls-scanner \
-          --all-pods \
-          --csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv" \
-          --log-file "${ARTIFACT_DIR}/tls-scanner/scanner.log"
+        SCANNER_POD_NAME="tls-scanner-$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 5 | head -n 1)"
+        
+        # We need to run the scanner inside a pod on the test cluster so that it can reach
+        # the internal pod IPs. The scanner will write its results to /tmp/artifacts inside the pod.
+        echo "--- Launching scanner pod (${SCANNER_POD_NAME}) on test cluster ---"
+        echo "Using image: ${PULL_SPEC_TLS_SCANNER_TOOL}"
+        oc run "${SCANNER_POD_NAME}" \
+          --image="${PULL_SPEC_TLS_SCANNER_TOOL}" \
+          --namespace="${NAMESPACE}" \
+          --restart=Never \
+          --command -- /bin/bash -c 'mkdir -p /tmp/artifacts && /usr/local/bin/tls-scanner --all-pods --csv-file /tmp/artifacts/report.csv --log-file /tmp/artifacts/scanner.log'
+
+        # Wait for the pod to finish its run.
+        echo "--- Waiting for scanner pod to complete ---"
+        for i in $(seq 1 60); do
+          POD_STATUS="$(oc get "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")"
+          if [[ "${POD_STATUS}" == "Succeeded" || "${POD_STATUS}" == "Failed" ]]; then
+            break
+          fi
+          echo "Pod status is ${POD_STATUS} (attempt ${i}/60), waiting..."
+          if [[ "${i}" -gt 1 ]]; then
+             echo "Describing scanner pod for more details:"
+             oc describe "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}"
+             echo "Recent events in namespace:"
+             oc get events --namespace="${NAMESPACE}" --sort-by='.lastTimestamp' | tail -n 10
+          fi
+          sleep 30
+        done
+        echo "Scanner pod finished with status: ${POD_STATUS}"
+
+        echo "--- Final state of scanner pod ---"
+        oc describe "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}"
+
+        # Copy the results and logs from the completed pod to the CI artifacts directory.
+        echo "--- Collecting logs and artifacts from scanner pod ---"
+        oc logs "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}" > "${ARTIFACT_DIR}/tls-scanner/pod-scanner.log"
+        oc rsync "${SCANNER_POD_NAME}:/tmp/artifacts/" "${ARTIFACT_DIR}/" --namespace="${NAMESPACE}" --no-perms
+        
+        echo "--- Cleaning up scanner pod ---"
+        oc delete "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}"
+        
+        # If the pod failed, fail the CI job.
+        if [[ "${POD_STATUS}" != "Succeeded" ]]; then
+          echo "Error: The scanner pod did not complete successfully."
+          exit 1
+        fi
+        
+        echo "--- Scanner finished ---"
       dependencies:
       - env: PULL_SPEC_TLS_SCANNER_TOOL
         name: tls-scanner-tool
