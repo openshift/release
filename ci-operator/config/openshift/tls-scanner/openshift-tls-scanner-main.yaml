@@ -75,6 +75,15 @@ tests:
           - {}
         EOF
 
+        echo "--- DIAGNOSING NETWORK ENVIRONMENT ---"
+        echo "--> Applied NetworkPolicy:"
+        oc get networkpolicy -n "${NAMESPACE}" -o yaml
+        echo "--> Pods in test namespace:"
+        oc get pods -n "${NAMESPACE}" -o wide
+        echo "--> Checking connectivity to Kubernetes API:"
+        curl --fail -k https://kubernetes.default.svc/version
+        echo "--- END DIAGNOSING NETWORK ENVIRONMENT ---"
+
         echo "--- Preparing artifact directory ---"
         mkdir -p "${ARTIFACT_DIR}/tls-scanner"
 
