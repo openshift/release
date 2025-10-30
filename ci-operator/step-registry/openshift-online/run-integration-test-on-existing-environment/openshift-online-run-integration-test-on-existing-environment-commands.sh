@@ -5,6 +5,8 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
+alias docker=podman
+
 unset GOFLAGS
 
 export AWS_TEST_ACCOUNT_ID; AWS_TEST_ACCOUNT_ID=$(cat /var/run/integration-tokens/AWS_TEST_ACCOUNT_ID)

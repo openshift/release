@@ -5,6 +5,8 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
+alias docker=podman
+
 unset GOFLAGS
 
 export OSD_ADMIN_ACCESS_KEY_ID; OSD_ADMIN_ACCESS_KEY_ID=$(cat /var/run/integration-tokens/OSD_ADMIN_ACCESS_KEY_ID)
