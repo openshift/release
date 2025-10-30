@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  flowlogs-pipeline:
+    name: flowlogs-pipeline
+    namespace: netobserv
+    tag: ci
   golangci-lint:
     name: golangci-lint
     namespace: ci
@@ -15,6 +19,18 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  netobserv-ebpf-agent:
+    name: netobserv-ebpf-agent
+    namespace: netobserv
+    tag: ci
+  network-observability-console-plugin:
+    name: network-observability-console-plugin
+    namespace: netobserv
+    tag: ci
+  network-observability-operator:
+    name: network-observability-operator
+    namespace: netobserv
+    tag: ci
   ocp_4.16_base-rhel9:
     name: "4.21"
     namespace: ocp
@@ -842,17 +858,15 @@ tests:
   optional: true
   steps:
     cluster_profile: aws-3
-    dependency_overrides:
-      flowlogs-pipeline: quay.io/netobserv/flowlogs-pipeline:ci
-      netobserv-ebpf-agent: quay.io/netobserv/netobserv-ebpf-agent:ci
-      network-observability-console-plugin: quay.io/netobserv/network-observability-console-plugin:ci
-      network-observability-operator: quay.io/netobserv/network-observability-operator:ci
     env:
       TEST_SUITE: openshift/conformance/parallel
     pre:
+    - chain: ipi-aws-pre
     - ref: netobserv-install-operator
-    workflow: openshift-e2e-aws-ovn
-  timeout: 6h0m0s
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift

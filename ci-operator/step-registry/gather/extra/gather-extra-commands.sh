@@ -563,6 +563,16 @@ ${t_all}     cluster:etcd:write:requests:latency:total:quantile histogram_quanti
 ${t_install} cluster:etcd:write:requests:latency:install:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_install}])) by (le,scope))
 ${t_test}    cluster:etcd:write:requests:latency:test:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_test}])) by (le,scope))
 
+${t_test}    cluster:etcd:disk:wal:fsync:test:p999:quantile avg(histogram_quantile(0.999, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:p99:quantile avg(histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:p95:quantile avg(histogram_quantile(0.95, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:p50:quantile avg(histogram_quantile(0.50, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+
+${t_test}    cluster:etcd:disk:backend:commit:test:p999:quantile avg(histogram_quantile(0.999, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:p99:quantile avg(histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:p95:quantile avg(histogram_quantile(0.95, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:p50:quantile avg(histogram_quantile(0.50, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+
 ${t_all}     cluster:etcd:read:requests:latency:total:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope)
 ${t_install} cluster:etcd:read:requests:latency:install:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope)
 ${t_test}    cluster:etcd:read:requests:latency:test:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_test}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_test}])) by (le,scope)
