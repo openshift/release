@@ -101,4 +101,143 @@ echo "==========================================================================
 oc get nodes -l node-role.kubernetes.io/worker
 
 echo ""
-echo "Nodes have successfully rebooted and recovered!"
+echo "=========================================================================="
+echo "$(date --rfc-3339=seconds) Verifying Hosted Cluster control plane recovery"
+echo "=========================================================================="
+
+# Get the hosted cluster namespace from shared directory
+HOSTED_CLUSTER_NAMESPACE=""
+if [ -f "${SHARED_DIR}/hostedcluster_namespace" ]; then
+    HOSTED_CLUSTER_NAMESPACE=$(cat "${SHARED_DIR}/hostedcluster_namespace")
+elif [ -f "${SHARED_DIR}/hosted_cluster_namespace" ]; then
+    HOSTED_CLUSTER_NAMESPACE=$(cat "${SHARED_DIR}/hosted_cluster_namespace")
+fi
+
+# Try to find it from hosted clusters
+if [ -z "${HOSTED_CLUSTER_NAMESPACE}" ]; then
+    echo "Attempting to discover hosted cluster namespace..."
+    HOSTED_CLUSTER_NAMESPACE=$(oc get hostedcluster -A --no-headers -o custom-columns=NAMESPACE:.metadata.namespace | head -n1)
+fi
+
+if [ -z "${HOSTED_CLUSTER_NAMESPACE}" ]; then
+    echo "WARNING: Could not determine hosted cluster namespace, skipping hosted cluster verification"
+    echo "Nodes have successfully rebooted and recovered!"
+    exit 0
+fi
+
+echo "Hosted cluster namespace: ${HOSTED_CLUSTER_NAMESPACE}"
+
+# Get the hosted cluster name
+HOSTED_CLUSTER_NAME=$(oc get hostedcluster -n "${HOSTED_CLUSTER_NAMESPACE}" --no-headers -o custom-columns=NAME:.metadata.name | head -n1)
+if [ -z "${HOSTED_CLUSTER_NAME}" ]; then
+    echo "WARNING: Could not find hosted cluster in namespace ${HOSTED_CLUSTER_NAMESPACE}"
+    echo "Nodes have successfully rebooted and recovered!"
+    exit 0
+fi
+
+echo "Hosted cluster name: ${HOSTED_CLUSTER_NAME}"
+
+# Determine the control plane namespace (typically clusters-<namespace>)
+CONTROL_PLANE_NAMESPACE="clusters-${HOSTED_CLUSTER_NAMESPACE}"
+echo "Control plane namespace: ${CONTROL_PLANE_NAMESPACE}"
+
+# Wait for control plane pods to stabilize after reboot
+echo ""
+echo "Waiting 60s for control plane pods to stabilize..."
+sleep 60
+
+echo ""
+echo "Checking critical control plane components..."
+echo ""
+
+# Check all pods in control plane namespace
+echo "All pods in ${CONTROL_PLANE_NAMESPACE}:"
+oc get pods -n "${CONTROL_PLANE_NAMESPACE}" || {
+    echo "ERROR: Failed to get pods in control plane namespace"
+    exit 1
+}
+
+echo ""
+echo "=========================================================================="
+echo "Verifying openshift-apiserver and ingress-operator pods"
+echo "=========================================================================="
+
+# Check for critical pods
+CRITICAL_PODS=$(oc get pods -n "${CONTROL_PLANE_NAMESPACE}" | grep -E "ingress-operator|openshift-apiserver" || true)
+if [ -z "${CRITICAL_PODS}" ]; then
+    echo "ERROR: No ingress-operator or openshift-apiserver pods found!"
+    exit 1
+fi
+
+echo "${CRITICAL_PODS}"
+echo ""
+
+# Check for pods in bad states
+BAD_STATES=$(oc get pods -n "${CONTROL_PLANE_NAMESPACE}" | grep -E "ingress-operator|openshift-apiserver" | grep -E "CrashLoopBackOff|Error|ImagePullBackOff" || true)
+if [ -n "${BAD_STATES}" ]; then
+    echo "ERROR: Found pods in bad states:"
+    echo "${BAD_STATES}"
+    echo ""
+    echo "Pod details:"
+    oc describe pods -n "${CONTROL_PLANE_NAMESPACE}" -l app=openshift-apiserver || true
+    oc describe pods -n "${CONTROL_PLANE_NAMESPACE}" -l app=ingress-operator || true
+    exit 1
+fi
+
+# Check for permission errors in openshift-apiserver logs
+echo ""
+echo "Checking openshift-apiserver initContainer logs for permission errors..."
+APISERVER_PODS=$(oc get pods -n "${CONTROL_PLANE_NAMESPACE}" -l app=openshift-apiserver --no-headers -o custom-columns=NAME:.metadata.name || true)
+if [ -n "${APISERVER_PODS}" ]; then
+    for POD in ${APISERVER_PODS}; do
+        echo "Checking pod: ${POD}"
+        # Check initContainer logs for permission errors
+        INIT_LOGS=$(oc logs -n "${CONTROL_PLANE_NAMESPACE}" "${POD}" -c oas-trust-anchor-generator 2>&1 || true)
+        if echo "${INIT_LOGS}" | grep -i "permission denied"; then
+            echo "ERROR: Found permission errors in pod ${POD}:"
+            echo "${INIT_LOGS}"
+            exit 1
+        fi
+        echo "  ✓ No permission errors found"
+    done
+else
+    echo "WARNING: No openshift-apiserver pods found to check logs"
+fi
+
+# Verify pods are Running and Ready
+echo ""
+echo "Verifying all critical pods are Running and Ready..."
+NOT_RUNNING=$(oc get pods -n "${CONTROL_PLANE_NAMESPACE}" | grep -E "ingress-operator|openshift-apiserver" | grep -v "Running" || true)
+if [ -n "${NOT_RUNNING}" ]; then
+    echo "ERROR: Found pods not in Running state:"
+    echo "${NOT_RUNNING}"
+    exit 1
+fi
+
+# Check readiness
+NOT_READY=$(oc get pods -n "${CONTROL_PLANE_NAMESPACE}" | grep -E "ingress-operator|openshift-apiserver" | grep "0/" || true)
+if [ -n "${NOT_READY}" ]; then
+    echo "WARNING: Found pods not ready:"
+    echo "${NOT_READY}"
+    echo "Waiting an additional 120s for pods to become ready..."
+    sleep 120
+
+    # Check again
+    NOT_READY=$(oc get pods -n "${CONTROL_PLANE_NAMESPACE}" | grep -E "ingress-operator|openshift-apiserver" | grep "0/" || true)
+    if [ -n "${NOT_READY}" ]; then
+        echo "ERROR: Pods still not ready after waiting:"
+        echo "${NOT_READY}"
+        exit 1
+    fi
+fi
+
+echo ""
+echo "=========================================================================="
+echo "✓ SUCCESS: All critical components recovered successfully!"
+echo "=========================================================================="
+echo "- Management cluster nodes: Ready"
+echo "- openshift-apiserver: Running and Ready"
+echo "- ingress-operator: Running and Ready"
+echo "- No permission errors detected"
+echo ""
+echo "OCPBUGS-61829 fix verified: Control plane recovered without manual intervention!"
