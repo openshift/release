@@ -13,21 +13,29 @@ export AWS_REGION=${HYPERSHIFT_AWS_REGION:-us-east-1}
 echo "Using kubeconfig: ${KUBECONFIG}"
 echo "AWS Region: ${AWS_REGION}"
 
-# Get all worker nodes
-echo "Getting list of worker nodes..."
-WORKER_NODES=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers -o custom-columns=NAME:.metadata.name)
-NODE_COUNT=$(echo "${WORKER_NODES}" | wc -l)
+# Determine which nodes to reboot based on REBOOT_ALL_NODES flag
+if [ "${REBOOT_ALL_NODES}" = "true" ]; then
+    echo "Getting list of all nodes (master + worker)..."
+    NODES=$(oc get nodes --no-headers -o custom-columns=NAME:.metadata.name)
+    NODE_TYPE="all nodes (master + worker)"
+else
+    echo "Getting list of worker nodes..."
+    NODES=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers -o custom-columns=NAME:.metadata.name)
+    NODE_TYPE="worker nodes"
+fi
+
+NODE_COUNT=$(echo "${NODES}" | wc -l)
 
 if [ "${NODE_COUNT}" -eq 0 ]; then
-    echo "ERROR: No worker nodes found in the management cluster"
+    echo "ERROR: No nodes found in the management cluster"
     exit 1
 fi
 
-echo "Found ${NODE_COUNT} worker nodes to reboot"
+echo "Found ${NODE_COUNT} ${NODE_TYPE} to reboot"
 
-# Get AWS instance IDs for all worker nodes
+# Get AWS instance IDs for all nodes to reboot
 INSTANCE_IDS=()
-for NODE in ${WORKER_NODES}; do
+for NODE in ${NODES}; do
     echo "Getting AWS instance ID for node: ${NODE}"
     INSTANCE_ID=$(oc get node "${NODE}" -o jsonpath='{.spec.providerID}' | cut -d'/' -f5)
     if [ -z "${INSTANCE_ID}" ]; then
@@ -64,12 +72,21 @@ sleep "${REBOOT_WAIT_TIME}"
 
 echo ""
 echo "=========================================================================="
-echo "$(date --rfc-3339=seconds) Waiting for nodes to recover (max ${RECOVERY_WAIT_TIME}s)..."
+echo "Waiting for Hosting Cluster nodes to recover (max ${RECOVERY_WAIT_TIME}s)..."
 echo "=========================================================================="
+echo "$(date --rfc-3339=seconds) Step 4: Observing Hosting Cluster recovery"
+echo ""
 
 # Wait for nodes to become Ready again
 START_TIME=$(date +%s)
 TIMEOUT=${RECOVERY_WAIT_TIME}
+
+# Determine which nodes to check based on what we rebooted
+if [ "${REBOOT_ALL_NODES}" = "true" ]; then
+    CHECK_SELECTOR=""  # Check all nodes
+else
+    CHECK_SELECTOR="-l node-role.kubernetes.io/worker"  # Check only workers
+fi
 
 while true; do
     CURRENT_TIME=$(date +%s)
@@ -78,15 +95,19 @@ while true; do
     if [ ${ELAPSED} -ge ${TIMEOUT} ]; then
         echo "ERROR: Timeout waiting for nodes to recover after ${TIMEOUT}s"
         echo "Current node status:"
-        oc get nodes -l node-role.kubernetes.io/worker
+        oc get nodes
         exit 1
     fi
 
-    # Check if all nodes are Ready
-    NOT_READY=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | grep -v " Ready " | wc -l || true)
+    # Check if all rebooted nodes are Ready
+    if [ "${REBOOT_ALL_NODES}" = "true" ]; then
+        NOT_READY=$(oc get nodes --no-headers | grep -v " Ready " | wc -l || true)
+    else
+        NOT_READY=$(oc get nodes ${CHECK_SELECTOR} --no-headers | grep -v " Ready " | wc -l || true)
+    fi
 
     if [ "${NOT_READY}" -eq 0 ]; then
-        echo "$(date --rfc-3339=seconds) All nodes are Ready!"
+        echo "$(date --rfc-3339=seconds) All Hosting Cluster nodes are Ready!"
         break
     fi
 
@@ -96,14 +117,19 @@ done
 
 echo ""
 echo "=========================================================================="
-echo "$(date --rfc-3339=seconds) Node reboot completed successfully"
+echo "$(date --rfc-3339=seconds) Hosting Cluster nodes recovered successfully"
 echo "=========================================================================="
-oc get nodes -l node-role.kubernetes.io/worker
+echo "All nodes:"
+oc get nodes
 
 echo ""
 echo "=========================================================================="
-echo "$(date --rfc-3339=seconds) Verifying Hosted Cluster control plane recovery"
+echo "$(date --rfc-3339=seconds) Step 5: Observing Hosted Cluster state"
 echo "=========================================================================="
+echo ""
+echo "Verifying that Hosted Cluster control plane recovered after"
+echo "Hosting Cluster node reboot..."
+echo ""
 
 # Get the hosted cluster namespace from shared directory
 HOSTED_CLUSTER_NAMESPACE=""
@@ -233,11 +259,25 @@ fi
 
 echo ""
 echo "=========================================================================="
-echo "✓ SUCCESS: All critical components recovered successfully!"
+echo "✓ SUCCESS: OCPBUGS-61829 Verification Passed"
 echo "=========================================================================="
-echo "- Management cluster nodes: Ready"
-echo "- openshift-apiserver: Running and Ready"
-echo "- ingress-operator: Running and Ready"
-echo "- No permission errors detected"
 echo ""
-echo "OCPBUGS-61829 fix verified: Control plane recovered without manual intervention!"
+echo "Bug Reproduction Steps Completed:"
+echo "  1. ✓ Hosting Cluster running HyperShift"
+echo "  2. ✓ Hosted Cluster deployed"
+echo "  3. ✓ Hosting Cluster nodes restarted (simulating full cluster reboot)"
+echo "  4. ✓ Hosting Cluster nodes recovered"
+echo "  5. ✓ Hosted Cluster state observed"
+echo ""
+echo "Verification Results:"
+echo "  ✓ Hosting Cluster nodes: Ready"
+echo "  ✓ openshift-apiserver: Running and Ready"
+echo "  ✓ ingress-operator: Running and Ready"
+echo "  ✓ No permission errors in initContainer logs"
+echo "  ✓ No stuck or unhealthy pods"
+echo "  ✓ No manual intervention required"
+echo ""
+echo "OCPBUGS-61829 FIX VERIFIED: Control plane recovered automatically!"
+echo "The initContainer cleanup logic successfully prevents permission errors"
+echo "after Hosting Cluster node reboots."
+echo "=========================================================================="

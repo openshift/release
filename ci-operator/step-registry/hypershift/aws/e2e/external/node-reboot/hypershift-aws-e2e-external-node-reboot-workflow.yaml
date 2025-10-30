@@ -1,24 +1,45 @@
 workflow:
   as: hypershift-aws-e2e-external-node-reboot
   documentation: |-
-    The HyperShift AWS e2e node-reboot workflow tests recovery after management cluster node reboots.
+    OCPBUGS-61829 Node Reboot Recovery Test Workflow
 
-    This workflow verifies the fix for OCPBUGS-61829 by:
-    1. Creating a hosted cluster on AWS
-    2. Running initial e2e tests
-    3. Rebooting all management cluster nodes (simulating hosting cluster reboot)
-    4. Verifying hosted cluster control plane recovers without permission errors
-    5. Running validation tests to ensure openshift-apiserver and other components are healthy
+    This workflow reproduces and verifies the fix for OCPBUGS-61829:
+    "openshift-apiserver initContainer fails with permission denied after
+    hosting cluster node reboot"
 
-    This test ensures that after management cluster node reboots, the openshift-apiserver
-    initContainer properly cleans up stale files and doesn't encounter permission errors.
+    Bug Reproduction Steps (from OCPBUGS-61829):
+      1. Deploy a Hosting Cluster running HyperShift → (setup phase)
+      2. Deploy Hosted Cluster using the Hosting Cluster → (test pre phase)
+      3. Restart the Hosting Cluster nodes (full cluster reboot) → (test reboot step)
+      4. Observe Hosting Cluster becomes available again → (test reboot step)
+      5. Observe the state of Hosted Clusters → (test verification)
+
+    What This Workflow Does:
+      PRE: Setup management cluster (AWS IPI) + Install HyperShift operator
+      TEST 1: Create hosted cluster + run e2e tests (steps 1-2 above)
+      TEST 2: Reboot management cluster nodes (steps 3-4 above)
+      TEST 3: Verify control plane recovery (step 5 above)
+             - Checks openshift-apiserver pods are Running and Ready
+             - Checks ingress-operator pods are Running and Ready
+             - Verifies no permission errors in initContainer logs
+             - Ensures no manual pod deletion was needed
+      POST: Cleanup
+
+    Expected Result:
+      ✓ Control plane pods recover automatically without permission errors
+      ✓ No stuck or unhealthy pods requiring manual intervention
+
+    Platform Note:
+      This test uses AWS instead of agent/baremetal (original bug scenario)
+      because the bug occurs in control plane pods on the Hosting Cluster,
+      which are identical regardless of Hosted Cluster platform.
 
     For questions, contact the HyperShift team:
     - Alberto Lamela (agarcial@redhat.com)
     - Seth Jennings (sjenning@redhat.com)
     - Cesar Wong (cewong@redhat.com)
 
-    Learn more about HyperShift: https://github.com/openshift/hypershift
+    Learn more: https://github.com/openshift/hypershift
   steps:
     post:
     - chain: hypershift-destroy-nested-management-cluster

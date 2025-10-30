@@ -14,6 +14,9 @@ ref:
     - default: ${SHARED_DIR}/management_cluster_kubeconfig
       name: KUBECONFIG
       documentation: "Path to the management cluster kubeconfig"
+    - default: "false"
+      name: REBOOT_ALL_NODES
+      documentation: "If true, reboot all nodes (master+worker). If false, reboot only worker nodes (default: false)"
     - default: "300"
       name: REBOOT_WAIT_TIME
       documentation: "Time in seconds to wait after triggering node reboot (default: 300s / 5min)"
@@ -27,6 +30,17 @@ ref:
       memory: 100Mi
   timeout: 30m0s
   documentation: |-
-    Reboots all worker nodes in the AWS management cluster and waits for recovery.
-    This simulates the OCPBUGS-61829 scenario where hosting cluster nodes reboot
-    and control plane pods need to recover without permission errors.
+    Reboots AWS management cluster nodes to verify OCPBUGS-61829 fix.
+
+    This step reproduces the bug scenario:
+      1. Hosting Cluster (management cluster) running HyperShift ✓ (pre-requisite)
+      2. Hosted Cluster deployed ✓ (pre-requisite)
+      3. Restart Hosting Cluster nodes (this step - simulates full cluster reboot)
+      4. Observe Hosting Cluster recovery (this step - waits for nodes Ready)
+      5. Observe Hosted Cluster state (this step - verifies control plane recovery)
+
+    By default, reboots worker nodes where HyperShift control plane pods run.
+    Set REBOOT_ALL_NODES=true to reboot all nodes (master+worker) for full cluster reboot.
+
+    Verifies that control plane pods (especially openshift-apiserver) recover
+    automatically without permission errors or manual intervention.
