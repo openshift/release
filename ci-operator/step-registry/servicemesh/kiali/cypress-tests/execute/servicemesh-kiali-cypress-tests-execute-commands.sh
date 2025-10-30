@@ -31,7 +31,7 @@ function mapTestsForComponentReadiness() {
         if [ -f "${results_file}" ]; then
             install_yq_if_not_exists
             echo "Mapping Kiali Cypress Test Suite Name To: Servicemesh-lp-interop"
-            yq eval -px -ox -iI0 '.testsuites.testsuite."+@name" = "Servicemesh-lp-interop"' "${results_file}" || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+            yq eval -px -ox -iI0 '.testsuites."+@name" = "Servicemesh-lp-interop"' "${results_file}" || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
