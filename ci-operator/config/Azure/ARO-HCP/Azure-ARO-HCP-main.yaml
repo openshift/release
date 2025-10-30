@@ -40,6 +40,28 @@ images:
       - destination_dir: src
         source_path: /go/src/github.com/Azure/ARO-HCP
   to: nested-podman-src
+- dockerfile_literal: |
+    FROM src-plus-az
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    USER root
+    RUN az bicep install
+    RUN mkdir -p /usr/local/bin
+    RUN az aks install-cli --install-location /usr/local/bin/kubectl --kubelogin-install-location /usr/local/bin/kubelogin
+    RUN export GOPATH=/opt/app-root && \
+        mkdir -p $GOPATH/bin && \
+        export GOFLAGS='-mod=readonly' && \
+        make install-tools && \
+        make -C tooling/templatize templatize
+    # Ensure all tools are in PATH
+    ENV PATH="/usr/local/bin:/opt/app-root/bin:$PATH"
+  from: src-plus-az
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/Azure/ARO-HCP
+  to: aro-hcp-e2e-tools
 resources:
   '*':
     limits:
@@ -169,16 +191,19 @@ tests:
     - chain: aro-hcp-provision-teardown-cluster
     test:
     - ref: aro-hcp-tests-run-aro-hcp-tests
-- always_run: false
-  as: create-dev-env
+- always_run: true
+  as: run-e2e-local
   optional: true
   steps:
+    allow_best_effort_post_steps: true
     env:
       CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+      LOCATION: westus3
     post:
     - ref: aro-hcp-provision-delete-dev-env
+    - ref: aro-hcp-provision-aro-hcp-gather-visualization
     test:
-    - ref: aro-hcp-provision-create-dev-env
+    - ref: aro-hcp-provision-run-e2e-local
 zz_generated_metadata:
   branch: main
   org: Azure

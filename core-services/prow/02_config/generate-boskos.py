@@ -237,6 +237,9 @@ CONFIG = {
         'usgovvirginia': 5,
         'usgovtexas': 5
     },
+    'aro-hcp-dev-quota-slice': {
+        'default': 10,
+    },    
     'azure-sustaining-autorelease-412-quota-slice': {
         'eastus': 60,
     },
