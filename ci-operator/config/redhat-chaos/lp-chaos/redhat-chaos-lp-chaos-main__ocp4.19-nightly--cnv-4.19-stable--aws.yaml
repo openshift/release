@@ -3,6 +3,24 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: cli
+images:
+- dockerfile_literal: |
+    FROM cli
+
+    # Install openssh-clients and jq
+    RUN PACKAGES="openssh-clients jq" && \
+        (dnf install --setopt=tsflags=nodocs -y $PACKAGES || microdnf install -y $PACKAGES) && \
+        (dnf clean all || microdnf clean all) && rm -rf /var/cache/dnf/*
+
+    # Install YQ (Direct download)
+    RUN YQ_PATH="/usr/local/bin/yq" && \
+        curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o "${YQ_PATH}" && \
+        chmod +x "${YQ_PATH}"
+
+    # Verification
+    RUN jq --version && yq --version && ssh -V
+  from: cli
+  to: cli-plus-tools
 releases:
   latest:
     candidate:

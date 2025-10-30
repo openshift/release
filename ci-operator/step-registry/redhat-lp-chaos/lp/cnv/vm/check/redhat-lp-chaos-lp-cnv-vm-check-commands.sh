@@ -22,9 +22,6 @@ function CheckVmRunningStatus() {
     : 'All VMs are confirmed ready via API.'
 }
 
-# Install ssh tool
-dnf install -y sshpass openssh-clients >/dev/null 2>&1
-
 # Install virtctl tool
 function InstallAndVerifyVirtctl() {
     : '--- Step 1: Install & Verify virtctl from OpenShift Cluster ---'
