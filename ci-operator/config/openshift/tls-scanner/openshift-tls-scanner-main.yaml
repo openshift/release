@@ -51,6 +51,11 @@ tests:
         set -o errexit
         set -o pipefail
 
+        echo "--- DIAGNOSING NETWORK ---"
+        ip addr
+        ip route
+        echo "--- END DIAGNOSING NETWORK ---"
+        
         # The CI system injects the test namespace into this variable.
         # We add a check to ensure it's set before proceeding.
         if [ -z "${NAMESPACE:-}" ]; then
@@ -60,7 +65,6 @@ tests:
 
         echo "--- Creating namespace on the test cluster ---"
         oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
-        
 
         echo "--- Preparing artifact directory ---"
         mkdir -p "${ARTIFACT_DIR}/tls-scanner"
