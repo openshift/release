@@ -39,19 +39,16 @@ function cleanup-collect() {
       mkdir "${original_results}"
       echo "Collecting original results in ${original_results}"
 
+      # Keep a copy of all the original Junit files before modifying them
+      cp -r "${ARTIFACT_DIR}"/junit-* "${original_results}" || echo "Warning: couldn't copy original files" >&2
+
       find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
-        base_dir=$(basename "$(dirname "${result_file}")")
-        file_name=$(basename "${result_file}")
-
-        # Keep a copy of all the original Junit files before modifying them
-        cp "${result_file}" "${original_results}/${base_dir}_${file_name}"
-
         # Map tests if needed for related use cases
         mapTestsForComponentReadiness "${result_file}"
-
-        # Send junit file to shared dir for Data Router Reporter step
-        cp "${result_file}" "${SHARED_DIR}/${base_dir}_${file_name}"
       done
+
+      # Send modified files to shared dir for Data Router Reporter step
+      cp -r "${ARTIFACT_DIR}"/junit-* "${SHARED_DIR}" || echo "Warning: couldn't copy files to SHARED_DIR" >&2
     fi
 }
 
