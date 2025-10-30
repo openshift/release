@@ -33,6 +33,22 @@ then
   stalld_service=""
 fi
 
+echo "applying kernelType: realtime if it doesn't exist"
+# It's important that this matches the contents of the RT_ENABLED bits in ipi-conf-gcp-commands.sh
+oc apply -f - <<EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: realtime-worker
+spec:
+  kernelType: realtime
+EOF
+
+# probably grep output to see if it changed anything?
+if $?; then sleep 15; fi
+
 echo "Creating new realtime tuned profile on cluster"
 oc create -f - <<EOF
 apiVersion: tuned.openshift.io/v1
