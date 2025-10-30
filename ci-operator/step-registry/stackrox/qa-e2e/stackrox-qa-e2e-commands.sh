@@ -36,7 +36,7 @@ function cleanup-collect() {
     if [[ $MAP_TESTS == "true" ]]; then
       install_yq
       original_results="${ARTIFACT_DIR}/original_results/"
-      mkdir "${original_results}"
+      mkdir "${original_results}" || true
       echo "Collecting original results in ${original_results}"
 
       # Keep a copy of all the original Junit files before modifying them
