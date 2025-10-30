@@ -36,12 +36,12 @@ mapt_destroy() {
   echo "Using S3 bucket for state storage: ${BUCKET_NAME}"
   mapt aws openshift-snc destroy \
     --project-name ${UNIQUE_PROJECT_NAME} \
-    --backed-url "s3://${BUCKET_NAME}" 
+    --backed-url s3://${BUCKET_NAME} 
 
   # Clean up S3 bucket only if the deletion was successful
   if [ $? -eq 0 ]; then
     echo "Deleting S3 bucket: ${BUCKET_NAME}"
-    aws s3 rb "s3://${BUCKET_NAME}" --force
+    aws s3 rb s3://${BUCKET_NAME} --force
     echo "S3 bucket ${BUCKET_NAME} deleted"
   else
     echo "Cluster destruction failed. S3 bucket ${BUCKET_NAME} not deleted."

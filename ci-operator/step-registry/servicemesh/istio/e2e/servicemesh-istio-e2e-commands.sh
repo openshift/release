@@ -127,10 +127,18 @@ spec:
 EOF
 }
 
+## DEBUG
+echo "MAISTRA_NAMESPACE: ${MAISTRA_NAMESPACE}"
+echo "MAISTRA_BUILDER_IMAGE: ${MAISTRA_BUILDER_IMAGE}"
+echo "MAISTRA_SC_POD: ${MAISTRA_SC_POD}"
+ls -l "${SHARED_DIR}"
+ls -l "${SHARED_DIR}/mapt-connection"
+
 # Adding a condition in case the workflow used is servicemesh-mapt when KUBECONFIG is stored in SHARED_DIR/mapt-connection/kubeconfig
 if [[ -f "${SHARED_DIR}/mapt-connection/kubeconfig" ]]; then
   KUBECONFIG="${SHARED_DIR}/mapt-connection/kubeconfig"
   export KUBECONFIG
+  echo "Using KUBECONFIG from mapt-connection"
 fi
 
 create_namespace "${MAISTRA_NAMESPACE}"
