@@ -11,8 +11,9 @@ declare vmNamesForWait=""
 : '------------------------------------'
 
 : "--- 0. Install yq & jq if needed ---"
-yum install -y jq >/dev/null 2>&1 && \
-curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq >/dev/null 2>&1 && \
+curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /usr/local/bin/jq >/dev/null 2>&1
+chmod +x /usr/local/bin/jq >/dev/null 2>&1
+curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq >/dev/null 2>&1
 chmod +x /usr/local/bin/yq >/dev/null 2>&1
 
 : "--- 1. Creating namespace ${VM_NAMESPACE} ---"
