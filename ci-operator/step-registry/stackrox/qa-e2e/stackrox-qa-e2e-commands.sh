@@ -34,7 +34,7 @@ function mapTestsForComponentReadiness() {
 # Archive results function
 function cleanup-collect() {
     if [[ $MAP_TESTS == "true" ]]; then
-      install_yq_if_not_exists
+      install_yq
       original_results="${ARTIFACT_DIR}/original_results/"
       mkdir "${original_results}"
       echo "Collecting original results in ${original_results}"
