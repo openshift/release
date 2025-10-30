@@ -7,7 +7,7 @@ echo "$(date --rfc-3339=seconds) Rebooting AWS management cluster nodes"
 echo "=========================================================================="
 
 # Configure AWS credentials
-export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/.awscred
+export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
 export AWS_REGION=${HYPERSHIFT_AWS_REGION:-us-east-1}
 
 echo "Using kubeconfig: ${KUBECONFIG}"
