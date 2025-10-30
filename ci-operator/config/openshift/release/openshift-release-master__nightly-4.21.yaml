@@ -833,6 +833,25 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
+- as: e2e-aws-ovn-dedicated
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      DEDICATED_HOST: "yes"
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-edge-zones-quota-slice
+    observers:
+      enable:
+      - observers-resource-watch
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    - ref: ipi-deprovision-aws-dedicated-hosts
+    workflow: openshift-e2e-aws-ovn
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
