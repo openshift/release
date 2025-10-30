@@ -50,11 +50,6 @@ tests:
         set -o nounset
         set -o errexit
         set -o pipefail
-
-        echo "--- DIAGNOSING NETWORK ---"
-        ip addr
-        ip route
-        echo "--- END DIAGNOSING NETWORK ---"
         
         # The CI system injects the test namespace into this variable.
         # We add a check to ensure it's set before proceeding.
@@ -66,6 +61,10 @@ tests:
         echo "--- Creating namespace on the test cluster ---"
         oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
+        echo "--- Granting SCCs to the default service account ---"
+        oc adm policy add-scc-to-user anyuid -z default -n "${NAMESPACE}"
+        oc adm policy add-scc-to-user privileged -z default -n "${NAMESPACE}"
+        
         echo "--- Preparing artifact directory ---"
         mkdir -p "${ARTIFACT_DIR}/tls-scanner"
 
