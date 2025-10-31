@@ -1,0 +1,61 @@
+ref:
+  as: cucushift-installer-rehearse-azure-cases-all-regions-provision
+  from: upi-installer
+  grace_period: 10m
+  commands: cucushift-installer-rehearse-azure-cases-all-regions-provision-commands.sh
+  timeout: 24h0m0s
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  env:
+  - name: BASE_DOMAIN
+    default: "qe.azure.devcluster.openshift.com"
+  - name: BASE_DOMAIN_RESOURCE_GROUP
+    default: "os4-common"
+    documentation: |-
+      The base resource group where base domain resides.
+  - name: CONTROL_PLANE_INSTANCE_TYPE
+    default: ""
+    documentation: |-
+      The instance type to use for control plane nodes.
+  - name: COMPUTE_NODE_TYPE
+    default: ""
+    documentation: |-
+      The instance type to use for compute nodes
+  - name: OCP_ARCH
+    default: "arm64"
+    documentation: |-
+      The architecture of the control plane nodes (e.g., amd64, arm64).
+  - name: CUSTOM_REGION_LIST
+    default: ""
+    documentation: |-
+      If specified, only regions in this list will be tested, e.g. CUSTOM_REGION_LIST: "us-east-1 us-east-2"
+      REGIONS_IGNORED and SPILT_REGIONS will be ignored if CUSTOM_REGION_LIST is not empty.
+  - name: REGIONS_IGNORED
+    default: "centralus northcentralus westus2"
+    documentation: |-
+      Regions in this list will not be tested, e.g REGIONS_IGNORED: "westus3 westus2"
+      Some regions will not be tested in this test, e.g. westus is already covered in daily test.
+      It works only if CUSTOM_REGION_LIST is empty.
+  - name: SPILT_REGIONS
+    default: ""
+    documentation: |-
+      Currently there are more than 40 regions to be tested, it's really a long run test.
+      This parm can split regions into 4 parts, and pick one part to test.
+
+      Allowed values:
+      "": Default, all regions will be tested
+      "REGION_SET_A": The first part of `az provider show -n Microsoft.Resources -ojson | jq -r '.resourceTypes[] | select(.resourceType=="resourceGroups") | .locations[]' | sort`
+      "REGION_SET_B": The second part of `az provider show -n Microsoft.Resources -ojson | jq -r '.resourceTypes[] | select(.resourceType=="resourceGroups") | .locations[]' | sort`
+      "REGION_SET_C": The third part of `az provider show -n Microsoft.Resources -ojson | jq -r '.resourceTypes[] | select(.resourceType=="resourceGroups") | .locations[]' | sort`
+      "REGION_SET_D": The fouth part of `az provider show -n Microsoft.Resources -ojson | jq -r '.resourceTypes[] | select(.resourceType=="resourceGroups") | .locations[]' | sort`
+      It works only if CUSTOM_REGION_LIST is empty.
+  - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
+    default: ""
+    documentation: "Set to true to disable the Sigstore image signature policy to allow the installation of an unsigned release image. This is for internal CI testing only"
+  documentation: >-
+    Create clusters on all supported regions.
