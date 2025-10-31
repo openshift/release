@@ -10,6 +10,11 @@ make -C test/
 # use login script from the aro-hcp-provision-azure-login step
 /bin/bash "${SHARED_DIR}/az-login.sh"
 
+# Source Azure credentials for test code
+if [[ -f "${SHARED_DIR}/azure-credentials.env" ]]; then
+  source "${SHARED_DIR}/azure-credentials.env"
+fi
+
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
   export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
 fi

@@ -23,3 +23,10 @@ az account set --subscription "\${SUBSCRIPTION}"
 EOF
 
 chmod +x "${SHARED_DIR}/az-login.sh"
+
+# Export Azure credentials for test code to use
+cat > "${SHARED_DIR}/azure-credentials.env" <<EOF
+export AZURE_TENANT_ID='${TENANT_ID}'
+export AZURE_CLIENT_ID='${CLIENT_ID}'
+export AZURE_CLIENT_SECRET='${CLIENT_SECRET}'
+EOF
