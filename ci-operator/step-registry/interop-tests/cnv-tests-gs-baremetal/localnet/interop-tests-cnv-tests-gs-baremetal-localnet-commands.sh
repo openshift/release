@@ -87,14 +87,13 @@ function cnv::toggle_common_boot_image_import () {
       sed -E 's/.+v([0-9]+\.[0-9]+).*/\1/'
   ) in
     (4.19*|4.[2-9]+([0-9])*|@([5-9]|[1-9]+([0-9])).*)
-      local commonBootImageFeatFlagPath="$(
-        yq -n -o json -I 0 '.spec.enableCommonBootImageImport = $status' --arg status "${status}"
-)"
+      local commonBootImageFeatFlagPath && commonBootImageFeatFlagPath="$(
+        yq -n -o json -I 0 eval ".spec.enableCommonBootImageImport = ${status}"
       )"
       ;;
     (*)
-      local commonBootImageFeatFlagPath="$(
-        yq -n -o json -I 0 '.spec.featureGates.enableCommonBootImageImport = $status' --arg status "${status}"
+      local commonBootImageFeatFlagPath && commonBootImageFeatFlagPath="$(
+        yq -n -o json -I 0 eval ".spec.featureGates.enableCommonBootImageImport = ${status}"
       )"
       ;;
   esac
