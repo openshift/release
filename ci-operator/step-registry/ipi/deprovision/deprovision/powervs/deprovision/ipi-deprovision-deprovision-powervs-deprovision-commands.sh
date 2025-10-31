@@ -32,14 +32,18 @@ OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true"; export OPENSHIFT_INSTALL_REPORT
 # TODO: Remove after infra bugs are fixed 
 # TO confirm resources are cleared properly
 set +e
-for i in {1..3}; do 
+for i in {1..5}; do
   echo "Destroying cluster $i attempt..."
   echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
   openshift-install --dir /tmp/installer destroy cluster 
   ret="$?"
   echo "ret=${ret}"
   if [ ${ret} -eq 0 ]; then
+    echo "Cluster destroyed successfully on attempt $i"
     break
+  else
+    echo "Attempt $i failed. Retrying in 3 minutes"
+    sleep 180
   fi
 done
 set -e
