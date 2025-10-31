@@ -13,17 +13,18 @@ build_root:
 images:
 - additional_architectures:
   - arm64
-  dockerfile_path: ./build/Dockerfile
+  dockerfile_path: build/Dockerfile
   from: base
   inputs:
     stolostron_builder_go1.24-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   optional: true
-  to: cert-policy-controller
+  to: governance-policy-propagator
 promotion:
   to:
-  - name: "2.15"
+  - disabled: true
+    name: "2.16"
     namespace: stolostron
 resources:
   '*':
@@ -35,19 +36,19 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: cert-policy-controller
+      SOURCE_IMAGE_REF: governance-policy-propagator
     env:
-      IMAGE_REPO: cert-policy-controller
-      IMAGE_TAG: latest-2.15
+      IMAGE_REPO: governance-policy-propagator
+      IMAGE_TAG: latest-2.16
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: cert-policy-controller
+      SOURCE_IMAGE_REF: governance-policy-propagator
     env:
-      IMAGE_REPO: cert-policy-controller
+      IMAGE_REPO: governance-policy-propagator
       REGISTRY_ORG: stolostron
     test:
     - as: publish
@@ -67,6 +68,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.15
+  branch: release-2.16
   org: stolostron
-  repo: cert-policy-controller
+  repo: governance-policy-propagator
