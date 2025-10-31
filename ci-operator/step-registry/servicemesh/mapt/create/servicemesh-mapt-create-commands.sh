@@ -17,7 +17,7 @@ TEST_NAME=${TEST_NAME:-"servicemesh-mapt"}
 OCP_VERSION=${OCP_VERSION:-"4.20.0"}
 MAPT_TAGS=${MAPT_TAGS:-"ci=true,repo=openshift-servicemesh"}
 SPOT=${SPOT:-"true"}
-SPOT_INCREASE_RATIO=${SPOT_INCREASE_RATIO:-"40"}
+SPOT_INCREASE_RATE=${SPOT_INCREASE_RATE:-"40"}
 CPU=${CPU:-16}
 MEMORY=${MEMORY:-128}
 TIMEOUT=${TIMEOUT:-10m}
@@ -96,7 +96,7 @@ mapt_cluster_creation() {
 
   # Add --spot option if SPOT is set to true
   if [ "${SPOT}" = "true" ]; then
-    MAPT_COMMAND="${MAPT_COMMAND} --spot --spot-increase-ratio ${SPOT_INCREASE_RATIO}"
+    MAPT_COMMAND="${MAPT_COMMAND} --spot --spot-increase-rate ${SPOT_INCREASE_RATE}"
   fi
 
   echo "Executing: ${MAPT_COMMAND}"
