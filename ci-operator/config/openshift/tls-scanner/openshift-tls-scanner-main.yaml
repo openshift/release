@@ -1,0 +1,141 @@
+base_images:
+  base:
+    name: "4.21"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21: {}
+  to: tls-scanner-tool
+promotion: {}
+releases:
+  initial:
+    integration:
+      name: "4.21"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: run-scanner-on-cluster
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
+  steps:
+    test:
+    - as: run-scanner
+      commands: |-
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+        
+        # The CI system injects the test namespace into this variable.
+        # We add a check to ensure it's set before proceeding.
+        if [ -z "${NAMESPACE:-}" ]; then
+          echo "Error: The NAMESPACE environment variable is not set." >&2
+          exit 1
+        fi
+
+        echo "--- Creating namespace on the test cluster ---"
+        oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+
+        echo "--- Applying NetworkPolicy to allow egress traffic ---"
+        cat <<EOF | oc apply -n "${NAMESPACE}" -f -
+        apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        metadata:
+          name: allow-all-egress
+        spec:
+          podSelector: {}
+          policyTypes:
+          - Egress
+          egress:
+          - {}
+        EOF
+
+        echo "--- Preparing artifact directory ---"
+        mkdir -p "${ARTIFACT_DIR}/tls-scanner"
+
+        echo "--- Running scanner ---"
+        SCANNER_POD_NAME="tls-scanner-$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 5 | head -n 1)"
+        
+        # We need to run the scanner inside a pod on the test cluster so that it can reach
+        # the internal pod IPs. The scanner will write its results to /tmp/artifacts inside the pod.
+        echo "--- Launching scanner pod (${SCANNER_POD_NAME}) on test cluster ---"
+        echo "Using image: ${PULL_SPEC_TLS_SCANNER_TOOL}"
+        oc run "${SCANNER_POD_NAME}" \
+          --image="${PULL_SPEC_TLS_SCANNER_TOOL}" \
+          --namespace="${NAMESPACE}" \
+          --restart=Never \
+          --command -- /bin/bash -c 'mkdir -p /tmp/artifacts && /usr/local/bin/tls-scanner --all-pods --csv-file /tmp/artifacts/report.csv --log-file /tmp/artifacts/scanner.log'
+
+        # Wait for the pod to finish its run.
+        echo "--- Waiting for scanner pod to complete ---"
+        for i in $(seq 1 60); do
+          POD_STATUS="$(oc get "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")"
+          if [[ "${POD_STATUS}" == "Succeeded" || "${POD_STATUS}" == "Failed" ]]; then
+            break
+          fi
+          echo "Pod status is ${POD_STATUS} (attempt ${i}/60), waiting..."
+          if [[ "${i}" -gt 1 ]]; then
+             echo "Describing scanner pod for more details:"
+             oc describe "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}"
+             echo "Recent events in namespace:"
+             oc get events --namespace="${NAMESPACE}" --sort-by='.lastTimestamp' | tail -n 10
+          fi
+          sleep 30
+        done
+        echo "Scanner pod finished with status: ${POD_STATUS}"
+
+        echo "--- Final state of scanner pod ---"
+        oc describe "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}"
+
+        # Copy the results and logs from the completed pod to the CI artifacts directory.
+        echo "--- Collecting logs and artifacts from scanner pod ---"
+        oc logs "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}" > "${ARTIFACT_DIR}/tls-scanner/pod-scanner.log"
+        oc rsync "${SCANNER_POD_NAME}:/tmp/artifacts/" "${ARTIFACT_DIR}/" --namespace="${NAMESPACE}" --no-perms
+        
+        echo "--- Cleaning up scanner pod ---"
+        oc delete "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}"
+        
+        # If the pod failed, fail the CI job.
+        if [[ "${POD_STATUS}" != "Succeeded" ]]; then
+          echo "Error: The scanner pod did not complete successfully."
+          exit 1
+        fi
+        
+        echo "--- Scanner finished ---"
+      dependencies:
+      - env: PULL_SPEC_TLS_SCANNER_TOOL
+        name: tls-scanner-tool
+      from: tls-scanner-tool
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: tls-scanner
