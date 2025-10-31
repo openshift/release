@@ -50,8 +50,9 @@ function InstallAndVerifyVirtctl() {
         return 1
     fi
 
-    tar -zxf /tmp/virtctl.tar.gz -C /usr/local/bin/
-    chmod +x /usr/local/bin/virtctl
+    tar -zxf /tmp/virtctl.tar.gz -C /tmp/
+    export PATH=/tmp:$PATH
+    chmod +x /tmp/virtctl
     rm -f /tmp/virtctl.tar.gz
 
     if ! command -v virtctl &> /dev/null; then
