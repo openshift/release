@@ -69,10 +69,10 @@ sed -i "s/skipped=\"[0-9]*\"/skipped=\"$skipped\"/" "$RESULT_FILE"
 }
 
 # Configuration
-VM_NAME="vmi-ephemeral"
+VM_NAME="vm-ephemeral"
 NAMESPACE="default"
 CSV_NAMESPACE="openshift-cnv"
-TIMEOUT="300"
+TIMEOUT="600"
 WORK_DIR="/tmp/kubevirt-test"
 KUBECTL_CMD="kubectl"
 VIRTCTL_CMD="virtctl"
@@ -131,9 +131,9 @@ check_prerequisites() {
 
 
 check_vm_exists() {
-    if ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
+    if ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
         local phase
-        phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        phase=$(${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
         log_info "VM ${VM_NAME} exists with phase: ${phase}"
         return 0
     else
@@ -210,7 +210,7 @@ wait_for_pod_ready() {
         log_info "Pods with virt-launcher label:"
         ${KUBECTL_CMD} get pods -n ${NAMESPACE} -l kubevirt.io=virt-launcher
         log_info "VM status:"
-        ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o yaml | head -50
+        ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} -o yaml | head -50
         return 1
     fi
 
@@ -424,11 +424,21 @@ show_vm_details() {
     echo "============================================"
 
     # VM status
+    echo "VM Status:"
+    ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} -o wide 2>/dev/null || log_warning "Could not get VM status"
+    echo ""
+
+    # VMI status (if exists)
     echo "VMI Status:"
-    ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o wide 2>/dev/null || log_warning "Could not get VMI status"
+    ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o wide 2>/dev/null || log_warning "Could not get VMI status (VM may not be running)"
     echo ""
 
     # VM description
+    echo "VM Description:"
+    ${KUBECTL_CMD} describe vm ${VM_NAME} -n ${NAMESPACE} 2>/dev/null || log_warning "Could not describe VM"
+    echo ""
+
+    # VMI description
     echo "VMI Description:"
     ${KUBECTL_CMD} describe vmi ${VM_NAME} -n ${NAMESPACE} 2>/dev/null || log_warning "Could not describe VMI"
     echo ""
@@ -436,7 +446,7 @@ show_vm_details() {
     # Launcher pod status
     echo "Launcher Pod Status:"
     local pod_name
-    pod_name=$(${KUBECTL_CMD} get pods -n ${NAMESPACE} -l kubevirt.io=virt-launcher -o jsonpath='{.items[?(@.metadata.ownerReferences[0].name=="'${VM_NAME}'")].metadata.name}' 2>/dev/null || echo "")
+    pod_name=$(${KUBECTL_CMD} get pods -n ${NAMESPACE} -l kubevirt.io=virt-launcher --field-selector=status.phase=Running -o jsonpath='{.items[?(@.metadata.ownerReferences[0].name=="'${VM_NAME}'")].metadata.name}' 2>/dev/null || echo "")
 
     if [[ -n "${pod_name}" ]]; then
         ${KUBECTL_CMD} get pod ${pod_name} -n ${NAMESPACE} -o wide
@@ -455,17 +465,17 @@ show_vm_details() {
 cleanup_vm() {
     log_info "Cleaning up VM ${VM_NAME}..."
 
-    if ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
-        ${KUBECTL_CMD} delete vmi ${VM_NAME} -n ${NAMESPACE} --timeout=60s
+    if ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
+        ${KUBECTL_CMD} delete vm ${VM_NAME} -n ${NAMESPACE} --timeout=60s
 
         # Wait for VM to be fully deleted
         local elapsed=0
-        while ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} &> /dev/null && [ ${elapsed} -lt 60 ]; do
+        while ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null && [ ${elapsed} -lt 60 ]; do
             sleep 2
             elapsed=$((elapsed + 2))
         done
 
-        if ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
+        if ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
             log_warning "VM ${VM_NAME} is still present after cleanup attempt"
         else
             log_success "VM ${VM_NAME} cleaned up successfully"
@@ -566,3 +576,8 @@ main_cleanup() {
 # Run main function
 main_post_upgrade
 main_cleanup
+set +e 
+virtctl version
+ret=$?
+echo $ret
+set -e

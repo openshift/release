@@ -15,7 +15,7 @@ export KUBECONFIG="${SHARED_DIR}/managed-cluster-kubeconfig"
 curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /tmp/jq
 chmod +x /tmp/jq
 
-RESULT_FILE="${ARTIFACT_DIR}/junit_pre_upgrader_esults.xml"
+RESULT_FILE="${ARTIFACT_DIR}/junit_pre_upgrade_results.xml"
 SUITE_NAME="pre-upgrade-test"
 
 # Initialize empty JUnit file
@@ -68,7 +68,7 @@ sed -i "s/skipped=\"[0-9]*\"/skipped=\"$skipped\"/" "$RESULT_FILE"
 
 
 # Configuration
-VM_NAME="vmi-ephemeral"
+VM_NAME="vm-ephemeral"
 NAMESPACE="default"
 CSV_NAMESPACE="openshift-cnv"
 TIMEOUT="300"
@@ -207,19 +207,19 @@ deploy_vm() {
     fi
 
     # Check if VM already exists
-    if ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
-        local current_phase
-        current_phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+    if ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
+        local current_status
+        current_status=$(${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "")
 
         if [[ "${MODE}" == "pre-upgrade" ]]; then
-            log_warning "VM ${VM_NAME} already exists with phase: ${current_phase}. Cleaning up for fresh deployment..."
+            log_warning "VM ${VM_NAME} already exists with status: ${current_status}. Cleaning up for fresh deployment..."
             cleanup_vm
             sleep 5
         elif [[ "${MODE}" == "post-upgrade" ]] || [[ "${MODE}" == "verify" ]]; then
-            log_info "VM ${VM_NAME} already exists with phase: ${current_phase}. Skipping deployment."
+            log_info "VM ${VM_NAME} already exists with status: ${current_status}. Skipping deployment."
             return 0
         else
-            log_warning "VM ${VM_NAME} already exists with phase: ${current_phase}. Cleaning up..."
+            log_warning "VM ${VM_NAME} already exists with status: ${current_status}. Cleaning up..."
             cleanup_vm
             sleep 5
         fi
@@ -231,10 +231,10 @@ deploy_vm() {
 }
 
 check_vm_exists() {
-    if ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
-        local phase
-        phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-        log_info "VM ${VM_NAME} exists with phase: ${phase}"
+    if ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
+        local status
+        status=$(${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "")
+        log_info "VM ${VM_NAME} exists with status: ${status}"
         return 0
     else
         log_warning "VM ${VM_NAME} does not exist"
@@ -282,6 +282,7 @@ wait_for_vm_running() {
     return 1
 }
 
+
 wait_for_pod_ready() {
     log_info "Waiting for launcher pod to be ready..."
 
@@ -291,8 +292,8 @@ wait_for_pod_ready() {
 
     # Wait for launcher pod to be created
     while [ ${elapsed} -lt ${TIMEOUT} ]; do
-        # Find the launcher pod by checking ownerReferences
-        pod_name=$(${KUBECTL_CMD} get pods -n ${NAMESPACE} -l kubevirt.io=virt-launcher -o jsonpath='{.items[?(@.metadata.ownerReferences[0].name=="'${VM_NAME}'")].metadata.name}' 2>/dev/null || echo "")
+        # Find the launcher pod by checking ownerReferences and Running status
+        pod_name=$(${KUBECTL_CMD} get pods -n ${NAMESPACE} -l kubevirt.io=virt-launcher --field-selector=status.phase=Running -o jsonpath='{.items[?(@.metadata.ownerReferences[0].name=="'${VM_NAME}'")].metadata.name}' 2>/dev/null || echo "")
 
         if [[ -n "${pod_name}" ]]; then
             break
@@ -390,6 +391,7 @@ check_hco_status() {
     return 0
 }
 
+#===========check csv status================
 check_csv_status() {
     log_info "Checking ClusterServiceVersion (CSV) status in namespace: ${CSV_NAMESPACE}..."
 
@@ -437,6 +439,7 @@ check_csv_status() {
     return 0
 }
 
+#===========================================
 
 # Check SSH connectivity to VM
 check_ssh_connectivity() {
@@ -519,11 +522,21 @@ show_vm_details() {
     echo "============================================"
 
     # VM status
+    echo "VM Status:"
+    ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} -o wide 2>/dev/null || log_warning "Could not get VM status"
+    echo ""
+
+    # VMI status (if exists)
     echo "VMI Status:"
-    ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o wide 2>/dev/null || log_warning "Could not get VMI status"
+    ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o wide 2>/dev/null || log_warning "Could not get VMI status (VM may not be running)"
     echo ""
 
     # VM description
+    echo "VM Description:"
+    ${KUBECTL_CMD} describe vm ${VM_NAME} -n ${NAMESPACE} 2>/dev/null || log_warning "Could not describe VM"
+    echo ""
+
+    # VMI description
     echo "VMI Description:"
     ${KUBECTL_CMD} describe vmi ${VM_NAME} -n ${NAMESPACE} 2>/dev/null || log_warning "Could not describe VMI"
     echo ""
@@ -531,7 +544,7 @@ show_vm_details() {
     # Launcher pod status
     echo "Launcher Pod Status:"
     local pod_name
-    pod_name=$(${KUBECTL_CMD} get pods -n ${NAMESPACE} -l kubevirt.io=virt-launcher -o jsonpath='{.items[?(@.metadata.ownerReferences[0].name=="'${VM_NAME}'")].metadata.name}' 2>/dev/null || echo "")
+    pod_name=$(${KUBECTL_CMD} get pods -n ${NAMESPACE} -l kubevirt.io=virt-launcher --field-selector=status.phase=Running -o jsonpath='{.items[?(@.metadata.ownerReferences[0].name=="'${VM_NAME}'")].metadata.name}' 2>/dev/null || echo "")
 
     if [[ -n "${pod_name}" ]]; then
         ${KUBECTL_CMD} get pod ${pod_name} -n ${NAMESPACE} -o wide
@@ -550,17 +563,17 @@ show_vm_details() {
 cleanup_vm() {
     log_info "Cleaning up VM ${VM_NAME}..."
 
-    if ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
-        ${KUBECTL_CMD} delete vmi ${VM_NAME} -n ${NAMESPACE} --timeout=60s
+    if ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
+        ${KUBECTL_CMD} delete vm ${VM_NAME} -n ${NAMESPACE} --timeout=60s
 
         # Wait for VM to be fully deleted
         local elapsed=0
-        while ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} &> /dev/null && [ ${elapsed} -lt 60 ]; do
+        while ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null && [ ${elapsed} -lt 60 ]; do
             sleep 2
             elapsed=$((elapsed + 2))
         done
 
-        if ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
+        if ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
             log_warning "VM ${VM_NAME} is still present after cleanup attempt"
         else
             log_success "VM ${VM_NAME} cleaned up successfully"
@@ -592,9 +605,6 @@ main_pre_upgrade() {
 
     # Deploy VM
     deploy_vm
-
-
-
 
     if wait_for_vm_running; then
         # Try to wait for pod ready, but don't fail if we can't find it

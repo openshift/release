@@ -165,7 +165,7 @@ metadata:
     vendor: OpenShift
     cluster.open-cluster-management.io/clusterset: '${CLUSTER_NAME}-set'
    annotations:
-    hive.openshift.io/cluster-lifespan: 2h
+    hive.openshift.io/cluster-lifespan: 6h
 spec:
    baseDomain: ${BASE_DOMAIN}
    clusterName: ${CLUSTER_NAME}
