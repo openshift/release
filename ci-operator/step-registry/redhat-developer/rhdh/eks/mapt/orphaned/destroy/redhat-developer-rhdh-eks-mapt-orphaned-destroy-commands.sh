@@ -40,7 +40,8 @@ for S3_TOP_LEVEL_FOLDER in "${CORRELATE_MAPT_ARRAY[@]}"; do
   echo "Destroying MAPT for folder: ${S3_TOP_LEVEL_FOLDER}"
   mapt aws eks destroy \
       --project-name "eks" \
-      --backed-url "s3://${AWS_S3_BUCKET}/${S3_TOP_LEVEL_FOLDER}"
+      --backed-url "s3://${AWS_S3_BUCKET}/${S3_TOP_LEVEL_FOLDER}" \
+      --force-destroy
   echo "Completed processing MAPT: ${S3_TOP_LEVEL_FOLDER}"
 done
 
