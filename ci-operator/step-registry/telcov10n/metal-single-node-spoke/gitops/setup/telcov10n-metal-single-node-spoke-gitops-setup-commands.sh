@@ -24,8 +24,7 @@ function setup_hub_cluster_with_argocd {
   cp -av ${HOME}/ztp/argocd/deployment/* ${argocd_templates_dir}
   set +x
 
-  echo "Patch the ArgoCD instance in the hub cluster using the ${HOME}/ztp/argocd/deployment/argocd-openshift-gitops-patch.json patch file:"
-
+  echo "Patch the ArgoCD instance to enable the PolicyGenerator plugin:"
   set -x
   oc patch argocd openshift-gitops -n openshift-gitops --type=merge \
     --patch-file ${HOME}/ztp/argocd/deployment/argocd-openshift-gitops-patch.json
@@ -123,7 +122,7 @@ function setup_hub_cluster_with_site_config_addon {
 
 function configute_argocd_for_cluster_instance {
 
-  echo "************ telcov10n Configure ArgoCD to cope with Custer Instance CRs ************"
+  echo "************ telcov10n Configure ArgoCD to cope with Cluster Instance CRs ************"
 
   cat << EOF | oc apply -f -
 ---
@@ -153,6 +152,18 @@ EOF
   wait_until_command_is_ok "oc -n openshift-gitops get AppProject | grep -w 'siteconfig-v2'" 1s 20
   set -x
   oc -n openshift-gitops get AppProject siteconfig-v2 -oyaml
+  set +x
+  echo
+}
+
+function setup_argocd_policy_plugin {
+
+  echo "************ telcov10n Setup ArgoCD PolicyGenerator Plugin ************"
+
+  echo "Patch the ArgoCD instance to enable the PolicyGenerator plugin:"
+  set -x
+  oc -n openshift-gitops patch argocd openshift-gitops \
+    --type=merge --patch-file ${HOME}/ztp/argocd/deployment/argocd-openshift-gitops-patch.json
   set +x
   echo
 }
@@ -225,7 +236,7 @@ EOF
   echo
 
   echo
-  echo "Setup ArgoCD PolicyGenTemplate plugin..."
+  echo "Setup ArgoCD PolicyGenerator application for site-policies..."
   echo
 
   echo "Copy ArgoCD deployment templates"
@@ -234,20 +245,7 @@ EOF
   cp -av ${HOME}/ztp/argocd/deployment/* ${argocd_templates_dir}
   set +x
 
-  echo "Enabling the load of the external plugin 'PolicyGenTemplate'..."
-  set -x
-  oc -n openshift-gitops patch argocd openshift-gitops \
-    --type=merge --patch-file ${HOME}/ztp/argocd/deployment/argocd-openshift-gitops-patch.json
-  set +x
-
-  # echo "In RHACM 2.7 and later, the multicluster engine enables the cluster-proxy-addon feature by default."
-  # echo "Apply the following patch to disable the cluster-proxy-addon feature and remove the relevant hub cluster"
-  # echo "and managed pods that are responsible for this add-on."
-  # set -x
-  # oc patch mce multiclusterengine --type=merge --patch-file ${HOME}/ztp/argocd/deployment/disable-cluster-proxy-addon.json
-  # set +x
-
-  echo "Setup ArgoCD PGT deployment templates"
+  echo "Setup ArgoCD policy deployment templates"
   set -x
   cd ${argocd_templates_dir}
   git_source_path_for_policies=site-policies
@@ -259,7 +257,7 @@ EOF
   sed -i.bak -r -e '/- app-project.yaml/d' -e '/- clusters-app.yaml/d' kustomization.yaml
   set +x
 
-  echo "Apply the pipeline configuration to your hub cluster by using the following command:"
+  echo "Apply the policies application configuration to your hub cluster:"
   set -x
   oc apply -k .
   set +x
@@ -270,6 +268,7 @@ function main {
   if [ "${SITE_CONFIG_VERSION}" == "v2" ]; then
     setup_hub_cluster_with_site_config_addon
     configute_argocd_for_cluster_instance
+    setup_argocd_policy_plugin
     setup_argocd_roles_permissions
     create_argo_application
   else
