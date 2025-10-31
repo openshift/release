@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-e2e-aws-csi-extended-lso-olmv1
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-provision
+    - ref: storage-conf-csi-optional-operator-install
+    - ref: storage-obj-save
+    test:
+    - ref: openshift-extended-test
+    post:
+    - ref: storage-obj-check
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      OP_PACKAGE_NAME: local-storage-operator
+      OP_NAMESPACE: openshift-local-storage
+      TEST_SCENARIOS: '\[LSO\]'
+      TEST_FILTERS: "~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;STORAGE&"
+      FORCE_SUCCESS_EXIT: "no"
+  documentation: |-
+    The Openshift E2E AWS CSI LSO extended workflow executes the `openshift csi extended end-to-end test suite` on LSO that was installed during cluster setup.
