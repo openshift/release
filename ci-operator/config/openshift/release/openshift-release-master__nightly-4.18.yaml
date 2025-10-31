@@ -39,10 +39,6 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: base
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
   console-tests:
     name: "4.18"
     namespace: ocp
@@ -69,6 +65,10 @@ base_images:
     tag: libvirt-installer
   nested-environment-builder:
     name: nested-environment-builder
+    namespace: ci
+    tag: latest
+  ocm-cli:
+    name: ocm-cli
     namespace: ci
     tag: latest
   rosa-aws-cli:
@@ -165,18 +165,6 @@ tests:
     cluster_profile: aws-3
     env:
       SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws-single-node-realtime
-  timeout: 5h0m0s
-- as: e2e-metal-ovn-single-node-rt-upgrade-serial
-  cron: 8 6 15 3 *
-  steps:
-    cluster_profile: aws
-    env:
-      SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
-      TEST_SUITE: openshift/conformance/serial
     observers:
       enable:
       - observers-resource-watch
@@ -747,7 +735,6 @@ tests:
   steps:
     cluster_profile: azure-2
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
     observers:
       enable:
@@ -807,7 +794,7 @@ tests:
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
-  cron: 47 4 3 11 *
+  cron: 0 1 * * 0-5
   restrict_network_access: false
   steps:
     env:
@@ -1794,6 +1781,19 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-upgrade-ipsec
+- as: e2e-vsphere-ovn-csi-vcf9
+  cron: 15 3,9 * * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-csi
 zz_generated_metadata:
   branch: master
   org: openshift

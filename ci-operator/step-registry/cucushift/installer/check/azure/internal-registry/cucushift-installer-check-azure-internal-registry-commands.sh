@@ -91,7 +91,14 @@ oc get config.image/cluster -ojson | jq -r '.spec.storage.azure' | tee -a ${imag
 
 echo "Check spec of image-registry config have correct setting..."
 echo "storage account name check..."
-field_check "${image_registry_sa_name}" "$(jq -r '.accountName' ${image_registry_spec_file})" || ret=1
+sa_name_registry_in_cluster="$(jq -r '.accountName' ${image_registry_spec_file})"
+#shellcheck disable=SC2076
+if [[ " ${image_registry_sa_name} " =~ " ${sa_name_registry_in_cluster} " ]]; then
+    echo "Get expected value!"
+else
+    echo "ERROR: Get unexpected value! expected value: ${image_registry_sa_name}; actual value: ${sa_name_registry_in_cluster}"
+    ret=1
+fi
 if [[ -n "${vnet_resource_group}" ]]; then
     echo "networkResourceGroupName check..."
     field_check "${vnet_resource_group}" "$(jq -r '.networkAccess.internal.networkResourceGroupName' ${image_registry_spec_file})" || ret=1

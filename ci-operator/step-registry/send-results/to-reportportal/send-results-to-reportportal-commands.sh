@@ -28,6 +28,7 @@ ALLOWED_REPOS=('openshift/openshift-tests-private'
                'openshift/rosa'
                'openshift/verification-tests'
                'oadp-qe/oadp-qe-automation'
+               'openshift-eng/agent-qe-infra'
               )
 org="$(jq -r 'if .extra_refs then .extra_refs[0].org
               elif .refs then .refs.org
@@ -40,13 +41,15 @@ repo="$(jq -r 'if .extra_refs then .extra_refs[0].repo
 # shellcheck disable=SC2076
 if ! [[ "${ALLOWED_REPOS[*]}" =~ "$org/$repo" ]]
 then
-    echo "Skip repository: $org/$repo"
-    exit 0
+  echo "Skip repository: $org/$repo"
+  exit 0
 fi
 
 LOGS_PATH='logs'
 if [[ "$(jq -r '.type' <<< ${JOB_SPEC})" = 'presubmit' ]]
 then
+  echo "Skip presubmit jobs"
+  exit 0
   pr_number="$(jq -r '.refs.pulls[0].number' <<< $JOB_SPEC)"
   if [[ -z "$pr_number" ]]
   then
@@ -90,15 +93,14 @@ mkdir --parents "$LOCAL_DIR" "$LOCAL_DIR_ORI" "$LOCAL_DIR_RST"
 function download_logs() {
   export PATH="$PATH:/opt/google-cloud-sdk/bin"
   gcloud_auth_cmd='gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private 2>&1'
-  for (( i=1; i<=3; i++ ))
+  for (( i=1; i<=10; i++ ))
   do
-    output="$(eval $gcloud_auth_cmd)"
-    if ! (grep -q 'ERROR' <<< "$output")
+    if (eval $gcloud_auth_cmd | grep -q -i 'Activated service account')
     then
       break
     fi
-    echo "Retry 'gcloud auth' after sleep $i minutes"
-    sleep ${i}m
+    echo "Retry 'gcloud auth' after sleep 2 minutes"
+    sleep 2m
   done
   logfile_name="${ARTIFACT_DIR}/rsync.log"
   gsutil -m rsync -r -x '^(?!.*.(finished.json|.xml)$).*' "${ROOT_PATH}/artifacts/${JOB_NAME_SAFE}/" "$LOCAL_DIR_ORI/" &> "$logfile_name"
@@ -167,6 +169,17 @@ function generate_attribute_env_fips() {
   write_attribute env_fips "$env_fips"
 }
 
+function generate_attribute_job_frequency() {
+  if [[ "$JOB_NAME_SAFE" =~ -(f[0-9]+) ]]
+  then
+    job_frequency="${BASH_REMATCH[1]}"
+    if [[ -n "$job_frequency" ]]
+    then
+      write_attribute job_frequency "$job_frequency"
+    fi
+  fi
+}
+
 function generate_attribute_job_type() {
   job_type='periodic'
   if [[ "$LOGS_PATH" =~ pr-logs ]]
@@ -188,7 +201,8 @@ function generate_attribute_install() {
                  'openshift-extended-test-supplementary' \
                  'openshift-extended-web-tests' \
                  'openshift-e2e-test-clusterinfra-qe' \
-                 'openshift-e2e-test-qe-report'
+                 'openshift-e2e-test-qe-report' \
+                 'cucushift-installer-check-cluster-health'
   do
     if [[ -d "$LOCAL_DIR_ORI/$keyword" ]]
     then
@@ -231,6 +245,17 @@ function generate_attribute_pr_author() {
   fi
 }
 
+function generate_attribute_version() {
+  if [[ "$JOB_NAME" =~ release-(4[.][0-9]+)- ]]
+  then
+    version="${BASH_REMATCH[1]}"
+    if [[ -n "$version" ]]
+    then
+      write_attribute version "$version"
+    fi
+  fi
+}
+
 function generate_attribute_version_installed() {
   version_installed="$(get_attribute "version_installed")"
   if [[ -z "$version_installed" ]]
@@ -269,11 +294,13 @@ function generate_attributes() {
   generate_attribute_cloud_provider
   generate_attribute_env_disconnected
   generate_attribute_env_fips
+  generate_attribute_job_frequency
   generate_attribute_job_type
   generate_attribute_install
   generate_attribute_install_method
   generate_attribute_profilename
   generate_attribute_pr_author
+  generate_attribute_version
   generate_attribute_version_installed
 }
 
@@ -388,7 +415,7 @@ function generate_results() {
   else
     generate_result_teststeps
   fi
-  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
+  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' ! -empty -exec cp {} "$LOCAL_DIR_RST" \;
 }
 
 function fix_xmls() {
@@ -441,15 +468,26 @@ function droute_send() {
                                 --wait
                    2>&1
                   '
-  for (( i=1; i<=3; i++ ))
+  sendSucceeded='false'
+  tries=10
+  for (( i=1; i<=$tries; i++ ))
   do
     if [[ "$(eval $droute_send_cmd)" =~ 'status: OK' ]]
     then
+      sendSucceeded='true'
       break
     fi
-    echo "Retry 'droute send' after sleep $i minutes"
-    sleep ${i}m
+    if [[ "$i" -le "$tries" ]]
+    then
+      echo "Retry 'droute send' after sleep 2 minutes"
+      sleep 2m
+    fi
   done
+  if [[ "$sendSucceeded" = 'false' ]]
+  then
+    echo "'droute send' failed after $tries tries"
+    exit 1
+  fi
 }
 
 export INSTALL_RESULT="fail"

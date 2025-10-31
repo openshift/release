@@ -23,8 +23,7 @@ images:
   to: cluster-config-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.20-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -81,12 +80,14 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-serial
-- as: e2e-gcp
+- always_run: false
+  as: e2e-gcp
   optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-azure
+- always_run: false
+  as: e2e-azure
   optional: true
   steps:
     cluster_profile: azure4
@@ -95,6 +96,21 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-tests-extension
+  optional: true
+  steps:
+    test:
+    - as: tests-extension
+      commands: |
+        echo "Build binary cluster-config-operator-tests-ext"
+        make tests-ext-build
+        echo "Running ./cluster-config-operator-tests-ext with sanity test"
+        ./cluster-config-operator-tests-ext run-suite openshift/cluster-config-operator/conformance/parallel -j ${ARTIFACT_DIR}/junit_$(shell date +%Y%m%d-%H%M%S).xml
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

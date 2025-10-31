@@ -22,7 +22,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: latest
+    tag: "4.20"
 build_root:
   image_stream_tag:
     name: release
@@ -55,8 +55,7 @@ images:
   to: ovn-kubernetes-microshift
 promotion:
   to:
-  - disabled: true
-    name: 4.20-priv
+  - name: 4.20-priv
     namespace: ocp-private
 releases:
   initial:
@@ -131,7 +130,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-dualstack
   timeout: 6h0m0s
-- as: e2e-ovn-hybrid-step-registry
+- always_run: false
+  as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
     cluster_profile: aws
@@ -154,6 +154,7 @@ tests:
     env:
       EXTRA_MG_ARGS: --host-network
       PARALLEL: "1"
+      TEST_TIMEOUT: "60"
     test:
     - chain: openshift-e2e-test-network-qe
     workflow: openshift-e2e-aws-ovn
@@ -168,7 +169,8 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid-toggle
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn
+- always_run: false
+  as: e2e-vsphere-ovn
   optional: true
   steps:
     cluster_profile: vsphere-elastic
@@ -176,7 +178,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-vsphere-ovn
   timeout: 6h0m0s
-- as: e2e-azure-ovn
+- always_run: false
+  as: e2e-azure-ovn
   optional: true
   steps:
     cluster_profile: azure4
@@ -192,14 +195,16 @@ tests:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
   timeout: 5h30m0s
-- as: e2e-aws-ovn-upgrade-ipsec
+- always_run: false
+  as: e2e-aws-ovn-upgrade-ipsec
   optional: true
   steps:
     cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-upgrade-ipsec
-- as: e2e-aws-ovn-serial-ipsec
+- always_run: false
+  as: e2e-aws-ovn-serial-ipsec
   optional: true
   steps:
     cluster_profile: aws-2
@@ -220,7 +225,6 @@ tests:
   steps:
     cluster_profile: azure-2
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -247,7 +251,8 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
   timeout: 6h0m0s
-- as: e2e-openstack-ovn
+- always_run: false
+  as: e2e-openstack-ovn
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -296,13 +301,13 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
   cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
-  timeout: 5h0m0s
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-hypershift
   steps:
     cluster_profile: hypershift
@@ -337,7 +342,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 6h0m0s
-- as: e2e-aws-ovn-hypershift-kubevirt
+- always_run: false
+  as: e2e-aws-ovn-hypershift-kubevirt
   optional: true
   steps:
     cluster_profile: aws-3
@@ -371,7 +377,7 @@ tests:
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
   timeout: 3h30m0s
-- always_run: true
+- always_run: false
   as: qe-perfscale-aws-ovn-small-udn-density-churn-l3
   optional: true
   steps:
@@ -381,7 +387,7 @@ tests:
       CHURN: "true"
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge
-      EXTRA_FLAGS: --churn-duration=120m --churn-percent=50
+      EXTRA_FLAGS: --churn-duration=30m --churn-percent=25
       ITERATION_MULTIPLIER_ENV: "3"
       RUN_ORION: "true"
       VERSION: "4.20"
@@ -392,7 +398,7 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-udn-density-pods
   timeout: 8h0m0s
-- always_run: true
+- always_run: false
   as: qe-perfscale-aws-ovn-small-udn-density-l3
   optional: true
   steps:
@@ -431,7 +437,8 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-udn-density-pods
   timeout: 8h0m0s
-- as: e2e-aws-ovn-techpreview
+- always_run: false
+  as: e2e-aws-ovn-techpreview
   optional: true
   steps:
     cluster_profile: aws-3
@@ -440,7 +447,8 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
-- as: e2e-aws-ovn-single-node-techpreview
+- always_run: false
+  as: e2e-aws-ovn-single-node-techpreview
   optional: true
   steps:
     cluster_profile: aws-2
@@ -449,7 +457,8 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-single-node
   timeout: 6h0m0s
-- as: e2e-aws-ovn-hypershift-conformance-techpreview
+- always_run: false
+  as: e2e-aws-ovn-hypershift-conformance-techpreview
   optional: true
   steps:
     cluster_profile: hypershift
@@ -457,7 +466,8 @@ tests:
       GUEST_FEATURE_SET: TechPreviewNoUpgrade
     workflow: hypershift-aws-conformance
   timeout: 6h0m0s
-- as: e2e-azure-ovn-techpreview
+- always_run: false
+  as: e2e-azure-ovn-techpreview
   optional: true
   steps:
     cluster_profile: azure4
@@ -475,7 +485,8 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp-ovn
   timeout: 6h0m0s
-- as: openshift-e2e-gcp-ovn-techpreview-upgrade
+- always_run: false
+  as: openshift-e2e-gcp-ovn-techpreview-upgrade
   optional: true
   steps:
     cluster_profile: gcp
@@ -484,7 +495,8 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp-upgrade
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-techpreview
+- always_run: false
+  as: e2e-metal-ipi-ovn-techpreview
   cluster: build05
   optional: true
   steps:
@@ -496,7 +508,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipv4
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-ipv6-techpreview
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6-techpreview
   cluster: build05
   optional: true
   steps:
@@ -508,7 +521,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipv6
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-dualstack-techpreview
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-techpreview
   cluster: build05
   optional: true
   steps:
@@ -520,7 +534,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-dualstack
   timeout: 6h0m0s
-- as: e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
   cluster: build05
   optional: true
   steps:
@@ -534,7 +549,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e
   timeout: 6h0m0s
-- as: e2e-vsphere-ovn-techpreview
+- always_run: false
+  as: e2e-vsphere-ovn-techpreview
   optional: true
   steps:
     cluster_profile: vsphere-elastic

@@ -58,10 +58,6 @@ export WORKLOAD=cluster-density-v2
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
-# Run a non-indexed warmup for scheduling inconsistencies
-ES_SERVER="" ITERATIONS=${current_worker_count} CHURN=false EXTRA_FLAGS='--pod-ready-threshold=2m' ./run.sh
-
-# The measurable run
 iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
@@ -73,16 +69,8 @@ fi
 EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 
 if [[ -n "${USER_METADATA}" ]]; then
-    USER_METADATA=$(echo "$USER_METADATA" | xargs)
-    IFS=',' read -r -a env_array <<< "$USER_METADATA"
-    true > user-metadata.yaml
-    for env_pair in "${env_array[@]}"; do
-      env_pair=$(echo "$env_pair" | xargs)
-      env_key=$(echo "$env_pair" | cut -d'=' -f1)
-      env_value=$(echo "$env_pair" | cut -d'=' -f2-)
-      echo "$env_key: \"$env_value\"" >> user-metadata.yaml
-    done
-    EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
+  echo "${USER_METADATA}" > user-metadata.yaml
+  EXTRA_FLAGS+=" --user-metadata=user-metadata.yaml"
 fi
 export EXTRA_FLAGS
 export ADDITIONAL_PARAMS

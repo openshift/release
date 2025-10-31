@@ -1041,6 +1041,8 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     workflow: cucushift-installer-rehearse-gcp-cases-valid-confidential-computing
 - as: gcp-ipi-dns-peering-zone-f28
   cron: 22 9 23 * *
@@ -1084,11 +1086,15 @@ tests:
     test:
     - ref: cucushift-ota-preupgrade
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-xpn-cco-manual-users-static-f28
-  cron: 28 0 3 * *
+- as: gcp-ipi-xpn-cco-manual-users-static-mini-perm-f28
+  cron: 24 2 3 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
+    env:
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-users-static

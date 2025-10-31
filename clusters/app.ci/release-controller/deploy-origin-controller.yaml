@@ -62,7 +62,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
   name: release-controller
   namespace: ci
 spec:
@@ -108,7 +111,8 @@ spec:
         - --release-architecture=amd64
         - -v=4
         - --manifest-list-mode
-        image: release-controller:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
@@ -215,7 +219,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller-api:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
   name: release-controller-api
   namespace: ci
 spec:
@@ -240,7 +247,8 @@ spec:
         - --jira-endpoint=https://issues.redhat.com
         - --jira-bearer-token-file=/etc/jira/api
         - -v=4
-        image: release-controller-api:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz

@@ -4,7 +4,7 @@ build_root:
       FROM quay.io/multi-arch/yq:4.30.5 as yq4
       FROM quay.io/openshift-kni/ztp-site-generator:4.20.0 AS ztp-gen
       WORKDIR /home/ztp
-      FROM registry.ci.openshift.org/ci/telco-runner
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ci_telco-runner_latest
       COPY --from=yq4 /usr/bin/yq /usr/bin/yq
       COPY --from=ztp-gen /home/ztp /output/ztp
       RUN \
@@ -38,10 +38,11 @@ tests:
       ADDITIONAL_WORKERS: "0"
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       CATALOGSOURCE_DISPLAY_NAME: Red Hat Telco PreGA Operators 4.21
+      CATALOGSOURCE_NAME: prega-operators-4-20
       DISCONNECTED: "false"
       DU_PROFILE: v4.21
       GITEA_NAMESPACE: ztp-gitea
-      IMAGE_INDEX_OCP_VERSION: "4.21"
+      IMAGE_INDEX_OCP_VERSION: "4.20"
       MCH_NAMESPACE: open-cluster-management
       RESERVE_BOOTSTRAP: "false"
       SHARED_HUB_CLUSTER_PROFILE: ztp-hub-preserved-prod-cluster_profile_dir
@@ -85,11 +86,11 @@ tests:
         SriovGlobalEnable: Enabled
         SubNumaCluster: Disabled
         UncoreFrequency: MaxUFS # Uncore Frequency
-      CATALOGSOURCE_DISPLAY_NAME: Red Hat Telco PreGA Operators 4.21
-      CATALOGSOURCE_NAME: prega-operators-4.21
+      CATALOGSOURCE_DISPLAY_NAME: Red Hat Telco PreGA Operators 4.20
+      CATALOGSOURCE_NAME: prega-operators-4-20
       DU_PROFILE: v4.21
       GITEA_NAMESPACE: ztp-gitea
-      IMAGE_INDEX_OCP_VERSION: "4.21"
+      IMAGE_INDEX_OCP_VERSION: "4.20"
       INTERNAL_NET_CIDR: 10.6.157.0/24
       MCH_NAMESPACE: open-cluster-management
       PGT_RELATED_FILES: |-
@@ -152,7 +153,7 @@ tests:
                 - fileName: SriovSubscription.yaml
                   policyName: "subscriptions-policy"
                   spec:
-                    source: prega-operators-4.21
+                    source: prega-operators-4.20
                 - fileName: SriovOperatorStatus.yaml
                   policyName: "subscriptions-policy"
                 # SR-IOV FEC
@@ -173,7 +174,7 @@ tests:
                 - fileName: PtpSubscription.yaml
                   policyName: "subscriptions-policy"
                   spec:
-                    source: prega-operators-4.21
+                    source: prega-operators-4.20
                     # channel: "stable"
                 - fileName: PtpOperatorStatus.yaml
                   policyName: "subscriptions-policy"
@@ -185,8 +186,9 @@ tests:
                 - fileName: ClusterLogSubscription.yaml
                   policyName: "subscriptions-policy"
                   spec:
-                    source: prega-operators-4.21
-                    channel: "stable-6.2"
+                    source: prega-operators-4.20
+                    channel: ""
+                    # channel: "stable-6.3"
                 - fileName: ClusterLogOperatorStatus.yaml
                   policyName: "subscriptions-policy"
                 - fileName: ClusterLogServiceAccount.yaml
@@ -203,20 +205,20 @@ tests:
                 - fileName: StorageSubscription.yaml
                   policyName: "subscriptions-policy"
                   spec:
-                    source: prega-operators-4.21
+                    source: prega-operators-4.20
                 - fileName: StorageOperatorStatus.yaml
                   policyName: "subscriptions-policy"
-                # MISC
-                - fileName: ReduceMonitoringFootprint.yaml
-                  policyName: "config-policy"
+                # # MISC
+                # - fileName: ReduceMonitoringFootprint.yaml
+                #   policyName: "config-policy"
                 - fileName: DefaultCatsrc.yaml
                   policyName: "config-policy"
                   metadata:
-                      name: prega-operators-4.21
+                      name: prega-operators-4.20
                   spec:
                     displayName: Red Hat Custom Operators Catalog
-                    image: quay.io/prega/prega-operator-index:v4.21.0
-                    # image: registry.redhat.io/redhat/redhat-operator-index:v4.17
+                    image: quay.io/prega/prega-operator-index:v4.20.0
+                    # image: registry.redhat.io/redhat/redhat-operator-index:v4.20
         - filename: group-du-sno-ranGen.yaml
           content: |-
             ---
@@ -232,6 +234,15 @@ tests:
                 group-du-sno: ""
               mcp: "master"
               sourceFiles:
+                - fileName: StorageLV.yaml
+                  policyName: "config-policy"
+                  metadata:
+                    name: local-disks
+                  spec:
+                    storageClassDevices:
+                      - storageClassName: general
+                        devicePaths:
+                          - /dev/disk/by-path/pci-0000:45:00.0-nvme-1
                 - fileName: DisableOLMPprof.yaml
                   policyName: "config-policy"
                 # Set ClusterLogForwarder as example might be better to create another policyTemp-Group
@@ -392,6 +403,7 @@ tests:
     test:
     - ref: telcov10n-metal-single-node-spoke-kpis-tests-telco-operators
     - ref: telcov10n-metal-single-node-spoke-kpis-tests-oslat
+    - ref: telcov10n-metal-single-node-spoke-kpis-tests-cpu-util
     workflow: telcov10n-metal-single-node-spoke-kpis
 zz_generated_metadata:
   branch: main

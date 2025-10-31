@@ -5,7 +5,7 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
-SRIOV_NUM_VFS=$(cat ${CLUSTER_PROFILE_DIR}/sriov_num_vfs)
+SRIOV_NUM_VFS=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".sriov_num_vfs")
 SRIOV_PF_NAME=$(cat ${CLUSTER_PROFILE_DIR}/sriov_pf_name)
 
 oc config view

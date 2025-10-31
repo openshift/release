@@ -65,7 +65,9 @@ tests:
   commands: make test-unit
   container:
     from: src
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
 - as: ci-install-e2e
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
   steps:
     cluster_profile: aws-telco
     env:
@@ -95,6 +97,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-aws
 - as: ci-e2e
+  skip_if_only_changed: \.tekton/.*|.konflux/.*|renovate.json
   steps:
     cluster_profile: aws-telco
     env:
@@ -123,7 +126,8 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-aws
-- as: ci-must-gather-e2e
+- always_run: false
+  as: ci-must-gather-e2e
   cron: 40 8 3 12 *
   steps:
     cluster_profile: aws-telco

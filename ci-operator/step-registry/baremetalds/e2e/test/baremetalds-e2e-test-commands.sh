@@ -16,6 +16,15 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
+# Starting in 4.21, we will aggressively retry test failures only in
+# presubmits to determine if a failure is a flake or legitimate. This is
+# to reduce the number of retests on PR's.
+if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_REF" == "master" ) ]]; then
+    if openshift-tests run --help | grep -q 'retry-strategy'; then
+        TEST_ARGS+=" --retry-strategy=aggressive"
+    fi
+fi
+
 function run_mirror_test_images_ssh_commands() {
         # shellcheck disable=SC2087
         ssh "${SSHOPTS[@]}" "root@${IP}" bash -ux << EOF
@@ -44,6 +53,8 @@ declare -a MIRRORED_IMAGES=(
   "registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-25-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY"
   # new image coming in k8s 1.33.4
   "registry.k8s.io/pause:3.10 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-24-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY"
+  # new image coming in k8s 1.34.0
+  "registry.k8s.io/pause:3.10.1 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-25-registry-k8s-io-pause-3-10-1-a6__nK-VRxiifU0Z"
   # new image coming in k8s 1.29.11. This should be removed once k8s is bumped in openshift/origin too (or https://issues.redhat.com/browse/TRT-1942 is fixed)
   "registry.k8s.io/etcd:3.5.16-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-16-0-ExW1ETJqOZa6gx2F"
   # new image coming in k8s 1.30.5. This should be removed once k8s is bumped in openshift/origin too (or https://issues.redhat.com/browse/TRT-1942 is fixed)
@@ -248,6 +259,38 @@ function is_openshift_version_gte() {
     printf '%s\n%s' "$1" "${DS_OPENSHIFT_VERSION}" | sort -C -V
 }
 
+function build_hypervisor_config() {
+    # Build hypervisor SSH configuration for tests that need to interact with the hypervisor
+    if [[ "${ENABLE_HYPERVISOR_SSH_CONFIG:-false}" != "true" ]]; then
+        return
+    fi
+
+    if [[ ! -f "${SHARED_DIR}/server-ip" ]]; then
+        echo "Warning: ENABLE_HYPERVISOR_SSH_CONFIG is true but ${SHARED_DIR}/server-ip not found"
+        return
+    fi
+
+    HYPERVISOR_IP=$(cat "${SHARED_DIR}/server-ip")
+    export HYPERVISOR_IP
+    export HYPERVISOR_SSH_USER="root"
+
+    # Determine the correct SSH key path
+    # Using equinix-ssh-key for ARM64 hosts or packet-ssh-key for others
+    if [[ -f "${CLUSTER_PROFILE_DIR}/equinix-ssh-key" ]]; then
+        export HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/equinix-ssh-key"
+    else
+        export HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+    fi
+
+    if [[ ! -f "${HYPERVISOR_SSH_KEY}" ]]; then
+        echo "Warning: SSH key not found at ${HYPERVISOR_SSH_KEY}"
+        unset HYPERVISOR_IP HYPERVISOR_SSH_USER HYPERVISOR_SSH_KEY
+        return
+    fi
+
+    echo "Hypervisor SSH configuration: IP=${HYPERVISOR_IP}, User=${HYPERVISOR_SSH_USER}, Key=${HYPERVISOR_SSH_KEY}"
+}
+
 function upgrade() {
     mirror_release_image_for_disconnected_upgrade
     set -x
@@ -261,7 +304,7 @@ function upgrade() {
 }
 
 function suite() {
-    if [[ -n "${TEST_SKIPS}" && "${TEST_SUITE}" == "openshift/conformance/parallel" ]]; then
+    if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/auth/external-oidc") ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
         echo "Skipping tests:" &&
@@ -271,10 +314,18 @@ function suite() {
     fi
 
     set -x
-    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
-        --provider "${TEST_PROVIDER:-}" \
-        -o "${ARTIFACT_DIR}/e2e.log" \
-        --junit-dir "${ARTIFACT_DIR}/junit"
+    if [[ -n "${HYPERVISOR_IP:-}" ]]; then
+        openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+            --provider "${TEST_PROVIDER:-}" \
+            --with-hypervisor-json="{\"hypervisorIP\":\"${HYPERVISOR_IP}\", \"sshUser\":\"${HYPERVISOR_SSH_USER}\", \"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}" \
+            -o "${ARTIFACT_DIR}/e2e.log" \
+            --junit-dir "${ARTIFACT_DIR}/junit"
+    else
+        openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+            --provider "${TEST_PROVIDER:-}" \
+            -o "${ARTIFACT_DIR}/e2e.log" \
+            --junit-dir "${ARTIFACT_DIR}/junit"
+    fi
     set +x
 }
 
@@ -404,6 +455,9 @@ echo "$(date) - Waiting 10 minutes before checking again clusteroperators"
 sleep 10m
 
 check_clusteroperators_status
+
+# Build hypervisor SSH configuration if enabled
+build_hypervisor_config
 
 case "${TEST_TYPE}" in
 upgrade-conformance)

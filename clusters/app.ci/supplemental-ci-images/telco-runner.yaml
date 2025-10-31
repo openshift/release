@@ -1,66 +1,60 @@
-apiVersion: v1
-kind: List
-items:
-- kind: ImageStream
-  apiVersion: image.openshift.io/v1
-  metadata:
-    namespace: ci
-    name: telco-runner
-- kind: BuildConfig
-  apiVersion: build.openshift.io/v1
-  metadata:
-    namespace: ci
-    name: telco-runner
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
-        kind: ImageStreamTag
-        name: telco-runner:latest
-    source:
-      dockerfile: |
-        FROM quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_stream9
-        ENV GOCACHE=/go/.cache \
-            GOARM=5 \
-            GOPATH=/go \
-            GOFLAGS='-mod=vendor' \
-            LOGNAME=deadbeef \
-            HOME=/output
-        RUN dnf install -y ansible-core python3 python3-pip python3-devel python3-libvirt wget gcc make jq which iputils nmap-ncat vim rsync procps-ng && \
-            dnf remove ansible-core --noautoremove -y && \
-            dnf clean all && \
-            pip3 install --no-cache-dir "ansible==8.7.0" jmespath jsonpatch openshift kubernetes kcli && \
-            wget https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/4.12.29/openshift-client-linux.tar.gz && \
-            tar -zxvf openshift-client-linux.tar.gz && \
-            mv oc /usr/local/bin/ && \
-            mv kubectl /usr/local/bin/ && \
-            rm -f openshift-client-linux.tar.gz && \
-            mkdir /output && \
-            chmod -R g+rwx /output && \
-            mkdir -p $GOPATH/bin && \
-            chmod g+xw -R $GOPATH && \
-            chmod g+w /etc/passwd && \
-            echo 'echo default:x:$(id -u):$(id -g):Default Application User:/output:/sbin/nologin\ >> /etc/passwd' > /output/fix_uid.sh && \
-            chmod g+rwx /output/fix_uid.sh
-        RUN for version in 1.19 1.20 1.21.11 1.22.4; do \
-            mkdir -p /usr/local/${version} && \
-            wget https://golang.org/dl/go${version}.linux-amd64.tar.gz && \
-            tar -C /usr/local/${version} -xzf go${version}.linux-amd64.tar.gz && \
-            chmod g+xw -R /usr/local/${version}/go && \
-            rm go${version}.linux-amd64.tar.gz && \
-            echo "export GOLANG_VERSION=${version}" > /output/golang-${version} && \
-            echo 'export GOROOT=/usr/local/${GOLANG_VERSION}/go' >> /output/golang-${version} && \
-            echo 'export PATH=$PATH:/usr/local/${GOLANG_VERSION}/go/bin:/go/bin' >> /output/golang-${version} && \
-            chmod g+rwx /output/golang-${version}; \
-            done
-      type: Dockerfile
-    strategy:
-      dockerStrategy:
-        from:
-          kind: DockerImage
-          name: quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_stream9
-        imageOptimizationPolicy: SkipLayers
-      type: Docker
-    triggers:
-    - type: ConfigChange
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: telco-runner
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_telco-runner_latest
+  source:
+    dockerfile: |
+      FROM quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_stream9
+      ENV GOCACHE=/go/.cache \
+          GOARM=5 \
+          GOPATH=/go \
+          GOFLAGS='-mod=vendor' \
+          LOGNAME=deadbeef \
+          HOME=/output
+      RUN dnf install -y ansible-core python3 python3-pip python3-devel python3-libvirt wget gcc make jq which iputils nmap-ncat vim rsync procps-ng && \
+          dnf remove ansible-core --noautoremove -y && \
+          dnf clean all && \
+          pip3 install --no-cache-dir "ansible==8.7.0" jmespath jsonpatch openshift kubernetes kcli && \
+          wget https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/4.12.29/openshift-client-linux.tar.gz && \
+          tar -zxvf openshift-client-linux.tar.gz && \
+          mv oc /usr/local/bin/ && \
+          mv kubectl /usr/local/bin/ && \
+          rm -f openshift-client-linux.tar.gz && \
+          mkdir /output && \
+          chmod -R g+rwx /output && \
+          mkdir -p $GOPATH/bin && \
+          chmod g+xw -R $GOPATH && \
+          chmod g+w /etc/passwd && \
+          echo 'echo default:x:$(id -u):$(id -g):Default Application User:/output:/sbin/nologin\ >> /etc/passwd' > /output/fix_uid.sh && \
+          chmod g+rwx /output/fix_uid.sh
+      RUN for version in 1.19 1.20 1.21.11 1.22.4; do \
+          mkdir -p /usr/local/${version} && \
+          wget https://golang.org/dl/go${version}.linux-amd64.tar.gz && \
+          tar -C /usr/local/${version} -xzf go${version}.linux-amd64.tar.gz && \
+          chmod g+xw -R /usr/local/${version}/go && \
+          rm go${version}.linux-amd64.tar.gz && \
+          echo "export GOLANG_VERSION=${version}" > /output/golang-${version} && \
+          echo 'export GOROOT=/usr/local/${GOLANG_VERSION}/go' >> /output/golang-${version} && \
+          echo 'export PATH=$PATH:/usr/local/${GOLANG_VERSION}/go/bin:/go/bin' >> /output/golang-${version} && \
+          chmod g+rwx /output/golang-${version}; \
+          done
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: DockerImage
+        name: quay-proxy.ci.openshift.org/openshift/ci:openshift_centos_stream9
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+  - type: ConfigChange

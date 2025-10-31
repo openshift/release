@@ -44,25 +44,6 @@ function get_ready_nodes_count() {
     grep -c -E ",True$"
 }
 
-function update_image_registry() {
-  # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
-  knownCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}")
-  if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
-      echo "knownCapabilities contains ImageRegistry"
-      # check if ImageRegistry capability enabled
-      enabledCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}")
-        if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
-            echo "ImageRegistry capability is not enabled, skip image registry configuration..."
-            return 0
-        fi
-  fi
-  while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
-                 --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
-    echo "Sleeping before retrying to patch the image registry config..."
-    sleep 60
-  done
-}
-
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
@@ -273,7 +254,6 @@ if ! wait "$!"; then
   # TODO: gather logs??
   exit 1
 fi
-update_image_registry
 
 # Used by observer pod
 touch  "${SHARED_DIR}/success"
