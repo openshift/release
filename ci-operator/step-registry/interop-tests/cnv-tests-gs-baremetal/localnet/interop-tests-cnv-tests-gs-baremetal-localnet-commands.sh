@@ -232,6 +232,7 @@ uv run --verbose --cache-dir /tmp/uv-cache pytest  \
     -s \
     -o log_cli=true \
     -o cache_dir=/tmp/pytest-cache \
+    -m single_nic \
     --pytest-log-file "${ARTIFACT_DIR}/tests.log" \
     --data-collector --data-collector-output-dir="${ARTIFACT_DIR}/" \
     --junitxml "${JUNIT_RESULTS_FILE}" \
