@@ -25,7 +25,7 @@ function mapTestsForComponentReadiness() {
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
             echo "Mapping Test Suite Name To: ACS-lp-interop"
-            /tmp/bin/yq eval -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+            /tmp/bin/yq eval -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' "$results_file" || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
