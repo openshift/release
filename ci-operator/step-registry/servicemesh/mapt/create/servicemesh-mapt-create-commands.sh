@@ -17,6 +17,7 @@ TEST_NAME=${TEST_NAME:-"servicemesh-mapt"}
 OCP_VERSION=${OCP_VERSION:-"4.20.0"}
 MAPT_TAGS=${MAPT_TAGS:-"ci=true,repo=openshift-servicemesh"}
 SPOT=${SPOT:-"true"}
+SPOT_INCREASE_RATIO=${SPOT_INCREASE_RATIO:-"40"}
 CPU=${CPU:-16}
 MEMORY=${MEMORY:-64}
 TIMEOUT=${TIMEOUT:-10m}
