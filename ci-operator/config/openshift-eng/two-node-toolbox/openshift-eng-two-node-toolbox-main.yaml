@@ -1,4 +1,8 @@
 base_images:
+  base_machine:
+    name: centos
+    namespace: openshift
+    tag: stream9
   shellcheck:
     name: shellcheck
     namespace: ci
@@ -8,6 +12,32 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.20
+images:
+- dockerfile_literal: |
+    FROM base_machine
+    RUN dnf config-manager --set-enabled crb && dnf update && dnf clean all
+    RUN dnf install -y git epel-release
+    RUN dnf install -y \
+    autoconf automake \
+    docbook-style-xsl glib2-devel \
+    libqb-devel rpm-build \
+    perl python3-devel \
+    libnet-devel python3-pyroute2 \
+    which systemd libxslt
+  from: base_machine
+  to: base_machine_agents
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.21"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -19,6 +49,19 @@ tests:
   container:
     from: shellcheck
   run_if_changed: (^deploy/)|(\.sh$)|(^\.ci-operator\.yaml$)
+- as: e2e-metal-ovn-two-node-fencing-etcd-certrotation
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      RESOURCE_AGENT_REPO: https://github.com/eggfoobar/resource-agents.git
+      RESOURCE_AGENT_REPO_REF: add-podman-etcd-file-monitor
+      TEST_SUITE: openshift/etcd/certrotation
+    pre:
+    - chain: baremetalds-ipi-pre
+    - ref: baremetalds-two-node-fencing-resource-agents
+    workflow: baremetalds-two-node-fencing-techpreview
 zz_generated_metadata:
   branch: main
   org: openshift-eng
