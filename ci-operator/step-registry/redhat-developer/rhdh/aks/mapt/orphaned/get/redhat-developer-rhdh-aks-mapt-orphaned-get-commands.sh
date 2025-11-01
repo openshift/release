@@ -37,3 +37,33 @@ else
   echo "Error: Failed to create blob list file"
   exit 1
 fi
+
+echo "Finding all .pulumi/locks/ blobs in container ${AZURE_STORAGE_BLOB}..."
+
+# Get unique top-level folders that have .pulumi/locks/
+az storage blob list \
+  --container-name "${AZURE_STORAGE_BLOB}" \
+  --account-name "${AZURE_STORAGE_ACCOUNT}" \
+  --account-key "${AZURE_STORAGE_KEY}" \
+  --output json | \
+  jq -r '.[].name | select(contains("/.pulumi/locks/")) | split("/.pulumi/locks/")[0]' | \
+  sort -u > "${SHARED_DIR}/folders_with_locks.txt"
+
+if [ ! -s "${SHARED_DIR}/folders_with_locks.txt" ]; then
+  echo "No .pulumi/locks/ directories found in container"
+  exit 0
+fi
+
+folder_count=$(wc -l < "${SHARED_DIR}/folders_with_locks.txt")
+echo "Found ${folder_count} folders with .pulumi/locks/ to clean"
+
+# Delete all lock blobs in one efficient command
+echo "Deleting all .pulumi/locks/ blobs across all folders..."
+az storage blob delete-batch \
+  --source "${AZURE_STORAGE_BLOB}" \
+  --account-name "${AZURE_STORAGE_ACCOUNT}" \
+  --account-key "${AZURE_STORAGE_KEY}" \
+  --pattern "*/.pulumi/locks/*"
+cp "${SHARED_DIR}/folders_with_locks.txt" "${ARTIFACT_DIR}/folders_cleaned.txt"
+
+echo "Successfully deleted .pulumi/locks/ from ${folder_count} folders"

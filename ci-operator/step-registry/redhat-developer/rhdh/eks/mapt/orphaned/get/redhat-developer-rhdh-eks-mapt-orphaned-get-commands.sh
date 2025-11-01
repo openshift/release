@@ -26,3 +26,32 @@ else
   echo "Error: Failed to create S3 object list file"
   exit 1
 fi
+
+echo "Finding all .pulumi/locks/ directories in S3 bucket ${AWS_S3_BUCKET}..."
+
+# Get unique top-level folders that have .pulumi/locks/
+aws s3api list-objects-v2 \
+  --bucket "${AWS_S3_BUCKET}" \
+  --output json \
+  --query 'Contents[?contains(Key, `.pulumi/locks/`)].Key' \
+  | jq -r '.[]?' \
+  | sed 's|/\.pulumi/locks/.*||' \
+  | sort -u > "${SHARED_DIR}/folders_with_locks.txt"
+
+if [ ! -s "${SHARED_DIR}/folders_with_locks.txt" ]; then
+  echo "No .pulumi/locks/ directories found in bucket"
+  exit 0
+fi
+
+folder_count=$(wc -l < "${SHARED_DIR}/folders_with_locks.txt")
+echo "Found ${folder_count} folders with .pulumi/locks/ to clean"
+
+# Delete all lock files in one efficient command
+echo "Deleting all .pulumi/locks/ files across all folders..."
+aws s3 rm "s3://${AWS_S3_BUCKET}/" \
+  --recursive \
+  --exclude "*" \
+  --include "*/.pulumi/locks/*"
+cp "${SHARED_DIR}/folders_with_locks.txt" "${ARTIFACT_DIR}/folders_cleaned.txt"
+
+echo "Successfully deleted .pulumi/locks/ from ${folder_count} folders"
