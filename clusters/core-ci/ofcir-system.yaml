@@ -324,7 +324,10 @@ subjects:
 apiVersion: v1
 kind: Service
 metadata:
+  annotations:
+    haproxy.router.openshift.io/ip_whitelist: 10.29.0.0/18 10.28.64.0/18
   labels:
+    app: ofcir-service
     control-plane: controller-manager
   name: ofcir-service
   namespace: ofcir-system
@@ -342,6 +345,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
+    app: ofcir-service
     control-plane: controller-manager
   name: ofcir-controller-manager
   namespace: ofcir-system
@@ -355,6 +359,7 @@ spec:
       annotations:
         kubectl.kubernetes.io/default-container: ofcir-api
       labels:
+        app: ofcir-service
         control-plane: controller-manager
     spec:
       nodeSelector:
@@ -399,6 +404,13 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
+        resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
         securityContext:
           allowPrivilegeEscalation: false
       - command:
