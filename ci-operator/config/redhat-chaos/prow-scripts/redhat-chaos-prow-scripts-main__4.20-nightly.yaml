@@ -20,6 +20,21 @@ base_images:
     namespace: ocp
     tag: upi-installer
 build_root:
+  from_repository: true
+images:
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-main-prow-420
+- dockerfile_path: Dockerfile
+  from: krkn.prow
+  to: prow-scripts-420
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
+build_root:
   image_stream_tag:
     name: release
     namespace: openshift
@@ -52,11 +67,14 @@ tests:
       TELEMETRY_GROUP: prow-ocp-4.20
       VMI_READY_THRESHOLD: "30"
       VMS_PER_NODE: "2"
+    observers:
+      enable:
+      - openshift-qe-virt-density-observer
     post:
     - chain: ipi-gcp-post
     test:
     - ref: kubevirt-install
-    - ref: openshift-qe-virt-density
+    - ref: redhat-chaos-start-krkn
     - ref: redhat-chaos-kubevirt-outage
     workflow: ipi-gcp
   timeout: 6h0m0s
