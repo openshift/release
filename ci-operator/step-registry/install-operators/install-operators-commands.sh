@@ -8,6 +8,12 @@ echo "=========  ${CLUSTER_PROFILE_DIR}  ============"
 echo ${CLUSTER_PROFILE_DIR}
 ls ${CLUSTER_PROFILE_DIR}
 echo "=================="
+echo ${SHARED_DIR}
+ls ${SHARED_DIR}
+
+echo "================================"
+
+
 
 # Set the cluster proxy configuration, if its present.
 if test -s "${SHARED_DIR}/proxy-conf.sh" ; then

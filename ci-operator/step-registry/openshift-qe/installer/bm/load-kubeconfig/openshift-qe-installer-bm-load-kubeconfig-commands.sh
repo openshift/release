@@ -73,4 +73,10 @@ PROXY_EOF
     ;;
 esac
 
+echo "*****************************"
+ls ${CLUSTER_PROFILE_DIR}/
+echo "---------------"
+ls ${SHARED_DIR}
+echo "*****************************"
+
 exit 0
