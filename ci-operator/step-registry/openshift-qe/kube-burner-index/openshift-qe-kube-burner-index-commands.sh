@@ -23,7 +23,12 @@ export WORKLOAD=index
 
 EXTRA_FLAGS="$METRIC_PROFILES --check-health=false"
 
-export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+if [ -z "$ES_SERVER" ] && [ -f "${SHARED_DIR}/ES_SERVER" ]; then
+  ES_SERVER=$(cat "${SHARED_DIR}/ES_SERVER")
+  export ES_SERVER
+  rm -f "${SHARED_DIR}/ES_SERVER"
+fi
+export ES_SERVER="${ES_SERVER:-https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com}"
 
 if [ -z "$START_TIME" ] && [ -f "${SHARED_DIR}/workload_start_time.txt" ]; then
   START_TIME=$(cat "${SHARED_DIR}/workload_start_time.txt")
