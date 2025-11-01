@@ -3,7 +3,7 @@
 function install_yq() {
     # Install yq manually if not found in image
       echo "Installing yq"
-      mkdir -p /tmp/bin
+      mkdir -p /tmp/bin || true
       export PATH=$PATH:/tmp/bin/
       curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
        -o /tmp/bin/yq && chmod +x /tmp/bin/yq
@@ -28,11 +28,13 @@ function mapTestsForComponentReadiness() {
             /tmp/bin/yq eval -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' "$results_file" || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
+    return 0  # Do not return exitcode of yq
 }
 
 
 # Archive results function
 function cleanup-collect() {
+    set +e  # unset errexit. warn only during this collection
     if [[ $MAP_TESTS == "true" ]]; then
       install_yq
       original_results="${ARTIFACT_DIR}/original_results/"
@@ -45,7 +47,7 @@ function cleanup-collect() {
       find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
         # Map tests if needed for related use cases
         mapTestsForComponentReadiness "${result_file}"
-      done
+      done || true  # Do not error if no files are found
 
       # Send modified files to shared dir for Data Router Reporter step
       cp -r "${ARTIFACT_DIR}"/junit-* "${SHARED_DIR}" || echo "Warning: couldn't copy files to SHARED_DIR" >&2
