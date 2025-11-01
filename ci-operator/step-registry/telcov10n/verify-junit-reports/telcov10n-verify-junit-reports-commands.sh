@@ -11,6 +11,9 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
+echo "Failed" >> ${SHARED_DIR}/job_status.txt
+
 # Change to eco-ci-cd directory and run the external Python script
 cd /eco-ci-cd/scripts
-python3 fail_if_any_test_failed.py
+python3 fail_if_any_test_failed.py && echo "Passed" > ${SHARED_DIR}/job_status.txt
+

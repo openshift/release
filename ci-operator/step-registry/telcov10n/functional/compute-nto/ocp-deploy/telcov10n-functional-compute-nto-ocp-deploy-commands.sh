@@ -31,6 +31,12 @@ process_inventory() {
 
 main() {
 
+    echo "Save cluster version to SHARED_DIR"
+    echo "${VERSION}" > "${SHARED_DIR}/cluster_version"
+
+    echo "Save slack webhook url to SHARED_DIR"
+    cat /var/group_variables/${CLUSTER_NAME}/nodes/slack-webhook-url > "${SHARED_DIR}/slack-webhook-url"
+
     echo "Set CLUSTER_NAME env var"
     if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
         CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
