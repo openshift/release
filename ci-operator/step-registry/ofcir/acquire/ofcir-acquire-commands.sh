@@ -77,7 +77,7 @@ cat > "${SHARED_DIR}/packet-conf.sh" <<-EOF
 EOF
 
 function getCIR(){
-    OFCIRURL="https://ofcir-service.ofcir-system.svc.cluster.local/v1/ofcir"
+    OFCIRURL="https://ofcir-system.apps.master.ci.devcluster.openshift.com/v1/ofcir"
     OFCIRTOKEN="$(cat "${CLUSTER_PROFILE_DIR}/ofcir-auth-token")"
     echo "Attempting to acquire a Host from OFCIR"
     IPFILE=$SHARED_DIR/server-ip
@@ -86,7 +86,7 @@ function getCIR(){
 
     # ofcir may be unavailable in the cluster(or the ingress machinery), retry
     # we can retry several times, preventing CIR leaking should be done by OFCIR with pool size
-    if ! timeout 70s curl --retry-all-errors --retry-delay 60 --retry 15 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
+    if ! timeout 70s curl --verbose --retry-all-errors --retry-delay 60 --retry 15 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
         BODY=$(cat "$CIRFILE")
         set +x
         echo "<==== OFCIR ERROR RESPONSE BODY ====="
@@ -101,7 +101,7 @@ function getCIR(){
     # If the node is being provisioned on demand it may take some time to be provisioned
     # wait upto 30 minutes to allow this to happen
     for _ in $(seq 60) ; do
-        curl --retry-all-errors --retry-delay 60 --retry 1 -kfs -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL/$NAME" -o "$CIRFILE"
+        curl --verbose --retry-all-errors --retry-delay 60 --retry 1 -kfs -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL/$NAME" -o "$CIRFILE"
         if [ "$(jq -r 'select(.status == "in use" and .ip != "")' < "$CIRFILE")" ] ; then
             break
         fi
@@ -125,7 +125,7 @@ CIRTYPE=host_el9
 [ "$CLUSTERTYPE" == "baremetal" ] && CIRTYPE=cluster_el9
 [ "$CLUSTERTYPE" == "baremetal-moc" ] && CIRTYPE=cluster_moc
 [ "$CLUSTERTYPE" == "virt-arm64" ] && CIRTYPE=host_arm
-[ "$CLUSTERTYPE" == "lab-small" ] && CIRTYPE=host_lab_small
+[ "$CLUSTERTYPE" == "lab-small" ] && CIRTYPE=host_test
 [ "$CLUSTERTYPE" == "assisted_large_el9" ] && CIRTYPE=assisted_large_el9
 [ "$CLUSTERTYPE" == "assisted_medium_el9" ] && CIRTYPE=assisted_medium_el9
 [ "$CLUSTERTYPE" == "assisted_small_el9" ] && CIRTYPE=assisted_small_el9
