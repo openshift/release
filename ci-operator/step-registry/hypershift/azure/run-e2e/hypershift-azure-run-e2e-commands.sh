@@ -87,6 +87,12 @@ if [[ "${AZURE_MULTI_ARCH:-}" == "true" ]]; then
   AZURE_MULTI_ARCH_PARAMS="--e2e.azure-multi-arch=true"
 fi
 
+MARKETPLACE_IMAGE_PARAMS=""
+# Use environment variables if set, otherwise use defaults based on version
+if [[ -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION:-}" ]]; then
+  MARKETPLACE_IMAGE_PARAMS="--e2e.azure-marketplace-publisher ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER} --e2e.azure-marketplace-offer ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER} --e2e.azure-marketplace-sku ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU} --e2e.azure-marketplace-version ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
+fi
+
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-} \
   -test.parallel=20 \
@@ -106,10 +112,7 @@ hack/ci-test-e2e.sh -test.v \
     ${AZURE_MULTI_ARCH_PARAMS:-} \
   --e2e.azure-encryption-key-id=${AKS_KMS_KEY} \
   --e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET} \
-  --e2e.azure-marketplace-publisher "azureopenshift" \
-  --e2e.azure-marketplace-offer "aro4" \
-  --e2e.azure-marketplace-sku "aro_419" \
-  --e2e.azure-marketplace-version "419.6.20250523" \
+  ${MARKETPLACE_IMAGE_PARAMS} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
 wait $!
