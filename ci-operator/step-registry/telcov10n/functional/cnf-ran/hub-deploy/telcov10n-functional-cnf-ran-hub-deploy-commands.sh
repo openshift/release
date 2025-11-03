@@ -60,6 +60,8 @@ find ${MOUNTED_HOST_INVENTORY}/"${CLUSTER_NAME}"/ -mindepth 1 -type d | while re
     process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
 done
 
+export ANSIBLE_SSH_ARGS="-o ServerAliveInterval=30 -o ServerAliveCountMax=120 -o ControlMaster=auto -o ControlPersist=3600s"
+
 cd /eco-ci-cd
 ansible-playbook ./playbooks/deploy-ocp-sno.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME} disconnected=true"
