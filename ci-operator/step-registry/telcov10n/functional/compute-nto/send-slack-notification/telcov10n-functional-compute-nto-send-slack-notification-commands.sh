@@ -2,7 +2,7 @@
 set -e
 set -o pipefail
 
-Skip if job type is presubmit
+# Skip if job type is presubmit
 if [ "$JOB_TYPE" = "presubmit" ]; then
   echo "JOB_TYPE=presubmit — skipping script"
   exit 0
