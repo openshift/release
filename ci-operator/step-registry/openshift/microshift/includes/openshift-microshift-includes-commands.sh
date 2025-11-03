@@ -287,7 +287,6 @@ function ci_custom_link_report() {
       width: 100%;
       border-collapse: collapse;
       background-color: #1e1e1e;
-      border-radius: 8px;
       overflow: hidden;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
     }
@@ -303,13 +302,13 @@ function ci_custom_link_report() {
       font-size: 0.75rem;
     }
     td {
-      padding: 8px 8px 8px 8px;
+      padding: 4px;
       border-top: 1px solid rgba(255, 255, 255, 0.1);
     }
     tr:nth-child(even) {
       background-color: rgba(255, 255, 255, 0.04);
     }
-    a {
+    a:link {
       color: #ffffff;
       text-decoration: unset;
     }
@@ -552,7 +551,7 @@ EOF
         if [ -f "${journal_file}" ]; then
             local ms_version=$(grep -oP '"Version" microshift="\K[^"]+' "${journal_file}" 2>/dev/null | tail -1)
             if [ -n "${ms_version}" ]; then
-                version_cell="<span class=\"version-badge\"><code>${ms_version}</code></span>"
+                version_cell="<span class=\"version-badge\">${ms_version}</span>"
             fi
         fi
 
