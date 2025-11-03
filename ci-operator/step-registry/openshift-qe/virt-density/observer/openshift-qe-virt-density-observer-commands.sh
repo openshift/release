@@ -51,10 +51,6 @@ EXTRA_FLAGS+=" --metrics-profile metrics.yml,cnv-metrics.yml --gc-metrics=true -
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
-# The measurable run
-iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
-export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
-
 export ES_SERVER=""
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
