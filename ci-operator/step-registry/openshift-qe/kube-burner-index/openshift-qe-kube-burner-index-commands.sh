@@ -23,12 +23,25 @@ export WORKLOAD=index
 
 EXTRA_FLAGS="$METRIC_PROFILES --check-health=false"
 
-if [ -z "$ES_SERVER" ] && [ -f "${SHARED_DIR}/ES_SERVER" ]; then
+if [ -z "${ES_SERVER:-}" ] && [ -f "${SHARED_DIR}/ES_SERVER" ]; then
   ES_SERVER=$(cat "${SHARED_DIR}/ES_SERVER")
   export ES_SERVER
   rm -f "${SHARED_DIR}/ES_SERVER"
 fi
+if [ -z "${ES_INDEX:-}" ] && [ -f "${SHARED_DIR}/ES_INDEX" ]; then
+  ES_INDEX=$(cat "${SHARED_DIR}/ES_INDEX")
+  export ES_INDEX
+  rm -f "${SHARED_DIR}/ES_INDEX"
+fi
 export ES_SERVER="${ES_SERVER:-https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com}"
+export ES_INDEX=${ES_INDEX:-ripsaw-kube-burner}
+
+if [ -z "${UUID:-}" ] && [ -f "${SHARED_DIR}/UUID" ]; then
+  UUID=$(cat "${SHARED_DIR}/UUID")
+  export UUID
+  rm -f "${SHARED_DIR}/UUID"
+fi
+export UUID=${UUID:-`uuidgen`}
 
 if [ -z "$START_TIME" ] && [ -f "${SHARED_DIR}/workload_start_time.txt" ]; then
   START_TIME=$(cat "${SHARED_DIR}/workload_start_time.txt")
