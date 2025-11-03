@@ -241,13 +241,13 @@ function ci_custom_link_report() {
         local junit_file=""
         if [ -f "${test}/log.html" ]; then
             junit_file="${test}/junit.xml"
-        elif [ -f "${test}/gingko-results/test-output.log" ]; then
-            junit_file="$( find "${test}/gingko-results" -name "junit_e2e_*.xml" -type f | head -1 )"
+        elif [ -f "${test}/ginkgo-results/test-output.log" ]; then
+            junit_file="$( find "${test}/ginkgo-results" -name "junit_e2e_*.xml" -type f | head -1 )"
         fi
         
         # Determine scenario status
         local scenario_status="skip"
-        if [ -f "${junit_file}" ] && grep -q -E 'failures="[1-9][0-9]?"' "${junit_file}"; then
+        if [ -f "${junit_file}" ] && grep -q -E 'failures="[1-9][0-9]*"' "${junit_file}"; then
             scenario_status="fail"
         elif [ -d "${test}/vms/" ]; then
             scenario_status="pass"
@@ -523,11 +523,11 @@ EOF
     
     for test in "${ARTIFACT_DIR}"/scenario-info/*; do
         junit_file=""
-        # RF or gingko
+        # RF or ginkgo
         if [ -f "${test}/log.html" ]; then
             junit_file="${test}/junit.xml"
-        elif [ -f "${test}/gingko-results/test-output.log" ]; then
-            junit_file="$( find "${test}/gingko-results" -name "junit_e2e_*.xml" -type f | head -1 )"
+        elif [ -f "${test}/ginkgo-results/test-output.log" ]; then
+            junit_file="$( find "${test}/ginkgo-results" -name "junit_e2e_*.xml" -type f | head -1 )"
         fi
 
         # set scenario status
@@ -547,7 +547,7 @@ EOF
 
         # get microshift version from journal log
         version_cell="<span class=\"version-badge\">-</span>"
-        local journal_file="$(ls ${test}/vms/*/sos/journal_*.log 2>/dev/null | head -1)"
+        local journal_file="$(ls "${test}"/vms/*/sos/journal_*.log 2>/dev/null | head -1)"
         if [ -f "${journal_file}" ]; then
             local ms_version=$(grep -oP '"Version" microshift="\K[^"]+' "${journal_file}" 2>/dev/null | tail -1)
             if [ -n "${ms_version}" ]; then
@@ -589,7 +589,7 @@ EOF
         html_report_cell="<span class=\"empty-state\">No test logs</span>"
         if [ -f "${test}/log.html" ]; then
             html_report_cell="<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/log.html\">🤖 log.html</a></div>"
-        elif [ -f "${test}/gingko-results/test-output.log" ]; then
+        elif [ -f "${test}/ginkgo-results/test-output.log" ]; then
             html_report_cell="<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/ginkgo-results/test-output.log\">☘️ test-output.log</a></div>"
         fi
 
@@ -615,7 +615,7 @@ EOF
         cat >>"${report_html}" <<EOF
       <tr class="${status_class}">
         <td class="status-emoji">${status_emoji}</td>
-        <td class>${scenario_cell}</td>
+        <td class="scenario-cell">${scenario_cell}</td>
         <td class="cell-links">${version_cell}</td>
         <td class="cell-links">${test_results_cell}</td>
         <td class="cell-links">${boot_run_cell}</td>
