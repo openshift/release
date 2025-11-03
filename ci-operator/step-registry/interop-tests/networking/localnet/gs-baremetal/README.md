@@ -1,4 +1,4 @@
-# interop-tests-cnv-tests-gs-baremetal-localnet<!-- omit from toc -->
+# interop-tests-networking-localnet-gs-baremetal<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
 - [General Information](#general-information)
@@ -23,7 +23,7 @@ To execute OpenShift Virtualization networking tests on a bare-metal cluster con
 The script performs the following to run Openshift Virtualization networking tests on Goldman Sachs bare-metal cluster:
 
 
-1. Set KUBECONFIG to `/app/.kube/config`
+1. Import KUBECONFIG to `${SHARED_DIR}/kubeconfig`.
 2. Run `tests/network/localnet/test_default_bridge.py` with specificed environment variables.
 3. Move xmls to `${ARTIFACT_DIR}/junit_*.xml`.
 
