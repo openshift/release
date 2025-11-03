@@ -1002,6 +1002,10 @@ secret_configs:
     namespace: ci
   - cluster_groups:
     - non_app_ci
+    name: cluster-secrets-aws-confidential-qe
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
     name: cluster-secrets-metal-perscale-cpt
     namespace: ci
   - cluster_groups:
@@ -1542,6 +1546,9 @@ secret_configs:
     - non_app_ci
     name: cluster-secrets-gcp-quay-qe
     namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-gcp-confidential-qe
 - from:
     gce.json:
       field: credentials.json
@@ -6053,6 +6060,9 @@ secret_configs:
     - build_farm
     name: splunk-receiver-token
     namespace: log-forwarding
+  - cluster: hosted-mgmt
+    name: splunk-receiver-token
+    namespace: log-forwarding
 - from:
     .dockerconfigjson:
       dockerconfigJSON:
@@ -8226,6 +8236,25 @@ secret_configs:
     name: manifest-tool-local-pusher
     namespace: test-credentials
     type: kubernetes.io/dockerconfigjson
+- from:
+    service-account.json:
+      field: gcp-service-account.json
+      item: ship-help
+  to:
+  - cluster: app.ci
+    name: ship-help-bot-gcp-service-account
+    namespace: ci
+- from:
+    app_token:
+      field: slack-app-token
+      item: ship-help
+    bot_token:
+      field: slack-bot-token
+      item: ship-help
+  to:
+  - cluster: app.ci
+    name: ship-help-slack
+    namespace: ci
 user_secrets_target_clusters:
 - app.ci
 - build01

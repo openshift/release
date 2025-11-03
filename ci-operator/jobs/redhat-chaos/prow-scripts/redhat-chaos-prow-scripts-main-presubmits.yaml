@@ -6045,6 +6045,273 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build10
+    context: ci/prow/rosa-4.17-nightly-krkn-rosa-hcp-node
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 7h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: rosa-4.17-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.17-nightly-krkn-rosa-hcp-node
+    reporter_config:
+      slack:
+        channel: '#chaos-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test rosa-4.17-nightly-krkn-rosa-hcp-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-rosa-hcp-node
+        - --variant=rosa-4.17-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.17-nightly-krkn-rosa-hcp-node|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/rosa-4.17-nightly-krkn-tests-rosa
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+      ci-operator.openshift.io/variant: rosa-4.17-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.17-nightly-krkn-tests-rosa
+    reporter_config:
+      slack:
+        channel: '#chaos-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test rosa-4.17-nightly-krkn-tests-rosa
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-tests-rosa
+        - --variant=rosa-4.17-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.17-nightly-krkn-tests-rosa|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/rosa-4.17-nightly-krkn-tests-rosa-hcp
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 7h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: rosa-4.17-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.17-nightly-krkn-tests-rosa-hcp
+    reporter_config:
+      slack:
+        channel: '#chaos-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test rosa-4.17-nightly-krkn-tests-rosa-hcp
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-tests-rosa-hcp
+        - --variant=rosa-4.17-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.17-nightly-krkn-tests-rosa-hcp|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
     context: ci/prow/rosa-4.17-nightly-krkn-tests-rosa-infra
     decorate: true
     decoration_config:
@@ -6118,6 +6385,95 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(rosa-4.17-nightly-krkn-tests-rosa-infra|remaining-required),?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/rosa-4.17-nightly-krkn-tests-rosa-node
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+      ci-operator.openshift.io/variant: rosa-4.17-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.17-nightly-krkn-tests-rosa-node
+    reporter_config:
+      slack:
+        channel: '#chaos-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test rosa-4.17-nightly-krkn-tests-rosa-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-tests-rosa-node
+        - --variant=rosa-4.17-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.17-nightly-krkn-tests-rosa-node|remaining-required),?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -6176,6 +6532,362 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )rosa-4.18-nightly-images,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/rosa-4.18-nightly-krkn-rosa-hcp-node
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: rosa-4.18-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.18-nightly-krkn-rosa-hcp-node
+    reporter_config:
+      slack:
+        channel: '#chaos-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test rosa-4.18-nightly-krkn-rosa-hcp-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-rosa-hcp-node
+        - --variant=rosa-4.18-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.18-nightly-krkn-rosa-hcp-node|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/rosa-4.18-nightly-krkn-tests-rosa
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+      ci-operator.openshift.io/variant: rosa-4.18-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.18-nightly-krkn-tests-rosa
+    reporter_config:
+      slack:
+        channel: '#chaos-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test rosa-4.18-nightly-krkn-tests-rosa
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-tests-rosa
+        - --variant=rosa-4.18-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.18-nightly-krkn-tests-rosa|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/rosa-4.18-nightly-krkn-tests-rosa-hcp
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: rosa-4.18-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.18-nightly-krkn-tests-rosa-hcp
+    reporter_config:
+      slack:
+        channel: '#chaos-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test rosa-4.18-nightly-krkn-tests-rosa-hcp
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-tests-rosa-hcp
+        - --variant=rosa-4.18-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.18-nightly-krkn-tests-rosa-hcp|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/rosa-4.18-nightly-krkn-tests-rosa-node
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+      ci-operator.openshift.io/variant: rosa-4.18-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.18"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.18-nightly-krkn-tests-rosa-node
+    reporter_config:
+      slack:
+        channel: '#chaos-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test rosa-4.18-nightly-krkn-tests-rosa-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-tests-rosa-node
+        - --variant=rosa-4.18-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.18-nightly-krkn-tests-rosa-node|remaining-required),?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -6233,3 +6945,359 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )rosa-4.19-nightly-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/rosa-4.19-nightly-krkn-rosa-hcp-node
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: rosa-4.19-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.19"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.19-nightly-krkn-rosa-hcp-node
+    reporter_config:
+      slack:
+        channel: '#chaos-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test rosa-4.19-nightly-krkn-rosa-hcp-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-rosa-hcp-node
+        - --variant=rosa-4.19-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.19-nightly-krkn-rosa-hcp-node|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/rosa-4.19-nightly-krkn-tests-rosa
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+      ci-operator.openshift.io/variant: rosa-4.19-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.19"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.19-nightly-krkn-tests-rosa
+    reporter_config:
+      slack:
+        channel: '#chaos-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test rosa-4.19-nightly-krkn-tests-rosa
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-tests-rosa
+        - --variant=rosa-4.19-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.19-nightly-krkn-tests-rosa|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/rosa-4.19-nightly-krkn-tests-rosa-hcp
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: rosa-4.19-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.19"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.19-nightly-krkn-tests-rosa-hcp
+    reporter_config:
+      slack:
+        channel: '#chaos-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test rosa-4.19-nightly-krkn-tests-rosa-hcp
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-tests-rosa-hcp
+        - --variant=rosa-4.19-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.19-nightly-krkn-tests-rosa-hcp|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/rosa-4.19-nightly-krkn-tests-rosa-node
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+      ci-operator.openshift.io/variant: rosa-4.19-nightly
+      ci.openshift.io/generator: prowgen
+      job-release: "4.19"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-chaos-prow-scripts-main-rosa-4.19-nightly-krkn-tests-rosa-node
+    reporter_config:
+      slack:
+        channel: '#chaos-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test rosa-4.19-nightly-krkn-tests-rosa-node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=krkn-tests-rosa-node
+        - --variant=rosa-4.19-nightly
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(rosa-4.19-nightly-krkn-tests-rosa-node|remaining-required),?($|\s.*)
