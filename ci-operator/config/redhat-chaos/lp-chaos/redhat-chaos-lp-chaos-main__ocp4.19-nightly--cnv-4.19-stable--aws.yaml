@@ -48,24 +48,32 @@ tests:
       KCFG_SRC_SFX: weiliu--chaos-test
       VM_REPLICA_COUNT: "3"
       VM_WAIT_TIMEOUT: 30m
+    post:
+    - ref: redhat-lp-chaos-lp-cnv-vm-check
     test:
     - ref: redhat-lp-chaos-lp-cnv-vm-create
-    - chain: redhat-chaos-krkn-hub-tests
-    - ref: redhat-lp-chaos-lp-cnv-vm-check
+    - ref: redhat-chaos-pod-scenarios-etcd-disruption
+    - ref: redhat-chaos-time-scenarios
+    - chain: redhat-chaos-krkn-hub-console-tests
+    - chain: redhat-chaos-krkn-hub-ovn-disruption
+    - chain: redhat-chaos-krkn-hub-prometheus-tests
+    - chain: redhat-chaos-krkn-hub-random-system-pods-disruption
+    - ref: redhat-chaos-pod-scenarios-kube-apiserver-disruption
     workflow: external-cluster
-  timeout: 5h0m0s
+  timeout: 8h0m0s
 - as: krkn-hub-node-tests
   cron: 0 17 * * *
   steps:
     cluster_profile: aws-lp-chaos
     env:
       KCFG_SRC_SFX: weiliu--chaos-test
+    post:
+    - ref: redhat-lp-chaos-lp-cnv-vm-check
     test:
     - ref: redhat-lp-chaos-lp-cnv-vm-create
     - chain: redhat-chaos-krkn-hub-node-tests
-    - ref: redhat-lp-chaos-lp-cnv-vm-check
     workflow: external-cluster
-  timeout: 5h0m0s
+  timeout: 8h0m0s
 - as: kubevirt-outage
   cron: 0 19 * * *
   steps:
@@ -76,18 +84,6 @@ tests:
     test:
     - ref: redhat-lp-chaos-lp-cnv-vm-create
     - ref: redhat-chaos-kubevirt-outage
-    - ref: redhat-lp-chaos-lp-cnv-vm-check
-    workflow: external-cluster
-  timeout: 5h0m0s
-- as: aws-chaos-syn-flood
-  cron: 0 21 * * *
-  steps:
-    cluster_profile: aws-lp-chaos
-    env:
-      KCFG_SRC_SFX: weiliu--chaos-test
-    test:
-    - ref: redhat-lp-chaos-lp-cnv-vm-create
-    - ref: redhat-chaos-syn-flood
     - ref: redhat-lp-chaos-lp-cnv-vm-check
     workflow: external-cluster
   timeout: 5h0m0s
