@@ -53,6 +53,10 @@ current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/work
 
 export ES_SERVER=""
 
+if [[ "${CHURN}" == "true" ]]; then
+    EXTRA_FLAGS+=" --churn=true --namespaced-iterations=true"
+fi
+
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
