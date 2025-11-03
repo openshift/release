@@ -45,8 +45,9 @@ if ! wget --quiet --timeout=30 --no-check-certificate "${GITLAB_PROD_URL}" -O /t
 fi
 
 # Extract all repository names from GitLab files and strip registry prefix
-GITLAB_REPOS_STAGE=$(yq eval '.spec.data.mapping.components[].repository' /tmp/gitlab-stage.yaml 2>/dev/null | sed 's|^[^/]*/||' || echo "")
-GITLAB_REPOS_PROD=$(yq eval '.spec.data.mapping.components[].repository' /tmp/gitlab-prod.yaml 2>/dev/null | sed 's|^[^/]*/||' || echo "")
+# Handle new schema format with repositories[] array containing url fields
+GITLAB_REPOS_STAGE=$(yq eval '.spec.data.mapping.components[].repositories[].url' /tmp/gitlab-stage.yaml 2>/dev/null | sed 's|^[^/]*/||' || echo "")
+GITLAB_REPOS_PROD=$(yq eval '.spec.data.mapping.components[].repositories[].url' /tmp/gitlab-prod.yaml 2>/dev/null | sed 's|^[^/]*/||' || echo "")
 
 # Find all YAML files in the images directory
 IMAGE_FILES=$(find images/ -name '*.yml' -o -name '*.yaml' 2>/dev/null || true)

@@ -15,4 +15,9 @@ export APP_ID
 export CLIENT_KEY=/secrets/pr-creds/key.pem
 
 cd /go/src/github.com/openshift/microshift/
-./scripts/release-notes/gen_ec_release_notes.sh ${DRY_RUN}
+
+if [ -f ./scripts/release-notes/gen_ec_release_notes.sh ]; then
+    ./scripts/release-notes/gen_ec_release_notes.sh ${DRY_RUN}
+else
+    ./scripts/release-notes/gen_gh_releases.sh mirror ${DRY_RUN}
+fi

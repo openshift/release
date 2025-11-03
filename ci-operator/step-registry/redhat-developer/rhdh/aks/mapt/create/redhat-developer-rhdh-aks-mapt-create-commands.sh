@@ -19,7 +19,7 @@ mapt azure aks create \
   --project-name "aks" \
   --backed-url "azblob://${AZURE_STORAGE_BLOB}/aks-${CORRELATE_MAPT}" \
   --conn-details-output "${SHARED_DIR}" \
-  --version 1.31 \
+  --version 1.33 \
   --vmsize "Standard_D4as_v6" \
   --spot \
   --spot-eviction-tolerance "low" \

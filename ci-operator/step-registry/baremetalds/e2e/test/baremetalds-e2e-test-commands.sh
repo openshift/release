@@ -19,8 +19,7 @@ export KUBECONFIG=$KUBECONFIG_BAK
 # Starting in 4.21, we will aggressively retry test failures only in
 # presubmits to determine if a failure is a flake or legitimate. This is
 # to reduce the number of retests on PR's.
-# TODO: Remove "origin" and run everywhere
-if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_REF" == "master" ) && "$REPO_NAME" == "origin" ]]; then
+if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_REF" == "master" ) ]]; then
     if openshift-tests run --help | grep -q 'retry-strategy'; then
         TEST_ARGS+=" --retry-strategy=aggressive"
     fi
@@ -260,6 +259,38 @@ function is_openshift_version_gte() {
     printf '%s\n%s' "$1" "${DS_OPENSHIFT_VERSION}" | sort -C -V
 }
 
+function build_hypervisor_config() {
+    # Build hypervisor SSH configuration for tests that need to interact with the hypervisor
+    if [[ "${ENABLE_HYPERVISOR_SSH_CONFIG:-false}" != "true" ]]; then
+        return
+    fi
+
+    if [[ ! -f "${SHARED_DIR}/server-ip" ]]; then
+        echo "Warning: ENABLE_HYPERVISOR_SSH_CONFIG is true but ${SHARED_DIR}/server-ip not found"
+        return
+    fi
+
+    HYPERVISOR_IP=$(cat "${SHARED_DIR}/server-ip")
+    export HYPERVISOR_IP
+    export HYPERVISOR_SSH_USER="root"
+
+    # Determine the correct SSH key path
+    # Using equinix-ssh-key for ARM64 hosts or packet-ssh-key for others
+    if [[ -f "${CLUSTER_PROFILE_DIR}/equinix-ssh-key" ]]; then
+        export HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/equinix-ssh-key"
+    else
+        export HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+    fi
+
+    if [[ ! -f "${HYPERVISOR_SSH_KEY}" ]]; then
+        echo "Warning: SSH key not found at ${HYPERVISOR_SSH_KEY}"
+        unset HYPERVISOR_IP HYPERVISOR_SSH_USER HYPERVISOR_SSH_KEY
+        return
+    fi
+
+    echo "Hypervisor SSH configuration: IP=${HYPERVISOR_IP}, User=${HYPERVISOR_SSH_USER}, Key=${HYPERVISOR_SSH_KEY}"
+}
+
 function upgrade() {
     mirror_release_image_for_disconnected_upgrade
     set -x
@@ -283,10 +314,18 @@ function suite() {
     fi
 
     set -x
-    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
-        --provider "${TEST_PROVIDER:-}" \
-        -o "${ARTIFACT_DIR}/e2e.log" \
-        --junit-dir "${ARTIFACT_DIR}/junit"
+    if [[ -n "${HYPERVISOR_IP:-}" ]]; then
+        openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+            --provider "${TEST_PROVIDER:-}" \
+            --with-hypervisor-json="{\"hypervisorIP\":\"${HYPERVISOR_IP}\", \"sshUser\":\"${HYPERVISOR_SSH_USER}\", \"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}" \
+            -o "${ARTIFACT_DIR}/e2e.log" \
+            --junit-dir "${ARTIFACT_DIR}/junit"
+    else
+        openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+            --provider "${TEST_PROVIDER:-}" \
+            -o "${ARTIFACT_DIR}/e2e.log" \
+            --junit-dir "${ARTIFACT_DIR}/junit"
+    fi
     set +x
 }
 
@@ -416,6 +455,9 @@ echo "$(date) - Waiting 10 minutes before checking again clusteroperators"
 sleep 10m
 
 check_clusteroperators_status
+
+# Build hypervisor SSH configuration if enabled
+build_hypervisor_config
 
 case "${TEST_TYPE}" in
 upgrade-conformance)

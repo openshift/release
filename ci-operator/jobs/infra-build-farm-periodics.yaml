@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -54,7 +54,7 @@ periodics:
           path: .awscred
         secretName: cluster-secrets-aws
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -108,7 +108,7 @@ periodics:
           path: .awscred
         secretName: cluster-secrets-aws-2
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -162,7 +162,7 @@ periodics:
           path: .awscred
         secretName: cluster-secrets-aws-3
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -216,7 +216,7 @@ periodics:
           path: .awscred
         secretName: cluster-secrets-aws-4
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -270,7 +270,7 @@ periodics:
           path: .awscred
         secretName: cluster-secrets-aws-5
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -327,7 +327,7 @@ periodics:
           path: gce.json
         secretName: cluster-secrets-gcp
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -384,7 +384,7 @@ periodics:
           path: gce.json
         secretName: cluster-secrets-gcp-3
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -441,7 +441,7 @@ periodics:
           path: gce.json
         secretName: cluster-secrets-gcp-openshift-gce-devel-ci-2
 - agent: kubernetes
-  cluster: build04
+  cluster: build08
   cron: '@daily'
   decorate: true
   name: periodic-openshift-dptp-3312-hypershift-leaks-cleaner
@@ -496,3 +496,48 @@ periodics:
     - name: hive
       secret:
         secretName: hypershift-workload-credentials
+- agent: kubernetes
+  cluster: build08
+  cron: '@daily'
+  decorate: true
+  decoration_config:
+    timeout: 1h0m0s
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-openshift-dptp-4552-clusterpool-pruner
+  reporter_config:
+    slack:
+      channel: '#team-hive-alert'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        succeeded. <!subteam^team-hive-info>{{else}} :failed: Job *{{.Spec.Job}}*
+        failed with *{{.Status.State}}*{{end}} <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - command:
+      - ./core-services/ipi-deprovision/clusterpool-pruner.sh
+      env:
+      - name: KUBECONFIG
+        value: /kubeconfig/kubeconfig
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-yq_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /kubeconfig
+        name: kc
+        readOnly: true
+    volumes:
+    - name: kc
+      secret:
+        secretName: clusterpool-manager-credentials
