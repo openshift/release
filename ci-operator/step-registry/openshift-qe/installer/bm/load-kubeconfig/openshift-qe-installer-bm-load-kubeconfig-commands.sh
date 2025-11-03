@@ -67,16 +67,12 @@ PROXY_EOF
             [ "${tgtFile}" = kubeconfig ] && cp "${CLUSTER_PROFILE_DIR}/${srcFile}" "${SHARED_DIR}/${tgtFile}-minimal"
         fi
     done
+	
+    cp "${CLUSTER_PROFILE_DIR}/metadata.json--${KCFG_SRC_SFX}" "${SHARED_DIR}/metadata.json"
     ;;
   (*)
     echo "Unsupported setting \`KUBECONFIG_ORIGIN=${KUBECONFIG_ORIGIN@Q}\`."
     ;;
 esac
-
-echo "*****************************"
-ls ${CLUSTER_PROFILE_DIR}/
-echo "---------------"
-ls ${SHARED_DIR}
-echo "*****************************"
 
 exit 0
