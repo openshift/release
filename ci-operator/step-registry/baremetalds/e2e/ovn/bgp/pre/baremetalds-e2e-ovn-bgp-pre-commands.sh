@@ -277,6 +277,14 @@ until oc wait -n openshift-frr-k8s deployment frr-k8s-webhook-server --for condi
   sleep 5
 done
 
+# override FRR-K8s with an upstream image needed to support EVPN
+oc patch Network.operator.openshift.io cluster --type=merge -p='{"spec":{"managementState": "Unmanaged"}}'
+oc set image -n openshift-frr-k8s ds/frr-k8s frr=quay.io/frrouting/frr:10.4.1 reloader=quay.io/frrouting/frr:10.4.1
+echo "Waiting for daemonset 'frr-k8s' to rollout..."
+until oc rollout status daemonset -n openshift-frr-k8s frr-k8s --timeout 2m &> /dev/null; do
+  sleep 5
+done
+
 # set up BGP peering of the cluster with the external FRR instance container
 # peer is setup on the default VRF and also on each extra network VRF
 for network in "${!vrf_neighbors[@]}"; do
