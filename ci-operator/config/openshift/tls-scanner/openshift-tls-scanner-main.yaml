@@ -85,11 +85,29 @@ tests:
         # the internal pod IPs. The scanner will write its results to /tmp/artifacts inside the pod.
         echo "--- Launching scanner pod (${SCANNER_POD_NAME}) on test cluster ---"
         echo "Using image: ${PULL_SPEC_TLS_SCANNER_TOOL}"
-        oc run "${SCANNER_POD_NAME}" \
-          --image="${PULL_SPEC_TLS_SCANNER_TOOL}" \
-          --namespace="${NAMESPACE}" \
-          --restart=Never \
-          --command -- /bin/bash -c 'mkdir -p /tmp/artifacts && /usr/local/bin/tls-scanner --all-pods --csv-file /tmp/artifacts/report.csv --log-file /tmp/artifacts/scanner.log'
+        cat <<EOF | oc apply -n "${NAMESPACE}" -f -
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: ${SCANNER_POD_NAME}
+        spec:
+          containers:
+          - name: scanner
+            image: ${PULL_SPEC_TLS_SCANNER_TOOL}
+            command:
+              - /bin/bash
+              - -c
+              - 'mkdir -p /tmp/artifacts && /usr/local/bin/tls-scanner --all-pods --csv-file /tmp/artifacts/report.csv --log-file /tmp/artifacts/scanner.log'
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop:
+                - "ALL"
+              runAsNonRoot: true
+              seccompProfile:
+                type: "RuntimeDefault"
+          restartPolicy: Never
+        EOF
 
         # Wait for the pod to finish its run.
         echo "--- Waiting for scanner pod to complete ---"
@@ -99,18 +117,9 @@ tests:
             break
           fi
           echo "Pod status is ${POD_STATUS} (attempt ${i}/60), waiting..."
-          if [[ "${i}" -gt 1 ]]; then
-             echo "Describing scanner pod for more details:"
-             oc describe "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}"
-             echo "Recent events in namespace:"
-             oc get events --namespace="${NAMESPACE}" --sort-by='.lastTimestamp' | tail -n 10
-          fi
           sleep 30
         done
         echo "Scanner pod finished with status: ${POD_STATUS}"
-
-        echo "--- Final state of scanner pod ---"
-        oc describe "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}"
 
         # Copy the results and logs from the completed pod to the CI artifacts directory.
         echo "--- Collecting logs and artifacts from scanner pod ---"
