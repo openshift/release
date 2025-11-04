@@ -24,13 +24,13 @@ fi
 cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
 hypershift_pods=$(! oc -n hypershift get pods| grep operator >/dev/null ||oc -n hypershift get pods| grep operator |wc -l)
 if [[ $cluster_infra == "BareMetal" && $hypershift_pods -ge 1 ]];then
-        echo "Executing cluster-density-v2 in hypershift cluster"
-        if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
-                echo "Set http proxy for hypershift cluster"
-                . $SHARED_DIR/proxy-conf.sh
-        fi
-        echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
-        export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
+  echo "Executing cluster-density-v2 in hypershift cluster"
+  if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
+    echo "Set http proxy for hypershift cluster"
+    . $SHARED_DIR/proxy-conf.sh
+  fi
+  echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
+  export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
 fi
 
 # Managment Kubeconfig for ROSA-HCP
@@ -86,7 +86,7 @@ gather_loop() {
 }
 
 # Run the gather loop in background
-gather_loop &
+gather_loop &> ${ARTIFACT_DIR}/must-gather-loop.log &
 GATHER_LOOP_PID=$!
 
 # Run workload immediately
