@@ -374,30 +374,11 @@ function ci_custom_link_report() {
       word-break: break-all;
     }
     .summary-container {
-      margin-bottom: 32px;
       background-color: #1e1e1e;
-      padding: 24px 32px;
-      border-radius: 8px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    }
-    .summary-header {
+      padding: 12px 24px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-    .summary-title-section {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    .summary-title {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: #ffffff;
+      gap: 24px;
     }
     .summary-version {
       display: inline-flex;
@@ -412,27 +393,32 @@ function ci_custom_link_report() {
     }
     .summary-stats {
       display: flex;
-      gap: 16px;
+      gap: 12px;
+      flex: 1 1 auto;
     }
     .stat-card {
       background-color: rgba(255, 255, 255, 0.04);
-      padding: 16px;
-      border-radius: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
       text-align: center;
       border: 1px solid rgba(255, 255, 255, 0.1);
       flex: 1;
-      min-width: 140px;
+      min-width: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
     .stat-value {
-      font-size: 2rem;
+      font-size: 1.2rem;
       font-weight: 700;
-      margin-bottom: 4px;
     }
     .stat-label {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       opacity: 0.9;
+      white-space: nowrap;
     }
     .stat-pass {
       color: #9ccc65;
@@ -448,14 +434,15 @@ function ci_custom_link_report() {
     }
     .summary-links {
       display: flex;
-      gap: 12px;
+      gap: 8px;
       align-items: center;
+      flex: 0 0 auto;
     }
     .summary-link {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      padding: 10px 20px;
+      gap: 6px;
+      padding: 8px 12px;
       background-color: rgba(255, 255, 255, 0.04);
       border-radius: 6px;
       border: 1px solid rgba(255, 255, 255, 0.1);
@@ -464,6 +451,7 @@ function ci_custom_link_report() {
       font-weight: 500;
       transition: all 0.2s ease;
       white-space: nowrap;
+      font-size: 0.85rem;
     }
     .summary-link:hover {
       background-color: rgba(255, 255, 255, 0.08);
@@ -474,36 +462,31 @@ function ci_custom_link_report() {
 </head>
 <body>
   <div class="summary-container">
-    <div class="summary-header">
-      <div class="summary-title-section">
-        <div class="summary-title">📊 Test Run Summary</div>
-      </div>
-      <div class="summary-links">
-        <a class="summary-link" target="_blank" href="${url_prefix}/">
-          📁 Scenarios Directory
-        </a>
-        <a class="summary-link" target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt">
-          📃 Build Log
-        </a>
-      </div>
-    </div>
     <div class="summary-stats">
       <div class="stat-card">
         <div class="stat-value stat-total">${total_scenarios}</div>
-        <div class="stat-label">Scenarios Executed</div>
+        <div class="stat-label">Executed</div>
       </div>
       <div class="stat-card">
         <div class="stat-value stat-pass">${scenarios_passed}</div>
-        <div class="stat-label">Scenarios Passed</div>
+        <div class="stat-label">Passed</div>
       </div>
       <div class="stat-card">
         <div class="stat-value stat-fail">${scenarios_failed}</div>
-        <div class="stat-label">Scenarios Failed</div>
+        <div class="stat-label">Failed</div>
       </div>
       <div class="stat-card">
         <div class="stat-value stat-skip">${scenarios_skipped}</div>
-        <div class="stat-label">Scenarios Skipped</div>
+        <div class="stat-label">Skipped</div>
       </div>
+    </div>
+    <div class="summary-links">
+      <a class="summary-link" target="_blank" href="${url_prefix}/">
+        📁 Scenarios Directory
+      </a>
+      <a class="summary-link" target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt">
+        📃 Build Log
+      </a>
     </div>
   </div>
   <table>
