@@ -1,5 +1,9 @@
 #!/bin/bash
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 function install_yq() {
     # Install yq manually if not found in image
       echo "Installing yq"
@@ -42,7 +46,8 @@ function cleanup-collect() {
       # Keep a copy of all the original Junit files before modifying them
       cp -r "${ARTIFACT_DIR}"/junit-* "${original_results}" || echo "Warning: couldn't copy original files" >&2
 
-      find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
+      # Safely handle filenames with spaces
+      find "${ARTIFACT_DIR}" -type f -iname "*.xml" -print0 | while IFS= read -r -d '' result_file; do
         # Map tests if needed for related use cases
         mapTestsForComponentReadiness "${result_file}"
       done
