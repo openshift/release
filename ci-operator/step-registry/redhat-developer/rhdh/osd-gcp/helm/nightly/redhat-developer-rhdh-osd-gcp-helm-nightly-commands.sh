@@ -1,10 +1,12 @@
 #!/bin/bash
 set -e
+echo "========== Workdir Setup =========="
 export HOME WORKSPACE
 HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
+echo "========== Cluster Authentication =========="
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
 K8S_CLUSTER_URL=$(oc whoami --show-server)
@@ -13,11 +15,26 @@ echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
 echo "Note: This cluster will be automatically deleted 4 hours after being claimed."
 echo "To debug issues or log in to the cluster manually, use the script: .ibm/pipelines/ocp-cluster-claim-login.sh"
 
+echo "========== Cluster Service Account and Token Management =========="
 oc create serviceaccount tester-sa-2 -n default
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
 K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default --duration=4h)
+
+echo "========== Platform Environment Variables =========="
+echo "Setting platform environment variables:"
+export IS_OPENSHIFT="true"
+echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
+export CONTAINER_PLATFORM="osd-gcp"
+echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
+echo "Getting container platform version"
+CONTAINER_PLATFORM_VERSION=$(oc version --output json 2> /dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
+export CONTAINER_PLATFORM_VERSION
+echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
+
+echo "========== Cluster kubeadmin logout =========="
 oc logout
 
+echo "========== Git Repository Setup & Checkout =========="
 # Prepare to git checkout
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
@@ -38,6 +55,7 @@ git checkout "$RELEASE_BRANCH_NAME" || exit
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
+echo "========== PR Branch Handling =========="
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     # If executed as PR check of the repository, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
@@ -47,10 +65,12 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     LONG_SHA=$(echo "$GIT_PR_RESPONSE" | jq -r '.head.sha')
     SHORT_SHA=$(git rev-parse --short=8 ${LONG_SHA})
     TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
-    echo "Tag name: $TAG_NAME"
+    echo "TAG_NAME: $TAG_NAME"
     IMAGE_NAME="${QUAY_REPO}:${TAG_NAME}"
+    echo "IMAGE_NAME: $IMAGE_NAME"
 fi
 
+echo "========== Changeset Analysis =========="
 PR_CHANGESET=$(git diff --name-only $RELEASE_BRANCH_NAME)
 echo "Changeset: $PR_CHANGESET"
 
@@ -66,6 +86,9 @@ for change in $PR_CHANGESET; do
     fi
 done
 
+echo "ONLY_IN_DIRS: $ONLY_IN_DIRS"
+
+echo "========== Image Tag Resolution =========="
 if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     QUAY_REPO="rhdh/rhdh-hub-rhel9"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
@@ -74,6 +97,7 @@ if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     else
         TAG_NAME="next"
     fi
+    echo "TAG_NAME: $TAG_NAME"
 elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         QUAY_REPO="rhdh/rhdh-hub-rhel9"
@@ -118,10 +142,11 @@ else
     done
 fi
 
-echo "############## Current branch ##############"
+echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
+echo "========== Namespace Configuration =========="
 export NAME_SPACE="showcase-ci-nightly"
 export NAME_SPACE_RBAC="showcase-rbac-nightly"
 export NAME_SPACE_POSTGRES_DB="postgress-external-db-nightly"
@@ -130,5 +155,9 @@ if [[ "$JOB_NAME" == *operator* ]]; then
     NAME_SPACE="showcase-operator-nightly"
     NAME_SPACE_RBAC="showcase-op-rbac-nightly"
 fi
+echo "NAME_SPACE: $NAME_SPACE"
+echo "NAME_SPACE_RBAC: $NAME_SPACE_RBAC"
 
+echo "========== Test Execution =========="
+echo "Executing openshift-ci-tests.sh"
 bash ./.ibm/pipelines/openshift-ci-tests.sh

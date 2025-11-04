@@ -814,6 +814,12 @@ secret_configs:
         email_field: email
         item: registry.redhat.io-pull-secret
         registry_url: registry.redhat.io
+    ssh-privatekey:
+      field: ssh-privatekey
+      item: openshift-ci-aws-credentials
+    ssh-publickey:
+      field: ssh-publickey
+      item: openshift-ci-aws-credentials
   to:
   - cluster_groups:
     - non_app_ci
@@ -822,6 +828,9 @@ secret_configs:
 - from:
     .awscred:
       field: .awscred
+      item: openshift-ci-aws-credentials
+    baseDomain:
+      field: public_hosted_zone
       item: openshift-ci-aws-credentials
     insights-live.yaml:
       field: insights-live.yaml
@@ -990,6 +999,10 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-aws-perfscale-okd
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-confidential-qe
     namespace: ci
   - cluster_groups:
     - non_app_ci
@@ -1532,6 +1545,10 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-gcp-quay-qe
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-gcp-confidential-qe
     namespace: ci
 - from:
     gce.json:
@@ -3273,6 +3290,21 @@ secret_configs:
     namespace: ci
 - from:
     kubeconfig:
+      field: sa.promotion-quay-tagger.app.ci.config
+      item: build_farm
+    sa.promotion-quay-tagger.app.ci.config:
+      field: sa.promotion-quay-tagger.app.ci.config
+      item: build_farm
+    sa.promotion-quay-tagger.app.ci.token.txt:
+      field: sa.promotion-quay-tagger.app.ci.token.txt
+      item: build_farm
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: promotion-quay-tagger-kubeconfig
+    namespace: ci
+- from:
+    kubeconfig:
       field: sa.hive.hosted-mgmt.config
       item: build_farm
     sa.hive.hosted-mgmt.token.txt:
@@ -4825,6 +4857,12 @@ secret_configs:
       - auth_field: push-token
         item: quay.io
         registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
   to:
   - cluster: app.ci
     name: registry-push-credentials-openshift
@@ -6021,6 +6059,9 @@ secret_configs:
   to:
   - cluster_groups:
     - build_farm
+    name: splunk-receiver-token
+    namespace: log-forwarding
+  - cluster: hosted-mgmt
     name: splunk-receiver-token
     namespace: log-forwarding
 - from:
@@ -8196,6 +8237,25 @@ secret_configs:
     name: manifest-tool-local-pusher
     namespace: test-credentials
     type: kubernetes.io/dockerconfigjson
+- from:
+    service-account.json:
+      field: gcp-service-account.json
+      item: ship-help
+  to:
+  - cluster: app.ci
+    name: ship-help-bot-gcp-service-account
+    namespace: ci
+- from:
+    app_token:
+      field: slack-app-token
+      item: ship-help
+    bot_token:
+      field: slack-bot-token
+      item: ship-help
+  to:
+  - cluster: app.ci
+    name: ship-help-slack
+    namespace: ci
 user_secrets_target_clusters:
 - app.ci
 - build01

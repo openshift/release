@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -35,18 +35,18 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: "4.21"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.20
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    tag: rhel-8-golang-1.24-openshift-4.21
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
   ocp_os:
     name: "4.21"
     namespace: ocp
@@ -56,15 +56,15 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: machine-config-operator
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
@@ -703,6 +703,31 @@ tests:
     env:
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: openshift-e2e-gcp
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-ovn-multidisk-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-multidisk
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-vsphere-ovn-disk-setup-techpreview
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_DISK: "true"
+      DISK_SETUP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: main

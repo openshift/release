@@ -11,6 +11,10 @@ base_images:
     name: kiali-int-tests
     namespace: ci
     tag: v2.11
+  kiali-ossm-cypress-tests-runner:
+    name: kiali-ossmc-cypress-tests
+    namespace: ci
+    tag: v2.11
 build_root:
   image_stream_tag:
     name: maistra-builder
@@ -47,17 +51,19 @@ tests:
               {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Integration Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "test_failure", "classification": "Kiali Integration Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Cypress Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "test_failure", "classification": "Kiali Cypress Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+              {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "test_failure", "classification": "Kiali Cypress Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-ossm-cypress-tests-execute", "failure_type": "pod_failure", "classification": "Kiali OSSMC Cypress Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-ossm-cypress-tests-execute", "failure_type": "test_failure", "classification": "Kiali OSSMC Cypress Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp","self-managed-lp","servicemesh-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mkralik@redhat.com
-      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Sail","QE"]'
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Sail Operator","QE"]'
       FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
-      GINKGO_FLAGS: -v --keep-going --label-filter='smoke && !ambient'
+      GINKGO_FLAGS: -v --keep-going --label-filter=smoke&&!ambient
       ISTIO_SAMPLE_APP_VERSION: v1.26.4
       ISTIO_VERSION: v1.26-latest
       KIALI_VERSION: v2.11
@@ -77,6 +83,7 @@ tests:
     - ref: servicemesh-kiali-int-tests-execute
     - ref: idp-htpasswd
     - ref: servicemesh-kiali-cypress-tests-execute
+    - ref: servicemesh-kiali-ossm-cypress-tests-execute
     workflow: firewatch-ipi-aws
 - as: servicemesh-interop-aws-fips
   cron: 0 23 31 2 *
@@ -95,17 +102,19 @@ tests:
               {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Integration Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "test_failure", "classification": "Kiali Integration Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Cypress Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "test_failure", "classification": "Kiali Cypress Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+              {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "test_failure", "classification": "Kiali Cypress Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-ossm-cypress-tests-execute", "failure_type": "pod_failure", "classification": "Kiali OSSMC Cypress Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-ossm-cypress-tests-execute", "failure_type": "test_failure", "classification": "Kiali OSSMC Cypress Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp","self-managed-lp","servicemesh-lp","fips"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mkralik@redhat.com
-      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Sail","QE"]'
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Sail Operator","QE"]'
       FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
-      GINKGO_FLAGS: -v --keep-going --label-filter='smoke && !ambient'
+      GINKGO_FLAGS: -v --keep-going --label-filter=smoke&&!ambient
       ISTIO_SAMPLE_APP_VERSION: v1.26.4
       ISTIO_VERSION: v1.26-latest
       KIALI_VERSION: v2.11
@@ -125,6 +134,7 @@ tests:
     - ref: servicemesh-kiali-int-tests-execute
     - ref: idp-htpasswd
     - ref: servicemesh-kiali-cypress-tests-execute
+    - ref: servicemesh-kiali-ossm-cypress-tests-execute
     workflow: firewatch-ipi-aws
 zz_generated_metadata:
   branch: lpinterop
