@@ -17,7 +17,7 @@ images:
         (dnf install --setopt=tsflags=nodocs -y $PACKAGES || microdnf install -y $PACKAGES) && \
         (dnf clean all || microdnf clean all) && rm -rf /var/cache/dnf/*
 
-    # Install YQ (Direct download)
+    # Install yq
     RUN YQ_PATH="/usr/local/bin/yq" && \
         curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o "${YQ_PATH}" && \
         chmod +x "${YQ_PATH}"
@@ -50,6 +50,7 @@ tests:
       VM_WAIT_TIMEOUT: 30m
     post:
     - ref: redhat-lp-chaos-lp-cnv-vm-check
+    - ref: redhat-lp-chaos-lp-cnv-vm-clean
     test:
     - ref: redhat-lp-chaos-lp-cnv-vm-create
     - ref: redhat-chaos-pod-scenarios-etcd-disruption
@@ -60,7 +61,7 @@ tests:
     - chain: redhat-chaos-krkn-hub-random-system-pods-disruption
     - ref: redhat-chaos-pod-scenarios-kube-apiserver-disruption
     workflow: external-cluster
-  timeout: 8h0m0s
+  timeout: 6h0m0s
 - as: krkn-hub-node-tests
   cron: 0 17 * * *
   steps:
@@ -69,6 +70,7 @@ tests:
       KCFG_SRC_SFX: weiliu--chaos-test
     post:
     - ref: redhat-lp-chaos-lp-cnv-vm-check
+    - ref: redhat-lp-chaos-lp-cnv-vm-clean
     test:
     - ref: redhat-lp-chaos-lp-cnv-vm-create
     - chain: redhat-chaos-krkn-hub-node-tests
@@ -85,6 +87,7 @@ tests:
     - ref: redhat-lp-chaos-lp-cnv-vm-create
     - ref: redhat-chaos-kubevirt-outage
     - ref: redhat-lp-chaos-lp-cnv-vm-check
+    - ref: redhat-lp-chaos-lp-cnv-vm-clean
     workflow: external-cluster
   timeout: 5h0m0s
 zz_generated_metadata:

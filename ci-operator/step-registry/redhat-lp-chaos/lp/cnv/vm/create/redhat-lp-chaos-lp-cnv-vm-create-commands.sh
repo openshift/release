@@ -11,7 +11,6 @@ declare vmNamesForWait=""
 : '------------------------------------'
 
 : "--- 1. Creating namespace ${VM_NAMESPACE} ---"
-# Use 'oc new-project' to ensure namespace exists or is created
 {
     oc create namespace "${VM_NAMESPACE}" \
         --dry-run=client -o yaml --save-config
