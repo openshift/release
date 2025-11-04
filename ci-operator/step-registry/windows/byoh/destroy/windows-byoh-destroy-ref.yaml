@@ -1,0 +1,32 @@
+ref:
+  as: windows-byoh-destroy
+  from_image:
+    namespace: ci
+    name: terraform-windows-provisioner
+    tag: latest
+  commands: windows-byoh-destroy-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: BYOH_INSTANCE_NAME
+      default: "byoh-winc"
+    - name: BYOH_NUM_WORKERS
+      default: "2"
+  documentation: |-
+    Destroys Windows BYOH nodes provisioned by windows-byoh-provision step.
+
+    This step:
+    1. Uses pre-built terraform-windows-provisioner image (ci/terraform-windows-provisioner:latest)
+    2. Accesses Terraform state from ${SHARED_DIR}/terraform_byoh/ (created by provision step)
+    3. Runs byoh.sh destroy to clean up resources
+
+    Fallback mechanism (if Terraform state unavailable):
+    - GCP: gcloud compute instances delete
+    - AWS: aws ec2 terminate-instances
+    - Azure: az vm delete
+
+    This prevents orphaned instances that could block cluster network deletion.
+
+    The container image includes all necessary tools (terraform, cloud CLIs, byoh.sh).
