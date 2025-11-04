@@ -1,0 +1,48 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
+images:
+- build_args:
+  - name: TERRAFORM_VERSION
+    value: 1.13.1-1
+  dockerfile_literal: |
+    FROM src
+    ARG TERRAFORM_VERSION
+    RUN dnf config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+    RUN dnf install -y "terraform${TERRAFORM_VERSION:+-${TERRAFORM_VERSION}}"
+  from: src
+  to: src-plus-terraform
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  src:
+    requests:
+      cpu: "8"
+      memory: 4Gi
+  src-plus-terraform:
+    requests:
+      cpu: "8"
+      memory: 4Gi
+tests:
+- as: terraform-validate
+  commands: make terraform-validate
+  container:
+    from: src-plus-terraform
+- as: terraform-test
+  commands: make terraform-test
+  container:
+    from: src-plus-terraform
+- as: check-orphan-modules
+  commands: make check-orphan-modules
+  container:
+    from: src-plus-terraform
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: gcp-hcp-infra

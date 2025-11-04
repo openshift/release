@@ -76,19 +76,16 @@ tests:
     from: microshift-test-rpm
   run_if_changed: ^(rpm/*|packaging/.*|Makefile)
 - as: test-rebase
-  optional: true
-  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)
   steps:
     env:
       DRY_RUN: "y"
     workflow: openshift-microshift-rebase
 - as: microshift-metal-tests
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh|.*\.ks\.template)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
-      EC2_AMI: ami-0d5b3039c1132e1b2
       EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.2
       SCENARIO_TYPE: presubmits
     workflow: openshift-microshift-e2e-metal-tests
 - as: rebase-on-nightlies
@@ -96,43 +93,31 @@ tests:
   steps:
     workflow: openshift-microshift-rebase
 - as: metal-periodic-test
-  run_if_changed: (.*periodic.*|^test/bin/.*)
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
-      EC2_AMI: ami-0d5b3039c1132e1b2
       EC2_INSTANCE_TYPE: c5.metal
+      MICROSHIFT_OS: rhel-9.2
       SCENARIO_TYPE: periodics
     workflow: openshift-microshift-e2e-metal-tests
-- as: ocp-metal-nightly
-  cron: 22 21 18 9 *
+- as: ocp-conformance
   steps:
-    cluster_profile: aws
-    env:
-      EC2_AMI: ami-0d5b3039c1132e1b2
-      EC2_INSTANCE_TYPE: c5.metal
-      SCENARIO_TYPE: periodics
-    workflow: openshift-microshift-e2e-metal-tests
-- as: ocp-conformance-nightly
-  cron: 59 2 28 4 *
-  steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       BRANCH: release-4.14
-      EC2_AMI: ami-0d5b3039c1132e1b2
+      MICROSHIFT_OS: rhel-9.2
     workflow: openshift-microshift-e2e-conformance-from-source
 - as: clusterbot
   cron: 51 19 2 * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       MICROSHIFT_ARCH: x86_64
       MICROSHIFT_OS: rhel-9.2
     workflow: openshift-microshift-clusterbot
 - as: e2e-aws-nvidia-device-plugin-nightly
-  cron: 8 6 25 10 *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EC2_INSTANCE_TYPE: g4dn.xlarge
       MICROSHIFT_OS: rhel-9.2

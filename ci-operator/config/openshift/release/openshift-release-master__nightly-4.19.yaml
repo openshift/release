@@ -174,18 +174,6 @@ tests:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-single-node-realtime
   timeout: 5h0m0s
-- as: e2e-metal-ovn-single-node-rt-upgrade-serial
-  interval: 168h
-  steps:
-    cluster_profile: aws
-    env:
-      SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
-      TEST_SUITE: openshift/conformance/serial
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws-single-node-realtime
-  timeout: 5h0m0s
 - as: e2e-aws-ovn-single-node-techpreview-serial
   interval: 168h
   steps:
@@ -457,6 +445,7 @@ tests:
         NUM_WORKERS=0
         FEATURE_SET="DevPreviewNoUpgrade"
         BMC_DRIVER=redfish
+      ENABLE_HYPERVISOR_SSH_CONFIG: "false"
     workflow: baremetalds-two-node-fencing
 - as: e2e-metal-ovn-two-node-fencing-upgrade
   cluster: build05
@@ -525,16 +514,6 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-      MULTI_NIC_IPI: "true"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-multi-network
-  cron: 9 18 * * 0
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
       MULTI_NIC_IPI: "true"
     observers:
       enable:
@@ -854,7 +833,6 @@ tests:
   steps:
     cluster_profile: azure-2
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
     observers:
       enable:
@@ -931,7 +909,7 @@ tests:
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
-  cron: 30 4 * * 1,3,5
+  cron: 30 16 * * 1,3,5
   restrict_network_access: false
   steps:
     env:
@@ -1139,24 +1117,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-etcd-scaling
-- as: e2e-gcp-custom-dns-techpreview
-  interval: 168h
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
-        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
-        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
-        for a Gateway object \| The HAProxy router should pass the http2 tests \|
-        The HAProxy router should pass the gRPC interoperability tests \| Services
-        should fail health check node port if there are only terminating endpoints
-        \| egressfirewall
-      USER_PROVISIONED_DNS: "yes"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-gcp-custom-dns
 - as: e2e-azure-ovn-etcd-scaling
   interval: 168h
   steps:
@@ -1878,6 +1838,19 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
   timeout: 6h0m0s
+- as: e2e-vsphere-ovn-csi-vcf9
+  cron: 45 3,9 * * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-csi
 zz_generated_metadata:
   branch: master
   org: openshift

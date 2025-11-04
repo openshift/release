@@ -3,6 +3,17 @@
 
 
 set -ex
+
+function exit_with_failure() {
+  oc get pod -n openshift-marketplace > "$ARTIFACT_DIR/openshift-marketplace-pod"
+  oc get pod -n openshift-marketplace -o yaml > "$ARTIFACT_DIR/openshift-marketplace-pod-yaml"
+  oc get pod -n multicluster-engine > "$ARTIFACT_DIR/multicluster-engine-pod"
+  oc get pod -n multicluster-engine -o yaml > "$ARTIFACT_DIR/multicluster-engine-pod-yaml"
+  exit 1
+}
+
+trap 'exit_with_failure' ERR
+
 env
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -15,12 +26,14 @@ fi
 
 echo "$MCE_VERSION"
 
-_REPO="quay.io/acm-d/mce-custom-registry"
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" >= 2.9)}') )); then
-  _REPO="quay.io/acm-d/mce-dev-catalog"
+MCE_CATALOG_PATH="acm-d/mce-custom-registry"
+_REPO="quay.io/$MCE_CATALOG_PATH"
+if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
+  MCE_CATALOG_PATH="acm-d/mce-dev-catalog"
+  _REPO="quay.io:443/$MCE_CATALOG_PATH"
 fi
 if [[ "$DISCONNECTED" == "true" ]]; then
-  _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d/mce-custom-registry
+  _REPO=$(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/$MCE_CATALOG_PATH
   # Setup disconnected quay mirror container repo
   oc apply -f - <<EOF
 apiVersion: operator.openshift.io/v1alpha1
@@ -38,6 +51,9 @@ spec:
   - mirrors:
     - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
     source: registry.redhat.io/multicluster-engine
+  - mirrors:
+    - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+    source: registry.stage.redhat.io/multicluster-engine
   - mirrors:
     - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6002/g')/openshift4/ose-oauth-proxy
     source: registry.access.redhat.com/openshift4/ose-oauth-proxy
@@ -84,7 +100,7 @@ EOF
 fi
 
 sleep 60
-oc wait mcp master worker --for condition=updated --timeout=20m
+oc wait mcp master worker --for condition=updated --timeout=30m
 
 echo "Install MCE custom catalog source"
 IMG="quay.io:443/acm-d/mce-dev-catalog:2.10.0-DOWNSTREAM-2025-09-11-15-12-31"
@@ -242,6 +258,7 @@ oc create secret generic hypershift-operator-oidc-provider-s3-credentials --from
 oc label secret hypershift-operator-oidc-provider-s3-credentials -n local-cluster cluster.open-cluster-management.io/backup=true
 # wait for Configuring the hosting service cluster
 _configReady=0
+trap - ERR
 set +e
 for ((i=1; i<=10; i++)); do
   oc get configmap -n kube-public oidc-storage-provider-s3-config
@@ -253,6 +270,7 @@ for ((i=1; i<=10; i++)); do
   sleep 30
 done
 set -e
+trap 'exit_with_failure' ERR
 if [ $_configReady -eq 0 ]; then
   echo "Configuring error"
   exit 1
@@ -265,6 +283,17 @@ oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_icsp.yaml && yq-go r /tmp/mgm
 echo "wait for addon to Available"
 oc wait --timeout=5m --for=condition=Available -n local-cluster ManagedClusterAddOn/hypershift-addon
 oc wait --timeout=5m --for=condition=Degraded=False -n local-cluster ManagedClusterAddOn/hypershift-addon
+
+if [[ "$USE_KONFLUX_CATALOG" == "true" ]]; then
+  declare -A konflux_mce_image_list=(
+    [2.6]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/release-mce-26/hypershift-release-mce-26:latest"
+    [2.7]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/release-mce-27/hypershift-release-mce-27:latest"
+    [2.8]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-release-mce-28:latest"
+    [2.9]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-release-mce-29:latest"
+    [2.10]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-release-mce-210:latest"
+  )
+  OVERRIDE_HO_IMAGE="${konflux_mce_image_list[$MCE_VERSION]}"
+fi
 if [[ ${OVERRIDE_HO_IMAGE} ]] ; then
   oc apply -f - <<EOF
 apiVersion: v1
@@ -291,9 +320,9 @@ if [ "$arch" == "x86_64" ]; then
   chmod +x /tmp/${HYPERSHIFT_NAME}
   cd -
 fi
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.3)}') )); then /tmp/${HYPERSHIFT_NAME} version; else /tmp/${HYPERSHIFT_NAME} --version; fi
+/tmp/${HYPERSHIFT_NAME} version
 
 # display HyperShift Operator Version and MCE version
 oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" > "$ARTIFACT_DIR/mce-version"
-oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}' | tee "$ARTIFACT_DIR/HyperShiftOperatorImage.txt" >/dev/null; echo > "$ARTIFACT_DIR/hypershiftoperator-image"
+oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}' > "$ARTIFACT_DIR/hypershiftoperator-image"
 oc logs -n hypershift -lapp=operator --tail=-1 -c operator | head -1 | jq > "$ARTIFACT_DIR/hypershift-version"

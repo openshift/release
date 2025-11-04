@@ -1,0 +1,41 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-private-customer-dns-provision
+  steps:
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vnet
+  - chain: azure-provision-bastionhost
+  - chain: ipi-conf-azure
+  - ref: ipi-conf-azure-provisionednetwork
+  - chain: azure-provision-service-principal-minimal-permission
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install-in-bastion
+  - ref: azure-provision-private-custom-dns
+  - ref: bastion-dnsmasq
+  - ref: proxy-config-generate
+  - ref: ipi-install-times-collection
+  - ref: nodes-readiness
+  - ref: multiarch-validate-nodes
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - chain: cucushift-installer-check-azure-private
+  - ref: cucushift-installer-check-user-provisioned-dns
+  env:
+  - name: PUBLISH
+    default:  "Internal"
+  - name: BASTION_BOOT_IMAGE
+    default: "azureopenshift:aro4:aro_417:417.94.20240701"
+    documentation: |-
+      Specify bastion boot image directly from Azure Marketplace to provision bastion vm.
+  - name: USER_PROVISIONED_DNS
+    default: "yes"
+  - name: BASE_DOMAIN
+    default: "custom-dns.com"
+  - name: BASTION_VM_SIZE
+    default: "Standard_D4s_v3"
+  - name: ENALBE_DNSMASQ_METHOD
+    default: "NetworkManager"
+  documentation: |-
+    Create an IPI private cluster on AZURE for QE e2e tests.
+    Enable custom dns on 4.19+.

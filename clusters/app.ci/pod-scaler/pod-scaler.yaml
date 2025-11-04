@@ -5,7 +5,10 @@ items:
   kind: Deployment
   metadata:
     annotations:
-      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"pod-scaler:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"pod-scaler\")].image"}]'
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 5m"
     labels:
       app: prow
       component: pod-scaler-producer
@@ -24,8 +27,9 @@ items:
           component: pod-scaler-producer
       spec:
         containers:
-        - image: pod-scaler
+        - image: quay-proxy.ci.openshift.org/openshift/ci:ci_pod-scaler_latest
           name: pod-scaler
+          imagePullPolicy: Always
           args:
           - --loglevel=debug
           - --cache-bucket=origin-ci-resource-usage-data-v2

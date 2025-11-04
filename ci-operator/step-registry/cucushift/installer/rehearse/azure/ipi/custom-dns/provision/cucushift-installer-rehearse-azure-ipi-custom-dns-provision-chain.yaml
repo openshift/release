@@ -1,0 +1,24 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-custom-dns-provision
+  steps:
+  - chain: ipi-conf-azure
+  - chain: azure-provision-service-principal-minimal-permission
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install
+  - ref: azure-provision-public-custom-dns
+  - ref: aws-provision-route53-public-record-sets
+  - ref: ipi-install-times-collection
+  - ref: nodes-readiness
+  - ref: multiarch-validate-nodes
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-user-provisioned-dns
+  env:
+  - name: USER_PROVISIONED_DNS
+    default: "yes"
+  - name: BASE_DOMAIN
+    default: "qe1.devcluster.openshift.com"
+  documentation: |-
+    Create an IPI cluster on Azure for QE e2e tests, enable custom dns.

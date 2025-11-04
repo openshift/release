@@ -114,12 +114,7 @@ set_power_configs() {
       POWERVS_VSI_SYS_TYPE=$(jq -r '.powervsVSISysType' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")
   fi
 
-  MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
   HYPERSHIFT_CLI_NAME=hcp
-  if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
-  echo "MCE version is less than 2.4, use hypershift command"
-  HYPERSHIFT_CLI_NAME=hypershift
-  fi
 
   # Installing hypershift cli
   echo "$(date) Installing hypershift cli"

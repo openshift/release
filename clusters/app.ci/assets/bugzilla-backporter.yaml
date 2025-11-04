@@ -46,7 +46,10 @@ items:
     namespace: ci
     name: bugzilla-backporter
     annotations:
-      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"bugzilla-backporter:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"bugzilla-backporter\")].image"}]'
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 5m"
   spec:
     replicas: 2
     strategy:
@@ -63,7 +66,8 @@ items:
       spec:
         containers:
         - name: bugzilla-backporter
-          image: bugzilla-backporter:latest
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_bugzilla-backporter_latest
+          imagePullPolicy: Always
           args:
           - -bugzilla-endpoint=https://bugzilla.redhat.com/
           - -bugzilla-api-key-path=/etc/bugzilla/api

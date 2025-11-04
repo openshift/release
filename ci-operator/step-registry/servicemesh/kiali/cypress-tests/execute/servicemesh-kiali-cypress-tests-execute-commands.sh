@@ -9,6 +9,33 @@ export CONSOLE_URL
 OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 export OCP_API_URL
 
+function install_yq_if_not_exists() {
+    # Install yq manually if not found in image
+    echo "Checking if yq exists"
+    cmd_yq="$(yq --version 2>/dev/null || true)"
+    if [ -n "$cmd_yq" ]; then
+        echo "yq version: $cmd_yq"
+    else
+        echo "Installing yq"
+        mkdir -p /tmp/bin
+        export PATH=$PATH:/tmp/bin/
+        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+            -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+    fi
+}
+
+function mapTestsForComponentReadiness() {
+    if [[ $MAP_TESTS == "true" ]]; then
+        results_file="${1}"
+        echo "Patching Tests Result File: ${results_file}"
+        if [ -f "${results_file}" ]; then
+            install_yq_if_not_exists
+            echo "Mapping Kiali Cypress Test Suite Name To: Servicemesh-lp-interop"
+            yq eval -px -ox -iI0 '.testsuites."+@name" = "Servicemesh-lp-interop"' "${results_file}" || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+        fi
+    fi
+}
+
 # login for interop
 if test -f ${SHARED_DIR}/kubeadmin-password
 then
@@ -28,19 +55,14 @@ then
 elif [ "${OSSM_VERSION}" == "3" ]
 then
   # remove v from ISTIO version if there is any
-  [[ $ISTIO_VERSION == v* ]] && ISTIO_VERSION="${ISTIO_VERSION#v}" || ISTIO_VERSION="$ISTIO_VERSION"
-  hack/istio/download-istio.sh -iv ${ISTIO_VERSION}
+  [[ $ISTIO_SAMPLE_APP_VERSION == v* ]] && ISTIO_SAMPLE_APP_VERSION="${ISTIO_SAMPLE_APP_VERSION#v}" || ISTIO_SAMPLE_APP_VERSION="$ISTIO_SAMPLE_APP_VERSION"
+  hack/istio/download-istio.sh -iv ${ISTIO_SAMPLE_APP_VERSION}
   # install testing apps
   hack/istio/install-testing-demos.sh -c oc -in ${ISTIO_NAMESPACE}
   # enable monitoring in demo apps
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n alpha -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n beta -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n gamma -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n default -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n bookinfo -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n sleep -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
+  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n "alpha beta gamma default bookinfo sleep" -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
   # install custom grafana
-  oc apply -n ${ISTIO_NAMESPACE} -f https://raw.githubusercontent.com/istio/istio/${ISTIO_VERSION}/samples/addons/grafana.yaml
+  oc apply -n ${ISTIO_NAMESPACE} -f https://raw.githubusercontent.com/istio/istio/${ISTIO_SAMPLE_APP_VERSION}/samples/addons/grafana.yaml
   oc wait -n ${ISTIO_NAMESPACE} --for=condition=available deployment/grafana --timeout=150s
   # Expose grafana route (for Kiali) (delete route first if exists from previous run)
   oc delete -n ${ISTIO_NAMESPACE} route grafana || true
@@ -67,11 +89,11 @@ export CYPRESS_AUTH_PROVIDER="kube:admin"
 
 # for flaky tests
 export CYPRESS_RETRIES=2
-export TEST_GROUP="not @crd-validation and not @multi-cluster and not @smoke and not @ambient and not @waypoint and not @cytoscape and not @skip-lpinterop"
+export TEST_GROUP="not @crd-validation and not @multi-cluster and not @smoke and not @ambient and not @waypoint and not @waypoint-tracing and not @tracing and not @cytoscape and not @skip-lpinterop"
 yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
 # save screenshots from the 1st run
 cp -r cypress/screenshots ${ARTIFACT_DIR}/ || true
-export TEST_GROUP="@crd-validation and not @multi-cluster and not @smoke and not @ambient and not @waypoint and not @cytoscape and not @skip-lpinterop"
+export TEST_GROUP="@crd-validation and not @multi-cluster and not @smoke and not @ambient and not @waypoint and not @waypoint-tracing and not @tracing and not @cytoscape and not @skip-lpinterop"
 yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
 
 # merge all reports together
@@ -82,6 +104,26 @@ echo "Copying result xml and screenshots to ${ARTIFACT_DIR}"
 cp cypress/results/combined-report.xml ${ARTIFACT_DIR}/junit-kiali-cypress.xml
 cp -r cypress/screenshots ${ARTIFACT_DIR}/ || true
 cp -r /tmp/kiali/cypress/screenshots ${ARTIFACT_DIR}/ || true
+
+# Preserve original test result files
+original_results="${ARTIFACT_DIR}/original_results"
+mkdir -p "${original_results}"
+
+# Find xml files safely (null-delimited) and process them. This avoids word-splitting
+# and is robust to filenames containing spaces/newlines.
+while IFS= read -r -d '' result_file; do
+    # Compute relative path under ARTIFACT_DIR to preserve structure in original_results
+    rel_path="${result_file#$ARTIFACT_DIR/}"
+    dest_path="${original_results}/${rel_path}"
+    mkdir -p "$(dirname "$dest_path")"
+    cp -- "$result_file" "$dest_path"
+
+    # Map tests if needed for related use cases
+    mapTestsForComponentReadiness "$result_file"
+
+    # Send junit file to shared dir for Data Router Reporter step (use basename to avoid overwriting files with same name)
+    cp -- "$result_file" "${SHARED_DIR}/$(basename "$result_file")"
+done < <(find "${ARTIFACT_DIR}" -type f -iname "*.xml" -print0)
 
 # cleaning demo apps
 hack/istio/install-testing-demos.sh -d true -c oc -in ${ISTIO_NAMESPACE}

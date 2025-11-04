@@ -44,9 +44,11 @@ export HOME=/tmp
 
 ret=0
 
-hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
-            --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${BASE_DOMAIN}.\`].Id" \
-            --output text)"
+hosted_zone_id="$(aws route53 list-hosted-zones-by-name --dns-name "${BASE_DOMAIN}." --query "HostedZones[0].Id" --output text)"
+if [[ -z "$hosted_zone_id" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: Could not find the public hosted zone ID for '${BASE_DOMAIN}.'"
+  exit 1
+fi
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
 echo "$(date -u --rfc-3339=seconds) - INFO: Creating batch file to create DNS records"

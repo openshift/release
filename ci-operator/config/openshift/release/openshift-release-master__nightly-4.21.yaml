@@ -4,27 +4,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -167,24 +167,17 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
+- as: e2e-aws-ccm-techpreview
+  interval: 168h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ccm-techpreview
 - as: e2e-metal-ovn-single-node-rt-upgrade
   interval: 168h
   steps:
     cluster_profile: aws-2
     env:
       SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws-single-node-realtime
-  timeout: 5h0m0s
-- as: e2e-metal-ovn-single-node-rt-upgrade-serial
-  interval: 168h
-  steps:
-    cluster_profile: aws
-    env:
-      SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
-      TEST_SUITE: openshift/conformance/serial
     observers:
       enable:
       - observers-resource-watch
@@ -328,7 +321,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-upgrade-ovn-ipv6
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-metal-ipi-ovn-techpreview
   cluster: build05
   interval: 168h
@@ -454,10 +447,7 @@ tests:
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO="TNA_IPV4"
-    workflow: baremetalds-two-node-arbiter
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-agent-ovn-two-node-arbiter-ipv6
   cluster: build05
   cron: '@daily'
@@ -466,7 +456,7 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV6"
-    workflow: baremetalds-two-node-arbiter
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-agent-ovn-two-node-arbiter-dualstack
   cluster: build05
   cron: '@daily'
@@ -475,7 +465,7 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV4V6"
-    workflow: baremetalds-two-node-arbiter
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-metal-ovn-two-node-arbiter-upgrade
   cluster: build05
   cron: '@daily'
@@ -488,6 +478,36 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-techpreview
+- as: e2e-metal-ovn-two-node-fencing-dualstack-techpreview
+  cluster: build05
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
+        BMC_DRIVER=redfish
+    workflow: baremetalds-two-node-fencing-techpreview
+- as: e2e-metal-ovn-two-node-fencing-ipv6-techpreview
+  cluster: build05
+  cron: 0 */6 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
+        BMC_DRIVER=redfish
+    workflow: baremetalds-two-node-fencing-techpreview
 - as: e2e-metal-ovn-two-node-fencing-etcd-certrotation
   cluster: build05
   cron: '@daily'
@@ -598,6 +618,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
+- as: e2e-vsphere-ovn-vcf9
+  cron: 45 4/12 * * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-static-ovn
   cron: 45 22 * * 6
   steps:
@@ -628,7 +660,7 @@ tests:
     workflow: openshift-e2e-vsphere-serial
   timeout: 5h0m0s
 - as: e2e-vsphere-ovn-techpreview-serial
-  cron: 20 18 * * 5
+  cron: 0 */8 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -637,12 +669,25 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
-  timeout: 5h0m0s
+  timeout: 7h0m0s
 - as: e2e-vsphere-ovn-upi
   cron: 34 7 * * 1
   steps:
     cluster_profile: vsphere-elastic
     env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-upi
+  timeout: 5h0m0s
+- as: e2e-vsphere-ovn-upi-vcf9
+  cron: 30 4/12 * * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     observers:
@@ -682,6 +727,19 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-csi
+- as: e2e-vsphere-ovn-csi-vcf9
+  cron: 15 4/12 * * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     observers:
@@ -745,9 +803,7 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
-        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
-      BASELINE_CAPABILITY_SET: None
+      CSI_MANAGEMENT_REMOVED: "true"
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
@@ -761,12 +817,9 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
-        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
-      BASELINE_CAPABILITY_SET: None
+      CSI_MANAGEMENT_REMOVED: "true"
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
-      NETWORK_TYPE: multi-tenant
       TEST_SKIPS: \[sig-storage\]\|\[sig-arch\]\[Early\] Operators low level operators
     workflow: openshift-e2e-vsphere-upi-hybrid-env
   timeout: 6h0m0s
@@ -808,6 +861,7 @@ tests:
     - chain: ipi-aws-pre-stableinitial
     - ref: fips-check
     workflow: openshift-upgrade-aws-ovn
+  timeout: 5h0m0s
 - as: e2e-gcp-ovn-upgrade
   interval: 168h
   steps:
@@ -893,6 +947,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-aws-ovn-serial
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: aws-3
     observers:
@@ -913,9 +968,8 @@ tests:
 - as: e2e-azure-csi
   interval: 168h
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
     observers:
       enable:
@@ -1026,7 +1080,7 @@ tests:
   restrict_network_access: false
   steps:
     env:
-      SKIP_OCP_INSTALL: "false"
+      SKIP_OCP_INSTALL: "true"
       T5CI_DEPLOY_UPSTREAM: "true"
       T5CI_JOB_TYPE: ptp
       T5CI_VERSION: "4.21"
@@ -1216,6 +1270,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-ovn-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-etcd-scaling
   interval: 168h
   steps:
@@ -1232,12 +1287,13 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-etcd-scaling
-- as: e2e-gcp-custom-dns-techpreview
+- as: e2e-gcp-custom-dns
   interval: 168h
   steps:
     cluster_profile: gcp-qe
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
+      COMPUTE_NODE_TYPE: e2-custom-8-32768
+      CONTROL_PLANE_NODE_TYPE: e2-custom-8-32768
       TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
         to support the 1.17 Sample API Server using the current Aggregator \| Ensure
         HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
@@ -1861,6 +1917,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial-runc
+  timeout: 5h0m0s
 - as: e2e-gcp-ovn-serial-runc
   cron: '@daily'
   steps:
@@ -1869,6 +1926,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial-runc
+  timeout: 5h0m0s
 - as: e2e-aws-serial-runc
   cron: '@daily'
   steps:

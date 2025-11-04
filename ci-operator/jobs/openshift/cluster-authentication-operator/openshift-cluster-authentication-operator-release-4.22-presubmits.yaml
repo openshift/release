@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build05
+    cluster: build06
     context: ci/prow/e2e-agnostic
     decorate: true
     labels:
@@ -73,7 +73,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-agnostic,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
@@ -151,7 +151,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build05
+    cluster: build06
     context: ci/prow/e2e-agnostic-upgrade
     decorate: true
     labels:
@@ -219,7 +219,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-agnostic-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
@@ -296,7 +296,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-console-login
     decorate: true
     labels:
@@ -368,7 +368,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-operator-encryption-perf
     decorate: true
     labels:
@@ -441,7 +441,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-gcp-operator-encryption-rotation
     decorate: true
     labels:
@@ -510,23 +510,20 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-operator-encryption-rotation,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build05
-    context: ci/prow/e2e-metal-ovn-ipv4-external-oidc-configure-techpreview
+    cluster: build04
+    context: ci/prow/e2e-oidc
     decorate: true
-    decoration_config:
-      timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-authentication-operator-release-4.22-e2e-metal-ovn-ipv4-external-oidc-configure-techpreview
-    rerun_command: /test e2e-metal-ovn-ipv4-external-oidc-configure-techpreview
+    name: pull-ci-openshift-cluster-authentication-operator-release-4.22-e2e-oidc
+    rerun_command: /test e2e-oidc
     spec:
       containers:
       - args:
@@ -535,7 +532,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ovn-ipv4-external-oidc-configure-techpreview
+        - --target=e2e-oidc
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -583,13 +580,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(e2e-metal-ovn-ipv4-external-oidc-configure-techpreview|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-oidc,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-oidc-techpreview
     decorate: true
     labels:
@@ -662,7 +659,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-operator
     decorate: true
     labels:
@@ -734,7 +731,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-operator-encryption
     decorate: true
     labels:
@@ -807,7 +804,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build05
+    cluster: build06
     context: ci/prow/images
     decorate: true
     labels:
@@ -861,63 +858,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build05
-    context: ci/prow/periodics-images
-    decorate: true
-    labels:
-      ci-operator.openshift.io/variant: periodics
-      ci.openshift.io/generator: prowgen
-      job-release: "4.22"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-authentication-operator-release-4.22-periodics-images
-    rerun_command: /test periodics-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=periodics
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )periodics-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.22$
-    - ^release-4\.22-
-    cluster: build05
+    cluster: build06
     context: ci/prow/test-operator-integration
     decorate: true
     labels:
@@ -971,7 +912,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build05
+    cluster: build06
     context: ci/prow/unit
     decorate: true
     labels:
@@ -1024,7 +965,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build05
+    cluster: build06
     context: ci/prow/verify
     decorate: true
     labels:
@@ -1077,7 +1018,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build05
+    cluster: build06
     context: ci/prow/verify-bindata
     decorate: true
     labels:
@@ -1130,7 +1071,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build05
+    cluster: build06
     context: ci/prow/verify-deps
     decorate: true
     labels:

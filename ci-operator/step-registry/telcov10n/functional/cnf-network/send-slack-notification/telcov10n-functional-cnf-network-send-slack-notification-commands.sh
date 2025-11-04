@@ -8,8 +8,8 @@ if [ "$JOB_TYPE" = "presubmit" ]; then
   exit 0
 fi
 
-SCRIPTS_FOLDER="/eco-ci-cd/scripts"
-PYTHON_SCRIPT="send-slack-notification-bot.py"
+SCRIPTS_FOLDER="/eco-ci-cd/scripts/network"
+PYTHON_SCRIPT="send-cnf-network-release-notification.py"
 CLUSTER_VERSION_FILE="${SHARED_DIR}/cluster_version"
 WEBHOOK_URL_FILE=/var/run/slack-webhook-url/url
 CLUSTER_NAME_FILE="${SHARED_DIR}/cluster_name"
