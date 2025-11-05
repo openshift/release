@@ -18,6 +18,13 @@ fi
 git clone --branch $LATEST_TAG $ORION_REPO --depth 1
 pushd orion
 
+# Invoked from orion repo by the openshift-ci bot
+if [[ -n "${PULL_NUMBER}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
+  echo "Invoked from orion repo by the openshift-ci bot, switching to PR#${PULL_NUMBER}"
+  git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
+  git switch ${PULL_NUMBER}
+fi
+
 pip install -r requirements.txt
 
 case "$ES_TYPE" in
