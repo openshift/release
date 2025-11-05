@@ -4950,29 +4950,20 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build10
-    context: ci/prow/4.20-nightly-krkn-hub-tests
+    cluster: vsphere02
+    context: ci/prow/4.20-nightly-vsphere-krkn-hub-node-tests-10nodes
     decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-chaos
-      ci-operator.openshift.io/variant: 4.20-nightly
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+      ci-operator.openshift.io/variant: 4.20-nightly-upgrade
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-chaos-prow-scripts-main-4.20-nightly-krkn-hub-tests
-    reporter_config:
-      slack:
-        channel: '#chaos-ci-results'
-        job_states_to_report:
-        - success
-        - failure
-        - error
-        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
-          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-          <{{.Status.URL}}|View logs> :warning: {{end}}'
-    rerun_command: /test 4.20-nightly-krkn-hub-tests
+    name: pull-ci-redhat-chaos-prow-scripts-main-4.20-nightly-upgrade-chaos-azure-multi-upgrade-419to420-3nodes-node-scenarios
+    rerun_command: /test 4.20-nightly-upgrade-chaos-azure-multi-upgrade-419to420-3nodes-node-scenarios
     spec:
       containers:
       - args:
@@ -4981,8 +4972,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=krkn-hub-tests
-        - --variant=4.20-nightly
+        - --target=chaos-azure-multi-upgrade-419to420-3nodes-node-scenarios
+        - --variant=4.20-nightly-upgrade
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -5030,35 +5021,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(4.20-nightly-krkn-hub-tests|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(4.20-nightly-upgrade-chaos-azure-multi-upgrade-419to420-3nodes-node-scenarios|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build10
-    context: ci/prow/4.20-nightly-krkn-hub-tests-37nodes
+    cluster: build05
+    context: ci/prow/4.20-nightly-upgrade-chaos-azure-multi-upgrade-419to420-3nodes-pod-scenarios
     decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-chaos
-      ci-operator.openshift.io/variant: 4.20-nightly
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+      ci-operator.openshift.io/variant: 4.20-nightly-upgrade
       ci.openshift.io/generator: prowgen
-      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-chaos-prow-scripts-main-4.20-nightly-krkn-hub-tests-37nodes
-    reporter_config:
-      slack:
-        channel: '#chaos-ci-results'
-        job_states_to_report:
-        - success
-        - failure
-        - error
-        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
-          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-          <{{.Status.URL}}|View logs> :warning: {{end}}'
-    rerun_command: /test 4.20-nightly-krkn-hub-tests-37nodes
+    name: pull-ci-redhat-chaos-prow-scripts-main-4.20-nightly-upgrade-chaos-azure-multi-upgrade-419to420-3nodes-pod-scenarios
+    rerun_command: /test 4.20-nightly-upgrade-chaos-azure-multi-upgrade-419to420-3nodes-pod-scenarios
     spec:
       containers:
       - args:
@@ -5067,8 +5049,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=krkn-hub-tests-37nodes
-        - --variant=4.20-nightly
+        - --target=chaos-azure-multi-upgrade-419to420-3nodes-pod-scenarios
+        - --variant=4.20-nightly-upgrade
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -5116,34 +5098,32 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(4.20-nightly-krkn-hub-tests-37nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(4.20-nightly-upgrade-chaos-azure-multi-upgrade-419to420-3nodes-pod-scenarios|remaining-required),?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build07
-    context: ci/prow/4.20-nightly-krkn-hub-tests-ibmcloud
+    cluster: build05
+    context: ci/prow/4.20-nightly-upgrade-images
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: ibmcloud
-      ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-qe
-      ci-operator.openshift.io/variant: 4.20-nightly
+      ci-operator.openshift.io/variant: 4.20-nightly-upgrade
       ci.openshift.io/generator: prowgen
       job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-chaos-prow-scripts-main-4.20-nightly-krkn-hub-tests-ibmcloud
-    rerun_command: /test 4.20-nightly-krkn-hub-tests-ibmcloud
+    name: pull-ci-redhat-chaos-prow-scripts-main-4.20-nightly-upgrade-images
+    rerun_command: /test 4.20-nightly-upgrade-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=krkn-hub-tests-ibmcloud
-        - --variant=4.20-nightly
+        - --target=[images]
+        - --variant=4.20-nightly-upgrade
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -5153,12 +5133,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -5173,15 +5147,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -5191,7 +5156,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(4.20-nightly-krkn-hub-tests-ibmcloud|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )4.20-nightly-upgrade-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -5200,6 +5165,8 @@ presubmits:
     cluster: vsphere02
     context: ci/prow/4.20-nightly-vsphere-krkn-hub-node-tests-10nodes
     decorate: true
+    decoration_config:
+      timeout: 6h0m0s
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
@@ -5275,6 +5242,8 @@ presubmits:
     cluster: vsphere02
     context: ci/prow/4.20-nightly-vsphere-krkn-hub-tests-10nodes
     decorate: true
+    decoration_config:
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
