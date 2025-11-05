@@ -3094,6 +3094,7 @@ periodics:
         #     "Status": {
         #       "header": {
         #         "member_id": 14942490142531888693,
+        #         "revision": 437385818,,
         #         ...
         #       },
         #       "leader": 11239076790641432752,
@@ -3149,10 +3150,10 @@ periodics:
             if [[ $compacted -eq 0 ]]; then
                 echo "Compacting $pod_name - $ip"
                 oc -n openshift-etcd exec pod/"$pod_name" -- sh -c 'unset ETCDCTL_ENDPOINTS;
-                rev=$(ETCDCTL_API=3 etcdctl --insecure-skip-tls-verify=true --endpoints=:2379 endpoint status --write-out="json" | egrep -o '"revision":[0-9]*' | egrep -o '[0-9]*');
+                rev=$(ETCDCTL_API=3 etcdctl --insecure-skip-tls-verify=true --endpoints=:2379 endpoint status --write-out="json" | jq ".[0].Status.header.revision");
                 ETCDCTL_API=3 etcdctl compact $rev;'
                 compacted=1
-            else
+            fi
 
             # Defragment
             echo "Defragmenting $pod_name - $ip"
