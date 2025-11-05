@@ -72,6 +72,16 @@ if [[ ${OCP_IMAGE_N2} != "${OCP_IMAGE_LATEST}" ]]; then
   N2_NP_VERSION_TEST_ARGS="--e2e.n2-minor-release-image=${OCP_IMAGE_N2}"
 fi
 
+N3_NP_VERSION_TEST_ARGS=""
+if [[ ${OCP_IMAGE_N3} != "${OCP_IMAGE_LATEST}" ]]; then
+  N3_NP_VERSION_TEST_ARGS="--e2e.n3-minor-release-image=${OCP_IMAGE_N3}"
+fi
+
+N4_NP_VERSION_TEST_ARGS=""
+if [[ ${OCP_IMAGE_N4} != "${OCP_IMAGE_LATEST}" ]]; then
+  N4_NP_VERSION_TEST_ARGS="--e2e.n4-minor-release-image=${OCP_IMAGE_N4}"
+fi
+
 MI_ARGS=""
 if [[ "${AUTH_THROUGH_CERTS}" == "true" ]]; then
   MI_ARGS="--e2e.azure-managed-identities-file=${AZURE_MANAGED_IDENTITIES_LOCATION}"
@@ -101,6 +111,8 @@ hack/ci-test-e2e.sh -test.v \
     ${AKS_ANNOTATIONS:-} \
     ${N1_NP_VERSION_TEST_ARGS:-} \
     ${N2_NP_VERSION_TEST_ARGS:-} \
+    ${N3_NP_VERSION_TEST_ARGS:-} \
+    ${N4_NP_VERSION_TEST_ARGS:-} \
     ${MI_ARGS:-} \
     ${DP_ARGS:-} \
     ${AZURE_MULTI_ARCH_PARAMS:-} \
