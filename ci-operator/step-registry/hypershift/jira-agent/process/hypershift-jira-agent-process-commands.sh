@@ -12,8 +12,8 @@ export GITHUB_TOKEN=$(cat /var/run/vault/hypershift-jira-agent-github-token/toke
 # GitHub CLI auth
 gh auth login --with-token <<< "$GITHUB_TOKEN"
 
-# Configuration: maximum issues to process per run (default: 10)
-MAX_ISSUES=${JIRA_AGENT_MAX_ISSUES:-10}
+# Configuration: maximum issues to process per run (default: 1)
+MAX_ISSUES=${JIRA_AGENT_MAX_ISSUES:-1}
 echo "Configuration: MAX_ISSUES=$MAX_ISSUES"
 
 # Query Jira for issues

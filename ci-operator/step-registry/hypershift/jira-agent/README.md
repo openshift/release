@@ -11,6 +11,113 @@ This workflow implements a fully automated system for processing HyperShift Jira
 3. **Track**: Maintains state in a ConfigMap to avoid reprocessing issues
 4. **Report**: Generates summary of processed issues and results
 
+## Data Flow Diagram
+
+```mermaid
+flowchart TD
+    %% Trigger
+    Start([Cron Trigger<br/>Daily 9:00 AM UTC]):::trigger --> PrePhase
+
+    %% PRE-PHASE: Setup
+    subgraph PrePhase[PRE-PHASE: Setup]
+        direction TB
+        Clone[Clone HyperShift Repository<br/>github.com/openshift/hypershift]:::setup
+        GitConfig[Configure Git<br/>user: OpenShift CI Bot]:::setup
+        GitHubAuth[Setup GitHub CLI<br/>Load token from secret]:::setup
+        ClaudeAuth[Setup Claude Code<br/>Load API key from secret]:::setup
+        Verify[Verify Claude CLI<br/>Test authentication]:::setup
+
+        Clone --> GitConfig --> GitHubAuth --> ClaudeAuth --> Verify
+    end
+
+    %% Secrets for Setup
+    Secret1[(Secret:<br/>hypershift-jira-agent-github-token)]:::secret -.->|Read token| GitHubAuth
+    Secret2[(Secret:<br/>hypershift-jira-agent-anthropic-api-key)]:::secret -.->|Read API key| ClaudeAuth
+
+    %% TEST-PHASE: Process
+    PrePhase --> TestPhase
+
+    subgraph TestPhase[TEST-PHASE: Process Issues]
+        direction TB
+
+        QueryJira[Query Jira API<br/>JQL: project in OCPBUGS, CNTRLPLANE<br/>AND resolution = Unresolved<br/>AND labels = issue-for-agent]:::process
+        LoadState[Load State ConfigMap<br/>kubectl get configmap<br/>hypershift-jira-agent-state]:::process
+
+        CheckIssues{Issues<br/>Found?}:::decision
+        CheckMax{Processed <<br/>MAX_ISSUES<br/>Default: 1}:::decision
+        CheckProcessed{Issue Already<br/>Processed?}:::decision
+        CheckSuccess{Processing<br/>Successful?}:::decision
+
+        ProcessIssue[Run Claude Code CLI<br/>echo '/jira-solve ISSUE-KEY origin'<br/>--max-turns 30<br/>--dangerously-skip-permissions]:::ai
+
+        RecordSuccess[Record to State:<br/>ISSUE-KEY TIMESTAMP PR-URL SUCCESS]:::success
+        RecordFailure[Record to State:<br/>ISSUE-KEY TIMESTAMP - FAILED]:::failure
+        Skip[Skip: Already processed<br/>Increment skip counter]:::skip
+        NoIssues[Exit: No issues to process]:::skip
+
+        RateLimit[Wait 60 seconds<br/>Rate limiting]:::process
+        UpdateState[Update ConfigMap<br/>kubectl apply configmap<br/>hypershift-jira-agent-state]:::process
+
+        QueryJira --> CheckIssues
+        CheckIssues -->|No| NoIssues
+        CheckIssues -->|Yes| LoadState
+        LoadState --> CheckMax
+        CheckMax -->|No| UpdateState
+        CheckMax -->|Yes| CheckProcessed
+        CheckProcessed -->|Yes| Skip
+        CheckProcessed -->|No| ProcessIssue
+        Skip --> CheckMax
+        ProcessIssue --> CheckSuccess
+        CheckSuccess -->|Yes| RecordSuccess
+        CheckSuccess -->|No| RecordFailure
+        RecordSuccess --> RateLimit
+        RecordFailure --> RateLimit
+        RateLimit --> CheckMax
+    end
+
+    %% External Systems
+    JiraAPI[(Jira API<br/>issues.redhat.com)]:::external -.->|Return issues| QueryJira
+    K8sCluster[(Kubernetes<br/>ci namespace)]:::external -.->|Read ConfigMap| LoadState
+    K8sCluster -.->|Write ConfigMap| UpdateState
+    ClaudeAPI[(Claude API<br/>AI Analysis)]:::external -.->|Generate solution| ProcessIssue
+    GitHubAPI[(GitHub API<br/>Create PR)]:::external -.->|PR created| ProcessIssue
+
+    %% POST-PHASE: Report
+    TestPhase --> PostPhase
+
+    subgraph PostPhase[POST-PHASE: Report]
+        direction TB
+        ReadState[Read State File<br/>/tmp/processed-issues.txt]:::report
+        CountStats[Calculate Statistics<br/>Total, Success, Failed counts]:::report
+        ShowSuccess[Display Recent Successes<br/>Last 5 with PR URLs]:::report
+        ShowFailures[Display Recent Failures<br/>Last 5 with timestamps]:::report
+
+        ReadState --> CountStats --> ShowSuccess --> ShowFailures
+    end
+
+    PostPhase --> End([Workflow Complete]):::trigger
+    NoIssues --> End
+
+    %% Data Store
+    ConfigMap[(ConfigMap:<br/>hypershift-jira-agent-state<br/>Format: ISSUE-KEY TIMESTAMP PR-URL STATUS)]:::datastore
+    ConfigMap -.->|Persistent state| LoadState
+    UpdateState -.->|Update| ConfigMap
+
+    %% Style Definitions
+    classDef trigger fill:#e1f5ff,stroke:#01579b,stroke-width:3px,color:#000
+    classDef setup fill:#f3e5f5,stroke:#4a148c,stroke-width:2px,color:#000
+    classDef process fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px,color:#000
+    classDef decision fill:#fff3e0,stroke:#e65100,stroke-width:2px,color:#000
+    classDef ai fill:#fce4ec,stroke:#880e4f,stroke-width:3px,color:#000
+    classDef success fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px,color:#000
+    classDef failure fill:#ffcdd2,stroke:#c62828,stroke-width:2px,color:#000
+    classDef skip fill:#f5f5f5,stroke:#757575,stroke-width:1px,color:#000
+    classDef report fill:#e0f2f1,stroke:#004d40,stroke-width:2px,color:#000
+    classDef external fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
+    classDef secret fill:#ffebee,stroke:#b71c1c,stroke-width:2px,color:#000
+    classDef datastore fill:#e1bee7,stroke:#6a1b9a,stroke-width:2px,color:#000
+```
+
 ## Components
 
 ### Workflow
@@ -70,7 +177,7 @@ Configured in `ci-operator/config/openshift/hypershift/openshift-hypershift-main
 
 ### Environment Variables
 
-- **`JIRA_AGENT_MAX_ISSUES`** (default: `10`)
+- **`JIRA_AGENT_MAX_ISSUES`** (default: `1`)
   - Maximum number of issues to process per run
   - Set to `1` initially for safe testing
   - Can be increased to `5`, `10`, or higher once validated
@@ -113,7 +220,7 @@ Issues are queried using JQL:
 project in (OCPBUGS, CNTRLPLANE) AND resolution = Unresolved AND labels = issue-for-agent
 ```
 
-Maximum issues queried and processed is controlled by `JIRA_AGENT_MAX_ISSUES` (default: 10, currently set to 1 for testing).
+Maximum issues queried and processed is controlled by `JIRA_AGENT_MAX_ISSUES` (default: 1).
 
 ### Rate Limiting
 
