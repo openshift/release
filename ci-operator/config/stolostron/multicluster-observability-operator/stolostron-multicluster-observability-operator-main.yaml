@@ -233,19 +233,70 @@ tests:
     test:
     - as: e2e
       commands: |
-        echo "Kube Contexts: $(kubectl config get-contexts)"
-        HUB_API_SERVER=$(oc whoami --show-server)
-        echo "HUB_API_SERVER: ${HUB_API_SERVER}"
-        HUB_TOKEN=$(clusteradm get token --use-bootstrap-token)
-        MANAGED_CLUSTER_NAME=spoke
-        kubectl config use-context ${MANAGED_CLUSTER_NAME} --kubeconfig=${SHARED_DIR}/managed-1.kc
-        clusteradm join --hub-token ${HUB_TOKEN} --hub-api-server ${HUB_API_SERVER} --cluster-name ${MANAGED_CLUSTER_NAME}
-        kubectl config use-context hub-1 --kubeconfig=${SHARED_DIR}/hub-1.kc
-        clusteradm accept --clusters ${MANAGED_CLUSTER_NAME}
         echo "ENDPOINT_MONITORING_OPERATOR_IMAGE_REF=$ENDPOINT_MONITORING_OPERATOR_IMAGE_REF"
         echo "GRAFANA_DASHBOARD_LOADER_IMAGE_REF=$GRAFANA_DASHBOARD_LOADER_IMAGE_REF"
         echo "METRICS_COLLECTOR_IMAGE_REF=$METRICS_COLLECTOR_IMAGE_REF"
         echo "RBAC_QUERY_PROXY_IMAGE_REF=$RBAC_QUERY_PROXY_IMAGE_REF"
+        KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+        export KUBECONFIG
+        CTX_HUB_CLUSTER=$(kubectl config current-context)
+        # Extract hub cluster info from JSON
+        HUB_API_URL=$(jq -r '.api_url' "${SHARED_DIR}/hub-1.json") &>/dev/null
+        TEMP_CA_FILE=$(mktemp)
+        # Writing hub's CA to a temp file
+        kubectl get cm kube-root-ca.crt -n kube-public -o jsonpath='{.data.ca\.crt}' >"${TEMP_CA_FILE}"
+        clusteradm init --wait --context "${CTX_HUB_CLUSTER}" &>/dev/null
+        set +x
+        HUB_TOKEN=$(clusteradm get token --context "${CTX_HUB_CLUSTER}")
+        IS_HUB_TOKEN=true
+        if [[ -z ${HUB_TOKEN} ]]; then
+          echo "Error: Failed to get hub token..."
+          echo "Skipping join..."
+          IS_HUB_TOKEN=false
+        fi
+        set -x
+        declare -A CSR_CREATED=()
+        for ((i = 1; i <= CLUSTERPOOL_MANAGED_COUNT; i++)); do
+          if $IS_HUB_TOKEN && [[ -n ${SHARED_DIR} ]] && [[ -f "${SHARED_DIR}/managed-${i}.json" ]]; then
+            export KUBECONFIG="${SHARED_DIR}/managed-${i}.kc"
+            CTX_MANAGED_CLUSTER=$(kubectl config current-context)
+            echo "Join managed-${i} to hub"
+            set +x
+            clusteradm join \
+              --hub-token "${HUB_TOKEN}" \
+              --hub-apiserver "${HUB_API_URL}" \
+              --wait \
+              --cluster-name "managed-${i}" \
+              --context "${CTX_MANAGED_CLUSTER}" \
+              --ca-file "$TEMP_CA_FILE"
+            set -x
+            CSR_CREATED[$i]=$i
+          fi
+        done
+        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
+        # Need to wait before accepting. Wait for each join to process and need timeout for each join.
+        echo "Waiting for CSR from each managed cluster..."
+        for j in {1..60}; do
+          for ((i = 1; i <= CLUSTERPOOL_MANAGED_COUNT; i++)); do
+            if $IS_HUB_TOKEN && [[ -n ${CSR_CREATED[$i]} ]] && kubectl get csr --context "${CTX_HUB_CLUSTER}" 2>/dev/null | grep -q "managed-${i}"; then
+              unset "CSR_CREATED[$i]"
+              clusteradm accept --clusters "managed-${i}" --context "${CTX_HUB_CLUSTER}" &>/dev/null
+            fi
+            if [[ ${#CSR_CREATED[@]} -eq 0 ]]; then
+              break 2
+            fi
+          done
+          if [[ ${j} -eq 60 ]]; then
+            for managed_num in "${!CSR_CREATED[@]}"; do
+              echo "timeout wait for CSR for managed-${managed_num} is not created."
+            done
+            break
+          fi
+          echo "retrying in 10s..."
+          sleep 10
+        done
+        # Checking that managed clusters were successfully added
+        kubectl get managedcluster --context "${CTX_HUB_CLUSTER}"
         export SELF="make"
         set -o pipefail
         make e2e-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
