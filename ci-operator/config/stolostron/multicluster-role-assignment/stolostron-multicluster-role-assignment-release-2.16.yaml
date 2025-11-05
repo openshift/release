@@ -8,7 +8,8 @@ images:
   to: multicluster-role-assignment
 promotion:
   to:
-  - name: "2.16"
+  - disabled: true
+    name: "2.16"
     namespace: stolostron
 resources:
   '*':
@@ -78,13 +79,33 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-role-assignment
     env:
-      DESTINATION_BRANCH: release-2.16
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: multicluster-role-assignment
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        export OSCI_COMPONENT_NAME="multicluster-role-assignment"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - collection: ""
+        mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.16
   org: stolostron
   repo: multicluster-role-assignment
