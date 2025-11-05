@@ -11,7 +11,7 @@ OCP_QE_PERFSCALE_CI_REPO="https://github.com/skordas/ocp-qe-perfscale-ci"
 OCP_QE_PERFSCALE_CI_BRANCH="ec-report"
 
 python --version
-push /tmp
+pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
