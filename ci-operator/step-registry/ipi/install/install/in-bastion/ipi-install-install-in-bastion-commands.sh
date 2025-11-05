@@ -83,6 +83,22 @@ function populate_artifact_dir() {
     mkdir -p "${ARTIFACT_DIR}/clusterapi_output-${current_time}"
     cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output-${current_time}" 2>/dev/null
   fi
+
+  # Capture infrastructure issue log to help gather the datailed failure message in junit files
+  if [[ "$ret" == "4" ]] || [[ "$ret" == "5" ]]; then
+    grep -Er "Throttling: Rate exceeded|\
+rateLimitExceeded|\
+The maximum number of [A-Za-z ]* has been reached|\
+The number of .* is larger than the maximum allowed size|\
+Quota .* exceeded|\
+Cannot create more than .* for this subscription|\
+The request is being throttled as the limit has been reached|\
+SkuNotAvailable|\
+Exceeded limit .* for zone|\
+Operation could not be completed as it results in exceeding approved .* quota|\
+A quota has been reached for project|\
+LimitExceeded.*exceed quota" ${ARTIFACT_DIR} > "${SHARED_DIR}/install_infrastructure_failure.log" || true
+  fi
 }
 
 function write_install_status() {

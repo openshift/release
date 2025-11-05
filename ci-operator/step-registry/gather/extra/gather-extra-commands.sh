@@ -563,6 +563,16 @@ ${t_all}     cluster:etcd:write:requests:latency:total:quantile histogram_quanti
 ${t_install} cluster:etcd:write:requests:latency:install:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_install}])) by (le,scope))
 ${t_test}    cluster:etcd:write:requests:latency:test:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_test}])) by (le,scope))
 
+${t_test}    cluster:etcd:disk:wal:fsync:test:p999:quantile avg(histogram_quantile(0.999, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:p99:quantile avg(histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:p95:quantile avg(histogram_quantile(0.95, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:p50:quantile avg(histogram_quantile(0.50, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+
+${t_test}    cluster:etcd:disk:backend:commit:test:p999:quantile avg(histogram_quantile(0.999, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:p99:quantile avg(histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:p95:quantile avg(histogram_quantile(0.95, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:p50:quantile avg(histogram_quantile(0.50, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+
 ${t_all}     cluster:etcd:read:requests:latency:total:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope)
 ${t_install} cluster:etcd:read:requests:latency:install:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope)
 ${t_test}    cluster:etcd:read:requests:latency:test:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_test}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_test}])) by (le,scope)
@@ -681,16 +691,19 @@ mkdir -p ${ARTIFACT_DIR}/junit/
 if openshift-tests e2e-analysis --help &>/dev/null; then
     echo "Post e2e-analysis check for the cluster"
     openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+else
+    # C2S/SC2S proxy can not access internet
+    if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+      source "${SHARED_DIR}/unset-proxy.sh"
+    fi
+    # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
+    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
+    if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+        # shellcheck disable=SC1090
+        source "${SHARED_DIR}/proxy-conf.sh"
+    fi
+    <${ARTIFACT_DIR}/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator conditions \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
 fi
-
-# C2S/SC2S proxy can not access internet
-if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
-  source "${SHARED_DIR}/unset-proxy.sh"
-fi
-# This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
-curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
-
-<${ARTIFACT_DIR}/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator conditions \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
 
 # This is an experimental wiring of autogenerated failure detection.
 echo "Detect known failures from symptoms (experimental) ..."
@@ -749,12 +762,6 @@ $( cat ${tests} )
 EOF
 
 popd || return
-
-if test -f "${SHARED_DIR}/proxy-conf.sh"
-then
-    # shellcheck disable=SC1090
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
 
 # Create custom-link-tools.html from custom-links.txt
 REPORT="${ARTIFACT_DIR}/custom-link-tools.html"

@@ -11,4 +11,3 @@ fi
 oc version
 oc get node -o wide
 oc adm wait-for-stable-cluster --minimum-stable-period=${MINIMUM_STABLE_PERIOD} --timeout=${TIMEOUT}
-
