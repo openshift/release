@@ -273,11 +273,16 @@ function ci_custom_link_report() {
   <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
   <link rel="stylesheet" type="text/css" href="/static/spyglass/spyglass.css">
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
       background-color: #303030;
       color: #FFFFFF;
       font-family: "Roboto", "Helvetica", "Arial", sans-serif;
-      padding: 32px;
+      padding: 16px;
+      margin: 0;
+      overflow-x: hidden;
     }
     h1 {
       font-size: 1.8rem;
@@ -287,23 +292,25 @@ function ci_custom_link_report() {
       width: 100%;
       border-collapse: collapse;
       background-color: #1e1e1e;
-      overflow: hidden;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      table-layout: auto;
     }
     thead {
       background-color: #424242;
     }
     th {
       text-align: left;
-      padding: 12px 16px;
+      padding: 8px 4px;
       font-weight: 700;
       letter-spacing: 0.02em;
       text-transform: uppercase;
-      font-size: 0.75rem;
+      font-size: 0.7rem;
+      white-space: nowrap;
     }
     td {
-      padding: 4px;
+      padding: 1px;
       border-top: 1px solid rgba(255, 255, 255, 0.1);
+      white-space: nowrap;
     }
     tr:nth-child(even) {
       background-color: rgba(255, 255, 255, 0.04);
@@ -337,8 +344,9 @@ function ci_custom_link_report() {
     .scenario-link {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       color: #FFFFFF;
+      word-break: break-word;
     }
     .scenario-link:hover {
       color: #82b1ff;
@@ -364,99 +372,91 @@ function ci_custom_link_report() {
     }
     .version-badge {
       display: inline-block;
-      padding: 4px 10px;
+      padding: 3px 8px;
       background-color: rgba(130, 177, 255, 0.16);
       border: 1px solid rgba(130, 177, 255, 0.28);
       border-radius: 4px;
-      font-size: 0.85rem;
+      font-size: 0.75rem;
       color: #82b1ff;
       font-family: monospace;
       word-break: break-all;
+      max-width: 100%;
     }
     .summary-container {
       background-color: #1e1e1e;
-      padding: 12px 24px;
+      padding: 8px 12px;
       display: flex;
       align-items: center;
-      gap: 24px;
-    }
-    .summary-version {
-      display: inline-flex;
-      align-items: center;
-      padding: 6px 12px;
-      background-color: rgba(130, 177, 255, 0.16);
-      border: 1px solid rgba(130, 177, 255, 0.28);
-      border-radius: 6px;
-      font-size: 0.85rem;
-      color: #82b1ff;
-      font-weight: 500;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
     }
     .summary-stats {
       display: flex;
-      gap: 12px;
-      flex: 1 1 auto;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
     }
     .stat-card {
       background-color: rgba(255, 255, 255, 0.04);
-      padding: 8px 12px;
-      border-radius: 6px;
-      text-align: center;
+      padding: 6px 8px;
+      border-radius: 4px;
       border: 1px solid rgba(255, 255, 255, 0.1);
-      flex: 1;
-      min-width: 100px;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 6px;
+      min-width: 0;
     }
     .stat-value {
-      font-size: 1.2rem;
+      font-size: 1rem;
       font-weight: 700;
     }
     .stat-label {
-      font-size: 0.75rem;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.03em;
       opacity: 0.9;
       white-space: nowrap;
     }
-    .stat-pass {
-      color: #9ccc65;
-    }
-    .stat-fail {
-      color: #ff5252;
-    }
-    .stat-total {
-      color: #82b1ff;
-    }
-    .stat-skip {
-      color: #ffd54f;
-    }
+    .stat-total { color: #82b1ff; }
+    .stat-pass { color: #9ccc65; }
+    .stat-fail { color: #ff5252; }
+    .stat-skip { color: #ffd54f; }
     .summary-links {
       display: flex;
-      gap: 8px;
-      align-items: center;
-      flex: 0 0 auto;
+      gap: 6px;
+      flex-shrink: 0;
     }
     .summary-link {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 8px 12px;
+      gap: 4px;
+      padding: 6px 10px;
       background-color: rgba(255, 255, 255, 0.04);
-      border-radius: 6px;
+      border-radius: 4px;
       border: 1px solid rgba(255, 255, 255, 0.1);
       color: #ffffff;
       text-decoration: none;
-      font-weight: 500;
-      transition: all 0.2s ease;
       white-space: nowrap;
-      font-size: 0.85rem;
     }
     .summary-link:hover {
       background-color: rgba(255, 255, 255, 0.08);
       border-color: rgba(255, 255, 255, 0.2);
       color: #558af4;
+    }
+    @media (max-width: 1200px) {
+      .summary-container {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .summary-stats {
+        width: 100%;
+      }
+      .summary-links {
+        width: 100%;
+        justify-content: flex-end;
+      }
     }
   </style>
 </head>
