@@ -10,20 +10,24 @@
 # Environment variables (all optional):
 #   INSTALL_TRUSTEE             - Enable/disable trustee installation (default: false)
 #   TRUSTEE_CATALOG_SOURCE_NAME - Catalog source name (default: from osc-config or "redhat-operators")
+#   TRUSTEE_NAMESPACE           - Trustee operator namespace (default: "trustee-operator-system")
 #   TRUSTEE_URL_USE_HTTP        - Use HTTP instead of HTTPS (default: false)
 #   TRUSTEE_URL_USE_NODEPORT    - Use nodePort instead of route (default: false)
 #   TRUSTEE_INSECURE_HTTP       - Enable insecure HTTP in KBS (default: false)
 #   TRUSTEE_TESTING             - Use permissive policy (default: false)
 #   TRUSTEE_ORG                 - Certificate organization (default: "Red Hat OpenShift")
 #   TRUSTEE_CN                  - Certificate common name (default: "kbs-trustee-operator-system")
+#   KBSCONFIG_OUTPUT_FILE       - KbsConfig YAML output file (default: "kbsconfig.yaml")
+#   KBS_SERVICE_TYPE            - KBS service type (default: "NodePort")
+#   KBS_DEPLOYMENT_TYPE         - KBS deployment type (default: "AllInOneDeployment")
+#   KBS_SECRET_RESOURCES        - Comma-separated secret resources (default: "kbsres1,cosign-public-key,security-policy,attestation-token")
+#   KBS_ENABLE_TDX              - Enable TDX configuration (default: "false")
 #   SHARED_DIR                  - Directory for outputs (default: current directory)
 #
 # Example:
 #   INSTALL_TRUSTEE=true TRUSTEE_TESTING=true ./sandboxed-containers-operator-trustee-install-commands.sh
 
 set -euo pipefail
-
-IMAGE=quay.io/confidential-containers/kbs-client:v0.13.0
 
 # Check if trustee installation is enabled
 INSTALL_TRUSTEE="${INSTALL_TRUSTEE:-false}"
@@ -53,7 +57,7 @@ TRUSTEE_CN="${TRUSTEE_CN:-kbs-trustee-operator-system}"
 # If not set, try to read from osc-config ConfigMap, otherwise default to "redhat-operators"
 if [ -z "${TRUSTEE_CATALOG_SOURCE_NAME:-}" ]; then
     # Try to get catalog source name from osc-config ConfigMap created by env-cm step
-    OSC_CONFIG_CATALOG=$(oc get configmap osc-config -n default -o jsonpath='{.data.catalogsourcename}' 2>/dev/null || echo "")
+    OSC_CONFIG_CATALOG=$(oc get configmap osc-config -n default '-o=jsonpath={.data.catalogsourcename}' 2>/dev/null || echo "")
     if [ -n "$OSC_CONFIG_CATALOG" ]; then
         TRUSTEE_CATALOG_SOURCE_NAME="$OSC_CONFIG_CATALOG"
         echo "Using catalog source from osc-config: ${TRUSTEE_CATALOG_SOURCE_NAME}"
@@ -64,6 +68,14 @@ if [ -z "${TRUSTEE_CATALOG_SOURCE_NAME:-}" ]; then
 else
     echo "Using TRUSTEE_CATALOG_SOURCE_NAME environment variable: ${TRUSTEE_CATALOG_SOURCE_NAME}"
 fi
+
+# KbsConfig configuration variables
+TRUSTEE_NAMESPACE="${TRUSTEE_NAMESPACE:-trustee-operator-system}"
+KBSCONFIG_OUTPUT_FILE="${KBSCONFIG_OUTPUT_FILE:-kbsconfig.yaml}"
+KBS_SERVICE_TYPE="${KBS_SERVICE_TYPE:-NodePort}"
+KBS_DEPLOYMENT_TYPE="${KBS_DEPLOYMENT_TYPE:-AllInOneDeployment}"
+KBS_SECRET_RESOURCES="${KBS_SECRET_RESOURCES:-kbsres1,cosign-public-key,security-policy,attestation-token}"
+KBS_ENABLE_TDX="${KBS_ENABLE_TDX:-false}"
 
 # Function to wait for an operator subscription and CSV to finish installation
 # Parameters:
@@ -91,7 +103,9 @@ wait_for_operator_subscription() {
     local subscription_ready=false
 
     for i in $(seq 1 "$max_attempts"); do
-        local subscription_state=$(oc get subscription "${subscription_name}" -n "${namespace}" -o jsonpath='{.status.state}' 2>/dev/null || echo "")
+        local subscription_state=""
+
+        subscription_state=$(oc get subscription "${subscription_name}" -n "${namespace}" '-o=jsonpath={.status.state}' 2>/dev/null )
         if [[ "$subscription_state" == "AtLatestKnown" ]]; then
             subscription_ready=true
             echo "Subscription is ready (state: AtLatestKnown)"
@@ -108,7 +122,8 @@ wait_for_operator_subscription() {
     fi
 
     # Get the CSV name from the subscription
-    local csv_name=$(oc get subscription "${subscription_name}" -n "${namespace}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || echo "")
+    local csv_name=""
+    csv_name=$(oc get subscription "${subscription_name}" -n "${namespace}" '-o=jsonpath={.status.installedCSV}' 2>/dev/null )
 
     if [ -z "$csv_name" ]; then
         echo "Warning: Could not get installedCSV from subscription '${subscription_name}'"
@@ -121,7 +136,8 @@ wait_for_operator_subscription() {
 
     for i in $(seq 1 "$max_attempts"); do
         # Check if CSV (ClusterServiceVersion) is in Succeeded phase with InstallSucceeded reason
-        local csv_status=$(oc get csv "${csv_name}" -n "${namespace}" -o jsonpath='{.status.phase}{.status.reason}' 2>/dev/null || echo "")
+        local csv_status
+        csv_status=$(oc get csv "${csv_name}" -n "${namespace}" '-o=jsonpath={.status.phase}{.status.reason}' 2>/dev/null )
         if [[ "$csv_status" == "SucceededInstallSucceeded" ]]; then
             installed=true
             echo "CSV '${csv_name}' finished!"
@@ -772,14 +788,16 @@ create_rvps_configmap_update() {
     echo "Calculating PCR8 hash for RVPS reference values..."
 
     # Step 1: Calculate SHA-256 hash of initdata file
-    local hash=$(sha256sum "${initdata_file}" | cut -d' ' -f1)
+    local hash=""
+    hash=$(sha256sum "${initdata_file}" | cut -d' ' -f1)
     echo "${initdata_file} SHA-256 hash: $hash"
 
     # Step 2: Set initial PCR value (32 bytes of 0s)
     local initial_pcr=0000000000000000000000000000000000000000000000000000000000000000
 
     # Step 3: Calculate PCR8 hash by combining initial_pcr and hash
-    local pcr08_value=$(echo -n "$initial_pcr$hash" | xxd -r -p | sha256sum | cut -d' ' -f1)
+    local pcr08_value=""
+    pcr08_value=$(echo -n "$initial_pcr$hash" | xxd -r -p | sha256sum | cut -d' ' -f1)
     echo "PCR8_HASH for RVPS: $pcr08_value"
 
     # Create RVPS ConfigMap update with the calculated PCR8 hash
@@ -877,7 +895,8 @@ create_kbsconfig_yaml() {
     echo "Creating KbsConfig custom resource YAML: ${output_file}"
 
     # Convert comma-separated list to JSON array format
-    local secret_resources_json=$(echo "$secret_resources" | sed 's/,/","/g')
+    local secret_resources_json=""
+    secret_resources_json="${secret_resources//,/\",\"}"
     secret_resources_json="[\"${secret_resources_json}\"]"
 
     cat > "${output_file}" << EOF
@@ -938,7 +957,7 @@ get_route_host() {
     local route_host=""
 
     for i in $(seq 1 "$max_attempts"); do
-        route_host=$(oc get route kbs-service -n trustee-operator-system -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
+        route_host=$(oc get route kbs-service -n trustee-operator-system '-o=jsonpath={.spec.host}' 2>/dev/null || echo "")
         if [ -n "$route_host" ]; then
             break
         fi
@@ -1031,7 +1050,7 @@ create_https_certificate_secret() {
 # host:80 will be redirected to kbs-service:8080
 create_ingress_to_kbs_service() {
     echo "Creating ingress to KBS service..."
-    DOMAIN=$(oc get ingress.config/cluster -o jsonpath='{.spec.domain}')
+    DOMAIN=$(oc get ingress.config/cluster '-o=jsonpath={.spec.domain}')
     HOST="kbs-service-trustee-operator-system.${DOMAIN}"
 
     cat > ingress-to-kbs-service.yaml << EOF
@@ -1159,12 +1178,12 @@ else
 fi
 
 # Create HTTPS certificate secret for KBS service
-ROUTE_HOST=$(get_route_host)
+ROUTE_HOST=$(get_route_host 10 2)
 create_https_certificate_secret "${ROUTE_HOST}" "${TRUSTEE_CN}" "${TRUSTEE_ORG}"
 
 # The service kbs-service does not appear until after KbsConfig is created
 # Create KbsConfig custom resource YAML
-create_kbsconfig_yaml
+create_kbsconfig_yaml "${TRUSTEE_NAMESPACE}" "${KBSCONFIG_OUTPUT_FILE}" "${KBS_SERVICE_TYPE}" "${KBS_DEPLOYMENT_TYPE}" "${KBS_SECRET_RESOURCES}" "${KBS_ENABLE_TDX}"
 
 # Apply KbsConfig custom resource
 if resource_exists "kbsconfig" "kbsconfig"; then
@@ -1210,7 +1229,7 @@ if [[ "${TRUSTEE_URL_USE_NODEPORT}" == "true" ]]; then
     # Get NodePort from kbs-service
     NODE_PORT=""
     for i in {1..30}; do
-        NODE_PORT=$(oc -n trustee-operator-system get service kbs-service -o=jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+        NODE_PORT=$(oc -n trustee-operator-system get service kbs-service '-o=jsonpath={.spec.ports[0].nodePort}' 2>/dev/null || echo "")
         if [ -n "$NODE_PORT" ]; then
             break
         fi
@@ -1235,7 +1254,7 @@ else
     # Use route-based access (default)
     echo "Waiting for Trustee service route to be available..."
     for i in {1..30}; do
-        TRUSTEE_HOST=$(oc get route kbs-service -n trustee-operator-system -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
+        TRUSTEE_HOST=$(oc get route kbs-service -n trustee-operator-system '-o=jsonpath={.spec.host}' 2>/dev/null || echo "")
         if [ -n "$TRUSTEE_HOST" ]; then
             break
         fi
@@ -1280,7 +1299,7 @@ else
     # Get the TLS certificate from the kbs-https-certificate secret
     KBS_CERT=""
     if resource_exists "secret" "kbs-https-certificate"; then
-        KBS_CERT=$(oc get secret kbs-https-certificate -n trustee-operator-system -o jsonpath='{.data.tls\.crt}' | base64 -d)
+        KBS_CERT=$(oc get secret kbs-https-certificate -n trustee-operator-system '-o=jsonpath={.data.tls\.crt}' | base64 -d)
         echo "Retrieved TLS certificate from kbs-https-certificate secret"
     else
         echo "Warning: kbs-https-certificate secret not found, using placeholder certificate"
@@ -1299,7 +1318,7 @@ else
 fi
 
 # Convert initdata.toml to base64 for INITDATA
-INITDATA_STRING=$(cat initdata.toml | gzip| base64 -w0 )
+INITDATA_STRING=$(gzip -c initdata.toml | base64 -w0 )
 echo "INITDATA generated (length: ${#INITDATA_STRING})"
 
 
