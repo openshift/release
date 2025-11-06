@@ -1,0 +1,75 @@
+ref:
+  as: trusted-execution-clusters-ref-operator-install
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  commands: trusted-execution-clusters-ref-operator-install-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: beaker-bm
+    mount_path: /var/run/beaker-bm
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      memory: 1Gi
+  env:
+  - name: BEAKER_IP
+    default: ""
+    documentation: |-
+      IP address of the Beaker provisioned bare metal machine.
+      If not set, will read from Vault or ${SHARED_DIR}/beaker_ip
+  - name: BEAKER_USER
+    default: "root"
+    documentation: |-
+      Username for SSH access to the Beaker machine.
+      If not set, will read from Vault or default to 'root'
+  - name: POD_READY_TIMEOUT
+    default: "900"
+    documentation: |-
+      Timeout in seconds for waiting for all pods to be ready.
+      Defaults to 900 seconds (15 minutes).
+  documentation: |-
+    This step installs the trusted-execution-clusters operator on the Kind cluster
+    that was created in the previous step.
+
+    The step performs the following operations:
+    1. Connects to the Beaker machine via SSH using credentials from Vault
+    2. Uses the operator repository downloaded by beaker-kind-provision step
+    3. Builds and pushes container images to local registry (localhost:5000)
+    4. Generates Kubernetes manifests
+    5. Installs the operator to the cluster
+    6. Auto-detects the operator namespace
+    7. Waits for all pods to be ready (with configurable timeout)
+    8. Sets up port forwarding for external access (KBS, node-register-server)
+    9. Collects installation logs and cluster state
+
+    Prerequisites:
+    - Kind cluster must be running (from kind-cluster-create step)
+    - kubeconfig must be available at ${SHARED_DIR}/kubeconfig
+    - Operator repository must be downloaded (from beaker-kind-provision step)
+    - SSH credentials must be available in Vault
+    - Local container registry must be running at localhost:5000
+
+    Outputs:
+    - ${SHARED_DIR}/operator-config: Operator configuration (namespace, etc.)
+    - ${ARTIFACT_DIR}/operator-install-logs/: Installation logs and diagnostics
+    - ${ARTIFACT_DIR}/operator-install-logs/cluster-all-resources.yaml: All cluster resources
+    - ${ARTIFACT_DIR}/operator-install-logs/operator-pods.yaml: Operator pod details
+
+    After this step completes:
+    - Operator is installed and running in the auto-detected namespace
+    - All pods are healthy and ready
+    - Port forwarding is configured:
+      * KBS: ${BEAKER_IP}:8080
+      * Node Register Server: ${BEAKER_IP}:8000
+    - Cluster state is collected for debugging
+
+    Exit Codes:
+    - 0: Installation completed successfully
+    - 1: Critical failure (SSH issues, installation failed, pods not ready)
+
+    Note: This step uses the operator repository downloaded by the beaker-kind-provision step
+    at ~/operator-kind-setup. It does not clone the repository again.

@@ -1,0 +1,30 @@
+chain:
+  as: trusted-execution-clusters-operator-lifecycle
+  steps:
+  - ref: trusted-execution-clusters-ref-operator-install
+  documentation: |-
+    Manages the complete lifecycle of trusted-execution-clusters operator deployment.
+
+    Operator Installation (trusted-execution-clusters-ref-operator-install):
+      - Connects to Beaker machine via SSH
+      - Uses operator repository from beaker-kind-provision step
+      - Builds and deploys the operator:
+        * make push: Build and push images to localhost:5000
+        * make manifests: Generate Kubernetes manifests
+        * make install: Deploy operator to cluster
+      - Performs health checks (900-second timeout)
+      - Sets up port forwarding for external access
+      - Collects installation logs and cluster state
+
+    Prerequisites:
+    - Kind cluster must be running
+    - kubeconfig available at ${SHARED_DIR}/kubeconfig
+    - SSH credentials available in Vault
+    - Operator repository downloaded by beaker-kind-provision step
+
+    Environment Variables:
+    - POD_READY_TIMEOUT: Health check timeout (default: 900s)
+
+    Outputs:
+    - ${ARTIFACT_DIR}/operator-install-logs/: Installation logs and diagnostics
+    - ${SHARED_DIR}/operator-config: Operator configuration (namespace, etc.)
