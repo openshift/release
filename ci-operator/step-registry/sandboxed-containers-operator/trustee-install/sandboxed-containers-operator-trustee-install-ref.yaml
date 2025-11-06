@@ -1,0 +1,55 @@
+ref:
+  as: sandboxed-containers-operator-trustee-install
+  # Provides openssl and oc cli
+  from: upi-installer
+  commands: sandboxed-containers-operator-trustee-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: INSTALL_TRUSTEE
+    default: "false"
+    documentation: |-
+      Set to "true" to enable trustee installation. Required for CoCo (Confidential Containers) workloads
+  - name: TRUSTEE_URL_USE_HTTP
+    default: "false"
+    documentation: |-
+      Set to "true" to use HTTP instead of HTTPS for Trustee URL (insecure - for testing only)
+  - name: TRUSTEE_URL_USE_NODEPORT
+    default: "false"
+    documentation: |-
+      Set to "true" to use nodeIP:nodePort instead of route hostname
+  - name: TRUSTEE_INSECURE_HTTP
+    default: "false"
+    documentation: |-
+      Set to "true" to enable insecure HTTP in KBS config
+  - name: TRUSTEE_TESTING
+    default: "false"
+    documentation: |-
+      Set to "true" to use permissive resource policy for development/testing
+  - name: TRUSTEE_ORG
+    default: "Red Hat OpenShift"
+    documentation: |-
+      Customize the Organization (O) value in certificates
+  - name: TRUSTEE_CN
+    default: "kbs-trustee-operator-system"
+    documentation: |-
+      Customize the Common Name (CN) value in certificates
+  - name: TRUSTEE_CATALOG_SOURCE_NAME
+    default: ""
+    documentation: |-
+      Specify the catalog source for operator subscription. When empty, uses the
+      CATALOG_SOURCE_NAME from osc-config configmap if available, otherwise defaults
+      to "redhat-operators"
+  documentation: |-
+    Installs and configures the Trustee Operator for Confidential Containers.
+    This step should run after the osc-config ConfigMap is created by the
+    sandboxed-containers-operator-env-cm step.
+
+    This step:
+    - Subscribes to the Trustee Operator
+    - Creates all necessary secrets and configmaps
+    - Configures KBS (Key Broker Service)
+    - Generates INITDATA configuration for peer pods
+    - Saves INITDATA_STRING to SHARED_DIR/initdata_string.txt for use by subsequent steps

@@ -99,6 +99,7 @@ data:
   trusteeCatalogSourcename: "${TRUSTEE_CATALOG_SOURCE_NAME}"
   trusteeUrl: "${TRUSTEE_URL}"
   enablePeerPods: "${ENABLEPEERPODS}"
+  installTrustee: "${INSTALL_TRUSTEE}"
   mustgatherimage: "${MUST_GATHER_IMAGE}"
   workloadImage: "${WORKLOAD_IMAGE}"
   installKataRPM: "${INSTALL_KATA_RPM}"
