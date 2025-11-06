@@ -239,7 +239,7 @@ main() {
 
 	#support hypershift config guest cluster's icsp
 	oc get imagecontentsourcepolicy -oyaml >/tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' - | sed '/---*/d' >"$SHARED_DIR"/mgmt_icsp.yaml
-echo "### sleep 3h for debuging ###"
-sleep 10800
+echo "### sleep 8h for debuging ###"
+sleep 8h
 }
 main
