@@ -319,6 +319,10 @@ function ci_custom_link_report() {
       color: #ffffff;
       text-decoration: unset;
     }
+    a:visited {
+      color: #558af4;
+      text-decoration: unset;
+    }
     a:hover {
       color: #558af4;
     }
@@ -410,13 +414,12 @@ function ci_custom_link_report() {
       min-width: 0;
     }
     .stat-value {
-      font-size: 1rem;
       font-weight: 700;
     }
     .stat-label {
       text-transform: uppercase;
+      font-weight: 700;
       letter-spacing: 0.03em;
-      opacity: 0.9;
       white-space: nowrap;
     }
     .stat-total { color: #82b1ff; }
@@ -445,7 +448,7 @@ function ci_custom_link_report() {
       border-color: rgba(255, 255, 255, 0.2);
       color: #558af4;
     }
-    @media (max-width: 1200px) {
+    @media (max-width: 700px) {
       .summary-container {
         flex-direction: column;
         align-items: stretch;
