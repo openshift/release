@@ -52,7 +52,7 @@ echo "Running automator for openshift-service-mesh/sail-operator@${TARGET_BRANCH
     --repo=sail-operator \
     --branch=${TARGET_BRANCH} \
     --token-path=/creds-github/token \
-    "--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH" \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
     "--labels=auto-merge,tide/merge-method-merge" \
     --modifier=merge_upstream_main \
     --cmd=./ossm/merge_upstream.sh
