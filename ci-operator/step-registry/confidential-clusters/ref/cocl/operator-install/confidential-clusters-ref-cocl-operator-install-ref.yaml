@@ -1,0 +1,82 @@
+ref:
+  as: confidential-clusters-ref-cocl-operator-install
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  commands: confidential-clusters-ref-cocl-operator-install-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: beaker-bm
+    mount_path: /var/run/beaker-bm
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      memory: 1Gi
+  env:
+  - name: BEAKER_IP
+    default: ""
+    documentation: |-
+      IP address of the Beaker provisioned bare metal machine.
+      If not set, will read from Vault or ${SHARED_DIR}/beaker_ip
+  - name: BEAKER_USER
+    default: "root"
+    documentation: |-
+      Username for SSH access to the Beaker machine.
+      If not set, will read from Vault or default to 'root'
+  - name: COCL_OPERATOR_REPO
+    default: "https://github.com/trusted-execution-clusters/operator.git"
+    documentation: |-
+      The repository URL for the cocl-operator.
+      Can be customized to use a fork or different repository.
+  - name: COCL_OPERATOR_BRANCH
+    default: "main"
+    documentation: |-
+      The repository branch for the cocl-operator.
+      Can be customized to test specific branches.
+  - name: COCL_OPERATOR_PATCH_URL
+    default: ""
+    documentation: |-
+      Optional: URL to a patch file to apply after cloning the repository.
+      Example: https://patch-diff.githubusercontent.com/raw/trusted-execution-clusters/operator/pull/78.patch
+      Leave empty to skip patching.
+  - name: CONTAINER_RUNTIME
+    default: "docker"
+    documentation: |-
+      Container runtime to use for building and deploying (podman or docker).
+      Defaults to 'docker' if not specified.
+  - name: POD_READY_TIMEOUT
+    default: "900"
+    documentation: |-
+      Timeout in seconds for waiting for all pods to be ready.
+      Defaults to 900 seconds (15 minutes).
+  documentation: |-
+    This step installs the Confidential Containers (CoCl) Operator on the Kind cluster
+    that was created in the previous step.
+
+    The step performs the following operations:
+    1. Connects to the Beaker machine via SSH using credentials from Vault
+    2. Clones the cocl-operator repository (configurable via env vars)
+    3. Optionally applies a patch if COCL_OPERATOR_PATCH_URL is set
+    4. Builds and pushes container images to local registry (localhost:5000)
+    5. Generates Kubernetes manifests
+    6. Installs the operator to the cluster
+    7. Performs comprehensive health checks with 15-minute timeout:
+       - Checks for failed pods
+       - Checks for container errors (CrashLoopBackOff, ImagePullBackOff, etc.)
+       - Waits for all pods to reach Running or Succeeded state
+
+    Prerequisites:
+    - The kind-cluster-create step must have completed successfully
+    - Kind cluster must be running on the Beaker machine
+    - SSH credentials must be available in Vault
+    - Rust, Go, and container runtime must be installed (from beaker-kind-provision step)
+
+    Outputs:
+    - ${ARTIFACT_DIR}/operator-install-logs/: Installation logs and pod diagnostics
+    - Cluster state with cocl-operator running in confidential-clusters namespace
+
+    After this step completes, the cocl-operator will be fully deployed and all
+    pods in the confidential-clusters namespace will be in a healthy state.

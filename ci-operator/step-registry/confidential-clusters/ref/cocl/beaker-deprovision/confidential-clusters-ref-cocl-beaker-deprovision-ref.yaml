@@ -1,0 +1,90 @@
+ref:
+  as: confidential-clusters-ref-cocl-beaker-deprovision
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  commands: confidential-clusters-ref-cocl-beaker-deprovision-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: beaker-bm
+    mount_path: /var/run/beaker-bm
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      memory: 1Gi
+  env:
+  - name: BEAKER_IP
+    default: ""
+    documentation: |-
+      IP address of the Beaker provisioned bare metal machine.
+      If not set, will read from Vault or ${SHARED_DIR}/beaker_ip
+  - name: BEAKER_USER
+    default: "root"
+    documentation: |-
+      Username for SSH access to the Beaker machine.
+      If not set, will read from Vault or default to 'root'
+  - name: DEPROVISION_TIMEOUT
+    default: "600"
+    documentation: |-
+      Timeout in seconds for the cleanup operations.
+      Defaults to 600 seconds (10 minutes).
+  - name: CLEANUP_IMAGES
+    default: "true"
+    documentation: |-
+      Whether to clean up container images (true/false).
+      Defaults to 'true'. Set to 'false' to preserve images for debugging.
+  - name: RESTART_SERVICES
+    default: "true"
+    documentation: |-
+      Whether to restart container runtime services after cleanup (true/false).
+      Defaults to 'true'.
+  documentation: |-
+    This step performs comprehensive cleanup operations on the Beaker bare metal machine,
+    removing all resources created during testing including VMs, containers, and build artifacts.
+
+    The step performs the following cleanup operations:
+    1. Deletes the Kind cluster and associated containers
+    2. Cleans up container images from local registry and operator builds
+    3. Removes temporary files and logs from standard locations
+    4. Cleans up cocl-operator working directories
+    5. Destroys Libvirt VMs and removes VM disk images
+    6. Removes FCOS container images and build artifacts
+    7. Cleans up E2E test logs and SSH keys created for VMs
+    8. Optionally restarts container runtime and virtualization services
+    9. Archives important logs before cleanup for post-mortem analysis
+
+    Cleanup Strategy:
+    - Kind Cluster: Delete using 'kind delete cluster'
+    - Container Images: Remove using docker/podman rmi (configurable)
+    - Temporary Files: Cleaned from /tmp/kind-*, /tmp/operator-*, /tmp/e2e-test-logs, etc.
+    - Libvirt VMs: Stop and undefine VMs matching 'existing-trustee', 'fcos', 'cocl' patterns
+    - VM Disk Images: Remove *.qcow2 files from /var/lib/libvirt/images/
+    - VM Console Logs: Remove VM log files from /var/lib/libvirt/images/
+    - Libvirt Networks: Destroy and undefine test-created networks (excluding 'default')
+    - FCOS Images: Remove fedora-coreos and trusted-execution-clusters container images
+    - Build Artifacts: Remove ${HOME}/investigations repository and osbuild caches
+    - E2E Logs: Remove /var/log/kbs_logs_* directories
+    - SSH Keys: Remove /root/.ssh/id_ed25519* keys created for VM access
+    - Services: Optionally restart docker/podman/libvirtd to ensure clean state
+    - Logs: Archived to ${ARTIFACT_DIR} before deletion
+
+    Prerequisites:
+    - SSH credentials must be available in Vault
+    - Beaker machine must be accessible
+    - Libvirt tools (virsh) are available on Beaker machine if VMs were created
+
+    Outputs:
+    - ${ARTIFACT_DIR}/cleanup-logs/: Pre-cleanup and post-cleanup system state
+    - ${ARTIFACT_DIR}/cleanup-logs/archived-logs/: Important logs archived before cleanup
+    - ${ARTIFACT_DIR}/cleanup-logs/cleanup-execution.log: Detailed cleanup operation log
+
+    Exit Codes:
+    - 0: Cleanup completed successfully (best effort)
+    - 1: Critical failure during cleanup (SSH connection issues, etc.)
+
+    Note: This step uses best-effort cleanup - individual cleanup operations
+    may fail without causing the entire step to fail, ensuring cleanup
+    proceeds even if some resources are already gone or never existed.
