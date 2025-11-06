@@ -280,7 +280,7 @@ function ci_custom_link_report() {
       background-color: #303030;
       color: #FFFFFF;
       font-family: "Roboto", "Helvetica", "Arial", sans-serif;
-      padding: 16px;
+      padding: 0px 0px 16px 0px;
       margin: 0;
       overflow-x: hidden;
     }
@@ -517,7 +517,7 @@ EOF
         testname=$(basename "${test}")
         status_class="status-pass"
         status_emoji="✅"
-        if [ ! -d "${test}/vms/" ]; then
+        if [ ! -d "${test}/vms/" ] || [ ! -f "${junit_file}" ]; then
             status_class="status-skip"
             status_emoji="⚠️"
         elif [ -f "${junit_file}" ] && grep -q -E 'failures="[1-9][0-9]?"' "${junit_file}"; then
