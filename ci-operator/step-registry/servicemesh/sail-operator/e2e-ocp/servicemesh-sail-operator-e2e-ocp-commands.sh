@@ -120,12 +120,12 @@ run_tests() {
     oc version
     cd /work
     # This checks if the VARIABLE ${VERSIONS_YAML_CONFIG} has a value
-    if [ -n ${VERSIONS_YAML_CONFIG} ]; then
+    if [ -n \"${VERSIONS_YAML_CONFIG:-}\" ]; then
       echo 'VERSIONS_YAML_CONFIG variable is set, executing contents...'
       # Export the variable so it is available for make commands. 
       # The variable should be filled for example with: "<file-name>.yaml"
-      export VERSIONS_YAML_FILE=${VERSIONS_YAML_CONFIG}
-      echo "Using VERSIONS_YAML_FILE=${VERSIONS_YAML_FILE}"
+      export VERSIONS_YAML_FILE=\"${VERSIONS_YAML_CONFIG}\"
+      echo \"Using VERSIONS_YAML_FILE=\${VERSIONS_YAML_FILE}\"
       make gen
     fi
     entrypoint ${E2E_COMMAND:-make test.e2e.ocp}
