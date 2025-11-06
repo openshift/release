@@ -93,8 +93,6 @@ tests:
         spec:
           securityContext:
             runAsNonRoot: true
-            runAsUser: 1001
-            fsGroup: 1001
             seccompProfile:
               type: "RuntimeDefault"
           containers:
@@ -126,12 +124,21 @@ tests:
             break
           fi
           echo "Pod status is ${POD_STATUS} (attempt ${i}/60), waiting..."
-          if [[ "${i}" -gt 1 ]]; then
-             echo "Describing scanner pod for more details:"
-             oc describe "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}"
-             echo "Recent events in namespace:"
-             oc get events --namespace="${NAMESPACE}" --sort-by='.lastTimestamp' | tail -n 10
+
+          # After a few attempts, add deep debugging of the pod and its node.
+          if (( i % 2 == 0 && i > 2 )); then
+            echo "Describing scanner pod for more details:"
+            oc describe "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}" || true
+            echo "Recent events in namespace:"
+            oc get events --namespace="${NAMESPACE}" --sort-by='.lastTimestamp' | tail -n 10 || true
+            NODE_NAME=$(oc get "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}" -o jsonpath='{.spec.nodeName}' 2>/dev/null || true)
+            if [[ -n "${NODE_NAME}" ]]; then
+              echo "--- Describing Node ${NODE_NAME} ---"
+              oc describe node "${NODE_NAME}" || true
+              echo "--- End Node Description ---"
+            fi
           fi
+
           sleep 30
         done
         echo "Scanner pod finished with status: ${POD_STATUS}"
