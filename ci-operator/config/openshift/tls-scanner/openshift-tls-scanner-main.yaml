@@ -103,13 +103,19 @@ tests:
             command:
               - /bin/bash
               - -c
-              - 'mkdir -p /tmp/artifacts && /usr/local/bin/tls-scanner --all-pods --csv-file /tmp/artifacts/report.csv --log-file /tmp/artifacts/scanner.log'
+              - '/usr/local/bin/tls-scanner --all-pods --csv-file /artifacts/report.csv --log-file /artifacts/scanner.log'
             securityContext:
               allowPrivilegeEscalation: false
               capabilities:
                 drop:
                 - "ALL"
+            volumeMounts:
+            - name: artifacts-volume
+              mountPath: /artifacts
           restartPolicy: Never
+          volumes:
+          - name: artifacts-volume
+            emptyDir: {}
         EOF
 
         # Wait for the pod to finish its run.
@@ -136,7 +142,7 @@ tests:
         # Copy the results and logs from the completed pod to the CI artifacts directory.
         echo "--- Collecting logs and artifacts from scanner pod ---"
         oc logs "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}" > "${ARTIFACT_DIR}/tls-scanner/pod-scanner.log"
-        oc rsync "${SCANNER_POD_NAME}:/tmp/artifacts/" "${ARTIFACT_DIR}/" --namespace="${NAMESPACE}" --no-perms
+        oc rsync "${SCANNER_POD_NAME}:/artifacts/" "${ARTIFACT_DIR}/" --namespace="${NAMESPACE}" --no-perms
         
         echo "--- Cleaning up scanner pod ---"
         oc delete "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}"
