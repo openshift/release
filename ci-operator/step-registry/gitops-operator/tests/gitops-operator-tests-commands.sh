@@ -33,10 +33,11 @@ set -x
 exit_code=0
 scripts/openshift-CI-kuttl-tests.sh
 unset CI
-make e2e-tests-ginkgo || exit_code=1
+make ginkgo
+./bin/ginkgo -v --trace --json-report=openshift-gitops-e2e.json -r ./test/openshift/e2e/ginkgo/sequential || exit_code=1
 
 # Find report
-cat openshift-gitops-e2e.json
+cat openshift-gitops-e2e.json || cat $(find . -name "*openshift-gitops-e2e.json")
 
 original_results="${ARTIFACT_DIR}/original_results/"
 mkdir "${original_results}"
