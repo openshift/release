@@ -1,0 +1,65 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.20_base-rhel9:
+    name: "4.21"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+build_root:
+  from_repository: true
+  use_build_cache: true
+releases:
+  initial:
+    integration:
+      name: "4.21"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-kwok
+  cron: 0 5 * * 1
+  presubmit: true
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        # log in to the cluster in order for the script to log in to the internal registry
+        oc login -u kubeadmin "$(oc whoami --show-server)" < "${KUBEADMIN_PASSWORD_FILE}"
+        CLEANUP=false ./hack/openshift-kwok-e2e.sh
+      from: bin-oc-kubectl-helm
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: kubernetes-sigs-karpenter
+  variant: periodics
