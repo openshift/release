@@ -1,4 +1,4 @@
-# interop-tests-networking-localnet-gs-baremetal<!-- omit from toc -->
+# interop-tests-network-localnet-gs-baremetal<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
 - [General Information](#general-information)
@@ -16,11 +16,11 @@
 
 ## Purpose
 
-To execute OpenShift Virtualization networking tests on a bare-metal cluster configured for Goldman Sachs. All XML results will be saved into `"$ARTIFACT_DIR"`.
+To execute OpenShift Virtualization network tests on a bare-metal cluster configured for Goldman Sachs. All XML results will be saved into `"$ARTIFACT_DIR"`.
 
 ## Process
 
-The script performs the following to run Openshift Virtualization networking tests on Goldman Sachs bare-metal cluster:
+The script performs the following to run Openshift Virtualization `localnet` network tests on Goldman Sachs bare-metal cluster:
 
 
 1. Import KUBECONFIG to `${SHARED_DIR}/kubeconfig`.

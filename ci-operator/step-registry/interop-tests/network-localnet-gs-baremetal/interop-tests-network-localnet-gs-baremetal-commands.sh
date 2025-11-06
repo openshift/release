@@ -81,22 +81,24 @@ function runMustGather() {
 #   * status - true / false
 function cnv::toggle_common_boot_image_import () {
   local status="${1}"
-
   case $(
       oc -n openshift-cnv get Subscriptions/hco-operatorhub -o jsonpath='{.status.currentCSV}'|
       sed -E 's/.+v([0-9]+\.[0-9]+).*/\1/'
   ) in
     (4.19*|4.[2-9]+([0-9])*|@([5-9]|[1-9]+([0-9])).*)
-      local commonBootImageFeatFlagPath="$(
+      local commonBootImageFeatFlagPath && commonBootImageFeatFlagPath="$(
         yq -n -o json -I 0 eval ".spec.enableCommonBootImageImport = ${status}"
       )"
       ;;
     (*)
-      local commonBootImageFeatFlagPath="$(
+      local commonBootImageFeatFlagPath && commonBootImageFeatFlagPath="$(
         yq -n -o json -I 0 eval ".spec.featureGates.enableCommonBootImageImport = ${status}"
       )"
       ;;
   esac
+  oc patch hco kubevirt-hyperconverged -n openshift-cnv \
+    --type=merge \
+    -p "${commonBootImageFeatFlagPath}"
   oc patch hco kubevirt-hyperconverged -n openshift-cnv \
     --type=merge \
     -p "${commonBootImageFeatFlagPath}"
@@ -107,8 +109,7 @@ function cnv::toggle_common_boot_image_import () {
     oc wait hco kubevirt-hyperconverged -n openshift-cnv  \
     --for=condition='Available' \
     --timeout='5m'
-}
-
+} 
 #
 # Re-import datavolumes, for example after changing the default storage class
 #
@@ -205,14 +206,7 @@ set -x
 export ORGANIZATION_ID ACCESS_TOKEN ARTIFACTORY_USER ARTIFACTORY_TOKEN ARTIFACTORY_SERVER
 
 # Unset the following environment variables to avoid issues with oc command
-unset KUBERNETES_SERVICE_PORT_HTTPS
-unset KUBERNETES_SERVICE_PORT
-unset KUBERNETES_PORT_443_TCP
-unset KUBERNETES_PORT_443_TCP_PROTO
-unset KUBERNETES_PORT_443_TCP_ADDR
-unset KUBERNETES_SERVICE_HOST
-unset KUBERNETES_PORT
-unset KUBERNETES_PORT_443_TCP_PORT
+unset -v "${!KUBERNETES_*}"
 
 ###########################################################################
 # Get oc binary
@@ -228,7 +222,7 @@ oc get sc
 cnv::reimport_datavolumes
 
 rc=0
-uv run --verbose --cache-dir /tmp/uv-cache pytest  \
+uv run --verbose --cache-dir /tmp/uv-cache pytest \
     -s \
     -o log_cli=true \
     -o cache_dir=/tmp/pytest-cache \
