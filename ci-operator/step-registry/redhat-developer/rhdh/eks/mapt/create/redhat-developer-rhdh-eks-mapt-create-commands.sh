@@ -2,19 +2,24 @@
 
 set -e
 
+echo "Loading AWS credentials from secrets..."
 AWS_ACCESS_KEY_ID=$(cat /tmp/secrets/AWS_ACCESS_KEY_ID)
 AWS_SECRET_ACCESS_KEY=$(cat /tmp/secrets/AWS_SECRET_ACCESS_KEY)
 AWS_DEFAULT_REGION=$(cat /tmp/secrets/AWS_DEFAULT_REGION)
 AWS_S3_BUCKET=$(cat /tmp/secrets/AWS_S3_BUCKET)
 export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION AWS_S3_BUCKET
+echo "AWS credentials loaded successfully"
 
-
+echo "Generating CORRELATE_MAPT..."
 echo "$RANDOM$RANDOM" > ${SHARED_DIR}/CORRELATE_MAPT
 CORRELATE_MAPT=$(cat ${SHARED_DIR}/CORRELATE_MAPT)
+FOLDER_NAME="eks-${CORRELATE_MAPT}"
+echo "Using folder: ${FOLDER_NAME}"
 
+echo "Creating MAPT infrastructure for ${FOLDER_NAME}..."
 mapt aws eks create \
   --project-name "eks" \
-  --backed-url "s3://${AWS_S3_BUCKET}/eks-${CORRELATE_MAPT}" \
+  --backed-url "s3://${AWS_S3_BUCKET}/${FOLDER_NAME}" \
   --conn-details-output "${SHARED_DIR}" \
   --version 1.33 \
   --workers-max 3 \
@@ -26,3 +31,5 @@ mapt aws eks create \
   --addons aws-ebs-csi-driver,coredns,eks-pod-identity-agent,kube-proxy,vpc-cni \
   --load-balancer-controller \
   --tags app-code=rhdh-003,service-phase=dev,cost-center=726
+
+echo "MAPT EKS cluster created successfully"
