@@ -2,6 +2,7 @@
 
 set -e
 
+echo "Loading Azure credentials from secrets..."
 AZURE_STORAGE_ACCOUNT=$(cat /tmp/secrets/AZURE_STORAGE_ACCOUNT)
 AZURE_STORAGE_BLOB=$(cat /tmp/secrets/AZURE_STORAGE_BLOB)
 AZURE_STORAGE_KEY=$(cat /tmp/secrets/AZURE_STORAGE_KEY)
@@ -10,14 +11,18 @@ ARM_CLIENT_SECRET=$(cat /tmp/secrets/ARM_CLIENT_SECRET)
 ARM_SUBSCRIPTION_ID=$(cat /tmp/secrets/ARM_SUBSCRIPTION_ID)
 ARM_TENANT_ID=$(cat /tmp/secrets/ARM_TENANT_ID)
 export AZURE_STORAGE_ACCOUNT AZURE_STORAGE_BLOB AZURE_STORAGE_KEY ARM_CLIENT_ID ARM_CLIENT_SECRET ARM_SUBSCRIPTION_ID ARM_TENANT_ID
+echo "Azure credentials loaded successfully"
 
-
+echo "Generating CORRELATE_MAPT..."
 echo "$RANDOM$RANDOM" > ${SHARED_DIR}/CORRELATE_MAPT
 CORRELATE_MAPT=$(cat ${SHARED_DIR}/CORRELATE_MAPT)
+FOLDER_NAME="aks-${CORRELATE_MAPT}"
+echo "Using folder: ${FOLDER_NAME}"
 
+echo "Creating MAPT infrastructure for ${FOLDER_NAME}..."
 mapt azure aks create \
   --project-name "aks" \
-  --backed-url "azblob://${AZURE_STORAGE_BLOB}/aks-${CORRELATE_MAPT}" \
+  --backed-url "azblob://${AZURE_STORAGE_BLOB}/${FOLDER_NAME}" \
   --conn-details-output "${SHARED_DIR}" \
   --version 1.33 \
   --vmsize "Standard_D4as_v6" \
@@ -25,3 +30,5 @@ mapt azure aks create \
   --spot-eviction-tolerance "low" \
   --spot-excluded-regions "centralindia" \
   --enable-app-routing
+
+echo "MAPT AKS cluster created successfully"
