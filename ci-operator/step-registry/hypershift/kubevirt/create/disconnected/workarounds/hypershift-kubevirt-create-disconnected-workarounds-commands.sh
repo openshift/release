@@ -59,10 +59,10 @@ jq -s '.[0] * .[1]' "${XDG_RUNTIME_DIR}/containers/auth.json" /home/pull-secret 
 ./oc-mirror version
 
 # mirror to disk first
-./oc-mirror --config imageset_config.yaml file://"${LOCALPATH}" --authfile /home/oc_mirror_auth --retry-times 5 --v2
+./oc-mirror --config imageset_config.yaml file://"${LOCALPATH}" --authfile /home/oc_mirror_auth --retry-times 5 --v2 --ignore-release-signature
 
 # push to the internal registry
-./oc-mirror --config imageset_config.yaml --from file://"${LOCALPATH}" docker://${mirror_registry} --authfile /home/oc_mirror_auth --retry-times 5 --v2
+./oc-mirror --config imageset_config.yaml --from file://"${LOCALPATH}" docker://${mirror_registry} --authfile /home/oc_mirror_auth --retry-times 5 --v2 --ignore-release-signature
 
 # apply IDMS
 cat "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
