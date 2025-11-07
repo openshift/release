@@ -54,14 +54,22 @@ for BLOB_TOP_LEVEL_FOLDER in "${CORRELATE_MAPT_ARRAY[@]}"; do
   [ -z "$BLOB_TOP_LEVEL_FOLDER" ] && echo "Skipping empty folder name" && continue
 
   echo "Destroying MAPT for folder: ${BLOB_TOP_LEVEL_FOLDER}"
-  if mapt azure aks destroy \
+  
+  # Capture both stdout and stderr to check for errors
+  output=$(mapt azure aks destroy \
       --project-name "aks" \
-      --backed-url "azblob://${AZURE_STORAGE_BLOB}/${BLOB_TOP_LEVEL_FOLDER}"; then
+      --backed-url "azblob://${AZURE_STORAGE_BLOB}/${BLOB_TOP_LEVEL_FOLDER}" 2>&1)
+  exit_code=$?
+  
+  # Check for both exit code and error patterns in output
+  if [ $exit_code -eq 0 ] && ! echo "$output" | grep -qiE "(stderr|error|failed|exit status [1-9])"; then
     echo "✅ Successfully destroyed MAPT: ${BLOB_TOP_LEVEL_FOLDER}"
     echo "${BLOB_TOP_LEVEL_FOLDER}" >> "${SUCCESSFUL_DESTROYS}"
+    echo "$output"
     success_count=$((success_count + 1))
   else
     echo "❌ Failed to destroy MAPT: ${BLOB_TOP_LEVEL_FOLDER}"
+    echo "$output"
     echo "${BLOB_TOP_LEVEL_FOLDER}" >> "${FAILED_DESTROYS}"
     failed_count=$((failed_count + 1))
   fi
