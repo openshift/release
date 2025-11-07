@@ -61,13 +61,13 @@ for S3_TOP_LEVEL_FOLDER in "${CORRELATE_MAPT_ARRAY[@]}"; do
   
   # Check for both exit code and error patterns in output
   if [ $exit_code -eq 0 ] && ! echo "$output" | grep -qiE "(stderr|error|failed|exit status [1-9])"; then
+    echo "$output"
     echo "✅ Successfully destroyed MAPT: ${S3_TOP_LEVEL_FOLDER}"
     echo "${S3_TOP_LEVEL_FOLDER}" >> "${SUCCESSFUL_DESTROYS}"
-    echo "$output"
     success_count=$((success_count + 1))
   else
-    echo "❌ Failed to destroy MAPT: ${S3_TOP_LEVEL_FOLDER}"
     echo "$output"
+    echo "❌ Failed to destroy MAPT: ${S3_TOP_LEVEL_FOLDER}"
     echo "${S3_TOP_LEVEL_FOLDER}" >> "${FAILED_DESTROYS}"
     failed_count=$((failed_count + 1))
   fi
