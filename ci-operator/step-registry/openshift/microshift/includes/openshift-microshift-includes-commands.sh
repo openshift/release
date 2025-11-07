@@ -514,6 +514,8 @@ EOF
             junit_file="${test}/junit.xml"
         elif [ -f "${test}/ginkgo-results/test-output.log" ]; then
             junit_file="$( find "${test}/ginkgo-results" -name "junit_e2e_*.xml" -type f | head -1 )"
+        elif [ -f "${test}/gingko-results/test-output.log" ]; then
+            junit_file="$( find "${test}/gingko-results" -name "junit_e2e_*.xml" -type f | head -1 )"
         fi
 
         # set scenario status
@@ -583,6 +585,8 @@ EOF
             html_report_cell="<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/log.html\">🤖 log.html</a></div>"
         elif [ -f "${test}/ginkgo-results/test-output.log" ]; then
             html_report_cell="<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/ginkgo-results/test-output.log\">☘️ test-output.log</a></div>"
+        elif [ -f "${test}/gingko-results/test-output.log" ]; then
+            html_report_cell="<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/gingko-results/test-output.log\">☘️ test-output.log</a></div>"
         fi
 
         # set SOS reports
