@@ -30,6 +30,29 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 export NAMESPACE=$TARGET_NAMESPACE 
 
+# Wait up to 3 minutes for VMIs to appear in the namespace
+echo "Waiting for VMIs to appear in namespace $NAMESPACE..."
+timeout=180  # 3 minutes in seconds
+interval=20   # Check every 20 seconds
+elapsed=0
+found=false
+
+while [ $elapsed -lt $timeout ]; do
+    if oc get vmi -n "$NAMESPACE" --no-headers 2>/dev/null | grep -q .; then
+        echo "VMIs found in namespace $NAMESPACE"
+        oc get vmi -n "$NAMESPACE"
+        found=true
+        break
+    fi
+    echo "Waiting for VMIs... (${elapsed}s/${timeout}s)"
+    sleep $interval
+    elapsed=$((elapsed + interval))
+done
+
+if [ "$found" = false ]; then
+    echo "Timeout: No VMIs found in namespace $NAMESPACE after 3 minutes"
+    exit 1
+fi
 
 export KUBE_VIRT_NAMESPACE=$TARGET_NAMESPACE
 ./kubevirt-outage/prow_run.sh || rc=$?
@@ -37,5 +60,5 @@ rc=$?
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
     cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 fi
-echo "Finished running network chaos"
+echo "Finished running kubevirt outage chaos disruption"
 echo "Return code: $rc"
