@@ -499,7 +499,7 @@ function ci_custom_link_report() {
         <th>Scenario</th>
         <th>MicroShift Version</th>
         <th>Test Results</th>
-        <th>Boot &amp; Run</th>
+        <th>Boot &amp; Run log</th>
         <th>Test Report</th>
         <th>VM SOS Reports</th>
       </tr>
@@ -542,12 +542,13 @@ EOF
         fi
 
         # set test results
-        test_results_cell="<span class=\"none-state\">0</span>"
+        test_results_cell="<span class=\"skip-state\">0/0/0</span>"
         if [ -f "${junit_file}" ]; then
           total_tests=$(grep -oP 'tests="\K[0-9]+' "${junit_file}" | head -1)
           failures=$(grep -oP 'failures="\K[0-9]+' "${junit_file}" | head -1)
           errors=$(grep -oP 'errors="\K[0-9]+' "${junit_file}" | head -1)
-          passed=$((${total_tests:-0} - ${failures:-0} - ${errors:-0}))
+          skipped=$(grep -oP 'skipped="\K[0-9]+' "${junit_file}" | head -1)
+          passed=$((${total_tests:-0} - ${failures:-0} - ${errors:-0} - ${skipped:-0}))
           failed=$((${failures:-0} + ${errors:-0}))
           total_tests=${total_tests:-0}
           if [ "${total_tests}" -gt 0 ]; then
@@ -561,7 +562,12 @@ EOF
               else
                   failed_span="<span class=\"none-state\">0</span>"
               fi
-              test_results_cell="${passed_span}<span class=\"none-state\">+</span>${failed_span}<span class=\"none-state\">=${total_tests}</span>"
+              if [ "${skipped}" -gt 0 ]; then
+                  skipped_span="<span class=\"status-skip\">${skipped}</span>"
+              else
+                  skipped_span="<span class=\"none-state\">0</span>"
+              fi
+              test_results_cell="${passed_span}<span class=\"none-state\">/</span>${failed_span}<span class=\"none-state\">/</span>${skipped_span}<span class=\"none-state\"></span>"
           fi
         fi
 
