@@ -15,23 +15,23 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  openshift_release_golang-1.20:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
+  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
 binary_build_commands: make manager
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
 images:
 - build_args:
   - name: ARCH
     value: amd64
   - name: ldflags
   dockerfile_literal: |-
-    FROM registry.ci.openshift.org/openshift/release:golang-1.20 as toolchain
+    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14 as toolchain
 
     # Run this with docker build --build_arg $(go env GOPROXY) to override the goproxy
     ARG goproxy=https://proxy.golang.org
@@ -61,9 +61,9 @@ images:
     ENTRYPOINT ["/manager"]
   from: base
   inputs:
-    openshift_release_golang-1.20:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
   to: cluster-api-provider-kubevirt
 promotion:
   to:
