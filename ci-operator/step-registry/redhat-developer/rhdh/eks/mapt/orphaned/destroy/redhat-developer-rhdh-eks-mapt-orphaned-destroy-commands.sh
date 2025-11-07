@@ -37,8 +37,8 @@ failed_count=0
 echo "Found ${total} S3 top-level folders to process"
 
 # Create files to track results
-SUCCESSFUL_DESTROYS="${SHARED_DIR}/successful_destroys.txt"
-FAILED_DESTROYS="${SHARED_DIR}/failed_destroys.txt"
+SUCCESSFUL_DESTROYS="${ARTIFACT_DIR}/successful_destroys.txt"
+FAILED_DESTROYS="${ARTIFACT_DIR}/failed_destroys.txt"
 touch "${SUCCESSFUL_DESTROYS}"
 touch "${FAILED_DESTROYS}"
 
@@ -55,11 +55,11 @@ for S3_TOP_LEVEL_FOLDER in "${CORRELATE_MAPT_ARRAY[@]}"; do
   if mapt aws eks destroy \
       --project-name "eks" \
       --backed-url "s3://${AWS_S3_BUCKET}/${S3_TOP_LEVEL_FOLDER}"; then
-    echo "✓ Successfully destroyed MAPT: ${S3_TOP_LEVEL_FOLDER}"
+    echo "✅ Successfully destroyed MAPT: ${S3_TOP_LEVEL_FOLDER}"
     echo "${S3_TOP_LEVEL_FOLDER}" >> "${SUCCESSFUL_DESTROYS}"
     success_count=$((success_count + 1))
   else
-    echo "✗ Failed to destroy MAPT: ${S3_TOP_LEVEL_FOLDER}"
+    echo "❌ Failed to destroy MAPT: ${S3_TOP_LEVEL_FOLDER}"
     echo "${S3_TOP_LEVEL_FOLDER}" >> "${FAILED_DESTROYS}"
     failed_count=$((failed_count + 1))
   fi
@@ -74,10 +74,6 @@ echo "Total processed: ${total}"
 echo "Successful: ${success_count}"
 echo "Failed: ${failed_count}"
 
-# Copy results to artifact directory
-cp "${SUCCESSFUL_DESTROYS}" "${ARTIFACT_DIR}/successful_destroys.txt"
-cp "${FAILED_DESTROYS}" "${ARTIFACT_DIR}/failed_destroys.txt"
-
 # Batch delete successfully destroyed folders from S3
 if [ "${success_count}" -gt 0 ]; then
   echo ""
@@ -90,10 +86,18 @@ if [ "${success_count}" -gt 0 ]; then
     fi
   done < "${SUCCESSFUL_DESTROYS}"
 
-  echo "✓ Successfully deleted all folders from S3"
+  echo "🎉 Successfully deleted all folders from S3"
 else
-  echo "No folders to delete from S3"
+  echo "🫙 No folders to delete from S3"
 fi
 
 echo ""
 echo "Finished processing all ${total} MAPT folders"
+
+# Exit with failure if any destroys failed
+if [ "${failed_count}" -gt 0 ]; then
+  echo "⚠️  Exiting with failure due to ${failed_count} failed destroy(s)"
+  exit 1
+fi
+
+echo "✅ All operations completed successfully"
