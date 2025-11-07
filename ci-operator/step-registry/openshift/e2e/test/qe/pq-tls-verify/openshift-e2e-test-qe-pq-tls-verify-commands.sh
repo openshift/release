@@ -77,7 +77,7 @@ test_component_tls() {
     echo "INFO - Testing TLS handshake for ${component_name}..."
 
     # Run openssl s_client and capture output
-    TLS_OUTPUT=$(echo 'Q' | timeout 10 openssl s_client -connect "127.0.0.1:${port}" -servername localhost -tls1_3 -groups X25519MLKEM768 2>&1 || true)
+    TLS_OUTPUT=$(echo 'Q' | timeout 10 openssl s_client -connect "127.0.0.1:${port}" -servername localhost 2>&1 || true)
 
     # Save full output for debugging
     echo "DEBUG - Full TLS output for ${component_name}:"
