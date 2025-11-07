@@ -394,7 +394,6 @@ function ci_custom_link_report() {
       justify-content: space-between;
       gap: 12px;
       flex-wrap: wrap;
-      margin-bottom: 16px;
     }
     .summary-stats {
       display: flex;
