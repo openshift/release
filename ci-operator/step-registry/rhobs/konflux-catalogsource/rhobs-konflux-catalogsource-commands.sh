@@ -183,7 +183,8 @@ EOF
 	}
 	return 0
 }
-
+echo '### sleep 8h for debuging ###'
+sleep 8h
 # From 4.11 on, the marketplace is optional.
 # That means, once the marketplace disabled, its "openshift-marketplace" project will NOT be created as default.
 # But, for OLM, its global namespace still is "openshift-marketplace"(details: https://bugzilla.redhat.com/show_bug.cgi?id=2076878),
