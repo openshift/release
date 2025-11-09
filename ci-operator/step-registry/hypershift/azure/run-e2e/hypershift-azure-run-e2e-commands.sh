@@ -101,15 +101,14 @@ hack/ci-test-e2e.sh -test.v \
     ${AKS_ANNOTATIONS:-} \
     ${N1_NP_VERSION_TEST_ARGS:-} \
     ${N2_NP_VERSION_TEST_ARGS:-} \
+    ${N3_NP_VERSION_TEST_ARGS:-} \
+    ${N4_NP_VERSION_TEST_ARGS:-} \
     ${MI_ARGS:-} \
     ${DP_ARGS:-} \
     ${AZURE_MULTI_ARCH_PARAMS:-} \
   --e2e.azure-encryption-key-id=${AKS_KMS_KEY} \
   --e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET} \
-  --e2e.azure-marketplace-publisher "azureopenshift" \
-  --e2e.azure-marketplace-offer "aro4" \
-  --e2e.azure-marketplace-sku "aro_419" \
-  --e2e.azure-marketplace-version "419.6.20250523" \
+  ${MARKETPLACE_IMAGE_PARAMS} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
 wait $!
