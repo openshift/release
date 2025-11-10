@@ -144,6 +144,14 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - always_run: false
+  as: e2e-azure-operator-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
+- always_run: false
   as: e2e-gcp-ovn
   optional: true
   steps:
@@ -220,6 +228,25 @@ tests:
   optional: true
   steps:
     cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix
+- always_run: false
+  as: e2e-nutanix-operator-multi-subnet
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      FEATURE_GATES: '["NutanixMultiSubnets=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: openshift-e2e-nutanix
 - always_run: false
   as: e2e-vsphere-ovn
