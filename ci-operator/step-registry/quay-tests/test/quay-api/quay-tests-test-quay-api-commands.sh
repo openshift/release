@@ -26,7 +26,7 @@ else
     echo "Using standard spec for Quay version ${QUAY_VERSION}"
 fi
 
-NO_COLOR=1 yarn run cypress run --spec "${CYPRESS_SPEC}" --browser electron --headless --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json > \
+NO_COLOR=1 yarn run cypress run --spec "${CYPRESS_SPEC}" --browser chrome --headless --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json > \
     quay_api_testing_report || true
 
 mkdir -p $ARTIFACT_DIR/quay_api_testing_cypress_videos || true
