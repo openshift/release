@@ -38,9 +38,9 @@ elapsed=0
 found=false
 
 while [ $elapsed -lt $timeout ]; do
-    if oc get vmi -n "$NAMESPACE" --no-headers 2>/dev/null | grep -q .; then
-        echo "VMIs found in namespace $NAMESPACE"
-        oc get vmi -n "$NAMESPACE"
+    if oc get vmi -A --no-headers 2>/dev/null | grep -q .; then
+        echo "VMIs found"
+        oc get vmi -A
         found=true
         break
     fi
