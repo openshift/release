@@ -50,117 +50,13 @@ tests:
         set -o nounset
         set -o errexit
         set -o pipefail
-        
-        # The CI system injects the test namespace into this variable.
-        # We add a check to ensure it's set before proceeding.
-        if [ -z "${NAMESPACE:-}" ]; then
-          echo "Error: The NAMESPACE environment variable is not set." >&2
-          exit 1
-        fi
 
-        echo "--- Creating namespace on the test cluster ---"
-        oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
-
-        echo "--- Applying NetworkPolicy to allow egress traffic ---"
-        cat <<EOF | oc apply -n "${NAMESPACE}" -f -
-        apiVersion: networking.k8s.io/v1
-        kind: NetworkPolicy
-        metadata:
-          name: allow-all-egress
-        spec:
-          podSelector: {}
-          policyTypes:
-          - Egress
-          egress:
-          - {}
-        EOF
-
-        echo "--- Preparing artifact directory ---"
         mkdir -p "${ARTIFACT_DIR}/tls-scanner"
 
-        echo "--- Running scanner ---"
-        SCANNER_POD_NAME="tls-scanner-$(head /dev/urandom | tr -dc a-z0-9 | head -c 5)"
-        
-        # We need to run the scanner inside a pod on the test cluster so that it can reach
-        # the internal pod IPs. The scanner will write its results to /tmp/artifacts inside the pod.
-        echo "--- Launching scanner pod (${SCANNER_POD_NAME}) on test cluster ---"
-        echo "Using image: ${PULL_SPEC_TLS_SCANNER_TOOL}"
-        cat <<EOF | oc apply -n "${NAMESPACE}" -f -
-        apiVersion: v1
-        kind: Pod
-        metadata:
-          name: ${SCANNER_POD_NAME}
-        spec:
-          securityContext:
-            runAsNonRoot: true
-            seccompProfile:
-              type: "RuntimeDefault"
-          containers:
-          - name: scanner
-            image: ${PULL_SPEC_TLS_SCANNER_TOOL}
-            command:
-              - /bin/bash
-              - -c
-              - '/usr/local/bin/tls-scanner --all-pods --csv-file /artifacts/report.csv --log-file /artifacts/scanner.log'
-            securityContext:
-              allowPrivilegeEscalation: false
-              capabilities:
-                drop:
-                - "ALL"
-            volumeMounts:
-            - name: artifacts-volume
-              mountPath: /artifacts
-          restartPolicy: Never
-          volumes:
-          - name: artifacts-volume
-            emptyDir: {}
-        EOF
-
-        # Wait for the pod to finish its run.
-        echo "--- Waiting for scanner pod to complete ---"
-        for i in $(seq 1 60); do
-          POD_STATUS="$(oc get "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")"
-          if [[ "${POD_STATUS}" == "Succeeded" || "${POD_STATUS}" == "Failed" ]]; then
-            break
-          fi
-          echo "Pod status is ${POD_STATUS} (attempt ${i}/60), waiting..."
-
-          # After a few attempts, add deep debugging of the pod and its node.
-          if (( i % 2 == 0 && i > 2 )); then
-            echo "Describing scanner pod for more details:"
-            oc describe "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}" || true
-            echo "Recent events in namespace:"
-            oc get events --namespace="${NAMESPACE}" --sort-by='.lastTimestamp' | tail -n 10 || true
-            NODE_NAME=$(oc get "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}" -o jsonpath='{.spec.nodeName}' 2>/dev/null || true)
-            if [[ -n "${NODE_NAME}" ]]; then
-              echo "--- Describing Node ${NODE_NAME} ---"
-              oc describe node "${NODE_NAME}" || true
-              echo "--- End Node Description ---"
-            fi
-          fi
-
-          sleep 30
-        done
-        echo "Scanner pod finished with status: ${POD_STATUS}"
-
-        echo "--- Final state of scanner pod ---"
-        oc describe "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}"
-
-        # Copy the results and logs from the completed pod to the CI artifacts directory.
-        echo "--- Collecting logs and artifacts from scanner pod ---"
-        oc logs "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}" > "${ARTIFACT_DIR}/tls-scanner/pod-scanner.log"
-        oc rsync "${SCANNER_POD_NAME}:/artifacts/" "${ARTIFACT_DIR}/" --namespace="${NAMESPACE}" --no-perms
-        
-        echo "--- Cleaning up scanner pod ---"
-        oc delete "pod/${SCANNER_POD_NAME}" --namespace="${NAMESPACE}"
-        
-        # If the pod failed, fail the CI job.
-        if [[ "${POD_STATUS}" != "Succeeded" ]]; then
-          echo "Error: The scanner pod did not complete successfully."
-          exit 1
-        fi
-        
-        echo "--- Scanner finished ---"
+        /usr/local/bin/tls-scanner \
+          --all-pods \
+          --csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv" \
+          --log-file "${ARTIFACT_DIR}/tls-scanner/scanner.log"
       dependencies:
       - env: PULL_SPEC_TLS_SCANNER_TOOL
         name: tls-scanner-tool
