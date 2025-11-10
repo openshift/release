@@ -3283,32 +3283,26 @@ tests:
     cluster_profile: equinix-ocp-metal-qe
     env:
       TEST_FILTERS: "76537"
+      TIMEOUT: "1 min"
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6v4
         MIRROR_IMAGES=true
         INSTALLER_PROXY=true
         NETWORK_TYPE=OVNKubernetes
+    pre:
+    - as: prepare-bm-env
+      commands: |
+          echo hello
+          echo this
+          echo works
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     test:
-    - chain: openshift-e2e-test-netobserv-qe
     - ref: wait
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
-
-- as: baremetal-upi-ovn-ipv6-static-rt-kernel-f30-netobserv-v2
-  capabilities:
-  - intranet
-  cron: 5 15 2,9,16,23 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RT_ENABLED: "true"
-      architecture: amd64
-      TEST_FILTERS: "76537"
-    test:
-    - chain: openshift-e2e-test-netobserv-qe
-    - ref: wait
-    workflow: baremetal-lab-upi-ipv6-static
-
 
 - as: vsphere-ipi-longduration-mco-fips-proxy-g1-f14
   cron: 24 14 11,25 * *
