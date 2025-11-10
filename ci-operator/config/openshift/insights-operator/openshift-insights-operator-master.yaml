@@ -89,13 +89,19 @@ tests:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - as: insights-operator-e2e-tests
+  cluster: build05
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: gcp
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-provision
-    - ref: insights-live
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v4.20
     test:
+    - ref: insights-live
     - as: test
       cli: latest
       commands: |
@@ -152,14 +158,24 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: cucushift-installer-rehearse-gcp-ipi
-- as: e2e-gcp-ovn-techpreview
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
+- as: e2e-metal-ovn-techpreview
+  cluster: build05
   steps:
-    cluster_profile: gcp
+    cluster_profile: equinix-ocp-metal-qe
     env:
-      FEATURE_SET: TechPreviewNoUpgrade
+      DEVSCRIPTS_CONFIG: |
+        FEATURE_SET=TechPreviewNoUpgrade
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=100G
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE: quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v4.20
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-provision
+    - chain: baremetalds-ofcir-pre
     - ref: insights-live
     test:
     - as: test
@@ -216,7 +232,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
