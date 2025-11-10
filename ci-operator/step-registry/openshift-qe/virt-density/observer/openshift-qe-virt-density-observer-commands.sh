@@ -48,9 +48,6 @@ export WORKLOAD=virt-density
 
 EXTRA_FLAGS+=" --metrics-profile metrics.yml,cnv-metrics.yml --gc-metrics=true --vms-per-node=$VMS_PER_NODE --vmi-ready-threshold=${VMI_READY_THRESHOLD}s --profile-type=${PROFILE_TYPE} --burst=${BURST} --qps=${QPS}"
 
-
-current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
-
 export ES_SERVER=""
 
 if [[ "${CHURN}" == "true" ]]; then
