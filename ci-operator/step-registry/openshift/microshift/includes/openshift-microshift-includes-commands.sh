@@ -535,7 +535,7 @@ EOF
 
         # get microshift version from journal log
         version_cell="<span class=\"version-badge\">-</span>"
-        local journal_file="$(ls "${test}"/vms/*/sos/journal_*.log 2>/dev/null | head -1)"
+        local journal_file="$(ls -t "${test}"/vms/*/sos/journal_*.log 2>/dev/null | head -1)"
         if [ -f "${journal_file}" ]; then
             local ms_version=$(grep -oP '"Version" microshift="\K[^"]+' "${journal_file}" 2>/dev/null | tail -1)
             if [ -n "${ms_version}" ]; then
@@ -577,6 +577,8 @@ EOF
         boot_run_cell="<span class=\"empty-state\">No run logs</span>"
         if [ -f "${test}/boot_and_run.log" ]; then
             boot_run_cell="<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/boot_and_run.log\">📃 boot_and_run.log</a></div>"
+        elif [ -f "${test}/boot.log" ] && [ -f "${test}/run.log" ]; then
+            boot_run_cell="<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/boot.log\">📃 boot.log</a><span> </span><a target=\"_blank\" href=\"${url_prefix}/${testname}/run.log\">📃 run.log</a></div>"
         fi
 
         # set test report
