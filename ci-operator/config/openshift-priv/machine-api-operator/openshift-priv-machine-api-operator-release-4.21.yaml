@@ -230,6 +230,25 @@ tests:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix
 - always_run: false
+  as: e2e-nutanix-operator-multi-subnet
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      FEATURE_GATES: '["NutanixMultiSubnets=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-nutanix
+- always_run: false
   as: e2e-vsphere-ovn
   optional: true
   steps:
