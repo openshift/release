@@ -233,6 +233,7 @@ tests:
     test:
     - as: e2e
       commands: |
+        CLUSTERPOOL_MANAGED_COUNT=${CLUSTERPOOL_MANAGED_COUNT:-1}
         echo "ENDPOINT_MONITORING_OPERATOR_IMAGE_REF=$ENDPOINT_MONITORING_OPERATOR_IMAGE_REF"
         echo "GRAFANA_DASHBOARD_LOADER_IMAGE_REF=$GRAFANA_DASHBOARD_LOADER_IMAGE_REF"
         echo "METRICS_COLLECTOR_IMAGE_REF=$METRICS_COLLECTOR_IMAGE_REF"
@@ -256,7 +257,7 @@ tests:
         fi
         set -x
         declare -A CSR_CREATED=()
-        for ((i = 1; i <= CLUSTERPOOL_MANAGED_COUNT; i++)); do
+        for ((i = 1; i <= ${CLUSTERPOOL_MANAGED_COUNT}; i++)); do
           if $IS_HUB_TOKEN && [[ -n ${SHARED_DIR} ]] && [[ -f "${SHARED_DIR}/managed-${i}.json" ]]; then
             export KUBECONFIG="${SHARED_DIR}/managed-${i}.kc"
             CTX_MANAGED_CLUSTER=$(kubectl config current-context)
@@ -277,7 +278,7 @@ tests:
         # Need to wait before accepting. Wait for each join to process and need timeout for each join.
         echo "Waiting for CSR from each managed cluster..."
         for j in {1..60}; do
-          for ((i = 1; i <= CLUSTERPOOL_MANAGED_COUNT; i++)); do
+          for ((i = 1; i <= ${CLUSTERPOOL_MANAGED_COUNT}; i++)); do
             if $IS_HUB_TOKEN && [[ -n ${CSR_CREATED[$i]} ]] && kubectl get csr --context "${CTX_HUB_CLUSTER}" 2>/dev/null | grep -q "managed-${i}"; then
               unset "CSR_CREATED[$i]"
               clusteradm accept --clusters "managed-${i}" --context "${CTX_HUB_CLUSTER}" &>/dev/null
