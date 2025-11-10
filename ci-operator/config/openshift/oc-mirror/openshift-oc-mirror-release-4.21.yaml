@@ -70,6 +70,7 @@ tests:
   commands: make sanity
   container:
     from: src
+  skip_if_only_changed: ^v1/
 - as: unit
   commands: |
     export HOME=/tmp/home
@@ -77,10 +78,22 @@ tests:
     make test-unit
   container:
     from: src
+  skip_if_only_changed: ^v1/
 - as: v1-e2e
   commands: |
     pushd v1 || true
     make test-e2e
+  container:
+    from: src
+- as: v1-sanity
+  commands: make -C v1 sanity
+  container:
+    from: src
+- as: v1-unit
+  commands: |
+    export HOME=/tmp/home
+    mkdir -p $HOME
+    make -C v1 test-unit
   container:
     from: src
 - as: lint
@@ -103,6 +116,7 @@ tests:
   container:
     clone: true
     from: golangci-lint
+  skip_if_only_changed: ^v1/
 - as: verify-deps
   steps:
     env:
@@ -114,7 +128,7 @@ tests:
     ./scripts/flow-controller.sh all_happy_path
   container:
     from: oc-mirror-tests
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^v1/)
 zz_generated_metadata:
   branch: release-4.21
   org: openshift
