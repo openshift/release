@@ -64,12 +64,21 @@ tests:
     test:
     - as: kserve-path-based-routing
       cli: latest
-      commands: "set -euxo pipefail\n\necho \"ODH_MODEL_CONTROLLER_IMAGE=${ODH_MODEL_CONTROLLER_IMAGE}\"\n\ngit
-        clone https://github.com/opendatahub-io/kserve.git /tmp/kserve\npushd /tmp/kserve\n
-        \ git fetch --all --tags\n  git checkout \"${KSERVE_REF:-main}\"\n  export
-        GITHUB_SHA=\"${PULL_BASE_SHA:-stable}\"\n  export ODH_MODEL_CONTROLLER_IMAGE=\"${ODH_MODEL_CONTROLLER_IMAGE}\"\n
-        \   \n  ./test/scripts/gh-actions/setup-uv.sh || true\n  ./test/scripts/openshift-ci/setup-e2e-tests.sh\n
-        \ ./test/scripts/openshift-ci/run-e2e-tests.sh path_based_routing\npopd\n"
+      commands: |
+        set -euxo pipefail
+
+        echo "ODH_MODEL_CONTROLLER_IMAGE=${ODH_MODEL_CONTROLLER_IMAGE}"
+
+        git clone https://github.com/opendatahub-io/kserve.git /tmp/kserve
+        pushd /tmp/kserve
+          git fetch --all --tags
+          git checkout "${KSERVE_REF:-main}"
+          export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
+          export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
+
+          ./test/scripts/gh-actions/setup-uv.sh
+          ./test/scripts/openshift-ci/run-e2e-tests.sh path_based_routing 2 raw
+        popd
       dependencies:
       - env: ODH_MODEL_CONTROLLER_IMAGE
         name: odh-model-controller
@@ -134,9 +143,8 @@ tests:
           export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
           export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
 
-          ./test/scripts/gh-actions/setup-uv.sh || true
-          ./test/scripts/openshift-ci/setup-e2e-tests.sh
-          ./test/scripts/openshift-ci/run-e2e-tests.sh predictor
+          ./test/scripts/gh-actions/setup-uv.sh
+          ./test/scripts/openshift-ci/run-e2e-tests.sh predictor 2 raw
         popd
       dependencies:
       - env: ODH_MODEL_CONTROLLER_IMAGE
@@ -202,9 +210,8 @@ tests:
           export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
           export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
 
-          ./test/scripts/gh-actions/setup-uv.sh || true
-          ./test/scripts/openshift-ci/setup-e2e-tests.sh
-          ./test/scripts/openshift-ci/run-e2e-tests.sh graph
+          ./test/scripts/gh-actions/setup-uv.sh
+          ./test/scripts/openshift-ci/run-e2e-tests.sh graph 2 raw
         popd
       dependencies:
       - env: ODH_MODEL_CONTROLLER_IMAGE
@@ -258,7 +265,7 @@ tests:
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "3"
     test:
-    - as: run
+    - as: kserve-raw
       cli: latest
       commands: |
         set -euxo pipefail
@@ -271,9 +278,8 @@ tests:
           export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
           export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
 
-          ./test/scripts/gh-actions/setup-uv.sh || true
-          ./test/scripts/openshift-ci/setup-e2e-tests.sh
-          ./test/scripts/openshift-ci/run-e2e-tests.sh raw
+          ./test/scripts/gh-actions/setup-uv.sh
+          ./test/scripts/openshift-ci/run-e2e-tests.sh raw 2 raw
         popd
       dependencies:
       - env: ODH_MODEL_CONTROLLER_IMAGE
