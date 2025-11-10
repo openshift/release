@@ -11,14 +11,20 @@ cd /tmp || exit 1
 arch=$(uname -m)
 if [ -n "${KATA_RPM_BUILD_TASK}" ];then
     KATA_RPM_BASE_TASK_URL=$(cat /usr/local/sandboxed-containers-operator-ci-secrets/secrets/KATA_RPM_BUILD_TASK_BASE_URL)
+    echo "KATA_RPM_BASE_TASK_URL: ${KATA_RPM_BASE_TASK_URL}"
     # To the base URL it's appended the "last four digits of task ID"/"full task ID"
     KATA_RPM_BUILD_URL="${KATA_RPM_BASE_TASK_URL}/${KATA_RPM_BUILD_TASK: -4}/${KATA_RPM_BUILD_TASK}/kata-containers-${KATA_RPM_VERSION}.${arch}.rpm"
 else
     ver=$(echo "$KATA_RPM_VERSION" | cut -d- -f1)
     build=$(echo "$KATA_RPM_VERSION" | cut -d- -f2)
+    echo "ver: ${ver}"
+    echo "build: ${build}"
     KATA_RPM_BASE_URL=$(cat /usr/local/sandboxed-containers-operator-ci-secrets/secrets/KATA_RPM_BASE_URL)
+    echo "KATA_RPM_BASE_URL: ${KATA_RPM_BASE_URL}"
     KATA_RPM_BUILD_URL="${KATA_RPM_BASE_URL}/${ver}/${build}/${arch}/kata-containers-${KATA_RPM_VERSION}.${arch}.rpm"
 fi
+
+echo "KATA_RPM_BUILD_URL: ${KATA_RPM_BUILD_URL}"
 
 brew_auth="$(oc get -n openshift-config secret/pull-secret -ojson  | jq -r '.data.".dockerconfigjson"' |  base64 -d | jq -r '.auths."registry.redhat.io".auth' | base64 -d)"
 
