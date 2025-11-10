@@ -55,7 +55,7 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
         y_version="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
         bash -x ./scripts/fetch_tools.sh brew
         # Fail the entire job if there is no access to brew, as this could render an incomplete cache.
-        if ! ./test/bin/manage_brew_rpms.sh access; then
+        if ! bash -x ./test/bin/manage_brew_rpms.sh access; then
             echo "ERROR: Brew Hub site is not accessible"
             exit 1
         fi
