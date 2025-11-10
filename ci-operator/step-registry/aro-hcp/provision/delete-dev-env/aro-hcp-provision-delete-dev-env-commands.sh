@@ -27,7 +27,7 @@ az aks install-cli --install-location /tmp/tools/kubectl --kubelogin-install-loc
 
 # Add to PATH
 export PATH="/tmp/tools:$PATH"
-export USER="cide"
+export USER="p${BUILD_ID: -3}"
 PRINCIPAL_ID=$(az ad sp show --id "${TEST_USER_CLIENT_ID}" --query id -o tsv)
 export PRINCIPAL_ID
 unset GOFLAGS
