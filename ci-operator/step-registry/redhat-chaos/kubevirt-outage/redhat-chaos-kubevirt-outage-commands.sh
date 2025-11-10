@@ -32,7 +32,7 @@ export NAMESPACE=$TARGET_NAMESPACE
 
 # Wait up to 3 minutes for VMIs to appear in the namespace
 echo "Waiting for VMIs to appear in namespace $NAMESPACE..."
-timeout=180  # 3 minutes in seconds
+timeout=300  # 5 minutes in seconds
 interval=20   # Check every 20 seconds
 elapsed=0
 found=false
@@ -47,10 +47,11 @@ while [ $elapsed -lt $timeout ]; do
     echo "Waiting for VMIs... (${elapsed}s/${timeout}s)"
     sleep $interval
     elapsed=$((elapsed + interval))
+    date
 done
 
 if [ "$found" = false ]; then
-    echo "Timeout: No VMIs found in namespace $NAMESPACE after 3 minutes"
+    echo "Timeout: No VMIs found in namespace $NAMESPACE after 5 minutes"
     exit 1
 fi
 
