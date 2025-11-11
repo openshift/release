@@ -51,7 +51,20 @@ echo "OPERATORS after substitution: ${OPERATORS}"
 
 export ANSIBLE_HOST_KEY_CHECKING=False
 # deploy ztp operators (acm, lso, gitops)
+
 cd /eco-ci-cd/
+
+cat <<EOF > ansible.cfg
+    [defaults]
+    collections_path = ./collections
+    host_key_checking = False
+    force_color = True
+    roles_path = ./playbooks/compute/nto/roles:./playbooks/infra/roles
+    [ssh_connection]
+    ssh_args = -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no 
+    EOF
+cat ansible.cfg
+
 ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=$VERSION disconnected=$DISCONNECTED operators='$OPERATORS'"
 
