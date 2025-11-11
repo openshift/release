@@ -76,7 +76,9 @@ start_tunnel
 unset GOFLAGS
 export LOCATION="westus3"
 export AROHCP_ENV="development"
-./demo/01-register-sub.sh
+cd demo
+./01-register-sub.sh
+cd ..
 make -C test/
 ./test/aro-hcp-tests run-suite "rp-api-compat-all/parallel" --junit-path="${ARTIFACT_DIR}/junit.xml"
 stop_tunnel
