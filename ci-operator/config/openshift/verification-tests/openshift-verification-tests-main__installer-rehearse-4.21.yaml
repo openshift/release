@@ -50,11 +50,29 @@ tests:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-3lp2yn2/release:latest
       FEATURE_SET: TechPreviewNoUpgrade
-      SLEEP_DURATION: 2h
+      SLEEP_DURATION: 10m
       USER_PROVISIONED_DNS: "yes"
-    test:
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-usage-info
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-hosted-loki
+    - ref: ipi-install-install
+    - ref: aws-provision-public-custom-dns
+    - ref: gcp-provision-public-dns-zone-record-sets
     - ref: cucushift-installer-wait
-    workflow: openshift-e2e-aws-custom-dns
+    - ref: ipi-install-times-collection
+    - ref: nodes-readiness
+    - ref: multiarch-validate-nodes
+    - ref: cucushift-installer-check-user-provisioned-dns
+    - chain: cucushift-installer-check
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    - ref: gcp-deprovision-public-dns-zone-record-sets
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
