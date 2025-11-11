@@ -109,19 +109,5 @@ done
 
 ls -la "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml
 
-echo "Generate HTML reports from JUnit files"
-
-
-script_url=https://raw.githubusercontent.com/openshift-kni/telco5gci/refs/heads/master/j2html.py
-requirements_url=https://raw.githubusercontent.com/openshift-kni/telco5gci/refs/heads/master/requirements.txt
-
-echo "Install dependencies"
-pip install -r ${requirements_url}
-
-echo "Download script"
-curl -o /tmp/j2html.py ${script_url}
-
-python3 /tmp/j2html.py --format xml ${ARTIFACT_DIR}/junit_eco_gotests/*.xml --output ${ARTIFACT_DIR}/nto_test_report.html
-
 echo "Copy junit test reports to shared directory for reporter step"
 cp -v "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml "${SHARED_DIR}/" 2>/dev/null || echo "No junit test reports found to copy to SHARED_DIR"

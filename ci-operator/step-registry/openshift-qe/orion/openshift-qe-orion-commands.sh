@@ -18,6 +18,13 @@ fi
 git clone --branch $LATEST_TAG $ORION_REPO --depth 1
 pushd orion
 
+# Invoked from orion repo by the openshift-ci bot
+if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
+  echo "Invoked from orion repo by the openshift-ci bot, switching to PR#${PULL_NUMBER}"
+  git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
+  git switch ${PULL_NUMBER}
+fi
+
 pip install -r requirements.txt
 
 case "$ES_TYPE" in
@@ -116,5 +123,11 @@ orion_exit_status=$?
 set -e
 
 cp *.csv *.xml *.json *.txt "${ARTIFACT_DIR}/" 2>/dev/null || true
+
+if [ $orion_exit_status -eq 3 ]; then
+  echo "Orion returned exit code 3, which means there are no results to analyze."
+  echo "Exiting zero since there were no regressions found."
+  exit 0
+fi
 
 exit $orion_exit_status

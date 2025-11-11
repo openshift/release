@@ -50,6 +50,9 @@ spec:
     - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
     source: registry.redhat.io/multicluster-engine
   - mirrors:
+    - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6001/g')/acm-d
+    source: registry.stage.redhat.io/multicluster-engine
+  - mirrors:
     - $(head -n 1 "${SHARED_DIR}/mirror_registry_url" | sed 's/5000/6002/g')/openshift4/ose-oauth-proxy
     source: registry.access.redhat.com/openshift4/ose-oauth-proxy
 EOF

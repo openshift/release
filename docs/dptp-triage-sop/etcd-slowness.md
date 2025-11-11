@@ -30,19 +30,37 @@ Once inside the master we can execute the following commands:
 sudo -i
 # get etcd container id
 ETCD=`crictl ps --label io.kubernetes.container.name=etcd --quiet`
+# check the size
+crictl exec $ETCD sh -c "etcdctl endpoint status --write-out=table"
+# at this point we should unset ETCDCTL_ENDPOINTS
 # get the revision
-crictl exec $ETCD etcdctl endpoint status --write-out fields | sed -nE 's,"Revision" : ([0-9]+),\1,p'
+crictl exec $ETCD sh -c "unset ETCDCTL_ENDPOINTS && etcdctl endpoint status --write-out fields" | sed -nE 's,"Revision" : ([0-9]+),\1,p'
 # output:
 # 6031370795
-# 6031370796
-# 6031370796
 # compact the revision
-crictl exec $ETCD etcdctl compact 6031370795
+crictl exec $ETCD sh -c "unset ETCDCTL_ENDPOINTS && etcdctl compact 6031370795"
 # defrag
-crictl exec $ETCD etcdctl defrag 6031370795 --command-timeout 120s
+crictl exec $ETCD sh -c "unset ETCDCTL_ENDPOINTS && etcdctl defrag 6031370795 --command-timeout 120s"
+# verify if the size decreased
+crictl exec $ETCD sh -c "etcdctl endpoint status --write-out=table"
 ```
 
 **Important:**
 
 These commands can take a while depending on the state of the cluster, in any case you can increase
 the value of `--command-timeout` to `300` or even higher if you receive `context deadline exceeded`.
+
+All-in-one script
+-----------------
+
+We should execute these commands very carefully, but in a case where you want to execute everything together:
+
+```bash
+# from inside machine or pod
+ETCD=`crictl ps --label io.kubernetes.container.name=etcd --quiet`
+crictl exec $ETCD sh -c "etcdctl endpoint status --write-out=table"
+REV=`crictl exec $ETCD sh -c "unset ETCDCTL_ENDPOINTS && etcdctl endpoint status --write-out fields" | sed -nE 's,"Revision" : ([0-9]+),\1,p'`
+crictl exec $ETCD sh -c "unset ETCDCTL_ENDPOINTS && etcdctl compact $REV"
+crictl exec $ETCD sh -c "unset ETCDCTL_ENDPOINTS && etcdctl defrag $REV --command-timeout 120s"
+crictl exec $ETCD sh -c "etcdctl endpoint status --write-out=table"
+```

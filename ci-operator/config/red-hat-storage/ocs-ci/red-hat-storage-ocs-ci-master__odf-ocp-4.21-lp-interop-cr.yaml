@@ -1,0 +1,68 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  ocs-ci-tests:
+    name: ocs-ci-container
+    namespace: ci
+    tag: stable
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: odf-interop-aws
+  cron: 0 3,15 * * *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      FIREWATCH_CONFIG: |
+        {
+        "failure_rules":
+        [
+          {"step": "odf-prepare-cluster", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","test-initialization"]},
+          {"step": "odf-apply-storage-cluster", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","test-initialization"]},
+          {"step": "interop-tests-ocs-tests", "failure_type": "all", "classification": "Test Failure", "jira_project": "DFBUGS", "jira_assignee": "oviner@redhat.com", "group": {"name": "lp-tests", "priority": 3},"jira_additional_labels": ["!default","interop-tests"]}
+        ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.21-lp","self-managed-lp","odf-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ebenahar@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: OCSQE
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      MAP_TESTS: "true"
+      OCP_VERSION: "4.21"
+      ODF_VERSION_MAJOR_MINOR: "4.20"
+      OPERATORS: |
+        [
+            {"name": "odf-operator", "install_namespace": "openshift-storage", "target_namespaces": "!install", "operator_group": "openshift-storage-operator-group"}
+        ]
+      REPORTPORTAL_CMP: ODF-lp-interop
+      USER_TAGS: |
+        scenario odf
+      ZONES_COUNT: "3"
+    test:
+    - ref: odf-prepare-cluster
+    - ref: install-operators
+    - ref: odf-apply-storage-cluster
+    - ref: interop-tests-ocs-tests
+    workflow: firewatch-ipi-aws-cr
+zz_generated_metadata:
+  branch: master
+  org: red-hat-storage
+  repo: ocs-ci
+  variant: odf-ocp-4.21-lp-interop-cr

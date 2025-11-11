@@ -207,20 +207,19 @@ else
   RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
   QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
   VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
-  DOWNLOAD_NEW_IMAGE=false
+  DOWNLOAD_NEW_IMAGE=true
 
   # Check if we need to update the source volume
-
   for CURRENT_SOURCE_VOLUME in $(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true); do
-    if [[ -z "${CURRENT_SOURCE_VOLUME}" || "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
-      # Delete the old source volume
-      if [[ ! -z "${CURRENT_SOURCE_VOLUME}" ]]; then
+    if [[ "${CURRENT_SOURCE_VOLUME}" == "${VOLUME_NAME}" ]]; then
+      DOWNLOAD_NEW_IMAGE=false
+    # Delete the old source volume
+    else
         echo "Deleting ${CURRENT_SOURCE_VOLUME} source volume..."
         ${VIRSH} vol-delete --pool ${POOL_NAME} ${CURRENT_SOURCE_VOLUME}
-      fi
-      DOWNLOAD_NEW_IMAGE=true
     fi
   done
+
   if [[ "${DOWNLOAD_NEW_IMAGE}" == true ]]; then
     # Download the new rhcos image
     echo "Downloading new rhcos image..."

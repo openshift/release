@@ -175,21 +175,10 @@ function download_microshift_scripts() {
 }
 
 function ci_get_clonerefs() {
-    local -r go_version=$(go version | awk '{print $3}' | tr -d '[a-z]' | cut -f2 -d.)
-    if (( go_version < 24 )); then
-        # Releases that use older Go, cannot compile the most recent prow code.
-        # Following checks out last commit that specified 1.21 as required, but is still buildable with 1.20.
-        mkdir -p /tmp/prow
-        cd /tmp/prow
-        git init
-        git remote add origin https://github.com/kubernetes-sigs/prow.git
-        git fetch origin 1a7a18f054ada0ed638678c1ee742ecfc9742958
-        git reset --hard FETCH_HEAD
-    else
-        git clone --depth 1 https://github.com/kubernetes-sigs/prow.git /tmp/prow
-        cd /tmp/prow
-    fi
-    go build -mod=mod -o /tmp/clonerefs ./cmd/clonerefs
+    curl -L \
+        "https://github.com/microshift-io/prow/releases/download/nightly/clonerefs-linux-$(go env GOARCH)" \
+        -o /tmp/clonerefs
+    chmod +x /tmp/clonerefs
 }
 
 function ci_clone_src() {

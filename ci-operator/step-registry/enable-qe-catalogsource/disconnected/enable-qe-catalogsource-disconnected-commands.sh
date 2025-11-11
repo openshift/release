@@ -224,7 +224,7 @@ EOF
     insecure = true
 EOF
     run_command "cd $work_dir"
-    run_command "oc-mirror --config ${work_dir}/imageset-config.yaml docker://${MIRROR_REGISTRY_HOST} --oci-registries-config=${work_dir}/registry.conf --continue-on-error --skip-missing --dest-skip-tls --source-skip-tls"
+    run_command "oc-mirror --v1 --config ${work_dir}/imageset-config.yaml docker://${MIRROR_REGISTRY_HOST} --oci-registries-config=${work_dir}/registry.conf --continue-on-error --skip-missing --dest-skip-tls --source-skip-tls"
     echo "oc-mirror operators success"
 }
 
