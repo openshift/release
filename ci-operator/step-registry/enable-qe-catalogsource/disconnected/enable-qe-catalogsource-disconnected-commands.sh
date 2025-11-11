@@ -181,6 +181,24 @@ function mirror_optional_images () {
         exit 1
     fi
 
+    # Extract target catalog and tag from origin_index_image for oc-mirror
+    if [[ $OO_INDEX == "" ]]; then
+        # Default scenario: use original hardcoded logic (unchanged for safety)
+        target_catalog="openshift-qe-optional-operators/aosqe-index"
+        target_tag="v${kube_major}.${kube_minor}"
+    else
+        # Custom OO_INDEX scenario: extract from origin_index_image
+        if [[ "${origin_index_image}" =~ ^[^/]+/([^:]+):(.+)$ ]]; then
+            target_catalog="${BASH_REMATCH[1]}"
+            target_tag="${BASH_REMATCH[2]}"
+        else
+            echo "ERROR: Invalid OO_INDEX format for mirroring: ${OO_INDEX}"
+            echo "Expected format: registry.io/org/repo:tag"
+            echo "Example: quay.io/openshifttest/test:v1"
+            exit 1
+        fi
+    fi
+
     echo "create ImageSetConfiguration"
     cat <<EOF >${work_dir}/imageset-config.yaml
 kind: ImageSetConfiguration
@@ -188,8 +206,8 @@ apiVersion: mirror.openshift.io/v1alpha2
 mirror:
   operators:
   - catalog: "oci://${work_dir}/oci-local-catalog"
-    targetCatalog: "openshift-qe-optional-operators/aosqe-index"
-    targetTag: "v${kube_major}.${kube_minor}"
+    targetCatalog: "${target_catalog}"
+    targetTag: "${target_tag}"
 EOF
     #OPERTORS_TO_MIRROR: comma-separated values. for example: elasticsearch-operator,cincinnati-operator,file-integrity-operator
     if [[ $OPERTORS_TO_MIRROR == "" ]]; then
@@ -343,14 +361,57 @@ EOF
     fi
 }
 
+# Create ClusterCatalog for OLMv1 (Kubernetes >= 1.31)
+function create_cluster_catalog()
+{
+    # ClusterCatalog is only available in Kubernetes 1.31+ (OCP 4.18+)
+    # OCP 4.18 = Kubernetes 1.31
+    if [[ ${kube_major} -gt 1 || ${kube_minor} -ge 31 ]]; then
+        echo "create QE ClusterCatalog: $CATALOGSOURCE_NAME"
+        cat <<EOF | oc create -f -
+apiVersion: olm.operatorframework.io/v1
+kind: ClusterCatalog
+metadata:
+  name: $CATALOGSOURCE_NAME
+spec:
+  source:
+    type: Image
+    image:
+      ref: ${mirror_index_image}
+EOF
+
+        COUNTER=0
+        while [ $COUNTER -lt 600 ]
+        do
+            sleep 20
+            COUNTER=`expr $COUNTER + 20`
+            echo "waiting ${COUNTER}s"
+            # Check if ClusterCatalog Serving condition is True
+            SERVING_STATUS=`oc get clustercatalog $CATALOGSOURCE_NAME -o=jsonpath='{.status.conditions[?(@.type=="Serving")].status}' 2>/dev/null`
+            if [[ $SERVING_STATUS = "True" ]]; then
+                echo "create the QE ClusterCatalog successfully"
+                break
+            fi
+        done
+        run_command "oc get clustercatalog $CATALOGSOURCE_NAME -o yaml"
+        if [[ $SERVING_STATUS != "True" ]]; then
+            echo "!!! fail to create QE ClusterCatalog"
+            return 1
+        fi
+    else
+        echo "ClusterCatalog requires Kubernetes >= 1.31 (current: ${kube_major}.${kube_minor}), skipping..."
+        return 0
+    fi
+}
+
 function create_catalog_sources()
-{    
+{
     echo "create QE catalogsource: $CATALOGSOURCE_NAME"
     # get cluster Major.Minor version
     # since OCP 4.15, the official catalogsource use this way. OCP4.14=K8s1.27
     # details: https://issues.redhat.com/browse/OCPBUGS-31427
     if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
-        echo "the index image as the initContainer cache image)" 
+        echo "the index image as the initContainer cache image)"
         cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -372,7 +433,7 @@ spec:
       interval: 15m
 EOF
     else
-        echo "the index image as the server image" 
+        echo "the index image as the server image"
         cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -404,7 +465,7 @@ EOF
     done
     if [[ $STATUS != "READY" ]]; then
         echo "!!! fail to create QE CatalogSource"
-        # ImagePullBackOff nothing with the imagePullSecrets 
+        # ImagePullBackOff nothing with the imagePullSecrets
         # run_command "oc get operatorgroup -n openshift-marketplace"
         # run_command "oc get sa qe-app-registry -n openshift-marketplace -o yaml"
         # run_command "oc -n openshift-marketplace get secret $(oc -n openshift-marketplace get sa qe-app-registry -o=jsonpath='{.secrets[0].name}') -o yaml"
@@ -539,12 +600,25 @@ kube_major=$(oc version -o json |jq -r '.serverVersion.major')
 kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
 
 if [[ $OO_INDEX == "" ]];then
+    # Default scenario: use original hardcoded logic (unchanged for safety)
     origin_index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+    mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 else
+    # Custom OO_INDEX scenario: use dynamic logic to support custom indexes
     origin_index_image="$OO_INDEX"
-fi
 
-mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+    # Extract image path (remove registry prefix) to construct mirror_index_image
+    # Supports formats: quay.io/org/repo:tag or registry.io:port/org/repo:tag
+    if [[ "${origin_index_image}" =~ ^[^/]+/(.+)$ ]]; then
+        index_path="${BASH_REMATCH[1]}"
+        mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/${index_path}"
+    else
+        echo "ERROR: Invalid OO_INDEX format: ${OO_INDEX}"
+        echo "Expected format: registry.io/org/repo:tag"
+        echo "Example: quay.io/openshifttest/test:v1"
+        exit 1
+    fi
+fi
 echo "origin_index_image: ${origin_index_image}"
 echo "mirror_index_image: ${mirror_index_image}"
 
@@ -569,5 +643,6 @@ fi
 if [ $mirror -eq 1 ]; then
     echo "Mirror operator images as cluster is C2S or SC2S"
     mirror_optional_images
-fi 
+fi
 create_catalog_sources
+create_cluster_catalog
