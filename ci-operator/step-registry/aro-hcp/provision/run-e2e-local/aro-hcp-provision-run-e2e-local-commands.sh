@@ -33,11 +33,12 @@ unset GOFLAGS
 make install-tools
 PATH=$(go env GOPATH)/bin:$PATH
 export PATH
-make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml
+if make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml; then
+   export KUBECONFIG=$(make -s infra.svc.aks.kubeconfigfile)
+fi
 #todo until prow env pr is merged
 #make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow
 #make visualize TIMING_OUTPUT=${SHARED_DIR}/steps.yaml VISUALIZATION_OUTPUT=${ARTIFACT_DIR}/timing
-export KUBECONFIG=$(make infra.svc.aks.kubeconfigfile)
 
 PIDFILE="/tmp/svc-tunnel.pid"
 start_tunnel() {
@@ -75,5 +76,5 @@ export LOCATION="westus3"
 export AROHCP_ENV="development"
 ./demo/01-register-sub.sh
 make -C test/
-./test/aro-hcp-tests run-suite "local/parallel" --junit-path="${ARTIFACT_DIR}/junit.xml"
+./test/aro-hcp-tests run-suite "rp-api-compat-all/parallel" --junit-path="${ARTIFACT_DIR}/junit.xml"
 stop_tunnel
