@@ -147,6 +147,22 @@ podman pod rm $(podman pod ps -q)   || echo 'No podman pods to delete'
 podman stop $(podman ps -aq)        || echo 'No podman containers to stop'
 podman rm $(podman ps -aq)          || echo 'No podman containers to delete'
 rm -rf /opt/*
+
+# Find connection that owns the default gateway
+default_gw_conn=$(
+  nmcli -t -f NAME,DEVICE connection show --active |
+    grep "$(ip route | awk '/default/ {print $5; exit}')" |
+    cut -d: -f1
+)
+# Read active connection names safely into an array
+readarray -t conns < <(nmcli -t -f NAME connection show --active)
+# Loop and delete all except the default one
+for c in "${conns[@]}"; do
+  if [[ "$c" != "$default_gw_conn" ]]; then
+    echo "Deleting: $c"
+    sudo nmcli connection delete "$c"
+  fi
+done
 EOF
 
 # Override JETLAG_BRANCH to main when JETLAG_LATEST is true
