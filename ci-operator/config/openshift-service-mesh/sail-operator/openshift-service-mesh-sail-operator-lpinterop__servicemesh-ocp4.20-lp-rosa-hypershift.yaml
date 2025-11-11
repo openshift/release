@@ -1,0 +1,109 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  kiali-cypress-tests-runner:
+    name: kiali-cypress-tests
+    namespace: ci
+    tag: v2.11
+  kiali-int-tests-runner:
+    name: kiali-int-tests
+    namespace: ci
+    tag: v2.11
+  kiali-ossm-cypress-tests-runner:
+    name: kiali-ossmc-cypress-tests
+    namespace: ci
+    tag: v2.11
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: upstream-1.26
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 2Gi
+tests:
+- as: servicemesh-aws-rosa-hypershift
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "servicemesh-sail-operator-e2e-lpinterop", "failure_type": "pod_failure", "classification": "Sail e2e Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-sail-operator-e2e-lpinterop", "failure_type": "test_failure", "classification": "Sail e2e Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-istio-install", "failure_type": "all", "classification": "Infrastructure Provisioning - Istio Install", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 2}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Integration Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "test_failure", "classification": "Kiali Integration Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Cypress Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "test_failure", "classification": "Kiali Cypress Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-ossm-cypress-tests-execute", "failure_type": "pod_failure", "classification": "Kiali OSSMC Cypress Test Execution", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "servicemesh-kiali-ossm-cypress-tests-execute", "failure_type": "test_failure", "classification": "Kiali OSSMC Cypress Test Failure", "jira_project": "OSSM", "group": {"name": "lp-tests", "priority": 3}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp","rosa-hypershift-lp","servicemesh-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mkralik@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Sail Operator","QE"]'
+      FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      GINKGO_FLAGS: -v --keep-going --label-filter=smoke&&!ambient
+      ISTIO_SAMPLE_APP_VERSION: v1.26.4
+      ISTIO_VERSION: v1.26-latest
+      KIALI_VERSION: v2.11
+      NAME_PREFIX: ocpe2e
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.20"
+      OPERATORS: |
+        [
+            {"name": "servicemeshoperator3", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"}
+        ]
+      TEST_PROFILE: rosa-hcp-advanced
+      VERSION: "4.20"
+    test:
+    - ref: ipi-install-rbac
+    - ref: cucushift-hypershift-extended-health-check
+    - ref: install-operators
+    - ref: servicemesh-sail-operator-e2e-lpinterop
+    - ref: servicemesh-istio-install
+    - ref: servicemesh-kiali-int-tests-execute
+    - ref: idp-htpasswd
+    - ref: servicemesh-kiali-cypress-tests-execute
+    - ref: servicemesh-kiali-ossm-cypress-tests-execute
+    - ref: firewatch-report-issues
+    workflow: rosa-lifecycle-advanced
+zz_generated_metadata:
+  branch: lpinterop
+  org: openshift-service-mesh
+  repo: sail-operator
+  variant: servicemesh-ocp4.20-lp-rosa-hypershift
