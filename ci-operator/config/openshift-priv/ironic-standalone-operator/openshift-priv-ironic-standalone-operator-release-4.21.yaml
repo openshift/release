@@ -1,8 +1,4 @@
 base_images:
-  dev-scripts:
-    name: test
-    namespace: ocp-kni
-    tag: dev-scripts
   ocp_4.21_base-rhel9:
     name: 4.21-priv
     namespace: ocp-private
@@ -11,9 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.21
+binary_build_commands: make build
 build_root:
   from_repository: true
-canonical_go_repository: github.com/openshift/image-registry
+canonical_go_repository: github.com/openshift/ironic-standalone-operator
 images:
 - dockerfile_path: Dockerfile.ocp
   inputs:
@@ -23,7 +20,7 @@ images:
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: docker-registry
+  to: ironic-standalone-operator
 promotion:
   to:
   - disabled: true
@@ -36,15 +33,28 @@ releases:
       namespace: ocp-private
   latest:
     integration:
+      include_built_images: true
       name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: (^(docs|examples|config)/)|(\.md$)|((^|/)OWNERS$)
+- as: lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache make lint
+  container:
+    from: src
+  skip_if_only_changed: (^(docs|examples)/)|(\.md$)|((^|/)OWNERS$)
 zz_generated_metadata:
   branch: release-4.21
   org: openshift-priv
-  repo: image-registry
-  variant: periodics
+  repo: ironic-standalone-operator
