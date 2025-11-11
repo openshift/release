@@ -2,37 +2,37 @@ base_images:
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
-  stolostron_builder_go1.18-linux:
+    tag: "9"
+  stolostron_builder_go1.24-linux:
     name: builder
     namespace: stolostron
-    tag: go1.18-linux
+    tag: go1.24-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.18-linux
+    tag: go1.22-linux
 images:
 - dockerfile_path: operator/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.18-linux:
+    stolostron_builder_go1.24-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: multicluster-global-hub-operator
 - dockerfile_path: manager/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.18-linux:
+    stolostron_builder_go1.24-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: multicluster-global-hub-manager
 - dockerfile_path: agent/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.18-linux:
+    stolostron_builder_go1.24-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: multicluster-global-hub-agent
 promotion:
   to:
@@ -41,12 +41,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.8"
+      name: "4.18"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.8"
+      name: "4.18"
       namespace: ocp
 resources:
   '*':
@@ -64,12 +64,21 @@ tests:
     make unit-tests
   container:
     from: src
+  skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
+- as: test-integration
+  commands: |
+    export SELF="make"
+    export HOME="/tmp"
+    make integration-test
+  container:
+    from: src
+  skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
 - as: test-e2e
-  skip_if_only_changed: ^doc/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
+  skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
   steps:
     env:
       AWS_CREDENTIALS_SECRET: ocm-hub-of-hubs-aws-kind
-      AWS_INSTANCE_TYPE: m5ad.xlarge
+      AWS_INSTANCE_TYPE: m5ad.2xlarge
     post:
     - ref: ocm-e2e-kind-destroy
     pre:
@@ -102,25 +111,32 @@ tests:
 - as: sonarcloud
   commands: |
     export TMP_BIN="/tmp/bin"
-    export HOME="/tmp"
+    export mcgh_dir=$(mktemp -d -t mcgh-XXXXX)
+    export HOME="$mcgh_dir"
+    export XDG_CONFIG_HOME=$HOME/.config
+    mkdir -p "${XDG_CONFIG_HOME}"
     make setup_envtest
     export KUBEBUILDER_ASSETS="$(${TMP_BIN}/setup-envtest use --use-env -p path)"
     export SELF="make -f /opt/build-harness/Makefile.prow"
-    export SONAR_GO_TEST_ARGS="-coverpkg=./... ./pkg/... ./operator/... ./agent/... ./manager/..."
+    export SONAR_GO_TEST_ARGS="-coverpkg=./... ./pkg/... ./operator/... ./agent/... ./manager/... ./test/integration/..."
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+  skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
 - as: sonarcloud-post-submit
   commands: |
     export TMP_BIN="/tmp/bin"
-    export HOME="/tmp"
+    export mcgh_dir=$(mktemp -d -t mcgh-XXXXX)
+    export HOME="$mcgh_dir"
+    export XDG_CONFIG_HOME=$HOME/.config
+    mkdir -p "${XDG_CONFIG_HOME}"
     make setup_envtest
     export KUBEBUILDER_ASSETS="$(${TMP_BIN}/setup-envtest use --use-env -p path)"
     export SELF="make -f /opt/build-harness/Makefile.prow"
-    export SONAR_GO_TEST_ARGS="-coverpkg=./... ./pkg/... ./operator/... ./agent/... ./manager/..."
+    export SONAR_GO_TEST_ARGS="-coverpkg=./... ./pkg/... ./operator/... ./agent/... ./manager/... ./test/integration/..."
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -128,6 +144,7 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+  skip_if_only_changed: ^operator/bundle|^\.github|^\.tekton|^tools/|^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.py$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS)$
 - as: publish-multicluster-global-hub-operator
   postsubmit: true
   steps:
@@ -154,34 +171,34 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: release-2160-operator-image-mirror
+- as: release-216-operator-image-mirror
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: multicluster-global-hub-operator
     env:
       IMAGE_REPO: multicluster-global-hub-operator
-      IMAGE_TAG: v0.6.0
+      IMAGE_TAG: v1.7.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: release-2160-manager-image-mirror
+- as: release-216-manager-image-mirror
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: multicluster-global-hub-manager
     env:
       IMAGE_REPO: multicluster-global-hub-manager
-      IMAGE_TAG: v0.6.0
+      IMAGE_TAG: v1.7.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: release-2160-agent-image-mirror
+- as: release-216-agent-image-mirror
   postsubmit: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: multicluster-global-hub-agent
     env:
       IMAGE_REPO: multicluster-global-hub-agent
-      IMAGE_TAG: v0.6.0
+      IMAGE_TAG: v1.7.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
