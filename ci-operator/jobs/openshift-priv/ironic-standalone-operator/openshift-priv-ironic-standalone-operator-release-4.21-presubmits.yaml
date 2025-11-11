@@ -1,21 +1,23 @@
 presubmits:
-  openshift-priv/os:
+  openshift-priv/ironic-standalone-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.17$
-    - ^release-4\.17-
-    cluster: build09
+    - ^release-4\.21$
+    - ^release-4\.21-
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-os-release-4.17-images
-    path_alias: github.com/openshift/os
+    name: pull-ci-openshift-priv-ironic-standalone-operator-release-4.21-images
+    path_alias: github.com/openshift/ironic-standalone-operator
     rerun_command: /test images
     spec:
       containers:
@@ -51,9 +53,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -67,23 +66,23 @@ presubmits:
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.17$
-    - ^release-4\.17-
-    cluster: build04
-    context: ci/prow/rhcos-9-build-test-metal
+    - ^release-4\.21$
+    - ^release-4\.21-
+    cluster: build05
+    context: ci/prow/lint
     decorate: true
     decoration_config:
-      skip_cloning: true
-      timeout: 3h0m0s
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
-      devices.kubevirt.io/kvm: "1"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-os-release-4.17-rhcos-9-build-test-metal
-    path_alias: github.com/openshift/os
-    rerun_command: /test rhcos-9-build-test-metal
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    name: pull-ci-openshift-priv-ironic-standalone-operator-release-4.21-lint
+    path_alias: github.com/openshift/ironic-standalone-operator
+    rerun_command: /test lint
+    skip_if_only_changed: (^(docs|examples)/)|(\.md$)|((^|/)OWNERS$)
     spec:
       containers:
       - args:
@@ -91,7 +90,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=rhcos-9-build-test-metal
+        - --target=lint
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -118,9 +117,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -130,27 +126,27 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhcos-9-build-test-metal,?($|\s.*)
+    trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-4\.17$
-    - ^release-4\.17-
-    cluster: build04
-    context: ci/prow/rhcos-9-build-test-qemu
+    - ^release-4\.21$
+    - ^release-4\.21-
+    cluster: build05
+    context: ci/prow/test
     decorate: true
     decoration_config:
-      skip_cloning: true
-      timeout: 4h0m0s
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
       ci.openshift.io/generator: prowgen
-      devices.kubevirt.io/kvm: "1"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-os-release-4.17-rhcos-9-build-test-qemu
-    path_alias: github.com/openshift/os
-    rerun_command: /test rhcos-9-build-test-qemu
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    name: pull-ci-openshift-priv-ironic-standalone-operator-release-4.21-test
+    path_alias: github.com/openshift/ironic-standalone-operator
+    rerun_command: /test test
+    skip_if_only_changed: (^(docs|examples|config)/)|(\.md$)|((^|/)OWNERS$)
     spec:
       containers:
       - args:
@@ -158,7 +154,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=rhcos-9-build-test-qemu
+        - --target=test
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -185,9 +181,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -197,69 +190,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhcos-9-build-test-qemu,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.17$
-    - ^release-4\.17-
-    cluster: build09
-    context: ci/prow/validate
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-os-release-4.17-validate
-    path_alias: github.com/openshift/os
-    rerun_command: /test validate
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --target=validate
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )validate,?($|\s.*)
+    trigger: (?m)^/test( | .* )test,?($|\s.*)
