@@ -41,13 +41,15 @@ export ANSIBLE_TIMEOUT=600
 
 # Create VERSION_TAG for TALM operator by replacing dots with dashes
 # Example: VERSION="4.19" becomes VERSION_TAG="4-19"
-export VERSION_TAG=$(echo "${VERSION}" | tr '.' '-')
+VERSION_TAG=$(echo "${VERSION}" | tr '.' '-')
+export VERSION_TAG
 echo "VERSION_TAG=${VERSION_TAG}"
 
 # Substitute VERSION_TAG in OPERATORS variable for TALM operator configuration
 OPERATORS=$(echo "${OPERATORS}" | envsubst '${VERSION_TAG}')
 echo "OPERATORS after substitution: ${OPERATORS}"
 
+export ANSIBLE_HOST_KEY_CHECKING=False
 # deploy ztp operators (acm, lso, gitops)
 cd /eco-ci-cd/
 ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deployment/build-inventory.py \
@@ -55,14 +57,14 @@ ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deplo
 
 # configure lso 
 ansible-playbook playbooks/ran/configure-lvm-storage.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH}"
+    --extra-vars "kubeconfig=${KUBECONFIG_PATH}" -vv
 
 # configure acm
 ansible-playbook playbooks/ran/configure-acm.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=$VERSION"
+    --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=$VERSION" -vv
 
 # configure kustomize plugin
 ansible-playbook playbooks/ran/configure-kustomize-plugin.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=v$VERSION"
+    --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=v$VERSION" -vv
 
 
