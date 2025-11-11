@@ -287,19 +287,19 @@ data:
     work_dir = "/opt/confidential-containers/attestation-service"
     policy_engine = "opa"
 
-    [attestation_service.attestation_token_broker]
-    type = "Ear"
-    policy_dir = "/opt/confidential-containers/attestation-service/policies"
+      [attestation_service.attestation_token_broker]
+      type = "Ear"
+      policy_dir = "/opt/confidential-containers/attestation-service/policies"
 
-    [attestation_service.attestation_token_config]
-    duration_min = 5
+      [attestation_service.attestation_token_config]
+      duration_min = 5
 
-    [attestation_service.rvps_config]
-    type = "BuiltIn"
+      [attestation_service.rvps_config]
+      type = "BuiltIn"
 
-    [attestation_service.rvps_config.storage]
-    type = "LocalJson"
-    file_path = "/opt/confidential-containers/rvps/reference-values/reference-values.json"
+        [attestation_service.rvps_config.storage]
+        type = "LocalJson"
+        file_path = "/opt/confidential-containers/rvps/reference-values/reference-values.json"
 
     [[plugins]]
     name = "resource"
@@ -325,7 +325,26 @@ data:
     [
     ]
 EOF
-}
+# internal docs suitable for testing with the kbs-client
+#   reference-values.json: |
+#    [
+#      {
+#        "name": "svn",
+#        "expiration": "2027-01-01T00:00:00Z",
+#        "value" : 1
+#      },
+#      {
+#        "name": "major_version",
+#        "expiration": "2027-01-01T00:00:00Z",
+#        "value" : 1
+#      },
+#      {
+#        "name": "minimum_minor_version",
+#        "expiration": "2027-01-01T00:00:00Z",
+#        "value" : 4
+#      }
+#    ]
+#}
 
 # Function to create KBS resource secret
 # Parameters:
@@ -373,6 +392,8 @@ create_resource_policy_cm() {
 
     if [[ "${default_allow}" == "true" ]]; then
         echo "Using permissive resource policy (default allow = true)..."
+        # Permissive policy for development/testing
+        # WARNING: This allows all resource requests - use only for testing!
         cat > "${filename}" << 'EOF'
 apiVersion: v1
 kind: ConfigMap
@@ -380,11 +401,8 @@ metadata:
   name: resource-policy
   namespace: trustee-operator-system
 data:
-  policy.rego: |
+  policy.rego:
     package policy
-
-    # Permissive policy for development/testing
-    # WARNING: This allows all resource requests - use only for testing!
     default allow = true
 EOF
     else
@@ -448,6 +466,7 @@ create_attestation_token_secret() {
 
 # Function to create attestation policy ConfigMap
 create_attestation_policy_cm() {
+    # does not match internal docs
     echo "Creating attestation policy ConfigMap..."
     cat > attestation-policy.yaml << EOF
 apiVersion: v1
@@ -1188,12 +1207,10 @@ create_kbsconfig_yaml "${TRUSTEE_NAMESPACE}" "${KBSCONFIG_OUTPUT_FILE}" "${KBS_S
 # Apply KbsConfig custom resource
 if resource_exists "kbsconfig" "kbsconfig"; then
     echo "KbsConfig 'kbsconfig' already exists, updating..."
-    oc apply -f kbsconfig.yaml
 else
     echo "Creating new KbsConfig 'kbsconfig'..."
-    oc apply -f kbsconfig.yaml
-    echo "Created KbsConfig custom resource"
 fi
+oc apply -f kbsconfig.yaml
 
 
 # Create optional TDX config map for Intel Trust Domain Extensions
