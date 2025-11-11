@@ -158,7 +158,7 @@ default_gw_conn=$(
 readarray -t conns < <(nmcli -t -f NAME connection show --active)
 # Loop and delete all except the default one
 for c in "${conns[@]}"; do
-  if [[ "$c" != "$default_gw_conn" ]]; then
+  if [[ "$c" != "$default_gw_conn" && "$c" != "lo" && "$c" != "cni-podman0" ]]
     echo "Deleting: $c"
     sudo nmcli connection delete "$c"
   fi
