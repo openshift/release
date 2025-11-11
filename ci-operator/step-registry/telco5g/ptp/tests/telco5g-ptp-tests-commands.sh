@@ -371,6 +371,13 @@ soaktest:
     desc: "The test measures PTP CPU usage and fails if >15mcores"
 EOF
 
+
+# Setup log collection with test markers
+export COLLECT_POD_LOGS=${COLLECT_POD_LOGS:-true}
+export LOG_TEST_MARKERS=true
+export LOG_ARTIFACTS_DIR="${ARTIFACT_DIR}/pod-logs"
+mkdir -p $LOG_ARTIFACTS_DIR
+
 # Set output directory
 export JUNIT_OUTPUT_DIR=${ARTIFACT_DIR}
 
