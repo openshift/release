@@ -62,8 +62,61 @@ if ! (oc get clusteroperator console --kubeconfig=${KUBECONFIG}) ; then
   exit 0
 fi
 
+# Function to monitor memory usage in the background
+function monitorMemory {
+  local memory_log="${ARTIFACT_DIR}/memory-usage.log"
+  local oom_log="${ARTIFACT_DIR}/oom-events.log"
+  local interval=5  # Log every 5 seconds
+  
+  echo "Starting memory monitoring (logging every ${interval}s to ${memory_log})"
+  echo "=== Memory Monitoring Started at $(date) ===" > "${memory_log}"
+  echo "=== OOM Events Monitoring Started at $(date) ===" > "${oom_log}"
+  
+  # Capture initial dmesg state to detect new OOM events
+  dmesg -T > "${ARTIFACT_DIR}/dmesg-initial.log" 2>&1 || echo "dmesg not available" > "${ARTIFACT_DIR}/dmesg-initial.log"
+  
+  while true; do
+    echo "--- $(date) ---" >> "${memory_log}"
+    free -h >> "${memory_log}" 2>&1
+    echo "" >> "${memory_log}"
+    echo "Memory details:" >> "${memory_log}"
+    cat /proc/meminfo | grep -E "MemTotal|MemFree|MemAvailable|Cached|SwapTotal|SwapFree" >> "${memory_log}" 2>&1
+    echo "" >> "${memory_log}"
+    echo "Top 10 memory consuming processes:" >> "${memory_log}"
+    ps aux --sort=-%mem | head -n 11 >> "${memory_log}" 2>&1
+    echo "" >> "${memory_log}"
+    
+    # Check for OOM events in dmesg
+    if dmesg -T 2>/dev/null | grep -i "out of memory\|oom-kill\|killed process" | tail -20 >> "${oom_log}" 2>&1; then
+      echo "$(date): OOM event detected!" >> "${memory_log}"
+    fi
+    
+    sleep "${interval}"
+  done
+}
+
 # Function to copy artifacts to the artifact directory after test run.
 function copyArtifacts {
+  echo "=== Cleanup and Final Memory State ==="
+  
+  # Capture final memory state
+  echo "Final memory state:" > "${ARTIFACT_DIR}/memory-final.log"
+  free -h >> "${ARTIFACT_DIR}/memory-final.log" 2>&1
+  echo "" >> "${ARTIFACT_DIR}/memory-final.log"
+  df -h >> "${ARTIFACT_DIR}/memory-final.log" 2>&1
+  
+  # Capture final dmesg to check for OOM kills
+  echo "Capturing final dmesg for OOM analysis..."
+  dmesg -T > "${ARTIFACT_DIR}/dmesg-final.log" 2>&1 || echo "dmesg not available" > "${ARTIFACT_DIR}/dmesg-final.log"
+  dmesg -T 2>/dev/null | grep -i "out of memory\|oom-kill\|killed process" > "${ARTIFACT_DIR}/oom-summary.log" 2>&1 || echo "No OOM events found in dmesg" > "${ARTIFACT_DIR}/oom-summary.log"
+  
+  # Stop memory monitoring if it's running
+  if [ ! -z "${MEMORY_MONITOR_PID:-}" ]; then
+    echo "Stopping memory monitor (PID: ${MEMORY_MONITOR_PID})"
+    kill "${MEMORY_MONITOR_PID}" 2>/dev/null || true
+    wait "${MEMORY_MONITOR_PID}" 2>/dev/null || true
+  fi
+  
   if [ -d "/tmp/monitoring-plugin/web/cypress/screenshots/" ]; then
     cp -r /tmp/monitoring-plugin/web/cypress/screenshots/ "${ARTIFACT_DIR}/screenshots"
     echo "Screenshots copied successfully."
@@ -76,6 +129,8 @@ function copyArtifacts {
   else
     echo "Directory videos does not exist. Nothing to copy."
   fi
+  
+  echo "Artifacts and memory logs collected."
 }
 
 ## Add IDP for testing
@@ -167,14 +222,18 @@ else
   exit 0
 fi
 
+# Start memory monitoring in the background
+monitorMemory &
+MEMORY_MONITOR_PID=$!
+echo "Memory monitor started with PID: ${MEMORY_MONITOR_PID}"
+
 # Install npm modules
 ls -ltr
 echo "Installing npm dependencies..."
 cd web || exit 0
 ls -ltr
+
 npm install || true
 
-# Run the Cypress tests
-echo "Running Cypress tests..."
 npm run test-cypress-incidents || true
-
+# npm run test-cypress-incidents-regression || true
