@@ -57,49 +57,19 @@ trap 'cleanup_ssh' EXIT
 PROXY_EOF
     fi
     ;;
-
-(vault)
-    if [ -z "${VAULT_ENV_PATH}" ]; then
-        echo "VAULT_ENV_PATH must be set when KUBECONFIG_ORIGIN=vault"
-        exit 1
-    fi
-
-    # Function to fetch a secret with retries
-    fetch_from_vault() {
-        local path="$1"
-        local dest="$2"
-        local retries=3
-        local count=0
-        local delay=5
-
-        until [ $count -ge $retries ]; do
-            if vault kv get -field=value "$path" > "$dest" 2>/dev/null; then
-                return 0
-            fi
-            echo "Failed to fetch $path from Vault, retrying in $delay seconds..."
-            count=$((count+1))
-            sleep $delay
-        done
-
-        echo "ERROR: Unable to fetch $path from Vault after $retries attempts."
-        return 1
-    }
+  (vault)
+    typeset srcFile='' tgtFile=''
 
     for tgtFile in kube{admin-password,config}; do
-        srcFile="${tgtFile}${KCFG_SRC_SFX:+--${KCFG_SRC_SFX}}"
-        fetch_from_vault "${VAULT_ENV_PATH}/${srcFile}" "${SHARED_DIR}/${tgtFile}"
-
-        # Optional minimal kubeconfig for CI workflows
-        [ "${tgtFile}" = kubeconfig ] && cp "${SHARED_DIR}/${tgtFile}" "${SHARED_DIR}/${tgtFile}-minimal"
+        srcFile="${tgtFile}${KCFG_SRC_SFX:+"--${KCFG_SRC_SFX}"}"
+        if [ -r "${CLUSTER_PROFILE_DIR}/${srcFile}" ]; then
+            cp "${CLUSTER_PROFILE_DIR}/${srcFile}" "${SHARED_DIR}/${tgtFile}"
+            [ "${tgtFile}" = kubeconfig ] && cp "${CLUSTER_PROFILE_DIR}/${srcFile}" "${SHARED_DIR}/${tgtFile}-minimal"
+        fi
     done
-
-    export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-
     ;;
-
   (*)
-    echo "Unsupported KUBECONFIG_ORIGIN='${KUBECONFIG_ORIGIN}'"
-    exit 1
+    echo "Unsupported setting \`KUBECONFIG_ORIGIN=${KUBECONFIG_ORIGIN@Q}\`."
     ;;
 esac
 
