@@ -1,0 +1,71 @@
+base_images:
+  base:
+    name: "4.21"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21: {}
+  to: tls-scanner-tool
+promotion: {}
+releases:
+  initial:
+    integration:
+      name: "4.21"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: run-scanner-on-cluster
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.16"
+  steps:
+    test:
+    - as: run-scanner
+      commands: |-
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        mkdir -p "${ARTIFACT_DIR}/tls-scanner"
+
+        /usr/local/bin/tls-scanner \
+          --all-pods \
+          --csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv" \
+          --log-file "${ARTIFACT_DIR}/tls-scanner/scanner.log"
+      dependencies:
+      - env: PULL_SPEC_TLS_SCANNER_TOOL
+        name: tls-scanner-tool
+      from: tls-scanner-tool
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: tls-scanner
