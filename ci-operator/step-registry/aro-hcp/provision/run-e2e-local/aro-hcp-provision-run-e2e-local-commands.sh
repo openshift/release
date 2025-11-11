@@ -34,6 +34,8 @@ make install-tools
 PATH=$(go env GOPATH)/bin:$PATH
 export PATH
 if make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml; then
+   #generates some cache outputs so running twice .
+   make -s infra.svc.aks.kubeconfigfile
    export KUBECONFIG=$(make -s infra.svc.aks.kubeconfigfile)
 fi
 #todo until prow env pr is merged
