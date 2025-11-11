@@ -827,7 +827,7 @@ case $CLUSTER_TYPE in
     max=1
     ;;
   *)
-    max=3
+    max=1
     ;;
 esac
 ret=4
