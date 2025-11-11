@@ -42,7 +42,7 @@ chain:
       requests:
         cpu: 300m
         memory: 500Mi
-  - as: e2e-kueue
+  - as: e2e-kueue-operator
     cli: latest
     env:
     - name: CONTAINER_IMAGE
@@ -50,7 +50,25 @@ chain:
     commands: |
       source "${SHARED_DIR}/env"
       echo "Running tests with CONTAINER_IMAGE=${CONTAINER_IMAGE}"
-      make e2e-ci-test
+      make e2e-ci-operator-test
+      mkdir ${ARTIFACT_DIR}/junit
+      cp report.xml ${ARTIFACT_DIR}/junit/
+    from: kueue-operator-src
+    resources:
+      requests:
+        cpu: 300m
+        memory: 500Mi
+  - as: e2e-kueue-operand
+    cli: latest
+    env:
+    - name: CONTAINER_IMAGE
+      default: ""
+    commands: |
+      source "${SHARED_DIR}/env"
+      echo "Running tests with CONTAINER_IMAGE=${CONTAINER_IMAGE}"
+      make e2e-ci-operand-test
+      mkdir ${ARTIFACT_DIR}/junit
+      cp report.xml ${ARTIFACT_DIR}/junit/
     from: kueue-operator-src
     resources:
       requests:
