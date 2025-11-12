@@ -76,7 +76,8 @@ images:
   to: grafana-dashboard-loader
 promotion:
   to:
-  - name: "2.16"
+  - disabled: true
+    name: "2.16"
     namespace: stolostron
 resources:
   '*':
@@ -87,56 +88,12 @@ resources:
       memory: 1Gi
 test_binary_build_commands: "true"
 tests:
-- as: ocm-ci-rbac
-  steps:
-    workflow: ocm-ci-rbac
-- as: pr-image-mirror-multicluster-observability-operator
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: multicluster-observability-operator
-    env:
-      IMAGE_REPO: multicluster-observability-operator
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
-- as: pr-image-mirror-rbac-query-proxy
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: rbac-query-proxy
-    env:
-      IMAGE_REPO: rbac-query-proxy
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
-- as: pr-image-mirror-endpoint-monitoring-operator
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: endpoint-monitoring-operator
-    env:
-      IMAGE_REPO: endpoint-monitoring-operator
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
-- as: pr-image-mirror-grafana-dashboard-loader
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: grafana-dashboard-loader
-    env:
-      IMAGE_REPO: grafana-dashboard-loader
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
-- as: pr-image-mirror-metrics-collector
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: metrics-collector
-    env:
-      IMAGE_REPO: metrics-collector
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: test-unit
   commands: |
     export SELF="make"
     VERBOSE="-v" make unit-tests
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: e2e-kind
   steps:
     env:
@@ -177,9 +134,8 @@ tests:
           memory: 200Mi
     workflow: ocm-e2e-kind
 - as: test-e2e
-  skip_if_only_changed: ^docs/|hack/|^\.tekton/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
+  skip_if_only_changed: ^docs/|hack/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO)$
   steps:
-    allow_skip_on_success: true
     dependencies:
       COMPONENT_IMAGE_REF: multicluster-observability-operator
     env:
@@ -189,7 +145,6 @@ tests:
       CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
       CLUSTERPOOL_HUB_FILTER: sno-4xlarge-420
       CLUSTERPOOL_LIFETIME: 1h
-      CLUSTERPOOL_MANAGED_COUNT: "1"
       CLUSTERPOOL_MANAGED_FILTER: sno-420
       COMPONENT_NAME: multicluster-observability-operator
       DEPLOY_HUB_ADDITIONAL_YAML: |
@@ -218,22 +173,9 @@ tests:
         ZDogU2VydmljZUFjY291bnQKICBuYW1lOiBtdWx0aWNsdXN0ZXItb2JzZXJ2YWJpbGl0eS1vcGVy
         YXRvcgogIG5hbWVzcGFjZTogb3Blbi1jbHVzdGVyLW1hbmFnZW1lbnQKLS0tCg==
       PIPELINE_STAGE: dev
-    post:
-    - as: obs-must-gather
-      best_effort: true
-      cli: latest
-      commands: oc adm must-gather --image=registry.redhat.io/rhacm2/acm-must-gather-rhel9:v2.12
-        /usr/bin/gather_observability_log --dest-dir=${ARTIFACT_DIR}/must-gather --insecure-skip-tls-verify
-      from: base-tests
-      optional_on_success: true
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 20m0s
     test:
     - as: e2e
       commands: |
-        KUBECONFIG=${SHARED_DIR}/hub-1.kc oc cm attach cluster --cluster managed --cluster-kubeconfig ${SHARED_DIR}/managed-1.kc
         echo "ENDPOINT_MONITORING_OPERATOR_IMAGE_REF=$ENDPOINT_MONITORING_OPERATOR_IMAGE_REF"
         echo "GRAFANA_DASHBOARD_LOADER_IMAGE_REF=$GRAFANA_DASHBOARD_LOADER_IMAGE_REF"
         echo "METRICS_COLLECTOR_IMAGE_REF=$METRICS_COLLECTOR_IMAGE_REF"
@@ -257,13 +199,168 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
-- as: fast-forward
+- as: publish-multicluster-observability-operator
+  postsubmit: true
+  run_if_changed: ^(operators/multiclusterobservability/.*|operators/pkg/.*|REMEDIATE.md|pkg/.*)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-observability-operator
+    env:
+      IMAGE_REPO: multicluster-observability-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="multicluster-observability-operator"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - collection: ""
+        mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-rbac-query-proxy
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: rbac-query-proxy
     env:
-      DESTINATION_BRANCH: release-2.16
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: rbac-query-proxy
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="rbac-query-proxy"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - collection: ""
+        mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-endpoint-monitoring-operator
+  postsubmit: true
+  run_if_changed: ^(operators/endpointmetrics/.*|operators/pkg/.*|REMEDIATE.md|pkg/.*)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: endpoint-monitoring-operator
+    env:
+      IMAGE_REPO: endpoint-monitoring-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="endpoint-monitoring-operator"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - collection: ""
+        mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-observability-e2e-test
+  postsubmit: true
+  run_if_changed: ^(tests/.*|REMEDIATE.md)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: observability-e2e-test
+    env:
+      IMAGE_REPO: observability-e2e-test
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="observability-e2e-test"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - collection: ""
+        mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-metrics-collector
+  postsubmit: true
+  run_if_changed: ^(collectors/metrics/.*|REMEDIATE.md|pkg/.*)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: metrics-collector
+    env:
+      IMAGE_REPO: metrics-collector
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="metrics-collector"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - collection: ""
+        mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-grafana-dashboard-loader
+  postsubmit: true
+  run_if_changed: ^(loaders/dashboards/.*|REMEDIATE.md|pkg/.*)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grafana-dashboard-loader
+    env:
+      IMAGE_REPO: grafana-dashboard-loader
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="grafana-dashboard-loader"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - collection: ""
+        mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.16
   org: stolostron
   repo: multicluster-observability-operator
