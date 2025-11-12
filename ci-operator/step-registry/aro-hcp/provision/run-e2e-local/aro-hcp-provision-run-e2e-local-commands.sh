@@ -35,8 +35,8 @@ PATH=$(go env GOPATH)/bin:$PATH
 export PATH
 if make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml; then
    #generates some cache outputs so running twice .
-   make -s infra.svc.aks.kubeconfigfile
-   export KUBECONFIG=$(make -s infra.svc.aks.kubeconfigfile)
+   make -C dev-infrastructure/ svc.aks.kubeconfig SVC_KUBECONFIG_FILE=../kubeconfig
+   export KUBECONFIG=kubeconfig
 fi
 #todo until prow env pr is merged
 #make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow
