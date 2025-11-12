@@ -34,6 +34,14 @@ echo CLUSTER_NAME=${CLUSTER_NAME}
 # Set kubeconfig path
 KUBECONFIG_PATH="/home/telcov10n/project/generated/kni-qe-99/auth/kubeconfig"
 
+# Extract and configure SSH key for Ansible to connect to masters
+echo "Set up SSH key configuration for Ansible"
+PROJECT_DIR="/tmp"
+grep ansible_ssh_private_key -A 100 "${SHARED_DIR}/all" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "${PROJECT_DIR}/ansible_ssh_key"
+chmod 600 "${PROJECT_DIR}/ansible_ssh_key"
+export ANSIBLE_PRIVATE_KEY_FILE="${PROJECT_DIR}/ansible_ssh_key"
+echo "SSH key configured at: ${ANSIBLE_PRIVATE_KEY_FILE}"
+
 # Configure Ansible SSH settings for connection resilience
 export ANSIBLE_SSH_RETRIES=3
 export ANSIBLE_TIMEOUT=600
@@ -45,7 +53,7 @@ export VERSION_TAG
 echo "VERSION_TAG=${VERSION_TAG}"
 
 # Substitute VERSION_TAG in OPERATORS variable for TALM operator configuration
-OPERATORS=$(echo "${OPERATORS}" | envsubst '${VERSION_TAG}')
+OPERATORS=$(echo "${OPERATORS}" | sed "s/\${VERSION_TAG}/${VERSION_TAG}/g")
 echo "OPERATORS after substitution: ${OPERATORS}"
 
 export ANSIBLE_HOST_KEY_CHECKING=False
@@ -58,6 +66,7 @@ cat <<EOF > ansible.cfg
 collections_path = ./collections
 host_key_checking = False
 force_color = True
+private_key_file = ${PROJECT_DIR}/ansible_ssh_key
 [ssh_connection]
 ssh_args = -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ConnectTimeout=30
 EOF
