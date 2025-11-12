@@ -95,6 +95,18 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
+- as: regression-clusterinfra-cluster-machine-approver
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: gcp
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-tqjnh8k/release:latest
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: machine-approver&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CMA
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: e2e-aws-capi-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
