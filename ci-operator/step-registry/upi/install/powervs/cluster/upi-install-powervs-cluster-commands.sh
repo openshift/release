@@ -456,6 +456,7 @@ fix_user_permissions
 build_upi_cluster
 echo "Finished, starting cleanup '$(date)'"
 
+<<<<<<< HEAD
 # Kill any running processes
 pkill terraform || true
 pkill ibmcloud || true
@@ -466,3 +467,7 @@ pkill scp || true
 echo "Remaining Processes"
 ps -ef || true
 echo "Done, cleanup '$(date)'"
+=======
+echo "Successfully created the PowerVS cluster"
+exit 0
+>>>>>>> 88936c0a672 (MULTIARCH-5196: p-px added exit 0 to UPI)
