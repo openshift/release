@@ -1,0 +1,23 @@
+ref:
+  as: egress-loki-query-range
+  from: cli
+  commands: egress-loki-query-range-commands.sh
+  grace_period: 2m0s
+  timeout: 30m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  env:
+  - name: LOKI_NAMESPACE
+    default: netobserv
+  - name: LOKI_SERVICE
+    default: loki
+  - name: LOKI_QUERY
+    default: '{job="flowlogs-pipeline"}'
+  - name: LOKI_STEP
+    default: 30s
+  documentation: |-
+    Queries Loki for a time window spanning from the recorded e2e start epoch
+    (saved by egress-record-e2e-start in $SHARED_DIR/e2e_start_epoch) to the current time.
+    Saves JSON output to $ARTIFACT_DIR/loki-query-range.json and fails if empty.
