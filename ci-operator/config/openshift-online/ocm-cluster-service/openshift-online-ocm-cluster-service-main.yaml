@@ -1,9 +1,29 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
 binary_build_commands: make
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.24-nofips-openshift-4.19
+images:
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY src/ /opt/app-root/src
+    WORKDIR /opt/app-root/src/ocm-cluster-service
+    USER root
+    RUN dnf install -y git go make jq
+    RUN dnf clean all
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/openshift-online/ocm-cluster-service
+  to: golang-plus
 promotion:
   to:
   - name: "4.19"
