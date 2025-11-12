@@ -8,8 +8,8 @@ oc create ns nfs-provisioner
 
 echo "INFO: Step2: Deploy nfs-provisioner."
 # Make sure nfs-provisioner deployed on the same node which changed security context
-worker0=`oc get nodes --show-labels |grep worker|grep -v SchedulingDisabled|awk {'print $6'}|head -1|awk -F ',' '{ORS="\n"; for(i=1;i<=NF;i++) print $i}' | grep hostname | awk -F '=' '{print $NF}'`
-oc annotate ns nfs-provisioner scheduler.alpha.kubernetes.io/node-selector=kubernetes.io/hostname=${worker0} --overwrite
+worker0=$(oc get nodes --show-labels |grep worker|grep -v SchedulingDisabled|awk '{print $6}'|head -1|awk -F ',' '{ORS="\n"; for(i=1;i<=NF;i++) print $i}' | grep hostname | awk -F '=' '{print $NF}')
+oc annotate ns nfs-provisioner scheduler.alpha.kubernetes.io/node-selector=kubernetes.io/hostname="${worker0}" --overwrite
 
 #deployment from https://raw.githubusercontent.com/openshift/external-storage/master/nfs/deploy/kubernetes/deployment.yaml
 oc -n nfs-provisioner create -f - <<EOF
@@ -268,8 +268,8 @@ while true; do
 	break;
   fi
   sleep $period
-  i=$(expr $i + $period)
-  if [ $i -ge 300 ]; then
+  i=$($($i) + $period)
+  if [ "$i" -ge 300 ]; then
     echo "ERROR: Step2: Deploy nfs-provisioner failed, exit."
     echo "INFO: Print event in nfs-provisioner namespace"
     oc -n nfs-provisioner get event 
@@ -291,8 +291,8 @@ mountOptions:
 EOF
 
 echo "INFO: tep4: Set storageclass nutanix-volume as default storageclass if there is no default one......"
-default_sc_count=$(oc get storageclass --no-headers | grep "default" | wc -l)
-if [ ${default_sc_count} -eq 0 ]; then
+default_sc_count=$(oc get storageclass --no-headers | grep -c "default" )
+if [ "${default_sc_count}" -eq 0 ]; then
   oc patch storageclass nfs -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
 fi
 

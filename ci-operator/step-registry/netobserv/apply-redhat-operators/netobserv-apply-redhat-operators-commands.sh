@@ -34,8 +34,7 @@ oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson
 # --- Dynamic Version Detection ---
 
 # echo "5. Detecting OpenShift Cluster Version..."
-OCP_MAJOR_MINOR=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d '.' -f1,2) [2, 3]
-#
+OCP_MAJOR_MINOR=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d '.' -f1,2)
 REDHAT_OPERATOR_INDEX_VERSION="v${OCP_MAJOR_MINOR}"
 
 echo "Detected OCP version: ${OCP_MAJOR_MINOR}. Using index tag: ${REDHAT_OPERATOR_INDEX_VERSION}"
@@ -44,7 +43,7 @@ echo "Detected OCP version: ${OCP_MAJOR_MINOR}. Using index tag: ${REDHAT_OPERAT
 
 echo "6. Applying redhat-operators CatalogSource using detected version..."
 
-# Use the shell variable (${REDHAT_OPERATOR_INDEX_VERSION}) inside the manifest definition [4, 5]
+# Use the shell variable (${REDHAT_OPERATOR_INDEX_VERSION}) inside the manifest definition 
 cat << EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
