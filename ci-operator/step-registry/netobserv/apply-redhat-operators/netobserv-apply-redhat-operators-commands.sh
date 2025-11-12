@@ -34,14 +34,8 @@ oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson
 # --- Dynamic Version Detection ---
 
 # echo "5. Detecting OpenShift Cluster Version..."
+OCP_MAJOR_MINOR=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d '.' -f1,2) [2, 3]
 #
-# # Retrieve the cluster's major.minor version (e.g., 4.19) from the desired status of ClusterVersion [2]
-# OCP_MAJOR_MINOR=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d '.' -f1,2) [2, 3]
-#
-# # Format the version tag required for the index image (e.g., v4.19)
-# REDHAT_OPERATOR_INDEX_VERSION="v${OCP_MAJOR_MINOR}"
-#
-OCP_MAJOR_MINOR="4.19"
 REDHAT_OPERATOR_INDEX_VERSION="v${OCP_MAJOR_MINOR}"
 
 echo "Detected OCP version: ${OCP_MAJOR_MINOR}. Using index tag: ${REDHAT_OPERATOR_INDEX_VERSION}"
