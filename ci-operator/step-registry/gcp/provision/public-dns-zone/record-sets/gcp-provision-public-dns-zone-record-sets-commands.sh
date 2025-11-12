@@ -49,7 +49,7 @@ gcloud --project ${project_id} dns record-sets delete ${name} --type ${record_ty
 EOF
 done
 
-echo "Verifying DNS records can be resolved locally..."
+echo "Verifying the created DNS records can be resolved ..."
 
 # Verify each created record
 for i in $(seq 0 $((count-1)));
@@ -59,7 +59,6 @@ do
     record_type=$(jq --argjson i $i -r '.[$i].record_type' ${SHARED_DIR}/public_custom_dns.json)
 
     echo "Verifying record: $name ($record_type)"
-
     # Try up to 30 times with 10 second intervals (5 minutes total)
     retry_count=0
     max_retries=30
@@ -81,7 +80,7 @@ do
 
     if [[ "${verified}" != "true" ]]; then
         echo "ERROR: Record ${name} could not be resolved after ${max_retries} attempts"
-	exit 1
+        exit 1
     fi
 done
 
