@@ -1,4 +1,4 @@
-# openshift-virtualization-tests-network-localnet-gs-baremetal<!-- omit from toc -->
+# gs-baremetal-localnet-test<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
 - [General Information](#general-information)

@@ -1,11 +1,11 @@
-# openshift-virtualization-tests-network-localnet-gs-baremetal<!-- omit from toc -->
+# gs-baremetal-localnet-test<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
 - [General Information](#general-information)
 - [Purpose](#purpose)
 - [Process](#process)
   - [Cluster Provisioning and Deprovisioning: `external-cluster`](#cluster-provisioning-and-deprovisioning-external-cluster)
-  - [Test Setup, Execution, and Reporting Results -`openshift-virtualization-tests-network-localnet-gs-baremetal`](#test-setup-execution-and-reporting-results--openshift-virtualization-tests-network-localnet-gs-baremetal)
+  - [Test Setup, Execution, and Reporting Results: `gs-baremetal-localnet-test`](#test-setup-execution-and-reporting-results-gs-baremetal-localnet-test)
 - [Prerequisite(s)](#prerequisites)
   - [Environment Variables](#environment-variables)
   - [Custom Images](#custom-images)
@@ -22,12 +22,12 @@ To execute OpenShift Virtualization network tests on a bare-metal cluster config
 
 ### Cluster Provisioning and Deprovisioning: `external-cluster`
 
-The [`external-cluster`](../../../../step-registry/openshift-virtualization-tests/network-localnet-gs-baremetal/README.md) workflow imports KUBECONFIG file of a cluster that was deployed outside CI Operator.
+The [`external-cluster`](../../../step-registry/gs-baremetal/localnet-test/README.md) workflow imports KUBECONFIG file of a cluster that was deployed outside CI Operator.
 
-### Test Setup, Execution, and Reporting Results -`openshift-virtualization-tests-network-localnet-gs-baremetal`
+### Test Setup, Execution, and Reporting Results: `gs-baremetal-localnet-test`
 
 Following the test cluster setup, the following steps are executed:
-- [`openshift-virtualization-tests-network-localnet-gs-baremetal`](../../../../step-registry/openshift-virtualization-tests/network-localnet-gs-baremetal/README.md)
+- [`gs-baremetal-localnet-test`](../../../step-registry/gs-baremetal/localnet-test/README.md)
 
 ## Prerequisite(s)
 
