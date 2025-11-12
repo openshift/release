@@ -459,10 +459,7 @@ tests:
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO="TNA_IPV4"
-    workflow: baremetalds-two-node-arbiter
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-agent-ovn-two-node-arbiter-ipv6
   cluster: build05
   cron: '@daily'
@@ -471,7 +468,7 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV6"
-    workflow: baremetalds-two-node-arbiter
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-agent-ovn-two-node-arbiter-dualstack
   cluster: build05
   cron: '@daily'
@@ -480,7 +477,7 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV4V6"
-    workflow: baremetalds-two-node-arbiter
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-metal-ovn-two-node-arbiter-upgrade
   cluster: build05
   cron: '@daily'
@@ -508,6 +505,21 @@ tests:
         FEATURE_SET="TechPreviewNoUpgrade"
         BMC_DRIVER=redfish
       ENABLE_HYPERVISOR_SSH_CONFIG: "false"
+    workflow: baremetalds-two-node-fencing-techpreview
+- as: e2e-metal-ovn-two-node-fencing-ipv6-techpreview
+  cluster: build05
+  cron: 0 */6 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
+        BMC_DRIVER=redfish
     workflow: baremetalds-two-node-fencing-techpreview
 - as: e2e-metal-ovn-two-node-fencing-etcd-certrotation
   cluster: build05
@@ -866,6 +878,7 @@ tests:
     - chain: ipi-aws-pre-stableinitial
     - ref: fips-check
     workflow: openshift-upgrade-aws-ovn
+  timeout: 5h0m0s
 - as: e2e-gcp-ovn-upgrade
   interval: 168h
   steps:
@@ -1077,7 +1090,7 @@ tests:
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
-  cron: 30 14 * * 0-5
+  cron: 0 17 * * 0-5
   restrict_network_access: false
   steps:
     env:
@@ -1088,6 +1101,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-ptp
+  timeout: 2h30m0s
 - as: e2e-telco5g-hcp-cnftests
   capabilities:
   - intranet
@@ -1138,7 +1152,7 @@ tests:
     workflow: telco5g-mno-ztp-cnf
 - as: telco5g-network-flow-matrix-bm
   cluster: build05
-  cron: 0 23 * * 2,5
+  cron: 0 15 * * *
   restrict_network_access: false
   steps:
     env:
@@ -1150,7 +1164,7 @@ tests:
     workflow: telco5g-network-flow-matrix-bm
 - as: telco5g-network-flow-matrix-single-node-bm
   cluster: build05
-  cron: 0 23 * * 2,5
+  cron: 0 15 * * *
   restrict_network_access: false
   steps:
     env:
@@ -1161,7 +1175,7 @@ tests:
       - observers-resource-watch
     workflow: telco5g-network-flow-matrix-single-node-bm
 - as: aws-ovn-network-flow-matrix
-  cron: 0 23 * * 2,5
+  cron: 0 15 * * *
   steps:
     cluster_profile: aws-3
     test:
@@ -1170,7 +1184,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 5h0m0s
 - as: aws-ovn-network-flow-matrix-single-node
-  cron: 0 23 * * 2,5
+  cron: 0 15 * * *
   steps:
     cluster_profile: aws-3
     test:
@@ -1179,7 +1193,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: metal-ovn-network-flow-matrix-bm
   cluster: build05
-  cron: 0 23 * * 2,5
+  cron: 0 15 * * *
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -1270,6 +1284,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-ovn-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-etcd-scaling
   interval: 168h
   steps:
@@ -1286,24 +1301,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-etcd-scaling
-- as: e2e-gcp-custom-dns-techpreview
-  interval: 168h
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
-        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
-        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
-        for a Gateway object \| The HAProxy router should pass the http2 tests \|
-        The HAProxy router should pass the gRPC interoperability tests \| Services
-        should fail health check node port if there are only terminating endpoints
-        \| egressfirewall
-      USER_PROVISIONED_DNS: "yes"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-gcp-custom-dns
 - as: e2e-azure-ovn-etcd-scaling
   interval: 168h
   steps:
@@ -1931,6 +1928,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial-runc
+  timeout: 5h0m0s
 - as: e2e-aws-serial-runc
   cron: '@daily'
   steps:

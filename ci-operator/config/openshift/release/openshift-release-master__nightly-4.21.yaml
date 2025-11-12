@@ -4,27 +4,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -321,7 +321,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-upgrade-ovn-ipv6
-  timeout: 5h0m0s
+  timeout: 5h30m0s
 - as: e2e-metal-ipi-ovn-techpreview
   cluster: build05
   interval: 168h
@@ -447,10 +447,7 @@ tests:
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO="TNA_IPV4"
-    workflow: baremetalds-two-node-arbiter
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-agent-ovn-two-node-arbiter-ipv6
   cluster: build05
   cron: '@daily'
@@ -459,7 +456,7 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV6"
-    workflow: baremetalds-two-node-arbiter
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-agent-ovn-two-node-arbiter-dualstack
   cluster: build05
   cron: '@daily'
@@ -468,7 +465,7 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV4V6"
-    workflow: baremetalds-two-node-arbiter
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-metal-ovn-two-node-arbiter-upgrade
   cluster: build05
   cron: '@daily'
@@ -489,6 +486,21 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
+        BMC_DRIVER=redfish
+    workflow: baremetalds-two-node-fencing-techpreview
+- as: e2e-metal-ovn-two-node-fencing-ipv6-techpreview
+  cluster: build05
+  cron: 0 */6 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
         MASTER_DISK=100
         MASTER_MEMORY=32768
         NUM_MASTERS=2
@@ -821,6 +833,25 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
   timeout: 6h0m0s
+- as: e2e-aws-ovn-dedicated
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws
+    env:
+      DEDICATED_HOST: "yes"
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-edge-zones-quota-slice
+    observers:
+      enable:
+      - observers-resource-watch
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    - ref: ipi-deprovision-aws-dedicated-hosts
+    workflow: openshift-e2e-aws-ovn
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
@@ -849,6 +880,7 @@ tests:
     - chain: ipi-aws-pre-stableinitial
     - ref: fips-check
     workflow: openshift-upgrade-aws-ovn
+  timeout: 5h0m0s
 - as: e2e-gcp-ovn-upgrade
   interval: 168h
   steps:
@@ -1049,7 +1081,7 @@ tests:
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
-  cron: 0 8 * * 0-5
+  cron: 30 9 * * 0-5
   restrict_network_access: false
   steps:
     env:
@@ -1060,10 +1092,11 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-ptp
+  timeout: 5h0m0s
 - as: e2e-telco5g-ptp-upstream
   capabilities:
   - intranet
-  cron: 30 12 * * 1-5
+  cron: 30 14 * * 1-5
   restrict_network_access: false
   steps:
     env:
@@ -1075,6 +1108,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-ptp
+  timeout: 2h30m0s
 - as: e2e-telco5g-hcp-cnftests
   capabilities:
   - intranet
@@ -1125,7 +1159,7 @@ tests:
     workflow: telco5g-mno-ztp-cnf
 - as: telco5g-network-flow-matrix-bm
   cluster: build05
-  cron: 0 23 * * 2,5
+  cron: 0 13 * * *
   restrict_network_access: false
   steps:
     env:
@@ -1137,7 +1171,7 @@ tests:
     workflow: telco5g-network-flow-matrix-bm
 - as: telco5g-network-flow-matrix-single-node-bm
   cluster: build05
-  cron: 0 23 * * 2,5
+  cron: 0 13 * * *
   restrict_network_access: false
   steps:
     env:
@@ -1148,7 +1182,7 @@ tests:
       - observers-resource-watch
     workflow: telco5g-network-flow-matrix-single-node-bm
 - as: aws-ovn-network-flow-matrix
-  cron: 0 23 * * 2,5
+  cron: 0 13 * * *
   steps:
     cluster_profile: aws-3
     test:
@@ -1157,7 +1191,7 @@ tests:
     workflow: openshift-e2e-aws-ovn-serial
   timeout: 5h0m0s
 - as: aws-ovn-network-flow-matrix-single-node
-  cron: 0 23 * * 2,5
+  cron: 0 13 * * *
   steps:
     cluster_profile: aws-3
     test:
@@ -1166,7 +1200,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: metal-ovn-network-flow-matrix-bm
   cluster: build05
-  cron: 0 23 * * 2,5
+  cron: 0 13 * * *
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -1257,6 +1291,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-ovn-serial
+  timeout: 5h0m0s
 - as: e2e-aws-ovn-etcd-scaling
   interval: 168h
   steps:
@@ -1903,6 +1938,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-serial-runc
+  timeout: 5h0m0s
 - as: e2e-gcp-ovn-serial-runc
   cron: '@daily'
   steps:
@@ -1911,6 +1947,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-serial-runc
+  timeout: 5h0m0s
 - as: e2e-aws-serial-runc
   cron: '@daily'
   steps:

@@ -84,77 +84,19 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      PUBLISH: Internal
-    post:
-    - ref: gather-installer-boostrap-logs-in-bastion
-    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
-    - ref: gcp-deprovision-bastionhost
-    - ref: gcp-deprovision-vpc
-    pre:
-    - ref: gcp-provision-minimal-permission
-    - ref: gcp-provision-vpc
-    - ref: ignition-bastionhost
-    - ref: gcp-provision-bastionhost
-    - ref: proxy-config-generate
-    - ref: ipi-conf
-    - ref: ipi-conf-telemetry
-    - ref: ipi-conf-gcp
-    - ref: single-node-conf-gcp
-    - ref: ipi-install-monitoringpvc
-    - chain: ipi-install
-    - ref: cucushift-installer-check-sno
-    - ref: cucushift-installer-check-gcp-private
-    - ref: enable-qe-catalogsource
-    - chain: cucushift-installer-check
-    test:
-    - chain: cucushift-installer-check-cluster-health
-- as: installer-rehearse-gcp-dedicated-dns-project
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-workload-identity
+- as: installer-rehearse-gcp2
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
       PRIVATE_ZONE_PROJECT: openshift-qe-regional
-    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
-- as: installer-rehearse-gcp-upi
-  cron: '@yearly'
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      SLEEP_DURATION: 10m
-    post:
-    - ref: cucushift-installer-wait
-    - ref: ipi-deprovision-deprovision
-    - ref: upi-deprovision-gcp
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-upi-provision
-- as: installer-rehearse-gcp-upi-private-xpn
-  cron: '@yearly'
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      PUBLISH: Internal
-      SLEEP_DURATION: 10m
-    post:
-    - ref: cucushift-installer-wait
-    - ref: gcp-deprovision-iam-creds-xpn-roles
-    - chain: ipi-deprovision
-    - ref: gcp-deprovision-bastionhost
-    - ref: upi-deprovision-gcp
-    pre:
-    - ref: ipi-install-rbac
-    - ref: upi-conf-gcp-xpn
-    - ref: ignition-bastionhost
-    - ref: gcp-provision-bastionhost
-    - ref: proxy-config-generate
-    - chain: ipi-conf-gcp
-    - ref: ingress-gcp-glb-manifest
-    - ref: upi-conf-gcp
-    - ref: upi-install-gcp
-    - ref: gcp-provision-iam-creds-xpn-roles
-    - ref: enable-qe-catalogsource
-    - chain: cucushift-installer-check
-    - ref: cucushift-installer-check-gcp-private
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-private
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:

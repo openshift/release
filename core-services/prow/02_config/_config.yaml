@@ -170,6 +170,7 @@ deck:
     gcs_browser_prefixes:
       '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-eng/agent-qe-infra: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      openshift-eng/ship-help-bot: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-kni/eco-ci-cd-private: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-online/access-transparency-service: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-online/gcp-hcp: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
@@ -334,10 +335,10 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20251014-8026e8037
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20251014-8026e8037
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20251014-8026e8037
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20251014-8026e8037
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20251030-0e4d5be42
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20251030-0e4d5be42
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20251030-0e4d5be42
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20251030-0e4d5be42
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -425,6 +426,13 @@ plank:
       timeout: 23h55m0s
     repo: openshift-eng/agent-qe-infra
   - config:
+      gcs_configuration:
+        bucket: qe-private-deck
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+    repo: openshift-eng/ship-help-bot
+  - config:
       timeout: 12h0m0s
     repo: openshift/ovn-kubernetes
   - config:
@@ -445,6 +453,7 @@ plank:
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
     openshift-eng/agent-qe-infra: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    openshift-eng/ship-help-bot: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-kni/eco-ci-cd-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-online/access-transparency-service: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-online/gcp-hcp: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
@@ -475,6 +484,9 @@ plank:
       ### Report flaky E2E tests and PROW issues in [INTLY-7197](https://issues.redhat.com/browse/INTLY-7197) epic. Detailed instructions can be found in the description of said epic.
       [Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).
     openshift-eng/agent-qe-infra: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-eng/ship-help-bot: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift-kni/eco-ci-cd-private: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
@@ -541,6 +553,10 @@ prowjob_default_entries:
   config:
     tenant_id: qe-private
   repo: openshift-eng/agent-qe-infra
+- cluster: '*'
+  config:
+    tenant_id: qe-private
+  repo: openshift-eng/ship-help-bot
 prowjob_namespace: ci
 push_gateway:
   interval: 1m0s
@@ -689,6 +705,7 @@ tide:
   pr_status_base_urls:
     '*': https://prow.ci.openshift.org/pr
     openshift-eng/agent-qe-infra: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
+    openshift-eng/ship-help-bot: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-kni/eco-ci-cd-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-online/gcp-hcp: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
@@ -699,6 +716,8 @@ tide:
     openshift/open-telemetry-opentelemetry-operator: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
   priority:
+  - labels:
+    - priority/ci-critical
   - labels:
     - jira/severity-critical
   - labels:

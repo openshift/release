@@ -99,6 +99,9 @@ CONFIG = {
     'metal-perscale-cpt-quota-slice': {
         'rdu3': 1,
     },
+    'metal-perfscale-cpt-quota-slice': {
+        'metal-perfscale-cpt-rdu3': 1,
+    },
     'metal-perfscale-jetlag-quota-slice': {
         'metal-perfscale-jetlag-rdu3': 1,
     },
@@ -124,7 +127,7 @@ CONFIG = {
     },
     'aws-sustaining-autorelease-412-quota-slice': {
         # We can re-configure later as per requirement
-        'us-east-1': 32,
+        'us-east-1': 60,
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
@@ -156,6 +159,9 @@ CONFIG = {
         'us-east-2': 60,
         'us-west-1': 60,
         'us-west-2': 60,
+    },
+    'aws-confidential-qe-quota-slice': {
+        'us-east-2': 6,
     },
     'aws-devfile-quota-slice': {
         'us-west-2': 10
@@ -207,7 +213,7 @@ CONFIG = {
         'centralus': 10
     },
     'azure-observability-quota-slice': {
-        'centralus': 30
+        'westus': 3
     },
     'azure-hcp-qe-quota-slice': {
         'westus': 5,
@@ -235,7 +241,7 @@ CONFIG = {
         'usgovtexas': 5
     },
     'azure-sustaining-autorelease-412-quota-slice': {
-        'eastus': 32,
+        'eastus': 60,
     },
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
@@ -273,8 +279,11 @@ CONFIG = {
     'gcp-autorelease-qe-quota-slice': {
         'us-central1': 7,
     },
+    'gcp-confidential-qe-quota-slice': {
+        'us-central1': 6,
+    },
     'gcp-sustaining-autorelease-412-quota-slice': {
-        'us-east1': 32,
+        'us-east1': 60,
     },
     'gcp-quota-slice': {
         'us-central1': 70,
