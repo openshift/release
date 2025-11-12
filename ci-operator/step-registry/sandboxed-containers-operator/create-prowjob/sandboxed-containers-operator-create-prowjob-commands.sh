@@ -253,8 +253,8 @@ validate_and_set_defaults() {
     else # GA
       CATALOG_SOURCE_NAME="redhat-operators"
       TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
-      CATALOG_SOURCE_IMAGE="none"
-      TRUSTEE_CATALOG_SOURCE_IMAGE="none"
+      CATALOG_SOURCE_IMAGE=""
+      TRUSTEE_CATALOG_SOURCE_IMAGE=""
     fi
 }
 
