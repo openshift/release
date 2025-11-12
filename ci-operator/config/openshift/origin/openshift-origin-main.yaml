@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  flowlogs-pipeline:
+    name: flowlogs-pipeline
+    namespace: netobserv
+    tag: ci
   golangci-lint:
     name: golangci-lint
     namespace: ci
@@ -840,22 +844,15 @@ tests:
     cluster_profile: hypershift
     workflow: hypershift-aws-conformance
 - always_run: false
-  as: e2e-aws-ovn-egress-netobserv
+  as: e2e-egress-aws
   optional: true
   steps:
     cluster_profile: aws-3
     env:
       TEST_SUITE: openshift/conformance/parallel
-    post:
-    - ref: egress-loki-query-range
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - ref: netobserv-install-operator
-    - ref: egress-record-e2e-start
     test:
     - ref: openshift-e2e-test
-    workflow: ipi-aws
+    workflow: egress-aws
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
