@@ -21,8 +21,12 @@ az account show
 mkdir -p /tmp/tools
 # installs kubectl and kubelogin
 az aks install-cli --install-location /tmp/tools/kubectl --kubelogin-install-location /tmp/tools/kubelogin
+# Install newer curl with --json support
+curl -L https://github.com/moparisthebest/static-curl/releases/latest/download/curl-amd64 -o /tmp/tools/curl
+chmod +x /tmp/tools/curl
+/tmp/tools/curl --version
 /tmp/tools/kubectl version
-/tmp/tools/kubelogin --version 
+/tmp/tools/kubelogin --version
 
 # Add to PATH
 export PATH="/tmp/tools:$PATH"
@@ -48,6 +52,21 @@ start_tunnel() {
           echo "Port forward already running (PID: $(cat "$PIDFILE"))"
           return 0
       fi
+      for i in {1..3}; do
+          if kubectl get svc -n aro-hcp aro-hcp-frontend >/dev/null 2>&1; then
+              echo "Service aro-hcp-frontend found"
+              break
+          else
+              echo "Service aro-hcp-frontend not found"
+              if [[ $i -lt 3 ]]; then
+                  echo "Waiting 10 seconds before retry..."
+                  sleep 10
+              else
+                  echo "Service not available after 3 attempts, exiting"
+                  exit 1
+              fi
+          fi
+      done
       kubectl port-forward -n aro-hcp svc/aro-hcp-frontend 8443:8443 >/dev/null 2>&1 &
       echo $! > "$PIDFILE"
 
