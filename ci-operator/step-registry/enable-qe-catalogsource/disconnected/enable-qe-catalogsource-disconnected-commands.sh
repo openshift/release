@@ -321,6 +321,8 @@ spec:
     source: registry-proxy.engineering.redhat.com
 EOF
     else
+        # Create both IDMS and ITMS together for digest-based and tag-based image references
+        # ITMS can coexist with IDMS (both are new APIs)
         cat <<EOF  | oc create -f -
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
@@ -349,14 +351,46 @@ spec:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY}
     source: registry-proxy.engineering.redhat.com
+---
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: image-policy-aosqe
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/openshifttest
+    source: quay.io/openshifttest
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators
+    source: quay.io/openshift-qe-optional-operators
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/olmqe
+    source: quay.io/olmqe
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: brew.registry.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry.stage.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry-proxy.engineering.redhat.com
 EOF
     fi
 
     if [ $? == 0 ]; then
-        echo "create the ICSP/IDMS successfully" 
+        if [[ $icsp_num -gt 0 || $kube_minor -lt 26 ]] ; then
+            echo "create the ICSP successfully"
+        else
+            echo "create the IDMS and ITMS successfully"
+        fi
 	return 0
     else
-        echo "!!! fail to create the ICSP/IDMS"
+        echo "!!! fail to create the ICSP/IDMS/ITMS"
         return 1
     fi
 }
@@ -367,6 +401,45 @@ function create_cluster_catalog()
     # ClusterCatalog is only available in Kubernetes 1.31+ (OCP 4.18+)
     # OCP 4.18 = Kubernetes 1.31
     if [[ ${kube_major} -gt 1 || ${kube_minor} -ge 31 ]]; then
+        # Check if OperatorLifecycleManagerV1 capability is enabled (OCP 4.18+)
+        knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+        if [[ ${knownCaps} =~ "OperatorLifecycleManagerV1\"," ]]; then
+            echo "knownCapabilities contains OperatorLifecycleManagerV1"
+            # check if OLMv1 capability enabled
+            enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+            if [[ ! ${enabledCaps} =~ "OperatorLifecycleManagerV1\"," ]]; then
+                echo "OperatorLifecycleManagerV1 capability is not enabled, skipping ClusterCatalog creation..."
+                return 0
+            fi
+        else
+            echo "OperatorLifecycleManagerV1 capability not in knownCapabilities, skipping ClusterCatalog creation..."
+            return 0
+        fi
+
+        # Restart catalogd to ensure it loads the latest CA certificates
+        echo "Restarting catalogd to load updated CA certificates..."
+        catalogd_namespace="openshift-catalogd"
+        run_command "oc delete pod -n $catalogd_namespace -l control-plane=catalogd-controller-manager"
+
+        # Wait for catalogd pod to be ready
+        echo "Waiting for catalogd pod to be ready..."
+        COUNTER=0
+        while [ $COUNTER -lt 300 ]; do
+            sleep 10
+            COUNTER=$((COUNTER + 10))
+            CATALOGD_READY=$(oc get pods -n $catalogd_namespace -l control-plane=catalogd-controller-manager -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+            if [[ "$CATALOGD_READY" == "True" ]]; then
+                echo "catalogd pod is ready after ${COUNTER}s"
+                break
+            fi
+            echo "waiting ${COUNTER}s for catalogd to be ready..."
+        done
+
+        if [[ "$CATALOGD_READY" != "True" ]]; then
+            echo "Failing: catalogd pod not ready after ${COUNTER}s"
+            return 1
+        fi
+
         echo "create QE ClusterCatalog: $CATALOGSOURCE_NAME"
         cat <<EOF | oc create -f -
 apiVersion: olm.operatorframework.io/v1
@@ -393,8 +466,8 @@ EOF
                 break
             fi
         done
-        run_command "oc get clustercatalog $CATALOGSOURCE_NAME -o yaml"
         if [[ $SERVING_STATUS != "True" ]]; then
+            run_command "oc get clustercatalog $CATALOGSOURCE_NAME -o yaml"
             echo "!!! fail to create QE ClusterCatalog"
             return 1
         fi
