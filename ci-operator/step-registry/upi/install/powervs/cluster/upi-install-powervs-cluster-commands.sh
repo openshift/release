@@ -309,7 +309,7 @@ release_image_override    = "${TARGET_VERSION}"
 use_zone_info_for_names    = true
 use_ibm_cloud_services     = true
 ibm_cloud_vpc_name         = "${VPC_NAME}"
-private_network_mtu        = 1400
+private_network_mtu        = 1450
 ibm_cloud_vpc_subnet_name  = "sn01"
 ibm_cloud_resource_group   = "${RESOURCE_GROUP}"
 iaas_vpc_region            = "${VPC_REGION}"
@@ -456,7 +456,6 @@ fix_user_permissions
 build_upi_cluster
 echo "Finished, starting cleanup '$(date)'"
 
-<<<<<<< HEAD
 # Kill any running processes
 pkill terraform || true
 pkill ibmcloud || true
@@ -467,7 +466,3 @@ pkill scp || true
 echo "Remaining Processes"
 ps -ef || true
 echo "Done, cleanup '$(date)'"
-=======
-echo "Successfully created the PowerVS cluster"
-exit 0
->>>>>>> 88936c0a672 (MULTIARCH-5196: p-px added exit 0 to UPI)
