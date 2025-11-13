@@ -506,20 +506,17 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-boot-diagnostics
-- as: azure-ipi-boot-diagnostics-managed-arm-f28
+- as: azure-ipi-boot-diagnostics-managed-f28
   cron: 41 16 21 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       AZURE_COMPUTE_BOOT_DIAGNOSTICS_TYPE: Managed
       AZURE_CONTROL_PLANE_BOOT_DIAGNOSTICS_TYPE: Managed
       AZURE_DEFAULT_MACHINE_BOOT_DIAGNOSTICS_TYPE: UserManaged
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      OCP_ARCH: arm64
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-0c6m6fk/release:latest
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-boot-diagnostics-usermanaged
@@ -561,6 +558,7 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_DC4ads_v5
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-0c6m6fk/release:latest
       ENABLE_CONFIDENTIAL_COMPUTE: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
@@ -618,6 +616,7 @@ tests:
       AZURE_DEFAULT_MACHINE_DISK_TYPE: Premium_LRS
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-0c6m6fk/release:latest
       EXIT_ON_INSTALLER_CHECK_FAIL: "no"
     test:
     - chain: cucushift-installer-check-cluster-health
@@ -674,11 +673,9 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_NP10s
       CONTROL_PLANE_INSTANCE_TYPE: Standard_NP10s
-      CUSTOM_AZURE_REGION: southcentralus
-      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker-gen1:4.18.2025031114
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-marketplace-image-gen2-vm-type-gen2-mini-perm-f14
   cron: 14 5 1,15 * *
   steps:
@@ -689,11 +686,10 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_DC4s_v3
       CONTROL_PLANE_INSTANCE_TYPE: Standard_DC4s_v3
-      CUSTOM_AZURE_REGION: southcentralus
-      OS_IMAGE_URN: RedHat:rh-ocp-worker:rh-ocp-worker:4.18.2025031114
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-0c6m6fk/release:latest
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-azure-ipi-marketplace-generation
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-mixed-apiserver-ingress-external-mini-perm-f14
   cron: 2 2 15,29 * *
   steps:
@@ -924,6 +920,7 @@ tests:
       COMPUTE_NODE_TYPE: Standard_DC4s_v3
       CONTROL_PLANE_INSTANCE_TYPE: Standard_DC4s_v3
       CUSTOM_AZURE_REGION: southcentralus
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-0c6m6fk/release:latest
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-generation
@@ -965,9 +962,20 @@ tests:
       AZURE_CONTROL_PLANE_BOOT_DIAGNOSTICS_TYPE: UserManaged
       AZURE_DEFAULT_MACHINE_BOOT_DIAGNOSTICS_TYPE: Managed
       BASE_DOMAIN: qemag.azure.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-0c6m6fk/release:latest
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-mag-ipi-boot-diagnostics-usermanaged
+- as: azure-stack-ipi-f28
+  cron: 6 0 4 * *
+  steps:
+    cluster_profile: azurestack-qe
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-0c6m6fk/release:latest
+      EXTRACT_MANIFEST_INCLUDED: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-stack-ipi
 - as: azure-mag-ipi-fullyprivate-reboot-nodes-f14
   cron: 56 0 11,27 * *
   steps:
