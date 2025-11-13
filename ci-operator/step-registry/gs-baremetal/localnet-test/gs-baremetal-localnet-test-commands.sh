@@ -30,8 +30,8 @@ debug_on_exit() {
     # The 'sleep' command will be interrupted by Ctrl+C.
     # To make the sleep uninterruptible by Ctrl+C, you could add:
     # trap '' SIGINT SIGTERM
-    oc get -n "${hco_namespace}" hco kubevirt-hyperconverged -o yaml > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml
-    oc logs --since=1h -n "${hco_namespace}" -l name=hyperconverged-cluster-operator > "${ARTIFACT_DIR}"/hco.log
+    # oc get -n "${hco_namespace}" hco kubevirt-hyperconverged -o yaml > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml
+    # oc logs --since=1h -n "${hco_namespace}" -l name=hyperconverged-cluster-operator > "${ARTIFACT_DIR}"/hco.log
 
     runMustGather
     echo "    😴 😴 😴"
@@ -206,7 +206,14 @@ set -x
 export ORGANIZATION_ID ACCESS_TOKEN ARTIFACTORY_USER ARTIFACTORY_TOKEN ARTIFACTORY_SERVER
 
 # Unset the following environment variables to avoid issues with oc command
-unset -v "${!KUBERNETES_*}"
+unset KUBERNETES_SERVICE_PORT_HTTPS
+unset KUBERNETES_SERVICE_PORT
+unset KUBERNETES_PORT_443_TCP
+unset KUBERNETES_PORT_443_TCP_PROTO
+unset KUBERNETES_PORT_443_TCP_ADDR
+unset KUBERNETES_SERVICE_HOST
+unset KUBERNETES_PORT
+unset KUBERNETES_PORT_443_TCP_PORT
 
 ###########################################################################
 # Get oc binary
