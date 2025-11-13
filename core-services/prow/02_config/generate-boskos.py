@@ -258,6 +258,9 @@ CONFIG = {
     'oex-aws-qe-quota-slice': {
         'default': 40,
     },
+    'hyperfleet-e2e-quota-slice': {
+        'default': 40,
+    },
     'equinix-ocp-hcp-quota-slice': {
         'default': 20,
     },
