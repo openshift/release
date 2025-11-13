@@ -17,7 +17,7 @@ export PULUMI_K8S_DELETE_UNREACHABLE=true
 echo "PULUMI_K8S_DELETE_UNREACHABLE set to true"
 
 echo "Setting CORRELATE_MAPT..."
-CORRELATE_MAPT="eks-${BUILD_ID}"
+CORRELATE_MAPT="aks-${BUILD_ID}"
 
 echo "Destroying MAPT infrastructure for ${CORRELATE_MAPT}..."
 
