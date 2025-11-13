@@ -263,8 +263,9 @@ show_usage() {
     echo "Usage: $0 <command>"
     echo ""
     echo "Commands:"
-    echo "  create  Create prowjob configuration files"
-    echo "  run     Run prowjobs from YAML configuration"
+    echo "  create            Create prowjob configuration files"
+    echo "  run               Run prowjobs from YAML configuration"
+	echo "  update_templates  Regenerate the ci-operator/config/openshift/sandboxed-containers-operator templates using default values (unless overridden)"
     echo ""
     echo "Examples:"
     echo "  $0 create"
@@ -310,6 +311,9 @@ main() {
         run)
             command_run "$@"
             ;;
+		update_templates)
+			command_update_templates
+			;;
         *)
             echo "ERROR: Unknown command '${COMMAND}'"
             echo ""
@@ -351,7 +355,7 @@ generate_workflow() {
     "ENABLE_MUST_GATHER: \"${ENABLE_MUST_GATHER}\""
     "EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}"
     "INSTALL_KATA_RPM: \"${INSTALL_KATA_RPM}\""
-    "KATA_RPM_VERSION: \"${KATA_RPM_VERSION}\""
+    "KATA_RPM_VERSION: ${KATA_RPM_VERSION:-\"\"}"
     "MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}"
     "MUST_GATHER_ON_FAILURE_ONLY: \"${MUST_GATHER_ON_FAILURE_ONLY}\""
     "SLEEP_DURATION: ${SLEEP_DURATION}"
@@ -666,6 +670,23 @@ command_run() {
     echo ""
     echo "Job triggering completed!"
     echo "Check the output_*.json and status_*.json files for details"
+}
+
+command_update_templates() {
+	local target_dir
+	local files
+	target_dir="$(realpath "$(dirname "${BASH_SOURCE[0]}")")/../../../config/openshift/sandboxed-containers-operator"
+	files="$(ls openshift-sandboxed-containers-operator-devel__downstream-{candidate,release}*.yaml 2>/dev/null)" ||:
+	if [ -n "$files" ]; then
+		echo "There are previously generated workflows, do you want to delete them? ${PWD}"
+		rm -i $files
+	fi
+	KATA_RPM_VERSION=3.21.0-3.rhaos4.19.el9 TEST_RELEASE_TYPE=Pre-GA "$(dirname "${BASH_SOURCE[0]}")"/sandboxed-containers-operator-create-prowjob-commands.sh create
+	INSTALL_KATA_RPM=false TEST_RELEASE_TYPE=GA "$(dirname "${BASH_SOURCE[0]}")"/sandboxed-containers-operator-create-prowjob-commands.sh create
+	mv openshift-sandboxed-containers-operator-devel__downstream-candidate*.yaml "${target_dir}/openshift-sandboxed-containers-operator-devel__downstream-candidate.yaml"
+	mv openshift-sandboxed-containers-operator-devel__downstream-release*.yaml "${target_dir}/openshift-sandboxed-containers-operator-devel__downstream-release.yaml"
+	echo
+	echo "Review the changes by 'git diff', then run 'make ci-operator-config && make jobs'"
 }
 
 # Call main function with all command line arguments
