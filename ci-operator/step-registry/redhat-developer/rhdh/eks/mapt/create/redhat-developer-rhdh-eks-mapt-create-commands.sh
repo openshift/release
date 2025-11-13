@@ -11,15 +11,13 @@ export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION AWS_S3_BUCKET
 echo "AWS credentials loaded successfully"
 
 echo "Generating CORRELATE_MAPT..."
-date "+%Y%m%d-%H%M%S-%3N" > ${SHARED_DIR}/CORRELATE_MAPT
-CORRELATE_MAPT=$(cat ${SHARED_DIR}/CORRELATE_MAPT)
-FOLDER_NAME="eks-${CORRELATE_MAPT}"
-echo "Using folder: ${FOLDER_NAME}"
+CORRELATE_MAPT="eks-$(date "+%Y%m%d-%H%M%S-%3N")"
+echo "${CORRELATE_MAPT}" > ${SHARED_DIR}/CORRELATE_MAPT
 
-echo "Creating MAPT infrastructure for ${FOLDER_NAME}..."
+echo "Creating MAPT infrastructure for ${CORRELATE_MAPT}..."
 mapt aws eks create \
   --project-name "eks" \
-  --backed-url "s3://${AWS_S3_BUCKET}/${FOLDER_NAME}" \
+  --backed-url "s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}" \
   --conn-details-output "${SHARED_DIR}" \
   --version 1.33 \
   --workers-max 3 \

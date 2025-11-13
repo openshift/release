@@ -14,15 +14,13 @@ export AZURE_STORAGE_ACCOUNT AZURE_STORAGE_BLOB AZURE_STORAGE_KEY ARM_CLIENT_ID 
 echo "Azure credentials loaded successfully"
 
 echo "Generating CORRELATE_MAPT..."
-date "+%Y%m%d-%H%M%S-%3N" > ${SHARED_DIR}/CORRELATE_MAPT
-CORRELATE_MAPT=$(cat ${SHARED_DIR}/CORRELATE_MAPT)
-FOLDER_NAME="aks-${CORRELATE_MAPT}"
-echo "Using folder: ${FOLDER_NAME}"
+CORRELATE_MAPT="aks-$(date "+%Y%m%d-%H%M%S-%3N")"
+echo "${CORRELATE_MAPT}" > ${SHARED_DIR}/CORRELATE_MAPT
 
-echo "Creating MAPT infrastructure for ${FOLDER_NAME}..."
+echo "Creating MAPT infrastructure for ${CORRELATE_MAPT}..."
 mapt azure aks create \
   --project-name "aks" \
-  --backed-url "azblob://${AZURE_STORAGE_BLOB}/${FOLDER_NAME}" \
+  --backed-url "azblob://${AZURE_STORAGE_BLOB}/${CORRELATE_MAPT}" \
   --conn-details-output "${SHARED_DIR}" \
   --version 1.33 \
   --vmsize "Standard_D4as_v6" \
