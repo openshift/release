@@ -61,22 +61,12 @@ export ANSIBLE_HOST_KEY_CHECKING=False
 
 cd /eco-ci-cd/
 
-cat <<EOF > ansible.cfg
-[defaults]
-collections_path = ./collections
-host_key_checking = False
-force_color = True
-private_key_file = ${PROJECT_DIR}/ansible_ssh_key
-[ssh_connection]
-ssh_args = -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ConnectTimeout=30
-EOF
-cat ansible.cfg
-
 ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=$VERSION disconnected=$DISCONNECTED operators='$OPERATORS'"
 
 # configure lso 
-ansible-playbook playbooks/ran/configure-lvm-storage.yml -i ./inventories/ocp-deployment/build-inventory.py \
+ansible-playbook playbooks/ran/hub-sno-configure-lvm-storage.yml -i ./inventories/ocp-deployment/build-inventory.py \
+    --private-key="${PROJECT_DIR}/ansible_ssh_key" \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH}" -vv
 
 # configure acm
