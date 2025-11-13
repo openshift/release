@@ -1,6 +1,6 @@
 #!/bin/bash
 # script to create prowjobs in ci-operator/config/openshift/sandboxed-containers-operator using environment variables.
-# Usage: 
+# Usage:
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh gen    # Generate prowjob configuration
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh run    # Run prowjobs
 # should be run in a branch of a fork of https://github.com/openshift/release/
@@ -15,9 +15,10 @@ set -o pipefail
 # used to interact with Prow via REST API
 GANGWAY_API_ENDPOINT="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions"
 
-# Function to get latest OSC catalog tag
-get_latest_osc_catalog_tag() {
-    local apiurl="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
+# Function to get latest catalog tag from Quay repository
+# Usage: get_latest_catalog_tag "https://quay.io/api/v1/repository/..."
+get_latest_catalog_tag() {
+    local apiurl="$1"
     local page=1
     local max_pages=20
     local test_pattern="^[0-9]+\.[0-9]+(\.[0-9]+)?-[0-9]+$"
@@ -46,50 +47,9 @@ get_latest_osc_catalog_tag() {
     done
 
     if [[ -z "${latest_tag}" ]]; then
-        echo "  ERROR: No matching OSC catalog tag found, using default fallback"
+        echo "  ERROR: No matching catalog tag found for ${apiurl}, using default fallback"
         latest_tag="latest"
     fi
-
-    echo "${latest_tag}"
-}
-
-get_latest_trustee_catalog_tag() {
-    local page=1
-    local latest_tag=""
-    local test_pattern="^trustee-fbc-${OCP_VER}-on-push-.*-build-image-index$"
-
-    while true; do
-        local resp
-
-        # Query the Quay API for tags
-        if ! resp=$(curl -sf "${APIURL}/tag/?limit=100&page=${page}"); then
-            break
-        fi
-
-        # Check if page has tags
-        if ! jq -e '.tags | length > 0' <<< "${resp}" >/dev/null; then
-            break
-        fi
-
-        # Extract the latest matching tag from this page
-        latest_tag=$(echo "${resp}" | \
-            jq -r --arg test_string "${test_pattern}" \
-            '.tags[]? | select(.name | test($test_string)) | "\(.start_ts) \(.name)"' | \
-            sort -nr | head -n1 | awk '{print $2}')
-
-        if [[ -n "${latest_tag}" ]]; then
-            break
-        fi
-
-        ((page++))
-
-
-        # Safety limit to prevent infinite loops
-        if [[ ${page} -gt 50 ]]; then
-            echo "ERROR: Reached maximum page limit (50) while searching for trustee tags"
-            exit 1
-        fi
-    done
 
     echo "${latest_tag}"
 }
@@ -143,6 +103,14 @@ validate_and_set_defaults() {
         KATA_RPM_VERSION="${KATA_RPM_VERSION:-3.17.0-3.rhaos4.19.el9}"
     else
         KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
+    fi
+
+    # Trustee Installation Configuration
+    # Default to false, always true for coco jobs
+    INSTALL_TRUSTEE="${INSTALL_TRUSTEE:-false}"
+    if [[ "${INSTALL_TRUSTEE}" != "true" && "${INSTALL_TRUSTEE}" != "false" ]]; then
+        echo "ERROR: INSTALL_TRUSTEE should be 'true' or 'false', got: ${INSTALL_TRUSTEE}"
+        exit 1
     fi
 
     # test is Pre-GA for brew builds or GA for operators/rpms already on OCP
@@ -208,7 +176,7 @@ validate_and_set_defaults() {
     if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
       # OSC Catalog Configuration - get latest or use provided
       if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
-          OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
+          OSC_CATALOG_TAG=$(get_latest_catalog_tag "https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc")
 
       else
           echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
@@ -224,19 +192,12 @@ validate_and_set_defaults() {
       CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:${OSC_CATALOG_TAG}}"
       CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-brew-catalog}"
 
-      # Trustee Catalog Configuration
-      # Convert OCP version for Trustee catalog naming
-      OCP_VER=$(echo "${OCP_VERSION}" | tr '.' '-')
-      subfolder=""
-      if [[ "${OCP_VER}" == "4-16" ]]; then
-          subfolder="trustee-fbc/"
+      # Trustee Catalog Configuration - get latest or use provided
+      if [[ -z "${TRUSTEE_CATALOG_TAG:-}" ]]; then
+          TRUSTEE_CATALOG_TAG=$(get_latest_catalog_tag "https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc")
+      else
+          echo "Using provided TRUSTEE_CATALOG_TAG: ${TRUSTEE_CATALOG_TAG}"
       fi
-      # Get latest Trustee catalog tag with page limit safety
-      TRUSTEE_REPO_NAME="${subfolder}trustee-fbc-${OCP_VER}"
-      TRUSTEE_CATALOG_REPO="quay.io/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
-
-      APIURL="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
-      TRUSTEE_CATALOG_TAG=$(get_latest_trustee_catalog_tag)
 
       # Extract expected Trustee version from catalog tag if it matches X.Y.Z-[0-9]+ format
       extracted_trustee_version=$(get_expected_version "${TRUSTEE_CATALOG_TAG}")
@@ -248,7 +209,7 @@ validate_and_set_defaults() {
           echo "Using default EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
       fi
 
-      TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
+      TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:${TRUSTEE_CATALOG_TAG}}"
       TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
     else # GA
       CATALOG_SOURCE_NAME="redhat-operators"
@@ -277,6 +238,7 @@ show_usage() {
     echo "  EXPECTED_OSC_VERSION           - Expected OSC version (default: 1.10.1)"
     echo "  INSTALL_KATA_RPM               - Install Kata RPM: true or false (default: true)"
     echo "  KATA_RPM_VERSION               - Kata RPM version (default: 3.17.0-3.rhaos4.19.el9)"
+    echo "  INSTALL_TRUSTEE                - Install Trustee: true or false (default: false, always true for coco)"
     echo "  SLEEP_DURATION                 - Sleep duration after tests (default: 0h)"
     echo "  TEST_SCENARIOS                 - Test scenarios filter (default: sig-kata.*Kata Author)"
     echo "  TEST_TIMEOUT                   - Test timeout in minutes (default: 90)"
@@ -369,13 +331,14 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
-      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
       CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
+      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
       ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
+      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
       INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
+      INSTALL_TRUSTEE: ${INSTALL_TRUSTEE}
       KATA_RPM_VERSION: ${KATA_RPM_VERSION}
       MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
       MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
@@ -400,6 +363,7 @@ tests:
       ENABLEPEERPODS: "true"
       EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
       INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
+      INSTALL_TRUSTEE: ${INSTALL_TRUSTEE}
       KATA_RPM_VERSION: ${KATA_RPM_VERSION}
       MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
       MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
@@ -426,6 +390,7 @@ tests:
       ENABLEPEERPODS: "true"
       EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
       INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
+      INSTALL_TRUSTEE: "true"
       KATA_RPM_VERSION: ${KATA_RPM_VERSION}
       MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
       MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
@@ -451,6 +416,7 @@ tests:
       ENABLEPEERPODS: "true"
       EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
       INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
+      INSTALL_TRUSTEE: ${INSTALL_TRUSTEE}
       KATA_RPM_VERSION: ${KATA_RPM_VERSION}
       MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
       MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
@@ -476,6 +442,7 @@ tests:
       ENABLEPEERPODS: "true"
       EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
       INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
+      INSTALL_TRUSTEE: "true"
       KATA_RPM_VERSION: ${KATA_RPM_VERSION}
       MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
       MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
@@ -534,17 +501,11 @@ EOF
     echo "  • AWS Region: ${AWS_REGION_OVERRIDE}"
     echo "  • Azure Region: ${CUSTOM_AZURE_REGION}"
     echo "  • Kata RPM: ${INSTALL_KATA_RPM} (${KATA_RPM_VERSION})"
+    echo "  • Install Trustee: ${INSTALL_TRUSTEE} (always true for coco workloads)"
     echo "  • Sleep Duration: ${SLEEP_DURATION}"
     echo "  • Test Timeout: ${TEST_TIMEOUT}"
-
-    if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-        echo "  • Catalog Source: ${CATALOG_SOURCE_NAME} (${CATALOG_SOURCE_IMAGE})"
-        echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME} (${TRUSTEE_CATALOG_SOURCE_IMAGE})"
-    else
-        echo "  • Catalog Source: ${CATALOG_SOURCE_NAME}"
-        echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME}"
-    fi
-
+    echo "  • Catalog Source: ${CATALOG_SOURCE_NAME} (${CATALOG_SOURCE_IMAGE})"
+    echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME} (${TRUSTEE_CATALOG_SOURCE_IMAGE})"
     echo "=========================================="
     echo "Generated file: ${OUTPUT_FILE}"
     echo "File size: ${file_size} bytes"
