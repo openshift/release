@@ -449,3 +449,22 @@ subjects:
 - apiGroup: rbac.authorization.k8s.io
   kind: Group
   name: ofcir-admin
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: ofcir-route
+  namespace: ofcir-system
+  labels:
+    internal: "true"
+  annotations:
+    haproxy.router.openshift.io/ip_allowlist: 10.29.0.0/18 10.28.64.0/18
+spec:
+  host: ofcir.apps-int.master.ci.devcluster.openshift.com
+  to:
+    kind: Service
+    name: ofcir-service
+  port:
+    targetPort: https
+  tls:
+    termination: passthrough
