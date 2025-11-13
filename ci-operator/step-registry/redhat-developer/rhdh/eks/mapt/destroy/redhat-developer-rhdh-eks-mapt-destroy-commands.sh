@@ -13,19 +13,17 @@ echo "AWS credentials loaded successfully"
 export PULUMI_K8S_DELETE_UNREACHABLE=true
 echo "PULUMI_K8S_DELETE_UNREACHABLE set to true"
 
-echo "Loading CORRELATE_MAPT from ${SHARED_DIR}..."
-CORRELATE_MAPT=$(cat ${SHARED_DIR}/CORRELATE_MAPT)
-FOLDER_NAME="eks-${CORRELATE_MAPT}"
-echo "Using folder: ${FOLDER_NAME}"
+echo "Setting CORRELATE_MAPT..."
+CORRELATE_MAPT="eks-${BUILD_ID}"
 
-echo "Destroying MAPT infrastructure for ${FOLDER_NAME}..."
+echo "Destroying MAPT infrastructure for ${CORRELATE_MAPT}..."
 mapt aws eks destroy \
   --project-name "eks" \
-  --backed-url "s3://${AWS_S3_BUCKET}/${FOLDER_NAME}"
+  --backed-url "s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}"
 
 echo "MAPT destroy completed successfully"
 
-echo "Deleting folder s3://${AWS_S3_BUCKET}/${FOLDER_NAME}/ from S3..."
-aws s3 rm "s3://${AWS_S3_BUCKET}/${FOLDER_NAME}/" --recursive
+echo "Deleting folder s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}/ from S3..."
+aws s3 rm "s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}/" --recursive
 
-echo "Successfully deleted folder ${FOLDER_NAME} from S3 bucket"
+echo "Successfully deleted folder ${CORRELATE_MAPT} from S3 bucket"

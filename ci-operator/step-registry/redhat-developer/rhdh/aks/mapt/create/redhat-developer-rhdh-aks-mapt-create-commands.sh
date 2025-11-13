@@ -13,9 +13,8 @@ ARM_TENANT_ID=$(cat /tmp/secrets/ARM_TENANT_ID)
 export AZURE_STORAGE_ACCOUNT AZURE_STORAGE_BLOB AZURE_STORAGE_KEY ARM_CLIENT_ID ARM_CLIENT_SECRET ARM_SUBSCRIPTION_ID ARM_TENANT_ID
 echo "Azure credentials loaded successfully"
 
-echo "Generating CORRELATE_MAPT..."
-CORRELATE_MAPT="aks-$(date "+%Y%m%d-%H%M%S-%3N")"
-echo "${CORRELATE_MAPT}" > ${SHARED_DIR}/CORRELATE_MAPT
+echo "Setting CORRELATE_MAPT..."
+CORRELATE_MAPT="eks-${BUILD_ID}"
 
 echo "Creating MAPT infrastructure for ${CORRELATE_MAPT}..."
 mapt azure aks create \

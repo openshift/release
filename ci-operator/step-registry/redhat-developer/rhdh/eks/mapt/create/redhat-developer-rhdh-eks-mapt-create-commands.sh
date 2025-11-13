@@ -10,9 +10,8 @@ AWS_S3_BUCKET=$(cat /tmp/secrets/AWS_S3_BUCKET)
 export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION AWS_S3_BUCKET
 echo "AWS credentials loaded successfully"
 
-echo "Generating CORRELATE_MAPT..."
-CORRELATE_MAPT="eks-$(date "+%Y%m%d-%H%M%S-%3N")"
-echo "${CORRELATE_MAPT}" > ${SHARED_DIR}/CORRELATE_MAPT
+echo "Setting CORRELATE_MAPT..."
+CORRELATE_MAPT="eks-${BUILD_ID}"
 
 echo "Creating MAPT infrastructure for ${CORRELATE_MAPT}..."
 mapt aws eks create \
