@@ -4,78 +4,52 @@ set -euxo pipefail; shopt -s inherit_errexit
 declare vmList="$(cat "${SHARED_DIR}/target-vm-name.txt")"
 
 : '--- Starting Check the VMs ---'
-: "Namespace: ${VM_NAMESPACE}"
+: "Namespace: ${LPC_LP_CNV_VM_CHECK__NS}"
 : '------------------------------'
 
 # Check vms status
 function CheckVmRunningStatus() {
-    : '--- Step 2: Checking All VM Status (VMI Ready Condition) ---'
     declare -i failedCount=0
     for vmName in ${vmList}; do
-        : "Checking VM: ${vmName}..."
-        oc -n "${VM_NAMESPACE}" wait "vmi/${vmName}" --for condition=Ready --timeout 0 || ((failedCount++))
+        oc -n "${LPC_LP_CNV_VM_CHECK__NS}" wait "vmi/${vmName}" --for condition=Ready --timeout 0 || ((failedCount++))
     done
     if ((failedCount > 0)); then
         echo "FATAL ERROR: ${failedCount} VM(s) failed the ready status check." >&2
         return 1
     fi
-    : 'All VMs are confirmed ready via API.'
 }
 
 # Install virtctl tool
 function InstallAndVerifyVirtctl() {
-    : '--- Step 1: Install & Verify virtctl from OpenShift Cluster ---'
-    if command -v virtctl &> /dev/null; then
-        # Extract GitVersion field (ignore redundant content before/after) - Local variable: lowerCamelCase
-        declare installedVersion
-        installedVersion=$(virtctl version --client 2>&1 | grep -oP 'GitVersion:"\K[^"]+' || true)
-        if [ -z "${installedVersion}" ]; then
-            installedVersion="Unknown (raw output: $(virtctl version --client 2>&1 | head -1))"
-        fi
-        : "virtctl already installed, version: ${installedVersion}"
+    declare binDir="/tmp/bin"
+    mkdir -p "${binDir}" || { echo "FATAL ERROR: Failed to create bin directory ${binDir}." >&2; return 1; }
+
+    declare baseURL
+    if ! baseURL=$(oc get ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'); then
+        echo "FATAL ERROR: Failed to get OpenShift cluster base domain." >&2; return 1
     fi
 
-    declare baseDomain
-    baseDomain=$(oc get ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}' 2>&1)
-    if [ $? -ne 0 ]; then
-        echo "FATAL ERROR: Failed to get OpenShift cluster base domain (oc command failed)" >&2
-        return 1
-    fi
-    declare virtctlHost="hyperconverged-cluster-cli-download-openshift-cnv.${baseDomain}"
-    declare virtctlDownloadUrl="https://${virtctlHost}/amd64/linux/virtctl.tar.gz"
-
-    : "Downloading virtctl from: ${virtctlDownloadUrl}"
-    if ! curl -k -L --output /tmp/virtctl.tar.gz "${virtctlDownloadUrl}"; then
-        echo "FATAL ERROR: Failed to download virtctl from OpenShift cluster" >&2
-        return 1
+    declare dlURL="https://hyperconverged-cluster-cli-download-openshift-cnv.${baseURL}/amd64/linux/virtctl.tar.gz"
+    if ! curl -kfsSL "${dlURL}" | tar zx -C "${binDir}"; then
+        echo "FATAL ERROR: Failed to download and extract virtctl." >&2; return 1
     fi
 
-    tar -zxf /tmp/virtctl.tar.gz -C /tmp/
-    export PATH=/tmp:$PATH
-    chmod +x /tmp/virtctl
-    rm -f /tmp/virtctl.tar.gz
-
-    if ! command -v virtctl &> /dev/null; then
-        echo "FATAL ERROR: virtctl unexecutable after installation (check permissions/path)" >&2
-        return 1
+    if ! [[ "${PATH}" =~ :?"${binDir}":? ]]; then
+        export PATH="${binDir}:${PATH}"
     fi
 
-    declare newVersion
-    newVersion=$(virtctl version --client 2>&1 | grep -oP 'GitVersion:"\K[^"]+' || true)
-    if [ -z "${newVersion}" ]; then
-        newVersion="Unknown (raw output: $(virtctl version --client 2>&1 | head -1))"
+    if ! virtctl version --client; then
+        echo "FATAL ERROR: virtctl installed but failed to execute after setup." >&2; return 1
     fi
-    : "virtctl installed successfully, version: ${newVersion}"
 }
 
 # Check ssh availability
 function CheckVmSshAccess() {
-    : '--- Step 3: Check SSH Availability (Port Open = Pass) ---'
     declare -i sshFailedCount=0
     for vmName in ${vmList}; do
         : "Testing SSH availability for VM ${vmName}..."
         declare sshOutput
-        sshOutput=$(virtctl ssh root@"${vmName}" --namespace "${VM_NAMESPACE}" \
+        sshOutput=$(virtctl ssh root@"${vmName}" --namespace "${LPC_LP_CNV_VM_CHECK__NS}" \
     --local-ssh-opts "-o BatchMode=yes" \
     --local-ssh-opts "-o StrictHostKeyChecking=no" \
     --local-ssh-opts "-o ConnectTimeout=3" 2>&1 | grep "Permission denied" || true)

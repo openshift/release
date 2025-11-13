@@ -11,19 +11,22 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM cli
-
+    RUN <<run-EOF
+    set -exo pipefail
     # Install openssh-clients and jq
-    RUN PACKAGES="openssh-clients jq" && \
-        (dnf install --setopt=tsflags=nodocs -y $PACKAGES || microdnf install -y $PACKAGES) && \
-        (dnf clean all || microdnf clean all) && rm -rf /var/cache/dnf/*
-
+    declare pkgs='openssh-clients jq' &&
+    if command -v dnf 1> /dev/null; then
+        dnf install --setopt tsflags=nodocs -y "${pkgs}"
+        dnf clean all
+    else
+        microdnf install -y "${pkgs}"
+        microdnf clean all
+    fi
+    rm -rf /var/cache/dnf/*
     # Install yq
-    RUN YQ_PATH="/usr/local/bin/yq" && \
-        curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o "${YQ_PATH}" && \
-        chmod +x "${YQ_PATH}"
-
-    # Verification
-    RUN jq --version && yq --version && ssh -V
+    wget -qO - 'https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64.tar.gz' |
+        tar zvx -C /usr/local/bin/ --transform 's|^\./yq_linux_amd64$|yq|' ./yq_linux_amd64
+    run-EOF
   from: cli
   to: cli-plus-tools
 releases:
@@ -47,8 +50,8 @@ tests:
     env:
       BASE_DOMAIN: test.lp.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.metal
-      VM_REPLICA_COUNT: "3"
-      VM_WAIT_TIMEOUT: 30m
+      LPC_LP_CNV_VM_CREATE__REPLICA_COUNT: "3"
+      LPC_LP_CNV_VM_CREATE__WAIT_TIMEOUT: 30m
     test:
     - ref: redhat-lp-chaos-lp-cnv-vm-create
     - ref: redhat-chaos-pod-scenarios-etcd-disruption

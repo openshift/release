@@ -6,20 +6,20 @@ declare vmList=""
 declare vmNamesForWait=""
 
 : '--- Target Configuration Summary ---'
-: "VM_NUM: ${VM_REPLICA_COUNT} | InstanceType: ${VM_INSTANCE_TYPE}"
-: "Source: ${DV_SOURCE_NAME} (NS: ${DV_SOURCE_NS})"
+: "VM_NUM: ${LPC_LP_CNV_VM_CREATE__REPLICA_COUNT} | InstanceType: ${LPC_LP_CNV_VM_CREATE__INSTANCE_TYPE}"
+: "Source: ${LPC_LP_CNV_VM_CREATE__DV_SOURCE_NAME} (NS: ${LPC_LP_CNV_VM_CREATE__DV_SOURCE_NS})"
 : '------------------------------------'
 
-: "--- 1. Creating namespace ${VM_NAMESPACE} ---"
+# Create namespace
 {
-    oc create namespace "${VM_NAMESPACE}" \
+    oc create namespace "${LPC_LP_CNV_VM_CREATE__NS}" \
         --dry-run=client -o yaml --save-config
 } | oc apply -f -
 
-: '--- 2. Create virtualmachine ---'
+# Create vms
 function vm_create() {
   declare vmIndex="${1}"; (($#)) && shift
-  declare currentVmName="${VM_NAME_PREFIX}-${vmIndex}"
+  declare currentVmName="${LPC_LP_CNV_VM_CREATE__NAME_PREFIX}-${vmIndex}"
   : "Submitting target VirtualMachine ${currentVmName}"
   # The DataVolume is automatically created via dataVolumeTemplates
   {
@@ -27,11 +27,11 @@ function vm_create() {
     yq -o json eval . | \
     jq -c \
         --arg vmName "${currentVmName}" \
-        --arg vmNamespace "${VM_NAMESPACE}" \
-        --arg instanceType "${VM_INSTANCE_TYPE}" \
-        --arg dvSourceName "${DV_SOURCE_NAME}" \
-        --arg dvSourceNs "${DV_SOURCE_NS}" \
-        --arg vmPreference "${VM_PREFERENCE}" \
+        --arg vmNamespace "${LPC_LP_CNV_VM_CREATE__NS}" \
+        --arg instanceType "${LPC_LP_CNV_VM_CREATE__INSTANCE_TYPE}" \
+        --arg dvSourceName "${LPC_LP_CNV_VM_CREATE__DV_SOURCE_NAME}" \
+        --arg dvSourceNs "${LPC_LP_CNV_VM_CREATE__DV_SOURCE_NS}" \
+        --arg vmPreference "${LPC_LP_CNV_VM_CREATE__PREFERENCE}" \
         '
         # 1. Replace metadata (name, namespace)
         .metadata.name = $vmName |
@@ -98,15 +98,15 @@ EOF
 }
 
 : '--- 3. Main execution logic ---'
-for ((i=1; i<=${VM_REPLICA_COUNT}; i++)); do
-    : "=== Start to create the ${i} vm (Total: ${VM_REPLICA_COUNT})"
+for ((i=1; i<=${LPC_LP_CNV_VM_CREATE__REPLICA_COUNT}; i++)); do
+    : "=== Start to create the ${i} vm (Total: ${LPC_LP_CNV_VM_CREATE__REPLICA_COUNT})"
     vm_create "${i}"
-    vmList+="${VM_NAME_PREFIX}-${i} "
-    vmNamesForWait+="vm/${VM_NAME_PREFIX}-${i} "
+    vmList+="${LPC_LP_CNV_VM_CREATE__NAME_PREFIX}-${i} "
+    vmNamesForWait+="vm/${LPC_LP_CNV_VM_CREATE__NAME_PREFIX}-${i} "
 done
   : 'Waiting for VMs to enter Ready state...'
   # This single wait command ensures both DV cloning AND VM startup are complete.
-  oc wait ${vmNamesForWait} -n "${VM_NAMESPACE}" --for=condition=Ready --timeout="${VM_WAIT_TIMEOUT}"
+  oc wait ${vmNamesForWait} -n "${LPC_LP_CNV_VM_CREATE__NS}" --for=condition=Ready --timeout="${LPC_LP_CNV_VM_CREATE__WAIT_TIMEOUT}"
 
 : '--- 4. Passing variables to subsequent steps (SHARED_DIR) ---'
 # Prow mechanism: write VM name and namespace to SHARED_DIR
