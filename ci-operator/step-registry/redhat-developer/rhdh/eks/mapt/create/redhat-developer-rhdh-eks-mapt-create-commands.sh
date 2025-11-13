@@ -1,6 +1,43 @@
 #!/bin/bash
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
+
+function cleanup() {
+  # Temporarily disable exit on error to capture failures
+  set +o errexit
+
+  export PULUMI_K8S_DELETE_UNREACHABLE=true
+  echo "PULUMI_K8S_DELETE_UNREACHABLE set to true"
+
+  echo "Destroying MAPT infrastructure for ${CORRELATE_MAPT}..."
+
+  # Capture both stdout and stderr to check for errors
+  output=$(mapt aws eks destroy \
+    --project-name "eks" \
+    --backed-url "s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}" 2>&1)
+  exit_code=$?
+
+  # Re-enable exit on error
+  set -o errexit
+
+  # Check for both exit code and error patterns in output
+  if [ $exit_code -eq 0 ] && ! echo "$output" | grep -qiE "(stderr|error|failed|exit status [1-9])"; then
+    echo "$output"
+    echo "✅ Successfully destroyed MAPT: ${CORRELATE_MAPT}"
+
+    echo "Deleting folder s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}/ from S3..."
+    aws s3 rm "s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}/" --recursive
+
+    echo "✅ Successfully deleted folder ${CORRELATE_MAPT} from S3 bucket"
+  else
+    echo "$output"
+    echo "❌ Failed to destroy MAPT: ${CORRELATE_MAPT}"
+    echo "⚠️  Skipping deletion of folder ${CORRELATE_MAPT} from S3 due to destroy failure"
+    exit 1
+  fi
+}
 
 echo "Loading AWS credentials from secrets..."
 AWS_ACCESS_KEY_ID=$(cat /tmp/secrets/AWS_ACCESS_KEY_ID)
@@ -12,6 +49,9 @@ echo "AWS credentials loaded successfully"
 
 echo "Setting CORRELATE_MAPT..."
 CORRELATE_MAPT="eks-${BUILD_ID}"
+export CORRELATE_MAPT
+
+trap cleanup EXIT TERM
 
 echo "Creating MAPT infrastructure for ${CORRELATE_MAPT}..."
 mapt aws eks create \

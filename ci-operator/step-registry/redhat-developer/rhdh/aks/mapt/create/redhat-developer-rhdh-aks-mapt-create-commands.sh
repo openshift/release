@@ -1,6 +1,47 @@
 #!/bin/bash
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
+
+function cleanup() {
+  # Temporarily disable exit on error to capture failures
+  set +o errexit
+
+  export PULUMI_K8S_DELETE_UNREACHABLE=true
+  echo "PULUMI_K8S_DELETE_UNREACHABLE set to true"
+
+  echo "Destroying MAPT infrastructure for ${CORRELATE_MAPT}..."
+
+  # Capture both stdout and stderr to check for errors
+  output=$(mapt azure aks destroy \
+    --project-name "aks" \
+    --backed-url "azblob://${AZURE_STORAGE_BLOB}/${CORRELATE_MAPT}" 2>&1)
+  exit_code=$?
+
+  # Re-enable exit on error
+  set -o errexit
+
+  # Check for both exit code and error patterns in output
+  if [ $exit_code -eq 0 ] && ! echo "$output" | grep -qiE "(stderr|error|failed|exit status [1-9])"; then
+    echo "$output"
+    echo "✅ Successfully destroyed MAPT: ${CORRELATE_MAPT}"
+
+    echo "Deleting folder ${CORRELATE_MAPT}/ from Azure Blob Storage..."
+    az storage blob delete-batch \
+      --source "${AZURE_STORAGE_BLOB}" \
+      --account-name "${AZURE_STORAGE_ACCOUNT}" \
+      --account-key "${AZURE_STORAGE_KEY}" \
+      --pattern "${CORRELATE_MAPT}/*"
+
+    echo "✅ Successfully deleted folder ${CORRELATE_MAPT} from blob container"
+  else
+    echo "$output"
+    echo "❌ Failed to destroy MAPT: ${CORRELATE_MAPT}"
+    echo "⚠️  Skipping deletion of folder ${CORRELATE_MAPT} from Azure Blob Storage due to destroy failure"
+    exit 1
+  fi
+}
 
 echo "Loading Azure credentials from secrets..."
 AZURE_STORAGE_ACCOUNT=$(cat /tmp/secrets/AZURE_STORAGE_ACCOUNT)
@@ -15,6 +56,9 @@ echo "Azure credentials loaded successfully"
 
 echo "Setting CORRELATE_MAPT..."
 CORRELATE_MAPT="aks-${BUILD_ID}"
+export CORRELATE_MAPT
+
+trap cleanup EXIT TERM
 
 echo "Creating MAPT infrastructure for ${CORRELATE_MAPT}..."
 mapt azure aks create \
