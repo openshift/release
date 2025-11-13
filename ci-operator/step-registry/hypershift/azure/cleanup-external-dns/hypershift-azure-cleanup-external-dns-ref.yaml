@@ -1,0 +1,29 @@
+ref:
+  as: hypershift-azure-cleanup-external-dns
+  from: upi-installer
+  commands: hypershift-azure-cleanup-external-dns-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 10m0s
+  grace_period: 1m0s
+  env:
+  - name: USE_HYPERSHIFT_AZURE_CREDS
+    default: "false"
+    documentation: "If true, use hypershift azure credentials"
+  - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+    default: ""
+    documentation: "The external DNS domain used by the cluster (e.g., aks-e2e.hypershift.azure.devcluster.openshift.com)"
+  - name: EXTERNAL_DNS_ZONE_RESOURCE_GROUP
+    default: "os4-common"
+    documentation: "The resource group containing the external DNS zone"
+  credentials:
+    - mount_path: /etc/hypershift-ci-jobs-azurecreds
+      name: hypershift-ci-jobs-azurecreds
+      namespace: test-credentials
+  documentation: |-
+    This step cleans up DNS records created by external-dns for a HyperShift cluster.
+    It deletes DNS records in the external DNS zone that match the cluster name pattern.
+    This prevents DNS record leaks when the AKS cluster (and external-dns controller)
+    is deleted before it can clean up the records.
