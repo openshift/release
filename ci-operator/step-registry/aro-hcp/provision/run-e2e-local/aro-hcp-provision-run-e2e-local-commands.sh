@@ -20,7 +20,7 @@ mkdir -p /tmp/tools
 az aks install-cli --install-location /tmp/tools/kubectl --kubelogin-install-location /tmp/tools/kubelogin
 # Install newer curl with --json support
 #curl -L https://github.com/moparisthebest/static-curl/releases/latest/download/curl-amd64 -o /tmp/tools/curl
-chmod +x /tmp/tools/curl
+#chmod +x /tmp/tools/curl
 #/tmp/tools/curl --version
 /tmp/tools/kubectl version
 /tmp/tools/kubelogin --version
