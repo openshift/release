@@ -39,8 +39,7 @@ else
    make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow
 fi
 make -C dev-infrastructure/ svc.aks.kubeconfig SVC_KUBECONFIG_FILE=../kubeconfig
-export KUBECONFIG=kubeconfig 
-make visualize TIMING_OUTPUT=${SHARED_DIR}/steps.yaml VISUALIZATION_OUTPUT=${ARTIFACT_DIR}/timing
+export KUBECONFIG=kubeconfig
 
 PIDFILE="/tmp/svc-tunnel.pid"
 start_tunnel() {
