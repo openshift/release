@@ -5,12 +5,19 @@ echo "INFO: Step1: Create namespace nfs-provisioner."
 # create all related resource on nfs-provisioner namespace
 oc create ns nfs-provisioner
 
+echo "Label namespace to allow privileged pods (required for NFS provisioner)" 
+oc label ns nfs-provisioner --overwrite \
+  security.openshift.io/scc.podSecurityLabelSync=false \
+  pod-security.kubernetes.io/enforce=privileged \
+  pod-security.kubernetes.io/audit=privileged \
+  pod-security.kubernetes.io/warn=privileged
 
 echo "INFO: Step2: Deploy nfs-provisioner."
 # Make sure nfs-provisioner deployed on the same node which changed security context
 worker0=$(oc get nodes --show-labels |grep worker|grep -v SchedulingDisabled|awk '{print $6}'|head -1|awk -F ',' '{ORS="\n"; for(i=1;i<=NF;i++) print $i}' | grep hostname | awk -F '=' '{print $NF}')
 oc annotate ns nfs-provisioner scheduler.alpha.kubernetes.io/node-selector=kubernetes.io/hostname="${worker0}" --overwrite
 
+echo "Creating service account, service and deployment"
 #deployment from https://raw.githubusercontent.com/openshift/external-storage/master/nfs/deploy/kubernetes/deployment.yaml
 oc -n nfs-provisioner create -f - <<EOF
 apiVersion: v1
@@ -153,6 +160,7 @@ spec:
             path: "/srv"
 EOF
 
+echo "Creating SecurityContextConstraints"
 # scc from https://raw.githubusercontent.com/openshift/external-storage/master/nfs/deploy/kubernetes/scc.yaml
 oc apply -f - <<EOF
 allowHostDirVolumePlugin: true
@@ -193,6 +201,7 @@ volumes:
 EOF
 
 #rbac from https://raw.githubusercontent.com/openshift/external-storage/master/nfs/deploy/kubernetes/rbac.yaml
+echo "Creating ClusterRole, ClusterRoleBinding, Role"
 oc -n nfs-provisioner apply -f - <<EOF
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
@@ -257,6 +266,7 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 EOF
 
+echo "Creating ClusterRole, ClusterRoleBinding, Role"
 oc adm policy add-scc-to-user nfs-provisioner system:serviceaccount:nfs-provisioner:nfs-provisioner
 oc adm policy add-scc-to-user privileged system:serviceaccount:nfs-provisioner:nfs-provisioner
 
