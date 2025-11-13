@@ -72,12 +72,78 @@ tests:
         git clone https://github.com/opendatahub-io/kserve.git /tmp/kserve
         pushd /tmp/kserve
           git fetch --all --tags
-          git checkout master
+          git checkout release-v0.15
           export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
           export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
 
-          ./test/scripts/gh-actions/setup-uv.sh
           ./test/scripts/openshift-ci/run-e2e-tests.sh raw 2 raw
+        popd
+      dependencies:
+      - env: ODH_MODEL_CONTROLLER_IMAGE
+        name: odh-model-controller
+      from: odhmc-kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: |
+        cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log "${ARTIFACT_DIR}/" || true
+      from: odhmc-kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: kserve-must-gather
+      best_effort: true
+      cli: latest
+      commands: |
+        oc adm must-gather \
+          --image=quay.io/modh/must-gather:rhoai-2.24 \
+          --dest-dir "${ARTIFACT_DIR}/gather-kserve" \
+          -- "export COMPONENT=kserve; /usr/bin/gather"
+      from: odhmc-kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: odhmc-kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    workflow: hypershift-hostedcluster-workflow
+- always_run: false
+  as: e2e-odh-llmisvc
+  optional: true
+  skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.*/)?(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: llmisvc
+      cli: latest
+      commands: |
+        set -euxo pipefail
+        echo "ODH_MODEL_CONTROLLER_IMAGE=${ODH_MODEL_CONTROLLER_IMAGE}"
+
+        git clone https://github.com/opendatahub-io/kserve.git /tmp/kserve
+        pushd /tmp/kserve
+          git fetch --all --tags
+          git checkout release-v0.15
+          export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
+          export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
+
+          ./test/scripts/openshift-ci/run-e2e-tests.sh "llminferenceservice and (cluster_cpu and cluster_single_node)" 2 "llm-d"
         popd
       dependencies:
       - env: ODH_MODEL_CONTROLLER_IMAGE
