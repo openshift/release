@@ -243,14 +243,16 @@ function ci_custom_link_report() {
             junit_file="${test}/junit.xml"
         elif [ -f "${test}/ginkgo-results/test-output.log" ]; then
             junit_file="$( find "${test}/ginkgo-results" -name "junit_e2e_*.xml" -type f | head -1 )"
+        elif [ -f "${test}/gingko-results/test-output.log" ]; then
+            junit_file="$( find "${test}/gingko-results" -name "junit_e2e_*.xml" -type f | head -1 )"
         fi
-        
+
         # Determine scenario status
-        local scenario_status="skip"
-        if [ -f "${junit_file}" ] && grep -q -E 'failures="[1-9][0-9]*"' "${junit_file}"; then
+        local scenario_status="pass"
+        if [ ! -d "${test}/vms/" ] || [ ! -f "${junit_file}" ]; then
+            scenario_status="skip"
+        elif [ -f "${junit_file}" ] && grep -q -E 'failures="[1-9][0-9]?"' "${junit_file}"; then
             scenario_status="fail"
-        elif [ -d "${test}/vms/" ]; then
-            scenario_status="pass"
         fi
         
         # Count by status
