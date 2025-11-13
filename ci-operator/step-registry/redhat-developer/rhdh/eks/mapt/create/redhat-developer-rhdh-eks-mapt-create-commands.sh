@@ -51,7 +51,8 @@ echo "Setting CORRELATE_MAPT..."
 CORRELATE_MAPT="eks-${BUILD_ID}"
 export CORRELATE_MAPT
 
-trap cleanup EXIT TERM
+# Trap TERM signal (job was interrupted/cancelled) into cleanup function to ensure MAPT infrastructure is destroyed
+trap cleanup TERM
 
 echo "Creating MAPT infrastructure for ${CORRELATE_MAPT}..."
 mapt aws eks create \

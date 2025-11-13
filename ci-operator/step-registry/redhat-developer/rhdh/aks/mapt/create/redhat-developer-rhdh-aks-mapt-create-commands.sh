@@ -58,7 +58,8 @@ echo "Setting CORRELATE_MAPT..."
 CORRELATE_MAPT="aks-${BUILD_ID}"
 export CORRELATE_MAPT
 
-trap cleanup EXIT TERM
+# Trap TERM signal (job was interrupted/cancelled) into cleanup function
+trap cleanup TERM
 
 echo "Creating MAPT infrastructure for ${CORRELATE_MAPT}..."
 mapt azure aks create \
