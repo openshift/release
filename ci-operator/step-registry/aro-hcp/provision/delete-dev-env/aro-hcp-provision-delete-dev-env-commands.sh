@@ -30,3 +30,4 @@ PATH=$(go env GOPATH)/bin:$PATH
 export PATH
 make cleanup-entrypoint/Region DEPLOY_ENV=prow CLEANUP_DRY_RUN=false CLEANUP_WAIT=false
 make visualize TIMING_OUTPUT=${SHARED_DIR}/steps.yaml VISUALIZATION_OUTPUT=${ARTIFACT_DIR}/timing
+cp ${SHARED_DIR}/timing.yaml ${ARTIFACT_DIR}

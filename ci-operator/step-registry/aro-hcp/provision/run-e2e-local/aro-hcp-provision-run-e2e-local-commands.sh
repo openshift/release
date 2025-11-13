@@ -19,9 +19,6 @@ az account show
 mkdir -p /tmp/tools
 az aks install-cli --install-location /tmp/tools/kubectl --kubelogin-install-location /tmp/tools/kubelogin
 # Install newer curl with --json support
-#curl -L https://github.com/moparisthebest/static-curl/releases/latest/download/curl-amd64 -o /tmp/tools/curl
-#chmod +x /tmp/tools/curl
-#/tmp/tools/curl --version
 /tmp/tools/kubectl version
 /tmp/tools/kubelogin --version
 
@@ -33,12 +30,9 @@ unset GOFLAGS
 make install-tools
 PATH=$(go env GOPATH)/bin:$PATH
 export PATH
-if make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow ; then
-   :
-else
-   make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow
-fi
-make -C dev-infrastructure/ svc.aks.kubeconfig SVC_KUBECONFIG_FILE=../kubeconfig
+make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow 
+
+make -C dev-infrastructure/ svc.aks.kubeconfig SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
 export KUBECONFIG=kubeconfig
 
 PIDFILE="/tmp/svc-tunnel.pid"
@@ -90,6 +84,9 @@ start_tunnel
 unset GOFLAGS
 export LOCATION="westus3"
 export AROHCP_ENV="development"
+curl -L https://github.com/moparisthebest/static-curl/releases/latest/download/curl-amd64 -o /tmp/tools/curl
+chmod +x /tmp/tools/curl
+curl --version
 cd demo
 ./01-register-sub.sh
 cd ..
