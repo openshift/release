@@ -91,6 +91,7 @@ ENV_DATA:
   platform: 'vsphere'
 __EOF__
 
+sleep 7h
 
 set -x
 START_TIME=$(date "+%s")
@@ -133,5 +134,3 @@ fi
 if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
 	oc apply -f /tmp/acm-policy-subscription-backup.yaml
 fi
-
-sleep 7h
