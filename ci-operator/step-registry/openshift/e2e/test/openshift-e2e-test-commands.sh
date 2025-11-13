@@ -11,6 +11,9 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
+echo "Sleeping for 3 hours"
+sleep 10800
+
 echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
 
 # In order for openshift-tests to pull external binary images from the
