@@ -172,7 +172,7 @@ allowPrivilegedContainer: false
 allowedCapabilities:
 - DAC_READ_SEARCH
 - SYS_RESOURCE
-apiVersion: v1
+apiVersion: security.openshift.io/v1
 defaultAddCapabilities: null
 fsGroup:
   type: MustRunAs
