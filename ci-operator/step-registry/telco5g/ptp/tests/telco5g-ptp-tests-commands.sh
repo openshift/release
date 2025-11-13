@@ -163,16 +163,15 @@ spec:
     sleep $sleep_time
   done
 
+  # print the build logs
+  oc -n openshift-ptp logs podman
+
   if [[ $success -eq 1 ]]; then
     echo "[INFO] index build succeeded"
   else
     echo "[ERROR] index build failed"
     exit 1
   fi
-
-  # print the build logs
-  oc -n openshift-ptp logs podman
-
 }
 
 # Define the function to retry a command with a timeout
