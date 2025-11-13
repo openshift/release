@@ -30,21 +30,20 @@ chmod +x /tmp/tools/curl
 
 # Add to PATH
 export PATH="/tmp/tools:$PATH"
-export USER="p${BUILD_ID: -3}"
 PRINCIPAL_ID=$(az ad sp show --id "${TEST_USER_CLIENT_ID}" --query id -o tsv)
 export PRINCIPAL_ID
 unset GOFLAGS
 make install-tools
 PATH=$(go env GOPATH)/bin:$PATH
 export PATH
-if make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml; then
-   #generates some cache outputs so running twice .
-   make -C dev-infrastructure/ svc.aks.kubeconfig SVC_KUBECONFIG_FILE=../kubeconfig
-   export KUBECONFIG=kubeconfig
+if make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow ; then
+   :
+else
+   make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow
 fi
-#todo until prow env pr is merged
-#make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow
-#make visualize TIMING_OUTPUT=${SHARED_DIR}/steps.yaml VISUALIZATION_OUTPUT=${ARTIFACT_DIR}/timing
+make -C dev-infrastructure/ svc.aks.kubeconfig SVC_KUBECONFIG_FILE=../kubeconfig
+export KUBECONFIG=kubeconfig 
+make visualize TIMING_OUTPUT=${SHARED_DIR}/steps.yaml VISUALIZATION_OUTPUT=${ARTIFACT_DIR}/timing
 
 PIDFILE="/tmp/svc-tunnel.pid"
 start_tunnel() {
