@@ -76,7 +76,7 @@ ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deplo
     --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=$VERSION disconnected=$DISCONNECTED operators='$OPERATORS'"
 
 # configure lso 
-ansible-playbook playbooks/ran/configure-lvm-storage.yml -i ./inventories/ocp-deployment/build-inventory.py \
+ansible-playbook playbooks/ran/hub-sno-configure-lvm-storage.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH}" -vv
 
 # configure acm
