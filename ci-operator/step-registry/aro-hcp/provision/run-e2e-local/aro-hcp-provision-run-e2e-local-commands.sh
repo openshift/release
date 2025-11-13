@@ -1,10 +1,9 @@
 #!/bin/bash
-# Create an ARO HCP Cluster + Node pool using bicep.
 set -o errexit
 set -o nounset
 set -o pipefail
 
-set -x # Turn on command tracing
+set -x
 
 # read the secrets and login as the user
 export TEST_USER_CLIENT_ID; TEST_USER_CLIENT_ID=$(cat /var/run/hcp-integration-credentials/client-id)
@@ -17,9 +16,7 @@ az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
 az account show
 
 # install required tools
-# Create tools directory
 mkdir -p /tmp/tools
-# installs kubectl and kubelogin
 az aks install-cli --install-location /tmp/tools/kubectl --kubelogin-install-location /tmp/tools/kubelogin
 # Install newer curl with --json support
 curl -L https://github.com/moparisthebest/static-curl/releases/latest/download/curl-amd64 -o /tmp/tools/curl

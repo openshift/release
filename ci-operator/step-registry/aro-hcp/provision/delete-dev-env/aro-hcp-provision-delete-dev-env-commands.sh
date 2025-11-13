@@ -2,7 +2,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-
 set -x
 
 # read the secrets and login as the user
