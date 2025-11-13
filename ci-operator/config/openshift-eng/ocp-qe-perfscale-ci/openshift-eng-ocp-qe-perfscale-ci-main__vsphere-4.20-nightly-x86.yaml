@@ -69,11 +69,23 @@ tests:
     workflow: openshift-qe-installer-vsphere-ipi-ovn
   timeout: 5h0m0s
 - always_run: false
-  as: control-plane-24nodes
+  as: control-plane-24nodes-rook
   steps:
     allow_skip_on_success: true
     cluster_profile: vsphere-connected-2
     env:
+      WORKER_REPLICA_COUNT: "24"
+    test:
+    - chain: workers-scale
+    - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-vsphere-ipi-ovn
+  timeout: 5h0m0s
+- always_run: false
+  as: elastic-control-plane-24nodes
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
       WORKER_REPLICA_COUNT: "24"
     test:
     - chain: workers-scale
@@ -114,7 +126,7 @@ tests:
     workflow: openshift-qe-installer-vsphere-ipi-ovn
   timeout: 5h0m0s
 - always_run: false
-  as: data-path-9nodes
+  as: data-path-9nodes-rook
   steps:
     allow_skip_on_success: true
     cluster_profile: vsphere-connected-2
