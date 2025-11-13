@@ -1,6 +1,8 @@
 #!/bin/bash
 
-set -e
+set -o errexit
+set -o nounset
+set -o pipefail
 
 echo "Loading AWS credentials from secrets..."
 AWS_ACCESS_KEY_ID=$(cat /tmp/secrets/AWS_ACCESS_KEY_ID)
@@ -19,7 +21,7 @@ CORRELATE_MAPT="eks-${BUILD_ID}"
 echo "Destroying MAPT infrastructure for ${CORRELATE_MAPT}..."
 
 # Temporarily disable exit on error to capture failures
-set +e
+set +o errexit
 
 # Capture both stdout and stderr to check for errors
 output=$(mapt aws eks destroy \
@@ -28,7 +30,19 @@ output=$(mapt aws eks destroy \
 exit_code=$?
 
 # Re-enable exit on error
-set -e
+set -o errexit
+
+# Check if the stack is locked
+if echo "$output" | grep -qiE "the stack is currently locked"; then
+  echo "$output"
+  echo "⚠️  Stack is currently locked, skipping destroy operations for ${CORRELATE_MAPT}"
+  echo ""
+  echo "Possible reasons:"
+  echo "  a) Job was interrupted/cancelled: destroy post-step ran before create pre-step finished."
+  echo "     Cleanup will be handled by the trap in the create pre-step."
+  echo "  b) Other error occurred: infrastructure will be cleaned up by the weekly destroy-orphaned job."
+  exit 0
+fi
 
 # Check for both exit code and error patterns in output
 if [ $exit_code -eq 0 ] && ! echo "$output" | grep -qiE "(stderr|error|failed|exit status [1-9])"; then
