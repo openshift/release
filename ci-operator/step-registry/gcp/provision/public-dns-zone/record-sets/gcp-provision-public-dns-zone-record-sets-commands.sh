@@ -48,3 +48,40 @@ do
 gcloud --project ${project_id} dns record-sets delete ${name} --type ${record_type} --zone ${base_domain_zone_name}
 EOF
 done
+
+echo "Verifying the created DNS records can be resolved ..."
+
+# Verify each created record
+for i in $(seq 0 $((count-1)));
+do
+    name=$(jq --argjson i $i -r '.[$i].name' ${SHARED_DIR}/public_custom_dns.json)
+    target=$(jq --argjson i $i -r '.[$i].target' ${SHARED_DIR}/public_custom_dns.json)
+    record_type=$(jq --argjson i $i -r '.[$i].record_type' ${SHARED_DIR}/public_custom_dns.json)
+
+    echo "Verifying record: $name ($record_type)"
+    # Try up to 30 times with 10 second intervals (5 minutes total)
+    retry_count=0
+    max_retries=30
+    verified=false
+
+    while [[ $retry_count -lt $max_retries ]]; do
+        if dig +short ${name} ${record_type} | grep -qF "${target}"; then
+            echo "Record ${name} verified and resolvable"
+            verified=true
+            break
+        fi
+
+        retry_count=$((retry_count + 1))
+        if [[ $retry_count -lt $max_retries ]]; then
+            echo "Waiting for DNS propagation... (attempt ${retry_count}/${max_retries})"
+            sleep 10
+        fi
+    done
+
+    if [[ "${verified}" != "true" ]]; then
+        echo "ERROR: Record ${name} could not be resolved after ${max_retries} attempts"
+        exit 1
+    fi
+done
+
+echo "DNS verification complete"
