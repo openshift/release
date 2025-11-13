@@ -87,6 +87,8 @@ REPORTING:
   default_ocs_must_gather_latest_tag: "latest-${ODF_VERSION_MAJOR_MINOR}"
 DEPLOYMENT:
   skip_download_client: True
+ENV_DATA:
+  platform: 'vsphere'
 __EOF__
 
 
@@ -131,3 +133,5 @@ fi
 if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
 	oc apply -f /tmp/acm-policy-subscription-backup.yaml
 fi
+
+sleep 7h
