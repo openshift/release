@@ -4,21 +4,21 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-echo "Loading AWS credentials from secrets..."
+echo "🔐 Loading AWS credentials from secrets..."
 AWS_ACCESS_KEY_ID=$(cat /tmp/secrets/AWS_ACCESS_KEY_ID)
 AWS_SECRET_ACCESS_KEY=$(cat /tmp/secrets/AWS_SECRET_ACCESS_KEY)
 AWS_DEFAULT_REGION=$(cat /tmp/secrets/AWS_DEFAULT_REGION)
 AWS_S3_BUCKET=$(cat /tmp/secrets/AWS_S3_BUCKET)
 export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION AWS_S3_BUCKET
-echo "AWS credentials loaded successfully"
+echo "✅ AWS credentials loaded successfully"
 
 export PULUMI_K8S_DELETE_UNREACHABLE=true
 echo "PULUMI_K8S_DELETE_UNREACHABLE set to true"
 
-echo "Setting CORRELATE_MAPT..."
+echo "🏷️ Setting CORRELATE_MAPT..."
 CORRELATE_MAPT="eks-${BUILD_ID}"
 
-echo "Destroying MAPT infrastructure for ${CORRELATE_MAPT}..."
+echo "🗑️ Destroying MAPT infrastructure for ${CORRELATE_MAPT}..."
 
 # Temporarily disable exit on error to capture failures
 set +o errexit
@@ -35,7 +35,7 @@ set -o errexit
 # Check if the stack is locked
 if echo "$output" | grep -qiE "the stack is currently locked"; then
   echo "$output"
-  echo "⚠️  Stack is currently locked, skipping destroy operations for ${CORRELATE_MAPT}"
+  echo "⚠️ Stack is currently locked, skipping destroy operations for ${CORRELATE_MAPT}"
   echo ""
   echo "Possible reasons:"
   echo "  a) Job was interrupted/cancelled: destroy post-step ran before create pre-step finished."
@@ -49,13 +49,13 @@ if [ $exit_code -eq 0 ] && ! echo "$output" | grep -qiE "(stderr|error|failed|ex
   echo "$output"
   echo "✅ Successfully destroyed MAPT: ${CORRELATE_MAPT}"
   
-  echo "Deleting folder s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}/ from S3..."
+  echo "🗑️ Deleting folder s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}/ from S3..."
   aws s3 rm "s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}/" --recursive
   
   echo "✅ Successfully deleted folder ${CORRELATE_MAPT} from S3 bucket"
 else
   echo "$output"
   echo "❌ Failed to destroy MAPT: ${CORRELATE_MAPT}"
-  echo "⚠️  Skipping deletion of folder ${CORRELATE_MAPT} from S3 due to destroy failure"
+  echo "⚠️ Skipping deletion of folder ${CORRELATE_MAPT} from S3 due to destroy failure"
   exit 1
 fi

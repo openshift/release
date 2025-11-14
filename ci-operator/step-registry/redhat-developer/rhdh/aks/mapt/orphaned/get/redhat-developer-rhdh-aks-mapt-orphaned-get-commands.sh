@@ -2,7 +2,7 @@
 
 set -e
 
-echo "Loading Azure credentials from secrets..."
+echo "🔐 Loading Azure credentials from secrets..."
 AZURE_STORAGE_ACCOUNT=$(cat /tmp/secrets/AZURE_STORAGE_ACCOUNT)
 AZURE_STORAGE_BLOB=$(cat /tmp/secrets/AZURE_STORAGE_BLOB)
 AZURE_STORAGE_KEY=$(cat /tmp/secrets/AZURE_STORAGE_KEY)
@@ -11,16 +11,16 @@ ARM_CLIENT_SECRET=$(cat /tmp/secrets/ARM_CLIENT_SECRET)
 ARM_SUBSCRIPTION_ID=$(cat /tmp/secrets/ARM_SUBSCRIPTION_ID)
 ARM_TENANT_ID=$(cat /tmp/secrets/ARM_TENANT_ID)
 export AZURE_STORAGE_ACCOUNT AZURE_STORAGE_BLOB AZURE_STORAGE_KEY ARM_CLIENT_ID ARM_CLIENT_SECRET ARM_SUBSCRIPTION_ID ARM_TENANT_ID
-echo "Azure credentials loaded successfully"
+echo "✅ Azure credentials loaded successfully"
 
-echo "Authenticating to Azure..."
+echo "🔐 Authenticating to Azure..."
 az login --service-principal \
   --username "${ARM_CLIENT_ID}" \
   --password "${ARM_CLIENT_SECRET}" \
   --tenant "${ARM_TENANT_ID}"
 az account set --subscription "${ARM_SUBSCRIPTION_ID}"
 
-echo "Listing blobs from container ${AZURE_STORAGE_BLOB}..."
+echo "📋 Listing blobs from container ${AZURE_STORAGE_BLOB}..."
 az storage blob list \
   --container-name "${AZURE_STORAGE_BLOB}" \
   --account-name "${AZURE_STORAGE_ACCOUNT}" \
@@ -30,15 +30,15 @@ az storage blob list \
   sort -u > "${SHARED_DIR}/blob_top_level_folders.txt"
 
 if [ -f "${SHARED_DIR}/blob_top_level_folders.txt" ]; then
-  echo "Blob list has been saved to ${SHARED_DIR}/blob_top_level_folders.txt"
+  echo "✅ Blob list has been saved to ${SHARED_DIR}/blob_top_level_folders.txt"
   cp "${SHARED_DIR}/blob_top_level_folders.txt" "${ARTIFACT_DIR}/blob_top_level_folders.txt"
-  echo "Blob list has also been copied to ARTIFACT_DIR"
+  echo "✅ Blob list has also been copied to ARTIFACT_DIR"
 else
-  echo "Error: Failed to create blob list file"
+  echo "❌ Error: Failed to create blob list file"
   exit 1
 fi
 
-echo "Finding all .pulumi/locks/ blobs in container ${AZURE_STORAGE_BLOB}..."
+echo "🔍 Finding all .pulumi/locks/ blobs in container ${AZURE_STORAGE_BLOB}..."
 
 # Get unique top-level folders that have .pulumi/locks/
 az storage blob list \
@@ -50,15 +50,15 @@ az storage blob list \
   sort -u > "${SHARED_DIR}/folders_with_locks.txt"
 
 if [ ! -s "${SHARED_DIR}/folders_with_locks.txt" ]; then
-  echo "No .pulumi/locks/ directories found in container"
+  echo "🫙 No .pulumi/locks/ directories found in container"
   exit 0
 fi
 
 folder_count=$(wc -l < "${SHARED_DIR}/folders_with_locks.txt")
-echo "Found ${folder_count} folders with .pulumi/locks/ to clean"
+echo "📋 Found ${folder_count} folders with .pulumi/locks/ to clean"
 
 # Delete all lock blobs in one efficient command
-echo "Deleting all .pulumi/locks/ blobs across all folders..."
+echo "🗑️ Deleting all .pulumi/locks/ blobs across all folders..."
 az storage blob delete-batch \
   --source "${AZURE_STORAGE_BLOB}" \
   --account-name "${AZURE_STORAGE_ACCOUNT}" \
@@ -66,4 +66,4 @@ az storage blob delete-batch \
   --pattern "*/.pulumi/locks/*"
 cp "${SHARED_DIR}/folders_with_locks.txt" "${ARTIFACT_DIR}/folders_cleaned.txt"
 
-echo "Successfully deleted .pulumi/locks/ from ${folder_count} folders"
+echo "✅ Successfully deleted .pulumi/locks/ from ${folder_count} folders"

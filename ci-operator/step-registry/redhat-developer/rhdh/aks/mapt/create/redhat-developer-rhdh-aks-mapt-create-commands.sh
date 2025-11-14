@@ -11,7 +11,7 @@ function cleanup() {
   export PULUMI_K8S_DELETE_UNREACHABLE=true
   echo "PULUMI_K8S_DELETE_UNREACHABLE set to true"
 
-  echo "Destroying MAPT infrastructure for ${CORRELATE_MAPT}..."
+  echo "🗑️ Destroying MAPT infrastructure for ${CORRELATE_MAPT}..."
 
   # Capture both stdout and stderr to check for errors
   output=$(mapt azure aks destroy \
@@ -38,7 +38,7 @@ function cleanup() {
   else
     echo "$output"
     echo "❌ Failed to destroy MAPT: ${CORRELATE_MAPT}"
-    echo "⚠️  Skipping deletion of folder ${CORRELATE_MAPT} from Azure Blob Storage due to destroy failure"
+    echo "⚠️ Skipping deletion of folder ${CORRELATE_MAPT} from Azure Blob Storage due to destroy failure"
     exit 1
   fi
 }
@@ -54,7 +54,7 @@ ARM_TENANT_ID=$(cat /tmp/secrets/ARM_TENANT_ID)
 export AZURE_STORAGE_ACCOUNT AZURE_STORAGE_BLOB AZURE_STORAGE_KEY ARM_CLIENT_ID ARM_CLIENT_SECRET ARM_SUBSCRIPTION_ID ARM_TENANT_ID
 echo "✅ Azure credentials loaded successfully"
 
-echo "🏷️  Setting CORRELATE_MAPT..."
+echo "🏷️ Setting CORRELATE_MAPT..."
 CORRELATE_MAPT="aks-${BUILD_ID}"
 export CORRELATE_MAPT
 

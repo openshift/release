@@ -2,7 +2,7 @@
 
 set -e
 
-echo "Loading Azure credentials from secrets..."
+echo "🔐 Loading Azure credentials from secrets..."
 AZURE_STORAGE_ACCOUNT=$(cat /tmp/secrets/AZURE_STORAGE_ACCOUNT)
 AZURE_STORAGE_BLOB=$(cat /tmp/secrets/AZURE_STORAGE_BLOB)
 AZURE_STORAGE_KEY=$(cat /tmp/secrets/AZURE_STORAGE_KEY)
@@ -11,20 +11,20 @@ ARM_CLIENT_SECRET=$(cat /tmp/secrets/ARM_CLIENT_SECRET)
 ARM_SUBSCRIPTION_ID=$(cat /tmp/secrets/ARM_SUBSCRIPTION_ID)
 ARM_TENANT_ID=$(cat /tmp/secrets/ARM_TENANT_ID)
 export AZURE_STORAGE_ACCOUNT AZURE_STORAGE_BLOB AZURE_STORAGE_KEY ARM_CLIENT_ID ARM_CLIENT_SECRET ARM_SUBSCRIPTION_ID ARM_TENANT_ID
-echo "Azure credentials loaded successfully"
+echo "✅ Azure credentials loaded successfully"
 
-echo "Reading blob top-level folders from ${SHARED_DIR}/blob_top_level_folders.txt..."
+echo "📋 Reading blob top-level folders from ${SHARED_DIR}/blob_top_level_folders.txt..."
 
 # Check if input file exists
 if [ ! -f "${SHARED_DIR}/blob_top_level_folders.txt" ]; then
-  echo "ERROR: Input file ${SHARED_DIR}/blob_top_level_folders.txt does not exist"
+  echo "❌ ERROR: Input file ${SHARED_DIR}/blob_top_level_folders.txt does not exist"
   exit 1
 fi
 
 # Check if input file is empty
 if [ ! -s "${SHARED_DIR}/blob_top_level_folders.txt" ]; then
-  echo "WARNING: Input file ${SHARED_DIR}/blob_top_level_folders.txt is empty"
-  echo "No MAPT folders to process"
+  echo "⚠️ WARNING: Input file ${SHARED_DIR}/blob_top_level_folders.txt is empty"
+  echo "🫙 No MAPT folders to process"
   exit 0
 fi
 
@@ -34,7 +34,7 @@ total=${#CORRELATE_MAPT_ARRAY[@]}
 current=0
 success_count=0
 failed_count=0
-echo "Found ${total} blob top-level folders to process"
+echo "📋 Found ${total} blob top-level folders to process"
 
 # Create files to track results
 SUCCESSFUL_DESTROYS="${ARTIFACT_DIR}/successful_destroys.txt"
@@ -48,12 +48,12 @@ set +e
 # Iterate over each value
 for BLOB_TOP_LEVEL_FOLDER in "${CORRELATE_MAPT_ARRAY[@]}"; do
   current=$((current + 1))
-  echo "Processing MAPT: ${BLOB_TOP_LEVEL_FOLDER} ($current/$total)"
+  echo "📋 Processing MAPT: ${BLOB_TOP_LEVEL_FOLDER} ($current/$total)"
 
   # Skip empty lines
-  [ -z "$BLOB_TOP_LEVEL_FOLDER" ] && echo "Skipping empty folder name" && continue
+  [ -z "$BLOB_TOP_LEVEL_FOLDER" ] && echo "⚠️ Skipping empty folder name" && continue
 
-  echo "Destroying MAPT for folder: ${BLOB_TOP_LEVEL_FOLDER}"
+  echo "🗑️ Destroying MAPT for folder: ${BLOB_TOP_LEVEL_FOLDER}"
   
   # Capture both stdout and stderr to check for errors
   output=$(mapt azure aks destroy \
@@ -79,7 +79,7 @@ done
 set -e
 
 echo ""
-echo "==== Destroy Summary ===="
+echo "📊 Destroy Summary"
 echo "Total processed: ${total}"
 echo "Successful: ${success_count}"
 echo "Failed: ${failed_count}"
@@ -87,11 +87,11 @@ echo "Failed: ${failed_count}"
 # Batch delete successfully destroyed folders from Azure Blob Storage
 if [ "${success_count}" -gt 0 ]; then
   echo ""
-  echo "Deleting ${success_count} successfully destroyed folders from Azure Blob Storage..."
+  echo "🗑️ Deleting ${success_count} successfully destroyed folders from Azure Blob Storage..."
 
   while IFS= read -r folder; do
     if [ -n "$folder" ]; then
-      echo "Deleting ${folder}/ from container ${AZURE_STORAGE_BLOB}..."
+      echo "🗑️ Deleting ${folder}/ from container ${AZURE_STORAGE_BLOB}..."
       az storage blob delete-batch \
         --source "${AZURE_STORAGE_BLOB}" \
         --account-name "${AZURE_STORAGE_ACCOUNT}" \
@@ -106,11 +106,11 @@ else
 fi
 
 echo ""
-echo "Finished processing all ${total} MAPT folders"
+echo "✅ Finished processing all ${total} MAPT folders"
 
 # Exit with failure if any destroys failed
 if [ "${failed_count}" -gt 0 ]; then
-  echo "⚠️  Exiting with failure due to ${failed_count} failed destroy(s)"
+  echo "⚠️ Exiting with failure due to ${failed_count} failed destroy(s)"
   exit 1
 fi
 
