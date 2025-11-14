@@ -13,7 +13,7 @@ export LAB_CLOUD
 
 # Get the number of current dedicated worker nodes in the cluster
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
-NUM_CURRENT_WORKER_NODES=$(oc get nodes | grep worker | grep -v -c master)
+NUM_CURRENT_WORKER_NODES=$(oc get nodes -l '!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master' --no-headers 2>/dev/null | wc -l)
 export NUM_CURRENT_WORKER_NODES
 
 # Calculate the number of scaleout worker nodes
