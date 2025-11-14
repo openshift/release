@@ -91,6 +91,9 @@ __EOF__
 
 # Append ENV_DATA in ocs-tests config file for vsphere platform
 if [[ -f "${SHARED_DIR}/vsphere_context.sh" ]]; then
+    declare vsphere_datacenter
+    declare vsphere_datastore
+    declare vsphere_cluster
     source "${SHARED_DIR}/vsphere_context.sh"
     source "${SHARED_DIR}/govc.sh"
 
