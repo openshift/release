@@ -19,7 +19,7 @@ declare vmNamesForWait=""
 # Create vms
 function vm_create() {
   declare vmIndex="${1}"; (($#)) && shift
-  declare currentVmName="${LPC_LP_CNV_VM_CREATE__NAME_PREFIX}-${vmIndex}"
+  declare currentVmName="${LPC_LP_CNV_VM_CREATE__PREFIX}-${vmIndex}"
   : "Submitting target VirtualMachine ${currentVmName}"
   # The DataVolume is automatically created via dataVolumeTemplates
   {
@@ -101,8 +101,8 @@ EOF
 for ((i=1; i<=${LPC_LP_CNV_VM_CREATE__REPLICA_COUNT}; i++)); do
     : "=== Start to create the ${i} vm (Total: ${LPC_LP_CNV_VM_CREATE__REPLICA_COUNT})"
     vm_create "${i}"
-    vmList+="${LPC_LP_CNV_VM_CREATE__NAME_PREFIX}-${i} "
-    vmNamesForWait+="vm/${LPC_LP_CNV_VM_CREATE__NAME_PREFIX}-${i} "
+    vmList+="${LPC_LP_CNV_VM_CREATE__PREFIX}-${i} "
+    vmNamesForWait+="vm/${LPC_LP_CNV_VM_CREATE__PREFIX}-${i} "
 done
   : 'Waiting for VMs to enter Ready state...'
   # This single wait command ensures both DV cloning AND VM startup are complete.
