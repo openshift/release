@@ -18,12 +18,13 @@ az account show
 # install required tools
 mkdir -p /tmp/tools
 az aks install-cli --install-location /tmp/tools/kubectl --kubelogin-install-location /tmp/tools/kubelogin
-# Install newer curl with --json support
 /tmp/tools/kubectl version
 /tmp/tools/kubelogin --version
 
 # Add to PATH
 export PATH="/tmp/tools:$PATH"
+export DEPLOY_ENV="prow"
+
 PRINCIPAL_ID=$(az ad sp show --id "${TEST_USER_CLIENT_ID}" --query id -o tsv)
 export PRINCIPAL_ID
 unset GOFLAGS
@@ -82,14 +83,13 @@ stop_tunnel() {
 }
 start_tunnel
 unset GOFLAGS
-export LOCATION="westus3"
-export AROHCP_ENV="development"
-curl -L https://github.com/moparisthebest/static-curl/releases/latest/download/curl-amd64 -o /tmp/tools/curl
-chmod +x /tmp/tools/curl
-curl --version
-cd demo
-./01-register-sub.sh
-cd ..
-make -C test/
+SUBSCRIPTION_ID=$(az account show --query id --output tsv)
+TENANT_ID=$(az account show --query tenantId --output tsv)
+curl --silent --show-error --include \
+	--request PUT \
+	--header "Content-Type: application/json" \
+	--data "{\"state\":\"Registered\", \"registrationDate\": \"now\", \"properties\": { \"tenantId\": \"${TENANT_ID}\"}}" \
+	"http://localhost:8443/subscriptions/${SUBSCRIPTION_ID}?api-version=2.0"
+make -C test
 ./test/aro-hcp-tests run-suite "rp-api-compat-all/parallel" --junit-path="${ARTIFACT_DIR}/junit.xml"
 stop_tunnel
