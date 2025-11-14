@@ -47,10 +47,14 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.21
-  ocp_os:
+  ocp_os_rhel_9:
     name: "4.21"
     namespace: ocp
     tag: rhel-coreos
+  ocp_os_rhel_10:
+    name: "4.21"
+    namespace: ocp
+    tag: rhel-coreos-10
 build_root:
   from_repository: true
 images:
@@ -66,26 +70,17 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: machine-config-operator
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
-    RUN curl -L 'https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep-13.0.0-x86_64-unknown-linux-musl.tar.gz' | tar -xvz -C /usr/bin --strip-components=1 ripgrep-13.0.0-x86_64-unknown-linux-musl/rg && \
-        chmod +x /usr/bin/rg && \
-        curl -Lo /usr/bin/yq 'https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64' && \
-        chmod +x /usr/bin/yq && \
-        cd /etc/yum.repos.d/ && curl -LO https://pkgs.tailscale.com/stable/rhel/8/tailscale.repo && \
-        rpm-ostree install tailscale && \
-        systemctl enable tailscaled && \
-        ostree container commit
-  from: ocp_os
-  to: custom-os-image
-- dockerfile_literal: |
-    FROM quay.io/zzlotnik/zacks-openshift-helpers:latest
-  to: zacks-toolbox
+- dockerfile_path: test/custom-os-images/Containerfile.rhel-coreos-9
+  from: ocp_os_rhel_9
+  to: custom-os-image-rhel-9
+- dockerfile_path: test/custom-os-images/Containerfile.rhel-coreos-10
+  from: ocp_os_rhel_10
+  to: custom-os-image-rhel-10
 promotion:
   to:
   - excluded_images:
-    - custom-os-image
-    - zacks-toolbox
+    - custom-os-image-rhel-9
+    - custom-os-image-rhel-10
     name: "4.21"
     namespace: ocp
 releases:
@@ -235,8 +230,10 @@ tests:
       cli: latest
       commands: make test-e2e
       dependencies:
-      - env: MCO_OS_IMAGE_URL
-        name: pipeline:custom-os-image
+      - env: MCO_OS_IMAGE_URL_RHEL_9
+        name: pipeline:custom-os-image-rhel-9
+      - env: MCO_OS_IMAGE_URL_RHEL_10
+        name: pipeline:custom-os-image-rhel-10
       from: src
       resources:
         requests:
@@ -253,8 +250,10 @@ tests:
       cli: latest
       commands: make test-e2e-1of2
       dependencies:
-      - env: MCO_OS_IMAGE_URL
-        name: pipeline:custom-os-image
+      - env: MCO_OS_IMAGE_URL_RHEL_9
+        name: pipeline:custom-os-image-rhel-9
+      - env: MCO_OS_IMAGE_URL_RHEL_10
+        name: pipeline:custom-os-image-rhel-10
       from: src
       resources:
         requests:
@@ -271,8 +270,10 @@ tests:
       cli: latest
       commands: make test-e2e-2of2
       dependencies:
-      - env: MCO_OS_IMAGE_URL
-        name: pipeline:custom-os-image
+      - env: MCO_OS_IMAGE_URL_RHEL_9
+        name: pipeline:custom-os-image-rhel-9
+      - env: MCO_OS_IMAGE_URL_RHEL_10
+        name: pipeline:custom-os-image-rhel-10
       from: src
       resources:
         requests:
@@ -491,8 +492,10 @@ tests:
       cli: latest
       commands: make test-e2e-single-node
       dependencies:
-      - env: MCO_OS_IMAGE_URL
-        name: pipeline:custom-os-image
+      - env: MCO_OS_IMAGE_URL_RHEL_9
+        name: pipeline:custom-os-image-rhel-9
+      - env: MCO_OS_IMAGE_URL_RHEL_10
+        name: pipeline:custom-os-image-rhel-10
       from: src
       resources:
         requests:
@@ -575,102 +578,6 @@ tests:
     env:
       PROJECT_NAME: machine-config-operator
     workflow: openshift-ci-security
-- always_run: false
-  as: e2e-aws-ovn-upgrade-ocb-techpreview
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    test:
-    - as: get-prelayering-rpmostree-status
-      commands: |-
-        #!/usr/bin/env bash
-        set -xeuo pipefail
-        run-on-all-nodes --keep-going --exit-zero 'rpm-ostree status'
-      from: zacks-toolbox
-      resources:
-        requests:
-          cpu: 100m
-    - as: enable-layering
-      commands: |-
-        #!/usr/bin/env bash
-        set -xeuo pipefail
-        onclustertesting version
-        onclustertesting setup ci --inject-yum-repos --containerfile-path <(curl -L https://raw.githubusercontent.com/openshift/machine-config-operator/refs/heads/main/test/e2e-ocl/Containerfile.cowsay)
-      from: zacks-toolbox
-      resources:
-        requests:
-          cpu: 100m
-    - as: get-postlayering-rpmostree-status
-      commands: |-
-        #!/usr/bin/env bash
-        set -xeuo pipefail
-        run-on-all-nodes --keep-going --exit-zero 'rpm-ostree status'
-      from: zacks-toolbox
-      resources:
-        requests:
-          cpu: 100m
-    - ref: openshift-e2e-test
-    - as: get-posttest-rpmostree-status
-      commands: |-
-        #!/usr/bin/env bash
-        set -xeuo pipefail
-        run-on-all-nodes --keep-going --exit-zero 'rpm-ostree status'
-      from: zacks-toolbox
-      resources:
-        requests:
-          cpu: 100m
-    workflow: openshift-upgrade-aws
-  timeout: 5h0m0s
-- always_run: false
-  as: e2e-aws-ovn-ocb-techpreview
-  optional: true
-  steps:
-    cluster_profile: aws-2
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    test:
-    - as: get-prelayering-rpmostree-status
-      commands: |-
-        #!/usr/bin/env bash
-        set -xeuo pipefail
-        run-on-all-nodes --keep-going --exit-zero 'rpm-ostree status'
-      from: zacks-toolbox
-      resources:
-        requests:
-          cpu: 100m
-    - as: enable-layering
-      commands: |-
-        #!/usr/bin/env bash
-        set -xeuo pipefail
-        onclustertesting version
-        onclustertesting setup ci --inject-yum-repos --containerfile-path <(curl -L https://raw.githubusercontent.com/openshift/machine-config-operator/refs/heads/main/test/e2e-ocl/Containerfile.cowsay)
-      from: zacks-toolbox
-      resources:
-        requests:
-          cpu: 100m
-    - as: get-postlayering-rpmostree-status
-      commands: |-
-        #!/usr/bin/env bash
-        set -xeuo pipefail
-        run-on-all-nodes --keep-going --exit-zero 'rpm-ostree status'
-      from: zacks-toolbox
-      resources:
-        requests:
-          cpu: 100m
-    - ref: openshift-e2e-test
-    - as: get-posttest-rpmostree-status
-      commands: |-
-        #!/usr/bin/env bash
-        set -xeuo pipefail
-        run-on-all-nodes --keep-going --exit-zero 'rpm-ostree status'
-      from: zacks-toolbox
-      resources:
-        requests:
-          cpu: 100m
-    workflow: openshift-e2e-aws
-  timeout: 5h0m0s
 - as: verify-deps
   steps:
     env:
