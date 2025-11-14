@@ -18,12 +18,13 @@ az account show
 # install required tools
 mkdir -p /tmp/tools
 az aks install-cli --install-location /tmp/tools/kubectl --kubelogin-install-location /tmp/tools/kubelogin
-# Install newer curl with --json support
 /tmp/tools/kubectl version
 /tmp/tools/kubelogin --version
 
 # Add to PATH
 export PATH="/tmp/tools:$PATH"
+export DEPLOY_ENV="prow"
+
 PRINCIPAL_ID=$(az ad sp show --id "${TEST_USER_CLIENT_ID}" --query id -o tsv)
 export PRINCIPAL_ID
 unset GOFLAGS
@@ -84,6 +85,8 @@ start_tunnel
 unset GOFLAGS
 export LOCATION="westus3"
 export AROHCP_ENV="development"
+export USER="j${BUILD_ID: -3}"
+# Install newer curl with --json support
 curl -L https://github.com/moparisthebest/static-curl/releases/latest/download/curl-amd64 -o /tmp/tools/curl
 chmod +x /tmp/tools/curl
 curl --version
