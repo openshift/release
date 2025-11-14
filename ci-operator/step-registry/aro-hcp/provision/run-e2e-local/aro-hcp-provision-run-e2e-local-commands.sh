@@ -83,16 +83,9 @@ stop_tunnel() {
 }
 start_tunnel
 unset GOFLAGS
-export LOCATION="westus3"
-export AROHCP_ENV="development"
-export USER="j${BUILD_ID: -3}"
 # Install newer curl with --json support
 curl -L https://github.com/moparisthebest/static-curl/releases/latest/download/curl-amd64 -o /tmp/tools/curl
 chmod +x /tmp/tools/curl
 curl --version
-cd demo
-./01-register-sub.sh
-cd ..
-make -C test/
-./test/aro-hcp-tests run-suite "rp-api-compat-all/parallel" --junit-path="${ARTIFACT_DIR}/junit.xml"
+make e2e/local
 stop_tunnel
