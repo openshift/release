@@ -1,0 +1,27 @@
+workflow:
+  as: baremetalds-two-node-arbiter-upgrade-workers
+  steps:
+    pre:
+      - chain: baremetalds-ofcir-pre
+    test:
+      - chain: baremetalds-ipi-test
+    post:
+      - chain: baremetalds-ofcir-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        NUM_ARBITERS=1
+        ARBITER_DISK=50
+        ARBITER_MEMORY=8192
+        ARBITER_VCPU=2
+        NUM_WORKERS=3
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+  documentation: |-
+    This workflow executes a Two Node OpenShift with Arbiter (TNA) cluster installation and upgrade with workers
