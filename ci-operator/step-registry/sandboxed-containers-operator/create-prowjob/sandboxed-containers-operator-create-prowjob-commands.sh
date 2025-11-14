@@ -391,6 +391,7 @@ tests:
       TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
     workflow: sandboxed-containers-operator-e2e-azure
+  timeout: 24h0m0s
 - as: azure-ipi-peerpods
   cron: 0 0 31 2 1
   steps:
@@ -417,6 +418,7 @@ tests:
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
       WORKLOAD_TO_TEST: peer-pods
     workflow: sandboxed-containers-operator-e2e-azure
+  timeout: 24h0m0s
 - as: azure-ipi-coco
   cron: 0 0 31 2 1
   steps:
@@ -443,6 +445,7 @@ tests:
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
       WORKLOAD_TO_TEST: coco
     workflow: sandboxed-containers-operator-e2e-azure
+  timeout: 24h0m0s
 - as: aws-ipi-peerpods
   cron: 0 0 31 2 1
   steps:
@@ -468,6 +471,7 @@ tests:
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
       WORKLOAD_TO_TEST: peer-pods
     workflow: sandboxed-containers-operator-e2e-aws
+  timeout: 24h0m0s
 - as: aws-ipi-coco
   cron: 0 0 31 2 1
   steps:
@@ -503,6 +507,7 @@ tests:
       TEE_TYPE: "snp"
       TEST_SCENARIOS: "sig-cocobm.*Kata Author"
     workflow: sandboxed-containers-operator-bm-coco-sno-e2e
+  timeout: 24h0m0s
 zz_generated_metadata:
   branch: devel
   org: openshift

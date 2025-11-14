@@ -48,3 +48,6 @@ do
 gcloud --project ${project_id} dns record-sets delete ${name} --type ${record_type} --zone ${base_domain_zone_name}
 EOF
 done
+
+echo "Waiting for 180s to ensure DNS records can be resolved ..."
+sleep 180

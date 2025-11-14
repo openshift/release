@@ -7,7 +7,7 @@ The current one was configured on Feb 6 2023 and is valid for 730 days.
 They are stored in the items `os4-installer.openshift-ci.azure` and `os4-installer.openshift-ci2.azure` in Vault.
 To rotate the credentials,
 
-- Ask [#forum-dp-platform](https://redhat-internal.slack.com/archives/CBUT43E94) for a new `Secret`.
+- Ask [#forum-pge-cloud-ops](https://redhat-internal.slack.com/archives/CBUT43E94) for a new `Secret`.
 - Replace the value of `clientSecret` of `osServicePrincipal.json` in the above TWO items in Vault with the SAME `Secret` obtained from the DPP team.
 Note that the two sets of credentials are from the same Service Principal, hence the same `Secret`, with different subscriptions.
 

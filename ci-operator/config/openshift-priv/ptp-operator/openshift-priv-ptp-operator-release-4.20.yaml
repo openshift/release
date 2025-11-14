@@ -3,6 +3,10 @@ base_images:
     name: 4.20-priv
     namespace: ocp-private
     tag: ptp
+  must_gather:
+    name: 4.20-priv
+    namespace: ocp-private
+    tag: must-gather
   ocp_4.20_base-rhel9:
     name: 4.20-priv
     namespace: ocp-private
@@ -24,6 +28,17 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ptp-operator
+- dockerfile_path: Dockerfile.ocp
+  from: must_gather
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ptp-operator/must-gather/.
+  to: ptp-operator-must-gather
 operator:
   bundles:
   - dockerfile_path: bundleci.Dockerfile

@@ -96,9 +96,6 @@ CONFIG = {
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 20,
     },
-    'metal-perscale-cpt-quota-slice': {
-        'rdu3': 1,
-    },
     'metal-perfscale-cpt-quota-slice': {
         'metal-perfscale-cpt-rdu3': 1,
     },

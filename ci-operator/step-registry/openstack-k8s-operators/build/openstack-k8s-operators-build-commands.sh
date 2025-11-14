@@ -246,7 +246,12 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
     API_MOD=$(basename $MOD)
     go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/${API_MOD}=github.com/${REPO_NAME}/${API_MOD}@${API_SHA}
     go mod tidy
-    pushd ./apis/
+    # before operator-sdk 1.41 bump, api module is in apis, later it is in api
+    if [ -d "./apis" ]; then
+      pushd ./apis/
+    else
+      pushd ./api/
+    fi
     go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/${API_MOD}=github.com/${REPO_NAME}/${API_MOD}@${API_SHA}
     go mod tidy
     popd
