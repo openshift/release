@@ -2,10 +2,17 @@
 set -euxo pipefail; shopt -s inherit_errexit
 
 declare vmList="$(cat "${SHARED_DIR}/target-vm-name.txt")"
+declare binDir="/tmp/bin"
 
 : '--- Starting Check the VMs ---'
 : "Namespace: ${LPC_LP_CNV_VM_CHECK__NS}"
 : '------------------------------'
+
+# Virtctl path
+mkdir -p "${binDir}" || { echo "FATAL ERROR: Failed to create bin directory ${binDir}." >&2; return 1; }
+if ! [[ "${PATH}" =~ :?"${binDir}":? ]]; then
+    export PATH="${binDir}:${PATH}"
+fi
 
 # Check vms status
 function CheckVmRunningStatus() {
@@ -21,9 +28,6 @@ function CheckVmRunningStatus() {
 
 # Install virtctl tool
 function InstallAndVerifyVirtctl() {
-    declare binDir="/tmp/bin"
-    mkdir -p "${binDir}" || { echo "FATAL ERROR: Failed to create bin directory ${binDir}." >&2; return 1; }
-
     declare baseURL
     if ! baseURL=$(oc get ingress.config.openshift.io/cluster -o jsonpath='{.spec.domain}'); then
         echo "FATAL ERROR: Failed to get OpenShift cluster base domain." >&2; return 1
@@ -32,10 +36,6 @@ function InstallAndVerifyVirtctl() {
     declare dlURL="https://hyperconverged-cluster-cli-download-openshift-cnv.${baseURL}/amd64/linux/virtctl.tar.gz"
     if ! curl -kfsSL "${dlURL}" | tar zx -C "${binDir}"; then
         echo "FATAL ERROR: Failed to download and extract virtctl." >&2; return 1
-    fi
-
-    if ! [[ "${PATH}" =~ :?"${binDir}":? ]]; then
-        export PATH="${binDir}:${PATH}"
     fi
 
     if ! virtctl version --client; then

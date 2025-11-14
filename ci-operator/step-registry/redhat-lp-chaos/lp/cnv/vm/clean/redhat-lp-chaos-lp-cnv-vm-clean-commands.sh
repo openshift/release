@@ -31,12 +31,11 @@ function DeleteAllVms() {
 
 # DeleteNS
 function DeleteNamespace() {
-    oc delete namespace "${LPC_LP_CNV_CLEAN_VM__NS}" --ignore-not-found=true
+    oc delete namespace "${LPC_LP_CNV_VM_CLEAN__NS}" --ignore-not-found=true
 }
 
 # Main Execution Flow
 DeleteAllVms
 DeleteNamespace
 
-: 'Cleanup process completed successfully'
 true

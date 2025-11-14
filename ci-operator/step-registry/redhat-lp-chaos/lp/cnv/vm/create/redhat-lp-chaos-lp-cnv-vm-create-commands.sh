@@ -97,7 +97,7 @@ EOF
   true
 }
 
-: '--- 3. Main execution logic ---'
+
 for ((i=1; i<=${LPC_LP_CNV_VM_CREATE__REPLICA_COUNT}; i++)); do
     : "=== Start to create the ${i} vm (Total: ${LPC_LP_CNV_VM_CREATE__REPLICA_COUNT})"
     vm_create "${i}"
@@ -108,7 +108,7 @@ done
   # This single wait command ensures both DV cloning AND VM startup are complete.
   oc wait ${vmNamesForWait} -n "${LPC_LP_CNV_VM_CREATE__NS}" --for=condition=Ready --timeout="${LPC_LP_CNV_VM_CREATE__WAIT_TIMEOUT}"
 
-: '--- 4. Passing variables to subsequent steps (SHARED_DIR) ---'
+
 # Prow mechanism: write VM name and namespace to SHARED_DIR
 echo "${vmList}" > "${SHARED_DIR}/target-vm-name.txt"
 
