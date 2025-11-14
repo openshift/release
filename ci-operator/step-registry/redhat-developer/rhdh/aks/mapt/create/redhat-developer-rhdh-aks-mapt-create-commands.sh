@@ -43,7 +43,7 @@ function cleanup() {
   fi
 }
 
-echo "Loading Azure credentials from secrets..."
+echo "🔐 Loading Azure credentials from secrets..."
 AZURE_STORAGE_ACCOUNT=$(cat /tmp/secrets/AZURE_STORAGE_ACCOUNT)
 AZURE_STORAGE_BLOB=$(cat /tmp/secrets/AZURE_STORAGE_BLOB)
 AZURE_STORAGE_KEY=$(cat /tmp/secrets/AZURE_STORAGE_KEY)
@@ -52,16 +52,16 @@ ARM_CLIENT_SECRET=$(cat /tmp/secrets/ARM_CLIENT_SECRET)
 ARM_SUBSCRIPTION_ID=$(cat /tmp/secrets/ARM_SUBSCRIPTION_ID)
 ARM_TENANT_ID=$(cat /tmp/secrets/ARM_TENANT_ID)
 export AZURE_STORAGE_ACCOUNT AZURE_STORAGE_BLOB AZURE_STORAGE_KEY ARM_CLIENT_ID ARM_CLIENT_SECRET ARM_SUBSCRIPTION_ID ARM_TENANT_ID
-echo "Azure credentials loaded successfully"
+echo "✅ Azure credentials loaded successfully"
 
-echo "Setting CORRELATE_MAPT..."
+echo "🏷️  Setting CORRELATE_MAPT..."
 CORRELATE_MAPT="aks-${BUILD_ID}"
 export CORRELATE_MAPT
 
 # Trap TERM signal (job was interrupted/cancelled) into cleanup function
 trap cleanup TERM
 
-echo "Creating MAPT infrastructure for ${CORRELATE_MAPT}..."
+echo "🚀 Creating MAPT infrastructure for ${CORRELATE_MAPT}..."
 mapt azure aks create \
   --project-name "aks" \
   --backed-url "azblob://${AZURE_STORAGE_BLOB}/${CORRELATE_MAPT}" \
@@ -71,6 +71,5 @@ mapt azure aks create \
   --spot \
   --spot-eviction-tolerance "low" \
   --spot-excluded-regions "centralindia" \
-  --enable-app-routing
-
-echo "MAPT AKS cluster created successfully"
+  --enable-app-routing && \
+echo "✅ MAPT AKS cluster created successfully"
