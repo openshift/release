@@ -3,6 +3,8 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x
+set +eu
 
 # If not provided in the JSON, will use the following defaults.
 DEFAULT_OPERATOR_SOURCE="redhat-operators"
@@ -34,7 +36,21 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         operator_channel="${DEFAULT_OPERATOR_CHANNEL}"
     fi
 
+    printenv
+    echo "${KUBECONFIG}"
+    ls -laF "${KUBECONFIG}" || true
+    ls -laF "${HOME}/.kube/config" ~/.kube/config
+    type oc
+    ls -laF "$(which oc)"
+    : Note that the server version is missing, indicating invalid KUBECONFIG.
+    oc version
+    (
+        oc whoami --show-console
+        oc get Nodes,ClusterVersion || echo Error
+        oc get packagemanifest "${operator_name}" catalog="${operator_source}" --ignore-not-found || echo Error
+    )
     is_available=$(oc get packagemanifest "${operator_name}" catalog="${operator_source}" --ignore-not-found)
+    typeset -p is_available
     if [[ -z "${is_available}" ]]; then
         echo "ERROR: Operator ${operator_name} from ${operator_source} not found."
         exit 1
@@ -51,3 +67,4 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         fi
     fi
 done
+e=180; while ((e--)); do { [ -e /tmp/debug.done ] && break; sleep 60; }; done
