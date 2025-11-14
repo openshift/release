@@ -352,6 +352,10 @@ base_images:
     name: "${OCP_VERSION}"
     namespace: ocp
     tag: upi-installer
+  telco-runner:
+    name: telco-runner
+    namespace: ci
+    tag: latest
 releases:
   latest:
     release:
@@ -493,6 +497,16 @@ tests:
       TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
       WORKLOAD_TO_TEST: coco
     workflow: sandboxed-containers-operator-e2e-aws
+- as: coco-bm-sno
+  cron: 0 0 31 2 1
+  steps:
+    env:
+      OCP_VERSION: "4.20"
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      BM_LAB: "pek"
+      TEE_TYPE: "snp"
+      TEST_SCENARIOS: "sig-cocobm.*Kata Author"
+    workflow: sandboxed-containers-operator-bm-coco-sno-e2e
   timeout: 24h0m0s
 zz_generated_metadata:
   branch: devel
