@@ -32,6 +32,7 @@ additionalNTPSources:
 hosts: []
 EOF
 
+echo "debugging..."
 cat > "${SHARED_DIR}/nodes-config.yaml" <<EOF
 cpuArchitecture: ${day2_arch}
 hosts: []
