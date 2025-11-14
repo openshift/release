@@ -75,7 +75,7 @@ sleep 120
 oc wait --for condition=Successful kiali/kiali -n ${ISTIO_NAMESPACE} --timeout=250s
 oc wait --for condition=available deployment/kiali -n ${ISTIO_NAMESPACE} --timeout=250s
 
-make test-integration -e URL="https://$(oc get route -n ${ISTIO_NAMESPACE} kiali -o 'jsonpath={.spec.host}')" -e TOKEN="$(oc whoami -t)" -e LPINTEROP="true"
+make test-integration -e URL="https://$(oc get route -n ${ISTIO_NAMESPACE} kiali -o 'jsonpath={.spec.host}')" -e TOKEN="$(oc whoami -t)" -e LPINTEROP="true" -e  GO_TEST_FLAGS="${GO_TEST_FLAGS}"
 
 echo "Copying result xml to ${ARTIFACT_DIR}"
 # the file name must start with 'junit'
