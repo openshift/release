@@ -49,18 +49,19 @@ esac
 export ES_SERVER
 
 pip install .
-EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
+
+EXTRA_FLAGS=(--lookback "${LOOKBACK}d" --hunter-analyze)
 
 if [[ ! -z "$UUID" ]]; then
-    EXTRA_FLAGS+=" --uuid ${UUID}"
+    EXTRA_FLAGS+=(--uuid "${UUID}")
 fi
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
-    EXTRA_FLAGS+=" --output-format junit --save-output-path=junit.xml"
+    EXTRA_FLAGS+=(--output-format junit --save-output-path junit.xml)
 elif [ "${OUTPUT_FORMAT}" == "JSON" ]; then
-    EXTRA_FLAGS+=" --output-format json"
+    EXTRA_FLAGS+=(--output-format json)
 elif [ "${OUTPUT_FORMAT}" == "TEXT" ]; then
-    EXTRA_FLAGS+=" --output-format text"
+    EXTRA_FLAGS+=(--output-format text)
 else
     echo "Unsupported format: ${OUTPUT_FORMAT}"
     exit 1
@@ -93,11 +94,11 @@ if [[ -n "$ACK_FILE" ]]; then
         ackFilePath="$ARTIFACT_DIR/$ACK_FILE"
         curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} -o "$ackFilePath"
     fi
-    EXTRA_FLAGS+=" --ack $ackFilePath"
+    EXTRA_FLAGS+=(--ack "$ackFilePath")
 fi
 
 if [ ${COLLAPSE} == "true" ]; then
-    EXTRA_FLAGS+=" --collapse"
+    EXTRA_FLAGS+=(--collapse)
 fi
 
 if [[ -n "${ORION_ENVS}" ]]; then
@@ -112,13 +113,21 @@ if [[ -n "${ORION_ENVS}" ]]; then
 fi
 
 if [[ -n "${LOOKBACK_SIZE}" ]]; then
-    EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
+    EXTRA_FLAGS+=(--lookback-size "${LOOKBACK_SIZE}")
+fi
+
+if [[ -n "${PULL_NUMBER}" ]]; then
+    JOBTYPE="pull"
+    EXTRA_FLAGS+=(--input-vars "{\"jobtype\": \"${JOBTYPE}\", \"pull_number\": \"${PULL_NUMBER}\", \"organization\": \"openshift\", \"repository\": \"${REPO_NAME}\"}")
+else
+    JOBTYPE="periodic"
 fi
 
 set +e
 set -o pipefail
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
+es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="${JOBTYPE}" \
+  orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${CONFIG} "${EXTRA_FLAGS[@]}" | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 
@@ -131,3 +140,4 @@ if [ $orion_exit_status -eq 3 ]; then
 fi
 
 exit $orion_exit_status
+
