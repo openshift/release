@@ -1,0 +1,25 @@
+ref:
+  as: windows-byoh-destroy
+  from: upi-installer
+  commands: windows-byoh-destroy-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: BYOH_INSTANCE_NAME
+      default: "byoh-winc"
+    - name: BYOH_NUM_WORKERS
+      default: "2"
+  documentation: |-
+    Destroys Windows BYOH nodes provisioned by windows-byoh-provision step.
+
+    This step runs byoh.sh destroy using the Terraform state from the provision step.
+
+    If the work directory is unavailable (e.g., SHARED_DIR issues), the step uses a
+    fallback mechanism to delete instances directly via cloud CLI:
+    - GCP: gcloud compute instances delete
+    - AWS: aws ec2 terminate-instances
+    - Azure: az vm delete
+
+    This prevents orphaned instances that could block cluster network deletion.
