@@ -115,7 +115,7 @@ fi
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
     export EXTRA_FLAGS+=" --output-format junit"
-    export EXTRA_FLAGS+=" --save-output-path=junit.xml"
+    export EXTRA_FLAGS+=" --save-output-path=junit_olmv1-GCP.xml"
 elif [ "${OUTPUT_FORMAT}" == "JSON" ]; then
     export EXTRA_FLAGS+=" --output-format json"
 elif [ "${OUTPUT_FORMAT}" == "TEXT" ]; then
