@@ -62,8 +62,20 @@ spec:
           set -xe
           yum install jq git wget podman-docker -y
           yum group install "development-tools" -y
+
           wget https://go.dev/dl/go1.20.4.linux-amd64.tar.gz
-          rm -rf /usr/local/go && tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz
+
+          # extraction was failing due to the file being double gzipped so
+          # so fallback was added as a workaround
+          rm -rf /usr/local/go && \
+          (
+            tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz || \
+            (
+              echo "Standard tar failed. Attempting double-gzip fallback..."
+              gzip -dc go1.20.4.linux-amd64.tar.gz | gzip -dc | tar -C /usr/local -xf -
+            )
+          )
+
           export PATH=$PATH:/usr/local/go/bin
           go version
 
@@ -163,16 +175,15 @@ spec:
     sleep $sleep_time
   done
 
+  # print the build logs
+  oc -n openshift-ptp logs podman
+
   if [[ $success -eq 1 ]]; then
     echo "[INFO] index build succeeded"
   else
     echo "[ERROR] index build failed"
     exit 1
   fi
-
-  # print the build logs
-  oc -n openshift-ptp logs podman
-
 }
 
 # Define the function to retry a command with a timeout
