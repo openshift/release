@@ -1,0 +1,104 @@
+ref:
+  as: confidential-clusters-ref-cocl-beaker-kind-provision  # Prepares environment, does not create cluster
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  commands: confidential-clusters-ref-cocl-beaker-kind-provision-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: beaker-bm
+    mount_path: /var/run/beaker-bm
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      memory: 1Gi
+  env:
+  - name: BEAKER_IP
+    default: ""
+    documentation: |-
+      IP address of the Beaker provisioned bare metal machine.
+      If not set, the script will try to read from:
+      1. Vault-mounted secret: /var/run/beaker-bm/beaker-ip (if exists)
+      2. ${SHARED_DIR}/beaker_ip (fallback)
+      Can be provided as environment variable to override Vault value.
+  - name: BEAKER_USER
+    default: "root"
+    documentation: |-
+      Username for SSH access to the Beaker machine.
+      If not set, the script will try to read from:
+      1. Vault-mounted secret: /var/run/beaker-bm/beaker-user (if exists)
+      2. Default: root
+  - name: BEAKER_PASSWORD
+    default: ""
+    documentation: |-
+      Password for SSH access to the Beaker machine (optional).
+      Used for automatic SSH key configuration if SSH key is not pre-configured.
+      If not set, the script will try to read from:
+      1. Vault-mounted secret: /var/run/beaker-bm/beaker-passwd (if exists)
+      If no password is available, assumes SSH key is already configured on Beaker machine.
+  - name: KIND_CLUSTER_NAME
+    default: "kind"
+    documentation: |-
+      Name of the Kind cluster to create.
+      Defaults to 'kind' if not specified.
+  - name: CONTAINER_RUNTIME
+    default: "docker"
+    documentation: |-
+      Container runtime to use for Kind cluster (podman or docker).
+      Defaults to 'docker' if not specified.
+  - name: COCL_OPERATOR_REPO
+    default: "https://github.com/confidential-clusters/cocl-operator.git"
+    documentation: |-
+      Git repository URL for the cocl-operator project.
+      The kind cluster configuration will be downloaded from this repository.
+  - name: COCL_OPERATOR_BRANCH
+    default: "main"
+    documentation: |-
+      Branch of the cocl-operator repository to use.
+      Defaults to 'main' if not specified.
+  - name: KIND_CREATE_TIMEOUT
+    default: "900"
+    documentation: |-
+      Timeout in seconds for the entire Kind cluster creation process.
+      Defaults to 900 seconds (15 minutes).
+  - name: CLUSTER_READY_TIMEOUT
+    default: "300"
+    documentation: |-
+      Timeout in seconds for waiting for cluster to be ready.
+      Defaults to 300 seconds (5 minutes).
+  documentation: |-
+    This step prepares the environment on a pre-provisioned Beaker bare metal
+    machine running Fedora for deploying Kind clusters with cocl-operator.
+
+    The step performs the following operations:
+    1. Connects to the Beaker machine via SSH using the provided credentials
+    2. Installs necessary dependencies (container runtime, kubectl, kind, git)
+    3. Downloads the cocl-operator repository with kind cluster configuration
+    4. Adapts the kind configuration for external access (apiServerAddress)
+    5. Verifies all tools are installed correctly
+
+    Prerequisites:
+    - A Beaker machine must be pre-provisioned with Fedora
+    - SSH credentials stored in Vault at: secrets/kv/selfservice/confidential-qe/beaker-bm
+      Required fields: beaker-ssh-private-key
+      Optional fields: beaker-passwd, beaker-ip, beaker-user
+    - ci-secret-bootstrap must sync the Vault secret to K8s secret 'beaker-bm' in 'test-credentials' namespace
+    - The BEAKER_IP must be provided via Vault secret, environment variable, or ${SHARED_DIR}/beaker_ip
+
+    Outputs:
+    - ${SHARED_DIR}/beaker_info: Information about the Beaker machine and installed tools
+    - ${ARTIFACT_DIR}/beaker-logs/: Installation logs and diagnostics
+
+    After this step completes, the Beaker machine will have:
+    - Container runtime (docker or podman) installed and running
+    - kubectl CLI tool installed
+    - kind installed
+    - cocl-operator repository downloaded to ~/cocl-operator-kind-setup
+    - kind configuration prepared at ~/cocl-operator-kind-setup/kind/config.yaml
+
+    Note: This step only prepares the environment. To create a Kind cluster,
+    SSH to the Beaker machine and run:
+      kind create cluster --name kind --config ~/cocl-operator-kind-setup/kind/config.yaml
