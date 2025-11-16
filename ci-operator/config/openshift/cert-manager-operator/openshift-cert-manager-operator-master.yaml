@@ -114,17 +114,23 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && !TechPreview"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint} && !TechPreview"' make test-e2e
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-generic-claim
 - as: e2e-operator-tech-preview
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
   optional: true
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-5
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
@@ -135,12 +141,12 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"!/Platform:/"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint} && TechPreview"' make test-e2e
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-hypershift
+    workflow: optional-operators-ci-operator-sdk-generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift
