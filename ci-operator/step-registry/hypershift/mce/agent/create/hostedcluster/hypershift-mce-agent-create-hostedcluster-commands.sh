@@ -93,6 +93,10 @@ if [[ -n "${HYPERSHIFT_NETWORK_TYPE}" ]]; then
   EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE} "
 fi
 
+if [[ -n $HYPERSHIFT_INFRA_AVAILABILITY_POLICY ]]; then
+  EXTRA_ARGS+=" --infra-availability-policy=${HYPERSHIFT_INFRA_AVAILABILITY_POLICY}"
+fi
+
 if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]; then
   cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
 fi
@@ -108,6 +112,7 @@ eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --ssh-key=${SHARED_DIR}/id_rsa.pub \
   --release-image ${RELEASE_IMAGE} $(support_np_skew)"
 
+sleep 3600
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
 
