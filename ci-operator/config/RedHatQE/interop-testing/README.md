@@ -5,7 +5,7 @@
 - [Purpose](#purpose)
 - [Process](#process)
   - [Cluster Provisioning and Deprovisioning: `firewatch-ipi-aws`](#cluster-provisioning-and-deprovisioning-firewatch-ipi-aws)
-  - [Test Setup, Execution, and Reporting Results - Openshift GitOps-interop-aws](#test-setup-execution-and-reporting-results---openshift-gitops-interop-aws)
+  - [Test Execution Workflows](#test-execution-workflows)
 - [Prerequisite(s)](#prerequisites)
   - [Environment Variables](#environment-variables)
 
@@ -32,7 +32,7 @@ The Openshift CNV+ODF Interop scenario can be broken into the following basic st
 
 Please see the [`firewatch-ipi-aws`](https://steps.ci.openshift.org/workflow/firewatch-ipi-aws) documentation for more information on this workflow. This workflow is not maintained by the Interop QE team.
 
-### Test Setup, Execution, and Reporting Results - `Openshift GitOps-interop-aws`
+### Test Execution Workflows
 
 Following the test cluster being provisioned, the following steps are executed in this order:
 

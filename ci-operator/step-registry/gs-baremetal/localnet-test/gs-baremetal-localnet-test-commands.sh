@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+shopt -s extglob
 
 start_time=$SECONDS
 
@@ -15,7 +16,7 @@ debug_on_exit() {
   local exit_code=$?
   local end_time=$SECONDS
   local execution_time=$((end_time - start_time))
-  local debug_threshold=1200 # 20 minutes in seconds
+  local debug_threshold=1800 # 30 minutes in seconds
   local hco_namespace=openshift-cnv
 
   if [[ (${execution_time} -lt ${debug_threshold}) || ${exit_code} -ne 0 ]]; then
@@ -23,8 +24,6 @@ debug_on_exit() {
     echo "--------------------------------------------------------"
     echo " SCRIPT EXITED PREMATURELY (runtime: ${execution_time}s) "
     echo "--------------------------------------------------------"
-    echo "Entering 2-hour debug sleep. Press Ctrl+C to terminate."
-    echo "You can now inspect the system state."
     echo "PID: $$"
     echo "Exit Code: ${exit_code}"
     echo "--------------------------------------------------------"
@@ -36,7 +35,6 @@ debug_on_exit() {
 
     runMustGather
     echo "    😴 😴 😴"
-    sleep 2h
   fi
 
   # exit with the original exit code.
@@ -51,7 +49,6 @@ function setDefaultStorageClass() {
 
 # shellcheck disable=SC2329
 function getMustGatherImage() {
-
     oc get csv --namespace='openshift-cnv' --selector='!olm.copiedFrom' --output='json' \
         | jq -r '
             .items[]
@@ -59,7 +56,6 @@ function getMustGatherImage() {
             | .spec.relatedImages[]
             | select(.name | contains("must-gather"))
             | .image'
-
 }
 
 # shellcheck disable=SC2329
@@ -85,9 +81,27 @@ function runMustGather() {
 #   * status - true / false
 function cnv::toggle_common_boot_image_import () {
   local status="${1}"
+  case $(
+      oc -n openshift-cnv get Subscriptions/hco-operatorhub -o jsonpath='{.status.currentCSV}'|
+      sed -E 's/.+v([0-9]+\.[0-9]+).*/\1/'
+  ) in
+    (4.19*|4.[2-9]+([0-9])*|@([5-9]|[1-9]+([0-9])).*)
+      local commonBootImageFeatFlagPath && commonBootImageFeatFlagPath="$(
+        yq -n -o json -I 0 eval ".spec.enableCommonBootImageImport = ${status}"
+      )"
+      ;;
+    (*)
+      local commonBootImageFeatFlagPath && commonBootImageFeatFlagPath="$(
+        yq -n -o json -I 0 eval ".spec.featureGates.enableCommonBootImageImport = ${status}"
+      )"
+      ;;
+  esac
   oc patch hco kubevirt-hyperconverged -n openshift-cnv \
     --type=merge \
-    -p "{\"spec\":{\"enableCommonBootImageImport\": ${status}}}"
+    -p "${commonBootImageFeatFlagPath}"
+  oc patch hco kubevirt-hyperconverged -n openshift-cnv \
+    --type=merge \
+    -p "${commonBootImageFeatFlagPath}"
 
     # In some edge cases, the HCO deployment will be scaled down, and not scale up.
     oc scale deployment hco-operator --replicas 1 -n openshift-cnv
@@ -95,8 +109,7 @@ function cnv::toggle_common_boot_image_import () {
     oc wait hco kubevirt-hyperconverged -n openshift-cnv  \
     --for=condition='Available' \
     --timeout='5m'
-}
-
+} 
 #
 # Re-import datavolumes, for example after changing the default storage class
 #
@@ -173,19 +186,7 @@ function install_yq_if_not_exists() {
          -o /tmp/bin/yq && chmod +x /tmp/bin/yq
     fi
 }
-
-
-function mapTestsForComponentReadiness() {
-    if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${1}"
-        echo "Patching Tests Result File: ${results_file}"
-        if [ -f "${results_file}" ]; then
-            install_yq_if_not_exists
-            echo "Mapping Test Suite Name To: CNV-lp-interop"
-            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
-        fi
-    fi
-}
+install_yq_if_not_exists
 
 BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
 OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
@@ -228,10 +229,11 @@ oc get sc
 cnv::reimport_datavolumes
 
 rc=0
-uv run --verbose --cache-dir /tmp/uv-cache pytest  \
+uv run --verbose --cache-dir /tmp/uv-cache pytest \
     -s \
     -o log_cli=true \
     -o cache_dir=/tmp/pytest-cache \
+    -m single_nic \
     --pytest-log-file "${ARTIFACT_DIR}/tests.log" \
     --data-collector --data-collector-output-dir="${ARTIFACT_DIR}/" \
     --junitxml "${JUNIT_RESULTS_FILE}" \
@@ -243,7 +245,7 @@ uv run --verbose --cache-dir /tmp/uv-cache pytest  \
     --latest-rhel \
     --storage-class-matrix=ocs-storagecluster-ceph-rbd-virtualization \
     --leftovers-collector \
-    -m smoke || rc=$?
+    tests/network/localnet/test_default_bridge.py || rc=$?
 
 # TODO: Fix junit, spyglass still show "nil" for failed jobs.
 #       (This attempt didn't work)
@@ -253,9 +255,6 @@ uv run --verbose --cache-dir /tmp/uv-cache pytest  \
 #         | sed --regexp-extended 's#</?testsuites([^>]+)?>##g' \
 #         | xmllint --format - > "${JUNIT_RESULTS_FILE}"
 # fi
-
-# Map tests if needed for related use cases
-mapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
 
 # Send junit file to shared dir for Data Router Reporter step
 cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}"
