@@ -4,13 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if test -f "${SHARED_DIR}/api.login"; then
-    eval "$(cat "${SHARED_DIR}/api.login")"
-else
-    echo "No ${SHARED_DIR}/api.login present. This is not an HCP or ROSA cluster. Continue using \$KUBECONFIG env path."
-fi
-
-# Used for downstream testing.
+# Used for stage testing.
 # Set the Go path and Go cache environment variables
 export GOPATH=/tmp/go
 export GOBIN=/tmp/go/bin
