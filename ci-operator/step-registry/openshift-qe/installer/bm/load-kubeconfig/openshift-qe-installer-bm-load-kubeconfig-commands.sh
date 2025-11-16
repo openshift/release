@@ -60,10 +60,10 @@ PROXY_EOF
   (vault)
     typeset srcFile='' tgtFile=''
 
-    for tgtFile in kube{admin-password,config}; do
+    for tgtFile in kube{admin-password,config} metadata.json; do
         srcFile="${tgtFile}${KCFG_SRC_SFX:+"--${KCFG_SRC_SFX}"}"
         if [ -r "${CLUSTER_PROFILE_DIR}/${srcFile}" ]; then
-            cp "${CLUSTER_PROFILE_DIR}/${srcFile}" "${SHARED_DIR}/${tgtFile}"
+            cp -f "${CLUSTER_PROFILE_DIR}/${srcFile}" "${SHARED_DIR}/${tgtFile}"
             [ "${tgtFile}" = kubeconfig ] && cp "${CLUSTER_PROFILE_DIR}/${srcFile}" "${SHARED_DIR}/${tgtFile}-minimal"
         fi
     done
