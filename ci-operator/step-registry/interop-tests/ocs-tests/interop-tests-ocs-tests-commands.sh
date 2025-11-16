@@ -89,6 +89,25 @@ DEPLOYMENT:
   skip_download_client: True
 __EOF__
 
+# Append ENV_DATA in ocs-tests config file for vsphere platform
+if [[ -f "${SHARED_DIR}/vsphere_context.sh" ]]; then
+    declare vsphere_datacenter
+    declare vsphere_datastore
+    declare vsphere_cluster
+    source "${SHARED_DIR}/vsphere_context.sh"
+    source "${SHARED_DIR}/govc.sh"
+
+    cat >> "${LOGS_CONFIG}" << __APPENDED_ENV_DATA__
+ENV_DATA:
+  platform: "vsphere"
+  vsphere_user: "${GOVC_USERNAME}"
+  vsphere_password: "${GOVC_PASSWORD}"
+  vsphere_datacenter: "${vsphere_datacenter}"
+  vsphere_cluster: "${vsphere_cluster}"
+  vsphere_datastore: "${vsphere_datastore}"
+__APPENDED_ENV_DATA__
+fi
+
 
 set -x
 START_TIME=$(date "+%s")
