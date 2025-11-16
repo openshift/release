@@ -30,8 +30,8 @@ debug_on_exit() {
     # The 'sleep' command will be interrupted by Ctrl+C.
     # To make the sleep uninterruptible by Ctrl+C, you could add:
     # trap '' SIGINT SIGTERM
-    # oc get -n "${hco_namespace}" hco kubevirt-hyperconverged -o yaml > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml
-    # oc logs --since=1h -n "${hco_namespace}" -l name=hyperconverged-cluster-operator > "${ARTIFACT_DIR}"/hco.log
+    oc get -n "${hco_namespace}" hco kubevirt-hyperconverged -o yaml > "${ARTIFACT_DIR}"/hco-kubevirt-hyperconverged-cr.yaml
+    oc logs --since=1h -n "${hco_namespace}" -l name=hyperconverged-cluster-operator > "${ARTIFACT_DIR}"/hco.log
 
     runMustGather
     echo "    😴 😴 😴"
