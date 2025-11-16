@@ -58,11 +58,4 @@ export WORKLOAD=crd-scale
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 export EXTRA_FLAGS+="${CRD_SCALE_EXTRA_FLAGS} --gc-metrics=true --profile-type=${PROFILE_TYPE} --iterations=${ITERATIONS}"
 
-#Debug to remove
-echo $EXTRA_FLAGS
-
-rm -f ${SHARED_DIR}/index.json
 ./run.sh
-
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
