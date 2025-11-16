@@ -29,6 +29,7 @@ set -x
 ./io-hog/prow_run.sh
 rc=$?
 
+
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
     cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 fi
