@@ -563,15 +563,56 @@ ${t_all}     cluster:etcd:write:requests:latency:total:quantile histogram_quanti
 ${t_install} cluster:etcd:write:requests:latency:install:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_install}])) by (le,scope))
 ${t_test}    cluster:etcd:write:requests:latency:test:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_test}])) by (le,scope))
 
-${t_test}    cluster:etcd:disk:wal:fsync:test:p999:quantile avg(histogram_quantile(0.999, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
-${t_test}    cluster:etcd:disk:wal:fsync:test:p99:quantile avg(histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
-${t_test}    cluster:etcd:disk:wal:fsync:test:p95:quantile avg(histogram_quantile(0.95, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
-${t_test}    cluster:etcd:disk:wal:fsync:test:p50:quantile avg(histogram_quantile(0.50, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+# Gather the aggregated etcd P999, P99, P95, P50 values for WAL fsync, backend commit durations, network RTT for the entire job duration
+# We first aggregate buckets across all 3 instances and then calculate the percentile bands
 
-${t_test}    cluster:etcd:disk:backend:commit:test:p999:quantile avg(histogram_quantile(0.999, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
-${t_test}    cluster:etcd:disk:backend:commit:test:p99:quantile avg(histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
-${t_test}    cluster:etcd:disk:backend:commit:test:p95:quantile avg(histogram_quantile(0.95, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
-${t_test}    cluster:etcd:disk:backend:commit:test:p50:quantile avg(histogram_quantile(0.50, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+# WAL fsync duration
+${t_test}    cluster:etcd:disk:wal:fsync:test:aggregated:p999:quantile histogram_quantile(0.999, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:wal:fsync:test:aggregated:p99:quantile histogram_quantile(0.99, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:wal:fsync:test:p95:aggregated:quantile histogram_quantile(0.95, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:wal:fsync:test:p50:aggregated:quantile histogram_quantile(0.50, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+
+# Backend commit duration
+${t_test}    cluster:etcd:disk:backend:commit:test:aggregated:p999:quantile histogram_quantile(0.999, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:backend:commit:test:aggregated:p99:quantile histogram_quantile(0.99, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:backend:commit:test:aggregated:p95:quantile histogram_quantile(0.95, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:backend:commit:test:aggregated:p50:quantile histogram_quantile(0.50, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])) by (le))
+
+# Network RTT
+${t_test}    cluster:etcd:network:rtt:test:aggregated:p999:quantile histogram_quantile(0.999, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:network:rtt:test:aggregated:p99:quantile histogram_quantile(0.99, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:network:rtt:test:aggregated:p95:quantile histogram_quantile(0.95, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:network:rtt:test:aggregated:p50:quantile histogram_quantile(0.50, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+
+# Gather the max etcd P999, P99, P95, P50 values for WAL fsync, backend commit durations, network RTT for the entire job duration
+# same as above but we take the max value across all 3 instances instead of aggregating the buckets
+# This would effectively be the slowest instance
+
+# WAL fsync duration
+${t_test}    cluster:etcd:disk:wal:fsync:test:max:p999:quantile max(histogram_quantile(0.999, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:max:p99:quantile max(histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:max:p95:quantile max(histogram_quantile(0.95, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:max:p50:quantile max(histogram_quantile(0.50, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+
+# Backend commit duration
+${t_test}    cluster:etcd:disk:backend:commit:test:max:p999:quantile max(histogram_quantile(0.999, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:max:p99:quantile max(histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:max:p95:quantile max(histogram_quantile(0.95, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:max:p50:quantile max(histogram_quantile(0.50, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+
+# Network RTT
+${t_test}    cluster:etcd:network:rtt:test:max:p999:quantile max(histogram_quantile(0.999, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:network:rtt:test:max:p99:quantile max(histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:network:rtt:test:max:p95:quantile max(histogram_quantile(0.95, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:network:rtt:test:max:p50:quantile max(histogram_quantile(0.50, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])))
+
+# Gather the percent of etcd grpc server handled requests that failed
+# This only tallies the failure for severe errors and ignores client side error types
+${t_test}    cluster:etcd:grpc:server:handled:test:error:percent 100 * ( sum(rate(grpc_server_handled_total{ job=~".*etcd.*", grpc_code=~"Internal|Unavailable|DataLoss|DeadlineExceeded|ResourceExhausted|Unknown" }[${d_test}])) / sum(rate(grpc_server_handled_total{job=~".*etcd.*"}[${d_test}])) )
+
+# Gather the total number of slow apply requests over the duration of the test
+# May indicate overloaded disk/network/cpu or all of the above so not directly useful but worth seeing if there is a pattern across jobs over time
+${t_test}    cluster:etcd:server:slow:apply:test:count sum(increase(etcd_server_slow_apply_total[${d_test}]))
 
 ${t_all}     cluster:etcd:read:requests:latency:total:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope)
 ${t_install} cluster:etcd:read:requests:latency:install:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope)
@@ -629,6 +670,8 @@ set -f
 echo > /tmp/queries_resolved
 while IFS= read -r i; do
   if [[ -z "${i}" ]]; then continue; fi
+  # Skip comment lines
+  if [[ "${i}" =~ ^[[:space:]]*# ]]; then continue; fi
   # Try to convert the line of the file into a query, performing bash substitution AND catch undefined variables
   # The heredoc is necessary because bash will perform quote evaluation on labels in queries (pod="x" becomes pod=x)
   if ! q=$( eval $'cat <<END\n'$i$'\nEND\n' 2>/dev/null ); then
@@ -660,6 +703,8 @@ SCRIPT
 cat <<'SCRIPT'
 while IFS= read -r q; do
   if [[ -z "${q}" ]]; then continue; fi
+  # Skip comment lines
+  if [[ "${q}" =~ ^[[:space:]]*# ]]; then continue; fi
   # part up the line '<unix_timestamp_query_time> <name> <query>'
   timestamp=${q%% *}
   q=${q#* }
