@@ -1,10 +1,12 @@
 build_root:
   project_image:
     dockerfile_literal: |-
-      FROM registry.access.redhat.com/ubi9/ubi
-      RUN yum install -y python3 python3-pip git make \
-      && pip3 install --no-cache-dir ruff \
-      && yum clean all
+      FROM registry.access.redhat.com/ubi9/python-312
+      USER root
+      RUN dnf install -y git make && \
+        dnf clean all
+      USER 1001
+      RUN python3 -m pip install --no-cache-dir ruff
 images:
 - dockerfile_path: Dockerfile
   from: src
