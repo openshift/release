@@ -140,8 +140,6 @@ function clear_partition_disk_table {
      sfdisk --delete ${node_dev} ;
      sleep 3 ;
      kpartx -d ${node_dev} || true ;
-     partprobe ${node_dev} || true ;
-     sleep 10 ;
      echo 'After wiping:' ;
      lsblk --fs ${node_dev} || true ;
      set +x ;
