@@ -31,7 +31,6 @@ QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
-BOND=$(cat ${CLUSTER_PROFILE_DIR}/bond)
 
 echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
 
