@@ -1,12 +1,8 @@
 base_images:
   cli:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: cli
-  upi-installer:
-    name: "4.18"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
@@ -22,35 +18,42 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: opentelemetry-stage-tests
-  cron: 0 0 30 2 *
+- as: opentelemetry-downstream-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  cron: 30 3 * * 2
   steps:
     env:
-      BASE_DOMAIN: observability.azure.devcluster.openshift.com
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.2", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.2", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
+            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-6.3", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-6.3", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
         ]
       SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-otel/google*
     test:
-    - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: install-operators
-    - ref: distributed-tracing-tests-opentelemetry-stage
-    workflow: cucushift-installer-rehearse-azure-ipi
+    - ref: distributed-tracing-tests-opentelemetry-downstream
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: open-telemetry-opentelemetry-operator
-  variant: opentelemetry-product-ocp-4.19-stage
+  variant: opentelemetry-product-ocp-4.20-downstream
