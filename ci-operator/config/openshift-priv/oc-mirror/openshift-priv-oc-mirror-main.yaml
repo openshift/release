@@ -70,6 +70,7 @@ tests:
   commands: make sanity
   container:
     from: src
+  skip_if_only_changed: ^v1/
 - as: unit
   commands: |
     export HOME=/tmp/home
@@ -77,8 +78,22 @@ tests:
     make test-unit
   container:
     from: src
-- as: e2e
-  commands: make test-e2e
+  skip_if_only_changed: ^v1/
+- as: v1-e2e
+  commands: |
+    pushd v1 || true
+    make test-e2e
+  container:
+    from: src
+- as: v1-sanity
+  commands: make -C v1 sanity
+  container:
+    from: src
+- as: v1-unit
+  commands: |
+    export HOME=/tmp/home
+    mkdir -p $HOME
+    make -C v1 test-unit
   container:
     from: src
 - as: lint
@@ -86,7 +101,7 @@ tests:
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
-    cd v2
+    pushd v2 || true
     golangci-lint version
     maj_version=$((golangci-lint version --short 2>/dev/null || golangci-lint version --format short 2>/dev/null) | cut -f1 -d.)
     if [ ${maj_version} -eq 1 ]; then
@@ -101,6 +116,7 @@ tests:
   container:
     clone: true
     from: golangci-lint
+  skip_if_only_changed: ^v1/
 - as: verify-deps
   steps:
     env:
@@ -112,7 +128,7 @@ tests:
     ./scripts/flow-controller.sh all_happy_path
   container:
     from: oc-mirror-tests
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^v1/)
 zz_generated_metadata:
   branch: main
   org: openshift-priv

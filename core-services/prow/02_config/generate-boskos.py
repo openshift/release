@@ -96,8 +96,8 @@ CONFIG = {
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 20,
     },
-    'metal-perscale-cpt-quota-slice': {
-        'rdu3': 1,
+    'metal-perfscale-cpt-quota-slice': {
+        'metal-perfscale-cpt-rdu3': 1,
     },
     'metal-perfscale-jetlag-quota-slice': {
         'metal-perfscale-jetlag-rdu3': 1,
@@ -157,6 +157,9 @@ CONFIG = {
         'us-west-1': 60,
         'us-west-2': 60,
     },
+    'aws-confidential-qe-quota-slice': {
+        'us-east-2': 6,
+    },
     'aws-devfile-quota-slice': {
         'us-west-2': 10
     },
@@ -207,7 +210,7 @@ CONFIG = {
         'centralus': 10
     },
     'azure-observability-quota-slice': {
-        'centralus': 30
+        'westus': 3
     },
     'azure-hcp-qe-quota-slice': {
         'westus': 5,
@@ -272,6 +275,9 @@ CONFIG = {
     },
     'gcp-autorelease-qe-quota-slice': {
         'us-central1': 7,
+    },
+    'gcp-confidential-qe-quota-slice': {
+        'us-central1': 6,
     },
     'gcp-sustaining-autorelease-412-quota-slice': {
         'us-east1': 60,
