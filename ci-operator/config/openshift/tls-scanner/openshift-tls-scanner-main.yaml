@@ -50,13 +50,36 @@ tests:
         set -o nounset
         set -o errexit
         set -o pipefail
-
-        mkdir -p "${ARTIFACT_DIR}/tls-scanner"
-
-        /usr/local/bin/tls-scanner \
-          --all-pods \
-          --csv-file "${ARTIFACT_DIR}/tls-scanner/report.csv" \
-          --log-file "${ARTIFACT_DIR}/tls-scanner/scanner.log"
+        
+        # 1. Setup environment variables for the deployment script
+        export SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
+        export NAMESPACE=tls-scanner-test
+        oc create namespace "${NAMESPACE}"
+        
+        # Use a trap to ensure cleanup happens even if there are errors.
+        # The deploy.sh cleanup is expected to delete the job and related resources.
+        trap './deploy.sh cleanup' EXIT
+        
+        # 2. Deploy the scanner Job to the ephemeral cluster
+        ./deploy.sh deploy
+        
+        # 3. Wait for the Job to complete
+        echo "Waiting for tls-scanner-job to complete in namespace ${NAMESPACE}..."
+        oc wait --for=condition=complete "job/tls-scanner-job" -n "${NAMESPACE}" --timeout=15m
+        
+        # 4. Copy artifacts from the completed Pod to the CI artifact directory
+        echo "Copying artifacts..."
+        POD_NAME=$(oc get pods -n "${NAMESPACE}" -l job-name=tls-scanner-job -o jsonpath='{.items[0].metadata.name}')
+        
+        # Create a dedicated directory for the scanner's artifacts
+        SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
+        mkdir -p "${SCANNER_ARTIFACT_DIR}"
+        
+        # Copy all files from the Pod's /artifacts/ directory
+        oc cp "${NAMESPACE}/${POD_NAME}:/artifacts/." "${SCANNER_ARTIFACT_DIR}/"
+        
+        echo "Scan complete. Artifacts collected in ${SCANNER_ARTIFACT_DIR}."
+        # The 'trap' will execute ./deploy.sh cleanup on exit.
       dependencies:
       - env: PULL_SPEC_TLS_SCANNER_TOOL
         name: tls-scanner-tool
