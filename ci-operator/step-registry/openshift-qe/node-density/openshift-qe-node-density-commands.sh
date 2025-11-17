@@ -65,13 +65,9 @@ fi
 
 export EXTRA_FLAGS
 
-rm -f ${SHARED_DIR}/index.json
 
 # Run workload immediately
 ./run.sh
-
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)

@@ -105,7 +105,7 @@ tests:
   as: e2e-aws-operator-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -120,7 +120,7 @@ tests:
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-azure-operator
@@ -142,6 +142,14 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-azure-operator-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-gcp-ovn
   optional: true
@@ -219,6 +227,25 @@ tests:
   optional: true
   steps:
     cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix
+- always_run: false
+  as: e2e-nutanix-operator-multi-subnet
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      FEATURE_GATES: '["NutanixMultiSubnets=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: openshift-e2e-nutanix
 - always_run: false
   as: e2e-vsphere-ovn
@@ -300,7 +327,7 @@ tests:
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       E2E_RUN_TAGS: '@mapi'
       TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
