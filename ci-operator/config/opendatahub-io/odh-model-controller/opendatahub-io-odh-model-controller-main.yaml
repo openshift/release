@@ -140,6 +140,21 @@ tests:
         pushd /tmp/kserve
           git fetch --all --tags
           git checkout release-v0.15
+
+          # Apply necessry prereqs for LLMISVC tests
+          oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/prerequisites/
+          oc wait --for=condition=CatalogSourcesUnhealthy=false subscription/openshift-cert-manager-operator -n cert-manager-operator --timeout=300s
+          oc wait --for=condition=CatalogSourcesUnhealthy=false subscription/servicemeshoperator -n openshift-operators --timeout=300s
+          oc wait --for=condition=CatalogSourcesUnhealthy=false subscription/leader-worker-set -n openshift-lws-operator --timeout=300s
+          oc get crd gateways.gateway.networking.k8s.io
+          oc get crd gatewayclasses.gateway.networking.k8s.io
+          oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/installation/
+          # Wait for Leader Worker Set Operator to be available
+          oc wait --for=condition=Available leaderworkersetoperator/cluster --timeout=300s
+          oc wait --for=condition=Ready istiocni/default --timeout=300s
+          oc wait --for=condition=Ready istio/default --timeout=300s
+          oc get gateway openshift-ai-inference -n openshift-ingress
+
           export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
           export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
 
