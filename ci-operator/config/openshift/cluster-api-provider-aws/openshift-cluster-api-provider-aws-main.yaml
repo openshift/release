@@ -76,9 +76,16 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
-    - as: test
+    - as: capi-operator-e2e
       commands: openshift/e2e-tests.sh
       from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: actuator-pkg-e2e
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-capi
+      from: stable:cluster-api-actuator-pkg
       resources:
         requests:
           cpu: 100m
