@@ -11,7 +11,7 @@ echo "Starting OpenShift QE Egress IP Resilience Tests"
 echo "==============================================="
 
 # Configuration
-EIP_NAME="${EIP_NAME:-egressip2}"
+EIP_NAME="${EIP_NAME:-egressip1}"
 POD_KILL_RETRIES="${POD_KILL_RETRIES:-10}"
 REBOOT_RETRIES="${REBOOT_RETRIES:-5}"
 NAMESPACE="openshift-ovn-kubernetes"
