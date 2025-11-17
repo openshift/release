@@ -35,6 +35,9 @@ BOND=$(cat ${CLUSTER_PROFILE_DIR}/bond)
 
 echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
 
+echo "Removing bastion self-reference from resolv.conf ..."
+ssh ${SSH_ARGS} root@${bastion} "sed -i '/^nameserver 192\./d' /etc/resolv.conf"
+
 cat <<EOF >>/tmp/all.yml
 ---
 lab: $LAB
