@@ -74,14 +74,16 @@ run_pod_disruption_test() {
     log_info "Pod disruption test iteration $iteration/$POD_KILL_RETRIES"
     
     # Get current assigned node
-    local current_node=$(oc get egressip "$EIP_NAME" -o jsonpath='{.status.items[0].node}' 2>/dev/null || echo "")
+    local current_node
+    current_node=$(oc get egressip "$EIP_NAME" -o jsonpath='{.status.items[0].node}' 2>/dev/null || echo "")
     if [[ -z "$current_node" ]]; then
         log_error "Egress IP not assigned in iteration $iteration"
         return 1
     fi
     
     # Find ovnkube-node pod on that node
-    local pod_name=$(oc get pods -n "$NAMESPACE" -o wide | grep "$current_node" | awk '/ovnkube-node/{print $1}' | head -1)
+    local pod_name
+    pod_name=$(oc get pods -n "$NAMESPACE" -o wide | grep "$current_node" | awk '/ovnkube-node/{print $1}' | head -1)
     if [[ -z "$pod_name" ]]; then
         log_error "No ovnkube-node pod found on node $current_node"
         return 1
@@ -121,7 +123,8 @@ run_pod_disruption_test() {
     sleep 15
     
     # Check NAT count
-    local count=$(oc exec -n "$NAMESPACE" "$new_pod" -c ovnkube-controller -- bash -c \
+    local count
+    count=$(oc exec -n "$NAMESPACE" "$new_pod" -c ovnkube-controller -- bash -c \
         "ovn-nbctl --format=csv --no-heading find nat | grep egressip | wc -l" 2>/dev/null || echo "0")
     
     log_info "Egress IP NAT count: $count"
@@ -155,7 +158,8 @@ run_node_reboot_test() {
     log_info "Node reboot test iteration $iteration/$REBOOT_RETRIES"
     
     # Get all egress nodes
-    local egress_nodes=($(oc get egressip -o jsonpath='{.items[*].status.items[*].node}' 2>/dev/null | tr ' ' '\n' | sort -u))
+    local egress_nodes
+    mapfile -t egress_nodes < <(oc get egressip -o jsonpath='{.items[*].status.items[*].node}' 2>/dev/null | tr ' ' '\n' | sort -u)
     if [[ ${#egress_nodes[@]} -eq 0 ]]; then
         log_error "No egress nodes found"
         return 1
@@ -166,7 +170,8 @@ run_node_reboot_test() {
     log_info "Selected node for reboot: $selected_node"
     
     # Get worker pods before reboot
-    local worker_pods=$(oc get pods -n "$NAMESPACE" -o wide | awk '/ovnkube-node/ && /worker/ && !/master/ {print $1}')
+    local worker_pods
+    worker_pods=$(oc get pods -n "$NAMESPACE" -o wide | awk '/ovnkube-node/ && /worker/ && !/master/ {print $1}')
     if [[ -z "$worker_pods" ]]; then
         worker_pods=$(oc get pods -n "$NAMESPACE" -o wide | awk '/ovnkube-node/ && !/master/ {print $1}')
     fi
@@ -181,9 +186,11 @@ run_node_reboot_test() {
     local old_policy_count=0
     
     for pod in $worker_pods; do
-        local snat=$(oc exec -n "$NAMESPACE" "$pod" -c ovnkube-controller -- bash -c \
+        local snat
+        snat=$(oc exec -n "$NAMESPACE" "$pod" -c ovnkube-controller -- bash -c \
             "ovn-nbctl --format=csv --no-heading find nat | grep egressip | wc -l" 2>/dev/null || echo "0")
-        local policy=$(oc exec -n "$NAMESPACE" "$pod" -c ovnkube-controller -- bash -c \
+        local policy
+        policy=$(oc exec -n "$NAMESPACE" "$pod" -c ovnkube-controller -- bash -c \
             "ovn-nbctl lr-policy-list ovn_cluster_router | grep '100 ' | grep -v 1004 | wc -l" 2>/dev/null || echo "0")
         
         old_snat_count=$((old_snat_count + snat))
@@ -204,7 +211,8 @@ run_node_reboot_test() {
     local notready_detected=false
     
     while [[ $elapsed -lt $node_notready_timeout ]]; do
-        local status=$(oc get node "$selected_node" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+        local status
+        status=$(oc get node "$selected_node" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
         if [[ "$status" != "True" ]]; then
             log_info "Node $selected_node is NotReady (rebooting)"
             notready_detected=true
@@ -214,13 +222,18 @@ run_node_reboot_test() {
         elapsed=$((elapsed + 5))
     done
     
+    if [[ "$notready_detected" == "false" ]]; then
+        log_warning "Node $selected_node did not go NotReady within timeout, but continuing..."
+    fi
+    
     # Wait for node to become Ready again
     elapsed=0
     local node_ready_timeout=1200
     local ready_detected=false
     
     while [[ $elapsed -lt $node_ready_timeout ]]; do
-        local status=$(oc get node "$selected_node" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+        local status
+        status=$(oc get node "$selected_node" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
         if [[ "$status" == "True" ]]; then
             log_info "Node $selected_node is Ready again"
             ready_detected=true
@@ -249,9 +262,11 @@ run_node_reboot_test() {
     local new_policy_count=0
     
     for pod in $worker_pods; do
-        local snat=$(oc exec -n "$NAMESPACE" "$pod" -c ovnkube-controller -- bash -c \
+        local snat
+        snat=$(oc exec -n "$NAMESPACE" "$pod" -c ovnkube-controller -- bash -c \
             "ovn-nbctl --format=csv --no-heading find nat | grep egressip | wc -l" 2>/dev/null || echo "0")
-        local policy=$(oc exec -n "$NAMESPACE" "$pod" -c ovnkube-controller -- bash -c \
+        local policy
+        policy=$(oc exec -n "$NAMESPACE" "$pod" -c ovnkube-controller -- bash -c \
             "ovn-nbctl lr-policy-list ovn_cluster_router | grep '100 ' | grep -v 1004 | wc -l" 2>/dev/null || echo "0")
         
         new_snat_count=$((new_snat_count + snat))
