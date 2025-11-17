@@ -279,7 +279,8 @@ then
 	# shellcheck disable=SC1090
 	source "${SHARED_DIR}/must-gather-image.sh"
 else
-	MUST_GATHER_IMAGE=${MUST_GATHER_IMAGE:-""}
+	# Use must-gather PR #514 for testing cloud load balancer collection
+	MUST_GATHER_IMAGE=${MUST_GATHER_IMAGE:-"registry.ci.openshift.org/ci/must-gather:pr-514"}
 fi
 
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
