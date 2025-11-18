@@ -21,22 +21,31 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     bios_attributes=$(curl -k -u "$bmc_user:$bmc_pass" https://$bmc_address/redfish/v1/Systems/System.Embedded.1/Bios | yq .Attributes)
     model=$(curl -k -u "$bmc_user:$bmc_pass" https://$bmc_address/redfish/v1/Systems/System.Embedded.1 | yq .Model)
 
+    apply_settings="false"
+
     case "${model}" in
       "PowerEdge R740")
         if [[ $(echo "$bios_attributes" | jq -r '.SerialPortAddress') != "Serial1Com2Serial2Com1" ]] || [[ $(echo "$bios_attributes" | jq -r '.ExtSerialConnector') != "Serial2" ]]; then
           echo "Applying serial console settings to $bmc_address"
           curl -k -u "$bmc_user:$bmc_pass" -H "Content-Type: application/json" -X PATCH https://$bmc_address/redfish/v1/Systems/System.Embedded.1/Bios/Settings --data '{"Attributes":{"SerialPortAddress": "Serial1Com2Serial2Com1", "ExtSerialConnector": "Serial2"}}'
+          apply_settings="true"
         fi
         ;;
       "PowerEdge R650")
         if [[ $(echo "$bios_attributes" | jq -r '.SerialPortAddress') != "Com1" ]]; then
           echo "Applying serial console settings to $bmc_address"
           curl -k -u "$bmc_user:$bmc_pass" -H "Content-Type: application/json" -X PATCH https://$bmc_address/redfish/v1/Systems/System.Embedded.1/Bios/Settings --data '{"Attributes":{"SerialPortAddress": "Com1"}}'
+          apply_settings="true"
         fi
         ;;
       *)
         echo "Unsupported model"
     esac
+
+    if [ "$apply_settings" = "true" ] ; then
+        echo "Scheduling BIOS Settings job"
+        curl -k -u "$bmc_user:$bmc_pass" -H "Content-Type: application/json" -X POST https://$bmc_address/redfish/v1/Managers/iDRAC.Embedded.1/Jobs --data '{"TargetSettingsURI":"/redfish/v1/Systems/System.Embedded.1/Bios/Settings"}'
+    fi
 
   fi
 done
