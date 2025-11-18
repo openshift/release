@@ -63,7 +63,15 @@ tests:
         # 2. Deploy the scanner Job to the ephemeral cluster
         ./deploy.sh deploy
         
-        # 3. Wait for the Job to complete
+        # 3. Add immediate debugging to check the state of the Job right after creation.
+        echo "--- Checking Job status immediately after deployment ---"
+        sleep 5 # Give the controllers a moment to react.
+        oc describe job "tls-scanner-job" -n "${NAMESPACE}" || echo "Job description not available."
+        echo "--- Checking for events in the namespace ---"
+        oc get events -n "${NAMESPACE}" --sort-by='.metadata.creationTimestamp'
+        echo "--- End of immediate debug ---"
+        
+        # 4. Wait for the Job to complete
         echo "Waiting for tls-scanner-job to complete in namespace ${NAMESPACE}..."
         if ! oc wait --for=condition=complete "job/tls-scanner-job" -n "${NAMESPACE}" --timeout=15m; then
           echo "Job did not complete in time. Gathering debug info..."
@@ -81,7 +89,7 @@ tests:
           exit 1
         fi
         
-        # 4. Copy artifacts from the completed Pod to the CI artifact directory
+        # 5. Copy artifacts from the completed Pod to the CI artifact directory
         echo "Copying artifacts..."
         POD_NAME=$(oc get pods -n "${NAMESPACE}" -l job-name=tls-scanner-job -o jsonpath='{.items[0].metadata.name}')
         
