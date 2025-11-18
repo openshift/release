@@ -51,18 +51,18 @@ tests:
         set -o nounset
         set -o errexit
         set -o pipefail
-        
+
         # 1. Setup environment variables for the deployment script
         export SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
         export NAMESPACE=tls-scanner-test
         oc create namespace "${NAMESPACE}"
-        
+
         # Use a trap to ensure cleanup happens even if there are errors.
         trap './deploy.sh cleanup' EXIT
-        
+
         # 2. Deploy the scanner Job to the ephemeral cluster
         ./deploy.sh deploy
-        
+
         # 3. Add immediate debugging to check the state of the Job right after creation.
         echo "--- Checking Job status immediately after deployment ---"
         sleep 5 # Give the controllers a moment to react.
@@ -70,7 +70,7 @@ tests:
         echo "--- Checking for events in the namespace ---"
         oc get events -n "${NAMESPACE}" --sort-by='.metadata.creationTimestamp'
         echo "--- End of immediate debug ---"
-        
+
         # 4. Wait for the Job to complete
         echo "Waiting for tls-scanner-job to complete in namespace ${NAMESPACE}..."
         if ! oc wait --for=condition=complete "job/tls-scanner-job" -n "${NAMESPACE}" --timeout=15m; then
@@ -88,18 +88,18 @@ tests:
           fi
           exit 1
         fi
-        
+
         # 5. Copy artifacts from the completed Pod to the CI artifact directory
         echo "Copying artifacts..."
         POD_NAME=$(oc get pods -n "${NAMESPACE}" -l job-name=tls-scanner-job -o jsonpath='{.items[0].metadata.name}')
-        
+
         # Create a dedicated directory for the scanner's artifacts
         SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
         mkdir -p "${SCANNER_ARTIFACT_DIR}"
-        
+
         # Copy all files from the Pod's /artifacts/ directory
         oc cp "${NAMESPACE}/${POD_NAME}:/artifacts/." "${SCANNER_ARTIFACT_DIR}/"
-        
+
         echo "Scan complete. Artifacts collected in ${SCANNER_ARTIFACT_DIR}."
         # The 'trap' will execute ./deploy.sh cleanup on exit.
       dependencies:
