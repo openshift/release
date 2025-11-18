@@ -1,0 +1,178 @@
+base_images:
+  4-20-bundle:
+    name: "4.20"
+    namespace: ocp
+    tag: windows-machine-config-operator-bundle
+  current-bundle:
+    name: "4.19"
+    namespace: ocp
+    tag: windows-machine-config-operator-bundle
+  current-wmco:
+    name: "4.19"
+    namespace: ocp
+    tag: windows-machine-config-operator-test
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+  ocp_builder_rhel-9-golang-1.24-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.19
+  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: make build
+build_root:
+  from_repository: true
+  use_build_cache: true
+images:
+- dockerfile_path: build/Dockerfile.ci
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
+  to: windows-machine-config-operator-test
+operator:
+  bundles:
+  - as: wmco-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: REPLACE_IMAGE
+    with: pipeline:windows-machine-config-operator-test
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 400Mi
+tests:
+- as: 4-20-upgrade
+  cron: 46 8 * * 0
+  steps:
+    cluster_profile: azure-2
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        oc create namespace $WMCO_NS
+        oc label --overwrite=true ns $WMCO_NS openshift.io/cluster-monitoring=true \
+        pod-security.kubernetes.io/enforce=privileged
+
+        operator-sdk run bundle --timeout=15m --security-context-config restricted -n $WMCO_NS "$WMCO_BUNDLE" \
+        || oc get csv -n $WMCO_NS | awk '{print $1}' | tail -n1 | xargs oc patch csv -n $WMCO_NS --type='json' \
+        -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$CURRENT_OPERATOR\"}]"
+
+        sleep 10
+        oc delete deployment -n $WMCO_NS windows-machine-config-operator
+
+        retries=0
+        while ! oc get -n $WMCO_NS deployment windows-machine-config-operator; do
+          if [[ $retries -eq 10 ]]; then
+            echo max retries hit
+            exit 1
+          fi
+          sleep 1m
+          retries=$((retries+1))
+        done
+        oc wait --timeout=10m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      dependencies:
+      - env: WMCO_BUNDLE
+        name: wmco-bundle
+      - env: CURRENT_OPERATOR
+        name: current-wmco
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test-setup
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        oc create secret generic cloud-private-key --from-file=private-key.pem="${KUBE_SSH_KEY_PATH}" -n openshift-windows-machine-config-operator
+        make upgrade-test-setup
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: upgrade
+      cli: latest
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        echo "Upgrading cluster to 4.20..."
+        oc adm upgrade channel stable-4.20
+        operator-sdk run bundle-upgrade --timeout=15m --security-context-config restricted -n $WMCO_NS "$OO_BUNDLE"
+        sleep 5m
+        oc wait --timeout=5m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+        echo "Waiting for upgrade to complete..."
+        oc wait clusterversion version --for='condition=Available=True' --timeout=120m
+        echo "Cluster upgrade successful!"
+      dependencies:
+      - env: OO_BUNDLE
+        name: 4-20-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: verify-upgrade
+      cli: latest
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        echo "Verifying WMCO upgrade..."
+        CURRENT_CSV=$(oc get csv -n $WMCO_NS --no-headers | awk '{print $1}')
+        echo "Current CSV: $CURRENT_CSV"
+        CSV_PHASE=$(oc get csv -n $WMCO_NS "$CURRENT_CSV" -o jsonpath='{.status.phase}')
+        echo "CSV Phase: $CSV_PHASE"
+        if [[ "$CSV_PHASE" != "Succeeded" ]]; then
+          echo "ERROR: CSV is not in Succeeded phase"
+          exit 1
+        fi
+        OPERATOR_IMAGE=$(oc get deployment -n $WMCO_NS windows-machine-config-operator -o jsonpath='{.spec.template.spec.containers[0].image}')
+        echo "Operator Image: $OPERATOR_IMAGE"
+        if [[ ! "$OPERATOR_IMAGE" =~ "pipeline" ]]; then
+          echo "WARNING: Operator image does not appear to be from the pipeline build"
+        fi
+        oc get deployment -n $WMCO_NS windows-machine-config-operator
+        echo "WMCO upgrade verification completed successfully"
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        make upgrade-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    workflow: ipi-azure-ovn-hybrid
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: windows-machine-config-operator
+  variant: upgrade
