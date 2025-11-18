@@ -1,0 +1,29 @@
+ref:
+  as: openshift-qe-egress-ip-workload
+  from_image:
+    namespace: ci
+    name: cli
+    tag: latest
+  commands: openshift-qe-egress-ip-workload-commands.sh
+  grace_period: 30s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: WORKLOAD_TYPE
+    default: "blue-red"
+    documentation: "Type of workload to generate (blue-red, continuous, burst)"
+  - name: NUM_PROJECTS
+    default: "4"
+    documentation: "Number of test projects to create"
+  - name: TEST_DURATION
+    default: "300"
+    documentation: "Duration in seconds for continuous load generation (0 to skip)"
+  - name: ECHO_SERVER
+    default: ""
+    documentation: "Echo server URL for egress validation (defaults to http://ifconfig.me/ip)"
+  documentation: |-
+    Creates active workloads that use egress IPs for validation and load testing.
+    Implements blue/red team testing with separate egress IP pools and generates
+    continuous traffic to validate egress IP functionality under load.
