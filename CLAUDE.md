@@ -16,6 +16,22 @@ This repository holds OpenShift cluster manifests, component build manifests and
 - `projects/` - Experimental, legacy, or non-critical service manifests
 - `tools/` - Container image build manifests for tooling
 
+## Slash Commands
+
+This repository includes custom slash commands to improve productivity:
+
+### `/step-finder` - Component Discovery
+Search the step-registry (4,400+ reusable CI components) to find existing steps, workflows, and chains before creating new ones:
+
+```bash
+/step-finder aws upgrade workflow          # Find AWS upgrade workflows
+/step-finder install operator step yes     # Find operator installation steps with usage examples
+```
+
+**Always use `/step-finder` before creating new step-registry components to avoid duplication.**
+
+See `.claude/SLASH_COMMANDS.md` for detailed documentation.
+
 ## Common Development Commands
 
 ### Configuration Updates
@@ -90,9 +106,18 @@ Steps are referenced in `ci-operator/config/` test definitions using multi-stage
 
 ### File Naming Conventions
 - `ci-operator/config/`: `<org>-<repo>-<branch>.yaml`
+- `ci-operator/config/`: `<org>-<repo>-<branch>__periodics.yaml` (variant periodic config)
 - `ci-operator/jobs/`: `<org>-<repo>-<org>-<repo>-<branch>-<jobtype>.yaml`
 - `step-registry/`: Component name prefixed (e.g., `openshift-e2e-test-ref.yaml`)
 - `core-services/`: `admin_*.yaml` for admin resources, `_*.yaml` excluded from application
+
+### Variant Periodic Configuration Pattern
+Periodic tests can be separated from main configuration into dedicated `__periodics.yaml` files:
+- Keeps main config files focused on presubmit/postsubmit tests
+- Example: `openshift-cluster-authentication-operator-release-4.21__periodics.yaml`
+- Contains only periodic tests with `interval:` scheduling
+- Uses `variant: periodics` in `zz_generated_metadata`
+- Generated jobs go to separate `-periodics.yaml` files in `ci-operator/jobs/`
 
 ## Key Workflows
 
@@ -114,6 +139,44 @@ Steps are referenced in `ci-operator/config/` test definitions using multi-stage
 2. Create a workflow file: `<name>-workflow.yaml`
 3. Define `pre`, `test`, and `post` phases using existing steps/chains
 4. Run `make validate-step-registry` to check correctness
+
+### Creating Variant Periodic Configurations
+For repositories with many periodic tests, separate them from the main config:
+1. Create `ci-operator/config/<org>/<repo>/<org>-<repo>-<branch>__periodics.yaml`
+2. Include `base_images`, `build_root`, `images`, `promotion`, `releases` sections (copy from main config)
+3. Add only `tests:` entries with `interval:` (periodic scheduling)
+4. Ensure `zz_generated_metadata` has `variant: periodics`
+5. Run `make jobs` to generate Prow jobs in separate `-periodics.yaml` file
+6. This pattern keeps main config focused on PR/postsubmit jobs while isolating scheduled tests
+
+## OpenShift Release Versioning
+
+### Release Branches
+OpenShift uses semantic versioning with minor releases (4.18, 4.19, 4.20, 4.21, 4.22, etc.):
+- **Branch names**: `release-4.21`, `release-4.20`, etc. (or `main`/`master`)
+- **Config files**: One per branch per repository (e.g., `openshift-oauth-server-release-4.21.yaml`)
+- **Release cycle**: New minor versions branch quarterly
+
+### Config Brancher Tool
+The `config-brancher` tool automates creating CI configs for new releases:
+```bash
+# Example from recent commits
+config-brancher --config-dir ./ci-operator/config --current-release 4.21 --future-release 4.22 --confirm
+```
+This copies configs from current to future release, updating version references.
+
+Use `--skip-periodics` to avoid branching periodic jobs (they're often managed separately in `__periodics.yaml` files).
+
+## Python Environment Setup
+
+If Python scripts fail (e.g., `generate-release-controllers.py`), set up a virtual environment:
+```bash
+python3 -m venv venv/           # First time only
+source venv/bin/activate
+python3 -m pip install pyyaml
+# Run your Python commands...
+deactivate                      # When done
+```
 
 ## Container Engine
 By default, `podman` is used. Override with:
