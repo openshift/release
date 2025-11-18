@@ -11,7 +11,7 @@ set -x
 export ES_PASSWORD
 export ES_USERNAME
 export EMAIL_ID_FOR_RESULTS_SHEET="openshift-netobserv-team@redhat.com"
-NOO_BUNDLE_VERSION=$(jq '.noo_bundle_info' < "$SHARED_DIR/$WORKLOAD-index_data.json")
+NOO_BUNDLE_VERSION=$(jq '.noo_bundle_info' < "$SHARED_DIR/additional_params.json")
 export NOO_BUNDLE_VERSION=${NOO_BUNDLE_VERSION//\"/}
 
 UUID=$(jq '.uuid' < "$SHARED_DIR/$WORKLOAD-index_data.json")

@@ -60,3 +60,4 @@ NOO_BUNDLE_INFO=$(scripts/build_info.sh)
 export METADATA="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$LOKI_RELEASE\", \"kafka_version\": \"$KAFKA_RELEASE\", \"noo_bundle_info\":\"$NOO_BUNDLE_INFO\"}"
 
 echo "$METADATA" >> "$SHARED_DIR/additional_params.json"
+cp "$SHARED_DIR/additional_params.json" "$ARTIFACT_DIR/additional_params.json"
