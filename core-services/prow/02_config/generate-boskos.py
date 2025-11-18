@@ -243,6 +243,9 @@ CONFIG = {
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
     },
+    'aro-hcp-int-e2e-quota-slice': {
+        'default': 1,
+    },
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },
@@ -321,7 +324,8 @@ CONFIG = {
     'nutanix-qe-flow-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
-        'default': 8,
+        # 3 * 512GB RAM, 96 cores (with 4x overcommit) hosts
+        'default': 15,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,

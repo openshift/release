@@ -74,6 +74,7 @@ if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
 else
   if [[ -n "$CATALOG_SOURCE_IMAGE" || -n "$TRUSTEE_CATALOG_SOURCE_IMAGE" ]]; then
     echo "CATALOG_SOURCE_IMAGE can only be used when TEST_RELEASE_TYPE==Pre-GA ($CATALOG_SOURCE_IMAGE)"
+    exit 1
   fi
 fi
 
