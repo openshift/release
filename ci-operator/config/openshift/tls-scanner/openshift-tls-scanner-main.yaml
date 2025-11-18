@@ -65,7 +65,21 @@ tests:
         
         # 3. Wait for the Job to complete
         echo "Waiting for tls-scanner-job to complete in namespace ${NAMESPACE}..."
-        oc wait --for=condition=complete "job/tls-scanner-job" -n "${NAMESPACE}" --timeout=15m
+        if ! oc wait --for=condition=complete "job/tls-scanner-job" -n "${NAMESPACE}" --timeout=15m; then
+          echo "Job did not complete in time. Gathering debug info..."
+          # The pod might not have been created, so we need to handle that.
+          POD_NAME=$(oc get pods -n "${NAMESPACE}" -l job-name=tls-scanner-job -o jsonpath='{.items[0].metadata.name}' || echo "pod-not-found")
+          if [ "${POD_NAME}" != "pod-not-found" ]; then
+            echo "--- Describing scanner job pod (${POD_NAME}) ---"
+            oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
+            echo "--- Logs from scanner job pod (${POD_NAME}) ---"
+            oc logs "${POD_NAME}" -n "${NAMESPACE}" --tail=-1
+          else
+            echo "Could not find a pod for the tls-scanner-job. Describing job for details:"
+            oc describe job "tls-scanner-job" -n "${NAMESPACE}"
+          fi
+          exit 1
+        fi
         
         # 4. Copy artifacts from the completed Pod to the CI artifact directory
         echo "Copying artifacts..."
