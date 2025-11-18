@@ -115,6 +115,14 @@ if [[ -n "${LOOKBACK_SIZE}" ]]; then
     EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
 fi
 
+if [[ -n "${LOOKBACK_SIZE}" ]]; then
+    EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
+fi
+
+if [[ -n "${DISPLAY}" ]]; then
+    EXTRA_FLAGS+=" --display ${DISPLAY}"
+fi
+
 set +e
 set -o pipefail
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
