@@ -6,6 +6,8 @@ set -o nounset
 ES_USERNAME=$(cat /secret/username)
 ES_PASSWORD=$(cat /secret/password)
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+ES_METADATA_INDEX="perf_scale_ci*"
+export ES_METADATA_INDEX
 
 set -x
 
@@ -14,7 +16,7 @@ function get_es_data(){
     # do a term query for exact matching
     query=$(jq -n --arg uuid "$uuid" '{"query":{"term":{"uuid.keyword": $uuid}}}')
     index_results="$ARTIFACT_DIR/${uuid}_index_data.json"
-    curl -sS -k -X GET -H 'Content-Type: application/json' "$ES_SERVER/perf_scale_ci*/_search" -d "$query" -o "$index_results"
+    curl -sS -k -X GET -H 'Content-Type: application/json' "$ES_SERVER/$ES_METADATA_INDEX/_search" -d "$query" -o "$index_results"
     res_len=$(jq '.hits.hits | length' "$index_results")
 
     # validate if there is record found for a UUID

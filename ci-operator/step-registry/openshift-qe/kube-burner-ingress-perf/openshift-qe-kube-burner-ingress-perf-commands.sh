@@ -99,15 +99,15 @@ echo "===> $WORKLOAD UUID $WORKLOAD_UUID"
 echo "===> ingress-perf UUID $INGRESS_PERF_UUID"
 
 if [[ -f $WORKLOAD_UUID_FILE ]]; then
-    cp "$WORKLOAD_UUID_FILE" "${ARTIFACT_DIR}/$WORKLOAD_UUID_FILE"
-    cp "$WORKLOAD_UUID_FILE" "${SHARED_DIR}/$WORKLOAD_UUID_FILE"
+    cp "$WORKLOAD_UUID_FILE" "${ARTIFACT_DIR}/$WORKLOAD-uuid.txt"
+    cp "$WORKLOAD_UUID_FILE" "${SHARED_DIR}/$WORKLOAD-uuid.txt"
 else
     echo "$WORKLOAD UUID not found" && exit 1
 fi
 
 if [[ -f $INGRESS_PERF_UUID_FILE ]]; then
-    cp "$INGRESS_PERF_UUID_FILE" "${ARTIFACT_DIR}/$INGRESS_PERF_UUID_FILE"
-    cp "$INGRESS_PERF_UUID_FILE" "${SHARED_DIR}/$INGRESS_PERF_UUID_FILE"
+    cp "$INGRESS_PERF_UUID_FILE" "${ARTIFACT_DIR}/ingress-perf-uuid.txt"
+    cp "$INGRESS_PERF_UUID_FILE" "${SHARED_DIR}/ingress-perf-uuid.txt"
 else
     echo "ingress-perf UUID not found" && exit 1
 fi
