@@ -1,0 +1,83 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  openshift_release_rhel-9-release-golang-1.24-openshift-4.21:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.21
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+  previous-bundle:
+    name: "4.20"
+    namespace: ocp
+    tag: windows-machine-config-operator-bundle
+  previous-wmco:
+    name: "4.20"
+    namespace: ocp
+    tag: windows-machine-config-operator-test
+build_root:
+  from_repository: true
+  use_build_cache: true
+operator:
+  bundles:
+  - as: wmco-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: REPLACE_IMAGE
+    with: pipeline:windows-machine-config-operator-test
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 400Mi
+  src:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: 100m
+      memory: 10Gi
+  windows-machine-config-operator-test:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: 100m
+      memory: 10Gi
+tests:
+- as: aws-e2e-operator-windows-server-2025
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      WINDOWS_SERVER_VERSION: "2025"
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-aws-ovn-hybrid
+  timeout: 5h0m0s
+- as: vsphere-e2e-ccm-install
+  cron: 0 9 * * 1
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: openshift-e2e-vsphere-ccm-ovn-hybrid-install
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: windows-machine-config-operator
+  variant: periodics
