@@ -243,6 +243,9 @@ CONFIG = {
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
     },
+    'aro-hcp-int-e2e-quota-slice': {
+        'default': 1,
+    },
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },
