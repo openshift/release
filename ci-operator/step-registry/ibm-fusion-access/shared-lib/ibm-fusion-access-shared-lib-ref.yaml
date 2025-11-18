@@ -1,0 +1,102 @@
+ref:
+  as: ibm-fusion-access-shared-lib
+  commands: ibm-fusion-access-shared-lib-commands.sh
+  from: cli
+  grace_period: 2m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Generates shared bash functions used by multiple Fusion Access test steps.
+    
+    **Overview**
+    
+    This step creates a reusable library of JUnit XML test result reporting functions
+    that are shared across all Fusion Access test steps, ensuring consistent test
+    reporting and integration with OCP CI test platform.
+    
+    
+    **Output Location**
+    
+    The shared library is written to:
+    
+      ${SHARED_DIR}/common-fusion-access-bash-functions.sh
+    
+    **Functions Provided**
+    
+    1. add_test_result() - Adds a test case result to the JUnit XML output
+       Parameters:
+         $1 - test_name: Name of the test case (snake_case)
+         $2 - test_status: "passed" or "failed"
+         $3 - test_duration: Duration in seconds
+         $4 - test_message: Error message (optional, for failed tests)
+         $5 - test_classname: Test class name (optional, defaults to "FusionAccessTests")
+    
+    2. generate_junit_xml() - Generates the final JUnit XML report
+       Uses global variables:
+         - JUNIT_RESULTS_FILE: Path to output XML file
+         - TEST_START_TIME: Start time of test suite
+         - TESTS_TOTAL: Total number of tests
+         - TESTS_FAILED: Number of failed tests
+         - TESTS_PASSED: Number of passed tests
+         - TEST_CASES: Accumulated test case XML
+         - JUNIT_SUITE_NAME: Test suite name (optional)
+         - JUNIT_EXIT_ON_FAILURE: Exit with error if tests failed (default: true)
+    
+    **Usage in Test Steps**
+    
+    1. Source the shared library after the script header:
+    
+       #!/bin/bash
+       set -eux -o pipefail; shopt -s inherit_errexit
+       
+       source "${SHARED_DIR}/common-fusion-access-bash-functions.sh"
+    
+    2. Initialize required variables before using the functions:
+    
+       ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
+       JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_<descriptive_test_name>_tests.xml"
+       JUNIT_SUITE_NAME="Fusion Access <Test Category> Tests"
+       TEST_START_TIME=$(date +%s)
+       TESTS_TOTAL=0
+       TESTS_FAILED=0
+       TESTS_PASSED=0
+       TEST_CASES=""
+    
+    3. Set up trap to generate XML on exit (CRITICAL - must be after sourcing):
+    
+       trap generate_junit_xml EXIT
+    
+    4. Use in test cases:
+    
+       # Test 1: Example test
+       echo "🧪 Test 1: Example test description..."
+       TEST1_START=$(date +%s)
+       TEST1_STATUS="failed"
+       TEST1_MESSAGE=""
+       
+       if perform_test_action; then
+         echo "  ✅ Test passed"
+         TEST1_STATUS="passed"
+       else
+         echo "  ❌ Test failed"
+         TEST1_MESSAGE="Specific failure reason"
+       fi
+       
+       TEST1_DURATION=$(($(date +%s) - TEST1_START))
+       add_test_result "test_example_action" "$TEST1_STATUS" "$TEST1_DURATION" "$TEST1_MESSAGE"
+    
+    **Integration Points**
+    
+    - ARTIFACT_DIR: JUnit XML files are saved for CI artifact collection
+    - SHARED_DIR: Results are copied for data router reporter integration
+    - Spyglass: Enables test result visualization in Prow UI
+    - Component Readiness Dashboard: Supports automated result aggregation
+    
+    **References**
+    
+    - OCP CI JUnit XML Test Results Patterns: .cursor/rules/ocp-ci-junit-xml-test-results-patterns.mdc
+    - JUnit XML Schema: https://www.ibm.com/docs/en/developer-for-zos/9.1.1?topic=formats-junit-xml-format
+    - OCP CI Test Platform: https://docs.ci.openshift.org/
+    
