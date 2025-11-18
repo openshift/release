@@ -1,0 +1,241 @@
+base_images:
+  4-19-bundle:
+    name: "4.19"
+    namespace: ocp
+    tag: windows-machine-config-operator-bundle
+  4-19-wmco:
+    name: "4.19"
+    namespace: ocp
+    tag: windows-machine-config-operator-test
+  4-20-bundle:
+    name: "4.20"
+    namespace: ocp
+    tag: windows-machine-config-operator-bundle
+  4-20-wmco:
+    name: "4.20"
+    namespace: ocp
+    tag: windows-machine-config-operator-test
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+  ocp_builder_rhel-9-golang-1.24-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.19
+  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: make build
+build_root:
+  from_repository: true
+  use_build_cache: true
+operator:
+  bundles:
+  - as: wmco-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: REPLACE_IMAGE
+    with: pipeline:windows-machine-config-operator-test
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.19"
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 400Mi
+tests:
+- as: 4-20-upgrade
+  cron: 46 8 * * 0
+  steps:
+    cluster_profile: azure-2
+    test:
+    - as: install
+      cli: initial
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        oc create namespace $WMCO_NS
+        oc label --overwrite=true ns $WMCO_NS openshift.io/cluster-monitoring=true \
+        pod-security.kubernetes.io/enforce=privileged
+
+        operator-sdk run bundle --timeout=15m --security-context-config restricted -n $WMCO_NS "$WMCO_BUNDLE" \
+        || oc get csv -n $WMCO_NS | awk '{print $1}' | tail -n1 | xargs oc patch csv -n $WMCO_NS --type='json' \
+        -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$WMCO_OPERATOR\"}]"
+
+        sleep 10
+        oc delete deployment -n $WMCO_NS windows-machine-config-operator
+
+        retries=0
+        while ! oc get -n $WMCO_NS deployment windows-machine-config-operator; do
+          if [[ $retries -eq 10 ]]; then
+            echo max retries hit
+            exit 1
+          fi
+          sleep 1m
+          retries=$((retries+1))
+        done
+        oc wait --timeout=10m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      dependencies:
+      - env: WMCO_BUNDLE
+        name: 4-19-bundle
+      - env: WMCO_OPERATOR
+        name: 4-19-wmco
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test-setup
+      cli: initial
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        oc create secret generic cloud-private-key --from-file=private-key.pem="${KUBE_SSH_KEY_PATH}" -n openshift-windows-machine-config-operator
+        make upgrade-test-setup
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: upgrade
+      cli: initial
+      commands: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        export WMCO_NS="openshift-windows-machine-config-operator"
+
+        echo "Upgrading cluster to 4.20..."
+        oc adm upgrade --force --allow-explicit-upgrade --to-image="$UPGRADE_IMAGE"
+
+        echo "Waiting for cluster upgrade to complete..."
+        oc wait clusterversion version \
+          --for=condition=Available=True \
+          --for=condition=Progressing=False \
+          --timeout=120m
+
+        echo "Cluster upgrade successful!"
+
+        operator-sdk run bundle "$NEXT_WMCO_BUNDLE" \
+          -n "$WMCO_NS" \
+          --timeout=10m || true
+
+        echo "Triggering WMCO upgrade..."
+
+        SUB=$(oc get subscription -n "$WMCO_NS" -o jsonpath='{.items[0].metadata.name}')
+
+        # Capture the currently-installed CSV
+        OLD_CSV=$(oc get csv -n "$WMCO_NS" \
+          -o jsonpath='{.items[?(@.status.phase=="Succeeded")].metadata.name}')
+
+        oc patch subscription "$SUB" \
+          -n "$WMCO_NS" \
+          --type=merge \
+          -p '{
+            "spec": {
+              "installPlanApproval": "Automatic"
+            }
+          }'
+
+        echo "Waiting for new WMCO CSV to succeed..."
+
+        # Wait for a *different* CSV than the old one
+        for i in {1..40}; do
+          NEW_CSV=$(oc get csv -n "$WMCO_NS" \
+            -o jsonpath='{.items[?(@.status.phase=="Succeeded")].metadata.name}' \
+            | tr ' ' '\n' | grep -v "$OLD_CSV" || true)
+
+          if [[ -n "$NEW_CSV" ]]; then
+            echo "New CSV succeeded: $NEW_CSV"
+            break
+          fi
+
+          sleep 30
+        done
+
+        if [[ -z "${NEW_CSV:-}" ]]; then
+          echo "ERROR: WMCO CSV did not upgrade"
+          oc get csv -n "$WMCO_NS"
+          exit 1
+        fi
+
+        DEPLOY=$(oc get csv "$NEW_CSV" -n "$WMCO_NS" \
+          -o jsonpath='{.spec.install.spec.deployments[0].name}')
+
+        echo "Waiting for WMCO deployment rollout: $DEPLOY"
+        oc rollout status deployment/"$DEPLOY" \
+          -n "$WMCO_NS" \
+          --timeout=15m
+
+        echo "Waiting for Windows nodes to be reconciled..."
+
+        EXPECTED_PREFIX="10.20"
+
+        for i in {1..60}; do
+          BAD_NODES=$(oc get nodes -l kubernetes.io/os=windows \
+            -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.annotations.windowsmachineconfig\.openshift\.io/version}{"\n"}{end}' \
+            | awk -v v="$EXPECTED_PREFIX" '$2 == "" || index($2, v) != 1')
+
+          if [[ -z "$BAD_NODES" ]]; then
+            echo "All Windows nodes successfully upgraded"
+            break
+          fi
+
+          echo "Waiting for Windows nodes to update:"
+          echo "$BAD_NODES"
+          sleep 30
+        done
+
+        if [[ -n "$BAD_NODES" ]]; then
+          echo "ERROR: Some Windows nodes did not upgrade:"
+          echo "$BAD_NODES"
+          exit 1
+        fi
+
+        echo "WMCO upgrade test completed successfully"
+      dependencies:
+      - env: NEXT_WMCO_BUNDLE
+        name: 4-20-bundle
+      - env: NEXT_WMCO_OPERATOR
+        name: 4-20-wmco
+      - env: UPGRADE_IMAGE
+        name: release:latest
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        make upgrade-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    workflow: ipi-azure-ovn-hybrid
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: windows-machine-config-operator
+  variant: upgrade
