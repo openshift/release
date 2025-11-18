@@ -41,13 +41,15 @@ repo="$(jq -r 'if .extra_refs then .extra_refs[0].repo
 # shellcheck disable=SC2076
 if ! [[ "${ALLOWED_REPOS[*]}" =~ "$org/$repo" ]]
 then
-    echo "Skip repository: $org/$repo"
-    exit 0
+  echo "Skip repository: $org/$repo"
+  exit 0
 fi
 
 LOGS_PATH='logs'
 if [[ "$(jq -r '.type' <<< ${JOB_SPEC})" = 'presubmit' ]]
 then
+  echo "Skip presubmit jobs"
+  exit 0
   pr_number="$(jq -r '.refs.pulls[0].number' <<< $JOB_SPEC)"
   if [[ -z "$pr_number" ]]
   then
@@ -264,8 +266,11 @@ function generate_attribute_version_installed() {
     if [[ -z "$arch" ]]
     then
       for release_file in 'release-images-arm64-latest' \
+                          'release-images-latest-arm64' \
                           'release-images-ppc64le-latest' \
-                          'release-images-s390x-latest'
+                          'release-images-latest-ppc64le' \
+                          'release-images-s390x-latest' \
+                          'release-images-latest-s390x'
       do
         release_info_file="$release_dir/$release_file"
         if [[ -f "$release_info_file" ]]
@@ -276,13 +281,68 @@ function generate_attribute_version_installed() {
     else
       if [[ "$arch" =~ arm64|ppc64le|s390x ]]
       then
-        release_info_file="$release_dir/release-images-${arch}-latest"
+        for release_file in "release-images-${arch}-latest" \
+                            "release-images-latest-${arch}"
+        do
+          release_info_file="$release_dir/$release_file"
+          if [[ -f "$release_info_file" ]]
+          then
+            break
+          fi
+        done
       fi
     fi
     if [[ -f "$release_info_file" ]]
     then
       version_installed="$(jq -r '.metadata.name' "$release_info_file")"
       write_attribute version_installed "$version_installed"
+    fi
+  fi
+}
+
+function generate_attribute_version_upgraded() {
+  if [[ "$JOB_NAME" =~ upgrade-from ]]
+  then
+    version_upgraded="$(get_attribute "version_upgraded")"
+    if [[ -z "$version_upgraded" ]]
+    then
+      release_dir="${LOCAL_DIR_ORI}/release/artifacts"
+      release_info_file="$release_dir/release-images-target"
+      arch="$(get_attribute "architecture")"
+      if [[ -z "$arch" ]]
+      then
+        for release_file in 'release-images-arm64-target' \
+                            'release-images-target-arm64' \
+                            'release-images-ppc64le-target' \
+                            'release-images-target-ppc64le' \
+                            'release-images-s390x-target' \
+                            'release-images-target-s390x'
+        do
+          release_info_file="$release_dir/$release_file"
+          if [[ -f "$release_info_file" ]]
+          then
+            break
+          fi
+        done
+      else
+        if [[ "$arch" =~ arm64|ppc64le|s390x ]]
+        then
+          for release_file in "release-images-${arch}-target" \
+                              "release-images-target-${arch}"
+          do
+            release_info_file="$release_dir/$release_file"
+            if [[ -f "$release_info_file" ]]
+            then
+              break
+            fi
+          done
+        fi
+      fi
+      if [[ -f "$release_info_file" ]]
+      then
+        version_upgraded="$(jq -r '.metadata.name' "$release_info_file")"
+        write_attribute version_upgraded "$version_upgraded"
+      fi
     fi
   fi
 }
@@ -300,6 +360,7 @@ function generate_attributes() {
   generate_attribute_pr_author
   generate_attribute_version
   generate_attribute_version_installed
+  generate_attribute_version_upgraded
 }
 
 function generate_metadata() {

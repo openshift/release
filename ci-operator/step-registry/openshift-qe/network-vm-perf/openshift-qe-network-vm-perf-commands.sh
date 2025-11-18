@@ -31,7 +31,7 @@ LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmark
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 
 if [ ${BAREMETAL} == "true" ]; then
-  bastion="$(cat /bm/address)"
+  bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
   ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "rm -rf /tmp/e2e-benchmarking"
   ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "cd /tmp;git clone $REPO_URL $TAG_OPTION --depth 1"
   ssh -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null root@$bastion "KUBECONFIG=~/mno/kubeconfig oc delete ns netperf --wait=true --ignore-not-found=true"

@@ -78,6 +78,10 @@ data:
       prefix = ""
 
       [[registry.mirror]]
+        location = "quay.io:443/acm-d"
+        insecure = false
+
+      [[registry.mirror]]
         location = "brew.registry.redhat.io/multicluster-engine"
         insecure = false
 EOF
@@ -91,6 +95,10 @@ cat <<EOF | oc create -f -
 apiVersion: agent-install.openshift.io/v1beta1
 kind: AgentServiceConfig
 metadata:
+  annotations:
+    # TODO: Remove after OCPBUGS-55106 is fixed
+    # OCPBUGS-55106 workaround
+    unsupported.agent-install.openshift.io/assisted-service-allow-unrestricted-image-pulls: 'true'
   name: agent
 spec:
   databaseStorage:
@@ -157,7 +165,7 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --control-plane-availability-policy=${CP_AVAILABILITY_POLICY} \
     --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --node-pool-replicas -1 \
-    ${RENDER_COMMAND} > /tmp/hc-manifests/cluster-agent.yaml
+    ${extra_flags} > /tmp/hc-manifests/cluster-agent.yaml
 
 # Split the manifest to replace routing strategy of various services
 csplit -f /tmp/hc-manifests/manifest_ -k /tmp/hc-manifests/cluster-agent.yaml /---/ "{5}"

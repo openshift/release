@@ -460,6 +460,7 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:arm64-latest
       RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       ADDITIONAL_HYPERSHIFT_NODE_COUNT: "1"
@@ -484,6 +485,7 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:arm64-latest
       RELEASE_IMAGE_LATEST: release:arm64-latest
     env:
       ADDITIONAL_HYPERSHIFT_NODE_COUNT: "1"
@@ -747,7 +749,7 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       FILTERS_ADDITIONAL: ""
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-18@sha256:5536f365df2ff3e4619532f2c6fad3ed99fe17376250d752b18ef495797feeae
+      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-18@sha256:bb4fe05ebd91d8d8da29b262ab55f5817edaccfae5e9c9f888cc36ae78ac9944
       OCP_ARCH: arm64
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
       TEST_PARALLEL: "3"
@@ -775,7 +777,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@complianceoperator'
       FILTERS_ADDITIONAL: ""
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-18@sha256:5536f365df2ff3e4619532f2c6fad3ed99fe17376250d752b18ef495797feeae
+      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-18@sha256:bb4fe05ebd91d8d8da29b262ab55f5817edaccfae5e9c9f888cc36ae78ac9944
       OCP_ARCH: arm64
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~StressTest&;Disruptive&
       TEST_PARALLEL: "3"
@@ -1719,11 +1721,13 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
       E2E_RUN_TAGS: '@level0'
       ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
       RT_ENABLED: "true"
       TEST_IMPORTANCE: LEVEL0
     test:
@@ -1736,9 +1740,11 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
       ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -1749,9 +1755,11 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
       ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
@@ -1970,33 +1978,42 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
-- as: gcp-ipi-xpn-oidc-amd-f28-destructive
-  cron: 30 12 20 * *
+- as: gcp-ipi-xpn-oidc-mini-perm-amd-f28-destructive
+  cron: 46 7 4 * *
   steps:
     cluster_profile: gcp-qe
     env:
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
       EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-workload-identity
-- as: gcp-ipi-xpn-oidc-arm-f28
-  cron: 53 11 25 * *
+- as: gcp-ipi-xpn-oidc-mini-perm-arm-f28
+  cron: 32 19 18 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
       EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-workload-identity
-- as: gcp-ipi-xpn-oidc-arm-f28-longduration-cloud
-  cron: 3 8 8 * *
+- as: gcp-ipi-xpn-oidc-mini-perm-arm-f28-longduration-cloud
+  cron: 13 14 26 * *
   steps:
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_TYPE: t2a-standard-4
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
       EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
       OCP_ARCH: arm64
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun

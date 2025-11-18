@@ -18,7 +18,7 @@ fi
 oc config view
 oc projects
 
-bastion="$(cat /bm/address)"
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 # Disk cleaning
 ssh ${SSH_ARGS} root@${bastion} '
   for i in $(oc get node --no-headers -l node-role.kubernetes.io/worker --output custom-columns="NAME:.status.addresses[0].address"); do

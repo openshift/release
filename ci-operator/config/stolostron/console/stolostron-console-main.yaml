@@ -48,6 +48,19 @@ tests:
     env:
       IMAGE_REPO: console-mce
     workflow: ocm-ci-image-mirror
+- as: sonar-post-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow sonar/js/jest-init
+    make -f Makefile.prow unit-tests
+    make -f Makefile.prow sonar/js/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: latest-image-mirror
   postsubmit: true
   steps:
@@ -70,7 +83,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.15
+      DESTINATION_BRANCH: release-2.16
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

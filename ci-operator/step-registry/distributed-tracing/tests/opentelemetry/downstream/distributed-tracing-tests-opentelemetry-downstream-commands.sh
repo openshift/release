@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if test -f "${SHARED_DIR}/api.login"; then
+    eval "$(cat "${SHARED_DIR}/api.login")"
+else
+    echo "No ${SHARED_DIR}/api.login present. This is not an HCP or ROSA cluster. Continue using \$KUBECONFIG env path."
+fi
+
 git clone https://github.com/IshwarKanse/opentelemetry-operator.git /tmp/otel-tests
 cd /tmp/otel-tests 
 git checkout rhosdt-3.7
@@ -77,7 +83,7 @@ tests/e2e-sidecar || any_errors=true
 
 # Set the operator args required for tests execution.
 OTEL_CSV_NAME=$(oc get csv -n openshift-opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n openshift-opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--enable-go-instrumentation\", \"--openshift-create-dashboard=true\", \"--enable-nginx-instrumentation=true\", \"--enable-cr-metrics=true\", \"--create-sm-operator-metrics=true\", \"--annotations-filter=.*filter.out\", \"--annotations-filter=config.*.gke.io.*\", \"--labels-filter=.*filter.out\", \"--feature-gates=operator.networkpolicy,operand.networkpolicy\"]}]"
+oc -n openshift-opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-go-instrumentation\", \"--openshift-create-dashboard=true\", \"--enable-nginx-instrumentation=true\", \"--enable-cr-metrics=true\", \"--create-sm-operator-metrics=true\", \"--annotations-filter=.*filter.out\", \"--annotations-filter=config.*.gke.io.*\", \"--labels-filter=.*filter.out\", \"--feature-gates=operator.networkpolicy,operand.networkpolicy\"]}]"
 sleep 60
 if oc -n openshift-opentelemetry-operator describe csv --selector=operators.coreos.com/opentelemetry-product.openshift-opentelemetry-operator= | tail -n 1 | grep -qi "InstallSucceeded"; then
     echo "CSV updated successfully, continuing script execution..."

@@ -59,6 +59,13 @@ images:
   dockerfile_path: Dockerfile
   from: must-gather
   to: lvms-must-gather
+- context_dir: .
+  dockerfile_path: test/integration/Dockerfile
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.access.redhat.com/ubi9/ubi-minimal:latest
+  to: lvm-operator-integration-test
 operator:
   bundles:
   - as: lvm-operator-bundle
@@ -72,6 +79,7 @@ promotion:
       lvm-operator-bundle: lvm-operator-bundle
     excluded_images:
     - lvms-pre-commit
+    - lvm-operator-integration-test
     namespace: lvms
     tag: latest
     tag_by_commit: true
@@ -252,6 +260,28 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-hypershift
+- as: e2e-aws-single-node-integration-tests
+  cron: '@weekly'
+  presubmit: true
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+  steps:
+    cluster_profile: aws-3
+    dependencies:
+      OO_BUNDLE: lvm-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-lvm-storage
+    test:
+    - as: lvms-sno-integration-test
+      cli: latest
+      commands: |
+        ./integration-test run-suite openshift/lvm-operator/test/integration/single-node
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws-sno
 zz_generated_metadata:
   branch: main
   org: openshift

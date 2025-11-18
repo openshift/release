@@ -651,7 +651,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 47 2 24 7 *
   decorate: true
   decoration_config:
@@ -726,7 +726,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 0 4 1 1 *
   decorate: true
   decoration_config:
@@ -801,7 +801,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 23 17 6 10 *
   decorate: true
   decoration_config:
@@ -876,7 +876,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 16 12 6 5 *
   decorate: true
   decoration_config:
@@ -951,7 +951,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 55 6 23 2 *
   decorate: true
   decoration_config:
@@ -1477,6 +1477,228 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
+  cron: 0 0 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.18
+    org: openshift
+    repo: hypershift
+  labels:
+    ci-operator.openshift.io/cloud: hypershift
+    ci-operator.openshift.io/cloud-cluster-profile: hypershift
+    ci-operator.openshift.io/variant: periodics-hcm
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-hypershift-release-4.18-periodics-hcm-e2e-aws
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-aws
+      - --variant=periodics-hcm
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 2 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.18
+    org: openshift
+    repo: hypershift
+  labels:
+    ci-operator.openshift.io/cloud: hypershift
+    ci-operator.openshift.io/cloud-cluster-profile: hypershift
+    ci-operator.openshift.io/variant: periodics-hcm
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-hypershift-release-4.18-periodics-hcm-e2e-aws-upgrade-from-zero
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-aws-upgrade-from-zero
+      - --variant=periodics-hcm
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 1 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.18
+    org: openshift
+    repo: hypershift
+  labels:
+    ci-operator.openshift.io/cloud: hypershift
+    ci-operator.openshift.io/cloud-cluster-profile: hypershift
+    ci-operator.openshift.io/variant: periodics-hcm
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-hypershift-release-4.18-periodics-hcm-e2e-aws-upgrade-minor
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-aws-upgrade-minor
+      - --variant=periodics-hcm
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build11
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1551,7 +1773,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1626,7 +1848,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 19 15 13 6 *
   decorate: true
   decoration_config:
@@ -1701,7 +1923,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 30 14 11 5 *
   decorate: true
   decoration_config:
@@ -1776,7 +1998,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 34 8 12 1 *
   decorate: true
   decoration_config:
@@ -1851,7 +2073,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 20 9 4 7 *
   decorate: true
   decoration_config:
@@ -1926,7 +2148,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 30 21 11 7 *
   decorate: true
   decoration_config:
@@ -2001,7 +2223,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 0 0 29 2 *
   decorate: true
   decoration_config:
@@ -2076,7 +2298,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 50 17 15 2 *
   decorate: true
   decoration_config:
@@ -2151,7 +2373,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 9 0 28 2 *
   decorate: true
   decoration_config:
@@ -2226,7 +2448,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 0 0 29 2 *
   decorate: true
   decoration_config:
@@ -2237,7 +2459,7 @@ periodics:
     repo: hypershift
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-3
     ci-operator.openshift.io/variant: periodics-mce
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
@@ -2301,7 +2523,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 37 2 14 5 *
   decorate: true
   decoration_config:
@@ -2376,7 +2598,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 53 12 22 7 *
   decorate: true
   decoration_config:
@@ -2387,7 +2609,7 @@ periodics:
     repo: hypershift
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/cloud-cluster-profile: aws-3
     ci-operator.openshift.io/variant: periodics-mce
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
@@ -2451,7 +2673,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 52 12 21 8 *
   decorate: true
   decoration_config:
@@ -2601,7 +2823,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 0 4 1 1 *
   decorate: true
   decoration_config:
@@ -2676,7 +2898,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 37 4 8 11 *
   decorate: true
   decoration_config:
@@ -2751,7 +2973,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 45 19 1 5 *
   decorate: true
   decoration_config:
@@ -2826,7 +3048,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 25 0 10 3 *
   decorate: true
   decoration_config:
@@ -2837,7 +3059,7 @@ periodics:
     repo: hypershift
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/cloud-cluster-profile: aws-3
     ci-operator.openshift.io/variant: periodics-mce
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
@@ -2901,7 +3123,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 32 23 16 10 *
   decorate: true
   decoration_config:
@@ -2912,7 +3134,7 @@ periodics:
     repo: hypershift
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-3
     ci-operator.openshift.io/variant: periodics-mce
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
