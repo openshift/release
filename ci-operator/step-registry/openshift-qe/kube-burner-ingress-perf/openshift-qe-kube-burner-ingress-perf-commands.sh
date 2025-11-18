@@ -90,25 +90,24 @@ ended_pid_rc=$?
 #shellcheck disable=SC2154
 check_pids $ended_pid_rc $ended_pid
 
-NODE_DENSITY_HEAVY_UUID=$(cat /tmp/"$WORKLOAD"-uuid.txt)
-INGRESS_PERF_UUID=$(cat /tmp/ingress-perf-uuid.txt)
+WORKLOAD_UUID_FILE=/tmp/"$WORKLOAD"-uuid.txt
+INGRESS_PERF_UUID_FILE=/tmp/ingress-perf-uuid.txt
+WORKLOAD_UUID=$(cat "$WORKLOAD_UUID_FILE")
+INGRESS_PERF_UUID=$(cat "$INGRESS_PERF_UUID_FILE")
 
-echo "===> $WORKLOAD UUID $NODE_DENSITY_HEAVY_UUID"
+echo "===> $WORKLOAD UUID $WORKLOAD_UUID"
 echo "===> ingress-perf UUID $INGRESS_PERF_UUID"
 
-if [[ -d "/tmp/$NODE_DENSITY_HEAVY_UUID" &&  -f "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json" ]]; then
-    cp /tmp/"$WORKLOAD"-uuid.txt  "${ARTIFACT_DIR}"/"$WORKLOAD"-uuid.txt
-    jq ".iterations = $PODS_PER_NODE"  >> "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json"
-    cp "/tmp/$NODE_DENSITY_HEAVY_UUID"/index_data.json "${ARTIFACT_DIR}/${WORKLOAD}-index_data.json"
-    cp "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json" "${SHARED_DIR}/${WORKLOAD}-index_data.json"
+if [[ -f $WORKLOAD_UUID_FILE ]]; then
+    cp "$WORKLOAD_UUID_FILE" "${ARTIFACT_DIR}/$WORKLOAD_UUID_FILE"
+    cp "$WORKLOAD_UUID_FILE" "${SHARED_DIR}/$WORKLOAD_UUID_FILE"
 else
     echo "$WORKLOAD UUID not found" && exit 1
 fi
 
-if [[ -d "/tmp/$INGRESS_PERF_UUID" && -f "/tmp/$INGRESS_PERF_UUID/index_data.json" ]]; then
-    cp /tmp/ingress-perf-uuid.txt "${ARTIFACT_DIR}"/ingress-perf-uuid.txt
-    cp "/tmp/$INGRESS_PERF_UUID/index_data.json" "${ARTIFACT_DIR}/ingress-perf-index_data.json"
-    cp "/tmp/$INGRESS_PERF_UUID/index_data.json" "${SHARED_DIR}/ingress-perf-index_data.json"
+if [[ -f $INGRESS_PERF_UUID_FILE ]]; then
+    cp "$INGRESS_PERF_UUID_FILE" "${ARTIFACT_DIR}/$INGRESS_PERF_UUID_FILE"
+    cp "$INGRESS_PERF_UUID_FILE" "${SHARED_DIR}/$INGRESS_PERF_UUID_FILE"
 else
     echo "ingress-perf UUID not found" && exit 1
 fi
