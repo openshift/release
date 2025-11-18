@@ -15,22 +15,13 @@ az bicep version
 az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
 az account show
 
-# install required tools
-mkdir -p /tmp/tools
-az aks install-cli --install-location /tmp/tools/kubectl --kubelogin-install-location /tmp/tools/kubelogin
-/tmp/tools/kubectl version
-/tmp/tools/kubelogin --version
-
-# Add to PATH
-export PATH="/tmp/tools:$PATH"
+kubectl version
+kubelogin --version
 export DEPLOY_ENV="prow"
 
 PRINCIPAL_ID=$(az ad sp show --id "${TEST_USER_CLIENT_ID}" --query id -o tsv)
 export PRINCIPAL_ID
 unset GOFLAGS
-make install-tools
-PATH=$(go env GOPATH)/bin:$PATH
-export PATH
 make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow 
 
 make -C dev-infrastructure/ svc.aks.kubeconfig SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
@@ -83,9 +74,6 @@ stop_tunnel() {
 }
 start_tunnel
 unset GOFLAGS
-# Install newer curl with --json support
-curl -L https://github.com/moparisthebest/static-curl/releases/latest/download/curl-amd64 -o /tmp/tools/curl
-chmod +x /tmp/tools/curl
 curl --version
 make e2e/local
 stop_tunnel

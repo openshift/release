@@ -14,17 +14,17 @@ az bicep version
 az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
 az account show
 
-# install required tools
-mkdir -p /tmp/tools
-az aks install-cli --install-location /tmp/tools/kubectl --kubelogin-install-location /tmp/tools/kubelogin
-/tmp/tools/kubectl version
-/tmp/tools/kubelogin --version 
+# install required tools - already pre-installed in image
+# mkdir -p /tmp/tools
+# az aks install-cli --install-location /tmp/tools/kubectl --kubelogin-install-location /tmp/tools/kubelogin
+kubectl version
+kubelogin --version
 
-export PATH="/tmp/tools:$PATH"
+# export PATH="/tmp/tools:$PATH" - already set in image
 PRINCIPAL_ID=$(az ad sp show --id "${TEST_USER_CLIENT_ID}" --query id -o tsv)
 export PRINCIPAL_ID
 unset GOFLAGS
-make install-tools
-PATH=$(go env GOPATH)/bin:$PATH
-export PATH
+# make install-tools - already done in image
+# PATH=$(go env GOPATH)/bin:$PATH
+# export PATH
 make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow
