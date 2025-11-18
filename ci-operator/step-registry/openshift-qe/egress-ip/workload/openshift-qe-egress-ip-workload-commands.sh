@@ -179,10 +179,8 @@ log_info "Validating egress IP functionality..."
 for i in {1..4}; do
     if [[ $i -le 2 ]]; then
         EXPECTED_TEAM="blue"
-        EXPECTED_IPS="$BLUE_IP1,$BLUE_IP2"
     else
         EXPECTED_TEAM="red"
-        EXPECTED_IPS="$RED_IP1,$RED_IP2"
     fi
     
     log_info "Testing egress from test$i (expected: $EXPECTED_TEAM team)..."
