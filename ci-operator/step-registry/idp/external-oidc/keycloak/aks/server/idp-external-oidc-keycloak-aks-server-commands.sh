@@ -2,8 +2,6 @@
 
 set -euo pipefail
 
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-
 # Insall helm binary
 wget https://get.helm.sh/helm-v3.17.2-linux-amd64.tar.gz -O /tmp/helm.tar.gz
 tar -xvf /tmp/helm.tar.gz -C /tmp/
@@ -13,8 +11,25 @@ KEYCLOAK_ADMIN_TEST_USER="admin-$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 6 | h
 KEYCLOAK_ADMIN_TEST_PASSWORD="$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true)"
 KEYCLOAK_PREFIX="keycloak-$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 9 | head -n 1 || true)"
 KEYCLOAK_HOST="$KEYCLOAK_PREFIX.$HYPERSHIFT_BASE_DOMAIN"
+
+# Save the Keycloak prefix for cleanup
+echo "${KEYCLOAK_PREFIX}" > ${SHARED_DIR}/keycloak-prefix
+# Note: This CLUSTER_CONSOLE value is a placeholder only.
+# Important: If you plan to create a hosted cluster later that uses this Keycloak server as an external OIDC provider,
+# this default value will NOT be correct. You must update it to match the actual console URL/domain of the hosted cluster
+# to ensure proper OIDC authentication flow.
 CLUSTER_CONSOLE="$(oc whoami --show-console)"
 CONSOLE_CLIENT_SECRET_VALUE=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 32 | head -n 1 || true)
+AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]] ; then
+    AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+fi
+AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
+AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
+AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+
+az --version
+az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
 # Generate random test users for testing
 TEST_USERS=""
@@ -35,6 +50,7 @@ TEST_USERS=${TEST_USERS%?}
   --create-namespace \
   --set controller.service.annotations."service\.beta\.kubernetes\.io/azure-load-balancer-health-probe-request-path"=/healthz \
   --wait
+INGRESS_EXTERNALIP="$(oc get svc -n ingress-nginx ingress-nginx-controller -ojsonpath='{.status.loadBalancer.ingress[].ip}')"
 
 # Install cert-manager
 oc create namespace cert-manager || true
@@ -45,19 +61,19 @@ cat <<EOF | oc apply -f -
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
-  name: letsencrypt-prod
+  name: letsencrypt-staging
 spec:
   acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
     email: openshift-qe@redhat.com
     privateKeySecretRef:
-      name: letsencrypt-prod
+      name: letsencrypt-staging
     solvers:
     - http01:
         ingress:
           class: nginx
 EOF
-oc wait --for=condition=ready clusterissuer letsencrypt-prod --timeout=120s
+oc wait --for=condition=ready clusterissuer letsencrypt-staging --timeout=120s
 
 # Set Keycloak repo
 /tmp/linux-amd64/helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -73,6 +89,8 @@ auth:
   adminUser: ${KEYCLOAK_ADMIN_TEST_USER}
   adminPassword: "${KEYCLOAK_ADMIN_TEST_PASSWORD}"
 image:
+  # Use the bitnamilegacy repo, if we meet docker pulling limit issue, 
+  # will try to update use quay.io image
   registry: docker.io
   repository: bitnamilegacy/keycloak
   tag: 26.3.3-debian-12-r0
@@ -85,9 +103,8 @@ securityContext:
   runAsNonRoot: true
 
 envFrom:
-  - configMapRef:
-      name: "keycloak-env-vars"
   - secretRef:
+      # This secret stores the admin-password of keycloak
       name: "keycloak"
 
 extraVolumes:
@@ -110,20 +127,6 @@ lifecycleHooks:
         - |
           #!/bin/bash
           set -euo pipefail
-
-          echo "Waiting for Keycloak server to be ready..."
-          timeout 10m bash -c 'while true; do
-            if curl -s http://localhost:${KC_HTTP_PORT:-8080}/health/ready; then
-              echo "Keycloak server is ready. Starting initialization..."
-              break
-            fi
-            sleep 5
-          done' || {
-            echo "ERROR: Timeout waiting for Keycloak server"
-            exit 1
-          }
-
-          echo "Executing setup-script.sh..."
           /opt/bitnami/keycloak/setup-scripts/setup-script.sh &> /tmp/postStart.log || true
 
 extraDeploy:
@@ -136,29 +139,37 @@ extraDeploy:
     data:
       setup-script.sh: |
         #!/bin/bash
-        set -euox pipefail
+        set -euo pipefail
         export PATH=\$PATH:/opt/bitnami/keycloak/bin
-        KCADM_CONFIG=/tmp/.keycloak-kcadm.config
+        export KCADM_CONFIG=/tmp/.keycloak-kcadm.config
 
-        echo "Authenticating with admin user: \${KC_BOOTSTRAP_ADMIN_USERNAME}"
-        kcadm.sh config credentials \
-          --server http://localhost:\${KC_HTTP_PORT:-8080} \
-          --realm master \
-          --user "\${KC_BOOTSTRAP_ADMIN_USERNAME}" \
-          --password "\$(cat "\${KC_BOOTSTRAP_ADMIN_PASSWORD_FILE}")" \
-          --config=\${KCADM_CONFIG}
+        echo "We need to wait the Keycloak server to be running up ..."
+        timeout 15m bash -c 'while true; do
+          kcadm.sh config credentials \
+            --server http://localhost:\${KC_HTTP_PORT:-8080} \
+            --realm master \
+            --user "\${KC_BOOTSTRAP_ADMIN_USERNAME}" \
+            --password "\$(cat "\${KC_BOOTSTRAP_ADMIN_PASSWORD_FILE}")" \
+            --config="\${KCADM_CONFIG}"
+          if [ "\$?" == "0" ] ; then
+            echo "Keycloak server is running up."
+            break
+          fi
+          sleep 10
+          done
+        ' || { echo "Timeout waiting the Keycloak server to be running up\n"; exit 1; }
 
         echo "Setting realms/master ssoSessionIdleTimeout"
         kcadm.sh update realms/master -s ssoSessionIdleTimeout=7200 --config=/tmp/.keycloak-kcadm.config
 
         echo "Creating client: oc-cli-test"
         if ! kcadm.sh get clients -r master --config=\${KCADM_CONFIG} | grep -q "oc-cli-test"; then
-          kcadm.sh create clients -r master -f /opt/bitnami/keycloak/setup-scripts/client-oc-cli-test.json --config=\${KCADM_CONFIG}
+          kcadm.sh create clients -r master -f /opt/bitnami/keycloak/setup-scripts/client-oc-cli-test.json --config=\${KCADM_CONFIG} &> /tmp/cmd_output
         fi
         CLIENT_OC_CLI_TEST_ID=\$(kcadm.sh get clients -r master --config=\${KCADM_CONFIG} -q clientId=oc-cli-test --fields id --format csv --noquotes)
         echo "Creating client: console-test"
         if ! kcadm.sh get clients -r master --config=\${KCADM_CONFIG} | grep -q "console-test"; then
-          kcadm.sh create clients -r master -f /opt/bitnami/keycloak/setup-scripts/client-console-test.json --config=\${KCADM_CONFIG}
+          kcadm.sh create clients -r master -f /opt/bitnami/keycloak/setup-scripts/client-console-test.json --config=\${KCADM_CONFIG} &> /tmp/cmd_output
         fi
         CLIENT_CONSOLE_TEST_ID=\$(kcadm.sh get clients -r master --config=\${KCADM_CONFIG} -q clientId=console-test --fields id --format csv --noquotes)
         echo "Adding group mappers"
@@ -166,20 +177,20 @@ extraDeploy:
           if ! kcadm.sh get clients/\${CLIENT_ID}/protocol-mappers/models -r master --config=\${KCADM_CONFIG} | grep -q "groupmapper"; then
             kcadm.sh create clients/\${CLIENT_ID}/protocol-mappers/models \
               -f /opt/bitnami/keycloak/setup-scripts/groupmapper-for-clients.json \
-              --config=\${KCADM_CONFIG}
+              --config=\${KCADM_CONFIG} &> /tmp/cmd_output
           fi
         done
 
         echo "Creating test group"
         if ! kcadm.sh get groups -r master --config=\${KCADM_CONFIG} | grep -q "keycloak-testgroup-1"; then
-          kcadm.sh create groups -r master -s name="keycloak-testgroup-1" --config=\${KCADM_CONFIG}
+          kcadm.sh create groups -r master -s name="keycloak-testgroup-1" --config=\${KCADM_CONFIG} &> /tmp/cmd_output
         fi
         TEST_GROUP_ID=\$(kcadm.sh get groups -r master --config=\${KCADM_CONFIG} -q name=keycloak-testgroup-1 --fields id --format csv --noquotes)
         echo "Creating test users"
         IFS=',' read -ra USER_LIST <<< "\$(cat /opt/bitnami/keycloak/setup-scripts/testusers)"
         for USER in "\${USER_LIST[@]}"; do
-          TEST_USER_NAME=\$(echo "\${USER}" | cut -d ':' -f 1)
-          TEST_USER_PASSWORD=\$(echo "\${USER}" | cut -d ':' -f 2)
+          TEST_USER_NAME=\$(cut -d ':' -f 1 <<< "\${USER}")
+          TEST_USER_PASSWORD=\$(cut -d ':' -f 2 <<< "\${USER}")
 
           kcadm.sh create users -r master \
             -s username="\${TEST_USER_NAME}" \
@@ -188,7 +199,7 @@ extraDeploy:
             -s lastName=KC \
             -s email="\${TEST_USER_NAME}@example.com" \
             -s emailVerified=true \
-            --config=\${KCADM_CONFIG}
+            --config=\${KCADM_CONFIG} &> /tmp/cmd_output
           TEST_USER_ID=\$(kcadm.sh get users -r master --config=\${KCADM_CONFIG} -q username=\${TEST_USER_NAME} --fields id --format csv --noquotes)
 
           kcadm.sh set-password -r master \
@@ -205,7 +216,7 @@ extraDeploy:
             --config=\${KCADM_CONFIG}
         done
 
-        echo "Keycloak initialization completed successfully"
+        echo "Keycloak initialization completed successfully."
 
       client-oc-cli-test.json: |
         {
@@ -280,8 +291,10 @@ keycloak:
     strict: false
   jvm:
     memory:
-      initial: 512m
-      max: 1024m
+      # JVM heap memory: 256m initial, 768m max
+      # Required for Keycloak's realm setup, client creation, and user management during initialization
+      initial: 256m
+      max: 768m
 
 ingress:
   enabled: true
@@ -294,14 +307,19 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/backend-protocol: HTTP
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: letsencrypt-staging
 
 postgresql:
   image:
+    # Use the bitnamilegacy repo, if we meet docker pulling limit issue, 
+    # will try to update use quay.io image
     registry: docker.io
     repository: bitnamilegacy/postgresql
     tag: 17.6.0-debian-12-r0
 
+# Resource requirements tuned for CI test environment
+# Memory: 1-2Gi needed for Keycloak + PostgreSQL + postStart initialization script
+# CPU: 500m-1000m ensures responsive startup and OIDC authentication flows
 resources:
   requests:
     cpu: 500m
@@ -320,22 +338,59 @@ service:
 EOF
 
 # Install Keycloak from helm chart
-/tmp/linux-amd64/helm install keycloak bitnami/keycloak \
+if ! /tmp/linux-amd64/helm install keycloak bitnami/keycloak \
   --namespace keycloak \
   --create-namespace \
   --values /tmp/keycloak-values.yaml \
   --timeout 30m \
-  --wait
-
-oc get pods,svc,ing -n keycloak
+  --wait; then
+  echo "Keycloak pods,services and ingresses:"
+  oc get pods,svc,ing -n keycloak 
+  exit 1
+fi
+echo "Keycloak setup logs:"
+oc rsh -n keycloak keycloak-0 cat /tmp/postStart.log 2>&1 | tee /tmp/postStart.log
+if ! grep -q "Keycloak initialization completed successfully" /tmp/postStart.log; then
+    echo "Keycloak is failed to setup."
+    exit 1
+fi
 
 # Save user info and Keycloak host info to shared dir for later use
 KEYCLOAK_ISSUER=https://${KEYCLOAK_HOST}/realms/master
 CONSOLE_CLIENT_ID=console-test
 CONSOLE_CLIENT_SECRET_NAME=authid-console-openshift-console
 CLI_CLIENT_ID=oc-cli-test
-AUDIENCE_1=${CONSOLE_CLIENT_ID}
-AUDIENCE_2=${CLI_CLIENT_ID}
+
+# Create dns record for keycloak host
+az network dns record-set a add-record \
+  --resource-group ${DNS_ZONE_RG_NAME} \
+  --zone-name ${HYPERSHIFT_BASE_DOMAIN} \
+  --record-set-name  ${KEYCLOAK_PREFIX} \
+  --ipv4-address ${INGRESS_EXTERNALIP}
+
+# Wait for keycloak tls secret created
+export KEYCLOAK_TLS_SECRET="${KEYCLOAK_HOST}-tls"
+timeout 15m bash -c '
+  while ! oc get secret "${KEYCLOAK_TLS_SECRET}" -n keycloak &> /dev/null; do
+    echo "Waiting for ${KEYCLOAK_TLS_SECRET} secret to be created..."
+    sleep 15
+  done
+  echo "${KEYCLOAK_TLS_SECRET} secret is created!"
+'
+# Get keycloak certificate
+mkdir -p /tmp/router-ca
+oc extract secret/${KEYCLOAK_TLS_SECRET} -n keycloak --to /tmp/router-ca --confirm
+cp /tmp/router-ca/tls.crt ${SHARED_DIR}/oidcProviders-ca.crt
+
+# Check keycloak host connection
+sleep 60
+curl -sSI --cacert /tmp/router-ca/tls.crt https://${KEYCLOAK_HOST}/realms/master/.well-known/openid-configuration | grep -Eq 'HTTP/[^ ]+ 200'
+if [ $? -ne 0 ]; then
+  echo "ERROR: Failed to access Keycloak OpenID configuration at https://${KEYCLOAK_HOST}"
+  echo "Possible reasons: TLS certificate invalid, Keycloak not running, or URL incorrect"
+  exit 1
+fi
+echo "Success: Keycloak OpenID configuration is accessible"
 
 # If the secret is managed by customer, we will create an empty secret here,
 # then create the secret in hosted cluster later.
@@ -352,6 +407,10 @@ EOF
 else
     oc create secret generic ${CONSOLE_CLIENT_SECRET_NAME} --from-literal=clientSecret=${CONSOLE_CLIENT_SECRET_VALUE} --dry-run=client -o yaml > "${SHARED_DIR}"/oidcProviders-secret-configmap.yaml
 fi
+
+echo "---" >> "${SHARED_DIR}"/oidcProviders-secret-configmap.yaml
+oc create configmap keycloak-oidc-ca --from-file=ca-bundle.crt=/tmp/router-ca/tls.crt --dry-run=client -o yaml >> "${SHARED_DIR}"/oidcProviders-secret-configmap.yaml
+
 # Spaces or symbol characters in below "name" should work, in case of similar bug OCPBUGS-44099 in old IDP area
 cat > "${SHARED_DIR}"/oidcProviders.json << EOF
 {
@@ -362,7 +421,7 @@ cat > "${SHARED_DIR}"/oidcProviders.json << EOF
         "username": {"claim": "email", "prefixPolicy": "Prefix", "prefix": {"prefixString": "oidc-user-test:"}}
       },
       "issuer": {
-        "issuerURL": "${KEYCLOAK_ISSUER}", "audiences": ["${AUDIENCE_1}", "${AUDIENCE_2}"],
+        "issuerURL": "${KEYCLOAK_ISSUER}", "audiences": ["${CONSOLE_CLIENT_ID}", "${CLI_CLIENT_ID}"],
         "issuerCertificateAuthority": {"name": "keycloak-oidc-ca"}
       },
       "name": "keycloak oidc server",
@@ -386,10 +445,10 @@ fi
 cat << EOF >> "${SHARED_DIR}/runtime_env"
 export KEYCLOAK_ISSUER="https://${KEYCLOAK_HOST}/realms/master"
 export KEYCLOAK_TEST_USERS="${TEST_USERS}"
-export KEYCLOAK_CLI_CLIENT_ID="oc-cli-test"
+export KEYCLOAK_CLI_CLIENT_ID="${CLI_CLIENT_ID}"
 export CONSOLE_CLIENT_SECRET_VALUE="${CONSOLE_CLIENT_SECRET_VALUE}"
-export CONSOLE_CLIENT_ID="console-test"
+export CONSOLE_CLIENT_ID="${CONSOLE_CLIENT_ID}"
+export KEYCLOAK_CA_BUNDLE_FILE=$SHARED_DIR/oidcProviders-ca.crt
 EOF
 
-echo ${KEYCLOAK_PREFIX} > ${SHARED_DIR}/keycloak-prefix
-echo "export OAUTH_EXTERNAL_OIDC_PROVIDER=keycloak" > ${SHARED_DIR}/keycloak-provider
+echo "export OAUTH_EXTERNAL_OIDC_PROVIDER=keycloak" > ${SHARED_DIR}/external-oidc-provider

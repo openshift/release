@@ -104,8 +104,8 @@ if [[ -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER:-}" && -n "${HYPERSHIFT
 fi
 
 OAUTH_EXTERNAL_OIDC_PARAM=""
-if [ -f ${SHARED_DIR}/keycloak-provider ] ; then
-    source ${SHARED_DIR}/keycloak-provider
+if [ -f ${SHARED_DIR}/external-oidc-provider ] ; then
+    source ${SHARED_DIR}/external-oidc-provider
 fi
 if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
   case "${OAUTH_EXTERNAL_OIDC_PROVIDER}" in
