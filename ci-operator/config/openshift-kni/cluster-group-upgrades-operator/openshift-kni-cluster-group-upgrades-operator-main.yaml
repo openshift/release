@@ -9,6 +9,9 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   to: cluster-group-upgrades-operator
+  build_args:
+    - name: COVER
+      value: true
 - dockerfile_path: Dockerfile.precache
   from: base
   to: cluster-group-upgrades-operator-precache
@@ -96,6 +99,8 @@ tests:
         export KUBECONFIG
         cp $(echo "${KUBECONFIG}") /go/src/github.com/openshift-kni/cluster-group-upgrades-operator/kubeconfig
         make complete-kuttl-test
+        ./hack/extract-coverage.sh
+        ls runtime-coverage/
       from: src
       resources:
         requests:
