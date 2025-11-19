@@ -22,6 +22,7 @@ function update_pull_secret () {
 
     jq -s 'map(.auths) | add | {auths: .}' \
       "${temp_dir}"/global_pull_secret.json \
+      "${temp_dir}"/quay-v3-9-pull.json \
       "${temp_dir}"/quay-v3-10-pull.json \
       "${temp_dir}"/quay-v3-11-pull.json \
       "${temp_dir}"/quay-v3-12-pull.json \
