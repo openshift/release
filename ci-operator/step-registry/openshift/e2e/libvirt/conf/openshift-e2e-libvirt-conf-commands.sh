@@ -291,11 +291,13 @@ elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($
 EOF
     # Skip the below defect for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-46563 is fixed
     # Skip the below etcd testcases for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-54839 is fixed
+    # Skip the ResourceQuota testcase for powervs jobs until https://issues.redhat.com/browse/OCPBUGS-65786. is fixed.
     if [ "${INSTALLER}" == "powervs" ]; then
        cat >> "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should provide basic identity [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[bz-etcd][invariant] alert/etcdMemberCommunicationSlow should not be at or above info"
 "[sig-etcd] etcd should not log excessive took too long messages"
+"[sig-api-machinery] ResourceQuota should verify ResourceQuota with terminating scopes through scope selectors. [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
     fi
 else
