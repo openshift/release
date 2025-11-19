@@ -35,7 +35,7 @@ export LOGIN
 echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
 
 echo "Removing bastion self-reference from resolv.conf ..."
-ssh ${SSH_ARGS} root@${bastion} "sed -i '/^nameserver 192\./d' /etc/resolv.conf"
+ssh ${SSH_ARGS} root@${bastion} "sed -i '$!{/^nameserver/d}' /etc/resolv.conf"
 
 cat <<EOF >>/tmp/all.yml
 ---
