@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 5h
+
 #
 # Deploy a sample application on the OPP clusters
 #
