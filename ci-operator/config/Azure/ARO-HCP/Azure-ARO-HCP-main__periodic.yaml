@@ -12,176 +12,55 @@ images:
     RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
     RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
     RUN dnf install -y azure-cli libicu
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    USER root
+    RUN az bicep install
+    RUN mkdir -p /usr/local/bin
+    RUN az aks install-cli --install-location /usr/local/bin/kubectl --kubelogin-install-location /usr/local/bin/kubelogin
+    RUN export GOPATH=/opt/app-root && \
+        mkdir -p $GOPATH/bin && \
+        export GOFLAGS='-mod=readonly' && \
+        make install-tools && \
+        make -C tooling/templatize templatize && \
+        make -C test/ aro-hcp-tests
+    # Ensure all tools are in PATH
+    ENV PATH="/usr/local/bin:/opt/app-root/bin:$PATH"
   from: src
-  to: src-plus-az
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/Azure/ARO-HCP
+  to: aro-hcp-e2e-tools
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
-      cpu: "8"
-      memory: 4Gi
+      cpu: 100m
+      memory: 200Mi
   unit:
     requests:
       cpu: 1000m
       memory: 4Gi
 tests:
-- as: create-aro-hcp-in-integration
-  cron: 0 2 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    env:
-      CLUSTER_NAME: periodic-integration-cluster
-      CUSTOMER_RESOURCE_GROUP_PREFIX: periodic-integration-customer-rg
-      LOCATION: uksouth
-      SUBSCRIPTION: ARO SRE Team - INT (EA Subscription 3)
-    post:
-    - ref: aro-hcp-provision-aro-hcp-gather-extra
-    - chain: aro-hcp-provision-teardown-cluster
-    pre:
-    - ref: aro-hcp-provision-generate-resource-group-name
-    test:
-    - chain: aro-hcp-provision-create-functional-cluster
 - as: delete-expired-integration-resource-groups
   cron: 7,37 * * * *
   steps:
-    env:
-      CUSTOMER_SUBSCRIPTION: ARO SRE Team - INT (EA Subscription 3)
+    cluster_profile: aro-hcp-int
     test:
-    - ref: aro-hcp-provision-delete-all-expired-resource-groups
-- as: integration-e2e-parallel
-  cron: 0 2 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    env:
-      ARO_HCP_SUITE_NAME: integration/parallel
-      CUSTOMER_SUBSCRIPTION: ARO SRE Team - INT (EA Subscription 3)
-      LOCATION: uksouth
-    post:
-    - ref: aro-hcp-provision-aro-hcp-gather-extra
-    - chain: aro-hcp-provision-teardown-cluster
-    test:
-    - ref: aro-hcp-tests-run-aro-hcp-tests
-- as: create-aro-hcp-in-stage
-  cron: 0 */4 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    env:
-      CLUSTER_NAME: periodic-stage-cluster
-      CUSTOMER_RESOURCE_GROUP_PREFIX: periodic-stage-customer-rg
-      LOCATION: uksouth
-      SUBSCRIPTION: ARO HCP - STAGE testing (EA Subscription)
-    post:
-    - ref: aro-hcp-provision-aro-hcp-gather-extra
-    - chain: aro-hcp-provision-teardown-cluster
-    pre:
-    - ref: aro-hcp-provision-generate-resource-group-name
-    test:
-    - chain: aro-hcp-provision-create-functional-cluster
-- as: stage-e2e-parallel
-  cron: 0 */4 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    env:
-      ARO_HCP_SUITE_NAME: stage/parallel
-      CUSTOMER_SUBSCRIPTION: ARO HCP - STAGE testing (EA Subscription)
-      LOCATION: uksouth
-    post:
-    - ref: aro-hcp-provision-aro-hcp-gather-extra
-    - chain: aro-hcp-provision-teardown-cluster
-    test:
-    - ref: aro-hcp-tests-run-aro-hcp-tests
+    - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-stage-resource-groups
   cron: 7,37 * * * *
   steps:
-    env:
-      CUSTOMER_SUBSCRIPTION: ARO HCP - STAGE testing (EA Subscription)
+    cluster_profile: aro-hcp-stg
     test:
-    - ref: aro-hcp-provision-delete-all-expired-resource-groups
-- as: create-aro-hcp-in-prod-uksouth
-  cron: 0 */4 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    env:
-      CLUSTER_NAME: periodic-prod-uksouth-cluster
-      CUSTOMER_RESOURCE_GROUP_PREFIX: periodic-prod-uksouth-customer-rg
-      LOCATION: uksouth
-      SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
-    post:
-    - ref: aro-hcp-provision-aro-hcp-gather-extra
-    - chain: aro-hcp-provision-teardown-cluster
-    pre:
-    - ref: aro-hcp-provision-generate-resource-group-name
-    test:
-    - chain: aro-hcp-provision-create-functional-cluster
-- as: prod-uksouth-e2e-parallel
-  cron: 0 */4 * * *
-  steps:
-    allow_best_effort_post_steps: true
-    env:
-      ARO_HCP_SUITE_NAME: prod/parallel
-      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
-      LOCATION: uksouth
-    post:
-    - ref: aro-hcp-provision-aro-hcp-gather-extra
-    - chain: aro-hcp-provision-teardown-cluster
-    test:
-    - ref: aro-hcp-tests-run-aro-hcp-tests
+    - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-prod-resource-groups
   cron: 7,37 * * * *
   steps:
-    env:
-      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
+    cluster_profile: aro-hcp-prod
     test:
-    - ref: aro-hcp-provision-delete-all-expired-resource-groups
-- as: prod-brazilsouth-e2e-parallel
-  cron: '@daily'
-  steps:
-    allow_best_effort_post_steps: true
-    env:
-      ARO_HCP_SUITE_NAME: prod/parallel
-      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
-      LOCATION: brazilsouth
-    post:
-    - ref: aro-hcp-provision-aro-hcp-gather-extra
-    - chain: aro-hcp-provision-teardown-cluster
-    test:
-    - ref: aro-hcp-tests-run-aro-hcp-tests
-- as: prod-centralindia-e2e-parallel
-  cron: '@daily'
-  steps:
-    allow_best_effort_post_steps: true
-    env:
-      ARO_HCP_SUITE_NAME: prod/parallel
-      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
-      LOCATION: centralindia
-    post:
-    - ref: aro-hcp-provision-aro-hcp-gather-extra
-    - chain: aro-hcp-provision-teardown-cluster
-    test:
-    - ref: aro-hcp-tests-run-aro-hcp-tests
-- as: prod-e2e-parallel
-  cron: 0 0 31 2 0
-  steps:
-    allow_best_effort_post_steps: true
-    env:
-      ARO_HCP_SUITE_NAME: prod/parallel
-      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
-      LOCATION: uksouth
-    post:
-    - ref: aro-hcp-provision-aro-hcp-gather-extra
-    - chain: aro-hcp-provision-teardown-cluster
-    test:
-    - ref: aro-hcp-tests-run-aro-hcp-tests
-- as: create-dev-env
-  cron: 0 */12 * * *
-  steps:
-    env:
-      CUSTOMER_SUBSCRIPTION: ARO Hosted Control Planes (EA Subscription 1)
-    post:
-    - ref: aro-hcp-provision-delete-dev-env
-    test:
-    - ref: aro-hcp-provision-create-dev-env
+    - ref: aro-hcp-deprovision-expired-resource-groups
 zz_generated_metadata:
   branch: main
   org: Azure
