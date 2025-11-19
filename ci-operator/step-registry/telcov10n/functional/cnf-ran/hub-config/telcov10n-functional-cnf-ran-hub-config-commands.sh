@@ -70,11 +70,11 @@ ansible-playbook playbooks/ran/hub-sno-configure-lvm-storage.yml -i ./inventorie
     --extra-vars "kubeconfig=${KUBECONFIG_PATH}" -vv
 
 # configure acm
-ansible-playbook playbooks/ran/configure-acm.yml -i ./inventories/ocp-deployment/build-inventory.py \
+ansible-playbook playbooks/ran/hub-sno-configure-acm.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=$VERSION" -vv
 
 # configure kustomize plugin
-ansible-playbook playbooks/ran/configure-kustomize-plugin.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=v$VERSION" -vv
+ansible-playbook playbooks/ran/hub-sno-configure-kustomize-plugin.yml -i ./inventories/ocp-deployment/build-inventory.py \
+    --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=$VERSION" -vv
 
 
