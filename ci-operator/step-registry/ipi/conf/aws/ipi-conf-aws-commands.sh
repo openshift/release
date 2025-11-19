@@ -412,9 +412,9 @@ compute:
 - name: worker
   platform:
     aws:
-      dedicatedHosts:
-        hostAffinity: Host
-        hosts: []
+      hostPlacement:
+        affinity: DedicatedHost
+        dedicatedHost: []
 EOF
 
   for zone in ${WORKER_ZONES}; do
@@ -426,7 +426,7 @@ EOF
     HOST_ID=$(aws ec2 allocate-hosts --instance-type "${HOST_TYPE}.4xlarge" --auto-placement 'off' --host-recovery 'off' --tag-specifications "${HOST_SPECS}" --host-maintenance 'off' --quantity '1' --availability-zone "${zone}" --region "${aws_source_region}" | jq -r '.HostIds[0]')
 
     # We need to pass in the vars since YQ doesnt see the loop variables
-    ZONE_NAME="${zone}" HOST_ID="${HOST_ID}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.dedicatedHosts.hosts += [ { "id": strenv(HOST_ID), "zone": strenv(ZONE_NAME) } ])' "${patch_dedicated_host}"
+    ZONE_NAME="${zone}" HOST_ID="${HOST_ID}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.hostPlacement.dedicatedHost += [ { "id": strenv(HOST_ID), "zone": strenv(ZONE_NAME) } ])' "${patch_dedicated_host}"
   done
 
   # Update config with host ID
