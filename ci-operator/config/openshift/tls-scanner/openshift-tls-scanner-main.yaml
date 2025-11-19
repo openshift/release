@@ -42,7 +42,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 4h0m0s
-    version: "4.16"
+    version: "4.21"
   steps:
     test:
     - as: run-scanner
@@ -64,12 +64,25 @@ tests:
         # 2. Deploy the scanner Job to the ephemeral cluster
         ./deploy.sh deploy
 
-        # 3. Stream logs and wait for completion
+        # 3. Add immediate debugging to check the state of the Job right after creation.
+        echo "--- Checking Job status immediately after deployment ---"
+        sleep 5 # Give the controllers a moment to react.
+        oc describe job "tls-scanner-job" -n "${NAMESPACE}" || echo "Job description not available."
+        echo "--- Checking for events in the namespace ---"
+        oc get events -n "${NAMESPACE}" --sort-by='.metadata.creationTimestamp'
+        echo "--- End of immediate debug ---"
+
+        # 4. Stream logs and wait for completion
         echo "Waiting for tls-scanner-job to complete in namespace ${NAMESPACE}..."
 
         # Get the pod name
         POD_NAME=$(oc get pods -n "${NAMESPACE}" -l job-name=tls-scanner-job -o jsonpath='{.items[0].metadata.name}')
         echo "Found pod: ${POD_NAME}"
+        
+        # Describe the pod immediately to catch early issues
+        echo "--- Describing scanner pod for more details ---"
+        oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
+        echo "--- End of pod description ---"
 
         # Start streaming logs immediately in the background.
         # We use 'oc logs -f' which will wait for the container to start.
@@ -81,6 +94,17 @@ tests:
         if ! oc wait --for=condition=complete "job/tls-scanner-job" -n "${NAMESPACE}" --timeout=3h; then
           echo "Job did not complete in time (3h timeout)."
           echo "--- End of Scanner Logs (Timeout) ---"
+          
+          echo "--- Debugging Timeout ---"
+          oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
+          NODE_NAME=$(oc get pod "${POD_NAME}" -n "${NAMESPACE}" -o jsonpath='{.spec.nodeName}')
+          if [ -n "${NODE_NAME}" ]; then
+            echo "--- Describing Node ${NODE_NAME} ---"
+            oc describe node "${NODE_NAME}"
+            echo "--- End Node Description ---"
+          fi
+          echo "--- End Debugging Timeout ---"
+
           # Kill the log streamer
           kill $LOG_PID || true
           exit 1
