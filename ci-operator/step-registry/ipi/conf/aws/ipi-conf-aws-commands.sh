@@ -214,7 +214,8 @@ else
 fi
 
 if [[ "${CI_NAT_REPLACE:-false}" == 'auto' ]]; then
-  if [[ "${BUILD_ID: -1}" == [0-1] && "${JOB_NAME}" == *pull-ci-openshift-*-main*e2e*aws* && "${JOB_NAME}" != *'microshift'* && "${JOB_NAME}" != *'hypershift'* ]]; then
+  # Target 50% of pull request jobs in master or main.
+  if [[ "${BUILD_ID: -1}" == [0-5] && "${JOB_NAME}" == *pull-ci-openshift-*-ma*e2e*aws* && "${JOB_NAME}" != *'microshift'* && "${JOB_NAME}" != *'hypershift'* && "${JOB_NAME}" != *'vpc'* && "${JOB_NAME}" != *'single-node'* ]]; then
     CI_NAT_REPLACE='true'
     echo "IMPORTANT: this job has been selected to use NAT instance instead of NAT gateway. See jupierce if abnormalities are detected."
   fi
