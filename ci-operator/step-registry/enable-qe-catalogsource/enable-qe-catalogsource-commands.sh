@@ -128,7 +128,7 @@ function create_catalog_sources()
     # get cluster Major.Minor version
     kube_major=$(oc version -o json |jq -r '.serverVersion.major')
     kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
-    index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+    index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.33"
 
     echo "Create QE catalogsource: $CATALOGSOURCE_NAME"
     echo "Use $index_image in catalogsource/$CATALOGSOURCE_NAME"
@@ -143,7 +143,7 @@ metadata:
   name: $CATALOGSOURCE_NAME
   namespace: openshift-marketplace
   annotations:
-    olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.{kube_minor_version}"
+    olm.catalogImageTemplate: "quay.io/openshift-qe-optional-operators/aosqe-index:v{kube_major_version}.33"
 spec:
   displayName: Production Operators
   grpcPodConfig:
