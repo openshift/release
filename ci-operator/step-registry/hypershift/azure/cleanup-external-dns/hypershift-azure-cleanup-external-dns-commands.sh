@@ -33,10 +33,19 @@ if [[ -z "${INFRA_IDS}" ]]; then
 
   # Look for the hypershift-azure-run-e2e test logs
   E2E_LOG="${ARTIFACT_DIR}/../hypershift-azure-run-e2e/build-log.txt"
+  echo "DEBUG: ARTIFACT_DIR=${ARTIFACT_DIR}"
+  echo "DEBUG: Looking for e2e log at: ${E2E_LOG}"
+
   if [[ -f "${E2E_LOG}" ]]; then
+    echo "DEBUG: Found e2e log file, extracting infraIDs..."
     # Extract infraIDs from log entries like "Successfully created hostedcluster e2e-clusters-xxx/create-cluster-abc123"
     # HyperShift infraIDs follow pattern: test-name-xxxxx (lowercase alphanumeric + hyphens)
     INFRA_IDS=$(grep -oE "(create-cluster|autoscaling|azure-scheduler|cilium-connectivity|control-plane-upgrade|konnectivity|node-pool|private|etcd)-[a-z0-9]{5,6}" "${E2E_LOG}" 2>/dev/null | sort -u || echo "")
+    echo "DEBUG: Extracted infraIDs: ${INFRA_IDS}"
+  else
+    echo "DEBUG: E2E log file not found at expected location"
+    echo "DEBUG: Listing parent directory contents..."
+    ls -la "${ARTIFACT_DIR}/.." 2>/dev/null || echo "DEBUG: Could not list parent directory"
   fi
 fi
 
