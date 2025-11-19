@@ -44,7 +44,32 @@ tests:
     - as: e2e-maas-api-openshift
       best_effort: true
       cli: latest
-      commands: ./test/e2e/scripts/prow_run_smoke_test.sh
+      commands: |-
+        echo "Testing Token"
+        echo "KUBECONFIG is set to: $KUBECONFIG"
+        export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
+        K8S_CLUSTER_URL=$(oc whoami --show-server)
+        echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
+        oc create serviceaccount tester-sa-2 -n default
+        oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
+        K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default)
+        echo "K8S_CLUSTER_TOKEN: $K8S_CLUSTER_TOKEN"
+
+        oc login --token "$K8S_CLUSTER_TOKEN" --server "$K8S_CLUSTER_URL" --insecure-skip-tls-verify=true
+
+        if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
+            OPENSHIFT_PASSWORD="$(cat "$KUBEADMIN_PASSWORD_FILE")"
+        elif [[ -s "${SHARED_DIR}/kubeadmin-password" ]]; then
+            # Recommendation from hypershift qe team in slack channel..
+            OPENSHIFT_PASSWORD="$(cat "${SHARED_DIR}/kubeadmin-password")"
+            echo "OPENSHIFT_PASSWORD: $OPENSHIFT_PASSWORD"
+        else
+            echo "Kubeadmin password file is empty... Aborting job"
+            exit 1
+        fi
+
+        echo "WHOAMIToken: $(oc whoami -t)"
+        ./test/e2e/scripts/prow_run_smoke_test.sh
       from: src
       optional_on_success: true
       resources:
