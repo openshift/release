@@ -64,27 +64,88 @@ function clear_partition_disk_table {
 
   set -x
   node_name="$(oc get node -oname)"
-  devices_to_be_wiped=$(oc -n openshift-storage get lvmclusters.lvm.topolvm.io lvmcluster -ojson | \
-    jq -c '
-      .status.deviceClassStatuses[]
-      | select(.name == "vg1").nodeStatus[].devices')
+
+  # Try to get devices from status (if LVM cluster is working)
+  devices_from_status=$(oc -n openshift-storage get lvmclusters.lvm.topolvm.io lvmcluster -ojson | \
+    jq -r '.status.deviceClassStatuses[] | select(.name == "vg1").nodeStatus[].devices[]? // empty' 2>/dev/null || echo)
+
+  # If no devices in status, extract device from failure reason
+  if [ -z "${devices_from_status}" ]; then
+    echo "No devices found in status, checking for failures..."
+    devices_from_status=$(oc -n openshift-storage get lvmclusters.lvm.topolvm.io lvmcluster -ojson | \
+      jq -r '.status.deviceClassStatuses[] | select(.name == "vg1").nodeStatus[].reason // empty' | \
+      grep -oE '/dev/[a-z]+' | sort -u || echo)
+  fi
+
+  # Get list of excluded devices
+  excluded_devices=$(oc -n openshift-storage get lvmclusters.lvm.topolvm.io lvmcluster -ojson | \
+    jq -r '.status.deviceClassStatuses[] | select(.name == "vg1").nodeStatus[].excluded[]?.name // empty' 2>/dev/null || echo)
+
+  # Get all block devices from the node
+  all_block_devices=$(oc debug ${node_name} -n default -- chroot /host bash -c \
+    "lsblk -ndo NAME,TYPE | awk '\$2==\"disk\" {print \"/dev/\"\$1}'" 2>/dev/null || echo)
+
   set +x
 
-  echo ${devices_to_be_wiped} | jq -r '.[]' | while read -r node_dev; do
+  echo "Excluded devices: ${excluded_devices}"
+  echo "All block devices: ${all_block_devices}"
+  echo "Devices from status/failure: ${devices_from_status}"
+
+  # Determine which devices to wipe
+  devices_to_wipe=""
+
+  # If we have specific devices from status or failure, use those
+  if [ -n "${devices_from_status}" ]; then
+    for dev in ${devices_from_status}; do
+      # Skip if excluded
+      echo "${excluded_devices}" | grep -q "^${dev}$" && continue
+      devices_to_wipe="${devices_to_wipe} ${dev}"
+    done
+  else
+    # Otherwise, check all block devices and find candidates
+    for dev in ${all_block_devices}; do
+      # Skip if excluded
+      echo "${excluded_devices}" | grep -q "^${dev}$" && continue
+
+      # Check if device has partitions or problematic signatures
+      set -x
+      has_partitions=$(oc debug ${node_name} -n default -- chroot /host bash -c \
+        "lsblk -no TYPE ${dev} 2>/dev/null | grep -c part || echo 0" 2>/dev/null || echo 0)
+      set +x
+
+      if [ "${has_partitions}" -gt 0 ]; then
+        echo "Device ${dev} has partitions, adding to wipe list"
+        devices_to_wipe="${devices_to_wipe} ${dev}"
+      fi
+    done
+  fi
+
+  # Remove duplicates and wipe devices
+  devices_to_wipe=$(echo ${devices_to_wipe} | tr ' ' '\n' | sort -u)
+
+  if [ -z "${devices_to_wipe}" ]; then
+    echo "No devices to wipe"
+    return 0
+  fi
+
+  for node_dev in ${devices_to_wipe}; do
     echo
-    echo "Wiping device $node_dev..."
+    echo "Wiping device ${node_dev}..."
     echo
+    set -x
     oc debug ${node_name} -n default -- chroot /host bash -c "
      set -x ;
-     lsblk --fs ${node_dev} ;
-     sgdisk --zap-all ${node_dev} ;
+     echo 'Before wiping:' ;
+     lsblk --fs ${node_dev} || true ;
+     sfdisk --delete ${node_dev} ;
      sleep 3 ;
-     kpartx -d ${node_dev} ;
-     sleep 30 ;
-     lsblk --fs ${node_dev} ;
+     kpartx -d ${node_dev} || true ;
+     echo 'After wiping:' ;
+     lsblk --fs ${node_dev} || true ;
      set +x ;
      echo ;
      echo '${node_dev} Wiped'"
+    set +x
   done
 }
 

@@ -62,7 +62,7 @@ azure4|azuremag|azurestack)
     ;;
 esac
 
-# REGION="${LEASED_RESOURCE}"
+REGION="${LEASED_RESOURCE}"
 INFRA_ID=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 # CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
@@ -83,9 +83,9 @@ aws|aws-arm64|aws-usgov)
     # records in public zone
     if [[ ${PUBLISH_STRATEGY} != "Internal" ]]; then
         echo "Checking records in public zone."
-        PUBLIC_ZONE_ID=$(aws route53 list-hosted-zones-by-name | jq --arg name "${BASE_DOMAIN}." -r '.HostedZones | .[] | select(.Name=="\($name)") | .Id' | awk -F / '{printf $3}')
+        PUBLIC_ZONE_ID=$(aws --region "$REGION" route53 list-hosted-zones-by-name | jq --arg name "${BASE_DOMAIN}." -r '.HostedZones | .[] | select(.Name=="\($name)") | .Id' | awk -F / '{printf $3}')
         if [[ -n "${PUBLIC_ZONE_ID}" ]]; then
-            PUBLIC_RECORD_SETS=$(aws route53 list-resource-record-sets --hosted-zone-id=${PUBLIC_ZONE_ID} --output json | jq '.ResourceRecordSets[].Name' |grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
+            PUBLIC_RECORD_SETS=$(aws --region "$REGION" route53 list-resource-record-sets --hosted-zone-id=${PUBLIC_ZONE_ID} --output json | jq '.ResourceRecordSets[].Name' |grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
 
             if [[ -n "${PUBLIC_RECORD_SETS}" ]]; then
                 echo "ERROR: Found DNS records for ${CLUSTER_NAME}.${BASE_DOMAIN}"
@@ -101,7 +101,7 @@ aws|aws-arm64|aws-usgov)
 
     # private zone
     echo "Checking private hosted zone for ${CLUSTER_NAME}.${BASE_DOMAIN}"
-    PRIVATE_HOSTED_ZONE=$(aws route53 list-hosted-zones --hosted-zone-type PrivateHostedZone | jq -r '.HostedZones[].Name' | grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
+    PRIVATE_HOSTED_ZONE=$(aws --region "$REGION" route53 list-hosted-zones --hosted-zone-type PrivateHostedZone | jq -r '.HostedZones[].Name' | grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
     if [[ ${PRIVATE_HOSTED_ZONE} != "" ]]; then
         echo "ERROR: Found private zone: ${PRIVATE_HOSTED_ZONE}"
         ret=$((ret+1))
