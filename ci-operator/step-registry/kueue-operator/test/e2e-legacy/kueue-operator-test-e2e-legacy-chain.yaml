@@ -1,6 +1,7 @@
 chain:
-  as: kueue-operator-test-perfscale
+  as: kueue-operator-test-e2e-legacy
   steps:
+  - ref: kueue-operator-image-env-setup
   - ref: cert-manager-install-operator
   - as: kueue-operator-jobset-install-operator
     cli: latest
@@ -32,20 +33,31 @@ chain:
         memory: 500Mi
   - as: install-operator
     cli: latest
-    dependencies:
-    - name: kueue-operator-bundle
-      env: OO_BUNDLE
     commands: |
-      echo "Installing operator from bundle: ${OO_BUNDLE}"
+      source "${SHARED_DIR}/env"
+      echo "Installing operator from bundle: ${BUNDLE_IMAGE}"
       oc create namespace openshift-kueue-operator || true
       oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true security.openshift.io/scc.podSecurityLabelSync=true --overwrite
       cd /tmp
-      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$OO_BUNDLE" --security-context-config=restricted
-    from: cli-operator-sdk
+      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE" --security-context-config=restricted
+    from: operator-sdk
     resources:
       requests:
         cpu: 300m
         memory: 300Mi
-  - chain: openshift-qe-kueue-operator
+  - ref: kueue-operator-image-patch
+  - as: e2e-kueue
+    cli: latest
+    env:
+    - name: CONTAINER_IMAGE
+      default: ""
+    commands: |
+      echo "Running tests with CONTAINER_IMAGE=${CONTAINER_IMAGE}"
+      make e2e-ci-test
+    from: kueue-operator-src
+    resources:
+      requests:
+        cpu: "4"
+        memory: "4Gi"
   documentation: |-
-    This chain runs the perfscale test suites for The Kueue operator.
+    This chain runs the operator e2e test suites for The Kueue operator with legacy image patching support.
