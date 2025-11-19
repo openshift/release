@@ -23,13 +23,13 @@ CONFIG = {
     },
     'aws-3-quota-slice': {
         'us-east-1': 50,
-        'us-east-2': 35,
+        'us-east-2': 10,
         'us-west-1': 35,
-        'us-west-2': 35,
+        'us-west-2': 25,
     },
     'aws-4-quota-slice': {
         'us-east-1': 50,
-        'us-east-2': 35,
+        'us-east-2': 4,
         'us-west-1': 35,
         'us-west-2': 35,
     },
