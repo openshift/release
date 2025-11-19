@@ -127,6 +127,11 @@ spec:
 EOF
 }
 
+if [ "${MAISTRA_BUILDER_IMAGE:-}" == "" ]; then
+    echo "SKIP: the step servicemesh-istio-e2e is going to be skipped because MAISTRA_BUILDER_IMAGE is not set"
+    exit 0
+fi
+
 create_namespace "${MAISTRA_NAMESPACE}"
 create_pod "${MAISTRA_SC_POD}"
 check_pod_status "${MAISTRA_SC_POD}"
