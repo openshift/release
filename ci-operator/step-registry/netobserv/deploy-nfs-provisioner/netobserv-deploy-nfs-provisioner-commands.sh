@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+set -o nounset
+set -o errexit
+set -o pipefail
+
 echo "INFO: Start to deploy nfs-provisioner."
 echo "INFO: Step1: Create namespace nfs-provisioner." 
 # create all related resource on nfs-provisioner namespace
@@ -266,15 +270,15 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 EOF
 
-echo "Creating ClusterRole, ClusterRoleBinding, Role"
+echo "Creating policy"
 oc adm policy add-scc-to-user nfs-provisioner system:serviceaccount:nfs-provisioner:nfs-provisioner
 oc adm policy add-scc-to-user privileged system:serviceaccount:nfs-provisioner:nfs-provisioner
 
 i=0
 period=10
 while true; do
-  result=$(oc -n nfs-provisioner get pod --show-labels --no-headers | grep "app=nfs-provisioner" | grep -w "Running")
-  if [ "${result}" != "" ]; then
+  POD_STATUS="$(oc -n nfs-provisioner get pods -l "app=nfs-provisioner" -o jsonpath='{range .items[*]}{.status.phase}{"\n"}{end}' || true)"
+  if ! grep -q '^Running$' <<<"$POD_STATUS"; then
 	break;
   fi
   sleep $period
@@ -301,7 +305,8 @@ mountOptions:
 EOF
 
 echo "INFO: tep4: Set storageclass nutanix-volume as default storageclass if there is no default one......"
-default_sc_count=$(oc get storageclass --no-headers | grep -c "default" )
+sc_out="$(oc get storageclass --no-headers 2>/dev/null || true)"
+default_sc_count="$(grep -c 'default' <<<"$sc_out" || true)"
 if [ "${default_sc_count}" -eq 0 ]; then
   oc patch storageclass nfs -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
 fi
