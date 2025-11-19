@@ -47,88 +47,45 @@ tests:
     test:
     - as: run-scanner
       cli: latest
-      timeout: 4h0m0s
-      commands: |-
-        set -o nounset
-        set -o errexit
-        set -o pipefail
-
-        # 1. Setup environment variables for the deployment script
-        export SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
-        export NAMESPACE=tls-scanner-test
-        oc create namespace "${NAMESPACE}"
-
-        # Use a trap to ensure cleanup happens even if there are errors.
-        trap './deploy.sh cleanup' EXIT
-
-        # 2. Deploy the scanner Job to the ephemeral cluster
-        ./deploy.sh deploy
-
-        # 3. Add immediate debugging to check the state of the Job right after creation.
-        echo "--- Checking Job status immediately after deployment ---"
-        sleep 5 # Give the controllers a moment to react.
-        oc describe job "tls-scanner-job" -n "${NAMESPACE}" || echo "Job description not available."
-        echo "--- Checking for events in the namespace ---"
-        oc get events -n "${NAMESPACE}" --sort-by='.metadata.creationTimestamp'
-        echo "--- End of immediate debug ---"
-
-        # 4. Stream logs and wait for completion
-        echo "Waiting for tls-scanner-job to complete in namespace ${NAMESPACE}..."
-
-        # Get the pod name
-        POD_NAME=$(oc get pods -n "${NAMESPACE}" -l job-name=tls-scanner-job -o jsonpath='{.items[0].metadata.name}')
-        echo "Found pod: ${POD_NAME}"
-        
-        # Describe the pod immediately to catch early issues
-        echo "--- Describing scanner pod for more details ---"
-        oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
-        echo "--- End of pod description ---"
-
-        # Start streaming logs immediately in the background.
-        # We use 'oc logs -f' which will wait for the container to start.
-        echo "--- Start of Scanner Logs ---"
-        oc logs -f "pod/${POD_NAME}" -n "${NAMESPACE}" &
-        LOG_PID=$!
-
-        # Wait for the job to complete with the 3h timeout
-        if ! oc wait --for=condition=complete "job/tls-scanner-job" -n "${NAMESPACE}" --timeout=3h; then
-          echo "Job did not complete in time (3h timeout)."
-          echo "--- End of Scanner Logs (Timeout) ---"
-          
-          echo "--- Debugging Timeout ---"
-          oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
-          NODE_NAME=$(oc get pod "${POD_NAME}" -n "${NAMESPACE}" -o jsonpath='{.spec.nodeName}')
-          if [ -n "${NODE_NAME}" ]; then
-            echo "--- Describing Node ${NODE_NAME} ---"
-            oc describe node "${NODE_NAME}"
-            echo "--- End Node Description ---"
-          fi
-          echo "--- End Debugging Timeout ---"
-
-          # Kill the log streamer
-          kill $LOG_PID || true
-          exit 1
-        fi
-
-        echo "Job completed successfully."
-
-        # Wait for the log streamer to finish (it should exit when the pod terminates)
-        wait $LOG_PID || true
-        echo "--- End of Scanner Logs ---"
-
-        # 5. Copy artifacts from the completed Pod to the CI artifact directory
-        echo "Copying artifacts..."
-        POD_NAME=$(oc get pods -n "${NAMESPACE}" -l job-name=tls-scanner-job -o jsonpath='{.items[0].metadata.name}')
-
-        # Create a dedicated directory for the scanner's artifacts
-        SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
-        mkdir -p "${SCANNER_ARTIFACT_DIR}"
-
-        # Copy all files from the Pod's /artifacts/ directory
-        oc cp "${NAMESPACE}/${POD_NAME}:/artifacts/." "${SCANNER_ARTIFACT_DIR}/"
-
-        echo "Scan complete. Artifacts collected in ${SCANNER_ARTIFACT_DIR}."
-        # The 'trap' will execute ./deploy.sh cleanup on exit.
+      commands: "set -o nounset\nset -o errexit\nset -o pipefail\n\n# 1. Setup environment
+        variables for the deployment script\nexport SCANNER_IMAGE=\"${PULL_SPEC_TLS_SCANNER_TOOL}\"\nexport
+        NAMESPACE=tls-scanner-test\noc create namespace \"${NAMESPACE}\"\n\n# Use
+        a trap to ensure cleanup happens even if there are errors.\ntrap './deploy.sh
+        cleanup' EXIT\n\n# 2. Deploy the scanner Job to the ephemeral cluster\n./deploy.sh
+        deploy\n\n# 3. Add immediate debugging to check the state of the Job right
+        after creation.\necho \"--- Checking Job status immediately after deployment
+        ---\"\nsleep 5 # Give the controllers a moment to react.\noc describe job
+        \"tls-scanner-job\" -n \"${NAMESPACE}\" || echo \"Job description not available.\"\necho
+        \"--- Checking for events in the namespace ---\"\noc get events -n \"${NAMESPACE}\"
+        --sort-by='.metadata.creationTimestamp'\necho \"--- End of immediate debug
+        ---\"\n\n# 4. Stream logs and wait for completion\necho \"Waiting for tls-scanner-job
+        to complete in namespace ${NAMESPACE}...\"\n\n# Get the pod name\nPOD_NAME=$(oc
+        get pods -n \"${NAMESPACE}\" -l job-name=tls-scanner-job -o jsonpath='{.items[0].metadata.name}')\necho
+        \"Found pod: ${POD_NAME}\"\n\n# Describe the pod immediately to catch early
+        issues\necho \"--- Describing scanner pod for more details ---\"\noc describe
+        pod \"${POD_NAME}\" -n \"${NAMESPACE}\"\necho \"--- End of pod description
+        ---\"\n\n# Start streaming logs immediately in the background.\n# We use 'oc
+        logs -f' which will wait for the container to start.\necho \"--- Start of
+        Scanner Logs ---\"\noc logs -f \"pod/${POD_NAME}\" -n \"${NAMESPACE}\" &\nLOG_PID=$!\n\n#
+        Wait for the job to complete with the 3h timeout\nif ! oc wait --for=condition=complete
+        \"job/tls-scanner-job\" -n \"${NAMESPACE}\" --timeout=3h; then\n  echo \"Job
+        did not complete in time (3h timeout).\"\n  echo \"--- End of Scanner Logs
+        (Timeout) ---\"\n  \n  echo \"--- Debugging Timeout ---\"\n  oc describe pod
+        \"${POD_NAME}\" -n \"${NAMESPACE}\"\n  NODE_NAME=$(oc get pod \"${POD_NAME}\"
+        -n \"${NAMESPACE}\" -o jsonpath='{.spec.nodeName}')\n  if [ -n \"${NODE_NAME}\"
+        ]; then\n    echo \"--- Describing Node ${NODE_NAME} ---\"\n    oc describe
+        node \"${NODE_NAME}\"\n    echo \"--- End Node Description ---\"\n  fi\n  echo
+        \"--- End Debugging Timeout ---\"\n\n  # Kill the log streamer\n  kill $LOG_PID
+        || true\n  exit 1\nfi\n\necho \"Job completed successfully.\"\n\n# Wait for
+        the log streamer to finish (it should exit when the pod terminates)\nwait
+        $LOG_PID || true\necho \"--- End of Scanner Logs ---\"\n\n# 5. Copy artifacts
+        from the completed Pod to the CI artifact directory\necho \"Copying artifacts...\"\nPOD_NAME=$(oc
+        get pods -n \"${NAMESPACE}\" -l job-name=tls-scanner-job -o jsonpath='{.items[0].metadata.name}')\n\n#
+        Create a dedicated directory for the scanner's artifacts\nSCANNER_ARTIFACT_DIR=\"${ARTIFACT_DIR}/tls-scanner\"\nmkdir
+        -p \"${SCANNER_ARTIFACT_DIR}\"\n\n# Copy all files from the Pod's /artifacts/
+        directory\noc cp \"${NAMESPACE}/${POD_NAME}:/artifacts/.\" \"${SCANNER_ARTIFACT_DIR}/\"\n\necho
+        \"Scan complete. Artifacts collected in ${SCANNER_ARTIFACT_DIR}.\"\n# The
+        'trap' will execute ./deploy.sh cleanup on exit."
       dependencies:
       - env: PULL_SPEC_TLS_SCANNER_TOOL
         name: tls-scanner-tool
@@ -137,6 +94,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
