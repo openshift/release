@@ -149,7 +149,7 @@ handle_azure() {
 
     # Wait for OpenShift API to be fully ready
     echo "Waiting for OpenShift infrastructure to be ready..."
-    oc wait --for=condition=Available --timeout=600s infrastructure/cluster
+    #oc wait --for=condition=Available --timeout=600s infrastructure/cluster
 
     # Get network configuration from OpenShift's cloud-conf ConfigMap (authoritative source)
     # This handles cases where vnetResourceGroup differs from the cluster resource group
