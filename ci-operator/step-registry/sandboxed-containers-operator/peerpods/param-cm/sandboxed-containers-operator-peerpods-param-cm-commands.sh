@@ -147,28 +147,29 @@ handle_azure() {
     AZURE_SUBSCRIPTION_ID="$(jq -r .data.azure_subscription_id azure_credentials.json|base64 -d)"
     rm -f azure_credentials.json
 
-    AZURE_RESOURCE_GROUP=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')
-    az login --service-principal --username "${AZURE_CLIENT_ID}" --password "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
-    # Recommended on az sites to refresh the subscription
-    az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
-    # This command still sometimes fails directly after login
-    for I in {1..30}; do
-	    AZURE_VNET_NAME=$(az network vnet list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[].{Name:name}" --output tsv ||:)
-	    if [[ -z "${AZURE_VNET_NAME}" ]]; then
-		    sleep "${I}"
-	    else	# VNET set, we are done
-		    break
-	    fi
-    done
-    if [[ -z "${AZURE_VNET_NAME}" ]]; then
-	    echo "Failed to get AZURE_VNET_NAME in 30 iterations"
-	    exit 1
-    fi
+    # Wait for OpenShift API to be fully ready
+    echo "Waiting for OpenShift infrastructure to be ready..."
+    oc wait --for=condition=Available --timeout=600s infrastructure/cluster
 
-    AZURE_SUBNET_NAME=$(az network vnet subnet list --resource-group "${AZURE_RESOURCE_GROUP}" --vnet-name "${AZURE_VNET_NAME}" --query "[].{Id:name} | [? contains(Id, 'worker')]" --output tsv)
-    AZURE_SUBNET_ID=$(az network vnet subnet list --resource-group "${AZURE_RESOURCE_GROUP}" --vnet-name "${AZURE_VNET_NAME}" --query "[].{Id:id} | [? contains(Id, 'worker')]" --output tsv)
-    AZURE_NSG_ID=$(az network nsg list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[].{Id:id}" --output tsv)
-    AZURE_REGION=$(az group show --resource-group "${AZURE_RESOURCE_GROUP}" --query "{Location:location}" --output tsv)
+    # Get network configuration from OpenShift's cloud-conf ConfigMap (authoritative source)
+    # This handles cases where vnetResourceGroup differs from the cluster resource group
+    echo "Retrieving Azure configuration from cloud-conf ConfigMap..."
+    CLOUD_CONF=$(oc get configmap cloud-conf -n openshift-cloud-controller-manager -o json | jq -r '.data."cloud.conf" | fromjson')
+
+    AZURE_RESOURCE_GROUP=$(echo "$CLOUD_CONF" | jq -r '.resourceGroup')
+    AZURE_VNET_NAME=$(echo "$CLOUD_CONF" | jq -r '.vnetName')
+    AZURE_VNET_RESOURCE_GROUP=$(echo "$CLOUD_CONF" | jq -r '.vnetResourceGroup')
+    AZURE_SUBNET_NAME=$(echo "$CLOUD_CONF" | jq -r '.subnetName')
+    AZURE_NSG_NAME=$(echo "$CLOUD_CONF" | jq -r '.securityGroupName')
+    AZURE_REGION=$(echo "$CLOUD_CONF" | jq -r '.location')
+
+    # Login to Azure for NAT gateway creation
+    az login --service-principal --username "${AZURE_CLIENT_ID}" --password "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
+    az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
+
+    # Construct full Azure resource IDs
+    AZURE_SUBNET_ID="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_VNET_RESOURCE_GROUP}/providers/Microsoft.Network/virtualNetworks/${AZURE_VNET_NAME}/subnets/${AZURE_SUBNET_NAME}"
+    AZURE_NSG_ID="/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_VNET_RESOURCE_GROUP}/providers/Microsoft.Network/networkSecurityGroups/${AZURE_NSG_NAME}"
 
     PP_REGION=eastus
     if [[ "${AZURE_REGION}" == "${PP_REGION}" ]]; then
