@@ -22,14 +22,25 @@ fi
 OWNER_ID=""
 if [[ -n "${KUBECONFIG:-}" ]]; then
   echo "Querying management cluster for external-dns owner ID..."
-  # Get the owner ID from the external-dns deployment
-  # This is the unique identifier that external-dns uses to tag all DNS records it creates
-  OWNER_ID=$(kubectl get deployment -n hypershift external-dns -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="EXTERNAL_DNS_TXT_OWNER_ID")].value}' 2>/dev/null || echo "")
+  echo "DEBUG: KUBECONFIG=${KUBECONFIG}"
 
-  if [[ -n "${OWNER_ID}" ]]; then
-    echo "Found external-dns owner ID: ${OWNER_ID}"
+  # Check if the cluster is accessible
+  if ! kubectl get ns hypershift &>/dev/null; then
+    echo "DEBUG: Cannot access hypershift namespace on management cluster"
   else
-    echo "WARNING: Could not find external-dns owner ID from deployment"
+    echo "DEBUG: Successfully accessed hypershift namespace"
+
+    # Get the owner ID from the external-dns deployment
+    # This is the unique identifier that external-dns uses to tag all DNS records it creates
+    OWNER_ID=$(kubectl get deployment -n hypershift external-dns -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="EXTERNAL_DNS_TXT_OWNER_ID")].value}' 2>/dev/null || echo "")
+
+    if [[ -n "${OWNER_ID}" ]]; then
+      echo "Found external-dns owner ID from deployment: ${OWNER_ID}"
+    else
+      echo "DEBUG: Could not find EXTERNAL_DNS_TXT_OWNER_ID env var in deployment"
+      echo "DEBUG: Checking all env vars in external-dns deployment..."
+      kubectl get deployment -n hypershift external-dns -o jsonpath='{.spec.template.spec.containers[0].env[*].name}' 2>/dev/null | tr ' ' '\n' | grep -i owner || echo "DEBUG: No owner-related env vars found"
+    fi
   fi
 fi
 
@@ -62,20 +73,28 @@ if [[ -z "${OWNER_ID}" ]]; then
   echo "Attempting to extract owner ID from existing TXT records in the DNS zone..."
 
   # Get a sample TXT record to extract the owner ID
+  echo "DEBUG: Querying TXT records from zone ${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}..."
   SAMPLE_TXT=$(az network dns record-set txt list \
     --resource-group "${EXTERNAL_DNS_ZONE_RESOURCE_GROUP}" \
     --zone-name "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}" \
     --output json | \
     jq -r '[.[] | select(.name | endswith("-external-dns"))] | .[0].txtRecords[0].value[0]' 2>/dev/null || echo "")
 
+  echo "DEBUG: Sample TXT record value: ${SAMPLE_TXT}"
+
   if [[ -n "${SAMPLE_TXT}" ]]; then
     # Extract owner ID from the TXT record value which looks like:
     # "heritage=external-dns,external-dns/owner=a0ad2bd1-c681-4f8a-9147-d4a4d8752579,external-dns/resource=..."
-    OWNER_ID=$(echo "${SAMPLE_TXT}" | grep -oP 'external-dns/owner=\K[a-f0-9-]+' || echo "")
+    # Use sed for portability (grep -P may not be available)
+    OWNER_ID=$(echo "${SAMPLE_TXT}" | sed -n 's/.*external-dns\/owner=\([a-f0-9-]*\).*/\1/p' || echo "")
 
     if [[ -n "${OWNER_ID}" ]]; then
       echo "Extracted owner ID from DNS records: ${OWNER_ID}"
+    else
+      echo "DEBUG: Failed to extract owner ID from sample TXT: ${SAMPLE_TXT}"
     fi
+  else
+    echo "DEBUG: No TXT records found in DNS zone with -external-dns suffix"
   fi
 fi
 
