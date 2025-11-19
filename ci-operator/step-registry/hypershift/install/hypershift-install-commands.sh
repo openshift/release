@@ -56,7 +56,7 @@ if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
 fi
 
 if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
-  "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
+  "${HCP_CLI}" install --hypershift-image="quay.io/mgencur/hypershift:RFE-8071" \
   --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
   --oidc-storage-provider-s3-bucket-name=hypershift-ci-oidc \
   --oidc-storage-provider-s3-region=us-east-1 \
