@@ -102,21 +102,14 @@ function clear_partition_disk_table {
       devices_to_wipe="${devices_to_wipe} ${dev}"
     done
   else
-    # Otherwise, check all block devices and find candidates
+    # Otherwise, wipe all non-excluded block devices
+    # Note: We wipe all available devices because vgcreate can detect
+    # partition table signatures that lsblk doesn't show
     for dev in ${all_block_devices}; do
       # Skip if excluded
       echo "${excluded_devices}" | grep -q "^${dev}$" && continue
-
-      # Check if device has partitions or problematic signatures
-      set -x
-      has_partitions=$(oc debug ${node_name} -n default -- chroot /host bash -c \
-        "lsblk -no TYPE ${dev} 2>/dev/null | grep -c part || echo 0" 2>/dev/null || echo 0)
-      set +x
-
-      if [ "${has_partitions}" -gt 0 ]; then
-        echo "Device ${dev} has partitions, adding to wipe list"
-        devices_to_wipe="${devices_to_wipe} ${dev}"
-      fi
+      echo "Device ${dev} is not excluded, adding to wipe list"
+      devices_to_wipe="${devices_to_wipe} ${dev}"
     done
   fi
 
@@ -137,8 +130,9 @@ function clear_partition_disk_table {
      set -x ;
      echo 'Before wiping:' ;
      lsblk --fs ${node_dev} || true ;
-     sfdisk --delete ${node_dev} ;
-     sleep 3 ;
+     sfdisk --delete ${node_dev} || true ;
+     dd if=/dev/zero of=${node_dev} bs=1M count=1 ;
+     sleep 2 ;
      kpartx -d ${node_dev} || true ;
      echo 'After wiping:' ;
      lsblk --fs ${node_dev} || true ;
@@ -147,6 +141,10 @@ function clear_partition_disk_table {
      echo '${node_dev} Wiped'"
     set +x
   done
+
+  echo "----------------------------------------"
+  echo "Cleared partition disk table"
+  echo "----------------------------------------"
 }
 
 function get_storage_class_name {
@@ -178,6 +176,7 @@ EOF
       [ $(( attempts=${attempts} + 1 )) -lt 2 ] || {
         clear_partition_disk_table ;
         oc -n openshift-storage wait lvmcluster/lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout 10m && break ;
+        oc -n openshift-storage get lvmcluster/lvmcluster -oyaml ;
         exit 1 ;
       }
     done
