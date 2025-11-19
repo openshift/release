@@ -56,9 +56,8 @@ sleep 300
 # Run ingress-perf
 popd
 pushd e2e-benchmarking/workloads/ingress-perf
-ES_INDEX="ingress-performance" ./run.sh &> "${ARTIFACT_DIR}"/ingress-perf-run.log &
+ES_INDEX="ingress-performance" WORKLOAD="ingress-perf" ./run.sh &> "${ARTIFACT_DIR}"/ingress-perf-run.log &
 WORKLOAD_PIDS["ingress-perf"]=$!
-#ingress_perf_pid=$!
 
 function check_pids(){
     pid_rc=$1
@@ -90,26 +89,15 @@ ended_pid_rc=$?
 #shellcheck disable=SC2154
 check_pids $ended_pid_rc $ended_pid
 
-WORKLOAD_UUID_FILE=/tmp/"$WORKLOAD"-uuid.txt
+WORKLOAD_UUID_FILE=/tmp/$WORKLOAD-uuid.txt
 INGRESS_PERF_UUID_FILE=/tmp/ingress-perf-uuid.txt
-WORKLOAD_UUID=$(cat "$WORKLOAD_UUID_FILE")
-INGRESS_PERF_UUID=$(cat "$INGRESS_PERF_UUID_FILE")
-
-echo "===> $WORKLOAD UUID $WORKLOAD_UUID"
-echo "===> ingress-perf UUID $INGRESS_PERF_UUID"
 
 if [[ -f $WORKLOAD_UUID_FILE ]]; then
     cp "$WORKLOAD_UUID_FILE" "${ARTIFACT_DIR}/$WORKLOAD-uuid.txt"
-    cp "$WORKLOAD_UUID_FILE" "${SHARED_DIR}/$WORKLOAD-uuid.txt"
-else
-    echo "$WORKLOAD UUID not found" && exit 1
 fi
 
 if [[ -f $INGRESS_PERF_UUID_FILE ]]; then
     cp "$INGRESS_PERF_UUID_FILE" "${ARTIFACT_DIR}/ingress-perf-uuid.txt"
-    cp "$INGRESS_PERF_UUID_FILE" "${SHARED_DIR}/ingress-perf-uuid.txt"
-else
-    echo "ingress-perf UUID not found" && exit 1
 fi
 
 echo "######## $WORKLOAD run logs ########"

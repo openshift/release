@@ -12,45 +12,55 @@ export ES_METADATA_INDEX
 set -x
 
 function get_es_data(){
-    uuid=$1
+    workload=$1
     # do a term query for exact matching
-    query=$(jq -n --arg uuid "$uuid" '{"query":{"term":{"uuid.keyword": $uuid}}}')
-    index_results="$ARTIFACT_DIR/${uuid}_index_data.json"
+    query=$(jq -n --arg workload "$workload" \
+            --arg build_id "$BUILD_ID" \
+'{
+  "query": {
+    "bool": {
+      "must": {
+        "match": {
+          "benchmark.keyword": $workload
+        }
+      },
+      "filter": {
+        "term": {
+          "buildTag.keyword": $build_id
+        }
+      }
+    }
+  }
+}')
+
+    index_results="$ARTIFACT_DIR/${workload}_index_data.json"
     curl -sS -k -X GET -H 'Content-Type: application/json' "$ES_SERVER/$ES_METADATA_INDEX/_search" -d "$query" -o "$index_results"
     res_len=$(jq '.hits.hits | length' "$index_results")
 
     # validate if there is record found for a UUID
     if [[ $res_len != "1" ]]; then
-        echo "could not find match for UUID: $uuid" && exit 1 
+        echo "could not find match for $workload and build $BUILD_ID on $ES_METADATA_INDEX index" && exit 1 
     fi
     echo "$index_results"
 }
 
 export ES_PASSWORD
 export ES_USERNAME
-WORKLOAD_UUID_FILE="$SHARED_DIR/$WORKLOAD-uuid.txt"
-INGRESS_PERF_UUID_FILE="$SHARED_DIR/ingress-perf-uuid.txt"
 
-if [[ ! -f $WORKLOAD_UUID_FILE || ! -f $INGRESS_PERF_UUID_FILE ]]; then
-    echo "UUID file not found for $WORKLOAD or ingress-perf" && exit 1
-fi
-
-UUID=$(cat "$WORKLOAD_UUID_FILE")
-INGRESS_PERF_UUID=$(cat "$INGRESS_PERF_UUID_FILE")
 # strip quotes
-export UUID=${UUID//\"/}
 
-workload_index_results=$(get_es_data "$UUID") 
-ingress_perf_index_results=$(get_es_data "$INGRESS_PERF_UUID")
+workload_index_results=$(get_es_data "$WORKLOAD") 
+ingress_perf_index_results=$(get_es_data "ingress-perf")
+
+UUID=$(jq '.hits.hits[0]._source.uuid' "$workload_index_results")
+export UUID=${UUID//\"/}
+NOO_BUNDLE_VERSION=$(jq '.hits.hits[0]._source.noo_bundle_info' "$workload_index_results")
+export NOO_BUNDLE_VERSION=${NOO_BUNDLE_VERSION//\"/}
 
 START_TIME=$(jq '.hits.hits[0]._source.startDate' "$workload_index_results" | xargs -I {} date -d {} +%s)
 END_TIME=$(jq '.hits.hits[0]._source.endDate' "$workload_index_results" | xargs -I {} date -d {} +%s)
 
 INGRESS_PERF_END_TIME=$(jq '.hits.hits[0]._source.endDate' "$ingress_perf_index_results" | xargs -I {} date -d {} +%s)
-
-NOO_BUNDLE_VERSION=$(jq '.hits.hits[0]._source.noo_bundle_info' "$workload_index_results")
-export NOO_BUNDLE_VERSION=${NOO_BUNDLE_VERSION//\"/}
-
 
 # cluster-density-v2 takes longer to complete than ingress-perf
 if [[ $WORKLOAD == "node-density-heavy" ]]; then
