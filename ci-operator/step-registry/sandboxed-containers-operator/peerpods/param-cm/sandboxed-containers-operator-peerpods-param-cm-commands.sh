@@ -170,31 +170,14 @@ handle_azure() {
     AZURE_NSG_ID=$(az network nsg list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[].{Id:id}" --output tsv)
     AZURE_REGION=$(az group show --resource-group "${AZURE_RESOURCE_GROUP}" --query "{Location:location}" --output tsv)
 
-    PP_REGION=eastus
-    if [[ "${AZURE_REGION}" == "${PP_REGION}" ]]; then
-        echo "Using the current region ${AZURE_REGION}"
-        PP_RESOURCE_GROUP="${AZURE_RESOURCE_GROUP}"
-        PP_VNET_NAME="${AZURE_VNET_NAME}"
-        PP_SUBNET_NAME="${AZURE_SUBNET_NAME}"
-        PP_SUBNET_ID="${AZURE_SUBNET_ID}"
-        PP_NSG_ID="${AZURE_NSG_ID}"
-    else
-        echo "Creating peering between ${AZURE_REGION} and ${PP_REGION}"
-        PP_RESOURCE_GROUP="${AZURE_RESOURCE_GROUP}-eastus"
-        PP_VNET_NAME="${AZURE_VNET_NAME}-eastus"
-        PP_SUBNET_NAME="${AZURE_SUBNET_NAME}-eastus"
-        PP_NSG_NAME="${AZURE_VNET_NAME}-nsg-eastus"
-        az group create --name "${PP_RESOURCE_GROUP}" --location "${PP_REGION}"
-        az network vnet create --resource-group "${PP_RESOURCE_GROUP}" --name "${PP_VNET_NAME}" --location "${PP_REGION}" --address-prefixes 10.2.0.0/16 --subnet-name "${PP_SUBNET_NAME}" --subnet-prefixes 10.2.1.0/24
-        az network nsg create --resource-group "${PP_RESOURCE_GROUP}" --name "${PP_NSG_NAME}" --location "${PP_REGION}"
-        az network vnet subnet update --resource-group "${PP_RESOURCE_GROUP}" --vnet-name "${PP_VNET_NAME}" --name "${PP_SUBNET_NAME}" --network-security-group "${PP_NSG_NAME}"
-        AZURE_VNET_ID=$(az network vnet show --resource-group "${AZURE_RESOURCE_GROUP}" --name "${AZURE_VNET_NAME}" --query id --output tsv)
-        PP_VNET_ID=$(az network vnet show --resource-group "${PP_RESOURCE_GROUP}" --name "${PP_VNET_NAME}" --query id --output tsv)
-        az network vnet peering create --name westus-to-eastus --resource-group "${AZURE_RESOURCE_GROUP}" --vnet-name "${AZURE_VNET_NAME}" --remote-vnet "${PP_VNET_ID}" --allow-vnet-access
-        az network vnet peering create --name eastus-to-westus --resource-group "${PP_RESOURCE_GROUP}" --vnet-name "${PP_VNET_NAME}" --remote-vnet "${AZURE_VNET_ID}" --allow-vnet-access
-        PP_SUBNET_ID=$(az network vnet subnet list --resource-group "${PP_RESOURCE_GROUP}" --vnet-name "${PP_VNET_NAME}" --query "[].{Id:id} | [? contains(Id, 'worker')]" --output tsv)
-        PP_NSG_ID=$(az network nsg list --resource-group "${PP_RESOURCE_GROUP}" --query "[].{Id:id}" --output tsv)
-fi
+    # Downstream version generates podvm, no need to peer to eastus
+    # (keeping the PP_* variables to be close to upstream setup)
+    PP_REGION="${AZURE_REGION}"
+    PP_RESOURCE_GROUP="${AZURE_RESOURCE_GROUP}"
+    PP_VNET_NAME="${AZURE_VNET_NAME}"
+    PP_SUBNET_NAME="${AZURE_SUBNET_NAME}"
+    PP_SUBNET_ID="${AZURE_SUBNET_ID}"
+    PP_NSG_ID="${AZURE_NSG_ID}"
 
     # Peer-pod requires gateway
     az network public-ip create \
