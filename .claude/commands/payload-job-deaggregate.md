@@ -48,7 +48,7 @@ This command accepts optional arguments: `/payload-job-deaggregate [release] [st
    - Keep all other existing fields like `"optional"`, `"upgrade"`, `"upgradeFromRelease"`, etc.
    - Maintain proper JSON formatting
 
-6. **Run make release-controllers**: Execute `make release-controllers` to regenerate the release controller configurations.
+6. **Run make release-controllers**: Create a Python virtual environment if needed and execute `make release-controllers` to regenerate the release controller configurations. First check if `venv` directory exists - if not, create it with `python3 -m venv venv`. Then activate it with `source venv/bin/activate`, and finally run `make release-controllers`.
 
 7. **Confirm completion**: Let the user know the job has been converted back to a regular single-run job and the configurations have been regenerated.
 

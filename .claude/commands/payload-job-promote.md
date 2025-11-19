@@ -45,7 +45,7 @@ This command accepts optional arguments: `/payload-job-promote [release] [stream
    - Remove the line containing `"optional": true,` (note: be careful with trailing commas)
    - Add `"maxRetries": 2,` if it doesn't exist, or ensure it's set to 2 if it does exist
 
-6. **Run make release-controllers**: Execute `make release-controllers` to regenerate the release controller configurations.
+6. **Run make release-controllers**: Create a Python virtual environment if needed and execute `make release-controllers` to regenerate the release controller configurations. First check if `venv` directory exists - if not, create it with `python3 -m venv venv`. Then activate it with `source venv/bin/activate`, and finally run `make release-controllers`.
 
 7. **Confirm completion**: Let the user know the job has been promoted and the configurations have been regenerated.
 

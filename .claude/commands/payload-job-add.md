@@ -106,7 +106,7 @@ This command accepts optional arguments: `/payload-job-add [release] [stream] [a
      }
      ```
 
-8. **Run make release-controllers**: Execute `make release-controllers` to regenerate the release controller configurations.
+8. **Run make release-controllers**: Create a Python virtual environment if needed and execute `make release-controllers` to regenerate the release controller configurations. First check if `venv` directory exists - if not, create it with `python3 -m venv venv`. Then activate it with `source venv/bin/activate`, and finally run `make release-controllers`.
 
 9. **Confirm completion**: Let the user know the job has been added and the configurations have been regenerated. Show them the job key and Prow job name that was added.
 

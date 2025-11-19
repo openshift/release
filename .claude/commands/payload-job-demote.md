@@ -46,7 +46,7 @@ This command accepts optional arguments: `/payload-job-demote [release] [stream]
    - Remove the `"maxRetries"` field if present
    - Keep any other existing fields like `"upgrade"`, `"aggregatedProwJob"`, etc.
 
-6. **Run make release-controllers**: Execute `make release-controllers` to regenerate the release controller configurations.
+6. **Run make release-controllers**: Create a Python virtual environment if needed and execute `make release-controllers` to regenerate the release controller configurations. First check if `venv` directory exists - if not, create it with `python3 -m venv venv`. Then activate it with `source venv/bin/activate`, and finally run `make release-controllers`.
 
 7. **Confirm completion**: Let the user know the job has been demoted to informing status and the configurations have been regenerated.
 

@@ -48,7 +48,7 @@ This command accepts optional arguments: `/payload-job-aggregate [release] [stre
    - Keep all existing fields like `"optional"`, `"upgrade"`, `"upgradeFromRelease"`, etc.
    - Maintain proper JSON formatting with commas
 
-6. **Run make release-controllers**: Execute `make release-controllers` to regenerate the release controller configurations.
+6. **Run make release-controllers**: Create a Python virtual environment if needed and execute `make release-controllers` to regenerate the release controller configurations. First check if `venv` directory exists - if not, create it with `python3 -m venv venv`. Then activate it with `source venv/bin/activate`, and finally run `make release-controllers`.
 
 7. **Confirm completion**: Let the user know the job has been converted to an aggregated job and explain that it will now run 10 times and statistically analyze the results.
 
