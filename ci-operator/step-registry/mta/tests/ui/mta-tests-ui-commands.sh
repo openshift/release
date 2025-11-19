@@ -41,8 +41,7 @@ function mapTestsForComponentReadiness() {
 
     # Try to map common XML root shapes. Each attempt is allowed to fail; the final
     # fallback prints a warning but does not fail the step (prevents errexit from aborting).
-    yq eval -px -ox -iI0 '.testsuite."+@name" = "MTA-lp-interop"' "${results_file}" \
-      || yq eval -px -ox -iI0 '.testsuites.testsuite[0]."+@name" = "MTA-lp-interop"' "${results_file}" \
+    yq eval -px -ox -iI0 '.testsuites.testsuite[]."+@name" = "MTA-lp-interop"' "${results_file}" \
       || { echo "Warning: yq failed to map test suite name for ${results_file}; inspect file manually" >&2; }
 }
 
