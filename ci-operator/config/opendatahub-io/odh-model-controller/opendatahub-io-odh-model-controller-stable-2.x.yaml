@@ -79,9 +79,16 @@ tests:
           export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
 
           echo "Loading environment variables from params.env"
-          set -a
-          source config/overlays/odh/params.env
-          set +a
+          #Parse params.env into shell vars with underscores instead of dashes
+          while IFS='=' read -r key value; do
+            case "$key" in
+              ''|\#*) continue ;;
+            esac
+            key="${key%%[[:space:]]*}"
+            value="${value##[[:space:]]}"
+            sane_key="${key//-/_}"
+            printf -v "$sane_key" '%s' "$value"
+          done < config/overlays/odh/params.env
 
           export KSERVE_CONTROLLER_IMAGE="${kserve_controller}"
           export KSERVE_AGENT_IMAGE="${kserve_agent}"
