@@ -102,6 +102,10 @@ MARKETPLACE_IMAGE_PARAMS=""
 if [[ -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION:-}" ]]; then
   MARKETPLACE_IMAGE_PARAMS="--e2e.azure-marketplace-publisher ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER} --e2e.azure-marketplace-offer ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER} --e2e.azure-marketplace-sku ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU} --e2e.azure-marketplace-version ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
 fi
+EXTERNAL_CNI_PROVIDER_ARGS=""
+if [[ -n ${EXTERNAL_CNI_PROVIDER:-} ]]; then
+  EXTERNAL_CNI_PROVIDER_ARGS="--e2e.external-cni-provider=${EXTERNAL_CNI_PROVIDER}"
+fi
 
 OAUTH_EXTERNAL_OIDC_PARAM=""
 if [ -f ${SHARED_DIR}/external-oidc-provider ] ; then
@@ -141,6 +145,7 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.azure-location=${HYPERSHIFT_AZURE_LOCATION} \
   --e2e.oidc-issuer-url=${AZURE_OIDC_ISSUER_URL} \
   --e2e.sa-token-issuer-private-key-path=${AZURE_SA_TOKEN_ISSUER_KEY_PATH} \
+    ${EXTERNAL_CNI_PROVIDER_ARGS:-} \
     ${EXTERNAL_DNS_ARGS:-} \
     ${AKS_ANNOTATIONS:-} \
     ${N1_NP_VERSION_TEST_ARGS:-} \

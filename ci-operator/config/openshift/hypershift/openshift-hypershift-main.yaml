@@ -176,6 +176,26 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
     workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-cilium
+  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  steps:
+    cluster_profile: hypershift-aks
+    dependencies:
+      OCP_IMAGE_N1: release:n1minor
+      OCP_IMAGE_N2: release:n2minor
+      OCP_IMAGE_N3: release:n3minor
+      OCP_IMAGE_N4: release:n4minor
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CILIUM_VERSION: 1.15.1
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      EXTERNAL_CNI_PROVIDER: cilium
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
+    workflow: hypershift-azure-aks-e2e
 - always_run: false
   as: e2e-aks-4-21
   pipeline_run_if_changed: ^(test/e2e|hypershift-operator)
