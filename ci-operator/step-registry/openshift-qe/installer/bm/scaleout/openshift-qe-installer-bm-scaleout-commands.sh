@@ -13,7 +13,7 @@ export LAB_CLOUD
 
 # Get the number of current dedicated worker nodes in the cluster
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
-NUM_CURRENT_WORKER_NODES=$(oc get nodes | grep worker | grep -v -c master)
+NUM_CURRENT_WORKER_NODES=$(oc get nodes -l '!node-role.kubernetes.io/control-plane,!node-role.kubernetes.io/master' --no-headers 2>/dev/null | wc -l)
 export NUM_CURRENT_WORKER_NODES
 
 # Calculate the number of scaleout worker nodes
@@ -45,7 +45,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    cd ${JETLAG_REPO_PATH}
    source bootstrap.sh
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
-   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/mno-scale-out.yml -vvv | tee /tmp/ansible-mno-scaleout-$(date +%s)
+   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/ocp-scale-out.yml -vvv | tee /tmp/ansible-ocp-scaleout-$(date +%s)
    deactivate
    rm -rf .ansible
 "
