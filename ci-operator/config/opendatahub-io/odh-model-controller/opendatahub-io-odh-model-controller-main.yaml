@@ -73,8 +73,33 @@ tests:
         pushd /tmp/kserve
           git fetch --all --tags
           git checkout release-v0.15
+
           export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
           export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
+
+          echo "Loading environment variables from params.env"
+          set -a
+          source config/overlays/odh/params.env
+          set +a
+
+          export KSERVE_CONTROLLER_IMAGE="${kserve_controller}"
+          export KSERVE_AGENT_IMAGE="${kserve_agent}"
+          export KSERVE_ROUTER_IMAGE="${kserve_router}"
+          export KSERVE_STORAGE_INITIALIZER_IMAGE="${kserve_storage_initializer}"
+          export LLMD_IMAGE="${kserve_llm_d}"
+          export LLMD_INFERENCE_SCHEDULER_IMAGE="${kserve_llm_d_inference_scheduler}"
+          export LLMD_ROUTING_SIDECAR_IMAGE="${kserve_llm_d_routing_sidecar}"
+          export KUBE_RBAC_PROXY_IMAGE="${kube_rbac_proxy}"
+
+          echo "Loaded all images from params.env:"
+          echo "KSERVE_CONTROLLER_IMAGE=${KSERVE_CONTROLLER_IMAGE}"
+          echo "KSERVE_AGENT_IMAGE=${KSERVE_AGENT_IMAGE}"
+          echo "KSERVE_ROUTER_IMAGE=${KSERVE_ROUTER_IMAGE}"
+          echo "KSERVE_STORAGE_INITIALIZER_IMAGE=${KSERVE_STORAGE_INITIALIZER_IMAGE}"
+          echo "KSERVE_LLMD_IMAGE=${KSERVE_LLMD_IMAGE}"
+          echo "KSERVE_LLMD_INFERENCE_SCHEDULER_IMAGE=${KSERVE_LLMD_INFERENCE_SCHEDULER_IMAGE}"
+          echo "KSERVE_LLMD_ROUTING_SIDECAR_IMAGE=${KSERVE_LLMD_ROUTING_SIDECAR_IMAGE}"
+          echo "KUBE_RBAC_PROXY_IMAGE=${KUBE_RBAC_PROXY_IMAGE}"
 
           ./test/scripts/openshift-ci/run-e2e-tests.sh raw 2 raw
         popd
@@ -132,30 +157,60 @@ tests:
     test:
     - as: llmisvc
       cli: latest
-      commands: "set -euxo pipefail\necho \"ODH_MODEL_CONTROLLER_IMAGE=${ODH_MODEL_CONTROLLER_IMAGE}\"\n\ngit
-        clone https://github.com/opendatahub-io/kserve.git /tmp/kserve\npushd /tmp/kserve\n
-        \ git fetch --all --tags\n  git checkout release-v0.15\n\n  # Apply necessry
-        prereqs for LLMISVC tests\n  oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/prerequisites/\n
-        \ oc wait --for=condition=CatalogSourcesUnhealthy=false subscription/openshift-cert-manager-operator
-        -n cert-manager-operator --timeout=300s\n  oc wait --for=condition=CatalogSourcesUnhealthy=false
-        subscription/servicemeshoperator -n openshift-operators --timeout=300s\n  oc
-        wait --for=condition=CatalogSourcesUnhealthy=false subscription/leader-worker-set
-        -n openshift-lws-operator --timeout=300s\n\n  echo \"Waiting for LeaderWorkerSetOperator
-        CRD to be installed...\"\n  until oc get crd leaderworkersetoperators.operator.openshift.io
-        >/dev/null 2>&1; do\n    echo \"  CRD leaderworkersetoperators.operator.openshift.io
-        not found yet, sleeping 10s...\"\n    sleep 10\n  done\n  \n  echo \"Waiting
-        for Istio & IstioCNI CRDs from Sail Operator...\"\n  until oc get crd istios.sailoperator.io
-        >/dev/null 2>&1 && oc get crd istiocnis.sailoperator.io >/dev/null 2>&1; do\n
-        \   echo \"  Istio CRDs not found yet, sleeping 10s...\"\n    sleep 10\n  done\n\n
-        \ oc get crd gateways.gateway.networking.k8s.io\n  oc get crd gatewayclasses.gateway.networking.k8s.io\n
-        \ oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/installation/\n  # Wait
-        for Leader Worker Set Operator to be available\n  oc wait --for=condition=Available
-        leaderworkersetoperator/cluster --timeout=300s\n  oc wait --for=condition=Ready
-        istiocni/default --timeout=300s\n  oc wait --for=condition=Ready istio/default
-        --timeout=300s\n  oc get gateway openshift-ai-inference -n openshift-ingress\n\n
-        \ export GITHUB_SHA=\"${PULL_BASE_SHA:-stable}\"\n  export ODH_MODEL_CONTROLLER_IMAGE=\"${ODH_MODEL_CONTROLLER_IMAGE}\"\n\n
-        \ ./test/scripts/openshift-ci/run-e2e-tests.sh \"llminferenceservice and (cluster_cpu
-        and cluster_single_node)\" 2 \"llm-d\"\npopd\n"
+      commands: |
+        set -euxo pipefail
+        git clone https://github.com/opendatahub-io/kserve.git /tmp/kserve
+        pushd /tmp/kserve
+          git fetch --all --tags
+          git checkout release-v0.15
+
+          export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
+          export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
+
+          echo "Loading environment variables from params.env"
+          set -a
+          source config/overlays/odh/params.env
+          set +a
+
+          export KSERVE_CONTROLLER_IMAGE="${kserve_controller}"
+          export KSERVE_AGENT_IMAGE="${kserve_agent}"
+          export KSERVE_ROUTER_IMAGE="${kserve_router}"
+          export KSERVE_STORAGE_INITIALIZER_IMAGE="${kserve_storage_initializer}"
+          export LLMD_IMAGE="${kserve_llm_d}"
+          export LLMD_INFERENCE_SCHEDULER_IMAGE="${kserve_llm_d_inference_scheduler}"
+          export LLMD_ROUTING_SIDECAR_IMAGE="${kserve_llm_d_routing_sidecar}"
+          export KUBE_RBAC_PROXY_IMAGE="${kube_rbac_proxy}"
+
+          echo "Loaded all images from params.env:"
+          echo "KSERVE_CONTROLLER_IMAGE=${KSERVE_CONTROLLER_IMAGE}"
+          echo "KSERVE_AGENT_IMAGE=${KSERVE_AGENT_IMAGE}"
+          echo "KSERVE_ROUTER_IMAGE=${KSERVE_ROUTER_IMAGE}"
+          echo "KSERVE_STORAGE_INITIALIZER_IMAGE=${KSERVE_STORAGE_INITIALIZER_IMAGE}"
+          echo "KSERVE_LLMD_IMAGE=${KSERVE_LLMD_IMAGE}"
+          echo "KSERVE_LLMD_INFERENCE_SCHEDULER_IMAGE=${KSERVE_LLMD_INFERENCE_SCHEDULER_IMAGE}"
+          echo "KSERVE_LLMD_ROUTING_SIDECAR_IMAGE=${KSERVE_LLMD_ROUTING_SIDECAR_IMAGE}"
+          echo "KUBE_RBAC_PROXY_IMAGE=${KUBE_RBAC_PROXY_IMAGE}"
+
+          echo "Apply necessary prereqs for LLMISVC tests"
+          oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/prerequisites/
+          oc wait --for=condition=CatalogSourcesUnhealthy=false subscription/openshift-cert-manager-operator
+          -n cert-manager-operator --timeout=300s
+          oc wait --for=condition=CatalogSourcesUnhealthy=false
+          subscription/servicemeshoperator -n openshift-operators --timeout=300s
+          oc wait --for=condition=CatalogSourcesUnhealthy=false subscription/leader-worker-set
+          -n openshift-lws-operator --timeout=300s
+          oc get crd gateways.gateway.networking.k8s.io
+          oc get crd gatewayclasses.gateway.networking.k8s.io
+          oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/installation/
+
+          echo "Wait for Leader Worker Set Operator to be available"
+          oc wait --for=condition=Available leaderworkersetoperator/cluster --timeout=300s
+          oc wait --for=condition=Ready istiocni/default --timeout=300s
+          oc wait --for=condition=Ready istio/default --timeout=300s
+          oc get gateway openshift-ai-inference -n openshift-ingress
+
+          ./test/scripts/openshift-ci/run-e2e-tests.sh "llminferenceservice and (cluster_cpu and cluster_single_node)" 2 "llm-d"
+        popd
       dependencies:
       - env: ODH_MODEL_CONTROLLER_IMAGE
         name: odh-model-controller
