@@ -196,7 +196,16 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
     --service-cidr 172.32.0.0/16 \
     --cluster-cidr 10.136.0.0/14 ${RENDER_COMMAND} > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 
-  oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+  sed '/issuerURL:/a\
+  operatorConfiguration:\
+    ingressOperator:\
+      endpointPublishingStrategy:\
+        hostNetwork:\
+          httpPort: 80\
+          httpsPort: 443\
+          protocol: TCP\
+          statsPort: 1936\
+        type: HostNetwork' "${SHARED_DIR}/hypershift_create_cluster_render.yaml" | oc apply -f -
 else
   # shellcheck disable=SC2086
   eval "${HCP_CLI} create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
