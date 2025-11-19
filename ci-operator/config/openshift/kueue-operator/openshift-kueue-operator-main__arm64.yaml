@@ -1,0 +1,166 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
+  ocp_builder_rhel-9-base-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.19
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
+build_root:
+  from_repository: true
+images:
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: arm64
+  dockerfile_path: Dockerfile.ci
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: kueue-operator
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: arm64
+  dockerfile_path: Dockerfile.kueue
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: kueue-operand
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: arm64
+  dockerfile_path: must-gather/Dockerfile
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: kueue-must-gather
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: arm64
+  dockerfile_literal: |
+    FROM src
+    RUN dnf install -y skopeo git && dnf clean all
+    RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+  from: src
+  to: kueue-operator-src
+operator:
+  bundles:
+  - as: kueue-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: registry.redhat.io/kueue/kueue-rhel9:latest
+    with: kueue-operand
+  - pullspec: registry.redhat.io/kueue/kueue-rhel9-operator:latest
+    with: kueue-operator
+  - pullspec: registry.redhat.io/kueue/kueue-must-gather-rhel9:latest
+    with: kueue-must-gather
+releases:
+  arm64-latest-4-19:
+    release:
+      architecture: arm64
+      channel: stable
+      version: "4.19"
+  arm64-latest-4-20:
+    release:
+      architecture: arm64
+      channel: stable
+      version: "4.20"
+  latest:
+    release:
+      architecture: arm64
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: "4"
+      memory: 4Gi
+tests:
+- as: test-e2e-operator-4-19
+  minimum_interval: 96h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest-4-19
+    env:
+      CONTAINER_IMAGE: quay.io/curl/curl:latest
+      OCP_ARCH: arm64
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e
+    workflow: ipi-aws
+- as: test-e2e-operator-4-20
+  minimum_interval: 96h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest-4-20
+    env:
+      CONTAINER_IMAGE: quay.io/curl/curl:latest
+      OCP_ARCH: arm64
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e
+    workflow: ipi-aws
+- as: test-e2e-upstream-4-19
+  minimum_interval: 96h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest-4-19
+    env:
+      OCP_ARCH: arm64
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-upstream
+    workflow: ipi-aws
+- as: test-e2e-upstream-4-20
+  minimum_interval: 96h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest-4-20
+    env:
+      OCP_ARCH: arm64
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-upstream
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: kueue-operator
+  variant: arm64

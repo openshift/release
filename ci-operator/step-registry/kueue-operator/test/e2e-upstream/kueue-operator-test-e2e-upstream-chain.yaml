@@ -1,19 +1,7 @@
 chain:
-  as: kueue-operator-test-e2e-downstream
+  as: kueue-operator-test-e2e-upstream
   steps:
-  - ref: kueue-operator-image-env-setup
   - ref: cert-manager-install-operator
-  - as: run-sdk
-    commands: |
-      source "${SHARED_DIR}/env"
-      echo "Using Bundle Image: ${BUNDLE_IMAGE}"
-      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE" --security-context-config=restricted
-    from: operator-sdk
-    resources:
-      requests:
-        cpu: 200m
-        memory: 300Mi
-  - ref: kueue-operator-image-patch
   - as: kueue-operator-jobset-install-operator
     cli: latest
     commands: |
@@ -42,19 +30,30 @@ chain:
       requests:
         cpu: 300m
         memory: 500Mi
-  - as: e2e-kueue
+  - as: install-operator
     cli: latest
-    env:
-    - name: CONTAINER_IMAGE
-      default: ""
+    dependencies:
+    - name: kueue-operator-bundle
+      env: OO_BUNDLE
     commands: |
-      source "${SHARED_DIR}/env"
-      echo "Running tests with CONTAINER_IMAGE=${CONTAINER_IMAGE}"
-      make e2e-ci-test
+      echo "Installing operator from bundle: ${OO_BUNDLE}"
+      oc create namespace openshift-kueue-operator || true
+      oc label ns openshift-kueue-operator openshift.io/cluster-monitoring=true security.openshift.io/scc.podSecurityLabelSync=true --overwrite
+      cd /tmp
+      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$OO_BUNDLE" --security-context-config=restricted
+    from: cli-operator-sdk
+    resources:
+      requests:
+        cpu: 300m
+        memory: 300Mi
+  - as: e2e-kueue-upstream
+    cli: latest
+    commands: |
+      make e2e-upstream-test
     from: kueue-operator-src
     resources:
       requests:
         cpu: "4"
         memory: "4Gi"
   documentation: |-
-    This chain runs the downstream e2e test suite for The Kueue operator.
+    This chain runs the upstream e2e test suites for The Kueue operator.

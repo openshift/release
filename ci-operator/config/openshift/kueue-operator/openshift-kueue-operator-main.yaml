@@ -3,49 +3,29 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: cli
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
   ocp_builder_rhel-9-base-openshift-4.19:
     name: builder
     namespace: ocp
     tag: rhel-9-base-openshift-4.19
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
-  operator-sdk:
-    name: "4.17"
-    namespace: origin
-    tag: operator-sdk
+    tag: rhel-9-golang-1.24-openshift-4.20
   upi-installer:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: upi-installer
 build_root:
   from_repository: true
 images:
-- additional_architectures:
-  - arm64
-  dockerfile_path: Dockerfile.ci
-  inputs:
-    ocp_builder_rhel-9-base-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.19
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: kueue-operator
-- additional_architectures:
-  - arm64
-  dockerfile_literal: |
-    FROM src
-    RUN dnf install -y skopeo git && dnf clean all
-    RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
-  from: src
-  to: kueue-operator-src
 - dockerfile_literal: |
     FROM src
     COPY oc /usr/bin/oc
     RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y skopeo git podman && dnf clean all
   from: src
   inputs:
     cli:
@@ -53,25 +33,79 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: src-with-oc-and-kubectl
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: kueue-operator
+- dockerfile_path: Dockerfile.kueue
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: kueue-operand
+- dockerfile_path: must-gather/Dockerfile
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: kueue-must-gather
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install -y skopeo git && dnf clean all
+    RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+  from: src
+  to: kueue-operator-src
+operator:
+  bundles:
+  - as: kueue-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: registry.redhat.io/kueue/kueue-rhel9:latest
+    with: kueue-operand
+  - pullspec: registry.redhat.io/kueue/kueue-rhel9-operator:latest
+    with: kueue-operator
+  - pullspec: registry.redhat.io/kueue/kueue-must-gather-rhel9:latest
+    with: kueue-must-gather
 releases:
-  arm64-4-19-latest:
-    candidate:
-      architecture: arm64
-      product: ocp
-      stream: nightly
-      version: "4.19"
   latest:
     release:
       architecture: multi
       channel: stable
+      version: "4.20"
+  latest-4-18:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.18"
+  latest-4-19:
+    release:
+      architecture: multi
+      channel: stable
       version: "4.19"
+  latest-4-20:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.20"
 resources:
   '*':
     requests:
       cpu: "4"
       memory: 4Gi
 tests:
-- as: test
+- as: unit
   commands: make test
   container:
     from: src
@@ -100,77 +134,53 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     workflow: openshift-ci-security
-- as: test-e2e-4-18
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
-  minimum_interval: 96h
-  presubmit: true
-  steps:
-    env:
-      BUNDLE_COMPONENT: kueue-bundle-main
-      OPERAND_COMPONENT: kueue-operand-main
-      OPERATOR_COMPONENT: kueue-operator-main
-    post:
-    - chain: kueue-operator-post
-    test:
-    - chain: kueue-operator-test-e2e
-- as: test-e2e-4-19-arm64
+- as: operator-test-e2e-4-18
   minimum_interval: 96h
   steps:
     cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-4-19-latest
-    env:
-      BUNDLE_COMPONENT: kueue-bundle-main
-      CONTAINER_IMAGE: quay.io/curl/curl:latest
-      OCP_ARCH: arm64
-      OPERAND_COMPONENT: kueue-operand-main
-      OPERATOR_COMPONENT: kueue-operator-main
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-18
     post:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
     workflow: ipi-aws
-- as: test-e2e-4-19
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.19"
+- as: operator-test-e2e-4-19
   minimum_interval: 96h
-  presubmit: true
   steps:
-    env:
-      BUNDLE_COMPONENT: kueue-bundle-main
-      OPERAND_COMPONENT: kueue-operand-main
-      OPERATOR_COMPONENT: kueue-operator-main
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-19
     post:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
-- as: test-e2e-4-19-fips
+    workflow: ipi-aws
+- as: operator-test-e2e-4-20
+  minimum_interval: 96h
+  presubmit: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-20
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e
+    workflow: ipi-aws
+- as: operator-test-e2e-4-19-fips
   minimum_interval: 96h
   steps:
     cluster_profile: aws
     env:
-      BUNDLE_COMPONENT: kueue-bundle-main
       FIPS_ENABLED: "true"
-      OPERAND_COMPONENT: kueue-operand-main
-      OPERATOR_COMPONENT: kueue-operator-main
     post:
     - chain: kueue-operator-post
     test:
     - ref: fips-check
     - chain: kueue-operator-test-e2e
     workflow: ipi-aws
-- as: test-e2e-4-19-hypershift
+- as: operator-test-e2e-4-19-hypershift
   minimum_interval: 96h
   steps:
     cluster_profile: aws-2
@@ -181,44 +191,17 @@ tests:
     test:
     - chain: kueue-operator-test-e2e-dev-bundle
     workflow: hypershift-hostedcluster-workflow
-- as: test-e2e-downstream-4-20
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.20"
+- as: operator-test-e2e-4-20-hypershift
   minimum_interval: 96h
-  presubmit: true
   steps:
+    cluster_profile: aws-2
     env:
-      BUNDLE_COMPONENT: kueue-bundle-main
-      OPERAND_COMPONENT: kueue-operand-main
-      OPERATOR_COMPONENT: kueue-operator-main
+      HYPERSHIFT_NODE_COUNT: "2"
     post:
     - chain: kueue-operator-post
     test:
-    - chain: kueue-operator-test-e2e-downstream
-- as: test-e2e-upstream-4-20
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.20"
-  minimum_interval: 96h
-  presubmit: true
-  steps:
-    env:
-      BUNDLE_COMPONENT: kueue-bundle-main
-      OPERAND_COMPONENT: kueue-operand-main
-      OPERATOR_COMPONENT: kueue-operator-main
-    post:
-    - chain: kueue-operator-post
-    test:
-    - chain: kueue-operator-test-e2e-upstream
+    - chain: kueue-operator-test-e2e-dev-bundle
+    workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: perfscale-payload-kueue-operator-9nodes
   optional: true
@@ -226,16 +209,36 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      BUNDLE_COMPONENT: kueue-bundle-main
       COMPUTE_NODE_REPLICAS: "9"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
-      OPERAND_COMPONENT: kueue-operand-main
-      OPERATOR_COMPONENT: kueue-operator-main
       ZONES_COUNT: "3"
     test:
     - chain: kueue-operator-test-perfscale
     workflow: openshift-qe-installer-aws
+- as: upstream-test-e2e-4-19
+  minimum_interval: 96h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-19
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-upstream
+    workflow: ipi-aws
+- as: upstream-test-e2e-4-20
+  minimum_interval: 96h
+  presubmit: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-20
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-upstream
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
