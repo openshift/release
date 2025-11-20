@@ -77,5 +77,9 @@ rc=$?
 if [[ $TELEMETRY_EVENTS_BACKUP == "True" ]]; then
     cp /tmp/events.json ${ARTIFACT_DIR}/events.json
 fi
+
+oc get routes -A
+
+
 echo "Finished running power outages"
 echo "Return code: $rc"
