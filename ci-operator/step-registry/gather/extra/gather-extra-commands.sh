@@ -791,6 +791,18 @@ while IFS= read -r line; do
       echo "<testcase name=\"$( xmlescape "${prefix}" )\"></testcase>" >> "${tests}"
       continue
     fi
+    
+    # sometimes infrastrue issue got recovered during cluster reconciling, does not result in a cricital issue, then skip it.
+    if [[ "$prefix" == "Infrastructure - quota exceeded or hit rate limit" ]]; then
+      INSTALL_EXIT_CODE=0
+      INSTALL_STATUS_FILE="${SHARED_DIR}/install-status.txt"
+      [[ -f "${INSTALL_STATUS_FILE}" ]] && INSTALL_EXIT_CODE=$(tail -n1 "${INSTALL_STATUS_FILE}" | awk '{print $1}') || true
+      if [[ "$INSTALL_EXIT_CODE" ==  0 ]]; then
+        echo "<testcase name=\"$( xmlescape "${prefix}" )\"><skipped>install succeed, skipping: $( xmlescape "${out}" )</skipped></testcase>" >> "${tests}"
+        continue
+      fi
+    fi
+
     echo Detected: "${prefix}" 1>&2
 
     failures=$((failures+1))
