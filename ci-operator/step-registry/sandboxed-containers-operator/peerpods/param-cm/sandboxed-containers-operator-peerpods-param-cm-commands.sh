@@ -140,13 +140,14 @@ handle_azure() {
         AZURE_CLIENT_ID="$(jq -r .clientId "${AZURE_AUTH_LOCATION}")"
         AZURE_CLIENT_SECRET="$(jq -r .clientSecret "${AZURE_AUTH_LOCATION}")"
         AZURE_TENANT_ID="$(jq -r .tenantId "${AZURE_AUTH_LOCATION}")"
+		AZURE_SUBSCRIPTION_ID="$(jq -r .data.azure_subscription_id azure_credentials.json|base64 -d)"
     else
         # Useful when testing this script outside of ci-operator
         AZURE_CLIENT_ID="$(jq -r .data.azure_client_id azure_credentials.json|base64 -d)"
         AZURE_CLIENT_SECRET="$(jq -r .data.azure_client_secret azure_credentials.json|base64 -d)"
         AZURE_TENANT_ID="$(jq -r .data.azure_tenant_id azure_credentials.json|base64 -d)"
+		AZURE_SUBSCRIPTION_ID="$(jq -r .data.azure_subscription_id azure_credentials.json|base64 -d)"
     fi
-    AZURE_SUBSCRIPTION_ID="$(jq -r .data.azure_subscription_id azure_credentials.json|base64 -d)"
     rm -f azure_credentials.json
 
     # Wait for OpenShift API to be fully ready
@@ -168,6 +169,21 @@ handle_azure() {
     AZURE_NSG_NAME=$(echo "$CLOUD_CONF" | jq -r '.securityGroupName')
     AZURE_REGION=$(echo "$CLOUD_CONF" | jq -r '.location')
 
+	if [ "${IS_ARO}" == "true" ]; then
+		set -x
+		source "${SHARED_DIR}/peerpods_creds"
+		az login --service-principal --username "${AZURE_CLIENT_ID}" --password "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
+		az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
+		# the aro managed identity is unable to attach main RG vnet, allow it
+		CLUSTER_NAME="$(az aro list --resource-group "$AZURE_RESOURCE_GROUP" --query "[0].name" -o tsv)"
+		SP_CLIENT_ID="$(az aro show --name "$CLUSTER_NAME" --resource-group "$AZURE_RESOURCE_GROUP" --query "servicePrincipalProfile.clientId" -o tsv)"
+		RG_SCOPE_ID="$(az group show --name "$AZURE_RESOURCE_GROUP" --query "id" -o tsv)"
+		az role assignment create --assignee "$SP_CLIENT_ID" --role "Network Contributor" --scope "$RG_SCOPE_ID"
+		az role assignment create --assignee "$SP_CLIENT_ID" --role "Contributor" --scope "$RG_SCOPE_ID"
+		az network nsg create -g "$AZURE_RESOURCE_GROUP" -n "$AZURE_NSG_NAME" -l "$AZURE_REGION" || echo "::warning:: NSG create failed, probably not needed"
+		set +x
+	fi
+
     # Login to Azure for NAT gateway creation
     az login --service-principal --username "${AZURE_CLIENT_ID}" --password "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
     az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
@@ -185,22 +201,25 @@ handle_azure() {
     PP_SUBNET_ID="${AZURE_SUBNET_ID}"
     PP_NSG_ID="${AZURE_NSG_ID}"
 
-    # Peer-pod requires gateway
-    az network public-ip create \
-        --resource-group "${PP_RESOURCE_GROUP}" \
-        --name MyPublicIP \
-        --sku Standard \
-        --allocation-method Static
-    az network nat gateway create \
-        --resource-group "${PP_RESOURCE_GROUP}" \
-        --name MyNatGateway \
-        --public-ip-addresses MyPublicIP \
-        --idle-timeout 10
-    az network vnet subnet update \
-        --resource-group "${PP_RESOURCE_GROUP}" \
-        --vnet-name "${PP_VNET_NAME}" \
-        --name "${PP_SUBNET_NAME}" \
-        --nat-gateway MyNatGateway
+	if [ "${IS_ARO}" != "true" ]; then
+		# Peer-pod requires gateway
+		# which is performed before ARO install on ARO
+		az network public-ip create \
+			--resource-group "${PP_RESOURCE_GROUP}" \
+			--name MyPublicIP \
+			--sku Standard \
+			--allocation-method Static
+		az network nat gateway create \
+			--resource-group "${PP_RESOURCE_GROUP}" \
+			--name MyNatGateway \
+			--public-ip-addresses MyPublicIP \
+			--idle-timeout 10
+		az network vnet subnet update \
+			--resource-group "${PP_RESOURCE_GROUP}" \
+			--vnet-name "${PP_VNET_NAME}" \
+			--name "${PP_SUBNET_NAME}" \
+			--nat-gateway MyNatGateway
+	fi
 
     # Start the downstream-only commands
 
