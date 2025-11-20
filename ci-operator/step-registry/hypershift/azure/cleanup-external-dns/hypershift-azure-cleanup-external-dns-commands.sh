@@ -12,36 +12,38 @@ if [[ -z "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN:-}" ]]; then
   exit 0
 fi
 
-# Try to get external-dns owner ID from the management cluster
-if [[ -f "${SHARED_DIR}/mgmt_kubeconfig" ]]; then
-  export KUBECONFIG="${SHARED_DIR}/mgmt_kubeconfig"
-elif [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
-  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+# For e2e tests, clusters are created and destroyed within the test run
+# We need to extract cluster names from the test artifacts to clean up any orphaned DNS records
+echo "Extracting cluster names from e2e test artifacts..."
+
+CLUSTER_NAMES=""
+E2E_LOG="${ARTIFACT_DIR}/../hypershift-azure-run-e2e/build-log.txt"
+
+if [[ -f "${E2E_LOG}" ]]; then
+  echo "Found e2e test log at: ${E2E_LOG}"
+
+  # Extract cluster names from log entries like:
+  # "Successfully created hostedcluster e2e-clusters-x5fll/ha-etcd-chaos-sz5qv"
+  # The cluster name is the second part after the slash
+  CLUSTER_NAMES=$(grep -oE "Successfully created hostedcluster [^/]+/([a-z0-9-]+)" "${E2E_LOG}" 2>/dev/null | \
+    sed -n 's/.*\/\([a-z0-9-]*\).*/\1/p' | \
+    sort -u || echo "")
+
+  if [[ -n "${CLUSTER_NAMES}" ]]; then
+    echo "Found cluster names from test log:"
+    echo "${CLUSTER_NAMES}"
+  else
+    echo "No cluster names found in test log"
+  fi
+else
+  echo "E2E test log not found at: ${E2E_LOG}"
+  echo "This may be expected for non-e2e test workflows"
 fi
 
-OWNER_ID=""
-if [[ -n "${KUBECONFIG:-}" ]]; then
-  echo "Querying management cluster for external-dns owner ID..."
-  echo "DEBUG: KUBECONFIG=${KUBECONFIG}"
-
-  # Check if the cluster is accessible
-  if ! kubectl get ns hypershift &>/dev/null; then
-    echo "DEBUG: Cannot access hypershift namespace on management cluster"
-  else
-    echo "DEBUG: Successfully accessed hypershift namespace"
-
-    # Get the owner ID from the external-dns deployment
-    # This is the unique identifier that external-dns uses to tag all DNS records it creates
-    OWNER_ID=$(kubectl get deployment -n hypershift external-dns -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="EXTERNAL_DNS_TXT_OWNER_ID")].value}' 2>/dev/null || echo "")
-
-    if [[ -n "${OWNER_ID}" ]]; then
-      echo "Found external-dns owner ID from deployment: ${OWNER_ID}"
-    else
-      echo "DEBUG: Could not find EXTERNAL_DNS_TXT_OWNER_ID env var in deployment"
-      echo "DEBUG: Checking all env vars in external-dns deployment..."
-      kubectl get deployment -n hypershift external-dns -o jsonpath='{.spec.template.spec.containers[0].env[*].name}' 2>/dev/null | tr ' ' '\n' | grep -i owner || echo "DEBUG: No owner-related env vars found"
-    fi
-  fi
+if [[ -z "${CLUSTER_NAMES}" ]]; then
+  echo "No cluster names found to clean up DNS records for"
+  echo "This is normal if tests cleaned up successfully or for non-e2e workflows"
+  exit 0
 fi
 
 # Set the parameters we'll need as env vars
@@ -68,110 +70,38 @@ if ! az network dns zone show --resource-group "${EXTERNAL_DNS_ZONE_RESOURCE_GRO
   exit 0
 fi
 
-# If we don't have an owner ID from the cluster, try to extract it from existing TXT records
-if [[ -z "${OWNER_ID}" ]]; then
-  echo "Attempting to extract owner ID from existing TXT records in the DNS zone..."
+echo "Querying DNS zone for records matching cluster names..."
 
-  # Get a sample TXT record to extract the owner ID
-  echo "DEBUG: Querying TXT records from zone ${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}..."
-  SAMPLE_TXT=$(az network dns record-set txt list \
-    --resource-group "${EXTERNAL_DNS_ZONE_RESOURCE_GROUP}" \
-    --zone-name "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}" \
-    --output json | \
-    jq -r '[.[] | select(.name | endswith("-external-dns"))] | .[0].txtRecords[0].value[0]' 2>/dev/null || echo "")
-
-  echo "DEBUG: Sample TXT record value: ${SAMPLE_TXT}"
-
-  if [[ -n "${SAMPLE_TXT}" ]]; then
-    # Extract owner ID from the TXT record value which looks like:
-    # "heritage=external-dns,external-dns/owner=a0ad2bd1-c681-4f8a-9147-d4a4d8752579,external-dns/resource=..."
-    # Use sed for portability (grep -P may not be available)
-    OWNER_ID=$(echo "${SAMPLE_TXT}" | sed -n 's/.*external-dns\/owner=\([a-f0-9-]*\).*/\1/p' || echo "")
-
-    if [[ -n "${OWNER_ID}" ]]; then
-      echo "Extracted owner ID from DNS records: ${OWNER_ID}"
-    else
-      echo "DEBUG: Failed to extract owner ID from sample TXT: ${SAMPLE_TXT}"
-    fi
-  else
-    echo "DEBUG: No TXT records found in DNS zone with -external-dns suffix"
-  fi
-fi
-
-if [[ -z "${OWNER_ID}" ]]; then
-  echo "ERROR: Could not determine external-dns owner ID"
-  echo "Cannot safely identify which DNS records to clean up"
-  exit 0
-fi
-
-echo "Querying DNS zone for all records owned by external-dns instance: ${OWNER_ID}"
-
-# Get all TXT records that contain this owner ID
-# These TXT records are ownership markers created by external-dns
-OWNERSHIP_RECORDS=$(az network dns record-set txt list \
-  --resource-group "${EXTERNAL_DNS_ZONE_RESOURCE_GROUP}" \
-  --zone-name "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}" \
-  --output json | \
-  jq --arg owner_id "${OWNER_ID}" '
-    [.[] |
-     select(.name | endswith("-external-dns")) |
-     select(.txtRecords[0].value[0] | contains($owner_id)) |
-     .name
-    ]')
-
-OWNERSHIP_COUNT=$(echo "${OWNERSHIP_RECORDS}" | jq 'length')
-echo "Found ${OWNERSHIP_COUNT} TXT ownership record(s) with owner ID ${OWNER_ID}"
-
-if [[ "${OWNERSHIP_COUNT}" -eq 0 ]]; then
-  echo "No DNS records found for this external-dns instance, cleanup complete"
-  exit 0
-fi
-
-echo "Ownership records to be deleted:"
-echo "${OWNERSHIP_RECORDS}" | jq -r '.[]'
-
-# For each ownership TXT record, we need to:
-# 1. Delete the TXT ownership records themselves (e.g., "a-api-cluster-xyz-external-dns" and "api-cluster-xyz-external-dns")
-# 2. Delete the actual DNS record they protect (e.g., "api-cluster-xyz")
-
-# Extract the base record names from ownership records
-# Ownership records follow patterns:
-# - "a-{record-name}-external-dns" (CNAME prefix for A records)
-# - "{record-name}-external-dns" (direct TXT record)
-# - "cname-{record-name}-external-dns" (for CNAME records)
-
-# Build a list of all records to delete (both TXT and actual records)
+# Get all DNS records from the zone
 ALL_RECORDS_JSON=$(az network dns record-set list \
   --resource-group "${EXTERNAL_DNS_ZONE_RESOURCE_GROUP}" \
   --zone-name "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}" \
   --output json)
 
-# Extract all record names that need to be deleted
-RECORDS_TO_DELETE=$(echo "${OWNERSHIP_RECORDS}" | jq -r --argjson all_records "${ALL_RECORDS_JSON}" '
-  # For each ownership record, extract the base name and find matching records
-  [.[] as $owner_rec |
-    # Remove "-external-dns" suffix
-    ($owner_rec | sub("-external-dns$"; "")) as $base_with_prefix |
-    # Remove "a-" or "cname-" prefix if present
-    ($base_with_prefix | sub("^(a|cname)-"; "")) as $base_name |
+# Convert cluster names to a JSON array for jq
+CLUSTER_NAMES_JSON=$(echo "${CLUSTER_NAMES}" | jq -R -s 'split("\n") | map(select(length > 0))')
 
-    # Find all records (TXT and actual) that match this base name
-    $all_records[] |
-    select(
-      (.name == $owner_rec) or                    # The ownership TXT record itself
-      (.name == $base_with_prefix) or             # The prefixed version
-      (.name == $base_name)                        # The actual DNS record
-    ) |
-    select(.type | endswith("/SOA") | not) |      # Never delete SOA records
-    select(.type | endswith("/NS") | not) |       # Never delete NS records
-    {name: .name, type: (.type | split("/")[-1])}
-  ] | unique_by(.name + .type)')
+# Find all DNS records that contain any of the cluster names
+# This includes:
+# - A records: api-{cluster-name}
+# - CNAME records: *.apps-{cluster-name}
+# - TXT records: a-api-{cluster-name}-external-dns, api-{cluster-name}-external-dns, etc.
+RECORDS_TO_DELETE=$(echo "${ALL_RECORDS_JSON}" | jq --argjson cluster_names "${CLUSTER_NAMES_JSON}" '
+  [.[] |
+   select(.type | endswith("/SOA") | not) |
+   select(.type | endswith("/NS") | not) |
+   select(
+     ($cluster_names | length) > 0 and
+     (.name as $name | $cluster_names | any(. as $cluster | $name | contains($cluster)))
+   ) |
+   {name: .name, type: (.type | split("/")[-1])}
+  ]')
 
 RECORD_COUNT=$(echo "${RECORDS_TO_DELETE}" | jq 'length')
-echo "Found ${RECORD_COUNT} total DNS record(s) to delete (including TXT ownership records)"
+echo "Found ${RECORD_COUNT} DNS record(s) to delete"
 
 if [[ "${RECORD_COUNT}" -eq 0 ]]; then
-  echo "No DNS records found to delete, cleanup complete"
+  echo "No DNS records found matching cluster names, cleanup complete"
   exit 0
 fi
 
@@ -207,7 +137,7 @@ echo "$(date -u --rfc-3339=seconds) - DNS cleanup complete"
 echo "Summary: Deleted ${DELETED_COUNT} record(s), Failed ${FAILED_COUNT} record(s)"
 
 if [[ "${FAILED_COUNT}" -gt 0 ]]; then
-  echo "Note: Some failures are expected if external-dns already deleted some records"
+  echo "Note: Some failures are expected if records were already cleaned up by the test framework"
 fi
 
 exit 0
