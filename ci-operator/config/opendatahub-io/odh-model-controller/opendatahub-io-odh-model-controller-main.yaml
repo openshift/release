@@ -79,15 +79,20 @@ tests:
 
           echo "Loading environment variables from params.env"
           #Parse params.env into shell vars with underscores instead of dashes
-          while IFS='=' read -r key value; do
-            case "$key" in
-              ''|\#*) continue ;;
-            esac
-            key="${key%%[[:space:]]*}"
-            value="${value##[[:space:]]}"
-            sane_key="${key//-/_}"
-            printf -v "$sane_key" '%s' "$value"
-          done < config/overlays/odh/params.env
+          awk -F'-' '
+          {
+              if (index($0, "=") > 0) {
+                  gsub(/-/, "_", $1);
+                  print $1 "=" $2;
+              } else {
+                  print $0;
+              }
+            }
+          ' config/overlays/odh/params.env > config/overlays/odh/params.env.new
+
+          set -a
+          source config/overlays/odh/params.env.new
+          set +a
 
           export KSERVE_CONTROLLER_IMAGE="${kserve_controller}"
           export KSERVE_AGENT_IMAGE="${kserve_agent}"
@@ -176,15 +181,20 @@ tests:
 
           echo "Loading environment variables from params.env"
           #Parse params.env into shell vars with underscores instead of dashes
-          while IFS='=' read -r key value; do
-            case "$key" in
-              ''|\#*) continue ;;
-            esac
-            key="${key%%[[:space:]]*}"
-            value="${value##[[:space:]]}"
-            sane_key="${key//-/_}"
-            printf -v "$sane_key" '%s' "$value"
-          done < config/overlays/odh/params.env
+          awk -F'-' '
+          {
+              if (index($0, "=") > 0) {
+                  gsub(/-/, "_", $1);
+                  print $1 "=" $2;
+              } else {
+                  print $0;
+              }
+            }
+          ' config/overlays/odh/params.env > config/overlays/odh/params.env.new
+
+          set -a
+          source config/overlays/odh/params.env.new
+          set +a
 
           export KSERVE_CONTROLLER_IMAGE="${kserve_controller}"
           export KSERVE_AGENT_IMAGE="${kserve_agent}"
