@@ -46,6 +46,7 @@ See detailed documentation below.
 - Uses the `.claude/scripts/migrate_periodic_file.py` script to automate migration
 - Transforms version references (base images, builder tags, registry paths, release names, branch metadata)
 - Regenerates randomized cron schedules to avoid thundering herd
+- Maintains existing interval schedules
 - Creates new periodic configuration files for the target release
 - Validates YAML structure
 - **Automatically runs `make update`** after migration to regenerate all downstream artifacts (Prow jobs, configs, etc.)

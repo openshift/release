@@ -17,7 +17,7 @@ You are helping users identify OpenShift periodic CI job configurations that exi
 
 ## Context
 
-Periodic jobs are CI tests that run on a schedule (via cron) rather than on pull requests. These are defined in files following the pattern: `*-release-{major.minor}__periodics.yaml` in the `ci-operator/config/` directory.
+Periodic jobs are CI tests that run on a schedule (via cron) or after a specified interval since last execution rather than on pull requests. These are defined in files following the pattern: `*-release-{major.minor}__periodics.yaml` in the `ci-operator/config/` directory.
 
 This is a **read-only analysis command** - it doesn't modify any files. Use it before `/migrate-variant-periodics` to understand the scope of work.
 
@@ -146,8 +146,6 @@ All periodic configurations for {from_version} have corresponding {to_version} c
 # Find missing periodics for an organization
 /find-missing-variant-periodics 4.19 4.20 ci-operator/config/openshift
 
-# Check openshift-priv repositories
-/find-missing-variant-periodics 4.17 4.18 ci-operator/config/openshift-priv
 ```
 
 ## Example Output

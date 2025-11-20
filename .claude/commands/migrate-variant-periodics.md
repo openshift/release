@@ -20,7 +20,7 @@ You are helping users migrate OpenShift periodic CI job definitions from one rel
 
 ## Context
 
-Periodic jobs are CI tests that run on a schedule (via cron) rather than on pull requests. These are defined in files following the pattern: `*-release-{major.minor}__periodics.yaml` in the `ci-operator/config/` directory.
+Periodic jobs are CI tests that run on a schedule (via cron) or after a specified interval since last execution rather than on pull requests. These are defined in files following the pattern: `*-release-{major.minor}__periodics.yaml` in the `ci-operator/config/` directory.
 
 ## Your Task
 
@@ -109,7 +109,9 @@ Next steps:
 ## Important Notes
 
 - **CRITICAL - openshift-priv repositories**: NEVER create, copy, or modify ANY files under `ci-operator/config/openshift-priv/` during migration. These are private repositories with special security considerations and must be handled separately by authorized personnel.
+- **Interval schedules**: Preserve existing interval schedules and do not modify the interval or convert to cron schedule
 - **Cron schedules**: Always regenerate randomized cron schedules to distribute load and avoid thundering herd problems
+- **Single schedule**: Only use interval or cron schedules do not use both
 - **Version consistency**: Update ALL version references consistently throughout the file
 - **YAML formatting**: Use Write tool which will handle YAML formatting
 - **Error handling**: Handle file read/write errors gracefully and report them clearly
@@ -146,7 +148,6 @@ releases:
 tests:
 - as: e2e-aws
   cron: "15 3 5 * *"  # Monthly on 5th at 3:15am
-  interval: 24h
 
 zz_generated_metadata:
   branch: release-4.17
@@ -179,7 +180,6 @@ releases:
 tests:
 - as: e2e-aws
   cron: "42 7 12 * *"  # New random: Monthly on 12th at 7:42am
-  interval: 24h
 
 zz_generated_metadata:
   branch: release-4.18

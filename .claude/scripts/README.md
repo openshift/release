@@ -13,6 +13,7 @@ Migrates a periodic configuration file from one OpenShift release version to ano
 **Features**:
 - Transforms version references (base images, builder tags, registry paths, release names, branch metadata)
 - Regenerates randomized cron schedules to avoid thundering herd
+- Maintains existing interval schedules
 - Preserves YAML structure and formatting
 
 **Usage**:
