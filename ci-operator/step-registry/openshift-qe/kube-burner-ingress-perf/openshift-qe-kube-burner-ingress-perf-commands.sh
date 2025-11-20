@@ -89,17 +89,6 @@ ended_pid_rc=$?
 #shellcheck disable=SC2154
 check_pids $ended_pid_rc $ended_pid
 
-WORKLOAD_UUID_FILE=/tmp/$WORKLOAD-uuid.txt
-INGRESS_PERF_UUID_FILE=/tmp/ingress-perf-uuid.txt
-
-if [[ -f $WORKLOAD_UUID_FILE ]]; then
-    cp "$WORKLOAD_UUID_FILE" "${ARTIFACT_DIR}/$WORKLOAD-uuid.txt"
-fi
-
-if [[ -f $INGRESS_PERF_UUID_FILE ]]; then
-    cp "$INGRESS_PERF_UUID_FILE" "${ARTIFACT_DIR}/ingress-perf-uuid.txt"
-fi
-
 echo "######## $WORKLOAD run logs ########"
 cat  "${ARTIFACT_DIR}/$WORKLOAD-run.log"
 echo "################"
