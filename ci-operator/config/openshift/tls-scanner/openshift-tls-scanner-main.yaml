@@ -119,8 +119,19 @@ tests:
             echo "Pod is now running."
             POD_RUNNING=true
             break
-          elif [ "$POD_PHASE" = "Failed" ] || [ "$POD_PHASE" = "Unknown" ]; then
-            echo "ERROR: Pod failed to start properly. Phase: $POD_PHASE"
+          elif [ "$POD_PHASE" = "Failed" ]; then
+            echo "ERROR: Pod failed. Phase: $POD_PHASE"
+            echo "=== Container Logs ==="
+            oc logs "${POD_NAME}" -n "${NAMESPACE}" --all-containers=true || echo "Could not retrieve logs"
+            echo "=== End Container Logs ==="
+            echo "=== Pod Description ==="
+            oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
+            echo "=== Namespace Events ==="
+            oc get events -n "${NAMESPACE}" --sort-by='.metadata.creationTimestamp'
+            kill $MONITOR_PID || true
+            exit 1
+          elif [ "$POD_PHASE" = "Unknown" ]; then
+            echo "ERROR: Pod phase is Unknown"
             oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
             oc get events -n "${NAMESPACE}" --sort-by='.metadata.creationTimestamp'
             kill $MONITOR_PID || true
@@ -132,7 +143,11 @@ tests:
 
         if [ "$POD_RUNNING" = "false" ]; then
           echo "ERROR: Pod did not start running within 10 minutes"
+          echo "=== Final Pod Status ==="
+          oc get pod "${POD_NAME}" -n "${NAMESPACE}" -o yaml
+          echo "=== Pod Description ==="
           oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
+          echo "=== Namespace Events ==="
           oc get events -n "${NAMESPACE}" --sort-by='.metadata.creationTimestamp'
           kill $MONITOR_PID || true
           exit 1
