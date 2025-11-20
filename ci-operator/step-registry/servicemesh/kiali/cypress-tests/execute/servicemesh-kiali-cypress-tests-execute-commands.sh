@@ -46,42 +46,30 @@ else #login for ROSA & Hypershift platforms
   eval "$(cat "${SHARED_DIR}/api.login")"
 fi
 
-if [ "${OSSM_VERSION}" == "2" ]
-then
-  # download istio samples
-  hack/istio/download-istio.sh -iv 1.22.3
-  # install demo apps
-  hack/istio/install-testing-demos.sh -c oc -in ${ISTIO_NAMESPACE}
-elif [ "${OSSM_VERSION}" == "3" ]
-then
-  # remove v from ISTIO version if there is any
-  [[ $ISTIO_SAMPLE_APP_VERSION == v* ]] && ISTIO_SAMPLE_APP_VERSION="${ISTIO_SAMPLE_APP_VERSION#v}" || ISTIO_SAMPLE_APP_VERSION="$ISTIO_SAMPLE_APP_VERSION"
-  hack/istio/download-istio.sh -iv ${ISTIO_SAMPLE_APP_VERSION}
-  # install testing apps
-  hack/istio/install-testing-demos.sh -c oc -in ${ISTIO_NAMESPACE}
-  # wait till all apps are ready
-  for namespace in alpha beta gamma bookinfo sleep
-  do
-    oc wait --for=condition=Ready pods --all -n ${namespace} --timeout 60s || true
-    oc wait --for=condition=Ready pods --all -n ${namespace} --timeout 60s || (oc get pods -n ${namespace}; oc describe pods -n ${namespace}; exit 1)
-  done
-  # enable monitoring in demo apps
-  hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n "alpha beta gamma default bookinfo sleep" -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
-  # install custom grafana
-  oc apply -n ${ISTIO_NAMESPACE} -f https://raw.githubusercontent.com/istio/istio/${ISTIO_SAMPLE_APP_VERSION}/samples/addons/grafana.yaml
-  oc wait -n ${ISTIO_NAMESPACE} --for=condition=available deployment/grafana --timeout=150s
-  # Expose grafana route (for Kiali) (delete route first if exists from previous run)
-  oc delete -n ${ISTIO_NAMESPACE} route grafana || true
-  oc expose -n ${ISTIO_NAMESPACE} service grafana --name=grafana
-  sleep 5s
-  GRAFANA_URL=$(oc get route grafana -o jsonpath='{.spec.host}' -n ${ISTIO_NAMESPACE})
-  oc patch kiali kiali -n ${ISTIO_NAMESPACE} -p "{\"spec\":{\"external_services\":{\"grafana\": {\"internal_url\": \"http://grafana.${ISTIO_NAMESPACE}:3000\"}}}}" --type=merge
-  oc patch kiali kiali -n ${ISTIO_NAMESPACE} -p "{\"spec\":{\"external_services\":{\"grafana\": {\"external_url\": \"http://${GRAFANA_URL}\"}}}}" --type=merge
-  oc patch kiali kiali -n ${ISTIO_NAMESPACE} -p "{\"spec\":{\"external_services\":{\"grafana\": {\"enabled\": true}}}}" --type=merge
-else
-  echo "Unsuported OSSM_VERSION ${OSSM_VERSION}!"
-  exit 1
-fi
+# remove v from ISTIO version if there is any
+[[ $ISTIO_SAMPLE_APP_VERSION == v* ]] && ISTIO_SAMPLE_APP_VERSION="${ISTIO_SAMPLE_APP_VERSION#v}" || ISTIO_SAMPLE_APP_VERSION="$ISTIO_SAMPLE_APP_VERSION"
+hack/istio/download-istio.sh -iv ${ISTIO_SAMPLE_APP_VERSION}
+# install testing apps
+hack/istio/install-testing-demos.sh -c oc -in ${ISTIO_NAMESPACE}
+# wait till all apps are ready
+for namespace in alpha beta gamma bookinfo sleep
+do
+  oc wait --for=condition=Ready pods --all -n ${namespace} --timeout 60s || true
+  oc wait --for=condition=Ready pods --all -n ${namespace} --timeout 60s || (oc get pods -n ${namespace}; oc describe pods -n ${namespace}; exit 1)
+done
+# enable monitoring in demo apps
+hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n "alpha beta gamma default bookinfo sleep" -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
+# install custom grafana
+oc apply -n ${ISTIO_NAMESPACE} -f https://raw.githubusercontent.com/istio/istio/${ISTIO_SAMPLE_APP_VERSION}/samples/addons/grafana.yaml
+oc wait -n ${ISTIO_NAMESPACE} --for=condition=available deployment/grafana --timeout=150s
+# Expose grafana route (for Kiali) (delete route first if exists from previous run)
+oc delete -n ${ISTIO_NAMESPACE} route grafana || true
+oc expose -n ${ISTIO_NAMESPACE} service grafana --name=grafana
+sleep 5s
+GRAFANA_URL=$(oc get route grafana -o jsonpath='{.spec.host}' -n ${ISTIO_NAMESPACE})
+oc patch kiali kiali -n ${ISTIO_NAMESPACE} -p "{\"spec\":{\"external_services\":{\"grafana\": {\"internal_url\": \"http://grafana.${ISTIO_NAMESPACE}:3000\"}}}}" --type=merge
+oc patch kiali kiali -n ${ISTIO_NAMESPACE} -p "{\"spec\":{\"external_services\":{\"grafana\": {\"external_url\": \"http://${GRAFANA_URL}\"}}}}" --type=merge
+oc patch kiali kiali -n ${ISTIO_NAMESPACE} -p "{\"spec\":{\"external_services\":{\"grafana\": {\"enabled\": true}}}}" --type=merge
 
 sleep 120
 oc wait --for condition=Successful kiali/kiali -n ${ISTIO_NAMESPACE} --timeout=250s
@@ -95,11 +83,11 @@ export CYPRESS_AUTH_PROVIDER="kube:admin"
 
 # for flaky tests
 export CYPRESS_RETRIES=2
-export TEST_GROUP="not @crd-validation and not @multi-cluster and not @smoke and not @ambient and not @waypoint and not @waypoint-tracing and not @tracing and not @cytoscape and not @skip-lpinterop"
+export TEST_GROUP="@lpinterop"
 yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
 # save screenshots from the 1st run
 cp -r cypress/screenshots ${ARTIFACT_DIR}/ || true
-export TEST_GROUP="@crd-validation and not @multi-cluster and not @smoke and not @ambient and not @waypoint and not @waypoint-tracing and not @tracing and not @cytoscape and not @skip-lpinterop"
+export TEST_GROUP="@crd-validation and not @multi-cluster and not @smoke and not @ambient and not @waypoint and not @waypoint-tracing and not @tracing and not @cytoscape"
 yarn cypress:run:test-group:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
 
 # merge all reports together
