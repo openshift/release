@@ -1,13 +1,14 @@
 build_root:
   project_image:
     dockerfile_literal: |-
-      FROM registry.redhat.io/ubi9/python-311
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.24
       USER 0
       RUN yum install -y --nodocs --allowerasing jq
       RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
       RUN mv kustomize /usr/local/bin/
       RUN yum clean all && rm -rf /var/cache/yum
       RUN ln -s /cli/oc /usr/bin/kubectl
+      RUN ln -s /usr/bin/python3 /usr/bin/python
 images:
 - context_dir: maas-api/
   dockerfile_path: Dockerfile
@@ -43,9 +44,7 @@ tests:
     - as: e2e-maas-api-openshift
       best_effort: true
       cli: latest
-      commands: |-
-        echo "Running Maas e2e"
-        ./test/e2e/scripts/prow_run_smoke_test.sh
+      commands: ./test/e2e/scripts/prow_run_smoke_test.sh
       from: src
       optional_on_success: true
       resources:
