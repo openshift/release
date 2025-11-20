@@ -7,14 +7,14 @@ set -o pipefail
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="${SHARED_DIR}/install-config-patch.yaml"
 
-if [[ "${CREATE_FIREWALL_RULES}" == "Disabled" ]]; then
+if [[ "${FILEWALL_RULES_MANAGEMENT}" == "Unmanaged" ]]; then
   cat > "${PATCH}" << EOF
 platform:
   gcp:
-    createFirewallRules: ${CREATE_FIREWALL_RULES}
+    firewallRulesManagement: ${FILEWALL_RULES_MANAGEMENT}
 EOF
   yq-go m -x -i "${CONFIG}" "${PATCH}"
-  echo "Updated createFirewallRules in '${CONFIG}'."
+  echo "Updated firewallRulesManagement in '${CONFIG}'."
 fi
 
 IFS=', ' read -r -a array <<< "${NETWORK_TAGS_FOR_COMPUTE_NODES}"
