@@ -22,6 +22,10 @@ if [ -n "${E2E_BENCHMARKING_PR}" ]; then
   echo "Cloning e2e-benchmarking repository and checking out PR #${E2E_BENCHMARKING_PR}"
   git clone $REPO_URL
   pushd e2e-benchmarking
+  # Update GIT Global user settings
+  git config --global user.name "Tu Nombre"
+  git config --global user.email "tu.email@example.com"
+
   git pull origin pull/${E2E_BENCHMARKING_PR}/head:${E2E_BENCHMARKING_PR} --rebase
   git switch ${E2E_BENCHMARKING_PR}
   popd
