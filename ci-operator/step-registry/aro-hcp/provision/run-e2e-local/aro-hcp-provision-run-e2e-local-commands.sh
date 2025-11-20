@@ -21,7 +21,20 @@ export DEPLOY_ENV="prow"
 
 PRINCIPAL_ID=$(az ad sp show --id "${TEST_USER_CLIENT_ID}" --query id -o tsv)
 export PRINCIPAL_ID
-unset GOFLAGS
+unset GOFLAGS 
+BACKEND_DIGEST=$(echo ${BACKEND_IMAGE} | cut -d'@' -f2)
+BACKEND_REPO=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d':' -f1)
+
+  # Set variables similar to your Makefile
+export OVERRIDE_CONFIG_FILE=${OVERRIDE_CONFIG_FILE:-/tmp/backend-override-config-$(date +%s).yaml}
+yq eval -n "
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPO}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.digest = \"${BACKEND_DIGEST}\"
+" > ${OVERRIDE_CONFIG_FILE}
+
+echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
+cat ${OVERRIDE_CONFIG_FILE}
+
 make entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow 
 
 make -C dev-infrastructure/ svc.aks.kubeconfig SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
