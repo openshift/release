@@ -215,11 +215,16 @@ else
     --cluster-cidr 10.136.0.0/14  $(support_np_skew)"
 fi
 
+# Hack to use my own CPO image `quay.io/rhn_engineering_lgao/cpo_image:OCPBUGS-60472`
 
+oc annotate hostedcluster ${CLUSTER_NAME} -n "${CLUSTER_NAMESPACE_PREFIX}" "hypershift.openshift.io/control-plane-operator-image=quay.io/rhn_engineering_lgao/cpo_image:OCPBUGS-60472"
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
+
+# print the hc info to check the cpo image updated
+oc get hostedcluster ${CLUSTER_NAME} -n "${CLUSTER_NAMESPACE_PREFIX}" -o yaml
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
