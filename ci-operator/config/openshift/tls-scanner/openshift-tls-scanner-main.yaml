@@ -121,8 +121,10 @@ tests:
             break
           elif [ "$POD_PHASE" = "Failed" ]; then
             echo "ERROR: Pod failed. Phase: $POD_PHASE"
-            echo "=== Container Logs ==="
-            oc logs "${POD_NAME}" -n "${NAMESPACE}" --all-containers=true || echo "Could not retrieve logs"
+            echo "=== Container Logs (current) ==="
+            oc logs "${POD_NAME}" -n "${NAMESPACE}" --all-containers=true 2>&1 || echo "No current logs available"
+            echo "=== Container Logs (previous/terminated) ==="
+            oc logs "${POD_NAME}" -n "${NAMESPACE}" --all-containers=true --previous 2>&1 || echo "No previous logs available"
             echo "=== End Container Logs ==="
             echo "=== Pod Description ==="
             oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
