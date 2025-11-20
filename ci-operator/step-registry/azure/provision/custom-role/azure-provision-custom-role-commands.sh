@@ -140,7 +140,6 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
     install_config_des_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.osDisk.diskEncryptionSet')
     install_config_des_worker=$(yq-go r ${CONFIG} 'compute[0].platform.azure.osDisk.diskEncryptionSet')
     install_config_security_type_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.settings.securityType')
-    install_config_security_type_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.settings.securityType')
     install_config_security_type_worker=$(yq-go r ${CONFIG} 'compute[0].platform.azure.settings.securityType')
     install_config_des_worker=$(yq-go r ${CONFIG} 'compute[0].platform.azure.osDisk.diskEncryptionSet')
     install_config_identity_type_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.identity.type')
