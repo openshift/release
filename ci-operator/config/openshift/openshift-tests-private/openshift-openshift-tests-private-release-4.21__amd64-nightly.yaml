@@ -15,6 +15,10 @@ base_images:
     name: cluster-api-actuator-pkg-test
     namespace: ci
     tag: "4.20"
+  csi-driver-smb-test:
+    name: "4.21"
+    namespace: ocp
+    tag: csi-driver-smb-test
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -47,6 +51,10 @@ base_images:
     name: rosa-aws-cli
     namespace: ci
     tag: latest
+  smb-csi-driver-operator-test:
+    name: "4.21"
+    namespace: ocp
+    tag: smb-csi-driver-operator-test
   tests-private:
     name: tests-private
     namespace: ci
@@ -110,6 +118,40 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
+- as: aws-efs-operator-e2e-extended
+  cron: 6 18 14 * *
+  steps:
+    cluster_profile: aws-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/pewang/efs-csi-operator:index
+    env:
+      OO_CHANNEL: stable
+      TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
+    workflow: openshift-e2e-aws-csi-efs-fips-sts-extended
+- as: smb-operator-e2e
+  cron: 6 18 14 * *
+  steps:
+    cluster_profile: azure4
+    dependency_overrides:
+      OO_INDEX: quay.io/pewang/csi-operator:samba-index
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+    workflow: openshift-e2e-azure-csi-smb
+- as: smb-operator-e2e-extended
+  cron: 6 18 14 * *
+  steps:
+    cluster_profile: azure4
+    dependency_overrides:
+      OO_INDEX: quay.io/pewang/csi-operator:samba-index
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+    workflow: openshift-e2e-azure-csi-smb-extended
 - as: olmv1-benchmark-test
   capabilities:
   - intranet
@@ -617,14 +659,16 @@ tests:
     dependencies:
       RELEASE_IMAGE_LATEST: release:multi-latest
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.21
+      OO_INDEX: quay.io/pewang/efs-csi-operator:index
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --arch=arm64
+      # EXTRA_ARGS: --arch=arm64
       HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
       HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
+      HYPERSHIFT_HC_RELEASE_IMAGE: registry.build07.ci.openshift.org/ci-ln-mm7xb0b/release:latest
       PUBLIC_ONLY: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EBS-CSI\]|\[AWS-EBS-CSI-Driver-Operator\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&;STORAGE&
       TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe
@@ -637,10 +681,13 @@ tests:
       RELEASE_IMAGE_LATEST: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRA_ARGS: --arch=arm64
+      # EXTRA_ARGS: --arch=arm64
       HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
       HYPERSHIFT_INSTANCE_TYPE: m6g.xlarge
+      HYPERSHIFT_HC_RELEASE_IMAGE: registry.build07.ci.openshift.org/ci-ln-mm7xb0b/release:latest
       PUBLIC_ONLY: "true"
+      TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EBS-CSI\]|\[AWS-EBS-CSI-Driver-Operator\]
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&;STORAGE&
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
@@ -1547,11 +1594,18 @@ tests:
   cron: 40 18 6,13,20,27 * *
   steps:
     cluster_profile: aws-usgov-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/pewang/efs-csi-operator:index
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build07.ci.openshift.org/ci-ln-mm7xb0b/release:latest
       FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;~LSO&;STORAGE&
+      TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EBS-CSI\]|\[AWS-EBS-CSI-Driver-Operator\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
     test:
+    - chain: storage-conf-csi-optional-aws-efs 
     - chain: openshift-e2e-test-qe
+    - ref: storage-destroy-csi-aws-efs
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-with-ep-s3
 - as: aws-usgov-ipi-private-ep-fips-f28-destructive
   cron: 9 17 14 * *
