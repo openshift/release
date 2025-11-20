@@ -139,6 +139,10 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
     install_config_des_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.osDisk.diskEncryptionSet')
     install_config_des_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.osDisk.diskEncryptionSet')
     install_config_des_worker=$(yq-go r ${CONFIG} 'compute[0].platform.azure.osDisk.diskEncryptionSet')
+    install_config_security_type_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.settings.securityType')
+    install_config_security_type_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.settings.securityType')
+    install_config_security_type_worker=$(yq-go r ${CONFIG} 'compute[0].platform.azure.settings.securityType')
+    install_config_des_worker=$(yq-go r ${CONFIG} 'compute[0].platform.azure.osDisk.diskEncryptionSet')
     install_config_identity_type_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.identity.type')
     install_config_user_identity_default=$(yq-go r ${CONFIG} 'platform.azure.defaultMachinePlatform.identity.userAssignedIdentities')
     install_config_identity_type_master=$(yq-go r ${CONFIG} 'controlPlane.platform.azure.identity.type')
@@ -244,6 +248,20 @@ if [[ "${AZURE_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 \"Microsoft.Storage/storageAccounts/delete\",
 \"Microsoft.Storage/storageAccounts/listKeys/action\"
 """
+
+    # optional permissions when using TrustedLaunch or ConfidentialVM security types for workers
+    # These security types require managed images instead of marketplace images (available in 4.21+)
+    if (( ocp_minor_version >= 21 && ocp_major_version == 4 )) ; then
+        if [[ -n "${install_config_security_type_default}" ]] || [[ -n "${install_config_security_type_worker}" ]]; then
+            required_permissions="""
+\"Microsoft.Compute/images/read\",
+\"Microsoft.Compute/images/write\",
+\"Microsoft.Compute/images/delete\",
+${required_permissions}
+"""
+        fi
+    fi
+
 
     # optional permissions for external dns operator
     required_permissions="""
