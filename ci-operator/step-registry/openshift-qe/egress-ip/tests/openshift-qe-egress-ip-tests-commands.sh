@@ -145,7 +145,8 @@ if [[ "$ENABLE_LOAD_TEST" == "true" ]]; then
             log_info "Response: $egress_response"
             
             # Extract egress IP from response and validate
-            local detected_egress_ip=$(echo "$egress_response" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)
+            local detected_egress_ip
+            detected_egress_ip=$(echo "$egress_response" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)
             if [[ -n "$detected_egress_ip" ]]; then
                 log_info "Detected egress IP: $detected_egress_ip"
                 # Save to metrics
