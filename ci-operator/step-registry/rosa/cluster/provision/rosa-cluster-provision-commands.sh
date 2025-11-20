@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -758,11 +759,8 @@ while [ $retry_count -lt $max_retries ]; do
   echo "Attempt $((retry_count + 1)) of $max_retries..."
 
   # Execute command and capture both output and exit code
-  cmd_output=$(eval "${cmd}" 2>&1)
-  exit_code=$?
-
-  # Write output to temp file
-  echo "$cmd_output" > "${CLUSTER_INFO_WITHOUT_MASK}"
+  eval "${cmd}"
+  echo $?
 
   # Check if output contains a retryable error message
   # If you find yourself here in the future for other errors another possible
