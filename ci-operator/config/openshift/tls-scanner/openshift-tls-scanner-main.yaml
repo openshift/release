@@ -41,7 +41,7 @@ tests:
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 4h0m0s
+    timeout: 5h0m0s
     version: "4.16"
   steps:
     test:
@@ -110,6 +110,34 @@ tests:
         oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
         echo "--- End of pod description ---"
 
+        # Wait for pod to actually start running (not just exist)
+        echo "Waiting for pod to start running..."
+        POD_RUNNING=false
+        for i in {1..60}; do  # Wait up to 10 minutes for pod to start
+          POD_PHASE=$(oc get pod "${POD_NAME}" -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+          if [ "$POD_PHASE" = "Running" ]; then
+            echo "Pod is now running."
+            POD_RUNNING=true
+            break
+          elif [ "$POD_PHASE" = "Failed" ] || [ "$POD_PHASE" = "Unknown" ]; then
+            echo "ERROR: Pod failed to start properly. Phase: $POD_PHASE"
+            oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
+            oc get events -n "${NAMESPACE}" --sort-by='.metadata.creationTimestamp'
+            kill $MONITOR_PID || true
+            exit 1
+          fi
+          echo "Pod status: $POD_PHASE. Waiting... ($i/60)"
+          sleep 10
+        done
+
+        if [ "$POD_RUNNING" = "false" ]; then
+          echo "ERROR: Pod did not start running within 10 minutes"
+          oc describe pod "${POD_NAME}" -n "${NAMESPACE}"
+          oc get events -n "${NAMESPACE}" --sort-by='.metadata.creationTimestamp'
+          kill $MONITOR_PID || true
+          exit 1
+        fi
+
         # Start streaming logs immediately in the background.
         # We use a loop to retry 'oc logs' if it fails initially (e.g. container creating)
         echo "--- Start of Scanner Logs ---"
@@ -130,9 +158,9 @@ tests:
         ) &
         LOG_PID=$!
 
-        # Wait for the job to complete with the 3h timeout
-        if ! oc wait --for=condition=complete "job/tls-scanner-job" -n "${NAMESPACE}" --timeout=3h; then
-          echo "Job did not complete in time (3h timeout)."
+        # Wait for the job to complete with the 3h30m timeout (increased from 3h)
+        if ! oc wait --for=condition=complete "job/tls-scanner-job" -n "${NAMESPACE}" --timeout=3h30m; then
+          echo "Job did not complete in time (3h30m timeout)."
           echo "--- End of Scanner Logs (Timeout) ---"
           
           echo "--- Debugging Timeout ---"
@@ -183,7 +211,7 @@ tests:
       - env: PULL_SPEC_TLS_SCANNER_TOOL
         name: tls-scanner-tool
       from: src
-      grace_period: 1m0s
+      grace_period: 5m0s
       resources:
         requests:
           cpu: 100m
