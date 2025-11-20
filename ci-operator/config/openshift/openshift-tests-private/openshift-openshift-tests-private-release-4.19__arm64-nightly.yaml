@@ -539,7 +539,7 @@ tests:
       COMPUTE_NODE_TYPE: t2a-standard-4
       FILTERS_ADDITIONAL: ""
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-19@sha256:ebc2dc91d610fe67e12b7e2cad2365871f89a89816afc27d1c4a469b9ac7490b
+      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-19@sha256:6e1491be9919aec032cb8a8aaf2f91e5a5b53a4bb48554444118d0b2f639f056
       OCP_ARCH: arm64
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
       TEST_PARALLEL: "3"
@@ -563,12 +563,12 @@ tests:
       E2E_RUN_TAGS: '@complianceoperator'
       FILTERS_ADDITIONAL: ""
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-19@sha256:ebc2dc91d610fe67e12b7e2cad2365871f89a89816afc27d1c4a469b9ac7490b
+      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-19@sha256:6e1491be9919aec032cb8a8aaf2f91e5a5b53a4bb48554444118d0b2f639f056
       OCP_ARCH: arm64
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~StressTest&;Disruptive&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
-      TEST_TIMEOUT: "55"
+      TEST_TIMEOUT: "60"
     test:
     - ref: file-integrity-konflux-catalogsource
     - ref: etcd-encryption
@@ -700,6 +700,24 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-ipv6-static
+- as: baremetal-upi-ovn-ipv4-disconnected-ipsec-fips-f28
+  capabilities:
+  - intranet
+  cron: 23 14 1 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      IPSEC_OVN: "true"
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi-install-disconnected
 zz_generated_metadata:
   branch: release-4.19
   org: openshift

@@ -29,7 +29,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.18"
-  skip_if_only_changed: ^docs/|showcase-docs/|^\.changeset/|CONTRIBUTING\.md|OWNERS|README\.md|USAGE_DATA\.md|^scripts/|^\.github/|\.threatmodel/|^ui/|\.md|\\.mdc|\\.toml$
+  skip_if_only_changed: ^docs/|rpms\.lock\.yaml|showcase-docs/|^\.changeset/|CONTRIBUTING\.md|OWNERS|README\.md|USAGE_DATA\.md|^scripts/|^\.github/|\.threatmodel/|^ui/|\.md|\\.mdc|\\.toml$
   steps:
     post:
     - ref: redhat-developer-rhdh-send-data-router
@@ -100,6 +100,30 @@ tests:
   steps:
     env:
       OC_CLIENT_VERSION: stable-4.19
+    post:
+    - ref: redhat-developer-rhdh-send-data-router
+    - ref: redhat-developer-rhdh-send-alert
+    - chain: gather
+    test:
+    - ref: redhat-developer-rhdh-ocp-helm-nightly
+    workflow: generic-claim
+- always_run: false
+  as: e2e-ocp-v4-20-helm-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  cron: 0 6 * * TUE,THU,SAT,SUN
+  optional: true
+  presubmit: true
+  steps:
+    env:
+      OC_CLIENT_VERSION: stable-4.20
     post:
     - ref: redhat-developer-rhdh-send-data-router
     - ref: redhat-developer-rhdh-send-alert
@@ -218,7 +242,6 @@ tests:
     test:
     - ref: redhat-developer-rhdh-osd-gcp-helm-nightly
     workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
-  timeout: 3h40m0s
 - always_run: false
   as: e2e-osd-gcp-operator-nightly
   cron: 30 6 * * TUE,THU,SAT,SUN
@@ -234,7 +257,6 @@ tests:
     test:
     - ref: redhat-developer-rhdh-osd-gcp-helm-nightly
     workflow: redhat-developer-rhdh-osd-gcp-claim-cluster
-  timeout: 3h40m0s
 - always_run: false
   as: e2e-ocp-operator-auth-providers-nightly
   cluster_claim:

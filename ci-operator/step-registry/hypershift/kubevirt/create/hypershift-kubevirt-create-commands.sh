@@ -34,9 +34,9 @@ function support_np_skew() {
   if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && -n "$MCE" ]]; then
     # >= 2.7: "--render-sensitive --render", else: "--render"
     if [[ "$(printf '%s\n' "2.7" "$MCE_VERSION" | sort -V | head -n1)" == "2.7" ]]; then
-      extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
+      EXTRA_FLARGS+="--render-sensitive --render > /tmp/hc.yaml "
     else
-      extra_flags+="--render > /tmp/hc.yaml "
+      EXTRA_FLARGS+="--render > /tmp/hc.yaml "
     fi
     EXTRA_FLARGS+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
     EXTRA_FLARGS+="&& oc apply -f /tmp/hc.yaml"

@@ -1,9 +1,11 @@
 #!/bin/bash
+echo "========== Workdir Setup =========="
 export HOME WORKSPACE
 HOME=/tmp
 WORKSPACE=$(pwd)
 cd /tmp || exit
 
+echo "========== Cluster Authentication =========="
 export OPENSHIFT_PASSWORD
 export OPENSHIFT_API
 export OPENSHIFT_USERNAME
@@ -32,6 +34,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+echo "========== Cluster Service Account and Token Management =========="
 export K8S_CLUSTER_URL K8S_CLUSTER_TOKEN
 K8S_CLUSTER_URL=$(oc whoami --show-server)
 echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
@@ -42,8 +45,22 @@ echo "To debug issues or log in to the cluster manually, use the script: .ibm/pi
 oc create serviceaccount tester-sa-2 -n default
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
 K8S_CLUSTER_TOKEN=$(oc create token tester-sa-2 -n default --duration=4h)
+
+echo "========== Platform Environment Variables =========="
+echo "Setting platform environment variables:"
+export IS_OPENSHIFT="true"
+echo "IS_OPENSHIFT=${IS_OPENSHIFT}"
+export CONTAINER_PLATFORM="ocp"
+echo "CONTAINER_PLATFORM=${CONTAINER_PLATFORM}"
+echo "Getting container platform version"
+CONTAINER_PLATFORM_VERSION=$(oc version --output json 2> /dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
+export CONTAINER_PLATFORM_VERSION
+echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
+
+echo "========== Cluster kubeadmin logout =========="
 oc logout
 
+echo "========== Git Repository Setup & Checkout =========="
 # Prepare to git checkout
 export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
@@ -64,6 +81,7 @@ git checkout "$RELEASE_BRANCH_NAME" || exit
 git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
+echo "========== PR Branch Handling =========="
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     # If executed as PR check of the repository, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
@@ -73,10 +91,12 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     LONG_SHA=$(echo "$GIT_PR_RESPONSE" | jq -r '.head.sha')
     SHORT_SHA=$(git rev-parse --short=8 ${LONG_SHA})
     TAG_NAME="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
-    echo "Tag name: $TAG_NAME"
+    echo "TAG_NAME: $TAG_NAME"
     IMAGE_NAME="${QUAY_REPO}:${TAG_NAME}"
+    echo "IMAGE_NAME: $IMAGE_NAME"
 fi
 
+echo "========== Changeset Analysis =========="
 PR_CHANGESET=$(git diff --name-only $RELEASE_BRANCH_NAME)
 echo "Changeset: $PR_CHANGESET"
 
@@ -92,6 +112,9 @@ for change in $PR_CHANGESET; do
     fi
 done
 
+echo "ONLY_IN_DIRS: $ONLY_IN_DIRS"
+
+echo "========== Image Tag Resolution =========="
 if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     QUAY_REPO="rhdh/rhdh-hub-rhel9"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
@@ -100,6 +123,7 @@ if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     else
         TAG_NAME="next"
     fi
+    echo "TAG_NAME: $TAG_NAME"
 elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         QUAY_REPO="rhdh/rhdh-hub-rhel9"
@@ -144,41 +168,13 @@ else
     done
 fi
 
-export SL_BUILD_SESSION_ID
-
-if [[ "$JOB_NAME" == *sealight* ]]; then
-    # Create a directory for cosign
-    mkdir -p /tmp/cosign-client
-    curl -L -o /tmp/cosign-client/cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64 && chmod +x /tmp/cosign-client/cosign
-    export PATH=/tmp/cosign-client:$PATH
-
-    COMPONENT_CONTAINER_IMAGE="quay.io/${QUAY_REPO}:${TAG_NAME}"
-    cosign download attestation "${COMPONENT_CONTAINER_IMAGE}" > cosign_metadata.json
-    SL_BUILD_SESSION_ID="$(jq -r \
-            '.payload | @base64d | fromjson | .predicate.buildConfig.tasks[] |
-            select(.invocation.environment.labels."konflux-ci/sealights" == "true")
-            | .results[] | select(.name == "sealights-bsid") | .value' \
-            cosign_metadata.json)"
-    echo "SL_BSID: $SL_BUILD_SESSION_ID"
-    SL_CONTAINER_IMAGE="$(jq -r '
-            .payload
-            | @base64d
-            | fromjson
-            | first(
-              .predicate.buildConfig.tasks[]
-              | select(.invocation.parameters.IMAGE? // "" | test("sealights"))
-              | .invocation.parameters.IMAGE
-              )
-          ' cosign_metadata.json)"
-    echo "SL_CONTAINER_IMAGE: $SL_CONTAINER_IMAGE"
-
-    QUAY_REPO=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f1 | sed 's|quay.io/||' | head -n1)
-    TAG_NAME=$(echo $SL_CONTAINER_IMAGE | cut -d ':' -f2 | head -n1)
-fi
-
-echo "############## Current branch ##############"
+echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
+echo "========== Namespace Configuration =========="
+echo "No special NAME_SPACE configuration."
 
+echo "========== Test Execution =========="
+echo "Executing openshift-ci-tests.sh"
 bash ./.ibm/pipelines/openshift-ci-tests.sh

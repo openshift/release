@@ -82,6 +82,10 @@ tests:
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aks-multi-x-ax
   cron: 0 2 * * *
@@ -94,6 +98,10 @@ tests:
       AUTH_THROUGH_CERTS: "true"
       AZURE_MULTI_ARCH: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-ovn
   capabilities:
@@ -163,7 +171,15 @@ tests:
   steps:
     cluster_profile: hypershift
     env:
-      CI_TESTS_RUN: TestExternalOIDCTechPreview
+      CI_TESTS_RUN: TestExternalOIDC
+      OAUTH_EXTERNAL_OIDC_PROVIDER: keycloak
+    workflow: hypershift-aws-e2e-external-oidc
+- as: e2e-aws-external-oidc-techpreview
+  minimum_interval: 12h
+  steps:
+    cluster_profile: hypershift
+    env:
+      CI_TESTS_RUN: TestExternalOIDC
       OAUTH_EXTERNAL_OIDC_PROVIDER: keycloak
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-external-oidc
@@ -218,12 +234,17 @@ tests:
 - as: e2e-kubevirt-aws-ovn-csi
   cron: 0 4 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: hypershift-kubevirt-csi-e2e
 - as: e2e-azure-aks-ovn-conformance
   cron: 0 */2 * * *
   steps:
     cluster_profile: hypershift
+    env:
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
     workflow: hypershift-azure-aks-conformance
 - as: e2e-azure-kubevirt-ovn
   cron: 0 4 * * *
@@ -322,6 +343,7 @@ tests:
   steps:
     cluster_profile: openstack-vexxhost
     env:
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-openstack-nested-conformance
 zz_generated_metadata:

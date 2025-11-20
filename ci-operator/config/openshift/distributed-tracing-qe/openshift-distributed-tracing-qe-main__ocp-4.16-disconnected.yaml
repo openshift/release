@@ -1,0 +1,57 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  tools:
+    name: "4.16"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.16"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-golang-1.23-openshift-4.19
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: distributed-tracing-tests-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: distributed-tracing-tests-disconnected
+  cron: 0 0 30 2 *
+  steps:
+    cluster_profile: gcp-observability
+    env:
+      OPERATORS: |
+        [
+            {"name": "amq-streams", "source": "cs-redhat-operator-index", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
+            {"name": "opentelemetry-product", "source": "cs-otel", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "tempo-product", "source": "cs-tempo", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"}
+        ]
+      SELF_MANAGED_ADDITIONAL_CA: "true"
+      SELF_MANAGED_REGISTRY_CERT: "true"
+    test:
+    - ref: distributed-tracing-install-disconnected
+    - ref: install-operators
+    - ref: distributed-tracing-tests-disconnected
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: distributed-tracing-qe
+  variant: ocp-4.16-disconnected

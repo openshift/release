@@ -40,11 +40,10 @@ fi
 if [[ -z "$BASE_DOMAIN" ]]; then
 	if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
 		BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
-	elif [[ -n "${DEFAULT_BASE_DOMAIN}" ]]; then
-		BASE_DOMAIN="${DEFAULT_BASE_DOMAIN}"
 	fi
 fi
 
+DOMAIN=""
 [[ ! -z "$BASE_DOMAIN" ]] && DOMAIN=${BASE_DOMAIN}
 [[ ! -z "$HYPERSHIFT_BASE_DOMAIN" ]] && DOMAIN=${HYPERSHIFT_BASE_DOMAIN}
 echo "DOMAIN is ${DOMAIN}"

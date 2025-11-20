@@ -3,6 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
+  yamllint:
+    name: yamllint
+    namespace: ci
+    tag: latest
 build_root:
   project_image:
     dockerfile_path: Dockerfile.buildroot
@@ -33,6 +37,11 @@ tests:
   commands: HOME=/tmp make lint
   container:
     from: src
+- as: yaml-lint
+  commands: IS_CONTAINER=TRUE ./hack/yaml-lint.sh
+  container:
+    from: yamllint
+  run_if_changed: \.ya?ml$
 - always_run: false
   as: e2e
   cluster_claim:

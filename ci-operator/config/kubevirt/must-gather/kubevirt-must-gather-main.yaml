@@ -1,37 +1,52 @@
 base_images:
-  base:
-    name: "4.16"
-    namespace: ocp
-    tag: base
   cli:
-    name: "4.16"
+    name: "4.21"
     namespace: ocp
     tag: cli
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+  hco-bundle-reg:
+    name: hyperconverged-cluster-bundle
+    namespace: ci
+    tag: 1.17.0-unstable
+  ocp_4.21_cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
 binary_build_commands: make install
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base
+  inputs:
+    ocp_4.21_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:cli
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: kubevirt-must-gather
 releases:
   initial:
     integration:
-      name: "4.16"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.16"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 500m
+      memory: 1Gi
 test_binary_build_commands: |-
   (
     cd tests
@@ -42,13 +57,20 @@ tests:
 - as: kubevirt-must-gather-e2e-azure
   steps:
     cluster_profile: azure-virtualization
+    dependencies:
+      OO_BUNDLE: hco-bundle-reg
     env:
       BASE_DOMAIN: cnv-devel.azure.devcluster.openshift.com
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_INSTALL_TIMEOUT_MINUTES: "15"
     test:
     - as: deploy
       cli: latest
       commands: |
-        ./automation/deploy_hco.sh
+        # Create the HyperConverged resource
+        curl "https://raw.githubusercontent.com/kubevirt/hyperconverged-cluster-operator/main/deploy/hco.cr.yaml" | oc -n kubevirt-hyperconverged apply -f -
+        # Wait for the HyperConverged CR to be available
+        oc wait -n kubevirt-hyperconverged HyperConverged "kubevirt-hyperconverged" --for=condition=Available --timeout="1080s"
         ./automation/create_workloads.sh
       from: src
       resources:
@@ -109,7 +131,37 @@ tests:
     - as: test-all-images
       cli: latest
       commands: |
-        oc annotate --overwrite -n kubevirt-hyperconverged $(oc get csv -n kubevirt-hyperconverged -l operators.coreos.com/community-kubevirt-hyperconverged.kubevirt-hyperconverged -o name) operators.openshift.io/must-gather-image=${KMG_IMAGE}
+        CSV=$(oc get csv -n kubevirt-hyperconverged -l operators.coreos.com/community-kubevirt-hyperconverged.kubevirt-hyperconverged -o name)
+        ORIG_MG_IMG=$(oc get -n kubevirt-hyperconverged ${CSV} -o json | jq -r '.metadata.annotations["operators.openshift.io/must-gather-image"]')
+        # update the must gather image to the image under test.
+        oc annotate --overwrite -n kubevirt-hyperconverged ${CSV} operators.openshift.io/must-gather-image=${KMG_IMAGE}
+        #
+        # Since we using the "AllNamespaces" installMode, the CSV is created in all the namespaces.
+        # oc adm must-gather --all-images collect the "operators.openshift.io/must-gather-image"
+        # annotations in the cluster, so it gets both the image under test that we just overwrote,
+        # and the original image from other copies of the CSV in other namespaces. the result is
+        # that both the image under test and original image are running in parallel.
+        #
+        # Once we change the annotation of main CSV - the one in the installation namespace, OLM
+        # will update the other copies of the CSV. We must wait until all of them are getting the
+        # update, before running must gather, to make sure only one image of kubevirt must gather
+        # will be run.
+        TIMEOUT_SEC=60
+        for i in $(seq 1 ${TIMEOUT_SEC}); do
+          NUM_CSV_W_ORIG_IMG=$(oc get csv -A -o json | jq '[.items[] | select(.metadata.annotations["operators.openshift.io/must-gather-image"] == "'"${ORIG_MG_IMG}"'") | .metadata.name] | length')
+          if [[ ${NUM_CSV_W_ORIG_IMG} == 0 ]]; then
+            echo "all CSVs are updated with the new image"
+            break
+          fi
+          if [[ $i == ${TIMEOUT_SEC} ]]; then
+            echo "timeout waiting for the CSVs to get the new must-gather image"
+            break
+          else
+            echo "Not all the CSVs were updated with the new image; trying again ($i/${TIMEOUT_SEC})"
+            sleep 1
+          fi
+        done
+        # now we can safely run must gather
         oc adm must-gather --all-images --dest-dir=${ARTIFACT_DIR}/must-gather-output
         mkdir -p ${ARTIFACT_DIR}/junit
         (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:product --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v --ginkgo.skip "should validate inspect and node-logs parameters usage on all the relevant logged commands" )
@@ -120,17 +172,24 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-azure
+    workflow: optional-operators-ci-operator-sdk-azure
 - as: kubevirt-must-gather-e2e-gcp
   steps:
     cluster_profile: gcp-virtualization
+    dependencies:
+      OO_BUNDLE: hco-bundle-reg
     env:
       COMPUTE_NODE_TYPE: n2-standard-4
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_INSTALL_TIMEOUT_MINUTES: "15"
     test:
     - as: deploy
       cli: latest
       commands: |
-        ./automation/deploy_hco.sh
+        # Create the HyperConverged resource
+        curl "https://raw.githubusercontent.com/kubevirt/hyperconverged-cluster-operator/main/deploy/hco.cr.yaml" | oc -n kubevirt-hyperconverged apply -f -
+        # Wait for the HyperConverged CR to be available
+        oc wait -n kubevirt-hyperconverged HyperConverged "kubevirt-hyperconverged" --for=condition=Available --timeout="1080s"
         ./automation/create_workloads.sh
       from: src
       resources:
@@ -191,7 +250,37 @@ tests:
     - as: test-all-images
       cli: latest
       commands: |
-        oc annotate --overwrite -n kubevirt-hyperconverged $(oc get csv -n kubevirt-hyperconverged -l operators.coreos.com/community-kubevirt-hyperconverged.kubevirt-hyperconverged -o name) operators.openshift.io/must-gather-image=${KMG_IMAGE}
+        CSV=$(oc get csv -n kubevirt-hyperconverged -l operators.coreos.com/community-kubevirt-hyperconverged.kubevirt-hyperconverged -o name)
+        ORIG_MG_IMG=$(oc get -n kubevirt-hyperconverged ${CSV} -o json | jq -r '.metadata.annotations["operators.openshift.io/must-gather-image"]')
+        # update the must gather image to the image under test.
+        oc annotate --overwrite -n kubevirt-hyperconverged ${CSV} operators.openshift.io/must-gather-image=${KMG_IMAGE}
+        #
+        # Since we using the "AllNamespaces" installMode, the CSV is created in all the namespaces.
+        # oc adm must-gather --all-images collect the "operators.openshift.io/must-gather-image"
+        # annotations in the cluster, so it gets both the image under test that we just overwrote,
+        # and the original image from other copies of the CSV in other namespaces. the result is
+        # that both the image under test and original image are running in parallel.
+        #
+        # Once we change the annotation of main CSV - the one in the installation namespace, OLM
+        # will update the other copies of the CSV. We must wait until all of them are getting the
+        # update, before running must gather, to make sure only one image of kubevirt must gather
+        # will be run.
+        TIMEOUT_SEC=60
+        for i in $(seq 1 ${TIMEOUT_SEC}); do
+          NUM_CSV_W_ORIG_IMG=$(oc get csv -A -o json | jq '[.items[] | select(.metadata.annotations["operators.openshift.io/must-gather-image"] == "'"${ORIG_MG_IMG}"'") | .metadata.name] | length')
+          if [[ ${NUM_CSV_W_ORIG_IMG} == 0 ]]; then
+            echo "all CSVs are updated with the new image"
+            break
+          fi
+          if [[ $i == ${TIMEOUT_SEC} ]]; then
+            echo "timeout waiting for the CSVs to get the new must-gather image"
+            break
+          else
+            echo "Not all the CSVs were updated with the new image; trying again ($i/${TIMEOUT_SEC})"
+            sleep 1
+          fi
+        done
+        # now we can safely run must gather
         oc adm must-gather --all-images --dest-dir=${ARTIFACT_DIR}/must-gather-output
         mkdir -p ${ARTIFACT_DIR}/junit
         (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:product --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v --ginkgo.skip "should validate inspect and node-logs parameters usage on all the relevant logged commands" )
@@ -202,7 +291,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: optional-operators-ci-operator-sdk-gcp
 zz_generated_metadata:
   branch: main
   org: kubevirt

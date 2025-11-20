@@ -96,17 +96,6 @@ INGRESS_PERF_UUID=$(grep 'uuid"' "${ARTIFACT_DIR}/ingress-perf-run.log" | cut -d
 echo "===> $WORKLOAD UUID $NODE_DENSITY_HEAVY_UUID"
 echo "===> ingress-perf UUID $INGRESS_PERF_UUID"
 
-if [[ -d "/tmp/$NODE_DENSITY_HEAVY_UUID" &&  -f "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json" ]]; then
-    jq ".iterations = $PODS_PER_NODE"  >> "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json"
-    cp "/tmp/$NODE_DENSITY_HEAVY_UUID"/index_data.json "${ARTIFACT_DIR}/${WORKLOAD}-index_data.json"
-    cp "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json" "${SHARED_DIR}/${WORKLOAD}-index_data.json"
-fi
-
-if [[ -d "/tmp/$INGRESS_PERF_UUID" && -f "/tmp/$INGRESS_PERF_UUID/index_data.json" ]]; then
-    cp "/tmp/$INGRESS_PERF_UUID/index_data.json" "${ARTIFACT_DIR}/ingress-perf-index_data.json"
-    cp "/tmp/$INGRESS_PERF_UUID/index_data.json" "${SHARED_DIR}/ingress-perf-index_data.json"
-fi
-
 echo "######## $WORKLOAD run logs ########"
 cat  "${ARTIFACT_DIR}/$WORKLOAD-run.log"
 echo "################"

@@ -68,7 +68,6 @@ fi
 
 export EXTRA_FLAGS
 
-rm -f ${SHARED_DIR}/index.json
 
 RANDOM_WORKER_NODE=$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | shuf -n1)
 
@@ -97,9 +96,6 @@ echo "Workload finished. Stopping gather loop (PID $GATHER_LOOP_PID)..."
 kill "$GATHER_LOOP_PID" 2>/dev/null || true
 wait "$GATHER_LOOP_PID" 2>/dev/null || true
 echo "Gather loop stopped."
-
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)

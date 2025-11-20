@@ -520,7 +520,7 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.21" ]] || [[ "$T5CI_VERSION" == "4.20" ]] ; then
+if [[ "$T5CI_VERSION" == "4.21" ]]; then
     export CNF_BRANCH="master"
     export CNF_TESTS_IMAGE="cnf-tests:4.20"
 else
