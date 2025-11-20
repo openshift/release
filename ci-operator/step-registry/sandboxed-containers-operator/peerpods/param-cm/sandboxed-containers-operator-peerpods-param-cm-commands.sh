@@ -99,6 +99,7 @@ create_ssh_key() {
 }
 
 handle_azure() {
+    local IS_ARO
     local AZURE_RESOURCE_GROUP
     local AZURE_AUTH_LOCATION
     local AZURE_CLIENT_SECRET
@@ -120,6 +121,7 @@ handle_azure() {
     local PP_NSG_ID
     local PP_NSG_NAME
 
+    IS_ARO=$(oc get crd clusters.aro.openshift.io &>/dev/null && echo true || echo false)
     # Note: Keep the following commands in sync with https://raw.githubusercontent.com/kata-containers/kata-containers/refs/heads/main/ci/openshift-ci/peer-pods-azure.sh
     # as much as possible.
 
@@ -149,7 +151,10 @@ handle_azure() {
 
     # Wait for OpenShift API to be fully ready
     echo "Waiting for OpenShift infrastructure to be ready..."
-    #oc wait --for=condition=Available --timeout=600s infrastructure/cluster
+    if [ "${IS_ARO}" != "true" ]; then
+        # Do not wait on ARO, it doesn't report the status
+        oc wait --for=condition=Available --timeout=600s infrastructure/cluster
+    fi
 
     # Get network configuration from OpenShift's cloud-conf ConfigMap (authoritative source)
     # This handles cases where vnetResourceGroup differs from the cluster resource group
