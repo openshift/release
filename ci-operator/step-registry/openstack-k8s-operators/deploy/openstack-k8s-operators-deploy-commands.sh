@@ -7,9 +7,6 @@ OPENSTACK_OPERATOR="openstack-operator"
 OPENSTACK_OPERATOR_TAG=${OPENSTACK_OPERATOR_TAG:="latest"}
 BASE_DIR=${HOME:-"/alabama"}
 NS_SERVICES=${NS_SERVICES:-"openstack"}
-export CEPH_HOSTNETWORK=${CEPH_HOSTNETWORK:-"true"}
-export CEPH_DATASIZE=${CEPH_DATASIZE:="8Gi"}
-export CEPH_TIMEOUT=${CEPH_TIMEOUT:="90"}
 
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE
@@ -64,7 +61,8 @@ fi
 
 if [ ! -d "${BASE_DIR}/install_yamls" ]; then
   cd ${BASE_DIR}
-  git clone https://github.com/openstack-k8s-operators/install_yamls.git -b ${REF_BRANCH}
+  # hack to test patch: https://github.com/openstack-k8s-operators/install_yamls/pull/1114
+  git clone https://github.com/fmount/install_yamls.git -b tentacle
 fi
 
 cd ${BASE_DIR}/install_yamls
