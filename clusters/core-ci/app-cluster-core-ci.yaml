@@ -1,21 +1,21 @@
 kind: Namespace
 apiVersion: v1
 metadata:
-  name: clusters
+  name: dptp-clusters
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
-  name: cluster-core-ci
+  name: project-core-ci
   namespace: openshift-gitops
 spec:
   destinations:
-  - name: in-cluster
+  - name: cluster-core-ci
     namespace: '*'
   sourceRepos:
   - 'https://github.com/openshift/release'
   sourceNamespaces:
-  - clusters
+  - dptp-clusters
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
@@ -23,18 +23,18 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cluster-core-ci
-  namespace: clusters
+  name: app-core-ci
+  namespace: dptp-clusters
 spec:
   destination:
-    name: in-cluster
-    namespace: clusters
+    name: cluster-core-ci
+    namespace: dptp-clusters
   source:
     path: clusters/core-ci/manifests
     repoURL: 'https://github.com/openshift/release'
-    targetRevision: core-ci
+    targetRevision: master
   sources: []
-  project: cluster-core-ci
+  project: project-core-ci
   syncPolicy:
     automated:
       prune: true
