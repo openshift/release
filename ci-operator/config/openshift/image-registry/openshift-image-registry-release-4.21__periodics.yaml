@@ -11,6 +11,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.21
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -96,6 +100,45 @@ tests:
       TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
       TEST_SUITE: openshift/test-image-stream-import-mode
     workflow: baremetalds-e2e
+  timeout: 4h0m0s
+- as: e2e-vsphere-image-stream-import-mode-techpreview
+  interval: 24h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SUITE: openshift/test-image-stream-import-mode
+    workflow: openshift-e2e-vsphere
+  timeout: 4h0m0s
+- as: e2e-metal-ovn-ipv6-image-stream-import-mode-techpreview
+  cluster: build05
+  interval: 24h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SUITE: openshift/test-image-stream-import-mode
+    workflow: baremetalds-e2e
+  timeout: 4h0m0s
+- as: e2e-metal-ovn-dualstack-image-stream-import-mode-techpreview
+  cluster: build05
+  interval: 24h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=legacy-cvo-invariants,legacy-test-framework-invariants
+      TEST_SUITE: openshift/test-image-stream-import-mode
+    workflow: baremetalds-e2e
+  timeout: 4h0m0s
 zz_generated_metadata:
   branch: release-4.21
   org: openshift
