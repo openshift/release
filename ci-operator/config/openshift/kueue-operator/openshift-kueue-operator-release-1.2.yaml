@@ -38,6 +38,7 @@ images:
   dockerfile_literal: |
     FROM src
     RUN dnf install -y skopeo git && dnf clean all
+    RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
   from: src
   to: kueue-operator-src
 - dockerfile_literal: |
@@ -67,8 +68,8 @@ releases:
 resources:
   '*':
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: "4"
+      memory: 10Gi
 tests:
 - as: test
   commands: make test
@@ -198,7 +199,6 @@ tests:
     test:
     - chain: kueue-operator-test-perfscale
     workflow: openshift-qe-installer-aws
-  timeout: 3h30m0s
 - as: test-e2e-disconnected
   capabilities:
   - arm64

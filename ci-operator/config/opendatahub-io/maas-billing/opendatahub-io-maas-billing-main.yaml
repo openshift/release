@@ -1,8 +1,14 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.20
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.24
+      USER 0
+      RUN yum install -y --nodocs --allowerasing jq
+      RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+      RUN mv kustomize /usr/local/bin/
+      RUN yum clean all && rm -rf /var/cache/yum
+      RUN ln -s /cli/oc /usr/bin/kubectl
+      RUN ln -s /usr/bin/python3 /usr/bin/python
 images:
 - context_dir: maas-api/
   dockerfile_path: Dockerfile
@@ -12,15 +18,11 @@ promotion:
   - namespace: opendatahub-io
     tag: latest
 releases:
-  initial:
-    integration:
-      name: "4.21"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.21"
-      namespace: ocp
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -29,6 +31,27 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- always_run: false
+  as: e2e-test-maas-api
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "1"
+    post:
+    - as: e2e-maas-api-openshift
+      best_effort: true
+      cli: latest
+      commands: ./test/e2e/scripts/prow_run_smoke_test.sh
+      from: src
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    workflow: hypershift-hostedcluster-workflow
 - always_run: false
   as: pr-image-mirror-maas-api
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/

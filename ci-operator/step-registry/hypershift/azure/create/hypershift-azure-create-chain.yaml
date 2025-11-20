@@ -129,6 +129,12 @@ chain:
     - name: ADDITIONAL_CA_BUNDLE_FILE
       default: ""
       documentation: "The additional ca bundle file name in the shared directory"
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_ENABLED
+      default: "true"
+      documentation: "Enable marketplace flags"
+    - name: HYPERSHIFT_AZURE_IMAGE_GENERATION
+      default: ""
+      documentation: "image generation value"  
     commands: |-
       set -exuo pipefail
 
@@ -226,6 +232,10 @@ chain:
         COMMAND+=( --oidc-issuer-url $AZURE_OIDC_ISSUER_URL)
       fi
       
+      if [[ $HYPERSHIFT_AZURE_IMAGE_GENERATION != "" ]]; then
+        COMMAND+=(  --image-generation $HYPERSHIFT_AZURE_IMAGE_GENERATION)
+      fi
+
       if [[ $AZURE_SA_TOKEN_ISSUER_KEY_PATH != "" ]]; then
         COMMAND+=( --sa-token-issuer-private-key-path $AZURE_SA_TOKEN_ISSUER_KEY_PATH)
       fi
@@ -251,21 +261,22 @@ chain:
       if [[ -n $HYPERSHIFT_OLM_CATALOG_PLACEMENT ]]; then
         EXTRA_ARGS+=" --olm-catalog-placement=${HYPERSHIFT_OLM_CATALOG_PLACEMENT}"
       fi
-      
-      if [[ -n $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER ]]; then
-        EXTRA_ARGS+=" --marketplace-offer=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER}"
-        EXTRA_ARGS+=" --marketplace-publisher=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER}"
+      if [[ $HYPERSHIFT_AZURE_MARKETPLACE_ENABLED == "true" ]];then 
+        if [[ -n $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER ]]; then
+          EXTRA_ARGS+=" --marketplace-offer=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER}"
+          EXTRA_ARGS+=" --marketplace-publisher=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER}"
 
-        if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU ]]; then
-          EXTRA_ARGS+=" --marketplace-sku=$(cat "${SHARED_DIR}/azure-marketplace-image-sku")"
-        else
-          EXTRA_ARGS+=" --marketplace-sku=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU}"
-        fi
+          if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU ]]; then
+            EXTRA_ARGS+=" --marketplace-sku=$(cat "${SHARED_DIR}/azure-marketplace-image-sku")"
+          else
+            EXTRA_ARGS+=" --marketplace-sku=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU}"
+          fi
         
-        if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION ]]; then
-          EXTRA_ARGS+=" --marketplace-version=$(cat "${SHARED_DIR}/azure-marketplace-image-version")"
-        else
-          EXTRA_ARGS+=" --marketplace-version=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
+          if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION ]]; then
+            EXTRA_ARGS+=" --marketplace-version=$(cat "${SHARED_DIR}/azure-marketplace-image-version")"
+          else
+            EXTRA_ARGS+=" --marketplace-version=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
+          fi
         fi
       fi
       
