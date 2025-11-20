@@ -63,6 +63,42 @@ tests:
     - ref: quay-tests-resource-provisioning-storage-odf
     - ref: quay-tests-test-quay-operator
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay314-ocp419-operator-test-singlens
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "8"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.19
+      POSTGRESQL_VERSION: "17.6"
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-19@sha256:fc0c23e4a59da922bff03b66065ac00b82de34345f52dcd0ed2bb8e027f6494f
+      QUAY_OPERATOR_CHANNEL: stable-3.14
+      QUAY_OPERATOR_TESTCASE: Quay-High|Quay-Medium
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-resource-provisioning-aws-unmanaged-component
+    - ref: quay-tests-test-quay-operator
+    workflow: quay-tests-cucushift-installer-rehearse-aws-ipi-operator
+- as: quay314-ocp419-operator-test-allns
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "8"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.19
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-19@sha256:fc0c23e4a59da922bff03b66065ac00b82de34345f52dcd0ed2bb8e027f6494f
+      QUAY_OPERATOR_CHANNEL: stable-3.14
+      QUAY_OPERATOR_TESTCASE: Quay-Allns-High|Quay-Allns-Medium
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-test-quay-operator
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay
