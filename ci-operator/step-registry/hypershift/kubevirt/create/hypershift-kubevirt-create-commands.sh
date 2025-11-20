@@ -191,7 +191,7 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
     --release-image "${RELEASE_IMAGE}" \
     --pull-secret "${PULL_SECRET_PATH}" \
     --generate-ssh \
-    --control-plane-operator-image=quay.io/mgencur/cpo:RFE-8071 \
+    --annotations=hypershift.openshift.io/control-plane-operator-image=quay.io/mgencur/cpo:RFE-8071 \
     --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
     --infra-availability-policy "${INFRA_AVAILABILITY}" \
     --service-cidr 172.32.0.0/16 \
