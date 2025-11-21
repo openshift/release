@@ -58,13 +58,13 @@ _output/kiali/hack/istio/download-istio.sh -iv ${ISTIO_SAMPLE_APP_VERSION}
 # install testing apps
 _output/kiali/hack/istio/install-testing-demos.sh -c oc -in ${ISTIO_NAMESPACE}
 # wait till all apps are ready
-for namespace in alpha beta gamma bookinfo sleep
+for namespace in alpha beta bookinfo sleep
 do
   oc wait --for=condition=Ready pods --all -n ${namespace} --timeout 60s || true
   oc wait --for=condition=Ready pods --all -n ${namespace} --timeout 60s || (oc get pods -n ${namespace}; oc describe pods -n ${namespace}; exit 1)
 done
 # enable monitoring in demo apps
-_output/kiali/hack//use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n "alpha beta gamma default bookinfo sleep" -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
+_output/kiali/hack//use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n "alpha beta default bookinfo sleep" -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
 # install custom grafana
 oc apply -n ${ISTIO_NAMESPACE} -f https://raw.githubusercontent.com/istio/istio/${ISTIO_SAMPLE_APP_VERSION}/samples/addons/grafana.yaml
 oc wait -n ${ISTIO_NAMESPACE} --for=condition=available deployment/grafana --timeout=150s
