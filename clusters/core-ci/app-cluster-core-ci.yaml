@@ -1,7 +1,7 @@
 kind: Namespace
 apiVersion: v1
 metadata:
-  name: dptp-clusters
+  name: openshift-gitops
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
@@ -10,12 +10,12 @@ metadata:
   namespace: openshift-gitops
 spec:
   destinations:
-  - name: cluster-core-ci
-    namespace: '*'
+  - namespace: '*'
+    server: https://kubernetes.default.svc
   sourceRepos:
   - 'https://github.com/openshift/release'
   sourceNamespaces:
-  - dptp-clusters
+  - openshift-gitops
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
@@ -24,11 +24,11 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: app-core-ci
-  namespace: dptp-clusters
+  namespace: openshift-gitops
 spec:
   destination:
-    name: cluster-core-ci
-    namespace: dptp-clusters
+    namespace: openshift-gitops
+    server: https://kubernetes.default.svc
   source:
     path: clusters/core-ci/manifests
     repoURL: 'https://github.com/openshift/release'
