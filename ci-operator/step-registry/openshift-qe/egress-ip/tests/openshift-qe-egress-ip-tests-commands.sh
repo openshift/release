@@ -111,11 +111,25 @@ if [[ "$ENABLE_LOAD_TEST" == "true" ]]; then
         fi
     fi
     
-    # Method 5: Use httpbin.org as fallback for basic connectivity testing
+    # Method 5: Use multiple fallback services to avoid rate limiting
     if [[ -z "$IPECHO_SERVICE_URL" ]]; then
-        log_warning "No ipecho service found, using httpbin.org for basic connectivity testing"
-        IPECHO_SERVICE_URL="http://httpbin.org/ip"
-        log_info "Using httpbin.org/ip for egress IP detection (fallback mode)"
+        log_warning "No ipecho service found, using external services for basic connectivity testing"
+        # Try multiple services to avoid rate limiting
+        FALLBACK_SERVICES=("http://ifconfig.me" "http://icanhazip.com" "http://ipecho.net/plain" "http://httpbin.org/ip")
+        
+        for service in "${FALLBACK_SERVICES[@]}"; do
+            log_info "Testing connectivity to $service..."
+            if timeout 10 curl -s --connect-timeout 5 "$service" >/dev/null 2>&1; then
+                IPECHO_SERVICE_URL="$service"
+                log_success "Using $service for egress IP detection"
+                break
+            fi
+        done
+        
+        if [[ -z "$IPECHO_SERVICE_URL" ]]; then
+            IPECHO_SERVICE_URL="http://httpbin.org/ip"
+            log_info "Using httpbin.org/ip as final fallback"
+        fi
     fi
     
     if [[ -z "$IPECHO_SERVICE_URL" ]]; then
@@ -134,6 +148,9 @@ if [[ "$ENABLE_LOAD_TEST" == "true" ]]; then
         
         log_info "Testing connectivity from $pod ($team team) in $namespace - iteration $iteration"
         
+        # Debug: Check pod labels
+        log_info "Pod labels: $(oc get pod -n "$namespace" "$pod" --show-labels 2>/dev/null | grep -o 'team=[^,]*' || echo 'no team label')"
+        
         # Test curl to discovered service
         local curl_exit_code=0
         local egress_response=""
@@ -144,13 +161,41 @@ if [[ "$ENABLE_LOAD_TEST" == "true" ]]; then
             log_success "✓ Connectivity SUCCESS from $pod ($team team)"
             log_info "Response: $egress_response"
             
-            # Extract egress IP from response and validate
+            # Extract egress IP from response and validate (handle different response formats)
             local detected_egress_ip
-            detected_egress_ip=$(echo "$egress_response" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)
+            if [[ "$egress_response" == *"503 Service Temporarily Unavailable"* || "$egress_response" == *"<html>"* ]]; then
+                log_warning "Service temporarily unavailable, retrying in 10 seconds..."
+                sleep 10
+                egress_response=$(timeout 30 oc exec -n "$namespace" "$pod" -- curl -s --connect-timeout 10 --max-time 20 "$IPECHO_SERVICE_URL" 2>/dev/null) || curl_exit_code=$?
+            fi
+            
+            # Extract IP from various response formats
+            if [[ "$IPECHO_SERVICE_URL" == *"httpbin.org"* ]]; then
+                detected_egress_ip=$(echo "$egress_response" | grep -oE '"origin":\s*"([0-9]{1,3}\.){3}[0-9]{1,3}"' | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}')
+            else
+                detected_egress_ip=$(echo "$egress_response" | grep -oE '([0-9]{1,3}\.){3}[0-9]{1,3}' | head -1)
+            fi
             if [[ -n "$detected_egress_ip" ]]; then
                 log_info "Detected egress IP: $detected_egress_ip"
+                
+                # Validate egress IP matches team expectation
+                local expected_result="success"
+                if [[ "$team" == "blue" ]]; then
+                    BLUE_EGRESS_IP=$(oc get egressip egressip-blue -o jsonpath='{.spec.egressIPs[0]}' 2>/dev/null || echo "")
+                    if [[ -n "$BLUE_EGRESS_IP" && "$detected_egress_ip" != "$BLUE_EGRESS_IP" ]]; then
+                        log_warning "Blue team pod using unexpected egress IP: $detected_egress_ip (expected: $BLUE_EGRESS_IP)"
+                        expected_result="unexpected_ip"
+                    fi
+                elif [[ "$team" == "red" ]]; then
+                    RED_EGRESS_IP=$(oc get egressip egressip-red -o jsonpath='{.spec.egressIPs[0]}' 2>/dev/null || echo "")
+                    if [[ -n "$RED_EGRESS_IP" && "$detected_egress_ip" != "$RED_EGRESS_IP" ]]; then
+                        log_warning "Red team pod using unexpected egress IP: $detected_egress_ip (expected: $RED_EGRESS_IP)"
+                        expected_result="unexpected_ip"
+                    fi
+                fi
+                
                 # Save to metrics
-                echo "$namespace,$pod,$team,$iteration,success,$detected_egress_ip" >> "$ARTIFACT_DIR/load_test_metrics.csv"
+                echo "$namespace,$pod,$team,$iteration,$expected_result,$detected_egress_ip" >> "$ARTIFACT_DIR/load_test_metrics.csv"
             else
                 log_warning "Could not extract egress IP from response"
                 echo "$namespace,$pod,$team,$iteration,success,unknown" >> "$ARTIFACT_DIR/load_test_metrics.csv"
@@ -178,6 +223,17 @@ if [[ "$ENABLE_LOAD_TEST" == "true" ]]; then
     
     # Only proceed with load testing if we have a valid service
     if [[ -n "$IPECHO_SERVICE_URL" ]]; then
+        # Debug: Check egress IP configurations
+        log_info "Debugging egress IP configurations..."
+        log_info "Current egress IPs in cluster:"
+        oc get egressip -o wide || true
+        
+        log_info "Checking blue team egress IP status:"
+        oc get egressip egressip-blue -o yaml 2>/dev/null | grep -E "(name|egressIPs|node|ready)" || log_warning "Blue team egress IP not found"
+        
+        log_info "Checking red team egress IP status:"
+        oc get egressip egressip-red -o yaml 2>/dev/null | grep -E "(name|egressIPs|node|ready)" || log_warning "Red team egress IP not found"
+        
         # Create CSV header
         echo "namespace,pod,team,iteration,status,egress_ip" > "$ARTIFACT_DIR/load_test_metrics.csv"
         
@@ -209,7 +265,7 @@ if [[ "$ENABLE_LOAD_TEST" == "true" ]]; then
             for pod in "${pods[@]}"; do
                 if [[ -n "$pod" && "$pod" != "<none>" ]]; then
                     test_pod_connectivity "$namespace" "$pod" "blue" "$iter"
-                    sleep 2
+                    sleep 5  # Increased sleep to avoid rate limiting
                 fi
             done
         done
@@ -235,7 +291,7 @@ if [[ "$ENABLE_LOAD_TEST" == "true" ]]; then
             for pod in "${pods[@]}"; do
                 if [[ -n "$pod" && "$pod" != "<none>" ]]; then
                     test_pod_connectivity "$namespace" "$pod" "red" "$iter"
-                    sleep 2
+                    sleep 5  # Increased sleep to avoid rate limiting
                 fi
             done
         done
