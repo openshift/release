@@ -50,4 +50,4 @@ EOF
 done
 
 echo "Waiting for 180s to ensure DNS records can be resolved ..."
-sleep 180
+sleep 1800
