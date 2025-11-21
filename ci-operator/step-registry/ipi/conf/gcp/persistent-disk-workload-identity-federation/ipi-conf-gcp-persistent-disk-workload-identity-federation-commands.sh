@@ -22,6 +22,25 @@ function run_command() {
 	eval "${CMD}"
 }
 
+function backoff() {
+	local attempt=0
+	local failed=0
+	echo "INFO: Running Command '$*'"
+	while true; do
+		eval "$*" && failed=0 || failed=1
+		if [[ $failed -eq 0 ]]; then
+			break
+		fi
+		attempt=$(( attempt + 1 ))
+		if [[ $attempt -gt 5 ]]; then
+			break
+		fi
+		echo "command failed, retrying in $(( 2 ** attempt )) seconds"
+		sleep $(( 2 ** attempt ))
+	done
+	return $failed
+}
+
 logger "INFO" "Starting GCP Persistent Disk Workload Identity Federation configuration"
 
 # For disconnected or otherwise unreachable environments, we want to
@@ -85,7 +104,7 @@ run_command "${CMD}"
 # Remove project-level serviceAccountUser role from the binding created by the installer
 logger "INFO" "Removing ${SA_USER_ROLE} from project-level binding for ${SERVICE_ACCOUNT_EMAIL}"
 CMD="gcloud projects remove-iam-policy-binding \"${GOOGLE_PROJECT_ID}\" --member=\"serviceAccount:${SERVICE_ACCOUNT_EMAIL}\" --role=\"${SA_USER_ROLE}\" --condition=None"
-run_command "${CMD}"
+backoff "${CMD}"
 
 logger "INFO" "IAM roles set successfully"
 
