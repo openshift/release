@@ -134,7 +134,7 @@ $HV_VM_DISK_YAML
 EOF
 fi
 
-if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
+if [[ "$TYPE" == "hmno" ]]; then
   cat <<EOF >>/tmp/all.yml
 hybrid_worker_count: $NUM_HYBRID_WORKER_NODES
 hv_ip_offset: 0
@@ -143,6 +143,7 @@ hv_inventory: true
 compact_cluster_dns_count: 0
 standard_cluster_dns_count: 0
 hv_ssh_pass: $LOGIN
+cluster_type: mno
 EOF
   cat <<EOF >>/tmp/hv.yml
 install_tc: false
@@ -245,13 +246,15 @@ scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/v
 scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:${jetlag_repo}/pull_secret.txt
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 
-if [[ ! -z "$NUM_HYBRID_WORKER_NODES" || "$TYPE" == "vmno" ]]; then
+if [[ "$TYPE" == "hmno" || "$TYPE" == "vmno" ]]; then
   scp -q ${SSH_ARGS} /tmp/hv.yml root@${bastion}:${jetlag_repo}/ansible/vars/hv.yml
 fi
 
 
 if [[ ${TYPE} == 'sno' ]]; then
   KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}/kubeconfig'
+elif [[ ${TYPE} == 'hmno' ]]; then
+  KUBECONFIG_SRC=/root/mno/kubeconfig
 else
   KUBECONFIG_SRC=/root/${TYPE}/kubeconfig
 fi
@@ -279,12 +282,12 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/clean-resources.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
-   if [[ ! -z \"$NUM_HYBRID_WORKER_NODES\" || \"$TYPE\" == \"vmno\" ]]; then
+   if [[ \"$TYPE\" == \"hmno\" || \"$TYPE\" == \"vmno\" ]]; then
      export ANSIBLE_HOST_KEY_CHECKING=False
      ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/hv-setup.yml -v | tee /tmp/ansible-hv-setup-$(date +%s)
      ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/hv-vm-create.yml -v | tee /tmp/ansible-hv-vm-create-$(date +%s)
    fi
-   if [[ \"$TYPE\" == \"vmno\" ]]; then
+   if [[ \"$TYPE\" == \"hmno\" || \"$TYPE\" == \"vmno\" ]]; then
      ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/mno-deploy.yml -v | tee /tmp/ansible-mno-deploy-$(date +%s)
    else
      ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
