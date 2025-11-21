@@ -1,6 +1,6 @@
 #!/bin/bash
 # script to create prowjobs in ci-operator/config/openshift/sandboxed-containers-operator using environment variables.
-# Usage: 
+# Usage:
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh gen    # Generate prowjob configuration
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh run    # Run prowjobs
 # should be run in a branch of a fork of https://github.com/openshift/release/
@@ -412,7 +412,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.21"
+    tag: "4.22"
   upi-installer:
     name: "${OCP_VERSION}"
     namespace: ocp
