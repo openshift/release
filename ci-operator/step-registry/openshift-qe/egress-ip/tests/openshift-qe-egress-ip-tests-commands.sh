@@ -192,11 +192,22 @@ if [[ "$ENABLE_LOAD_TEST" == "true" ]]; then
         for ((i=1; i<=blue_projects; i++)); do
             namespace="egressip-test$i"
             
+            # Check if namespace exists
+            if ! oc get namespace "$namespace" >/dev/null 2>&1; then
+                log_warning "Namespace $namespace does not exist, skipping"
+                continue
+            fi
+            
             # Get pods in namespace
             mapfile -t pods < <(oc get pods -n "$namespace" -l app=test-pod --no-headers -o custom-columns=":metadata.name" 2>/dev/null)
             
+            if [[ ${#pods[@]} -eq 0 || -z "${pods[0]}" ]]; then
+                log_warning "No test pods found in namespace $namespace"
+                continue
+            fi
+            
             for pod in "${pods[@]}"; do
-                if [[ -n "$pod" ]]; then
+                if [[ -n "$pod" && "$pod" != "<none>" ]]; then
                     test_pod_connectivity "$namespace" "$pod" "blue" "$iter"
                     sleep 2
                 fi
@@ -207,11 +218,22 @@ if [[ "$ENABLE_LOAD_TEST" == "true" ]]; then
         for ((i=blue_projects+1; i<=PROJECT_COUNT; i++)); do
             namespace="egressip-test$i"
             
+            # Check if namespace exists
+            if ! oc get namespace "$namespace" >/dev/null 2>&1; then
+                log_warning "Namespace $namespace does not exist, skipping"
+                continue
+            fi
+            
             # Get pods in namespace
             mapfile -t pods < <(oc get pods -n "$namespace" -l app=test-pod --no-headers -o custom-columns=":metadata.name" 2>/dev/null)
             
+            if [[ ${#pods[@]} -eq 0 || -z "${pods[0]}" ]]; then
+                log_warning "No test pods found in namespace $namespace"
+                continue
+            fi
+            
             for pod in "${pods[@]}"; do
-                if [[ -n "$pod" ]]; then
+                if [[ -n "$pod" && "$pod" != "<none>" ]]; then
                     test_pod_connectivity "$namespace" "$pod" "red" "$iter"
                     sleep 2
                 fi

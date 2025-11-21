@@ -33,6 +33,23 @@ log_info "  - Project Count: $PROJECT_COUNT"
 log_info "  - Load Testing: $ENABLE_LOAD_TEST"
 log_info "  - IPecho Service Port: $IPECHO_SERVICE_PORT"
 
+# Cleanup function for load testing resources
+cleanup_load_test_resources() {
+    if [[ "$ENABLE_LOAD_TEST" == "true" ]]; then
+        log_info "Cleaning up load testing resources..."
+        
+        # Clean up test namespaces
+        for ((i=1; i<=PROJECT_COUNT; i++)); do
+            oc delete namespace "egressip-test$i" --ignore-not-found=true --timeout=30s 2>/dev/null || true
+        done
+        
+        # Clean up additional egress IPs
+        oc delete egressip egressip-blue egressip-red --ignore-not-found=true 2>/dev/null || true
+        
+        log_info "Load testing cleanup completed"
+    fi
+}
+
 # Check cluster connectivity
 if ! oc cluster-info &> /dev/null; then
     echo "ERROR: Cannot connect to OpenShift cluster. Please check your kubeconfig."
@@ -179,6 +196,9 @@ metadata:
 spec:
   egressIPs:
   - "$BLUE_EGRESS_IP"
+  namespaceSelector:
+    matchLabels:
+      egress: egressip1
   podSelector:
     matchLabels:
       team: blue
@@ -196,6 +216,9 @@ metadata:
 spec:
   egressIPs:
   - "$RED_EGRESS_IP"
+  namespaceSelector:
+    matchLabels:
+      egress: egressip1
   podSelector:
     matchLabels:
       team: red
@@ -244,17 +267,18 @@ metadata:
 EOF
         log_info "Created namespace: $NAMESPACE"
         
-        # Create test pods in each namespace
+        # Create test pods using Deployment (preferred over RC)
         cat <<EOF | oc apply -f -
-apiVersion: v1
-kind: ReplicationController
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: test-rc
+  name: test-deployment
   namespace: $NAMESPACE
 spec:
   replicas: 2
   selector:
-    app: test-pod
+    matchLabels:
+      app: test-pod
   template:
     metadata:
       labels:
@@ -262,7 +286,7 @@ spec:
     spec:
       containers:
       - name: test-container
-        image: registry.access.redhat.com/ubi8/ubi:latest
+        image: quay.io/openshift/origin-cli:latest
         command: ["sleep", "3600"]
         resources:
           requests:
@@ -271,7 +295,21 @@ spec:
           limits:
             memory: "128Mi"
             cpu: "100m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+          capabilities:
+            drop:
+            - ALL
 EOF
+        
+        # Wait for deployment to be ready
+        log_info "Waiting for deployment in $NAMESPACE to be ready..."
+        if ! oc wait --for=condition=Available deployment/test-deployment -n "$NAMESPACE" --timeout=300s; then
+            log_warning "Deployment in $NAMESPACE may not be ready"
+        fi
         
         # Wait for pods to be ready
         log_info "Waiting for pods in $NAMESPACE to be ready..."
@@ -280,20 +318,36 @@ EOF
         fi
     done
 
-    # Label pods for blue/red teams
+    # Label pods for blue/red teams (wait for pods to be available first)
     log_info "Assigning blue/red team labels to pods..."
     blue_projects=$((PROJECT_COUNT / 2))
     
     for ((i=1; i<=blue_projects; i++)); do
         NAMESPACE="egressip-test$i"
         log_info "Labeling pods in $NAMESPACE as blue team"
-        oc label pods -l app=test-pod -n "$NAMESPACE" team=blue --overwrite
+        # Ensure pods exist before labeling
+        for attempt in {1..30}; do
+            if oc get pods -l app=test-pod -n "$NAMESPACE" --no-headers | grep -q "Running\|Ready"; then
+                oc label pods -l app=test-pod -n "$NAMESPACE" team=blue --overwrite
+                break
+            fi
+            log_info "Waiting for pods in $NAMESPACE to be available for labeling... (attempt $attempt/30)"
+            sleep 2
+        done
     done
     
     for ((i=blue_projects+1; i<=PROJECT_COUNT; i++)); do
         NAMESPACE="egressip-test$i"
         log_info "Labeling pods in $NAMESPACE as red team"
-        oc label pods -l app=test-pod -n "$NAMESPACE" team=red --overwrite
+        # Ensure pods exist before labeling
+        for attempt in {1..30}; do
+            if oc get pods -l app=test-pod -n "$NAMESPACE" --no-headers | grep -q "Running\|Ready"; then
+                oc label pods -l app=test-pod -n "$NAMESPACE" team=red --overwrite
+                break
+            fi
+            log_info "Waiting for pods in $NAMESPACE to be available for labeling... (attempt $attempt/30)"
+            sleep 2
+        done
     done
     
     log_success "Load testing setup completed with $PROJECT_COUNT projects!"
