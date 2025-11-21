@@ -18,22 +18,15 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-test
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-east-1
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.18"
   steps:
+    cluster_profile: aws
     env:
+      COMPUTE_NODE_TYPE: m5.8xlarge
       ODF_OPERATOR_SUB_CHANNEL: stable-4.18
     test:
     - ref: operatorhub-subscribe-odf-operator
     - ref: odf-prepare-cluster
-    - ref: insights-onprem-odf-apply-minimal-storage-cluster
+    - ref: odf-apply-storage-cluster
     - as: e2e-test-dataflow
       cli: latest
       commands: make oc-deploy-test
@@ -41,7 +34,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: generic-claim
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: insights-onprem
