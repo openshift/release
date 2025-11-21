@@ -4,8 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-sleep 5h
-
 #
 # Deploy a sample application on the OPP clusters
 #
@@ -46,6 +44,10 @@ echo ""
 oc get quayintegration quay -o yaml
 echo ""
 oc get secret -n policies quay-integration -o yaml
+
+
+sleep 5h
+
 
 # run other tests
 
