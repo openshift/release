@@ -292,6 +292,7 @@ if [[ "$USE_KONFLUX_CATALOG" == "true" ]]; then
     [2.8]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-release-mce-28:latest"
     [2.9]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-release-mce-29:latest"
     [2.10]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-release-mce-210:latest"
+    [2.11]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-release-mce-211:latest"
   )
   OVERRIDE_HO_IMAGE="${konflux_mce_image_list[$MCE_VERSION]}"
 fi
