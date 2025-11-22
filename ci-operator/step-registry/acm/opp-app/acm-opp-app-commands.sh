@@ -17,7 +17,7 @@ chmod +x /tmp/jq
 git clone https://github.com/stolostron/policy-collection.git
 cd policy-collection/deploy/
 
-echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp
+echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/tanfengshuang/grc-demo.git -a e2e-opp
 
 # Wait for the Quay resources to be created
 # How do I check this?
@@ -44,9 +44,6 @@ echo ""
 oc get quayintegration quay -o yaml
 echo ""
 oc get secret -n policies quay-integration -o yaml
-
-
-sleep 5h
 
 
 # run other tests
