@@ -10,8 +10,6 @@ set -x
 : "${LOKI_QUERY:={K8S_FlowLayer=\"infra\", FlowDirection=\"1\", SrcK8S_Namespace=~\"^openshift-.*\"} | json | DstSubnetLabel=\"\" | SrcSubnetLabel=\"Pods\" | __error__=\"\"}"
 : "${LOKI_STEP:=30s}"
 
-
-
 start_file="${SHARED_DIR}/e2e_start_epoch"
 if [[ ! -s "${start_file}" ]]; then
   echo "Missing start epoch file: ${start_file}" >&2
@@ -31,12 +29,17 @@ sleep 5
 
 out_json="${ARTIFACT_DIR}/loki-query-range.json"
 
+echo "Querying Loki for the time window: ${start_epoch} to ${end_epoch}"
+
 curl -sG "http://127.0.0.1:3100/loki/api/v1/query_range" \
   --data-urlencode "query=${LOKI_QUERY}" \
   --data-urlencode "start=${start_epoch}" \
   --data-urlencode "end=${end_epoch}" \
   --data-urlencode "step=${LOKI_STEP}" \
   > "${out_json}"
+
+echo "Waiting for 2 hours to ensure data is ingested into Loki"
+sleep 2h # wait for the data to be ingested into Loki
 
 # Process the results: group by SrcK8S_Namespace and remove duplicates
 processed_json="${ARTIFACT_DIR}/loki-query-range-grouped.json"
