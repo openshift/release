@@ -13,7 +13,6 @@ marketplace=0
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
         echo "setting the proxy"
-        # cat "${SHARED_DIR}/proxy-conf.sh"
         echo "source ${SHARED_DIR}/proxy-conf.sh"
         source "${SHARED_DIR}/proxy-conf.sh"
         export no_proxy=brew.registry.redhat.io,registry.stage.redhat.io,registry.redhat.io,registry.ci.openshift.org,quay.io,s3.us-east-1.amazonaws.com
