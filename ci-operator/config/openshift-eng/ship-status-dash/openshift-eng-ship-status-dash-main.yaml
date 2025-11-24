@@ -1,0 +1,32 @@
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.buildroot
+images:
+- dockerfile_path: images/dashboard/Dockerfile
+  to: dashboard
+promotion:
+  to:
+  - namespace: ship-status-dash
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: HOME=/tmp make lint
+  container:
+    from: src
+- as: unit
+  commands: |
+    export GOCACHE=/tmp/gocache
+    make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ship-status-dash

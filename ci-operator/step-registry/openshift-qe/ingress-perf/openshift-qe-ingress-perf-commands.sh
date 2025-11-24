@@ -37,12 +37,5 @@ pushd e2e-benchmarking/workloads/ingress-perf
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 export ES_INDEX="ingress-performance"
 
-rm -f ${SHARED_DIR}/index.json
-
 # Start the Workload
 ./run.sh
-
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-cp $folder_name/index_data.json "${SHARED_DIR}"/index_data.json
-cp "${SHARED_DIR}"/index_data.json "${SHARED_DIR}"/ingress-perf-index_data.json
-cp "${SHARED_DIR}"/ingress-perf-index_data.json "${ARTIFACT_DIR}"/ingress-perf-index_data.json

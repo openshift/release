@@ -38,13 +38,14 @@ images:
   dockerfile_literal: |
     FROM src
     RUN dnf install -y skopeo git && dnf clean all
+    RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
   from: src
   to: kueue-operator-src
 - dockerfile_literal: |
     FROM src
     COPY oc /usr/bin/oc
     RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y skopeo git && dnf clean all
+    RUN dnf install -y skopeo git podman && dnf clean all
   from: src
   inputs:
     cli:
@@ -67,8 +68,8 @@ releases:
 resources:
   '*':
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: "4"
+      memory: 4Gi
 tests:
 - as: test
   commands: make test
@@ -86,7 +87,7 @@ tests:
     make lint
   container:
     clone: true
-    from: src
+    from: kueue-operator-src
 - as: fips-image-scan-kueue-operator
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
@@ -173,6 +174,21 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
+- as: test-e2e-4-19-fips
+  minimum_interval: 96h
+  steps:
+    cluster_profile: aws
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      FIPS_ENABLED: "true"
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - ref: fips-check
+    - chain: kueue-operator-test-e2e
+    workflow: ipi-aws
 - as: test-e2e-4-19-hypershift
   minimum_interval: 96h
   steps:
@@ -201,7 +217,6 @@ tests:
     test:
     - chain: kueue-operator-test-perfscale
     workflow: openshift-qe-installer-aws
-  timeout: 3h30m0s
 zz_generated_metadata:
   branch: main
   org: openshift

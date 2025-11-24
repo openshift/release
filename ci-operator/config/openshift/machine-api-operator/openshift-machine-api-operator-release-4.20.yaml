@@ -2,7 +2,7 @@ base_images:
   cluster-api-actuator-pkg-test:
     name: cluster-api-actuator-pkg-test
     namespace: ci
-    tag: latest
+    tag: "4.20"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -162,7 +162,8 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-metal-ipi
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
     cluster_profile: equinix-ocp-metal
@@ -172,7 +173,8 @@ tests:
     workflow: baremetalds-e2e
 - always_run: false
   as: e2e-metal-ipi-upgrade
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -180,7 +182,8 @@ tests:
       RUN_UPGRADE_TEST: "true"
     workflow: baremetalds-e2e-upgrade-ovn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
     cluster_profile: equinix-ocp-metal
@@ -191,7 +194,8 @@ tests:
     workflow: baremetalds-e2e
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -201,7 +205,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
     cluster_profile: equinix-ocp-metal
@@ -280,7 +285,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-vsphere-host-groups-ovn-techpreview
   optional: true
@@ -307,7 +311,6 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi
-  timeout: 7h0m0s
 - as: verify-deps
   steps:
     env:

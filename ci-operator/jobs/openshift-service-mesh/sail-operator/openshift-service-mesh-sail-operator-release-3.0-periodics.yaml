@@ -1,11 +1,10 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: 00 0,3,6,9,12,15,18,21 * * 1-5
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 40m0s
   extra_refs:
   - base_ref: release-3.0
     org: openshift-service-mesh
@@ -15,6 +14,14 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-service-mesh-sail-operator-release-3.0-ocp-4.20-sync-upstream
+  reporter_config:
+    slack:
+      channel: '#istio-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:

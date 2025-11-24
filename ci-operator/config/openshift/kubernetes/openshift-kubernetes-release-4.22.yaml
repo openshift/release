@@ -316,7 +316,7 @@ tests:
   as: e2e-aws
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-gcp
   steps:
@@ -326,24 +326,24 @@ tests:
   as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview-serial
   optional: true
+  shard_count: 2
   steps:
     cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-serial
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-azure
   optional: true
@@ -362,12 +362,12 @@ tests:
   as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     workflow: openshift-e2e-aws-disruption
 - always_run: false
   as: e2e-aws-jenkins
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     workflow: openshift-e2e-aws-jenkins
 - always_run: false
   as: e2e-gcp-ovn-upgrade
@@ -380,7 +380,7 @@ tests:
 - as: e2e-aws-ovn-upgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     workflow: openshift-upgrade-aws
 - as: e2e-azure-ovn-upgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
@@ -396,15 +396,15 @@ tests:
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     workflow: openshift-upgrade-aws
 - as: e2e-aws-ovn-serial
+  shard_count: 2
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     workflow: openshift-e2e-aws-serial
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-aws-csi
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-4
     workflow: openshift-e2e-aws-csi
 - always_run: false
   as: e2e-vsphere
@@ -416,7 +416,7 @@ tests:
     workflow: openshift-e2e-vsphere
 - as: k8s-e2e-conformance-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-4
     test:
     - as: test
       cli: latest
@@ -427,7 +427,8 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -435,10 +436,10 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-  timeout: 5h30m0s
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -450,7 +451,7 @@ tests:
 - always_run: false
   as: configmap-scale
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-perfscale-e2e-configmap-scale
 - as: e2e-aws-ovn-fips
   steps:
@@ -473,7 +474,7 @@ tests:
   as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-openstack
@@ -500,7 +501,7 @@ tests:
     workflow: openshift-e2e-openstack-csi-manila
 - as: e2e-aws-ovn-cgroupsv2
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-cgroupsv2
 - as: e2e-aws-ovn-crun
   steps:
@@ -508,12 +509,12 @@ tests:
     workflow: openshift-e2e-aws-crun
 - as: e2e-aws-ovn-runc
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-4
     workflow: openshift-e2e-aws-runc
 - as: e2e-aws-crun-wasm
   skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|SECURITY_CONTACTS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-5
     workflow: openshift-e2e-aws-crun-wasm
 - always_run: false
   as: perfscale-control-plane-6nodes
@@ -532,7 +533,6 @@ tests:
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
-  timeout: 3h30m0s
 - always_run: false
   as: e2e-external-aws-ccm
   optional: true
@@ -544,7 +544,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-external-aws
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

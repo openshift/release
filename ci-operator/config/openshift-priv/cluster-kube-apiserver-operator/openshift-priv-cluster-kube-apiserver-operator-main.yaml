@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -97,7 +97,7 @@ tests:
     workflow: openshift-kubernetes-e2e-gcp-serial
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-5
     workflow: openshift-e2e-aws
 - as: e2e-gcp-operator
   steps:
@@ -226,7 +226,7 @@ tests:
 - as: e2e-aws-ovn-serial
   shard_count: 2
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-4
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-metal-single-node-live-iso
@@ -238,13 +238,13 @@ tests:
   as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-4
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-aws-operator-disruptive-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-4
     test:
     - as: test
       cli: latest
@@ -444,29 +444,14 @@ tests:
   as: e2e-short-cert-rotation
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-4
     workflow: openshift-e2e-cert-rotation-short-aws
-  timeout: 8h0m0s
 - always_run: false
   as: e2e-short-cert-rotation-azure
   optional: true
   steps:
     cluster_profile: azure-2
     workflow: openshift-e2e-cert-rotation-short-azure
-  timeout: 8h0m0s
-- as: e2e-tests-extension
-  steps:
-    test:
-    - as: tests-extension
-      commands: |
-        echo "Build binary cluster-kube-apiserver-operator-tests-ext"
-        make tests-ext-build
-        echo "Running ./cluster-kube-apiserver-operator-tests-ext with sanity test"
-        ./cluster-kube-apiserver-operator-tests-ext run-test -n "[Jira:kube-apiserver][sig-api-machinery] sanity test should always pass [Suite:openshift/cluster-kube-apiserver-operator/conformance/parallel]"
-      from: src
-      resources:
-        requests:
-          cpu: 100m
 zz_generated_metadata:
   branch: main
   org: openshift-priv

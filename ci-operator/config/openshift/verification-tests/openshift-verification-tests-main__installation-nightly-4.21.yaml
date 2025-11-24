@@ -359,6 +359,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       ENABLE_REBOOT_CHECK: "true"
       OCP_ARCH: arm64
+      REBOOT_TYPE: HARD_REBOOT
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy
@@ -471,6 +472,7 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       ENABLE_REBOOT_CHECK: "true"
+      REBOOT_TYPE: HARD_REBOOT
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-upi
@@ -1040,19 +1042,36 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-default
-- as: gcp-ipi-cco-manual-users-static-f28
-  cron: 26 20 15 * *
+- as: gcp-ipi-cco-manual-users-static-mini-perm-f28
+  cron: 2 5 14 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
       COMPUTE_DISK_TYPE: hyperdisk-balanced
       COMPUTE_NODE_TYPE: n4-standard-2
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
       CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
       CONTROL_PLANE_NODE_TYPE: n4-standard-4
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-users-static
+- as: gcp-ipi-custom-endpoint-proxy-users-static-mini-perm-f28
+  cron: 26 4 24 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-users-static
 - as: gcp-ipi-valid-confidential-computing-f14
   cron: 21 1 6,22 * *
   steps:

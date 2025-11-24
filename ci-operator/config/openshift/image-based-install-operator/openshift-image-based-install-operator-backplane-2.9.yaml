@@ -7,14 +7,14 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: installer
-  ocp_4.17_base-rhel9:
-    name: "4.17"
+  ocp_4.21_base-rhel9:
+    name: "4.21"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   image_stream_tag:
     name: release
@@ -23,12 +23,12 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.17_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: image-based-install-operator
 promotion:
   to:
@@ -86,7 +86,8 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ibio
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -97,7 +98,8 @@ tests:
       SEED_IMAGE_TAG: "4.19"
     workflow: image-based-install-operator-ofcir
 - as: e2e-ibio-periodic
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 00 00 * * 0-5
   steps:
     cluster_profile: packet-assisted
@@ -108,7 +110,8 @@ tests:
       SEED_IMAGE_TAG: "4.19"
     workflow: image-based-install-operator-ofcir
 - as: ibio-reinstall
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -120,7 +123,8 @@ tests:
       SEED_IMAGE_TAG: "4.19"
     workflow: image-based-install-operator-ofcir-reinstall
 - as: ibio-reinstall-periodic
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 00 00 * * 0-5
   steps:
     cluster_profile: packet-assisted

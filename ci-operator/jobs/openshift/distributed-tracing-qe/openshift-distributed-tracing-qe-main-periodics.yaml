@@ -12,11 +12,22 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp-observability
-    ci-operator.openshift.io/variant: ocp-4.15-disconnected
+    ci-operator.openshift.io/variant: ocp-4.16-disconnected
     ci.openshift.io/generator: prowgen
-    job-release: "4.15"
+    job-release: "4.16"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-distributed-tracing-qe-main-ocp-4.15-disconnected-distributed-tracing-tests-disconnected
+  name: periodic-ci-openshift-distributed-tracing-qe-main-ocp-4.16-disconnected-distributed-tracing-tests-disconnected
+  reporter_config:
+    slack:
+      channel: '#distributed-tracing-qe'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -26,7 +37,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=distributed-tracing-tests-disconnected
-      - --variant=ocp-4.15-disconnected
+      - --variant=ocp-4.16-disconnected
       command:
       - ci-operator
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
