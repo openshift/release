@@ -68,6 +68,12 @@ releases:
       include_built_images: true
       name: "4.18"
       namespace: ocp
+  nightly-arm64:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -148,7 +154,8 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
-- as: e2e-aws-ovn-kube-apiserver-rollout
+- always_run: false
+  as: e2e-aws-ovn-kube-apiserver-rollout
   optional: true
   steps:
     cluster_profile: aws-3
@@ -174,16 +181,15 @@ tests:
   steps:
     cluster_profile: azure-2
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
-- as: e2e-agnostic-ovn-cmd
+- always_run: false
+  as: e2e-agnostic-ovn-cmd
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     env:
@@ -256,25 +262,26 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp
-- as: e2e-gcp-ovn-rt-upgrade
+- always_run: false
+  as: e2e-gcp-ovn-rt-upgrade
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp-3
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-gcp-ovn-rt
-- as: e2e-gcp-csi
+- always_run: false
+  as: e2e-gcp-csi
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-csi
-- as: e2e-aws-ovn-upgrade
+- always_run: false
+  as: e2e-aws-ovn-upgrade
   optional: true
   steps:
     cluster_profile: aws-3
@@ -285,7 +292,8 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-aws
-- as: e2e-aws-ovn-upgrade-rollback
+- always_run: false
+  as: e2e-aws-ovn-upgrade-rollback
   optional: true
   run_if_changed: ^(test/e2e/upgrade)
   steps:
@@ -309,7 +317,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-serial
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-aws-ovn-virt-techpreview
   optional: true
@@ -327,10 +334,9 @@ tests:
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws-ovn-serial-ipsec
-  timeout: 6h0m0s
-- as: e2e-aws-csi
+- always_run: false
+  as: e2e-aws-csi
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-3
     env:
@@ -367,20 +373,22 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-- as: e2e-metal-ipi-ovn
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-ovn-kube-apiserver-rollout
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-kube-apiserver-rollout
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -391,7 +399,8 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
@@ -401,7 +410,8 @@ tests:
     workflow: baremetalds-e2e-ovn-ipv6
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -411,7 +421,8 @@ tests:
     workflow: baremetalds-e2e-ovn-dualstack
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack-local-gateway
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -426,7 +437,8 @@ tests:
     workflow: baremetalds-e2e
 - always_run: false
   as: e2e-metal-ipi-virtualmedia
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -436,7 +448,8 @@ tests:
     workflow: baremetalds-e2e-virtualmedia
 - always_run: false
   as: e2e-metal-ipi-serial
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -444,10 +457,10 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-metal-ipi-serial-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -455,27 +468,26 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack-bgp-techpreview
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw-techpreview
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-metal-ovn-single-node-live-iso
   optional: true
@@ -494,18 +506,18 @@ tests:
       PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
     workflow: baremetalds-sno
-- as: e2e-aws-ovn-single-node
+- always_run: false
+  as: e2e-aws-ovn-single-node
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
-- as: e2e-aws-ovn-single-node-serial
+- always_run: false
+  as: e2e-aws-ovn-single-node-serial
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-3
     env:
@@ -537,9 +549,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
-- as: e2e-aws-ovn-single-node-upgrade
+- always_run: false
+  as: e2e-aws-ovn-single-node-upgrade
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-3
     env:
@@ -548,9 +560,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-single-node
-- as: e2e-openstack-ovn
+- always_run: false
+  as: e2e-openstack-ovn
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -574,10 +586,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-openstack-ipi
-  timeout: 5h0m0s
-- as: e2e-aws-ovn-cgroupsv2
+- always_run: false
+  as: e2e-aws-ovn-cgroupsv2
   optional: true
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws-cgroupsv2
@@ -665,13 +676,15 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp
-- as: e2e-aws-ovn-kubevirt
+- always_run: false
+  as: e2e-aws-ovn-kubevirt
   optional: true
   run_if_changed: ^test/extended/kubevirt/.*
   steps:
     cluster_profile: aws-3
     workflow: hypershift-kubevirt-conformance
-- as: e2e-baremetalds-kubevirt
+- always_run: false
+  as: e2e-baremetalds-kubevirt
   optional: true
   run_if_changed: ^test/extended/kubevirt/.*
   steps:
@@ -694,7 +707,6 @@ tests:
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws-edge-zones
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-external-aws
   optional: true
@@ -704,7 +716,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-external-aws
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-external-aws-ccm
   optional: true
@@ -716,7 +727,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-external-aws
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-external-vsphere-ccm
   optional: true
@@ -726,7 +736,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: upi-vsphere-platform-external-ccm
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-microshift
   steps:
     cluster_profile: aws-3
@@ -735,7 +744,6 @@ tests:
       SRC_FROM_GIT: "true"
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-microshift-e2e-origin-conformance
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-microshift-serial
   steps:
     cluster_profile: aws-3
@@ -744,7 +752,6 @@ tests:
       SRC_FROM_GIT: "true"
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-microshift-e2e-origin-conformance
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

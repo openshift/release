@@ -1,46 +1,47 @@
 base_images:
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: "4.21"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   from_repository: true
 canonical_go_repository: k8s.io/cloud-provider-openstack
 images:
 - dockerfile_path: images/manila-csi-plugin/Dockerfile
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: csi-driver-manila
 - dockerfile_path: images/cinder-csi-plugin/Dockerfile
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: openstack-cinder-csi-driver
 - dockerfile_path: images/cloud-controller-manager/Dockerfile
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: openstack-cloud-controller-manager
 promotion:
   to:
-  - name: "4.21"
+  - disabled: true
+    name: "4.21"
     namespace: ocp
 releases:
   initial:
@@ -69,7 +70,8 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-parallel
+- always_run: false
+  as: e2e-openstack-parallel
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -78,7 +80,8 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-csi-cinder
+- always_run: false
+  as: e2e-openstack-csi-cinder
   optional: true
   run_if_changed: (^pkg/csi/cinder/)|(^images/cinder-csi-plugin/)
   steps:

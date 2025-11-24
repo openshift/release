@@ -64,28 +64,87 @@ function clear_partition_disk_table {
 
   set -x
   node_name="$(oc get node -oname)"
-  devices_to_be_wiped=$(oc -n openshift-storage get lvmclusters.lvm.topolvm.io lvmcluster -ojson | \
-    jq -c '
-      .status.deviceClassStatuses[]
-      | select(.name == "vg1").nodeStatus[].devices')
+
+  # Try to get devices from status (if LVM cluster is working)
+  devices_from_status=$(oc -n openshift-storage get lvmclusters.lvm.topolvm.io lvmcluster -ojson | \
+    jq -r '.status.deviceClassStatuses[] | select(.name == "vg1").nodeStatus[].devices[]? // empty' 2>/dev/null || echo)
+
+  # If no devices in status, extract device from failure reason
+  if [ -z "${devices_from_status}" ]; then
+    echo "No devices found in status, checking for failures..."
+    devices_from_status=$(oc -n openshift-storage get lvmclusters.lvm.topolvm.io lvmcluster -ojson | \
+      jq -r '.status.deviceClassStatuses[] | select(.name == "vg1").nodeStatus[].reason // empty' | \
+      grep -oE '/dev/[a-z]+' | sort -u || echo)
+  fi
+
+  # Get list of excluded devices
+  excluded_devices=$(oc -n openshift-storage get lvmclusters.lvm.topolvm.io lvmcluster -ojson | \
+    jq -r '.status.deviceClassStatuses[] | select(.name == "vg1").nodeStatus[].excluded[]?.name // empty' 2>/dev/null || echo)
+
+  # Get all block devices from the node
+  all_block_devices=$(oc debug ${node_name} -n default -- chroot /host bash -c \
+    "lsblk -ndo NAME,TYPE | awk '\$2==\"disk\" {print \"/dev/\"\$1}'" 2>/dev/null || echo)
+
   set +x
 
-  echo ${devices_to_be_wiped} | jq -r '.[]' | while read -r node_dev; do
+  echo "Excluded devices: ${excluded_devices}"
+  echo "All block devices: ${all_block_devices}"
+  echo "Devices from status/failure: ${devices_from_status}"
+
+  # Determine which devices to wipe
+  devices_to_wipe=""
+
+  # If we have specific devices from status or failure, use those
+  if [ -n "${devices_from_status}" ]; then
+    for dev in ${devices_from_status}; do
+      # Skip if excluded
+      echo "${excluded_devices}" | grep -q "^${dev}$" && continue
+      devices_to_wipe="${devices_to_wipe} ${dev}"
+    done
+  else
+    # Otherwise, wipe all non-excluded block devices
+    # Note: We wipe all available devices because vgcreate can detect
+    # partition table signatures that lsblk doesn't show
+    for dev in ${all_block_devices}; do
+      # Skip if excluded
+      echo "${excluded_devices}" | grep -q "^${dev}$" && continue
+      echo "Device ${dev} is not excluded, adding to wipe list"
+      devices_to_wipe="${devices_to_wipe} ${dev}"
+    done
+  fi
+
+  # Remove duplicates and wipe devices
+  devices_to_wipe=$(echo ${devices_to_wipe} | tr ' ' '\n' | sort -u)
+
+  if [ -z "${devices_to_wipe}" ]; then
+    echo "No devices to wipe"
+    return 0
+  fi
+
+  for node_dev in ${devices_to_wipe}; do
     echo
-    echo "Wiping device $node_dev..."
+    echo "Wiping device ${node_dev}..."
     echo
+    set -x
     oc debug ${node_name} -n default -- chroot /host bash -c "
      set -x ;
-     lsblk --fs ${node_dev} ;
-     sgdisk --zap-all ${node_dev} ;
-     sleep 3 ;
-     kpartx -d ${node_dev} ;
-     sleep 30 ;
-     lsblk --fs ${node_dev} ;
+     echo 'Before wiping:' ;
+     lsblk --fs ${node_dev} || true ;
+     sfdisk --delete ${node_dev} || true ;
+     dd if=/dev/zero of=${node_dev} bs=1M count=1 ;
+     sleep 2 ;
+     kpartx -d ${node_dev} || true ;
+     echo 'After wiping:' ;
+     lsblk --fs ${node_dev} || true ;
      set +x ;
      echo ;
      echo '${node_dev} Wiped'"
+    set +x
   done
+
+  echo "----------------------------------------"
+  echo "Cleared partition disk table"
+  echo "----------------------------------------"
 }
 
 function get_storage_class_name {
@@ -117,6 +176,7 @@ EOF
       [ $(( attempts=${attempts} + 1 )) -lt 2 ] || {
         clear_partition_disk_table ;
         oc -n openshift-storage wait lvmcluster/lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout 10m && break ;
+        oc -n openshift-storage get lvmcluster/lvmcluster -oyaml ;
         exit 1 ;
       }
     done
@@ -356,7 +416,7 @@ function generate_ztp_cluster_manifests {
     if [ "${root_device}" != "" ]; then
         ignition_config_override="$(
           echo "${NODE_IGNITION_CONF_OVERRIDE}" \
-          | sed "s#\${root_device}#${root_device}#" \
+          | sed "s#\${root_device}#${root_device}#g" \
           | jq --compact-output)"
 
       if [ "${root_dev_hctl}" != "" ]; then

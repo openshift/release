@@ -85,7 +85,6 @@ promotion:
   to:
   - additional_images:
       oc-rpms: rpms
-    disabled: true
     excluded_images:
     - tests
     - must-gather
@@ -159,7 +158,6 @@ tests:
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
-  timeout: 5h0m0s
 - as: e2e-agnostic-ovn-cmd
   steps:
     cluster_profile: azure4
@@ -170,7 +168,8 @@ tests:
   steps:
     cluster_profile: aws-3
     workflow: openshift-upgrade-aws
-- as: e2e-aws-certrotation
+- always_run: false
+  as: e2e-aws-certrotation
   optional: true
   steps:
     cluster_profile: aws
@@ -178,14 +177,17 @@ tests:
     - ref: openshift-oc-certrotation
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-builds
+- always_run: false
+  as: e2e-aws-ovn-builds
   optional: true
   run_if_changed: ^(pkg/.*build.*)|^(pkg/.*newapp.*)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-builds
-- as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -198,14 +200,15 @@ tests:
   optional: true
   steps:
     workflow: openshift-ci-security
-- as: e2e-agent-compact-ipv4
-  cluster: build05
+- always_run: false
+  as: e2e-agent-compact-ipv4
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: ^(pkg/cli/admin/nodeimage/|go.mod)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

@@ -6,19 +6,25 @@ set -x
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+target_bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+
+# Check if target bastion is in maintenance mode
+if ssh ${SSH_ARGS} -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p root@${bastion}" root@${target_bastion} 'test -f /root/pause'; then
+  echo "The cluster is on maintenance mode. Remove the file /root/pause in the bastion host when the maintenance is over"
+  exit 1
+fi
+
 CRUCIBLE_URL=$(cat ${CLUSTER_PROFILE_DIR}/crucible_url)
 JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
 PULL_NUMBER=${PULL_NUMBER:-}
 KUBECONFIG_SRC=""
-BASTION_CP_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/bastion_cp_interface)
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
 export LAB
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud || cat ${SHARED_DIR}/lab_cloud)
 export LAB_CLOUD
-LAB_INTERFACE=$(cat ${CLUSTER_PROFILE_DIR}/lab_interface)
 if [[ "$NUM_WORKER_NODES" == "" ]]; then
-  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/num_worker_nodes)
+  NUM_WORKER_NODES=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".num_worker_nodes")
   export NUM_WORKER_NODES
 fi
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
@@ -26,8 +32,10 @@ export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
 
-
 echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
+
+echo "Removing bastion self-reference from resolv.conf ..."
+ssh ${SSH_ARGS} root@${bastion} "sed -i '\$!{/^nameserver/d}' /etc/resolv.conf"
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -41,26 +49,62 @@ enable_fips: $FIPS
 ssh_private_key_file: ~/.ssh/id_rsa
 ssh_public_key_file: ~/.ssh/id_rsa.pub
 pull_secret: "{{ lookup('file', '../pull_secret.txt') }}"
+smcipmitool_url: "file:///root/smcipmitool.tar.gz"
 bastion_cluster_config_dir: /root/{{ cluster_type }}
-bastion_controlplane_interface: $BASTION_CP_INTERFACE
-bastion_lab_interface: $LAB_INTERFACE
-controlplane_lab_interface: $LAB_INTERFACE
 setup_bastion_gogs: false
 setup_bastion_registry: false
 use_bastion_registry: false
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 payload_url: "${RELEASE_IMAGE_LATEST}"
+image_type: "minimal-iso"
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
+  echo "Private network deployment"
+  echo -e "enable_bond: $BOND" >> /tmp/all.yml
   echo -e "controlplane_network: 192.168.216.1/21\ncontrolplane_network_prefix: 21" >> /tmp/all.yml
+
+  # Create proxy configuration for private VLAN deployments
+  cat > ${SHARED_DIR}/proxy-conf.sh << 'PROXY_EOF'
+#!/bin/bash
+
+cleanup_ssh() {
+  # Kill the SOCKS proxy running on the jumphost
+  ssh ${SSH_ARGS} root@${jumphost} "pkill -f 'ssh root@${bastion} -fNT -D'" 2>/dev/null || true
+  # Kill local SSH processes
+  pkill ssh
+}
+
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+
+# Generate a random port between 10000-65535 for SOCKS proxy
+SOCKS_PORT=$((RANDOM % 55536 + 10000))
+
+# Step 1: Start SOCKS proxy on jumphost connecting to bastion (runs in background on jumphost)
+ssh ${SSH_ARGS} root@${jumphost} "ssh root@${bastion} -fNT -D 0.0.0.0:${SOCKS_PORT}" &
+
+# Step 2: Forward the SOCKS proxy from jumphost back to CI host
+ssh ${SSH_ARGS} root@${jumphost} -fNT -L ${SOCKS_PORT}:localhost:${SOCKS_PORT}
+
+# Give SSH tunnels a moment to establish
+sleep 3
+
+# Configure proxy settings for oc commands
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+export https_proxy=socks5://localhost:${SOCKS_PORT}
+export http_proxy=socks5://localhost:${SOCKS_PORT}
+
+# Configure oc to use the proxy
+oc --kubeconfig=${SHARED_DIR}/kubeconfig config set-cluster "$(oc config current-context)" --proxy-url=socks5://localhost:${SOCKS_PORT}
+
+trap 'cleanup_ssh' EXIT
+PROXY_EOF
 fi
 
 if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
-  HV_NIC_INTERFACE=$(cat "${CLUSTER_PROFILE_DIR}/hypervisor_nic_interface")
-  export HV_NIC_INTERFACE
-
   cat <<EOF >>/tmp/all.yml
 hybrid_worker_count: $NUM_HYBRID_WORKER_NODES
 hv_ip_offset: 0
@@ -69,7 +113,6 @@ hv_inventory: true
 compact_cluster_dns_count: 0
 standard_cluster_dns_count: 0
 hv_ssh_pass: $LOGIN
-hypervisor_nic_interface_idx: $HV_NIC_INTERFACE
 EOF
   cat <<EOF >>/tmp/hv.yml
 install_tc: false
@@ -81,9 +124,11 @@ compact_cluster_dns_count: 0
 standard_cluster_dns_count: 0
 hv_vm_generate_manifests: false
 sno_cluster_count: 0
-hypervisor_nic_interface_idx: $HV_NIC_INTERFACE
 EOF
 fi
+
+echo "This is the final all.yml file:"
+cat /tmp/all.yml
 
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
@@ -104,6 +149,22 @@ podman pod rm $(podman pod ps -q)   || echo 'No podman pods to delete'
 podman stop $(podman ps -aq)        || echo 'No podman containers to stop'
 podman rm $(podman ps -aq)          || echo 'No podman containers to delete'
 rm -rf /opt/*
+
+# Find connection that owns the default gateway
+default_gw_conn=$(
+  nmcli -t -f NAME,DEVICE connection show --active |
+    grep "$(ip route | awk '/default/ {print $5; exit}')" |
+    cut -d: -f1
+)
+# Read active connection names safely into an array
+readarray -t conns < <(nmcli -t -f NAME connection show --active)
+# Loop and delete all except the default one
+for c in "${conns[@]}"; do
+  if [[ "$c" != "$default_gw_conn" && "$c" != "lo" && "$c" != "cni-podman0" ]]; then
+    echo "Deleting: $c"
+    nmcli connection delete "$c"
+  fi
+done
 EOF
 
 # Override JETLAG_BRANCH to main when JETLAG_LATEST is true
@@ -149,6 +210,21 @@ if [[ ${TYPE} == 'sno' ]]; then
 else
   KUBECONFIG_SRC=/root/${TYPE}/kubeconfig
 fi
+
+collect_ai_logs() {
+  echo "Collecting AI logs ..."
+  ssh ${SSH_ARGS} root@${bastion} "
+    AI_CLUSTER_ID=\$(curl -sS http://$bastion2:8080/api/assisted-install/v2/clusters/  | jq -r .[0].id)
+    echo 'Cluster ID is:' \$AI_CLUSTER_ID
+    mkdir -p /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE
+    curl -LsSo /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar http://$bastion2:8080/api/assisted-install/v2/clusters/\$AI_CLUSTER_ID/logs
+    rm -rf /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar.gz
+    gzip /tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar
+  "
+  scp -q ${SSH_ARGS} root@${bastion}:/tmp/ai-logs/$LAB/$LAB_CLOUD/$TYPE/ai-cluster-logs.tar.gz ${ARTIFACT_DIR}
+}
+
+trap 'collect_ai_logs' EXIT
 
 ssh ${SSH_ARGS} root@${bastion} "
    set -e

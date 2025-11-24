@@ -23,7 +23,7 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 KUBE_DIR=${KUBE_DIR:-/tmp}
 EXTRA_FLAGS=${EXTRA_FLAGS:-}
-ITERATIONS=${ITERATIONS:-300}
+ITERATIONS=${ITERATIONS:-50}
 
 # cannot clone openshift-tests-private repo directly, so use tests-private-burner image
 # copy olm-metrics.yml and extended-metrics.yml 
@@ -45,14 +45,7 @@ EXTRA_FLAGS+=" --metrics-profile=${KUBE_DIR}/olm-metrics.yml,${KUBE_DIR}/extende
 
 export EXTRA_FLAGS ADDITIONAL_PARAMS ITERATIONS
 
-rm -f ${SHARED_DIR}/index.json
 ./run.sh
-
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
-
-cp "${SHARED_DIR}"/index_data.json "${SHARED_DIR}"/${WORKLOAD}-index_data.json 
-cp "${SHARED_DIR}"/${WORKLOAD}-index_data.json  "${ARTIFACT_DIR}"/${WORKLOAD}-index_data.json
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)

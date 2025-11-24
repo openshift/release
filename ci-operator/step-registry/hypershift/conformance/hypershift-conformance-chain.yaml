@@ -56,6 +56,12 @@ chain:
       }
 
       if [[ -z "${HOSTED_CP:-}" ]]; then
+        # Use management cluster's kubeconfig to get the hosted cluster namespace.
+        # Some workflows might call the step cucushift-hypershift-extended-enable-guest
+        # which sets the kubeconfig to the guest cluster.
+        if [ -s "${SHARED_DIR}/mgmt_kubeconfig" ] ; then
+          export KUBECONFIG=${SHARED_DIR}/mgmt_kubeconfig
+        fi
         export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
         export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
         export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"

@@ -2,13 +2,14 @@
 
 set -e
 
+echo "Loading AWS credentials from secrets..."
 AWS_ACCESS_KEY_ID=$(cat /tmp/secrets/AWS_ACCESS_KEY_ID)
 AWS_SECRET_ACCESS_KEY=$(cat /tmp/secrets/AWS_SECRET_ACCESS_KEY)
 AWS_DEFAULT_REGION=$(cat /tmp/secrets/AWS_DEFAULT_REGION)
 AWS_S3_BUCKET=$(cat /tmp/secrets/AWS_S3_BUCKET)
 export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION AWS_S3_BUCKET
+echo "AWS credentials loaded successfully"
 
-# List all top-level prefixes in the S3 bucket and save to file
 echo "Listing top-level prefixes from S3 bucket ${AWS_S3_BUCKET}..."
 aws s3api list-objects-v2 \
   --bucket "${AWS_S3_BUCKET}" \
@@ -19,6 +20,8 @@ aws s3api list-objects-v2 \
 
 if [ -f "${SHARED_DIR}/s3_top_level_folders.txt" ]; then
   echo "S3 object list has been saved to ${SHARED_DIR}/s3_top_level_folders.txt"
+  cp "${SHARED_DIR}/s3_top_level_folders.txt" "${ARTIFACT_DIR}/s3_top_level_folders.txt"
+  echo "S3 object list has also been copied to ARTIFACT_DIR"
 else
   echo "Error: Failed to create S3 object list file"
   exit 1

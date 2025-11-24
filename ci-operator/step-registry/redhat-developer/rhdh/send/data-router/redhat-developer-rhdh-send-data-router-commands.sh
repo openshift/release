@@ -3,24 +3,49 @@
 set +o errexit
 set +o nounset
 
-# if [[ "${JOB_NAME}" == *rehearse* ]]; then
-#   echo "This job is a rehearse job, skipping Data Router."
-#   return 0
-# fi
-
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
+export RELEASE_BRANCH_NAME
 
 # Load required variables from secrets
 DATA_ROUTER_URL=$(cat /tmp/secrets/DATA_ROUTER_URL)
 DATA_ROUTER_USERNAME=$(cat /tmp/secrets/DATA_ROUTER_USERNAME)
 DATA_ROUTER_PASSWORD=$(cat /tmp/secrets/DATA_ROUTER_PASSWORD)
 REPORTPORTAL_HOSTNAME=$(cat /tmp/secrets/REPORTPORTAL_HOSTNAME)
+export DATA_ROUTER_URL DATA_ROUTER_USERNAME DATA_ROUTER_PASSWORD REPORTPORTAL_HOSTNAME
 
 DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD="0.9"
 DATA_ROUTER_PROJECT="main"
 METADATA_OUTPUT="data_router_metadata_output.json"
+export DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD DATA_ROUTER_PROJECT METADATA_OUTPUT
 
-export RELEASE_BRANCH_NAME DATA_ROUTER_URL DATA_ROUTER_USERNAME DATA_ROUTER_PASSWORD DATA_ROUTER_PROJECT DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD REPORTPORTAL_HOSTNAME METADATA_OUTPUT
+IS_OPENSHIFT=$(cat $SHARED_DIR/IS_OPENSHIFT.txt)
+CONTAINER_PLATFORM=$(cat $SHARED_DIR/CONTAINER_PLATFORM.txt)
+CONTAINER_PLATFORM_VERSION=$(cat $SHARED_DIR/CONTAINER_PLATFORM_VERSION.txt)
+export IS_OPENSHIFT CONTAINER_PLATFORM CONTAINER_PLATFORM_VERSION
+
+save_status_data_router_failed() {
+  local result=$1
+  STATUS_DATA_ROUTER_FAILED=${result}
+  echo "Saving STATUS_DATA_ROUTER_FAILED=${STATUS_DATA_ROUTER_FAILED}"
+  printf "%s" "${STATUS_DATA_ROUTER_FAILED}" > "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt"
+  cp "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt" "$ARTIFACT_DIR/STATUS_DATA_ROUTER_FAILED.txt"
+}
+
+# Download and source the reporting.sh file from RHDH repository
+REPORTING_SCRIPT_URL="https://raw.githubusercontent.com/redhat-developer/rhdh/${RELEASE_BRANCH_NAME}/.ibm/pipelines/reporting.sh"
+REPORTING_SCRIPT_TMP="/tmp/reporting.sh"
+
+echo "💾 Downloading reporting.sh from ${REPORTING_SCRIPT_URL}"
+if curl -f -s -o "${REPORTING_SCRIPT_TMP}" "${REPORTING_SCRIPT_URL}"; then
+  echo "🟢 Successfully downloaded reporting.sh, sourcing it..."
+  # shellcheck source=/dev/null
+  source "${REPORTING_SCRIPT_TMP}"
+  rm -f "${REPORTING_SCRIPT_TMP}"
+  echo "✅ Successfully sourced reporting.sh from redhat-developer/rhdh/${RELEASE_BRANCH_NAME}"
+else
+  echo "🔴 Error: Failed to download reporting.sh from ${REPORTING_SCRIPT_URL}"
+  save_status_data_router_failed true
+fi
 
 # Validate required variables
 validate_required_vars() {
@@ -39,14 +64,6 @@ validate_required_vars() {
   done
 }
 
-save_status_data_router_failed() {
-  local result=$1
-  STATUS_DATA_ROUTER_FAILED=${result}
-  echo "Saving STATUS_DATA_ROUTER_FAILED=${STATUS_DATA_ROUTER_FAILED}"
-  printf "%s" "${STATUS_DATA_ROUTER_FAILED}" > "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt"
-  cp "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt" "$ARTIFACT_DIR/STATUS_DATA_ROUTER_FAILED.txt"
-}
-
 save_status_url_reportportal() {
   local url=$1
   STATUS_URL_REPORTPORTAL=${url}
@@ -60,19 +77,24 @@ get_metadata_output_path() {
   echo "${ARTIFACT_DIR}/${metadata_output}"
 }
 
-get_job_url() {
-  local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results"
-  local job_complete_url
-  if [ -n "${PULL_NUMBER:-}" ]; then
-    job_complete_url="${job_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
-  else
-    job_complete_url="${job_base_url}/logs/${JOB_NAME}/${BUILD_ID}"
-  fi
-  echo "${job_complete_url}"
-}
-
 save_data_router_metadata() {
   JOB_URL=$(get_job_url)
+  local install_method
+  local cluster_type
+
+  # Set install_method based on job name
+  if [[ "$JOB_NAME" == *operator* ]]; then
+    install_method="operator"
+  else
+    install_method="helm-chart"
+  fi
+
+  # Set cluster_type based on IS_OPENSHIFT
+  if [[ "$IS_OPENSHIFT" == "true" ]]; then
+    cluster_type="openshift"
+  else
+    cluster_type="kubernetes"
+  fi
 
   # Generate the metadata file for Data Router from the template
   jq -n \
@@ -84,6 +106,10 @@ save_data_router_metadata() {
     --arg pr "$GIT_PR_NUMBER" \
     --arg job_name "$JOB_NAME" \
     --arg tag_name "$TAG_NAME" \
+    --arg install_method "$install_method" \
+    --arg cluster_type "$cluster_type" \
+    --arg container_platform "$CONTAINER_PLATFORM" \
+    --arg container_platform_version "$CONTAINER_PLATFORM_VERSION" \
     --argjson auto_finalization_threshold "$DATA_ROUTER_AUTO_FINALIZATION_TRESHOLD" \
     '{
       "targets": {
@@ -103,7 +129,11 @@ save_data_router_metadata() {
                 {"key": "job_type", "value": $job_type},
                 {"key": "pr", "value": $pr},
                 {"key": "job_name", "value": $job_name},
-                {"key": "tag_name", "value": $tag_name}
+                {"key": "tag_name", "value": $tag_name},
+                {"key": "install_method", "value": $install_method},
+                {"key": "cluster_type", "value": $cluster_type},
+                {"key": "container_platform", "value": $container_platform},
+                {"key": "container_platform_version", "value": $container_platform_version}
               ]
             },
             "tfa": {
@@ -150,7 +180,7 @@ main() {
         return
       fi
 
-      if output=$(/droute send --metadata "$(get_metadata_output_path)" \
+      if output=$(droute send --metadata "$(get_metadata_output_path)" \
           --url "${DATA_ROUTER_URL}" \
           --username "${DATA_ROUTER_USERNAME}" \
           --password "${DATA_ROUTER_PASSWORD}" \
@@ -188,7 +218,7 @@ main() {
         echo "Attempt ${i} of ${max_attempts}: Checking Data Router request completion..."
 
         # Get DataRouter request information.
-        DATA_ROUTER_REQUEST_OUTPUT=$(/droute request get \
+        DATA_ROUTER_REQUEST_OUTPUT=$(droute request get \
           --url "${DATA_ROUTER_URL}" \
           --username "${DATA_ROUTER_USERNAME}" \
           --password "${DATA_ROUTER_PASSWORD}" \

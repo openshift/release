@@ -58,11 +58,7 @@ export WORKLOAD=node-density
 RANDOM_WORKER_NODE=$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | shuf -n1)
 oc adm must-gather --timeout=3h --dest-dir "${ARTIFACT_DIR}/" -- PROFILING_NODE_SECONDS=60 gather_profiling_node $RANDOM_WORKER_NODE &
 
-# A non-indexed warmup run
-ES_SERVER="" EXTRA_FLAGS="--pods-per-node=50 --pod-ready-threshold=60s" ./run.sh
-
-# The measurable run
-EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
@@ -72,7 +68,6 @@ fi
 
 export EXTRA_FLAGS
 
-rm -f ${SHARED_DIR}/index.json
 
 RANDOM_WORKER_NODE=$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | shuf -n1)
 
@@ -102,10 +97,10 @@ kill "$GATHER_LOOP_PID" 2>/dev/null || true
 wait "$GATHER_LOOP_PID" 2>/dev/null || true
 echo "Gather loop stopped."
 
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
-
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
     cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
+fi
+if [[ ${PPROF} == "true" ]]; then
+  cp -r pprof-data "${ARTIFACT_DIR}/"
 fi

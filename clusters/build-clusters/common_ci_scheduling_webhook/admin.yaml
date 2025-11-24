@@ -8,7 +8,7 @@ apiVersion: node.k8s.io/v1
 kind: RuntimeClass
 metadata:
   name: ci-scheduler-runtime-builds
-handler: runc
+handler: crun
 overhead:
   podFixed:
     # Reserve an CPU and memory for each build on crio as overhead for the runtime
@@ -26,7 +26,7 @@ apiVersion: node.k8s.io/v1
 kind: RuntimeClass
 metadata:
   name: ci-scheduler-runtime-tests
-handler: runc
+handler: crun
 overhead:
   podFixed:
     # Reserve a CPU and memory for each build on crio as overhead for the runtime
@@ -44,7 +44,7 @@ apiVersion: node.k8s.io/v1
 kind: RuntimeClass
 metadata:
   name: ci-scheduler-runtime-longtests
-handler: runc
+handler: crun
 overhead:
   podFixed:
     # Reserve a CPU and memory for each build on crio as overhead for the runtime
@@ -62,7 +62,7 @@ apiVersion: node.k8s.io/v1
 kind: RuntimeClass
 metadata:
   name: ci-scheduler-runtime-prowjobs
-handler: runc
+handler: crun
 scheduling:
   nodeSelector:
     ci-workload: prowjobs
@@ -70,3 +70,11 @@ scheduling:
     - effect: NoSchedule
       key: node-role.kubernetes.io/ci-prowjobs-worker
       operator: Exists
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: overprovisioning
+value: -10
+globalDefault: false
+description: "Priority class used by overprovisioning."

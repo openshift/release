@@ -342,6 +342,7 @@ tests:
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       ENABLE_REBOOT_CHECK: "true"
       OCP_ARCH: arm64
+      REBOOT_TYPE: HARD_REBOOT
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy
@@ -454,6 +455,7 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       ENABLE_REBOOT_CHECK: "true"
+      REBOOT_TYPE: HARD_REBOOT
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-upi
@@ -1023,16 +1025,19 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-default
-- as: gcp-ipi-cco-manual-users-static-f28
-  cron: 45 21 26 * *
+- as: gcp-ipi-cco-manual-users-static-mini-perm-f28
+  cron: 6 18 9 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
       COMPUTE_DISK_TYPE: hyperdisk-balanced
       COMPUTE_NODE_TYPE: n4-standard-2
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
       CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
       CONTROL_PLANE_NODE_TYPE: n4-standard-4
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-users-static
@@ -1041,6 +1046,8 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     workflow: cucushift-installer-rehearse-gcp-cases-valid-confidential-computing
 - as: gcp-ipi-dns-peering-zone-f28
   cron: 22 9 23 * *
@@ -1084,11 +1091,15 @@ tests:
     test:
     - ref: cucushift-ota-preupgrade
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-xpn-cco-manual-users-static-f28
-  cron: 28 0 3 * *
+- as: gcp-ipi-xpn-cco-manual-users-static-mini-perm-f28
+  cron: 24 2 3 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
+    env:
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-cco-manual-users-static

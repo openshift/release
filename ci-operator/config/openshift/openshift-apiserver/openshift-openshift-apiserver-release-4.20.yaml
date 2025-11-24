@@ -22,8 +22,7 @@ images:
   to: openshift-apiserver
 promotion:
   to:
-  - disabled: true
-    name: "4.20"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -70,9 +69,9 @@ tests:
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-builds
-- as: e2e-aws-ovn-cmd
+- always_run: false
+  as: e2e-aws-ovn-cmd
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-cmd
@@ -87,19 +86,6 @@ tests:
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
-- as: e2e-tests-extension
-  steps:
-    test:
-    - as: tests-extension
-      commands: |
-        echo "Build binary openshift-apiserver-tests-ext"
-        make tests-ext-build
-        echo "Running ./openshift-apiserver-tests-ext with sanity test"
-        ./openshift-apiserver-tests-ext run-test -n "[Jira:openshift-apiserver][sig-api-machinery] sanity test should always pass [Suite:openshift/openshift-apiserver/conformance/parallel]"
-      from: src
-      resources:
-        requests:
-          cpu: 100m
 zz_generated_metadata:
   branch: release-4.20
   org: openshift

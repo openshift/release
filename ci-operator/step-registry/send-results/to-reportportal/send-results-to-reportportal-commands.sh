@@ -28,6 +28,7 @@ ALLOWED_REPOS=('openshift/openshift-tests-private'
                'openshift/rosa'
                'openshift/verification-tests'
                'oadp-qe/oadp-qe-automation'
+               'openshift-eng/agent-qe-infra'
               )
 org="$(jq -r 'if .extra_refs then .extra_refs[0].org
               elif .refs then .refs.org
@@ -40,13 +41,15 @@ repo="$(jq -r 'if .extra_refs then .extra_refs[0].repo
 # shellcheck disable=SC2076
 if ! [[ "${ALLOWED_REPOS[*]}" =~ "$org/$repo" ]]
 then
-    echo "Skip repository: $org/$repo"
-    exit 0
+  echo "Skip repository: $org/$repo"
+  exit 0
 fi
 
 LOGS_PATH='logs'
 if [[ "$(jq -r '.type' <<< ${JOB_SPEC})" = 'presubmit' ]]
 then
+  echo "Skip presubmit jobs"
+  exit 0
   pr_number="$(jq -r '.refs.pulls[0].number' <<< $JOB_SPEC)"
   if [[ -z "$pr_number" ]]
   then
@@ -88,9 +91,18 @@ DATAROUTER_JSON="${LOCAL_DIR}/datarouter.json"
 mkdir --parents "$LOCAL_DIR" "$LOCAL_DIR_ORI" "$LOCAL_DIR_RST"
 
 function download_logs() {
-  logfile_name="${ARTIFACT_DIR}/rsync.log"
   export PATH="$PATH:/opt/google-cloud-sdk/bin"
-  gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private
+  gcloud_auth_cmd='gcloud auth activate-service-account --key-file /var/run/datarouter/gcs_sa_openshift-ci-private 2>&1'
+  for (( i=1; i<=10; i++ ))
+  do
+    if (eval $gcloud_auth_cmd | grep -q -i 'Activated service account')
+    then
+      break
+    fi
+    echo "Retry 'gcloud auth' after sleep 2 minutes"
+    sleep 2m
+  done
+  logfile_name="${ARTIFACT_DIR}/rsync.log"
   gsutil -m rsync -r -x '^(?!.*.(finished.json|.xml)$).*' "${ROOT_PATH}/artifacts/${JOB_NAME_SAFE}/" "$LOCAL_DIR_ORI/" &> "$logfile_name"
   gsutil -m rsync -r -x '^(?!.*.(release-images-.*)$).*' "${ROOT_PATH}/artifacts" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
   #gsutil -m cp "${ROOT_PATH}/build-log.txt" "$LOCAL_DIR_ORI/" &>> "$logfile_name"
@@ -157,6 +169,17 @@ function generate_attribute_env_fips() {
   write_attribute env_fips "$env_fips"
 }
 
+function generate_attribute_job_frequency() {
+  if [[ "$JOB_NAME_SAFE" =~ -(f[0-9]+) ]]
+  then
+    job_frequency="${BASH_REMATCH[1]}"
+    if [[ -n "$job_frequency" ]]
+    then
+      write_attribute job_frequency "$job_frequency"
+    fi
+  fi
+}
+
 function generate_attribute_job_type() {
   job_type='periodic'
   if [[ "$LOGS_PATH" =~ pr-logs ]]
@@ -178,7 +201,8 @@ function generate_attribute_install() {
                  'openshift-extended-test-supplementary' \
                  'openshift-extended-web-tests' \
                  'openshift-e2e-test-clusterinfra-qe' \
-                 'openshift-e2e-test-qe-report'
+                 'openshift-e2e-test-qe-report' \
+                 'cucushift-installer-check-cluster-health'
   do
     if [[ -d "$LOCAL_DIR_ORI/$keyword" ]]
     then
@@ -221,6 +245,17 @@ function generate_attribute_pr_author() {
   fi
 }
 
+function generate_attribute_version() {
+  if [[ "$JOB_NAME" =~ release-(4[.][0-9]+)- ]]
+  then
+    version="${BASH_REMATCH[1]}"
+    if [[ -n "$version" ]]
+    then
+      write_attribute version "$version"
+    fi
+  fi
+}
+
 function generate_attribute_version_installed() {
   version_installed="$(get_attribute "version_installed")"
   if [[ -z "$version_installed" ]]
@@ -231,8 +266,11 @@ function generate_attribute_version_installed() {
     if [[ -z "$arch" ]]
     then
       for release_file in 'release-images-arm64-latest' \
+                          'release-images-latest-arm64' \
                           'release-images-ppc64le-latest' \
-                          'release-images-s390x-latest'
+                          'release-images-latest-ppc64le' \
+                          'release-images-s390x-latest' \
+                          'release-images-latest-s390x'
       do
         release_info_file="$release_dir/$release_file"
         if [[ -f "$release_info_file" ]]
@@ -243,7 +281,15 @@ function generate_attribute_version_installed() {
     else
       if [[ "$arch" =~ arm64|ppc64le|s390x ]]
       then
-        release_info_file="$release_dir/release-images-${arch}-latest"
+        for release_file in "release-images-${arch}-latest" \
+                            "release-images-latest-${arch}"
+        do
+          release_info_file="$release_dir/$release_file"
+          if [[ -f "$release_info_file" ]]
+          then
+            break
+          fi
+        done
       fi
     fi
     if [[ -f "$release_info_file" ]]
@@ -254,17 +300,67 @@ function generate_attribute_version_installed() {
   fi
 }
 
+function generate_attribute_version_upgraded() {
+  if [[ "$JOB_NAME" =~ upgrade-from ]]
+  then
+    version_upgraded="$(get_attribute "version_upgraded")"
+    if [[ -z "$version_upgraded" ]]
+    then
+      release_dir="${LOCAL_DIR_ORI}/release/artifacts"
+      release_info_file="$release_dir/release-images-target"
+      arch="$(get_attribute "architecture")"
+      if [[ -z "$arch" ]]
+      then
+        for release_file in 'release-images-arm64-target' \
+                            'release-images-target-arm64' \
+                            'release-images-ppc64le-target' \
+                            'release-images-target-ppc64le' \
+                            'release-images-s390x-target' \
+                            'release-images-target-s390x'
+        do
+          release_info_file="$release_dir/$release_file"
+          if [[ -f "$release_info_file" ]]
+          then
+            break
+          fi
+        done
+      else
+        if [[ "$arch" =~ arm64|ppc64le|s390x ]]
+        then
+          for release_file in "release-images-${arch}-target" \
+                              "release-images-target-${arch}"
+          do
+            release_info_file="$release_dir/$release_file"
+            if [[ -f "$release_info_file" ]]
+            then
+              break
+            fi
+          done
+        fi
+      fi
+      if [[ -f "$release_info_file" ]]
+      then
+        version_upgraded="$(jq -r '.metadata.name' "$release_info_file")"
+        write_attribute version_upgraded "$version_upgraded"
+      fi
+    fi
+  fi
+}
+
 function generate_attributes() {
   generate_attribute_architecture
   generate_attribute_cloud_provider
   generate_attribute_env_disconnected
   generate_attribute_env_fips
+  generate_attribute_job_frequency
   generate_attribute_job_type
   generate_attribute_install
   generate_attribute_install_method
   generate_attribute_profilename
   generate_attribute_pr_author
+  generate_attribute_version
   generate_attribute_version_installed
+  generate_attribute_version_upgraded
 }
 
 function generate_metadata() {
@@ -349,8 +445,7 @@ EOF_JUNIT
 # For tests in ReportPortal prow project, if install fails, they prefer to log only one failure test case
 function generate_result_customize_prow() {
   testsuite_name='Installation'
-  # using the same junit filename as the one generated in must-gather step to overwirte installation results
-  junit_file="$LOCAL_DIR_RST/junit_install.xml"
+  junit_file="$LOCAL_DIR_RST/junit_reportportal_install.xml"
   cat > "$junit_file" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="${testsuite_name}" failures="0" errors="0" skipped="0" tests="1">
@@ -367,15 +462,19 @@ EOF
 }
 
 function generate_results() {
-  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' -exec cp {} "$LOCAL_DIR_RST" \;
-
   # For tests in ReportPortal prow project, if install fails, they prefer to log only one failure test case
   if [[ "$REPORTPORTAL_PROJECT" = 'prow' ]]
   then
     generate_result_customize_prow
+    # must-gather and gather-extra in post stage also generate junit, once install fails, skip the other junit.
+    if [[ "$INSTALL_RESULT" == "fail" ]]
+    then
+        return 0
+    fi
   else
     generate_result_teststeps
   fi
+  find "$LOCAL_DIR_ORI" -name "*.xml" ! -name 'junit_cypress-*.xml' ! -empty -exec cp {} "$LOCAL_DIR_RST" \;
 }
 
 function fix_xmls() {
@@ -426,18 +525,28 @@ function droute_send() {
                                 --metadata="$DATAROUTER_JSON"
                                 --results="${LOCAL_DIR_RST}/*"
                                 --wait
+                   2>&1
                   '
-  for (( i=1; i<=3; i++ ))
+  sendSucceeded='false'
+  tries=10
+  for (( i=1; i<=$tries; i++ ))
   do
-    output="$(eval $droute_send_cmd)"
-    echo "$output"
-    if (grep -q 'request' <<< "$output")
+    if [[ "$(eval $droute_send_cmd)" =~ 'status: OK' ]]
     then
+      sendSucceeded='true'
       break
     fi
-    echo "Retry 'droute send' after sleep $i minutes"
-    sleep ${i}m
+    if [[ "$i" -le "$tries" ]]
+    then
+      echo "Retry 'droute send' after sleep 2 minutes"
+      sleep 2m
+    fi
   done
+  if [[ "$sendSucceeded" = 'false' ]]
+  then
+    echo "'droute send' failed after $tries tries"
+    exit 1
+  fi
 }
 
 export INSTALL_RESULT="fail"

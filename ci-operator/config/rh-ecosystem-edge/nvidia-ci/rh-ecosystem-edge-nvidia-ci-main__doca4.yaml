@@ -1,0 +1,175 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_path: Containerfile
+  to: nvidia-ci
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: nvidia-network-operator-legacy-sriov-rdma
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    env:
+      DUMP_FAILED_TESTS: "true"
+      NVIDIANETWORK_CLEANUP: "false"
+      NVIDIANETWORK_IPOIBNETWORK_IPAM_EXCLUDEIP1: 192.168.4.229/30
+      NVIDIANETWORK_IPOIBNETWORK_IPAM_EXCLUDEIP2: 192.168.4.236/32
+      NVIDIANETWORK_IPOIBNETWORK_IPAM_RANGE: 192.168.4.225/24
+      NVIDIANETWORK_IPOIBNETWORK_NAME: example-ipoibnetwork
+      NVIDIANETWORK_MACVLANNETWORK_IPAM_GATEWAY: 192.168.4.1
+      NVIDIANETWORK_MACVLANNETWORK_IPAM_RANGE: 192.168.4.0/24
+      NVIDIANETWORK_MACVLANNETWORK_NAME: rdmashared-net
+      NVIDIANETWORK_MELLANOX_ETH_INTERFACE_NAME: enp55s0np0
+      NVIDIANETWORK_MELLANOX_IB_INTERFACE_NAME: ibp13s0
+      NVIDIANETWORK_RDMA_CLIENT_HOSTNAME: nvd-srv-23.nvidia.eng.rdu2.dc.redhat.com
+      NVIDIANETWORK_RDMA_GPUDIRECT: "true"
+      NVIDIANETWORK_RDMA_LINK_TYPE: ethernet
+      NVIDIANETWORK_RDMA_MLX_DEVICE: mlx5_1
+      NVIDIANETWORK_RDMA_NETWORK_TYPE: sriov
+      NVIDIANETWORK_RDMA_SERVER_HOSTNAME: nvd-srv-22.nvidia.eng.rdu2.dc.redhat.com
+      NVIDIANETWORK_RDMA_SRIOV_NETWORK_NAME: sriov-network
+      NVIDIANETWORK_RDMA_WORKLOAD_NAMESPACE: default
+      TEST_FEATURES: nvidianetwork
+      TEST_LABELS: deploy || rdma-legacy-sriov
+      TEST_TRACE: "true"
+      VERBOSE_LEVEL: "100"
+    test:
+    - as: network-operator-e2e
+      commands: |
+        export OVERRIDE_ENV_FILE=test.env
+        export REPORTS_DUMP_DIR=${ARTIFACT_DIR}
+        export KUBECONFIG=/var/run/nvidia-ci/kubeconfig
+        if [ -e "${OVERRIDE_ENV_FILE}" ]; then
+          echo "Loading environment variables from ${OVERRIDE_ENV_FILE}"
+          set -o allexport
+          source "${OVERRIDE_ENV_FILE}"
+          set +o allexport
+        fi
+        make run-tests
+      credentials:
+      - collection: ""
+        mount_path: /var/run/nvidia-ci
+        name: nvidia-ci-doca4
+        namespace: test-credentials
+      env:
+      - name: DUMP_FAILED_TESTS
+      - name: NVIDIANETWORK_CLEANUP
+      - name: NVIDIANETWORK_IPOIBNETWORK_IPAM_EXCLUDEIP1
+      - name: NVIDIANETWORK_IPOIBNETWORK_IPAM_EXCLUDEIP2
+      - name: NVIDIANETWORK_IPOIBNETWORK_IPAM_RANGE
+      - name: NVIDIANETWORK_IPOIBNETWORK_NAME
+      - name: NVIDIANETWORK_MACVLANNETWORK_IPAM_GATEWAY
+      - name: NVIDIANETWORK_MACVLANNETWORK_IPAM_RANGE
+      - name: NVIDIANETWORK_MACVLANNETWORK_NAME
+      - name: NVIDIANETWORK_MELLANOX_ETH_INTERFACE_NAME
+      - name: NVIDIANETWORK_MELLANOX_IB_INTERFACE_NAME
+      - name: NVIDIANETWORK_RDMA_CLIENT_HOSTNAME
+      - name: NVIDIANETWORK_RDMA_GPUDIRECT
+      - name: NVIDIANETWORK_RDMA_LINK_TYPE
+      - name: NVIDIANETWORK_RDMA_MLX_DEVICE
+      - name: NVIDIANETWORK_RDMA_NETWORK_TYPE
+      - name: NVIDIANETWORK_RDMA_SERVER_HOSTNAME
+      - name: NVIDIANETWORK_RDMA_SRIOV_NETWORK_NAME
+      - name: NVIDIANETWORK_RDMA_WORKLOAD_NAMESPACE
+      - name: TEST_FEATURES
+      - name: TEST_LABELS
+      - name: TEST_TRACE
+      - name: VERBOSE_LEVEL
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+- always_run: false
+  as: nvidia-network-operator-shared-device-eth-rdma
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    env:
+      DUMP_FAILED_TESTS: "true"
+      NVIDIANETWORK_CLEANUP: "false"
+      NVIDIANETWORK_IPOIBNETWORK_IPAM_EXCLUDEIP1: 192.168.4.229/30
+      NVIDIANETWORK_IPOIBNETWORK_IPAM_EXCLUDEIP2: 192.168.4.236/32
+      NVIDIANETWORK_IPOIBNETWORK_IPAM_RANGE: 192.168.4.225/24
+      NVIDIANETWORK_IPOIBNETWORK_NAME: example-ipoibnetwork
+      NVIDIANETWORK_MACVLANNETWORK_IPAM_GATEWAY: 192.168.4.1
+      NVIDIANETWORK_MACVLANNETWORK_IPAM_RANGE: 192.168.4.0/24
+      NVIDIANETWORK_MACVLANNETWORK_NAME: rdmashared-net
+      NVIDIANETWORK_MELLANOX_ETH_INTERFACE_NAME: enp55s0np0
+      NVIDIANETWORK_MELLANOX_IB_INTERFACE_NAME: ibp13s0
+      NVIDIANETWORK_RDMA_CLIENT_HOSTNAME: nvd-srv-23.nvidia.eng.rdu2.dc.redhat.com
+      NVIDIANETWORK_RDMA_GPUDIRECT: "true"
+      NVIDIANETWORK_RDMA_LINK_TYPE: ethernet
+      NVIDIANETWORK_RDMA_MLX_DEVICE: mlx5_1
+      NVIDIANETWORK_RDMA_NETWORK_TYPE: shared-device
+      NVIDIANETWORK_RDMA_SERVER_HOSTNAME: nvd-srv-22.nvidia.eng.rdu2.dc.redhat.com
+      NVIDIANETWORK_RDMA_SRIOV_NETWORK_NAME: sriov-network
+      NVIDIANETWORK_RDMA_WORKLOAD_NAMESPACE: default
+      TEST_FEATURES: nvidianetwork
+      TEST_LABELS: deploy || rdma-shared-dev
+      TEST_TRACE: "true"
+      VERBOSE_LEVEL: "100"
+    test:
+    - as: network-operator-e2e
+      commands: |
+        export OVERRIDE_ENV_FILE=test.env
+        export REPORTS_DUMP_DIR=${ARTIFACT_DIR}
+        export KUBECONFIG=/var/run/nvidia-ci/kubeconfig
+        if [ -e "${OVERRIDE_ENV_FILE}" ]; then
+          echo "Loading environment variables from ${OVERRIDE_ENV_FILE}"
+          set -o allexport
+          source "${OVERRIDE_ENV_FILE}"
+          set +o allexport
+        fi
+        make run-tests
+      credentials:
+      - collection: ""
+        mount_path: /var/run/nvidia-ci
+        name: nvidia-ci-doca4
+        namespace: test-credentials
+      env:
+      - name: DUMP_FAILED_TESTS
+      - name: NVIDIANETWORK_CLEANUP
+      - name: NVIDIANETWORK_IPOIBNETWORK_IPAM_EXCLUDEIP1
+      - name: NVIDIANETWORK_IPOIBNETWORK_IPAM_EXCLUDEIP2
+      - name: NVIDIANETWORK_IPOIBNETWORK_IPAM_RANGE
+      - name: NVIDIANETWORK_IPOIBNETWORK_NAME
+      - name: NVIDIANETWORK_MACVLANNETWORK_IPAM_GATEWAY
+      - name: NVIDIANETWORK_MACVLANNETWORK_IPAM_RANGE
+      - name: NVIDIANETWORK_MACVLANNETWORK_NAME
+      - name: NVIDIANETWORK_MELLANOX_ETH_INTERFACE_NAME
+      - name: NVIDIANETWORK_MELLANOX_IB_INTERFACE_NAME
+      - name: NVIDIANETWORK_RDMA_CLIENT_HOSTNAME
+      - name: NVIDIANETWORK_RDMA_GPUDIRECT
+      - name: NVIDIANETWORK_RDMA_LINK_TYPE
+      - name: NVIDIANETWORK_RDMA_MLX_DEVICE
+      - name: NVIDIANETWORK_RDMA_NETWORK_TYPE
+      - name: NVIDIANETWORK_RDMA_SERVER_HOSTNAME
+      - name: NVIDIANETWORK_RDMA_SRIOV_NETWORK_NAME
+      - name: NVIDIANETWORK_RDMA_WORKLOAD_NAMESPACE
+      - name: TEST_FEATURES
+      - name: TEST_LABELS
+      - name: TEST_TRACE
+      - name: VERBOSE_LEVEL
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: doca4

@@ -24,6 +24,7 @@ tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 cd ~/microshift
 
 export CI_JOB_NAME="${JOB_NAME}"
+export GITHUB_TOKEN="\$(cat /tmp/token-git 2>/dev/null || echo '')"
 if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     ./test/bin/ci_phase_iso_build.sh -update_cache
 else
@@ -50,20 +51,23 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     # If the current release supports brew RPM download, get the latest RPMs from
     # brew to be included in the source repository archive
     pushd "${src_path}" &>/dev/null
-    if [ -e ./test/bin/manage_brew_rpms.sh ] ; then
+    if [ -e ./test/bin/manage_brew_rpms.sh ] && ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type' ; then
         y_version="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
         bash -x ./scripts/fetch_tools.sh brew
-        bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}"
-
-        # Fetch brew RPMs for release regression testing
-        # Condition to skip it if manage_brew_rpms.sh script latest version is not backported to all release branches
-        if ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type'  ; then
-            bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "zstream" || true
-            bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 1))" "${out_path}" "zstream" || true
-            bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 2))" "${out_path}" "zstream" || true
-            bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "rc" || true
-            bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "ec" || true
+        # Fail the entire job if there is no access to brew, as this could render an incomplete cache.
+        if ! bash -x ./test/bin/manage_brew_rpms.sh access; then
+            echo "ERROR: Brew Hub site is not accessible"
+            exit 1
         fi
+        LATEST_RELEASE_TYPE="$(awk -F= '/^LATEST_RELEASE_TYPE=/ {gsub(/[[:space:]"]/, "", $2); print $2}' ./test/bin/common_versions.sh)"
+        if [[ -z "${LATEST_RELEASE_TYPE}" ]]; then
+            LATEST_RELEASE_TYPE="ec"
+        fi
+        # Warn on failures, as there are periods of time where a specific release type RPM for a release may not be available.
+        bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "${LATEST_RELEASE_TYPE}" || echo "WARNING: Failed to download ${LATEST_RELEASE_TYPE} RPMs for 4.${y_version}"
+        bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "nightly" || echo "WARNING: Failed to download nightly RPMs for 4.${y_version}"
+        bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 1))" "${out_path}" "zstream" || echo "WARNING: Failed to download zstream RPMs for 4.$((${y_version} - 1))"
+        bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 2))" "${out_path}" "zstream"
     fi
     popd &>/dev/null
 fi
@@ -76,6 +80,7 @@ scp \
     /tmp/iso.sh \
     /var/run/rhsm/subscription-manager-org \
     /var/run/rhsm/subscription-manager-act-key \
+    /var/run/vault/tests-private-account/token-git \
     "${CLUSTER_PROFILE_DIR}/pull-secret" \
     "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
     "${CLUSTER_PROFILE_DIR}/ssh-publickey" \

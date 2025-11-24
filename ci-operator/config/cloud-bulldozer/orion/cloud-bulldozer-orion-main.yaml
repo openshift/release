@@ -1,0 +1,63 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: payload-control-plane-6nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "3"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_LOCAL_INDEX: "true"
+      ES_TYPE: qe
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s --service-latency
+      IGNORE_JOB_ITERATIONS: "true"
+      ITERATION_MULTIPLIER_ENV: "15"
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: "true"
+      VERSION: "4.21"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: payload-control-plane-6nodes-nodeploy
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ES_TYPE: qe
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: "true"
+      VERSION: "4.21"
+    test:
+    - chain: openshift-qe-orion-consolidated
+- always_run: false
+  as: daily-virt-6nodes-nodeploy
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      RUN_ORION: "true"
+      VERSION: "4.19"
+    test:
+    - chain: openshift-qe-orion-consolidated-virt
+zz_generated_metadata:
+  branch: main
+  org: cloud-bulldozer
+  repo: orion

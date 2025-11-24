@@ -1,0 +1,52 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+images:
+- dockerfile_path: ci/Dockerfile.ci
+  to: ocp-virt-validation-checkup
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 600Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws-virtualization
+    env:
+      BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
+    test:
+    - ref: interop-tests-deploy-cnv
+    - as: run-validation-checkup
+      cli: latest
+      commands: make ci-validate
+      dependencies:
+      - env: OCP_VIRT_VALIDATION_IMAGE
+        name: ocp-virt-validation-checkup
+      env:
+      - default: gp3
+        name: STORAGE_CLASS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+    workflow: cnv-e2e-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift-cnv
+  repo: ocp-virt-validation-checkup

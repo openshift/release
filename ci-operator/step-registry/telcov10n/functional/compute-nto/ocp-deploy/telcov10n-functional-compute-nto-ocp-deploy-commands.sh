@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 set -o pipefail
+set -x
 MOUNTED_HOST_INVENTORY="/var/host_variables"
 
 process_inventory() {
@@ -30,6 +31,9 @@ process_inventory() {
 
 main() {
 
+    echo "Save cluster version to SHARED_DIR"
+    echo "${VERSION}" > "${SHARED_DIR}/cluster_version"
+
     echo "Set CLUSTER_NAME env var"
     if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
         CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
@@ -53,13 +57,11 @@ main() {
     echo "Create host_vars directory"
     mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
 
-    if [[ "$CLUSTER_NAME" == "hlxcl15" ]]; then
-        mkdir /tmp/"${CLUSTER_NAME}"
-        cp -r "${MOUNTED_HOST_INVENTORY}"/hlxcl15/hypervisor /tmp/"${CLUSTER_NAME}"/hypervisor
-        cp -r "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/"* /tmp/"${CLUSTER_NAME}"/
-        ls -l /tmp/"${CLUSTER_NAME}"/
-        MOUNTED_HOST_INVENTORY="/tmp"
-    fi
+    mkdir /tmp/"${CLUSTER_NAME}"
+    cp -r "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/hypervisor" /tmp/"${CLUSTER_NAME}"/hypervisor
+    cp -r "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/"* /tmp/"${CLUSTER_NAME}"/
+    ls -l /tmp/"${CLUSTER_NAME}"/
+    MOUNTED_HOST_INVENTORY="/tmp"
 
     find ${MOUNTED_HOST_INVENTORY}/"${CLUSTER_NAME}"/ -mindepth 1 -type d | while read -r dir; do
         echo "Process group inventory file: ${dir}"
@@ -68,8 +70,13 @@ main() {
 
     cd /eco-ci-cd
     echo "Deploy OCP for compute-nto testing"
-    ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml -i ./inventories/ocp-deployment/build-inventory.py \
-        --extra-vars "release=${VERSION} cluster_name=${CLUSTER_NAME} kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
+    ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py \
+        --extra-vars "release=${VERSION}" \
+        --extra-vars "cluster_name=${CLUSTER_NAME}" \
+        --extra-vars "kubeconfig=/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig" \
+        --extra-vars "ocp_version_facts_release_type=${OCP_VERSION_RELEASE_TYPE}" \
+        --extra-vars "ocp_version_release_age_max_days=${OCP_VERSION_RELEASE_AGE_MAX_DAYS}"
 
     echo "Store inventory in SHARED_DIR"
     cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/

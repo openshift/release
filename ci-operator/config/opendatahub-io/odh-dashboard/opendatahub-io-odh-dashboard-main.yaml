@@ -1,27 +1,30 @@
-base_images:
-  dev-scripts:
-    name: test
-    namespace: ocp-kni
-    tag: dev-scripts
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.17-openshift-4.10
+    tag: rhel-9-release-golang-1.22-openshift-4.18
 images:
 - context_dir: .
   dockerfile_path: Dockerfile
   to: odh-dashboard-image
+- context_dir: .
+  dockerfile_path: ./packages/model-registry/Dockerfile.workspace
+  to: odh-mod-arch-model-registry-image
+- context_dir: .
+  dockerfile_path: ./packages/gen-ai/Dockerfile.workspace
+  to: odh-mod-arch-gen-ai-image
 promotion:
   to:
   - namespace: opendatahub-io
     tag: latest
+  - namespace: opendatahub-io
+    tag: main
 releases:
   latest:
     release:
       architecture: amd64
       channel: fast
-      version: "4.10"
+      version: "4.18"
 resources:
   '*':
     requests:
@@ -44,13 +47,38 @@ tests:
     env:
       IMAGE_REPO: odh-dashboard
     workflow: opendatahub-io-ci-image-mirror
-- as: odh-dashboard-s390x-build
-  cron: 0 2 * * *
+- as: odh-mod-arch-model-registry-pr-image-mirror
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-model-registry-image
     env:
-      IMAGE_REPO: odh-dashboard
-      IMAGE_TAG: multiarch-nightly
-    workflow: opendatahub-io-ci-s390x-build-build-publish
+      IMAGE_REPO: odh-mod-arch-modular-architecture
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-model-registry-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-model-registry-image
+    env:
+      IMAGE_REPO: odh-mod-arch-modular-architecture
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-gen-ai-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-gen-ai-image
+    env:
+      IMAGE_REPO: odh-mod-arch-gen-ai
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-gen-ai-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-gen-ai-image
+    env:
+      IMAGE_REPO: odh-mod-arch-gen-ai
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: opendatahub-io

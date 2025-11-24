@@ -11,14 +11,14 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
   rhel-coreos-base:
     name: 4.21-priv
     namespace: ocp-private
@@ -26,7 +26,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.20"
+    tag: "4.21"
 binary_build_commands: go build ./cmd/cloud-controller-manager
 build_root:
   from_repository: true
@@ -34,12 +34,12 @@ canonical_go_repository: k8s.io/cloud-provider-gcp
 images:
 - dockerfile_path: openshift-hack/images/Dockerfile.openshift
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: gcp-cloud-controller-manager
 - dockerfile_literal: |
     # This uses the new rhel-coreos base image
@@ -66,6 +66,7 @@ promotion:
   to:
   - additional_images:
       cloud-provider-gcp-rpms: rpms
+    disabled: true
     excluded_images:
     - rhel-coreos
     name: 4.21-priv
@@ -120,22 +121,22 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-gcp-ipi
-  timeout: 7h0m0s
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-main}
   container:
     from: commitchecker
   optional: true
-- as: security
-  steps:
-    env:
-      PROJECT_NAME: cloud-provider-gcp
-    workflow: openshift-ci-security
-- as: verify-deps
+- as: verify-vendor-work
   commands: openshift-hack/verify-vendor.sh
   container:
     from: src
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 - as: unit
   commands: openshift-hack/test-unit.sh
   container:

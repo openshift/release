@@ -55,8 +55,6 @@ bastion_user=$(head -n 1 "${SHARED_DIR}/bastion_ssh_user")
 
 echo "Start to configure the dnsmasq on the bastion host..."
 
-run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "rpm -q dnsmasq >/dev/null 2>&1 || { echo 'Error: dnsmasq is not installed.' >&2; exit 1; }"
-
 #A custom_dns file is expected to be existed under ${SHARED_DIR}, with content like below, a mapping list of domain and IP separated by space
 #api.ci-op-lzf5p7sb-12fc7.qe.gcp.devcluster.openshift.com 3.3.3.3
 #apps.ci-op-lzf5p7sb-12fc7.qe.gcp.devcluster.openshift.com 4.4.4.4
@@ -74,12 +72,25 @@ done < "${SHARED_DIR}/custom_dns" > /tmp/custom-dns.conf
 
 run_scp_to_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/custom-dns.conf" "/tmp/"
 
-#Set the custom DNS configuration and start dnsmasq
-run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo mv /tmp/custom-dns.conf /etc/dnsmasq.d/"
-run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo chown root:root /etc/dnsmasq.d/custom-dns.conf && sudo restorecon -v /etc/dnsmasq.d/custom-dns.conf"
-run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo systemctl unmask dnsmasq && sudo systemctl enable dnsmasq && sudo systemctl start dnsmasq"
+if [[ "${ENALBE_DNSMASQ_METHOD}" == "NetworkManager" ]]; then
+    #Set the custom DNS configuration in dnsmasq plugin of NetworkManager
+    run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo mv /tmp/custom-dns.conf /etc/NetworkManager/dnsmasq.d/"
+    run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo chown root:root /etc/NetworkManager/dnsmasq.d/custom-dns.conf && sudo restorecon -v /etc/NetworkManager/dnsmasq.d/custom-dns.conf"
+    run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo touch /etc/NetworkManager/conf.d/use-dnsmasq.conf && echo -e '[main]\ndns=dnsmasq' | sudo tee -a /etc/NetworkManager/conf.d/use-dnsmasq.conf"
+    run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo systemctl restart NetworkManager.service"
 
-#Set dnsmasq as the first DNS server
-run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "echo -e '[Resolve]\nDNS=127.0.0.1' | sudo tee -a /etc/systemd/resolved.conf && sudo systemctl restart systemd-resolved && resolvectl"
+elif [[ "${ENALBE_DNSMASQ_METHOD}" == "systemd-service" ]]; then
+    run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "rpm -q dnsmasq >/dev/null 2>&1 || { echo 'Error: dnsmasq is not installed.' >&2; exit 1; }"
+    #Set the custom DNS configuration and start dnsmasq
+    run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo mv /tmp/custom-dns.conf /etc/dnsmasq.d/"
+    run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo chown root:root /etc/dnsmasq.d/custom-dns.conf && sudo restorecon -v /etc/dnsmasq.d/custom-dns.conf"
+    run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo systemctl unmask dnsmasq && sudo systemctl enable dnsmasq && sudo systemctl start dnsmasq"
+
+    #Set dnsmasq as the first DNS server
+    run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "echo -e '[Resolve]\nDNS=127.0.0.1' | sudo tee -a /etc/systemd/resolved.conf && sudo systemctl restart systemd-resolved && resolvectl"
+else
+    echo "ERROR: unsupported ENALBE_DNSMASQ_METHOD: ${ENALBE_DNSMASQ_METHOD}, abort..."
+    exit 1
+fi
 
 echo "Custom DNS records were configured on the bastion host."

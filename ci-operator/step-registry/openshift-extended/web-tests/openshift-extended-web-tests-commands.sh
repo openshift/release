@@ -8,6 +8,12 @@ pwd && ls -ltr
 cd frontend || exit 0
 pwd && ls -ltr
 
+#set env for kubeadmin
+if [ -f "${SHARED_DIR}/kubeadmin-password" ]; then
+    QE_KUBEADMIN_PASSWORD=$(cat "${SHARED_DIR}/kubeadmin-password")
+    export QE_KUBEADMIN_PASSWORD
+fi
+
 ## skip all tests when console is not installed
 if ! (oc get clusteroperator console --kubeconfig=${KUBECONFIG}) ; then
   echo "console is not installed, skipping all console tests."
@@ -15,16 +21,7 @@ if ! (oc get clusteroperator console --kubeconfig=${KUBECONFIG}) ; then
 fi
 
 if ! (oc get node --kubeconfig=${KUBECONFIG} | grep master) ; then
-  if [[ "$E2E_RUN_TAGS" =~ @rosa && "$E2E_RUN_TAGS" =~ @critical ]]; then
-    echo "Run on ROSA hypershift hosted cluster - Only Critical"
-    ./console-test-frontend-hypershift.sh --tags @hypershift-hosted-critical || true
-  elif [[ "$E2E_RUN_TAGS" =~ @rosa ]] ; then
-    echo "Run on ROSA hypershift hosted cluster"
-    ./console-test-frontend-hypershift.sh --tags @hypershift-hosted+@rosa || true
-  else
-    echo "Run on normal hypershift hosted cluster"
     ./console-test-frontend-hypershift.sh || true
-  fi
 else
   export E2E_RUN_TAGS="${E2E_RUN_TAGS}"
   echo "E2E_RUN_TAGS is: ${E2E_RUN_TAGS}"

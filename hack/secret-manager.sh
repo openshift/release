@@ -15,5 +15,8 @@ else
     source "$VENV_PATH/bin/activate"
 fi
 
+# Set quota project for this tool only (doesn't affect user's global gcloud config)
+export GOOGLE_CLOUD_QUOTA_PROJECT="openshift-ci-secrets"
+
 # Forward arguments to the Python script
 python3 "$SCRIPT_DIR/gcp-secret-manager/main.py" "$@"

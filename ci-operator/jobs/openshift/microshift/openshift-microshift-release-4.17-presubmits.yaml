@@ -1,7 +1,82 @@
 presubmits:
   openshift/microshift:
   - agent: kubernetes
-    always_run: false
+    always_run: true
+    branches:
+    - ^release-4\.17$
+    - ^release-4\.17-
+    cluster: build03
+    context: ci/prow/e2e-aws-nvidia-device-plugin
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci.openshift.io/generator: prowgen
+      job-release: "4.17"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.17-e2e-aws-nvidia-device-plugin
+    rerun_command: /test e2e-aws-nvidia-device-plugin
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-nvidia-device-plugin
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-nvidia-device-plugin,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -12,13 +87,12 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-footprint-and-performance
     rerun_command: /test footprint-and-performance
-    run_if_changed: ^(scripts/ci-footprint-and-performance/.*)$
     spec:
       containers:
       - args:
@@ -30,7 +104,7 @@ presubmits:
         - --target=footprint-and-performance
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -81,7 +155,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -103,7 +177,7 @@ presubmits:
         - --target=[release:latest]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -135,7 +209,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -146,13 +220,12 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-metal-bootc-periodic-test
     rerun_command: /test metal-bootc-periodic-test
-    run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
     spec:
       containers:
       - args:
@@ -164,7 +237,7 @@ presubmits:
         - --target=metal-bootc-periodic-test
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -211,7 +284,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )metal-bootc-periodic-test,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -222,13 +295,12 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-3
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-metal-bootc-periodic-test-arm
     rerun_command: /test metal-bootc-periodic-test-arm
-    run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
     spec:
       containers:
       - args:
@@ -240,7 +312,7 @@ presubmits:
         - --target=metal-bootc-periodic-test-arm
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -287,7 +359,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )metal-bootc-periodic-test-arm,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -298,13 +370,12 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-metal-bootc-test
     rerun_command: /test metal-bootc-test
-    run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
     spec:
       containers:
       - args:
@@ -316,7 +387,7 @@ presubmits:
         - --target=metal-bootc-test
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -363,7 +434,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )metal-bootc-test,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -374,13 +445,12 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-metal-bootc-test-arm
     rerun_command: /test metal-bootc-test-arm
-    run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
     spec:
       containers:
       - args:
@@ -392,7 +462,7 @@ presubmits:
         - --target=metal-bootc-test-arm
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -439,7 +509,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )metal-bootc-test-arm,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -450,13 +520,12 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-metal-periodic-test
     rerun_command: /test metal-periodic-test
-    run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
     spec:
       containers:
       - args:
@@ -468,7 +537,7 @@ presubmits:
         - --target=metal-periodic-test
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -515,7 +584,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )metal-periodic-test,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -532,7 +601,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-metal-periodic-test-arm
     rerun_command: /test metal-periodic-test-arm
-    run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
     spec:
       containers:
       - args:
@@ -544,7 +612,7 @@ presubmits:
         - --target=metal-periodic-test-arm
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -591,7 +659,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )metal-periodic-test-arm,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -602,13 +670,12 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-microshift-metal-cache
     rerun_command: /test microshift-metal-cache
-    run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
     spec:
       containers:
       - args:
@@ -620,7 +687,7 @@ presubmits:
         - --target=microshift-metal-cache
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -667,7 +734,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )microshift-metal-cache,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -678,13 +745,12 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-microshift-metal-cache-arm
     rerun_command: /test microshift-metal-cache-arm
-    run_if_changed: ^test\/bin\/(ci_phase_iso_build|manage_build_cache)\.sh$
     spec:
       containers:
       - args:
@@ -696,7 +762,7 @@ presubmits:
         - --target=microshift-metal-cache-arm
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -743,7 +809,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )microshift-metal-cache-arm,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -754,13 +820,12 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-microshift-metal-tests
     rerun_command: /test microshift-metal-tests
-    run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
     spec:
       containers:
       - args:
@@ -772,7 +837,7 @@ presubmits:
         - --target=microshift-metal-tests
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -819,7 +884,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )microshift-metal-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -830,13 +895,12 @@ presubmits:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-microshift-metal-tests-arm
     rerun_command: /test microshift-metal-tests-arm
-    run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
     spec:
       containers:
       - args:
@@ -848,7 +912,7 @@ presubmits:
         - --target=microshift-metal-tests-arm
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -895,24 +959,23 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )microshift-metal-tests-arm,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
-    context: ci/prow/ocp-conformance-rhel-eus
+    context: ci/prow/ocp-conformance-with-optional-rpms-rhel-eus-nightly
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.17-ocp-conformance-rhel-eus
-    rerun_command: /test ocp-conformance-rhel-eus
-    run_if_changed: ^(assets/.*|etcd/.*|vendor/.*)$
+    name: pull-ci-openshift-microshift-release-4.17-ocp-conformance-with-optional-rpms-rhel-eus-nightly
+    rerun_command: /test ocp-conformance-with-optional-rpms-rhel-eus-nightly
     spec:
       containers:
       - args:
@@ -921,10 +984,10 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=ocp-conformance-rhel-eus
+        - --target=ocp-conformance-with-optional-rpms-rhel-eus-nightly
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -969,26 +1032,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-conformance-rhel-eus,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-conformance-with-optional-rpms-rhel-eus-nightly,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
     cluster: build03
-    context: ci/prow/ocp-conformance-rhel-eus-arm
+    context: ci/prow/ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
       ci.openshift.io/generator: prowgen
       job-release: "4.17"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.17-ocp-conformance-rhel-eus-arm
-    rerun_command: /test ocp-conformance-rhel-eus-arm
-    run_if_changed: ^(assets/.*|etcd/.*|vendor/.*)$
+    name: pull-ci-openshift-microshift-release-4.17-ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm
+    rerun_command: /test ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm
     spec:
       containers:
       - args:
@@ -997,10 +1059,10 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=ocp-conformance-rhel-eus-arm
+        - --target=ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1045,9 +1107,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocp-conformance-rhel-eus-arm,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-conformance-with-optional-rpms-rhel-eus-nightly-arm,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
@@ -1064,7 +1126,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-microshift-release-4.17-ocp-full-conformance-rhel-eus
     rerun_command: /test ocp-full-conformance-rhel-eus
-    run_if_changed: ^(origin/.*|assets/.*|etcd/.*|vendor/.*)$
     spec:
       containers:
       - args:
@@ -1076,7 +1137,7 @@ presubmits:
         - --target=ocp-full-conformance-rhel-eus
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1127,7 +1188,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build01
     context: ci/prow/test-rebase
     decorate: true
     decoration_config:
@@ -1150,7 +1211,7 @@ presubmits:
         - --target=test-rebase
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1192,7 +1253,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build01
     context: ci/prow/test-rpm
     decorate: true
     decoration_config:
@@ -1213,7 +1274,7 @@ presubmits:
         - --target=test-rpm
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1249,7 +1310,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build01
     context: ci/prow/test-unit
     decorate: true
     decoration_config:
@@ -1269,7 +1330,7 @@ presubmits:
         - --target=test-unit
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1305,7 +1366,7 @@ presubmits:
     branches:
     - ^release-4\.17$
     - ^release-4\.17-
-    cluster: build03
+    cluster: build01
     context: ci/prow/verify
     decorate: true
     decoration_config:
@@ -1326,7 +1387,7 @@ presubmits:
         - --target=verify
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:

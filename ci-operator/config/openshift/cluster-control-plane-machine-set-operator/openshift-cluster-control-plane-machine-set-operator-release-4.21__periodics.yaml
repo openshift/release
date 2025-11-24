@@ -3,14 +3,14 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: cluster-control-plane-machine-set-tests
-  ocp_4.20_base-rhel9:
-    name: "4.20"
+  ocp_4.21_base-rhel9:
+    name: "4.21"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
   openstack-installer:
     name: "4.21"
     namespace: ocp
@@ -20,12 +20,12 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cluster-control-plane-machine-set-operator
 releases:
   arm64-latest:
@@ -50,7 +50,7 @@ tests:
 - as: e2e-aws
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     observers:
       enable:
       - observers-resource-watch
@@ -64,7 +64,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 6h0m0s
 - as: e2e-aws-arm
   interval: 24h
   steps:
@@ -83,7 +82,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 6h0m0s
 - as: e2e-azure
   interval: 24h
   steps:
@@ -101,7 +99,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-azure
-  timeout: 6h0m0s
 - as: e2e-gcp
   interval: 24h
   steps:
@@ -119,7 +116,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-  timeout: 6h0m0s
 - as: e2e-openstack
   interval: 24h
   steps:
@@ -135,11 +131,10 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: openshift-e2e-openstack-ipi
-  timeout: 6h0m0s
 - as: e2e-aws-techpreview
   interval: 24h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -152,11 +147,10 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 6h0m0s
 - as: e2e-aws-arm-techpreview
   interval: 24h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-5
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
@@ -172,7 +166,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
-  timeout: 6h0m0s
 - as: e2e-azure-techpreview
   interval: 24h
   steps:
@@ -189,7 +182,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-azure
-  timeout: 6h0m0s
 - as: e2e-gcp-techpreview
   interval: 24h
   steps:
@@ -206,7 +198,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-  timeout: 6h0m0s
 - as: e2e-openstack-techpreview
   interval: 24h
   steps:
@@ -224,7 +215,6 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: openshift-e2e-openstack-ipi
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.21
   org: openshift

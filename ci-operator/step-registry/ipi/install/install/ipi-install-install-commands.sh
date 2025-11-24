@@ -132,6 +132,22 @@ function populate_artifact_dir() {
     mkdir -p "${ARTIFACT_DIR}/clusterapi_output-${current_time}"
     cp -rpv "${dir}/.clusterapi_output/"{,**/}*.{log,yaml} "${ARTIFACT_DIR}/clusterapi_output-${current_time}" 2>/dev/null
   fi
+
+  # Capture infrastructure issue log to help gather the datailed failure message in junit files
+  if [[ "$ret" == "4" ]] || [[ "$ret" == "5" ]]; then
+    grep -Er "Throttling: Rate exceeded|\
+rateLimitExceeded|\
+The maximum number of [A-Za-z ]* has been reached|\
+The number of .* is larger than the maximum allowed size|\
+Quota .* exceeded|\
+Cannot create more than .* for this subscription|\
+The request is being throttled as the limit has been reached|\
+SkuNotAvailable|\
+Exceeded limit .* for zone|\
+Operation could not be completed as it results in exceeding approved .* quota|\
+A quota has been reached for project|\
+LimitExceeded.*exceed quota" ${ARTIFACT_DIR} > "${SHARED_DIR}/install_infrastructure_failure.log" || true
+  fi
 }
 
 
@@ -630,6 +646,9 @@ gcp)
     elif [ -f "${SHARED_DIR}/xpn_min_perm_passthrough.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_passthrough.json"
+    elif [ -f "${SHARED_DIR}/xpn_min_perm_cco_manual.json" ]; then
+      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC with CCO in Manual mode..."
+      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_min_perm_cco_manual.json"
     elif [ -f "${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json" ]; then
       echo "$(date -u --rfc-3339=seconds) - Using the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC using BYO hosted zone..."
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json"
@@ -791,24 +810,10 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
 case $CLUSTER_TYPE in
-  vsphere*)
-    # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
-    max=1
-    ;;
-  aws*)
-    # Do not retry because aws resources can collide when re-using installer assets
-    max=1
-    ;;
-  azure*)
-    # Do not retry because azure resources always collide when re-using installer assets
-    max=1
-    ;;
-  ibmcloud*)
-    # Do not retry because IBMCloud resources will has BucketAlreadyExists error when re-using installer assets
-    max=1
-    ;;
   *)
-    max=3
+  # Installs are stable enough to not benefit from retries; and not all platforms support retries.
+  # If a platform could benefit from retries (e.g. flaking due to resource contention), add a case for the platform above.
+    max=1
     ;;
 esac
 ret=4

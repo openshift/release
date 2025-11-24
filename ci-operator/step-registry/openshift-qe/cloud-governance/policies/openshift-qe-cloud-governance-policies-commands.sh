@@ -3,7 +3,7 @@
 # Export ES environment variables
 es_host="$(cat /secret/es-host)"
 export es_host
-es_port="$(cat /secret/es-port)"
+es_port=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".es-port")
 export es_port
 es_index="${POLICIES_GROUP}-$(cat /secret/policy-es-index)"
 export es_index

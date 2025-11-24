@@ -48,6 +48,9 @@ chain:
     - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION
       default: ""
       documentation: "The Azure Marketplace image version."
+    - name: HYPERSHIFT_AZURE_SELF_MANAGED
+      default: "false"
+      documentation: "If true , a self-managed HCP will be installed in azure cloud provider."
     - name: HYPERSHIFT_ETCD_ENCRYPTION
       default: "false"
       documentation: |-
@@ -123,6 +126,15 @@ chain:
     - name: HYPERSHIFT_INSTANCE_TYPE
       default: ""
       documentation: "Instance type for the nodepool vm size"
+    - name: ADDITIONAL_CA_BUNDLE_FILE
+      default: ""
+      documentation: "The additional ca bundle file name in the shared directory"
+    - name: HYPERSHIFT_AZURE_MARKETPLACE_ENABLED
+      default: "true"
+      documentation: "Enable marketplace flags"
+    - name: HYPERSHIFT_AZURE_IMAGE_GENERATION
+      default: ""
+      documentation: "image generation value"  
     commands: |-
       set -exuo pipefail
 
@@ -220,6 +232,10 @@ chain:
         COMMAND+=( --oidc-issuer-url $AZURE_OIDC_ISSUER_URL)
       fi
       
+      if [[ $HYPERSHIFT_AZURE_IMAGE_GENERATION != "" ]]; then
+        COMMAND+=(  --image-generation $HYPERSHIFT_AZURE_IMAGE_GENERATION)
+      fi
+
       if [[ $AZURE_SA_TOKEN_ISSUER_KEY_PATH != "" ]]; then
         COMMAND+=( --sa-token-issuer-private-key-path $AZURE_SA_TOKEN_ISSUER_KEY_PATH)
       fi
@@ -245,21 +261,22 @@ chain:
       if [[ -n $HYPERSHIFT_OLM_CATALOG_PLACEMENT ]]; then
         EXTRA_ARGS+=" --olm-catalog-placement=${HYPERSHIFT_OLM_CATALOG_PLACEMENT}"
       fi
-      
-      if [[ -n $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER ]]; then
-        EXTRA_ARGS+=" --marketplace-offer=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER}"
-        EXTRA_ARGS+=" --marketplace-publisher=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER}"
+      if [[ $HYPERSHIFT_AZURE_MARKETPLACE_ENABLED == "true" ]];then 
+        if [[ -n $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER ]]; then
+          EXTRA_ARGS+=" --marketplace-offer=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER}"
+          EXTRA_ARGS+=" --marketplace-publisher=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER}"
 
-        if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU ]]; then
-          EXTRA_ARGS+=" --marketplace-sku=$(cat "${SHARED_DIR}/azure-marketplace-image-sku")"
-        else
-          EXTRA_ARGS+=" --marketplace-sku=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU}"
-        fi
+          if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU ]]; then
+            EXTRA_ARGS+=" --marketplace-sku=$(cat "${SHARED_DIR}/azure-marketplace-image-sku")"
+          else
+            EXTRA_ARGS+=" --marketplace-sku=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU}"
+          fi
         
-        if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION ]]; then
-          EXTRA_ARGS+=" --marketplace-version=$(cat "${SHARED_DIR}/azure-marketplace-image-version")"
-        else
-          EXTRA_ARGS+=" --marketplace-version=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
+          if [[ -z $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION ]]; then
+            EXTRA_ARGS+=" --marketplace-version=$(cat "${SHARED_DIR}/azure-marketplace-image-version")"
+          else
+            EXTRA_ARGS+=" --marketplace-version=${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
+          fi
         fi
       fi
       
@@ -317,6 +334,14 @@ chain:
         COMMAND+=(--instance-type=${HYPERSHIFT_INSTANCE_TYPE})
       fi
       
+      if [[ -n "${ADDITIONAL_CA_BUNDLE_FILE}" ]]; then
+        COMMAND+=(--additional-trust-bundle "${SHARED_DIR}/${ADDITIONAL_CA_BUNDLE_FILE}")
+      fi
+
+      if [[ $HYPERSHIFT_AZURE_SELF_MANAGED == "true" ]]; then
+          COMMAND+=(--workload-identities-file "/etc/hypershift-selfmanaged-azurecreds/workload-identities.json")
+      fi
+
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         COMMAND+=(--render)
         if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER_SENSITIVE == "true" ]]; then
@@ -378,6 +403,9 @@ chain:
     - mount_path: /etc/hypershift-aro-azurecreds
       name: hypershift-aro-azurecreds
       namespace: test-credentials
+    - mount_path: /etc/hypershift-selfmanaged-azurecreds
+      name: hypershift-selfmanaged-azurecreds
+      namespace: test-credentials  
     dependencies:
     - name: "release:latest"
       env: RELEASE_IMAGE_LATEST

@@ -1,0 +1,60 @@
+base_images:
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.20
+images:
+- context_dir: .
+  dockerfile_path: Containerfile
+  from: ubi_minimal
+  to: odh-model-controller
+promotion:
+  to:
+  - namespace: opendatahub-io
+    tag: stable-2.x
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: HOME=/go GOFLAGS=-mod=mod make test
+  container:
+    from: src
+  skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
+- as: pr-image-mirror
+  skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-model-controller
+    env:
+      IMAGE_REPO: odh-model-controller
+    workflow: opendatahub-io-ci-image-mirror
+- as: stable-image-mirror
+  postsubmit: true
+  skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-model-controller
+    env:
+      IMAGE_REPO: odh-model-controller
+      RELEASE_VERSION: stable-2.x
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: stable-2.x
+  org: opendatahub-io
+  repo: odh-model-controller

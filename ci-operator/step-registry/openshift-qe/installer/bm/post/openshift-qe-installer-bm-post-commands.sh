@@ -5,8 +5,8 @@ set -o pipefail
 set -x
 
 
-bastion=$(cat "/secret/address")
-SSH_ARGS="-i /secret/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 
 # Clean up JetLag
 ssh ${SSH_ARGS} root@${bastion} "./clean-resources.sh"

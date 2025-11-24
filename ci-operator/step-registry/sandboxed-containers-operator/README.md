@@ -155,24 +155,7 @@ replace the suffix `-azure` with `-aws` to do the same on `aws`:
 Unlike in Azure in **AWS you are responsible for deleting all
 extra resources you created (AMI images, snapshots, S3 buckets)**
 The main source of left-overs usually is kataconfig, you can
-delete it by:
-
-```
-count=0;
-interval=120 # seconds
-maxcount=<20 minutes>
-oc delete kataconfig example-kataconfig
-while [$count -lt $maxcount ] ; do
-  if [ $(oc get kataconfig example-kataconfig) == "not found" ]
-  then
-    exit 0
-  fi
-  sleep $interval
-  count=$count+$interval
-done
-echo "timed out"
-exit 1
-```
+delete it by ``oc delete --wait kataconfig example-kataconfig``.
 
 Alternatively delete AMI **and** the associated snapshot manually.
 

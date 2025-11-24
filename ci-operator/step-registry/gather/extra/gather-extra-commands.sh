@@ -53,7 +53,7 @@ if [[ "${CAPI_PLATFORM}" == "powervs" ]]; then
   CAPI_PLATFORM=ibmpower
 fi
 
-queue ${ARTIFACT_DIR}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io authentication.config.openshift.io build.config.openshift.io console.config.openshift.io dns.config.openshift.io featuregate.config.openshift.io image.config.openshift.io infrastructure.config.openshift.io ingress.config.openshift.io network.config.openshift.io oauth.config.openshift.io project.config.openshift.io scheduler.config.openshift.io -o json
+queue ${ARTIFACT_DIR}/config-resources.json oc --insecure-skip-tls-verify --request-timeout=5s get apiserver.config.openshift.io,authentication.config.openshift.io,build.config.openshift.io,console.config.openshift.io,dns.config.openshift.io,featuregate.config.openshift.io,image.config.openshift.io,infrastructure.config.openshift.io,ingress.config.openshift.io,network.config.openshift.io,oauth.config.openshift.io,project.config.openshift.io,scheduler.config.openshift.io -o json
 queue ${ARTIFACT_DIR}/apiservices.json oc --insecure-skip-tls-verify --request-timeout=5s get apiservices -o json
 queue ${ARTIFACT_DIR}/oc_cmds/apiservices oc --insecure-skip-tls-verify --request-timeout=5s get apiservices
 queue ${ARTIFACT_DIR}/clusteroperators.json oc --insecure-skip-tls-verify --request-timeout=5s get clusteroperators -o json
@@ -166,7 +166,13 @@ done
 # change to the network artifact dir
 mkdir -p ${ARTIFACT_DIR}/network/multus_logs/
 pushd ${ARTIFACT_DIR}/network/multus_logs/ || return
-oc get node -oname | xargs oc adm must-gather -- /usr/bin/gather_multus_logs
+
+VOLUME_PERCENTAGE_FLAG=""
+if oc adm must-gather --help 2>&1 | grep -q -- '--volume-percentage'; then
+   VOLUME_PERCENTAGE_FLAG="--volume-percentage=100"
+fi
+
+oc get node -oname | xargs oc adm must-gather $VOLUME_PERCENTAGE_FLAG -- /usr/bin/gather_multus_logs
 popd || return
 
 # If the tcpdump-service or conntrackdump-service step was used, grab the files.
@@ -213,6 +219,7 @@ function gather_network() {
   local namespace=$1
   local selector=$2
   local container=$3
+  local netfilter=$4
 
   if ! oc --insecure-skip-tls-verify --request-timeout=20s get ns ${namespace}; then
     echo "Namespace ${namespace} does not exist, skipping ${namespace} network pods"
@@ -221,10 +228,13 @@ function gather_network() {
 
   local podlist="/tmp/${namespace}-pods"
 
-  # Snapshot iptables-save on each node for debugging possible kube-proxy issues
+  # Snapshot iptables/nftables rules on each node
   oc --insecure-skip-tls-verify --request-timeout=20s get -n "${namespace}" -l "${selector}" pods --template '{{ range .items }}{{ .metadata.name }}{{ "\n" }}{{ end }}' > ${podlist}
   while IFS= read -r i; do
     queue ${ARTIFACT_DIR}/network/iptables-save-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i iptables-save -c
+    if [[ ${netfilter} == "nftables" ]]; then
+      queue ${ARTIFACT_DIR}/network/nft-list-ruleset-$i oc --insecure-skip-tls-verify --request-timeout=20s rsh -n ${namespace} -c ${container} $i nft list ruleset
+    fi
   done < ${podlist}
   # Snapshot all used ports on each node.
   while IFS= read -r i; do
@@ -233,17 +243,19 @@ function gather_network() {
 }
 
 # Gather network details both from SDN and OVN. One of them should succeed.
-gather_network openshift-sdn app=sdn sdn
+gather_network openshift-sdn app=sdn sdn iptables
 sample_node=$(oc get no -o jsonpath='{.items[0].metadata.name}')
 sample_node_zone=$(oc get node "${sample_node}" -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/zone-name}')
 if [ "${sample_node}" = "${sample_node_zone}" ]; then
   echo "INFO: INTERCONNECT MODE"
   ovnkube_container=ovnkube-controller
+  ovnkube_netfilter=nftables
 else
   echo "INFO: LEGACY MODE"
   ovnkube_container=ovnkube-node
+  ovnkube_netfilter=iptables
 fi
-gather_network openshift-ovn-kubernetes app=ovnkube-node $ovnkube_container
+gather_network openshift-ovn-kubernetes app=ovnkube-node ${ovnkube_container} ${ovnkube_netfilter}
 
 while IFS= read -r i; do
   file="$( echo "$i" | cut -d ' ' -f 3 | tr -s ' ' '_' )"
@@ -551,6 +563,57 @@ ${t_all}     cluster:etcd:write:requests:latency:total:quantile histogram_quanti
 ${t_install} cluster:etcd:write:requests:latency:install:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_install}])) by (le,scope))
 ${t_test}    cluster:etcd:write:requests:latency:test:quantile histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket{operation=~"create|update|delete"}[${d_test}])) by (le,scope))
 
+# Gather the aggregated etcd P999, P99, P95, P50 values for WAL fsync, backend commit durations, network RTT for the entire job duration
+# We first aggregate buckets across all 3 instances and then calculate the percentile bands
+
+# WAL fsync duration
+${t_test}    cluster:etcd:disk:wal:fsync:test:aggregated:p999:quantile histogram_quantile(0.999, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:wal:fsync:test:aggregated:p99:quantile histogram_quantile(0.99, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:wal:fsync:test:p95:aggregated:quantile histogram_quantile(0.95, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:wal:fsync:test:p50:aggregated:quantile histogram_quantile(0.50, sum(rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+
+# Backend commit duration
+${t_test}    cluster:etcd:disk:backend:commit:test:aggregated:p999:quantile histogram_quantile(0.999, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:backend:commit:test:aggregated:p99:quantile histogram_quantile(0.99, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:backend:commit:test:aggregated:p95:quantile histogram_quantile(0.95, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:disk:backend:commit:test:aggregated:p50:quantile histogram_quantile(0.50, sum(rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])) by (le))
+
+# Network RTT
+${t_test}    cluster:etcd:network:rtt:test:aggregated:p999:quantile histogram_quantile(0.999, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:network:rtt:test:aggregated:p99:quantile histogram_quantile(0.99, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:network:rtt:test:aggregated:p95:quantile histogram_quantile(0.95, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+${t_test}    cluster:etcd:network:rtt:test:aggregated:p50:quantile histogram_quantile(0.50, sum(rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])) by (le))
+
+# Gather the max etcd P999, P99, P95, P50 values for WAL fsync, backend commit durations, network RTT for the entire job duration
+# same as above but we take the max value across all 3 instances instead of aggregating the buckets
+# This would effectively be the slowest instance
+
+# WAL fsync duration
+${t_test}    cluster:etcd:disk:wal:fsync:test:max:p999:quantile max(histogram_quantile(0.999, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:max:p99:quantile max(histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:max:p95:quantile max(histogram_quantile(0.95, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:disk:wal:fsync:test:max:p50:quantile max(histogram_quantile(0.50, rate(etcd_disk_wal_fsync_duration_seconds_bucket{job="etcd"}[${d_test}])))
+
+# Backend commit duration
+${t_test}    cluster:etcd:disk:backend:commit:test:max:p999:quantile max(histogram_quantile(0.999, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:max:p99:quantile max(histogram_quantile(0.99, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:max:p95:quantile max(histogram_quantile(0.95, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+${t_test}    cluster:etcd:disk:backend:commit:test:max:p50:quantile max(histogram_quantile(0.50, rate(etcd_disk_backend_commit_duration_seconds_bucket{job=~".*etcd.*"}[${d_test}])))
+
+# Network RTT
+${t_test}    cluster:etcd:network:rtt:test:max:p999:quantile max(histogram_quantile(0.999, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:network:rtt:test:max:p99:quantile max(histogram_quantile(0.99, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:network:rtt:test:max:p95:quantile max(histogram_quantile(0.95, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])))
+${t_test}    cluster:etcd:network:rtt:test:max:p50:quantile max(histogram_quantile(0.50, rate(etcd_network_peer_round_trip_time_seconds_bucket{job="etcd"}[${d_test}])))
+
+# Gather the percent of etcd grpc server handled requests that failed
+# This only tallies the failure for severe errors and ignores client side error types
+${t_test}    cluster:etcd:grpc:server:handled:test:error:percent 100 * ( sum(rate(grpc_server_handled_total{ job=~".*etcd.*", grpc_code=~"Internal|Unavailable|DataLoss|DeadlineExceeded|ResourceExhausted|Unknown" }[${d_test}])) / sum(rate(grpc_server_handled_total{job=~".*etcd.*"}[${d_test}])) )
+
+# Gather the total number of slow apply requests over the duration of the test
+# May indicate overloaded disk/network/cpu or all of the above so not directly useful but worth seeing if there is a pattern across jobs over time
+${t_test}    cluster:etcd:server:slow:apply:test:count sum(increase(etcd_server_slow_apply_total[${d_test}]))
+
 ${t_all}     cluster:etcd:read:requests:latency:total:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_all}])) by (le,scope)
 ${t_install} cluster:etcd:read:requests:latency:install:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_install}])) by (le,scope)
 ${t_test}    cluster:etcd:read:requests:latency:test:avg sum(rate(etcd_request_duration_seconds_sum{operation=~"get|list|listWithCount"}[${d_test}])) by (le,scope) / sum(rate(etcd_request_duration_seconds_count{operation=~"get|list|listWithCount"}[${d_test}])) by (le,scope)
@@ -607,6 +670,8 @@ set -f
 echo > /tmp/queries_resolved
 while IFS= read -r i; do
   if [[ -z "${i}" ]]; then continue; fi
+  # Skip comment lines
+  if [[ "${i}" =~ ^[[:space:]]*# ]]; then continue; fi
   # Try to convert the line of the file into a query, performing bash substitution AND catch undefined variables
   # The heredoc is necessary because bash will perform quote evaluation on labels in queries (pod="x" becomes pod=x)
   if ! q=$( eval $'cat <<END\n'$i$'\nEND\n' 2>/dev/null ); then
@@ -638,6 +703,8 @@ SCRIPT
 cat <<'SCRIPT'
 while IFS= read -r q; do
   if [[ -z "${q}" ]]; then continue; fi
+  # Skip comment lines
+  if [[ "${q}" =~ ^[[:space:]]*# ]]; then continue; fi
   # part up the line '<unix_timestamp_query_time> <name> <query>'
   timestamp=${q%% *}
   q=${q#* }
@@ -664,25 +731,94 @@ queue ${ARTIFACT_DIR}/metrics/job_metrics.json oc --insecure-skip-tls-verify rsh
 
 wait
 
-# C2S/SC2S proxy can not access internet
-if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
-  source "${SHARED_DIR}/unset-proxy.sh"
-fi
-# This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
-curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
-
 mkdir -p ${ARTIFACT_DIR}/junit/
-<${ARTIFACT_DIR}/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator conditions \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
+
+if openshift-tests e2e-analysis --help &>/dev/null; then
+    echo "Post e2e-analysis check for the cluster"
+    openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+else
+    # C2S/SC2S proxy can not access internet
+    if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+      source "${SHARED_DIR}/unset-proxy.sh"
+    fi
+    # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
+    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
+    if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+        # shellcheck disable=SC1090
+        source "${SHARED_DIR}/proxy-conf.sh"
+    fi
+    <${ARTIFACT_DIR}/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator conditions \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
+fi
 
 # This is an experimental wiring of autogenerated failure detection.
 echo "Detect known failures from symptoms (experimental) ..."
-curl -f https://gist.githubusercontent.com/liangxia/1188ce4d25f42138694e32ac8ee9a373/raw/994d3bedeb7cb4cfc679b1e27e1a659a3d845d61/symptom.sh 2>/dev/null | bash -s ${ARTIFACT_DIR} > ${ARTIFACT_DIR}/junit/junit_symptoms.xml
+# curl -f https://gist.githubusercontent.com/liangxia/1188ce4d25f42138694e32ac8ee9a373/raw/994d3bedeb7cb4cfc679b1e27e1a659a3d845d61/symptom.sh 2>/dev/null | bash -s ${ARTIFACT_DIR} > ${ARTIFACT_DIR}/junit/junit_symptoms.xml
 
-if test -f "${SHARED_DIR}/proxy-conf.sh"
-then
-    # shellcheck disable=SC1090
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
+function xmlescape() {
+  echo -n "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
+}
+
+pushd "${ARTIFACT_DIR}" || return
+
+tests=$( mktemp -t result-XXXX )
+input=$( mktemp -t search-XXXX )
+
+cat <<EOF > ${input}
+==Undiagnosed panic detected in pod=pods/*=Observed a panic
+==Undiagnosed panic detected in journal=nodes/*/journal*=Observed a panic
+=segfault=Bug 1812261: iptables is segfaulting=nodes/*/journal*=kernel: .+: segfault .+ libnftnl
+segfault==Node process segfaulted=nodes/*/journal*=kernel: .+: segfault
+==Infrastructure - quota exceeded or hit rate limit=pods/*=Throttling: Rate exceeded|The maximum number of [A-Za-z ]* has been reached|Quota .* exceeded|LimitExceeded.*exceed quota
+EOF
+
+searches=0
+failures=0
+declare -A covered
+while IFS= read -r line; do
+    searches=$((searches+1))
+    id=$( echo -n "${line}" | cut -f 1 -d = )
+    covers=$( echo -n "${line}" | cut -f 2 -d = )
+    if [[ -n "${id}" && -n "${covered[${id}]-}" ]]; then
+      continue
+    fi
+
+    prefix=$( echo -n "${line}" | cut -f 3 -d = )
+    files=$( echo -n "${line}" | cut -f 4 -d = )
+    search=$( echo -n "${line}" | cut -f 5- -d = )
+
+    out=$( zgrep -E "${search}" ${files} || true ) # ignore failures but log them to stderr
+    if [[ -z "${out}" ]]; then
+      echo "<testcase name=\"$( xmlescape "${prefix}" )\"></testcase>" >> "${tests}"
+      continue
+    fi
+    
+    # sometimes infrastrue issue got recovered during cluster reconciling, does not result in a cricital issue, then skip it.
+    if [[ "$prefix" == "Infrastructure - quota exceeded or hit rate limit" ]]; then
+      INSTALL_EXIT_CODE=0
+      INSTALL_STATUS_FILE="${SHARED_DIR}/install-status.txt"
+      [[ -f "${INSTALL_STATUS_FILE}" ]] && INSTALL_EXIT_CODE=$(tail -n1 "${INSTALL_STATUS_FILE}" | awk '{print $1}') || true
+      if [[ "$INSTALL_EXIT_CODE" ==  0 ]]; then
+        echo "<testcase name=\"$( xmlescape "${prefix}" )\"><skipped>install succeed, skipping: $( xmlescape "${out}" )</skipped></testcase>" >> "${tests}"
+        continue
+      fi
+    fi
+
+    echo Detected: "${prefix}" 1>&2
+
+    failures=$((failures+1))
+    if [[ -n "${covers}" ]]; then
+      covered[${covers}]="1"
+    fi
+    echo "<testcase name=\"$( xmlescape "${prefix}" )\"><failure>$( xmlescape "${out}" )</failure></testcase>" >> "${tests}"
+done < "${input}"
+
+cat <<EOF > ${ARTIFACT_DIR}/junit/junit_symptoms.xml
+<testsuite name="Symptom Detection" tests="${searches}" errors="0" failures="${failures}" skipped="0" time="0" package="symptom">
+$( cat ${tests} )
+</testsuite>
+EOF
+
+popd || return
 
 # Create custom-link-tools.html from custom-links.txt
 REPORT="${ARTIFACT_DIR}/custom-link-tools.html"

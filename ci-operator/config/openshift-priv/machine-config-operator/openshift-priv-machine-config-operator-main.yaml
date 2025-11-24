@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -35,20 +35,20 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.20_base-rhel9:
-    name: 4.20-priv
+  ocp_4.21_base-rhel9:
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.20
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    tag: rhel-8-golang-1.24-openshift-4.21
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
   ocp_os:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: rhel-coreos
 build_root:
@@ -57,15 +57,15 @@ canonical_go_repository: github.com/openshift/machine-config-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: machine-config-operator
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
@@ -87,17 +87,17 @@ promotion:
   - excluded_images:
     - custom-os-image
     - zacks-toolbox
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -111,32 +111,29 @@ tests:
     from: src
 - always_run: false
   as: e2e-agent-compact-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-metal-ovn-two-node-arbiter
   optional: true
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-metal-ovn-two-node-fencing
   optional: true
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-aws-ovn-fips-op
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -155,7 +152,7 @@ tests:
   as: e2e-aws-ovn-fips
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     env:
       FIPS_ENABLED: "true"
     pre:
@@ -167,34 +164,32 @@ tests:
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-azure-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
-- as: e2e-azure-ovn-upgrade-out-of-change
+- always_run: false
+  as: e2e-azure-ovn-upgrade-out-of-change
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
 - always_run: false
   as: e2e-aws-serial
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-4
     workflow: openshift-e2e-aws-serial
 - as: verify
   commands: |
@@ -247,7 +242,6 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-gcp
-  timeout: 5h0m0s
 - as: e2e-gcp-op-1of2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
@@ -265,7 +259,6 @@ tests:
           cpu: 100m
       timeout: 1h40m0s
     workflow: ipi-gcp
-  timeout: 4h0m0s
 - as: e2e-gcp-op-2of2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
@@ -283,10 +276,9 @@ tests:
           cpu: 100m
       timeout: 1h40m0s
     workflow: ipi-gcp
-  timeout: 4h0m0s
-- as: e2e-gcp-op-ocl
+- always_run: false
+  as: e2e-gcp-op-ocl
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp
     env:
@@ -321,11 +313,11 @@ tests:
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-4
     workflow: openshift-upgrade-aws
-- as: e2e-aws-ovn-upgrade-out-of-change
+- always_run: false
+  as: e2e-aws-ovn-upgrade-out-of-change
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: aws
     dependencies:
@@ -344,11 +336,10 @@ tests:
   as: e2e-aws-ovn-serial-ipsec
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-workers-rhel8
   optional: true
@@ -383,24 +374,24 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-vsphere-ovn-zones
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -443,7 +434,8 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-metal-assisted
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -626,7 +618,6 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-upgrade-aws
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-aws-ovn-ocb-techpreview
   optional: true
@@ -674,40 +665,61 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-aws
-  timeout: 5h0m0s
 - as: verify-deps
   steps:
     env:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
-- as: e2e-aws-ovn-windows
+- always_run: false
+  as: e2e-aws-ovn-windows
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       CUSTOM_VXLAN_PORT: "true"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
-- as: e2e-aws-mco-disruptive
+- always_run: false
+  as: e2e-aws-mco-disruptive
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: openshift-e2e-aws
-- as: e2e-gcp-mco-disruptive
+- always_run: false
+  as: e2e-gcp-mco-disruptive
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp-3
     env:
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: openshift-e2e-gcp
-  timeout: 6h0m0s
+- always_run: false
+  as: e2e-azure-ovn-multidisk-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-multidisk
+- always_run: false
+  as: e2e-vsphere-ovn-disk-setup-techpreview
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_DISK: "true"
+      DISK_SETUP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-vsphere
 zz_generated_metadata:
   branch: main
   org: openshift-priv

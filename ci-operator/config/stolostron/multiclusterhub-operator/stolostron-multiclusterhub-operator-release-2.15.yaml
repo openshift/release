@@ -12,7 +12,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.23-linux
+    tag: go1.24-linux
 images:
 - dockerfile_path: build/Dockerfile.prow
   from: base
@@ -29,8 +29,7 @@ images:
   to: multiclusterhub-operator-tests
 promotion:
   to:
-  - disabled: true
-    name: "2.15"
+  - name: "2.15"
     namespace: stolostron
 resources:
   '*':
@@ -46,6 +45,14 @@ tests:
       IMAGE_REPO: multiclusterhub-operator
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: test-unit
+  commands: |
+    export ocm_dir=$(mktemp -d -t ocm-XXXXX)
+    export HOME="$ocm_dir"
+    export SELF="make -f Makefile"
+    make -f Makefile test
+  container:
+    from: src
 - as: sonar-pre-submit
   commands: |
     export ocm_dir=$(mktemp -d -t ocm-XXXXX)

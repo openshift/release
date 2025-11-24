@@ -39,10 +39,6 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: base
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
   console-tests:
     name: "4.20"
     namespace: ocp
@@ -69,6 +65,10 @@ base_images:
     tag: libvirt-installer
   nested-environment-builder:
     name: nested-environment-builder
+    namespace: ci
+    tag: latest
+  ocm-cli:
+    name: ocm-cli
     namespace: ci
     tag: latest
   rosa-aws-cli:
@@ -116,7 +116,7 @@ tests:
 - as: e2e-aws-ovn-single-node-csi
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     observers:
       enable:
       - observers-resource-watch
@@ -142,15 +142,23 @@ tests:
 - as: e2e-aws-ovn-single-node
   interval: 168h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node
-- as: e2e-aws-ovn-single-node-techpreview
-  interval: 168h
+- as: e2e-aws-ovn-single-node-rhcos10
+  interval: 48h
   steps:
     cluster_profile: aws-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-rhcos10
+- as: e2e-aws-ovn-single-node-techpreview
+  interval: 48h
+  steps:
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -160,7 +168,7 @@ tests:
 - as: e2e-aws-ovn-single-node-serial
   interval: 168h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift/conformance/serial
     observers:
@@ -177,23 +185,10 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-aws-single-node-realtime
-  timeout: 5h0m0s
-- as: e2e-metal-ovn-single-node-rt-upgrade-serial
-  interval: 168h
-  steps:
-    cluster_profile: aws
-    env:
-      SINGLE_NODE_AWS_INSTANCE_TYPE: c7i.metal-24xl
-      TEST_SUITE: openshift/conformance/serial
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-upgrade-aws-single-node-realtime
-  timeout: 5h0m0s
 - as: e2e-aws-ovn-single-node-techpreview-serial
   interval: 168h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
@@ -218,7 +213,8 @@ tests:
       TEST_FUNC: test_bip_add_worker
     workflow: baremetalds-sno
 - as: e2e-metal-ipi-ovn-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -226,8 +222,19 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-ovn-ipv4-rhcos10
+  capabilities:
+  - intranet
+  interval: 48h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-ovn-ipv4-rhcos10
 - as: e2e-metal-ipi-ovn-bm
-  cluster: build05
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -238,7 +245,8 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-serial-ovn-ipv6-runc
-  cluster: build05
+  capabilities:
+  - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-ocp-metal
@@ -246,9 +254,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6-runc
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-serial-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -256,9 +264,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h30m0s
 - as: e2e-metal-ipi-serial-ovn-ipv4-techpreview
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 4 * * *
   shard_count: 2
   steps:
@@ -273,9 +281,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 6h0m0s
 - as: e2e-metal-ipi-serial-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -283,9 +291,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
-  timeout: 5h30m0s
 - as: e2e-metal-ipi-ovn-serial-virtualmedia
-  cluster: build05
+  capabilities:
+  - intranet
   interval: 168h
   shard_count: 2
   steps:
@@ -294,9 +302,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-virtualmedia
-  timeout: 5h30m0s
 - as: e2e-metal-ipi-serial-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -304,9 +312,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-upgrade
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
@@ -316,9 +324,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-upgrade-ovn-ipv4
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-upgrade-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
@@ -328,9 +336,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-upgrade-ovn-ipv6
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-techpreview
-  cluster: build05
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -343,7 +351,8 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6-techpreview
-  cluster: build05
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -356,7 +365,8 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-serial-ovn-ipv6-techpreview
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 4 * * *
   shard_count: 2
   steps:
@@ -371,9 +381,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
-  timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-ipv6-runc-techpreview
-  cluster: build05
+  capabilities:
+  - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-ocp-metal
@@ -386,7 +396,8 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv6-runc
 - as: e2e-metal-ipi-ovn-dualstack-techpreview
-  cluster: build05
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -399,7 +410,8 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ipi-serial-ovn-dualstack-techpreview
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 4 * * *
   shard_count: 2
   steps:
@@ -415,9 +427,9 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
-  timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -426,7 +438,8 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-ipv6-runc
-  cluster: build05
+  capabilities:
+  - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-ocp-metal
@@ -435,7 +448,8 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv6-runc
 - as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 0 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
@@ -444,129 +458,152 @@ tests:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ovn-two-node-arbiter
-  cluster: build05
+  capabilities:
+  - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
 - as: e2e-agent-ovn-two-node-arbiter
-  cluster: build05
+  capabilities:
+  - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO="TNA_IPV4"
-        FEATURE_SET="TechPreviewNoUpgrade"
-    workflow: baremetalds-two-node-arbiter
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-agent-ovn-two-node-arbiter-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV6"
-        FEATURE_SET="TechPreviewNoUpgrade"
-    workflow: baremetalds-two-node-arbiter
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-agent-ovn-two-node-arbiter-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     env:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV4V6"
-        FEATURE_SET="TechPreviewNoUpgrade"
-    workflow: baremetalds-two-node-arbiter
+    workflow: agent-e2e-two-node-arbiter-ipv4
 - as: e2e-metal-ovn-two-node-arbiter-upgrade
-  cluster: build05
+  capabilities:
+  - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-upgrade
 - as: e2e-metal-ovn-two-node-arbiter-techpreview
-  cluster: build05
-  cron: 0 */6 * * *
+  capabilities:
+  - intranet
+  cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-techpreview
-- as: e2e-metal-ovn-two-node-arbiter-ipv6-techpreview
-  cluster: build05
+- as: e2e-metal-ovn-two-node-fencing-dualstack-techpreview
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
+        BMC_DRIVER=redfish
+      ENABLE_HYPERVISOR_SSH_CONFIG: "false"
+    workflow: baremetalds-two-node-fencing-techpreview
+- as: e2e-metal-ovn-two-node-fencing-ipv6-techpreview
+  capabilities:
+  - intranet
   cron: 0 */6 * * *
   steps:
     cluster_profile: equinix-edge-enablement
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
-        NUM_MASTERS=2
+        MASTER_DISK=100
         MASTER_MEMORY=32768
-        NUM_ARBITERS=1
-        ARBITER_MEMORY=16384
+        NUM_MASTERS=2
         NUM_WORKERS=0
-        ENABLE_ARBITER=true
         FEATURE_SET="TechPreviewNoUpgrade"
-    workflow: baremetalds-two-node-arbiter-techpreview
-- as: e2e-metal-ovn-two-node-arbiter-dualstack-techpreview
-  cluster: build05
+        BMC_DRIVER=redfish
+    workflow: baremetalds-two-node-fencing-techpreview
+- as: e2e-metal-ovn-two-node-fencing-etcd-certrotation
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      ENABLE_HYPERVISOR_SSH_CONFIG: "false"
+      TEST_SUITE: openshift/etcd/certrotation
+    workflow: baremetalds-two-node-fencing-techpreview
+- as: e2e-metal-ovn-two-node-fencing
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      ENABLE_HYPERVISOR_SSH_CONFIG: "false"
+    workflow: baremetalds-two-node-fencing
+- as: e2e-metal-ovn-two-node-fencing-serial
+  capabilities:
+  - intranet
   cron: 0 */6 * * *
   steps:
     cluster_profile: equinix-edge-enablement
     env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4v6
-        NUM_MASTERS=2
-        MASTER_MEMORY=32768
-        NUM_ARBITERS=1
-        ARBITER_MEMORY=16384
-        NUM_WORKERS=0
-        ENABLE_ARBITER=true
-        FEATURE_SET="TechPreviewNoUpgrade"
-    workflow: baremetalds-two-node-arbiter-techpreview
-- as: e2e-metal-ovn-two-node-fencing-etcd-certrotation
-  cluster: build05
-  cron: '@daily'
-  steps:
-    cluster_profile: equinix-edge-enablement
-    env:
-      TEST_SUITE: openshift/etcd/certrotation
-    workflow: baremetalds-two-node-fencing-techpreview
-- as: e2e-metal-ovn-two-node-fencing
-  cluster: build05
-  cron: '@daily'
-  steps:
-    cluster_profile: equinix-edge-enablement
+      ENABLE_HYPERVISOR_SSH_CONFIG: "false"
+      TEST_SUITE: openshift/conformance/serial
     workflow: baremetalds-two-node-fencing
+  timeout: 5h0m0s
 - as: e2e-metal-ovn-two-node-fencing-upgrade
-  cluster: build05
+  capabilities:
+  - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-upgrade
 - as: e2e-metal-ovn-two-node-arbiter-workload-partitioning
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 2 * * 1
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-workload-partitioning
 - as: e2e-metal-ovn-two-node-fencing-recovery-techpreview
-  cluster: build05
+  capabilities:
+  - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     env:
+      ENABLE_HYPERVISOR_SSH_CONFIG: "false"
       TEST_ARGS: --disable-monitor=etcd-log-analyzer,legacy-cvo-invariants,legacy-etcd-invariants,node-lifecycle
         --cluster-stability=Disruptive
       TEST_SUITE: openshift/two-node
     workflow: baremetalds-two-node-fencing-techpreview
 - as: e2e-metal-ovn-two-node-arbiter-openshift-test-private-tests
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 2 * * 1
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
 - as: e2e-metal-ovn-two-node-fencing-extended
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 4 * * *
   steps:
     cluster_profile: equinix-edge-enablement
@@ -574,7 +611,7 @@ tests:
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
@@ -611,11 +648,10 @@ tests:
       enable:
       - observers-resource-watch
     workflow: upi-vsphere-platform-external-ccm
-  timeout: 5h0m0s
 - as: e2e-aws-ovn-local-gateway
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       GATEWAY_MODE: local
     observers:
@@ -633,6 +669,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
+- as: e2e-vsphere-ovn-vcf9
+  cron: 45 5/12 * * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-static-ovn
   cron: 45 22 * * 6
   steps:
@@ -641,7 +689,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-staticip
-  timeout: 5h0m0s
 - as: e2e-vsphere-externallb-ovn
   cron: 22 16 * * 2
   steps:
@@ -661,7 +708,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
-  timeout: 5h0m0s
 - as: e2e-vsphere-ovn-techpreview-serial
   cron: 20 18 * * 5
   steps:
@@ -672,7 +718,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
-  timeout: 5h0m0s
 - as: e2e-vsphere-ovn-upi
   cron: 34 7 * * 1
   steps:
@@ -684,7 +729,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi
-  timeout: 5h0m0s
+- as: e2e-vsphere-ovn-upi-vcf9
+  cron: 30 5/12 * * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-upi
 - as: e2e-vsphere-ovn-upi-serial
   cron: 17 13 * * 4
   steps:
@@ -696,7 +752,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi-serial
-  timeout: 5h0m0s
 - as: e2e-vsphere-csi-operator-test
   cron: 17 6 * * *
   steps:
@@ -717,6 +772,19 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-csi
+- as: e2e-vsphere-ovn-csi-vcf9
+  cron: 15 5/12 * * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     observers:
@@ -764,7 +832,6 @@ tests:
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-multi-vcenter
-  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-upi-multi-vcenter
   cron: 59 13 * * *
   steps:
@@ -774,15 +841,12 @@ tests:
         vcenter-1.ci.ibmc.devcluster.openshift.com-cidatacenter-2-cicluster-3
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
-  timeout: 5h0m0s
 - as: e2e-vsphere-ovn-hybrid-env
   cron: '@yearly'
   steps:
     cluster_profile: vsphere-elastic
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
-        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
-      BASELINE_CAPABILITY_SET: None
+      CSI_MANAGEMENT_REMOVED: "true"
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
       NETWORK_TYPE: multi-tenant
@@ -790,21 +854,16 @@ tests:
       SETUP_IMAGE_REGISTRY_WITH_PVC: "false"
       TEST_SKIPS: \[sig-storage\]\|\[sig-arch\]\[Early\] Operators low level operators
     workflow: openshift-e2e-vsphere-hybrid-env
-  timeout: 5h0m0s
 - as: e2e-vsphere-ovn-upi-hybrid-env
   cron: '@yearly'
   steps:
     cluster_profile: vsphere-elastic
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudControllerManager Ingress CloudCredential
-        ImageRegistry Build OperatorLifecycleManager OperatorLifecycleManagerV1 Console
-      BASELINE_CAPABILITY_SET: None
+      CSI_MANAGEMENT_REMOVED: "true"
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
-      NETWORK_TYPE: multi-tenant
       TEST_SKIPS: \[sig-storage\]\|\[sig-arch\]\[Early\] Operators low level operators
     workflow: openshift-e2e-vsphere-upi-hybrid-env
-  timeout: 6h0m0s
 - as: e2e-vsphere-ovn-disk-setup-techpreview
   cron: 50 21 * * 2
   steps:
@@ -814,11 +873,10 @@ tests:
       DISK_SETUP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-fips
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FIPS_ENABLED: "true"
     observers:
@@ -831,7 +889,7 @@ tests:
 - as: e2e-aws-ovn-upgrade-fips
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FAIL_ON_CORE_DUMP: "true"
       FIPS_ENABLED: "true"
@@ -879,7 +937,7 @@ tests:
 - as: e2e-aws-ovn-fips-serial
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -893,7 +951,7 @@ tests:
 - as: console-aws
   interval: 168h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -920,25 +978,35 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-realtime
+- as: e2e-gcp-ovn-rt-rhcos10
+  interval: 48h
+  steps:
+    cluster_profile: gcp-3
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+      RT_ENABLED: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-ovn-rt-rhcos10
 - as: e2e-gcp-ovn-xpn
   interval: 168h
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-xpn
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-serial
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
-  timeout: 5h0m0s
 - as: e2e-aws-csi
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
     observers:
@@ -950,7 +1018,6 @@ tests:
   steps:
     cluster_profile: azure-2
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
     observers:
       enable:
@@ -970,7 +1037,7 @@ tests:
 - as: e2e-aws-ovn-cgroupsv2
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
@@ -978,7 +1045,7 @@ tests:
 - as: e2e-aws-driver-toolkit
   interval: 48h
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     observers:
       enable:
       - observers-resource-watch
@@ -1023,7 +1090,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-cnf
-  timeout: 6h0m0s
 - as: e2e-telco5g-sno-cnftests
   capabilities:
   - intranet
@@ -1043,11 +1109,11 @@ tests:
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
-  cron: 0 7 * * 0-5
+  cron: 0 17 * * 0-5
   restrict_network_access: false
   steps:
     env:
-      SKIP_OCP_INSTALL: "false"
+      SKIP_OCP_INSTALL: "true"
       T5CI_JOB_TYPE: ptp
       T5CI_VERSION: "4.20"
     observers:
@@ -1103,8 +1169,9 @@ tests:
       - observers-resource-watch
     workflow: telco5g-mno-ztp-cnf
 - as: telco5g-network-flow-matrix-bm
-  cluster: build05
-  cron: 0 23 * * 2,5
+  capabilities:
+  - intranet
+  cron: 0 15 * * *
   restrict_network_access: false
   steps:
     env:
@@ -1115,8 +1182,9 @@ tests:
       - observers-resource-watch
     workflow: telco5g-network-flow-matrix-bm
 - as: telco5g-network-flow-matrix-single-node-bm
-  cluster: build05
-  cron: 0 23 * * 2,5
+  capabilities:
+  - intranet
+  cron: 0 15 * * *
   restrict_network_access: false
   steps:
     env:
@@ -1127,24 +1195,25 @@ tests:
       - observers-resource-watch
     workflow: telco5g-network-flow-matrix-single-node-bm
 - as: aws-ovn-network-flow-matrix
-  cron: 0 23 * * 2,5
+  cron: 0 15 * * *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     test:
     - ref: network-flow-matrix-tests
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn-serial
 - as: aws-ovn-network-flow-matrix-single-node
-  cron: 0 23 * * 2,5
+  cron: 0 15 * * *
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     test:
     - ref: network-flow-matrix-tests
     - ref: single-node-e2e-test
     workflow: openshift-e2e-aws-single-node
 - as: metal-ovn-network-flow-matrix-bm
-  cluster: build05
-  cron: 0 23 * * 2,5
+  capabilities:
+  - intranet
+  cron: 0 15 * * *
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
@@ -1188,7 +1257,7 @@ tests:
 - as: e2e-aws-ovn-upi
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     observers:
       enable:
       - observers-resource-watch
@@ -1251,23 +1320,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-etcd-scaling
-- as: e2e-gcp-custom-dns-techpreview
-  interval: 168h
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-      TEST_SKIPS: DNS should provide DNS for the cluster \| Aggregator Should be able
-        to support the 1.17 Sample API Server using the current Aggregator \| Ensure
-        HTTPRoute object is created \| Ensure LB, service, and dnsRecord are created
-        for a Gateway object \| The HAProxy router should pass the http2 tests \|
-        The HAProxy router should pass the gRPC interoperability tests \| Services
-        should fail health check node port if there are only terminating endpoints
-      USER_PROVISIONED_DNS: "yes"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-gcp-custom-dns
 - as: e2e-azure-ovn-etcd-scaling
   interval: 168h
   steps:
@@ -1292,7 +1344,7 @@ tests:
 - as: e2e-aws-ovn-single-node-one-core-serial
   interval: 168h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node-one-core
@@ -1304,13 +1356,14 @@ tests:
 - as: e2e-aws-ovn-shared-vpc-phz-techpreview
   interval: 168h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-shared-vpc-phz
 - as: e2e-agent-compact-fips
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 */12 * * *
   steps:
     cluster_profile: equinix-ocp-metal
@@ -1320,9 +1373,9 @@ tests:
         FIPS_MODE=true
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
-  timeout: 5h0m0s
 - as: e2e-agent-single-node-ipv6-conformance
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 */12 * * *
   steps:
     cluster_profile: equinix-ocp-metal
@@ -1331,9 +1384,9 @@ tests:
         AGENT_E2E_TEST_SCENARIO=SNO_IPV6
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
-  timeout: 5h0m0s
 - as: e2e-agent-ha-dualstack-conformance
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 0 */12 * * *
   steps:
     cluster_profile: equinix-ocp-metal
@@ -1342,7 +1395,6 @@ tests:
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6
       TEST_SUITE: openshift/conformance/parallel
     workflow: agent-e2e-generic-conformance
-  timeout: 5h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-suspend-30d
   cron: 0 8 * * Fri
   steps:
@@ -1371,12 +1423,12 @@ tests:
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend-sno
-- as: e2e-metal-ovn-sno-cert-rotation-suspend-360d
+- as: e2e-metal-ovn-sno-cert-rotation-suspend-1y
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
-      SKEW: 360d
+      SKEW: 1y
     workflow: openshift-e2e-cert-rotation-suspend-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-30d
   cron: 0 8 * * Fri
@@ -1407,7 +1459,7 @@ tests:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "365"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-2y-age-90d
@@ -1415,8 +1467,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "730"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "731"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-3y-age-90d
@@ -1424,88 +1476,80 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "1100"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "1096"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-4y-age-90d
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "1470"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "1462"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-5y-age-90d
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "1830"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "1827"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-6y-age-90d
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "2190"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "2191"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-7y-age-90d
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "2560"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "2557"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-8y-age-90d
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "2930"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "2925"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-9y-age-90d
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "3290"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-10y-age-90d
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "3650"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-1y-age-90d
   cron: 0 16 * * Fri
   steps:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "365"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-2y-age-90d
@@ -1513,8 +1557,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "730"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "731"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-3y-age-90d
@@ -1522,78 +1566,71 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      CLUSTER_AGE_DAYS: "1100"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_DAYS: "1096"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-4y-age-90d
   cron: 0 16 * * Fri
   steps:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "1470"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-5y-age-90d
   cron: 0 16 * * Fri
   steps:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "1830"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-6y-age-90d
   cron: 0 16 * * Fri
   steps:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "2190"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-7y-age-90d
   cron: 0 16 * * Fri
   steps:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "2560"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-8y-age-90d
   cron: 0 16 * * Fri
   steps:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "2930"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-9y-age-90d
   cron: 0 16 * * Fri
   steps:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "3290"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
-  timeout: 6h0m0s
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-10y-age-90d
   cron: 0 16 * * Fri
   steps:
     cluster_profile: gcp
     env:
       CLUSTER_AGE_DAYS: "3650"
-      CLUSTER_AGE_STEP: "300"
+      CLUSTER_AGE_STEP: "365"
       SKEW: 90d
     workflow: openshift-e2e-cert-rotation-shutdown
 - as: e2e-metal-ovn-sno-cert-rotation-shutdown-60d
@@ -1617,12 +1654,12 @@ tests:
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-shutdown-sno
-- as: e2e-metal-ovn-sno-cert-rotation-shutdown-360d
+- as: e2e-metal-ovn-sno-cert-rotation-shutdown-1y
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
-      SKEW: 360d
+      SKEW: 1y
     workflow: openshift-e2e-cert-rotation-shutdown-sno
 - as: e2e-metal-ovn-ha-cert-rotation-suspend-30d
   cron: 0 8 * * Fri
@@ -1652,12 +1689,12 @@ tests:
     env:
       SKEW: 180d
     workflow: openshift-e2e-cert-rotation-suspend
-- as: e2e-metal-ovn-ha-cert-rotation-suspend-360d
+- as: e2e-metal-ovn-ha-cert-rotation-suspend-1y
   cron: 0 8 * * Fri
   steps:
     cluster_profile: gcp
     env:
-      SKEW: 360d
+      SKEW: 1y
     workflow: openshift-e2e-cert-rotation-suspend
 - as: e2e-metal-ovn-ha-cert-rotation-shutdown-30d
   cron: 0 8 * * Fri
@@ -1697,12 +1734,12 @@ tests:
 - as: e2e-aws-crun-wasm
   interval: 168h
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     workflow: openshift-e2e-aws-crun-wasm
 - as: e2e-aws-ovn-ha-cert-rotation-suspend-30d
   cron: 0 8 * * Fri
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI CloudCredential CloudControllerManager
         Ingress
@@ -1710,33 +1747,28 @@ tests:
       PERSISTENT_MONITORING: "false"
       SKEW: 30d
     workflow: openshift-e2e-aws-cert-rotation
-  timeout: 4h0m0s
 - as: e2e-aws-ovn-edge-zones
   cron: '@weekly'
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-edge-zones
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-shared-vpc-edge-zones
   cron: '@weekly'
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-edge-zones-manifest-validation
   cron: '@daily'
   steps:
     cluster_profile: aws
     workflow: openshift-installer-manifests-aws-edge-zones
-  timeout: 1h0m0s
 - as: e2e-aws-overlay-mtu-ovn-5000
   cron: '@weekly'
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       CLUSTER_NETWORK_MTU: "5000"
     workflow: openshift-e2e-aws-network-mtu
-  timeout: 6h0m0s
 - as: e2e-aws-overlay-mtu-ovn-edge-1100
   cron: '@weekly'
   steps:
@@ -1744,7 +1776,6 @@ tests:
     env:
       CLUSTER_NETWORK_MTU: "1100"
     workflow: openshift-e2e-aws-network-mtu-edge-zones
-  timeout: 6h0m0s
 - as: metal-ovn-single-node-recert-cluster-rename
   cron: '@weekly'
   steps:
@@ -1769,27 +1800,24 @@ tests:
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-external-aws
-  timeout: 6h0m0s
 - as: e2e-external-aws-ccm
   cron: '@weekly'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: openshift-e2e-external-aws
-  timeout: 6h0m0s
 - as: opct-external-aws-ccm
   cron: '@weekly'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: opct-conformance-external-aws
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-kube-apiserver-rollout
   interval: 168h
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       TEST_SUITE: openshift/kube-apiserver/rollout
       TEST_TYPE: suite
@@ -1798,7 +1826,8 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
 - as: e2e-metal-ipi-ovn-kube-apiserver-rollout
-  cluster: build05
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -1836,6 +1865,14 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-runc
+- as: e2e-azure-ovn-rhcos10
+  interval: 48h
+  steps:
+    cluster_profile: azure4
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-rhcos10
 - as: e2e-azure-ovn-runc
   cron: '@daily'
   steps:
@@ -1855,7 +1892,7 @@ tests:
 - as: e2e-aws-ovn-runc
   cron: '@daily'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     observers:
       enable:
       - observers-resource-watch
@@ -1940,7 +1977,7 @@ tests:
 - as: e2e-aws-ovn-runc-techpreview
   cron: '@daily'
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -1948,7 +1985,8 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-runc
 - as: e2e-metal-ipi-ovn-upgrade-runc
-  cluster: build05
+  capabilities:
+  - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-ocp-metal
@@ -1958,7 +1996,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-upgrade-ovn-ipv6-runc
-  timeout: 5h0m0s
 - as: e2e-rosa-sts-ovn
   cron: '@daily'
   steps:
@@ -1967,18 +2004,16 @@ tests:
       enable:
       - observers-resource-watch
     workflow: rosa-aws-sts-conformance
-  timeout: 6h0m0s
 - as: e2e-osd-ccs-gcp
   cluster: build10
   cron: '@daily'
   steps:
     cluster_profile: gcp-qe
     workflow: osd-ccs-gcp-conformance
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-upgrade-ipsec
   cron: '@daily'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     observers:
@@ -1988,23 +2023,20 @@ tests:
 - as: e2e-aws-ovn-serial-ipsec
   cron: '@daily'
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
-  timeout: 6h0m0s
 - as: e2e-short-cert-rotation
   cron: 0 8 * * Sun
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-cert-rotation-short-aws
-  timeout: 8h0m0s
 - as: e2e-short-cert-rotation-azure
   cron: 0 8 * * Sun
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-cert-rotation-short-azure
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

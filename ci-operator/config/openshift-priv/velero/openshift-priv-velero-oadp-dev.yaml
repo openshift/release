@@ -1,0 +1,58 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.24
+canonical_go_repository: github.com/openshift/velero
+images:
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile.ubi
+  to: velero
+promotion:
+  to:
+  - additional_images:
+      velero: velero
+    disabled: true
+    name: velero
+    namespace: konveyor
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.11"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-test
+  run_if_changed: (\.sh|\.go|config/.*|cmd/.*|assets/.*|internal/.*|Dockerfile.*|Makefile.*)$
+  steps:
+    test:
+    - as: unit
+      commands: PATH="/go/bin:$PATH" make -f Makefile.prow ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: lint
+  run_if_changed: .*\.go$
+  steps:
+    test:
+    - as: lint
+      commands: |
+        PATH="/go/bin:$PATH" make -f Makefile.prow lint
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: oadp-dev
+  org: openshift-priv
+  repo: velero

@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function xmlescape() {
+  echo -n "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
+}
+
 function createInstallJunit() {
   EXIT_CODE_CONFIG=3
   EXIT_CODE_INFRA=4
@@ -12,6 +16,9 @@ function createInstallJunit() {
   EXIT_CODE_OPERATORS=7
   EXIT_CODE_PRECONFIG=100
   EXIT_CODE_POSTCHECK=101
+  INSTALL_INFRA_FAILURE_LOGFILE="${SHARED_DIR}/install_infrastructure_failure.log"
+  local failure_output
+
   if test -f "${SHARED_DIR}/install-status.txt"
   then
     EXIT_CODE=`tail -n1 "${SHARED_DIR}/install-status.txt" | awk '{print $1}'`
@@ -38,9 +45,13 @@ EOF
       # failure, insert that failure case so CI tracks it as a flake.
       if [ "$PREVIOUS_INFRA_FAILURE" = 1 ]
       then
-      cat >>"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+        failure_output="openshift cluster install failed with infrastructure setup"
+        if [ -s "${INSTALL_INFRA_FAILURE_LOGFILE}" ]; then
+          failure_output=$(cat "${INSTALL_INFRA_FAILURE_LOGFILE}")
+        fi
+        cat >>"${ARTIFACT_DIR}/junit_install.xml" <<EOF
         <testcase name="install should succeed: infrastructure">
-          <failure message="">openshift cluster install failed with infrastructure setup</failure>
+          <failure message="">$( xmlescape "${failure_output}" )</failure>
         </testcase>
 EOF
       fi
@@ -63,12 +74,16 @@ EOF
 EOF
     elif [ "$EXIT_CODE" == "$EXIT_CODE_INFRA" ]
     then
+      failure_output="openshift cluster install failed with infrastructure setup"
+      if [ -s "${INSTALL_INFRA_FAILURE_LOGFILE}" ]; then
+        failure_output=$(cat "${INSTALL_INFRA_FAILURE_LOGFILE}")
+      fi
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
       <testsuite name="cluster install" tests="4" failures="2">
         <testcase name="install should succeed: other"/>
         <testcase name="install should succeed: configuration"/>
         <testcase name="install should succeed: infrastructure">
-          <failure message="">openshift cluster install failed with infrastructure setup</failure>
+          <failure message="">$( xmlescape "${failure_output}" )</failure>
         </testcase>
         <testcase name="install should succeed: overall">
           <failure message="">openshift cluster install failed overall</failure>
@@ -77,13 +92,17 @@ EOF
 EOF
     elif [ "$EXIT_CODE" == "$EXIT_CODE_BOOTSTRAP" ]
     then
+      failure_output="openshift cluster install failed with cluster bootstrap"
+      if [ -s "${INSTALL_INFRA_FAILURE_LOGFILE}" ]; then
+        failure_output=$(cat "${INSTALL_INFRA_FAILURE_LOGFILE}")
+      fi
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
       <testsuite name="cluster install" tests="5" failures="2">
         <testcase name="install should succeed: other"/>
         <testcase name="install should succeed: configuration"/>
         <testcase name="install should succeed: infrastructure"/>
         <testcase name="install should succeed: cluster bootstrap">
-          <failure message="">openshift cluster install failed with cluster bootstrap</failure>
+          <failure message="">$( xmlescape "${failure_output}" )</failure>
         </testcase>
         <testcase name="install should succeed: overall">
           <failure message="">openshift cluster install failed overall</failure>
@@ -271,7 +290,11 @@ mkdir -p ${ARTIFACT_DIR}/must-gather
 if [ -n "$MUST_GATHER_IMAGE" ]; then
     EXTRA_MG_ARGS="${EXTRA_MG_ARGS} ${MUST_GATHER_IMAGE}"
 fi
-oc --insecure-skip-tls-verify adm must-gather --timeout="$MUST_GATHER_TIMEOUT" --dest-dir "${ARTIFACT_DIR}/must-gather" ${EXTRA_MG_ARGS} > "${ARTIFACT_DIR}/must-gather/must-gather.log"
+VOLUME_PERCENTAGE_FLAG=""
+if oc adm must-gather --help 2>&1 | grep -q -- '--volume-percentage'; then
+   VOLUME_PERCENTAGE_FLAG="--volume-percentage=100"
+fi
+oc --insecure-skip-tls-verify adm must-gather $VOLUME_PERCENTAGE_FLAG --timeout="$MUST_GATHER_TIMEOUT" --dest-dir "${ARTIFACT_DIR}/must-gather" ${EXTRA_MG_ARGS} > "${ARTIFACT_DIR}/must-gather/must-gather.log"
 find "${ARTIFACT_DIR}/must-gather" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
 [ -f "${ARTIFACT_DIR}/must-gather/event-filter.html" ] && cp "${ARTIFACT_DIR}/must-gather/event-filter.html" "${ARTIFACT_DIR}/event-filter.html"
 installCamgi

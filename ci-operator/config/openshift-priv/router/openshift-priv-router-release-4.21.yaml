@@ -3,26 +3,26 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.19_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/router
 images:
 - dockerfile_path: images/router/base/Dockerfile.ocp
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: haproxy-router-base
 - dockerfile_path: images/router/haproxy/Dockerfile.ocp
   from: haproxy-router-base
@@ -32,7 +32,8 @@ images:
   to: f5-router
 promotion:
   to:
-  - name: 4.21-priv
+  - disabled: true
+    name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
@@ -59,11 +60,20 @@ tests:
   container:
     from: src
 - as: e2e-agnostic
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp-3
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-gcp-post
+    pre:
+    - ref: enable-node-coredumps
+    - chain: ipi-gcp-pre
     workflow: openshift-e2e-gcp
-- as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -71,9 +81,17 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
+    post:
+    - chain: gather-core-dump
+    - chain: baremetalds-ofcir-post
+    pre:
+    - ref: enable-node-coredumps
+    - chain: baremetalds-ofcir-pre
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -81,14 +99,23 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
+    post:
+    - chain: gather-core-dump
+    - chain: baremetalds-ofcir-post
+    pre:
+    - ref: enable-node-coredumps
+    - chain: baremetalds-ofcir-pre
     workflow: baremetalds-e2e
 - as: e2e-aws-serial
+  shard_count: 2
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-serial
-  timeout: 5h0m0s
-- as: e2e-metal-ipi-ovn-router
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-router
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -96,6 +123,12 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
+    post:
+    - chain: gather-core-dump
+    - chain: baremetalds-ofcir-post
+    pre:
+    - ref: enable-node-coredumps
+    - chain: baremetalds-ofcir-pre
     test:
     - as: baremetalds-e2e-conf-router
       commands: |
@@ -141,8 +174,15 @@ tests:
     - ref: baremetalds-e2e-test
     workflow: baremetalds-e2e
 - as: e2e-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-azure-post
+    pre:
+    - ref: enable-node-coredumps
+    - chain: ipi-azure-pre
     workflow: openshift-upgrade-azure
 - always_run: false
   as: perfscale-aws-ingress-perf
@@ -157,13 +197,14 @@ tests:
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
       SET_ENV_BY_PLATFORM: custom
     post:
+    - chain: gather-core-dump
     - chain: ipi-aws-post
     pre:
+    - ref: enable-node-coredumps
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     test:
     - chain: openshift-qe-ingress-perf
-  timeout: 5h0m0s
 - always_run: false
   as: perfscale-aws-fips-ingress-perf
   optional: true
@@ -178,14 +219,15 @@ tests:
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
       SET_ENV_BY_PLATFORM: custom
     post:
+    - chain: gather-core-dump
     - chain: ipi-aws-post
     pre:
+    - ref: enable-node-coredumps
     - chain: ipi-aws-pre
     - ref: fips-check
     - chain: create-infra-move-ingress-monitoring-registry
     test:
     - chain: openshift-qe-ingress-perf
-  timeout: 5h0m0s
 - as: verify-deps
   steps:
     env:

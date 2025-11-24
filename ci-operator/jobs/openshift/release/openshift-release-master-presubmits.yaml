@@ -72,6 +72,7 @@ presubmits:
         - --ignore=jws-qe/interop-ocp-ci
         - --ignore=ran-telco5g/kpi-results
         - --ignore=openshift-logging/extended-logging-tests-interop
+        - --ignore=Azure/ARO-HCP
         command:
         - ./hack/check-gh-automation.sh
         env:
@@ -133,6 +134,7 @@ presubmits:
         - --ignore=ansible/tower-qa
         - --ignore=rh-openjdk/jdkContainerOcpTests
         - --ignore=jws-qe/interop-ocp-ci
+        - --ignore=Azure/ARO-HCP
         command:
         - ./hack/check-gh-automation.sh
         env:
@@ -418,7 +420,6 @@ presubmits:
       ci.openshift.io/generator: cluster-init
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-build02-dry
-    optional: true
     rerun_command: /test build02-dry
     run_if_changed: ^clusters/.*
     spec:
@@ -735,6 +736,60 @@ presubmits:
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )build07-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: app.ci
+    context: ci/build-farm/build08-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build08
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build08-dry
+    rerun_command: /test build08-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build08
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build08_id
+          valueFrom:
+            secretKeyRef:
+              key: build08-id
+              name: build08-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build08.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build08-dry,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1061,7 +1116,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20250819-3d885f42c
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20251117-cfbb719bc
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1100,7 +1155,7 @@ presubmits:
         - --target=core-valid
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1411,6 +1466,7 @@ presubmits:
       containers:
       - args:
         - --validate-configs=core-services/release-controller/_releases
+        - --release-qualifiers-config-path=core-services/release-controller/release-qualifiers.yaml
         command:
         - release-controller
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
@@ -1498,7 +1554,7 @@ presubmits:
         - --target=services-valid
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1556,7 +1612,7 @@ presubmits:
         - --variant=stackrox-stackrox
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -1639,6 +1695,32 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )step-registry-shellcheck,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build10
+    context: ci/prow/verified-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-verified-config
+    rerun_command: /test verified-config
+    run_if_changed: ^core-services/verified/.*
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-verified-config.sh
+        image: quay.io/openshift/ci-public:ci_tide-config-manager_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )verified-config,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

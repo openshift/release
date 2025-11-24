@@ -11,10 +11,6 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: cli
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -26,6 +22,10 @@ base_images:
   hypershift-tests:
     name: hypershift-tests
     namespace: hypershift
+    tag: latest
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
     tag: latest
   openstack-installer:
     name: "4.20"
@@ -528,61 +528,6 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
-- as: baremetal-pxe-compact-agent-ipv4-static-connected-f14
-  capabilities:
-  - intranet
-  cron: 11 13 13,29 * *
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "0"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: baremetal-lab-agent-install-pxe
-- as: baremetal-pxe-ha-agent-ipv4-static-connected-f14
-  capabilities:
-  - intranet
-  cron: 31 17 7,23 * *
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "3"
-      workers: "2"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: baremetal-lab-agent-install-pxe
-- as: baremetal-pxe-sno-agent-ipv4-static-connected-f14
-  capabilities:
-  - intranet
-  cron: 54 20 3,17 * *
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AGENT_PLATFORM_TYPE: none
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      ipv4_enabled: "true"
-      ipv6_enabled: "false"
-      masters: "1"
-      workers: "0"
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: baremetal-lab-agent-install-pxe
 - as: gcp-ipi-to-multiarch-mini-perm-f28
   cron: 7 10 17 * *
   steps:
@@ -634,6 +579,34 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: osd-ccs-gcp-xpn-private
+- as: gcp-ocm-osd-ccs-marketplace-api-f999
+  capabilities:
+  - intranet
+  cron: 24 23 29 9 *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      CHANNEL_GROUP: candidate
+      TEST_PROFILE: osd-ccs-gcp-marketplace
+      VERSION: "4.20"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: ocm-api-lifecycle
+- as: gcp-ocm-wif-sv-f999
+  capabilities:
+  - intranet
+  cron: 24 23 29 9 *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      CHANNEL_GROUP: candidate
+      TEST_PROFILE: osd-gcp-wif-sv
+      VERSION: "4.20"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: ocm-api-lifecycle
 - as: ibmcloud-ipi-disc-priv-f28
   cron: 57 5 14 * *
   steps:
