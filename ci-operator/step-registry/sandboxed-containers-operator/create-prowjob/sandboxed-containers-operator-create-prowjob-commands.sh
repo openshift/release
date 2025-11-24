@@ -1,6 +1,6 @@
 #!/bin/bash
 # script to create prowjobs in ci-operator/config/openshift/sandboxed-containers-operator using environment variables.
-# Usage: 
+# Usage:
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh gen    # Generate prowjob configuration
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh run    # Run prowjobs
 # should be run in a branch of a fork of https://github.com/openshift/release/
@@ -201,6 +201,8 @@ validate_and_set_defaults() {
         exit 1
     fi
 
+    TRUSTEE_URL="${TRUSTEE_URL:-""}"
+
     # Catalog Source Configuration
     echo "Configuring catalog sources..."
 
@@ -365,6 +367,7 @@ generate_workflow() {
     "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
     "TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE:-\"\"}"
     "TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}"
+    "TRUSTEE_URL: ${TRUSTEE_URL:-\"\"}"
   )
 
   # Workload-specific
