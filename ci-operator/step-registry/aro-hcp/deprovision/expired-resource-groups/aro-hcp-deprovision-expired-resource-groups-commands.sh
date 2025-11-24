@@ -12,4 +12,4 @@ export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscripti
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
 az account set --subscription "${SUBSCRIPTION_ID}"
 
-./test/aro-hcp-tests cleanup resource-groups --delete-expired
+./test/aro-hcp-tests cleanup resource-groups --expired

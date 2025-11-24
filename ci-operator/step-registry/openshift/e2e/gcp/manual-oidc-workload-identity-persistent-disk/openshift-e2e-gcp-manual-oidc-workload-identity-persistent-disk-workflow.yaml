@@ -1,0 +1,20 @@
+workflow:
+  as: openshift-e2e-gcp-manual-oidc-workload-identity-persistent-disk
+  steps:
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-gcp-oidc-creds-provision
+    - chain: ipi-install
+    - chain: ipi-gcp-pre-manual-oidc-workload-identity-persistent-disk
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-gcp-post
+    env:
+      TEST_CSI_DRIVER_MANIFEST: manifest-gcp-pd.yaml
+      TEST_OCP_CSI_DRIVER_MANIFEST: ocp-manifest-gcp-pd.yaml
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    The Openshift E2E GCP workflow executes the common end-to-end test with user defined OIDC provider and service
+    accounts on GCP Persistent Disk operator.
