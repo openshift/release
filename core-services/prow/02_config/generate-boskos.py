@@ -23,13 +23,13 @@ CONFIG = {
     },
     'aws-3-quota-slice': {
         'us-east-1': 50,
-        'us-east-2': 35,
+        'us-east-2': 10,
         'us-west-1': 35,
-        'us-west-2': 35,
+        'us-west-2': 25,
     },
     'aws-4-quota-slice': {
         'us-east-1': 50,
-        'us-east-2': 35,
+        'us-east-2': 4,
         'us-west-1': 35,
         'us-west-2': 35,
     },
@@ -237,11 +237,32 @@ CONFIG = {
         'usgovvirginia': 5,
         'usgovtexas': 5
     },
+    'aro-hcp-dev-quota-slice': {
+        'default': 10,
+    },    
     'azure-sustaining-autorelease-412-quota-slice': {
         'eastus': 60,
     },
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
+    },
+    'aro-hcp-int-quota-slice': {
+        'default': 1,
+    },
+    'aro-hcp-stg-quota-slice': {
+        'default': 1,
+    },
+    'aro-hcp-prod-quota-slice': {
+        'default': 1,
+    },
+    'aro-hcp-dev-quota-slice': {
+        'default': 10,
+    },
+    'aro-hcp-test-tenant-quota-slice': {
+        'default': 10,
+    },
+    'aro-hcp-test-tenant-msi-quota-slice': {
+        'default': 10,
     },
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
@@ -321,7 +342,8 @@ CONFIG = {
     'nutanix-qe-flow-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
-        'default': 8,
+        # 3 * 512GB RAM, 96 cores (with 4x overcommit) hosts
+        'default': 15,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,
@@ -598,7 +620,7 @@ CONFIG = {
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
-for i in range(0, 3):
+for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):

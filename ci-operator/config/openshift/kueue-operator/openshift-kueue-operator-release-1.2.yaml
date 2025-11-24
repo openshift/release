@@ -38,6 +38,7 @@ images:
   dockerfile_literal: |
     FROM src
     RUN dnf install -y skopeo git && dnf clean all
+    RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
   from: src
   to: kueue-operator-src
 - dockerfile_literal: |
@@ -109,7 +110,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.18"
-  minimum_interval: 96h
+  cron: '@daily'
   presubmit: true
   steps:
     env:
@@ -123,7 +124,7 @@ tests:
 - as: test-e2e-4-19-arm64
   capabilities:
   - arm64
-  minimum_interval: 96h
+  cron: '@daily'
   steps:
     cluster_profile: aws
     dependencies:
@@ -149,7 +150,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.19"
-  minimum_interval: 96h
+  cron: '@daily'
   presubmit: true
   steps:
     env:
@@ -170,7 +171,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.20"
-  minimum_interval: 96h
+  cron: '@daily'
   presubmit: true
   steps:
     env:
@@ -181,6 +182,21 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
+- as: test-e2e-4-19-fips
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-1-2
+      FIPS_ENABLED: "true"
+      OPERAND_COMPONENT: kueue-operand-1-2
+      OPERATOR_COMPONENT: kueue-operator-1-2
+    post:
+    - chain: kueue-operator-post
+    test:
+    - ref: fips-check
+    - chain: kueue-operator-test-e2e
+    workflow: ipi-aws
 - always_run: false
   as: perfscale-payload-kueue-operator-9nodes
   optional: true
@@ -198,11 +214,10 @@ tests:
     test:
     - chain: kueue-operator-test-perfscale
     workflow: openshift-qe-installer-aws
-  timeout: 3h30m0s
 - as: test-e2e-disconnected
   capabilities:
   - arm64
-  minimum_interval: 96h
+  cron: '@daily'
   steps:
     cluster_profile: gcp
     env:
