@@ -404,6 +404,9 @@ CONFIG = {
     'hypershift-quota-slice': {
         'default': 50,
     },
+    'powervc-1-quota-slice': {
+        'default': 4,
+    },
     'powervs-1-quota-slice': {
         'mon01': 1,
         'osa21': 1,
