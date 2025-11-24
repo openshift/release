@@ -198,7 +198,7 @@ spec:
   - "$BLUE_EGRESS_IP"
   namespaceSelector:
     matchLabels:
-      egress: egressip1
+      team: blue
   podSelector:
     matchLabels:
       team: blue
@@ -218,7 +218,7 @@ spec:
   - "$RED_EGRESS_IP"
   namespaceSelector:
     matchLabels:
-      egress: egressip1
+      team: red
   podSelector:
     matchLabels:
       team: red
@@ -253,19 +253,29 @@ EOF
 
     # Create test namespaces
     log_info "Creating $PROJECT_COUNT test namespaces..."
+    blue_projects=$((PROJECT_COUNT / 2))
+    
     for ((i=1; i<=PROJECT_COUNT; i++)); do
         NAMESPACE="egressip-test$i"
         
-        # Create namespace with egress labels
+        # Determine team label for namespace
+        if [[ $i -le $blue_projects ]]; then
+            TEAM_LABEL="blue"
+        else
+            TEAM_LABEL="red"
+        fi
+        
+        # Create namespace with team-specific labels
         cat <<EOF | oc apply -f -
 apiVersion: v1
 kind: Namespace
 metadata:
   name: $NAMESPACE
   labels:
+    team: $TEAM_LABEL
     egress: egressip1
 EOF
-        log_info "Created namespace: $NAMESPACE"
+        log_info "Created namespace: $NAMESPACE (team: $TEAM_LABEL)"
         
         # Create test pods using Deployment (preferred over RC)
         cat <<EOF | oc apply -f -
@@ -320,7 +330,6 @@ EOF
 
     # Label pods for blue/red teams (wait for pods to be available first)
     log_info "Assigning blue/red team labels to pods..."
-    blue_projects=$((PROJECT_COUNT / 2))
     
     for ((i=1; i<=blue_projects; i++)); do
         NAMESPACE="egressip-test$i"
