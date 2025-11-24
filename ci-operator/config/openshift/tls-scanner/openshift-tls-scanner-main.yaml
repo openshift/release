@@ -55,6 +55,23 @@ tests:
         # 1. Setup environment variables for the deployment script
         export SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
         export NAMESPACE=tls-scanner-test
+        
+        # Create additional nftables rules for ports that should not be filtered
+        cat > /tmp/additional-nftables-rules <<EOF
+        tcp dport 8443 accept
+        udp dport 8443 accept
+        tcp dport 2379 accept
+        udp dport 2379 accept
+        tcp dport 10300 accept
+        udp dport 10300 accept
+        tcp dport 10901 accept
+        udp dport 10901 accept
+        tcp dport 29108 accept
+        udp dport 29108 accept
+        EOF
+        export EXTRA_NFTABLES_MASTER_FILE=/tmp/additional-nftables-rules
+        export EXTRA_NFTABLES_WORKER_FILE=/tmp/additional-nftables-rules
+        
         oc create namespace "${NAMESPACE}"
 
         # Use a trap to ensure cleanup happens even if there are errors.
