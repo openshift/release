@@ -175,7 +175,49 @@ tests:
         ) &
         LOG_PID=$!
 
-        # Wait for the job to complete with the 3h30m timeout (increased from 3h)
+        # Monitor logs for completion signal "Pausing for log collection..." to trigger artifact copy
+        # This ensures we copy artifacts while the pod is still running (during its 120s sleep)
+        echo "Monitoring logs for scanner completion..."
+        SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
+        mkdir -p "${SCANNER_ARTIFACT_DIR}"
+        
+        start_wait=$(date +%s)
+        while true; do
+            current_time=$(date +%s)
+            if [ $((current_time - start_wait)) -gt 12600 ]; then # 3.5h timeout
+                echo "Timeout waiting for scanner completion."
+                exit 1
+            fi
+
+            # Check for the specific log message indicating scanner finished
+            if oc logs "${POD_NAME}" -n "${NAMESPACE}" 2>&1 | grep -q "Pausing for log collection"; then
+                 echo "Scanner finished (detected via logs). Copying artifacts..."
+                 
+                 # Try to copy artifacts
+                 if oc cp "${NAMESPACE}/${POD_NAME}:/artifacts/." "${SCANNER_ARTIFACT_DIR}/"; then
+                    echo "Artifacts copied successfully."
+                 else
+                    echo "Warning: Failed to copy artifacts despite scanner being in pause mode."
+                 fi
+                 break
+            fi
+
+            # Check if job failed
+            if oc get job "tls-scanner-job" -n "${NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' | grep -q "True"; then
+                 echo "Job failed."
+                 exit 1
+            fi
+            
+            # Check if job completed (we might have missed the window)
+            if oc get job "tls-scanner-job" -n "${NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' | grep -q "True"; then
+                 echo "Job completed before we could detect pause message."
+                 break
+            fi
+
+            sleep 10
+        done
+
+        # Wait for the job to complete (it should be finishing soon if not already)
         if ! oc wait --for=condition=complete "job/tls-scanner-job" -n "${NAMESPACE}" --timeout=3h30m; then
           echo "Job did not complete in time (3h30m timeout)."
           echo "--- End of Scanner Logs (Timeout) ---"
@@ -210,18 +252,6 @@ tests:
         kill $MONITOR_PID || true
         echo "--- End of Scanner Logs ---"
         
-        # 5. Copy artifacts from the completed Pod to the CI artifact directory
-        echo "Copying artifacts..."
-        # We re-fetch the pod name in case it changed
-        POD_NAME=$(oc get pods -n "${NAMESPACE}" -l job-name=tls-scanner-job -o jsonpath='{.items[0].metadata.name}')
-        
-        # Create a dedicated directory for the scanner's artifacts
-        SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
-        mkdir -p "${SCANNER_ARTIFACT_DIR}"
-
-        # Copy all files from the Pod's /artifacts/ directory
-        oc cp "${NAMESPACE}/${POD_NAME}:/artifacts/." "${SCANNER_ARTIFACT_DIR}/"
-
         echo "Scan complete. Artifacts collected in ${SCANNER_ARTIFACT_DIR}."
         # The 'trap' will execute ./deploy.sh cleanup on exit.
       dependencies:
