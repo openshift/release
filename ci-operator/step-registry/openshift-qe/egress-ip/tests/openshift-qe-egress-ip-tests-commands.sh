@@ -45,7 +45,8 @@ error_exit() {
 # Enhanced metrics collection functions
 collect_enhanced_ovn_metrics() {
     local phase="${1:-unknown}"
-    local metrics_file="$ARTIFACT_DIR/enhanced_ovn_metrics_${phase}_$(date +%Y%m%d_%H%M%S).json"
+    local metrics_file
+    metrics_file="$ARTIFACT_DIR/enhanced_ovn_metrics_${phase}_$(date +%Y%m%d_%H%M%S).json"
     
     log_info "Collecting enhanced OVN metrics for phase: $phase"
     
