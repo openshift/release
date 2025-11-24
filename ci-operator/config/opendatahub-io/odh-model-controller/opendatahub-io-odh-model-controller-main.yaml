@@ -164,70 +164,38 @@ tests:
     test:
     - as: llmisvc
       cli: latest
-      commands: |
-        set -euxo pipefail
-        git clone https://github.com/opendatahub-io/kserve.git /tmp/kserve
-        pushd /tmp/kserve
-          git fetch --all --tags
-          git checkout release-v0.15
-
-          export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
-          export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
-
-          echo "Loading environment variables from params.env"
-          #Parse params.env into shell vars with underscores instead of dashes
-          while IFS='=' read -r key value; do
-            case "$key" in
-              ''|\#*) continue ;;
-            esac
-            key="${key%%[[:space:]]*}"
-            value="${value##[[:space:]]}"
-            sane_key="${key//-/_}"
-            printf -v "$sane_key" '%s' "$value"
-          done < config/overlays/odh/params.env
-
-          export KSERVE_CONTROLLER_IMAGE="${kserve_controller}"
-          export KSERVE_AGENT_IMAGE="${kserve_agent}"
-          export KSERVE_ROUTER_IMAGE="${kserve_router}"
-          export KSERVE_STORAGE_INITIALIZER_IMAGE="${kserve_storage_initializer}"
-          export LLMD_IMAGE="${kserve_llm_d}"
-          export LLMD_INFERENCE_SCHEDULER_IMAGE="${kserve_llm_d_inference_scheduler}"
-          export LLMD_ROUTING_SIDECAR_IMAGE="${kserve_llm_d_routing_sidecar}"
-          export KUBE_RBAC_PROXY_IMAGE="${kube_rbac_proxy}"
-
-          echo "Loaded all images from params.env:"
-          echo "KSERVE_CONTROLLER_IMAGE=${KSERVE_CONTROLLER_IMAGE}"
-          echo "KSERVE_AGENT_IMAGE=${KSERVE_AGENT_IMAGE}"
-          echo "KSERVE_ROUTER_IMAGE=${KSERVE_ROUTER_IMAGE}"
-          echo "KSERVE_STORAGE_INITIALIZER_IMAGE=${KSERVE_STORAGE_INITIALIZER_IMAGE}"
-          echo "LLMD_IMAGE=${LLMD_IMAGE}"
-          echo "LLMD_INFERENCE_SCHEDULER_IMAGE=${LLMD_INFERENCE_SCHEDULER_IMAGE}"
-          echo "LLMD_ROUTING_SIDECAR_IMAGE=${LLMD_ROUTING_SIDECAR_IMAGE}"
-          echo "KUBE_RBAC_PROXY_IMAGE=${KUBE_RBAC_PROXY_IMAGE}"
-
-          echo "Apply necessary prereqs for LLMISVC tests"
-          oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/prerequisites/
-          
-          echo "Waiting for LeaderWorkerSetOperator CRD..."
-          oc wait --for=condition=Established crd/leaderworkersetoperators.operator.openshift.io --timeout=600s
-
-          echo "Waiting for Sail Istio CRDs..."
-          oc wait --for=condition=Established crd/istios.sailoperator.io --timeout=600s
-          oc wait --for=condition=Established crd/istiocnis.sailoperator.io --timeout=600s
-          
-          oc get crd gateways.gateway.networking.k8s.io
-          oc get crd gatewayclasses.gateway.networking.k8s.io
-
-          oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/installation/
-
-          echo "Wait for Leader Worker Set Operator to be available"
-          oc wait --for=condition=Available leaderworkersetoperator/cluster --timeout=300s
-          oc wait --for=condition=Ready istiocni/default --timeout=300s
-          oc wait --for=condition=Ready istio/default --timeout=300s
-          oc get gateway openshift-ai-inference -n openshift-ingress
-
-          ./test/scripts/openshift-ci/run-e2e-tests.sh "llminferenceservice and (cluster_cpu and cluster_single_node)" 2 "llm-d"
-        popd
+      commands: "set -euxo pipefail\ngit clone https://github.com/opendatahub-io/kserve.git
+        /tmp/kserve\npushd /tmp/kserve\n  git fetch --all --tags\n  git checkout release-v0.15\n\n
+        \ export GITHUB_SHA=\"${PULL_BASE_SHA:-stable}\"\n  export ODH_MODEL_CONTROLLER_IMAGE=\"${ODH_MODEL_CONTROLLER_IMAGE}\"\n\n
+        \ echo \"Loading environment variables from params.env\"\n  #Parse params.env
+        into shell vars with underscores instead of dashes\n  while IFS='=' read -r
+        key value; do\n    case \"$key\" in\n      ''|\\#*) continue ;;\n    esac\n
+        \   key=\"${key%%[[:space:]]*}\"\n    value=\"${value##[[:space:]]}\"\n    sane_key=\"${key//-/_}\"\n
+        \   printf -v \"$sane_key\" '%s' \"$value\"\n  done < config/overlays/odh/params.env\n\n
+        \ export KSERVE_CONTROLLER_IMAGE=\"${kserve_controller}\"\n  export KSERVE_AGENT_IMAGE=\"${kserve_agent}\"\n
+        \ export KSERVE_ROUTER_IMAGE=\"${kserve_router}\"\n  export KSERVE_STORAGE_INITIALIZER_IMAGE=\"${kserve_storage_initializer}\"\n
+        \ export LLMD_IMAGE=\"${kserve_llm_d}\"\n  export LLMD_INFERENCE_SCHEDULER_IMAGE=\"${kserve_llm_d_inference_scheduler}\"\n
+        \ export LLMD_ROUTING_SIDECAR_IMAGE=\"${kserve_llm_d_routing_sidecar}\"\n
+        \ export KUBE_RBAC_PROXY_IMAGE=\"${kube_rbac_proxy}\"\n\n  echo \"Loaded all
+        images from params.env:\"\n  echo \"KSERVE_CONTROLLER_IMAGE=${KSERVE_CONTROLLER_IMAGE}\"\n
+        \ echo \"KSERVE_AGENT_IMAGE=${KSERVE_AGENT_IMAGE}\"\n  echo \"KSERVE_ROUTER_IMAGE=${KSERVE_ROUTER_IMAGE}\"\n
+        \ echo \"KSERVE_STORAGE_INITIALIZER_IMAGE=${KSERVE_STORAGE_INITIALIZER_IMAGE}\"\n
+        \ echo \"LLMD_IMAGE=${LLMD_IMAGE}\"\n  echo \"LLMD_INFERENCE_SCHEDULER_IMAGE=${LLMD_INFERENCE_SCHEDULER_IMAGE}\"\n
+        \ echo \"LLMD_ROUTING_SIDECAR_IMAGE=${LLMD_ROUTING_SIDECAR_IMAGE}\"\n  echo
+        \"KUBE_RBAC_PROXY_IMAGE=${KUBE_RBAC_PROXY_IMAGE}\"\n\n  echo \"Apply necessary
+        prereqs for LLMISVC tests\"\n  oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/prerequisites/\n
+        \ \n  echo \"Waiting for LeaderWorkerSetOperator CRD...\"\n  oc wait --for=condition=Established
+        crd/leaderworkersetoperators.operator.openshift.io --timeout=600s\n\n  echo
+        \"Waiting for Sail Istio CRDs...\"\n  oc wait --for=condition=Established
+        crd/istios.sailoperator.io --timeout=600s\n  oc wait --for=condition=Established
+        crd/istiocnis.sailoperator.io --timeout=600s\n  \n  oc get crd gateways.gateway.networking.k8s.io\n
+        \ oc get crd gatewayclasses.gateway.networking.k8s.io\n\n  oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/installation/\n\n
+        \ echo \"Wait for Leader Worker Set Operator to be available\"\n  oc wait
+        --for=condition=Available leaderworkersetoperator/cluster --timeout=300s\n
+        \ oc wait --for=condition=Ready istiocni/default --timeout=300s\n  oc wait
+        --for=condition=Ready istio/default --timeout=300s\n  oc get gateway openshift-ai-inference
+        -n openshift-ingress\n\n  ./test/scripts/openshift-ci/run-e2e-tests.sh \"llminferenceservice
+        and (cluster_cpu and cluster_single_node)\" 2 \"llm-d\"\npopd\n"
       dependencies:
       - env: ODH_MODEL_CONTROLLER_IMAGE
         name: odh-model-controller
