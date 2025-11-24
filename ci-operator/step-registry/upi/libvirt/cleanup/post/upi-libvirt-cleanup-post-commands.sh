@@ -12,14 +12,27 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
   exit 1
 fi
 
-# ensure hostname can be found
-HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
-if [[ -z "${HOSTNAME}" ]]; then
-  echo "Couldn't retrieve hostname from lease config"
+if [[ "${ARCH}" == "s390x" ]]; then
+  # ensure internal IP can be found
+  INTERNAL_IP="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".internal_ip" "${CLUSTER_PROFILE_DIR}/leases")"
+  if [[ -z "${INTERNAL_IP}" ]]; then
+    echo "Couldn't retrieve internal IP from lease config"
+    exit 1
+  fi
+  REMOTE_LIBVIRT_URI="qemu+tcp://${INTERNAL_IP}/system"
+elif [[ "${ARCH}" == "ppc64le" ]]; then
+  # ensure hostname can be found
+  HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
+  if [[ -z "${HOSTNAME}" ]]; then
+    echo "Couldn't retrieve hostname from lease config"
+    exit 1
+  fi
+  REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME}/system"
+else
+  echo "Unsupported architecture: ${ARCH}"
   exit 1
 fi
 
-REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME}/system"
 VIRSH="mock-nss.sh virsh --connect ${REMOTE_LIBVIRT_URI}"
 echo "Using libvirt connection for $REMOTE_LIBVIRT_URI"
 
