@@ -27,6 +27,144 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: quay-acs-violations-check-ocp416-quay312
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      ACS_OPERATOR_CHANNEL: stable
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.16
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-12-v4-16@sha256:4283b7a137bb422110faf8812eb28f33f131333d7a824db86a773f5dfddac257
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.12"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-noobaa
+    - ref: quay-tests-quay-acs
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay312-ocp416-virtual-builder
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.16
+      QUAY_BUILDER_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-12@sha256:97ff8715ac8d47660eba7342fefe6b16aed3c54544fd5c557d65b611fea2417b
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-12-v4-16@sha256:4283b7a137bb422110faf8812eb28f33f131333d7a824db86a773f5dfddac257
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.12"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-resource-provisioning-tls
+    - ref: quay-tests-resource-provisioning-builder
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-builder
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay312-ocp416-operator-test-singlens
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "8"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.16
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-12-v4-16@sha256:4283b7a137bb422110faf8812eb28f33f131333d7a824db86a773f5dfddac257
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_OPERATOR_TESTCASE: Quay-High|Quay-Medium
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-resource-provisioning-aws-unmanaged-component
+    - ref: quay-tests-test-quay-operator
+    workflow: quay-tests-cucushift-installer-rehearse-aws-ipi-operator
+  timeout: 8h0m0s
+- as: quay312-ocp416-operator-test-allns
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "8"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.16
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-12-v4-16@sha256:4283b7a137bb422110faf8812eb28f33f131333d7a824db86a773f5dfddac257
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_OPERATOR_TESTCASE: Quay-Allns-High|Quay-Allns-Medium
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-test-quay-operator
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay312-ocp416-upgrade
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.16
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-12-v4-16@sha256:4283b7a137bb422110faf8812eb28f33f131333d7a824db86a773f5dfddac257
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_UPGRADE_TESTCASE: Quay-Upgrade-High|Quay-Upgrade-Medium
+      QUAY_VERSION: 3.12.13
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-test-quay-upgrade
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 8h0m0s
+- as: cso-quay312-ocp416-upgrade
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-12-v4-16@sha256:4283b7a137bb422110faf8812eb28f33f131333d7a824db86a773f5dfddac257
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_UPGRADE_TESTCASE: Quay-CSO-Upgrade-High
+      QUAY_VERSION: 3.12.13
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-test-quay-upgrade
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: qbo-quay312-ocp416-upgrade
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.16
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-12-v4-16@sha256:4283b7a137bb422110faf8812eb28f33f131333d7a824db86a773f5dfddac257
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_UPGRADE_TESTCASE: Quay-QBO-Upgrade-High
+      QUAY_VERSION: 3.12.13
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-noobaa
+    - ref: quay-tests-test-quay-upgrade
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: quay-e2e-tests-quay313-ocp416-lp-interop
   cron: 0 23 31 2 *
   steps:
