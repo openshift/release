@@ -105,6 +105,9 @@ for ((i=1; i <= $RETRIES; i++)); do
     sleep 10
 done
 
+# debug
+sleep 3h
+
 oc wait deployment noobaa-operator \
 --namespace="${ODF_INSTALL_NAMESPACE}" \
 --for=condition='Available' \
