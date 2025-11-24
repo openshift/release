@@ -207,11 +207,17 @@ tests:
 
           echo "Apply necessary prereqs for LLMISVC tests"
           oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/prerequisites/
-          oc wait --for=condition=CatalogSourcesUnhealthy=false subscription/openshift-cert-manager-operator -n cert-manager-operator --timeout=300s
-          oc wait --for=condition=CatalogSourcesUnhealthy=false subscription/servicemeshoperator -n openshift-operators --timeout=300s
-          oc wait --for=condition=CatalogSourcesUnhealthy=false subscription/leader-worker-set -n openshift-lws-operator --timeout=300s
+          
+          echo "Waiting for LeaderWorkerSetOperator CRD..."
+          oc wait --for=condition=Established crd/leaderworkersetoperators.operator.openshift.io --timeout=600s
+
+          echo "Waiting for Sail Istio CRDs..."
+          oc wait --for=condition=Established crd/istios.sailoperator.io --timeout=600s
+          oc wait --for=condition=Established crd/istiocnis.sailoperator.io --timeout=600s
+          
           oc get crd gateways.gateway.networking.k8s.io
           oc get crd gatewayclasses.gateway.networking.k8s.io
+
           oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/installation/
 
           echo "Wait for Leader Worker Set Operator to be available"
