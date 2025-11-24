@@ -7,7 +7,9 @@ set -x
 
 : "${LOKI_NAMESPACE:=netobserv}"
 : "${LOKI_SERVICE:=loki}"
-: "${LOKI_QUERY:={K8S_FlowLayer=\"infra\", FlowDirection=\"1\", SrcK8S_Namespace=~\"^openshift-.*\"} | json | DstSubnetLabel=\"\" | SrcSubnetLabel=\"Pods\" | __error__=\"\"}"
+if [[ -z "${LOKI_QUERY:-}" ]]; then
+  LOKI_QUERY='{K8S_FlowLayer="infra", FlowDirection="1", SrcK8S_Namespace=~"^openshift-.*"} | json | (DstSubnetLabel="" and SrcSubnetLabel="Pods" and __error__="")'
+fi
 : "${LOKI_STEP:=30s}"
 
 start_file="${SHARED_DIR}/e2e_start_epoch"
@@ -16,6 +18,8 @@ if [[ ! -s "${start_file}" ]]; then
   exit 1
 fi
 start_epoch=$(cat "${start_file}")
+
+#start_epoch=$(date -v-2H +%s)
 end_epoch=$(date +%s)
 
 # Best-effort: ensure Loki is up
@@ -30,6 +34,7 @@ sleep 5
 out_json="${ARTIFACT_DIR}/loki-query-range.json"
 
 echo "Querying Loki for the time window: ${start_epoch} to ${end_epoch}"
+echo "LOKI_QUERY: '${LOKI_QUERY}'"
 
 curl -sG "http://127.0.0.1:3100/loki/api/v1/query_range" \
   --data-urlencode "query=${LOKI_QUERY}" \
@@ -38,8 +43,8 @@ curl -sG "http://127.0.0.1:3100/loki/api/v1/query_range" \
   --data-urlencode "step=${LOKI_STEP}" \
   > "${out_json}"
 
-echo "Waiting for 2 hours to ensure data is ingested into Loki"
-sleep 2h # wait for the data to be ingested into Loki
+#echo "Waiting for 2 hours to ensure data is ingested into Loki"
+#sleep 2h # wait for the data to be ingested into Loki
 
 # Process the results: group by SrcK8S_Namespace and remove duplicates
 processed_json="${ARTIFACT_DIR}/loki-query-range-grouped.json"
