@@ -108,11 +108,22 @@ ENV_DATA:
 __APPENDED_ENV_DATA__
 fi
 
+# Ensure pytest-xdist is installed and compatible with ocs-ci (pytest 6.x)
+# We pin to <3.0.0 because newer versions require pytest >= 7.0
+if ! python3 -c "import xdist" &> /dev/null; then
+    echo "pytest-xdist not found. Installing compatible version..."
+    pip install "pytest-xdist<3.0.0"
+fi
 
 set -x
 START_TIME=$(date "+%s")
 
+# Define parallel workers (default to 4)
+PARALLEL_WORKERS="${PARALLEL_WORKERS:-4}"
+
 run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
+  -n "${PARALLEL_WORKERS}" \
+  --dist loadscope \
   --ocsci-conf "${LOGS_CONFIG}" \
   --collect-logs \
   --ocs-version  "${OCS_VERSION}"                    \
