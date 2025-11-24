@@ -1,0 +1,38 @@
+ref:
+  as: baremetalds-metallb-catalogsource
+  from_image:
+    namespace: ocp
+    name: "4.20"
+    tag: upi-installer
+  cli: latest
+  grace_period: 10m
+  commands: baremetalds-metallb-catalogsource-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: IDMS_NAME
+    documentation: The name of ImageDigestMirrorSet
+    default: metallb-operator-idms
+  - name: METALLB_CATALOG_SOURCE
+    documentation: The name of catalogsource which will be created for MetalLB
+    default: metallb-catalogsource
+  - name: MULTISTAGE_PARAM_OVERRIDE_METALLB_INDEX_IMAGE
+    documentation: |-
+      The var can be set when using the Gangway API, pass it as:
+      "pod_spec_options": {
+        "envs": {
+          "MULTISTAGE_PARAM_OVERRIDE_METALLB_INDEX_IMAGE": "quay.io/example/metallb-index:latest"
+        }
+      }
+    default: ""
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  - namespace: test-credentials
+    name: dt-secrets
+    mount_path: /var/run/vault/dt-secrets
+  documentation: |-
+    Enable the MetalLB Operator catalogsource in a connected env.
