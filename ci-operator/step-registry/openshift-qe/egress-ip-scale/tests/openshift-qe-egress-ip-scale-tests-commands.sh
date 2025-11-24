@@ -145,7 +145,8 @@ count_snat_rules_by_node() {
 # Function to collect detailed scale metrics
 collect_scale_metrics() {
     local phase="$1"
-    local metrics_file="$ARTIFACT_DIR/scale_metrics_${phase}_$(date +%Y%m%d_%H%M%S).json"
+    local metrics_file
+    metrics_file="$ARTIFACT_DIR/scale_metrics_${phase}_$(date +%Y%m%d_%H%M%S).json"
     
     log_info "Collecting scale test metrics for phase: $phase"
     
