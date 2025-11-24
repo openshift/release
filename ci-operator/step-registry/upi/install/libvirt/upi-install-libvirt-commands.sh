@@ -20,10 +20,24 @@ function leaseLookup () {
   echo "$lookup"
 }
 
-# ensure hostname can be found
-HOSTNAME="$(leaseLookup 'hostname')"
-if [[ -z "${HOSTNAME}" ]]; then
-  echo "Couldn't retrieve hostname from lease config"
+if [[ "${ARCH}" == "s390x" ]]; then
+  # ensure internal IP can be found
+  INTERNAL_IP="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".internal_ip" "${CLUSTER_PROFILE_DIR}/leases")"
+  if [[ -z "${INTERNAL_IP}" ]]; then
+    echo "Couldn't retrieve internal IP from lease config"
+    exit 1
+  fi
+  REMOTE_LIBVIRT_URI="qemu+tcp://${INTERNAL_IP}/system"
+elif [[ "${ARCH}" == "ppc64le" ]]; then
+  # ensure hostname can be found
+  HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
+  if [[ -z "${HOSTNAME}" ]]; then
+    echo "Couldn't retrieve hostname from lease config"
+    exit 1
+  fi
+  REMOTE_LIBVIRT_URI="qemu+tcp://${HOSTNAME}/system"
+else
+  echo "Unsupported architecture: ${ARCH}"
   exit 1
 fi
 
@@ -65,7 +79,7 @@ oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INST
 CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 OCPINSTALL="${INSTALL_DIR}/openshift-install"
 # All virsh commands need to be run on the hypervisor
-LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
+LIBVIRT_CONNECTION="${REMOTE_LIBVIRT_URI}"
 # Simplify the virsh command
 VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 
@@ -213,10 +227,10 @@ else
   for CURRENT_SOURCE_VOLUME in $(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true); do
     if [[ "${CURRENT_SOURCE_VOLUME}" == "${VOLUME_NAME}" ]]; then
       DOWNLOAD_NEW_IMAGE=false
-    # Delete the old source volume
     else
-        echo "Deleting ${CURRENT_SOURCE_VOLUME} source volume..."
-        ${VIRSH} vol-delete --pool ${POOL_NAME} ${CURRENT_SOURCE_VOLUME}
+      # Delete the old source volume
+      echo "Deleting ${CURRENT_SOURCE_VOLUME} source volume..."
+      ${VIRSH} vol-delete --pool ${POOL_NAME} ${CURRENT_SOURCE_VOLUME}
     fi
   done
 
