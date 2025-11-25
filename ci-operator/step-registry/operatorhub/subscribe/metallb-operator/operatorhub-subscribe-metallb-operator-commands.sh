@@ -63,15 +63,16 @@ for i in $(seq "${RETRIES}") max; do
   sleep 30
   if [[ -z "${CSV}" ]]; then
     echo "[Retry ${i}/${RETRIES}] The subscription is not yet available. Trying to get it..."
-    CSV=$(oc get subscription -n "${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}" "${METALLB_OPERATOR_SUB_PACKAGE}" -o jsonpath='{.status.installedCSV}')
+    CSV=$(oc get subscription -n "${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}" "${METALLB_OPERATOR_SUB_PACKAGE}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
     continue
   fi
 
-  if [[ $(oc get csv -n ${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE} ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
+  PHASE=$(oc get csv -n ${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE} ${CSV} -o jsonpath='{.status.phase}' 2>/dev/null || true)
+  if [[ "${PHASE}" == "Succeeded" ]]; then
     echo "${METALLB_OPERATOR_SUB_PACKAGE} is deployed"
     break
   fi
-  echo "Try ${i}/${RETRIES}: ${METALLB_OPERATOR_SUB_PACKAGE} is not deployed yet. Checking again in 30 seconds"
+  echo "Try ${i}/${RETRIES}: ${METALLB_OPERATOR_SUB_PACKAGE} is not deployed yet (phase: ${PHASE}). Checking again in 30 seconds"
 done
 
 if [[ "$i" == "max" ]]; then
