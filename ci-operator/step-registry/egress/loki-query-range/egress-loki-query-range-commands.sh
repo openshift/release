@@ -30,8 +30,7 @@ else
   # Fallback: calculate manually (works on both)
   start_epoch=$(($(date +%s) - 7200)) # Subtract 2 hours (7200 seconds)
 fi
-# Define end time as 30 minutes from now
-sleep 1800
+
 end_epoch=$(date +%s)
 
 # Best-effort: ensure Loki is up
