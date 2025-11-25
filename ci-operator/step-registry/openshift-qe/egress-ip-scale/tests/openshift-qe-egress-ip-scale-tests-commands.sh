@@ -55,13 +55,17 @@ count_snat_rules() {
     local total_snat=0
     local ovn_master_pod
     
-    ovn_master_pod=$(oc get pods -n "$NAMESPACE" -l app=ovnkube-master --no-headers -o custom-columns=":metadata.name" | head -1)
+    ovn_master_pod=$(oc get pods -n "$NAMESPACE" -o wide | grep "ovnkube-master" | awk '{print $1}' | head -1)
     
     if [[ -z "$ovn_master_pod" ]]; then
-        log_error "No ovnkube-master pod found"
+        log_error "No ovnkube-master pod found in namespace $NAMESPACE"
+        log_info "Available pods in $NAMESPACE:"
+        oc get pods -n "$NAMESPACE" | grep -E "(ovnkube|ovn)" || echo "No OVN pods found"
         echo "0"
         return 1
     fi
+    
+    log_info "Using OVN master pod: $ovn_master_pod"
     
     # Count SNAT rules for each EgressIP
     for ((i=1; i<=EIP_COUNT; i++)); do
@@ -86,13 +90,17 @@ count_lrp_rules() {
     local total_lrp=0
     local ovn_master_pod
     
-    ovn_master_pod=$(oc get pods -n "$NAMESPACE" -l app=ovnkube-master --no-headers -o custom-columns=":metadata.name" | head -1)
+    ovn_master_pod=$(oc get pods -n "$NAMESPACE" -o wide | grep "ovnkube-master" | awk '{print $1}' | head -1)
     
     if [[ -z "$ovn_master_pod" ]]; then
-        log_error "No ovnkube-master pod found"
+        log_error "No ovnkube-master pod found in namespace $NAMESPACE"
+        log_info "Available pods in $NAMESPACE:"
+        oc get pods -n "$NAMESPACE" | grep -E "(ovnkube|ovn)" || echo "No OVN pods found"
         echo "0"
         return 1
     fi
+    
+    log_info "Using OVN master pod: $ovn_master_pod"
     
     # Count LRP rules for each EgressIP
     for ((i=1; i<=EIP_COUNT; i++)); do
@@ -118,7 +126,7 @@ count_snat_rules_by_node() {
     local total_snat=0
     local ovn_master_pod
     
-    ovn_master_pod=$(oc get pods -n "$NAMESPACE" -l app=ovnkube-master --no-headers -o custom-columns=":metadata.name" | head -1)
+    ovn_master_pod=$(oc get pods -n "$NAMESPACE" -o wide | grep "ovnkube-master" | awk '{print $1}' | head -1)
     
     # Get all EgressIPs assigned to the target node
     for ((i=1; i<=EIP_COUNT; i++)); do
@@ -228,6 +236,9 @@ if [[ $EXISTING_NAMESPACES -lt $EIP_COUNT ]]; then
 fi
 
 log_success "Prerequisites validated. Found $EXISTING_EIPS EgressIPs and $EXISTING_NAMESPACES namespaces."
+
+# Initialize validation results CSV
+echo "phase,metric,actual,expected,result" > "$ARTIFACT_DIR/rule_validation.csv"
 
 # Phase 1: Baseline SNAT/LRP Rule Validation
 log_info "==============================="
