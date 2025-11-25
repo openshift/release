@@ -1,6 +1,47 @@
 chain:
   as: hypershift-mce-aws-create
   steps:
+    - as: prepare-aws-iam-cli-role
+      cli: latest
+      env:
+        - name: MCE_VERSION
+          default: "2.4"
+          documentation: "version of the mce.(2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10)"
+        - name: HYPERSHIFT_BASE_DOMAIN
+          default: "ci.hypershift.devcluster.openshift.com"
+          documentation: "The cluster's FQDN will be a subdomain of the base domain."
+      commands: |-
+        set -exuo pipefail
+
+        # only run when MCE_VERSION >= 2.6
+        if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
+          # The CLUSTER_NAME here is the same in the step below
+          export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+          echo "$(date) Preparing aws cli-role to create HyperShift cluster ${CLUSTER_NAME}"
+          AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+          if [[ $HYPERSHIFT_BASE_DOMAIN == "ci.hypershift.devcluster.openshift.com" ]]; then
+            AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+          fi
+
+          export AWS_SHARED_CREDENTIALS_FILE="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
+          # hypershift CLI is needed to create iam cli-role, and it is already available in hypershift-operator image
+          output=$(bin/hypershift create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE})
+          echo "$output"
+          hcp_role_arn="$(echo $output | grep 'arn:aws:iam:' | awk '{print $NF}')"
+          echo "$hcp_role_arn" > "${SHARED_DIR}/hcp-role-arn"
+          echo "hcp-role-arn: $hcp_role_arn gets saved to the shared directory"
+        fi
+      from: hypershift-operator
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 15m0s
+      credentials:
+        - mount_path: /etc/hypershift-ci-jobs-awscreds
+          name: hypershift-ci-jobs-awscreds
+          namespace: test-credentials
     - as: create-hostedcluster
       cli: latest
       env:
@@ -37,9 +78,9 @@ chain:
           documentation: "Extra args to pass to the create cluster aws command"
       commands: |-
         set -exuo pipefail
-        
+
         trap 'FRC=$?; [[ $FRC != 0 ]] && debug' EXIT TERM
-        
+
         debug() {
           oc get --namespace=local-cluster hostedcluster/${CLUSTER_NAME} > $ARTIFACT_DIR/hostedcluster
           oc get pod -n local-cluster-${CLUSTER_NAME} > $ARTIFACT_DIR/hostedcluster_cp_pods
@@ -71,25 +112,6 @@ chain:
           echo "$extra_flags"
         }
 
-        HCP_CLI=""
-        echo "MCE version is greater than or equal to 2.4, need to extract HyperShift cli"
-        mkdir /tmp/hs-cli
-        HCP_CLI="/tmp/hs-cli/hypershift"
-        # >= 2.9
-        if [[ "$(printf '%s\n' "2.9" "$MCE_VERSION" | sort -V | head -n1)" == "2.9" ]]; then
-          oc cp -n hypershift "$(oc get pod -n hypershift -l app=operator -o jsonpath='{.items[0].metadata.name}')":/usr/bin/hypershift /tmp/hs-cli/hypershift
-        else
-          set +x
-          oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-          HO_IMAGE=$(oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}')
-          brew_registry_auth=$(echo -n "${BREW_IMAGE_REGISTRY_USERNAME}:$(<$BREW_IMAGE_REGISTRY_TOKEN_PATH)" | base64 -w 0)
-          echo '{}' | jq --arg auth "$brew_registry_auth" '.auths += {"brew.registry.redhat.io": {"auth": $auth}}' > /tmp/brew_configjson
-          oc image extract "brew.${HO_IMAGE}" --path /usr/bin/hypershift-no-cgo:/tmp/hs-cli --registry-config=/tmp/brew_configjson
-          HCP_CLI="/tmp/hs-cli/hypershift-no-cgo"
-          set -x
-        fi
-        chmod +x "$HCP_CLI"
-
         HYPERSHIFT_NAME=hcp
         arch=$(arch)
         if [ "$arch" == "x86_64" ]; then
@@ -110,37 +132,35 @@ chain:
           oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
           PULL_SECRET_PATH="/tmp/.dockerconfigjson"
         fi
-        
+
         if [[ -z "$HYPERSHIFT_AWS_REGION" ]]; then
           HYPERSHIFT_AWS_REGION="$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')"
         fi
-        
+
         AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
         if [[ $HYPERSHIFT_BASE_DOMAIN == "ci.hypershift.devcluster.openshift.com" ]]; then
           AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
         fi
-        
+
         CRED_COMMAND=""
         if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
           set +x
           export AWS_SHARED_CREDENTIALS_FILE="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
           export AWS_REGION=${HYPERSHIFT_AWS_REGION}
-          "${HCP_CLI}" create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE}
+          # cli-role has been created in above step: prepare-aws-iam-cli-role
           aws sts get-session-token --output json > ${SHARED_DIR}/sts-creds.json
-          ACCOUNT=$(aws sts get-caller-identity | jq -r '.Account')
-          echo "arn:aws:iam::$ACCOUNT:role/$CLUSTER_NAME" > ${SHARED_DIR}/hcp-role-arn
           set -x
-          CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")  
+          CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")
           sleep 60
         else
           echo "MCE version is less than 2.6, use --aws-creds command"
           CRED_COMMAND=$(echo "--aws-creds ${AWS_GUEST_INFRA_CREDENTIALS_FILE}")
         fi
-        
+
         if [[ $PUBLIC_ONLY == "true" ]]; then
           EXTRA_ARGS+=" --public-only "
         fi
-        
+
         eval "/tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} \
         --name ${CLUSTER_NAME} \
         --infra-id ${CLUSTER_NAME} \
@@ -152,15 +172,15 @@ chain:
         --pull-secret ${PULL_SECRET_PATH} \
         --namespace local-cluster \
         --release-image ${HOSTEDCLUSTER_RELEASE_IMAGE_LATEST} $(support_np_skew)"
-        
-        
+
+
         echo "Waiting for cluster to become available"
         oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
         echo "Cluster became available, creating kubeconfig"
         /tmp/${HYPERSHIFT_NAME} create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
         echo "Waiting for clusteroperators to be ready"
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        
+
         timeout 20m bash -c '
           until \
             oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
@@ -171,7 +191,7 @@ chain:
         '
         echo "Waiting for ManagedCluster to be ready"
         export KUBECONFIG=${SHARED_DIR}/kubeconfig
-        
+
         timeout 20m bash -c '
           until \
             oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterJoined' >/dev/null && \
@@ -180,11 +200,11 @@ chain:
             echo "$(date --rfc-3339=seconds) ManagedCluster not yet ready"
             sleep 10s
           done
-        '        
+        '
         echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
       from_image:
         namespace: ocp
-        name: "4.12"
+        name: "4.16"
         tag: upi-installer
       grace_period: 5m0s
       resources:
