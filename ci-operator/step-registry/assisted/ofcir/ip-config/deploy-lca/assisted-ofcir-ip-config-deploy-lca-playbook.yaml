@@ -1,0 +1,61 @@
+---
+- name: Deploy lifecycle-agent operator
+  hosts: primary
+  gather_facts: false
+  vars:
+    repo_url: "{{ lookup('env', 'LCA_REPO') | default('https://github.com/openshift-kni/lifecycle-agent.git', true) }}"
+    repo_branch: "{{ lookup('env', 'LCA_BRANCH') | default('main', true) }}"
+    lca_image: "{{ lookup('env', 'LCA_IMAGE') | default('', true) }}"
+    workdir: /home/assisted/lifecycle-agent
+    image_ref: "localhost/lifecycle-agent:ci"
+  tasks:
+    - name: Ensure required packages are present
+      become: true
+      ansible.builtin.package:
+        name:
+          - git
+          - make
+          - podman
+        state: present
+
+    - name: Ensure working directory exists
+      ansible.builtin.file:
+        path: "{{ workdir }}"
+        state: directory
+
+    - name: Checkout lifecycle-agent repository
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ workdir }}"
+        version: "{{ repo_branch }}"
+        force: true
+        accept_hostkey: true
+
+    - name: Build LCA image
+      when: lca_image | length == 0
+      ansible.builtin.shell: "podman build -t {{ image_ref }} ."
+      args:
+        chdir: "{{ workdir }}"
+
+    - name: Tag LCA image
+      when: lca_image | length > 0
+      ansible.builtin.shell: "podman tag {{ lca_image }} {{ image_ref }}"
+
+    - name: Deploy operator using environment IMG
+      ansible.builtin.shell: "IMG='{{ image_ref }}' make deploy"
+      args:
+        chdir: "{{ workdir }}"
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+
+    - name: Wait for operator to be ready (if oc available)
+      ansible.builtin.command:
+        cmd: "oc wait --for=condition=ready pod -l app=lifecycle-agent --timeout=10m"
+      environment:
+        KUBECONFIG: "{{ kubeconfig_path }}"
+      register: operator_ready
+
+    - name: Fail if operator is not ready
+      ansible.builtin.fail:
+        msg: "Operator is not ready"
+      when: operator_ready.rc != 0
