@@ -27,6 +27,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.64.8
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -52,7 +56,20 @@ base_images:
     namespace: ocp
     tag: rhel-coreos
 build_root:
-  from_repository: true
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ci/golangci-lint:v1.64.8 AS linter
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21 AS final
+      COPY --from=linter /usr/bin/golangci-lint /usr/bin/golangci-lint
+      RUN dnf install -y skopeo && \
+        make install-tools
+    inputs:
+      golangci-lint:
+        as:
+        - registry.ci.openshift.org/ci/golangci-lint:v1.64.8
+      ocp_4.21_base-rhel9:
+        as:
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
@@ -194,11 +211,11 @@ tests:
   commands: |
     make verify
   container:
-    from: src
+    from: root
 - as: bootstrap-unit
   commands: make bootstrap-e2e
   container:
-    from: src
+    from: root
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - always_run: false
@@ -286,7 +303,7 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e-ocl
-      from: src
+      from: root
       resources:
         requests:
           cpu: 100m
