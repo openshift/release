@@ -19,17 +19,8 @@ if [[ ! -s "${start_file}" ]]; then
 fi
 start_epoch=$(cat "${start_file}")
 
-# Cross-platform date calculation: try GNU date (Linux) first, then BSD date (macOS)
-if date -d '2 hours ago' +%s >/dev/null 2>&1; then
-  # GNU date (Linux)
-  start_epoch=$(date -d '2 hours ago' +%s) # Adjust start time to 2 hours earlier to account for ingestion delay
-elif date -v-2H +%s >/dev/null 2>&1; then
-  # BSD date (macOS)
-  start_epoch=$(date -v-2H +%s) # Adjust start time to 2 hours earlier to account for ingestion delay
-else
-  # Fallback: calculate manually (works on both)
-  start_epoch=$(($(date +%s) - 7200)) # Subtract 2 hours (7200 seconds)
-fi
+# Log the start epoch for debugging
+echo "Using start_epoch from file: ${start_epoch}"
 
 end_epoch=$(date +%s)
 
