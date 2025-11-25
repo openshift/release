@@ -2,13 +2,55 @@ chain:
   as: openshift-qe-egress-ip
   steps:
   - ref: openshift-qe-egress-ip-setup
+  - ref: redhat-chaos-pod-scenarios-custom
+  - ref: redhat-chaos-node-disruptions-worker-outage
   - ref: openshift-qe-egress-ip-tests
+  env:
+  # Pod disruption chaos step environment variables
+  - name: TARGET_NAMESPACE
+    default: "openshift-ovn-kubernetes"
+  - name: POD_LABEL
+    default: "app=ovnkube-node"
+  - name: DISRUPTION_COUNT
+    default: "10"
+  - name: EXPECTED_POD_COUNT
+    default: "3"
+  - name: KILL_TIMEOUT
+    default: "180"
+  - name: EXPECTED_RECOVERY_TIME
+    default: "120"
+  - name: ENABLE_ALERTS
+    default: "True"
+  - name: CHECK_CRITICAL_ALERTS
+    default: "True"
+  - name: WAIT_DURATION
+    default: "300"
+  - name: TELEMETRY_ENABLED
+    default: "True"
+  - name: TELEMETRY_RUN_TAG
+    default: "-egress-ip-pod-disruption"
+  - name: TELEMETRY_GROUP
+    default: "prow"
+  - name: JUNIT_TESTCASE
+    default: '[Egress-IP] OVN pod disruption resilience test'
+  # Node disruption chaos step environment variables
+  - name: ACTION
+    default: "node_reboot_scenario"
+  - name: LABEL_SELECTOR
+    default: "node-role.kubernetes.io/worker="
+  - name: RUNS
+    default: "5"
+  - name: NODE_OUTAGE_TIMEOUT
+    default: "180"
   documentation: >-
-    Executes the complete OpenShift QE egress IP test suite.
+    Executes the enhanced OpenShift QE egress IP test suite with chaos engineering.
     
     This chain orchestrates:
     1. Infrastructure setup (egress-assignable nodes, egress IP configuration)
-    2. Comprehensive resilience testing (pod disruption and node reboot scenarios)
+    2. Chaos engineering pod disruption using krkn framework (targets ovnkube-node pods)
+    3. Chaos engineering node reboot using krkn framework (targets worker nodes)
+    4. Post-chaos validation and resilience testing
     
-    The test suite validates egress IP functionality under infrastructure
-    disruption and ensures proper recovery of OVN network configuration.
+    The test suite validates egress IP functionality under controlled chaos
+    scenarios including pod disruption and node outages, ensuring proper recovery 
+    of OVN network configuration using standardized chaos testing infrastructure.
