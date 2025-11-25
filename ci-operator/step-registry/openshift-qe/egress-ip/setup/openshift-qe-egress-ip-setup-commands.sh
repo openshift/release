@@ -56,15 +56,23 @@ MACHINE_SUBNET=$(oc get machines -n openshift-machine-api -o jsonpath='{.items[0
 
 # If we can't get machine subnet, get node IPs and calculate from there
 if [[ -z "$MACHINE_SUBNET" ]]; then
-    NODE_IP=$(oc get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+    # Use worker node IP instead of first node (which might be master)
+    NODE_IP=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+    if [[ -z "$NODE_IP" ]]; then
+        # Fallback to any node if no worker nodes found
+        NODE_IP=$(oc get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+    fi
     echo "Using node IP for subnet calculation: $NODE_IP"
     
     # Extract subnet (assumes /24 for AWS) and use .250 as egress IP
     SUBNET_BASE=$(echo "$NODE_IP" | cut -d. -f1-3)
     EGRESS_IP="${SUBNET_BASE}.250"
 else
-    # For more robust subnet detection, we'll use a default approach
-    NODE_IP=$(oc get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+    # For more robust subnet detection, we'll use a worker node IP approach
+    NODE_IP=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+    if [[ -z "$NODE_IP" ]]; then
+        NODE_IP=$(oc get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+    fi
     SUBNET_BASE=$(echo "$NODE_IP" | cut -d. -f1-3)
     EGRESS_IP="${SUBNET_BASE}.250"
 fi
