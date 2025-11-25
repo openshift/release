@@ -33,6 +33,7 @@ if [[ ! -f "$TARGET_FILE" ]]; then
 fi
 
 log_info "Loading target configuration..."
+# shellcheck disable=SC1090
 source "$TARGET_FILE"
 
 # Validate required variables
