@@ -87,79 +87,21 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      SLEEP_DURATION: 10m
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-provision
+    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints
 - as: installer-rehearse-gcp-proxy
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.21
-    env:
-      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      SLEEP_DURATION: 10m
-    post:
-    - ref: cucushift-installer-wait
-    - ref: storage-destroy-csi-gcp-filestore
-    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-provision
-    - chain: storage-conf-csi-optional-gcp-filestore
-- as: installer-rehearse-gcp-proxy-wif
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
       CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
       ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
       GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
-      SLEEP_DURATION: 10m
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-workload-identity-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-workload-identity-provision
-- as: installer-rehearse-gcp-proxy-users-static
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
-      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
-      SLEEP_DURATION: 10m
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-users-static-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-users-static-provision
+    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-workload-identity
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
