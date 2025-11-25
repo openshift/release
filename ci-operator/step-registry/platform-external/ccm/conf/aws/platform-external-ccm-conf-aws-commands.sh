@@ -21,10 +21,15 @@ fi
 # Setup CCM deployment manifests
 #
 
-# Discovering the AWS CCM image from OpenShift release payload.
-log "Discovering controller image 'aws-cloud-controller-manager' from release [${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE-}]"
+# Discovering the AWS CCM image from OpenShift release payload or use override.
+if [[ -n "${CCM_IMAGE_OVERRIDE:-}" ]]; then
+  log "Using CCM image override from CCM_IMAGE_OVERRIDE=${CCM_IMAGE_OVERRIDE}"
+  CCM_IMAGE="${CCM_IMAGE_OVERRIDE}"
+else
+  log "Discovering controller image 'aws-cloud-controller-manager' from release [${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE-}]"
+  CCM_IMAGE="$(oc adm release info -a "${REGISTRY_AUTH_FILE}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --image-for='aws-cloud-controller-manager')"
+fi
 
-CCM_IMAGE="$(oc adm release info -a "${REGISTRY_AUTH_FILE}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" --image-for='aws-cloud-controller-manager')"
 CCM_MANIFEST=ccm-00-deployment.yaml
 
 log "Using CCM image=${CCM_IMAGE}"
