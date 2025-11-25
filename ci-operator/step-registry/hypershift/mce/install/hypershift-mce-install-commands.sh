@@ -317,12 +317,62 @@ fi
 HYPERSHIFT_NAME=hcp
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
-  downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
-  cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
-  chmod +x /tmp/${HYPERSHIFT_NAME}
-  cd -
+  # Wait for ConsoleCLIDownload to be created by hypershift-addon-manager
+  # The resource might not exist immediately due to transient errors during initial setup
+  _cliDownloadReady=0
+  trap - ERR
+  set +e
+  for ((i=1; i<=20; i++)); do
+    echo "Checking if ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download exists (attempt $i/20)..."
+    oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download &>/dev/null
+    if [ $? -eq 0 ]; then
+      _cliDownloadReady=1
+      echo "ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download found"
+      break
+    fi
+
+    # On first retry attempt, check if hypershift-addon-manager had errors and restart it
+    if [ $i -eq 5 ]; then
+      echo "ConsoleCLIDownload not found after 5 attempts, checking hypershift-addon-manager logs..."
+      if oc logs -n multicluster-engine -l app=hypershift-addon-manager --tail=100 | grep -q "failed to create or update hcp-cli-download"; then
+        echo "Detected failure in hypershift-addon-manager, restarting pod to retry..."
+        oc delete pod -n multicluster-engine -l app=hypershift-addon-manager
+        echo "Waiting for hypershift-addon-manager to restart and create ConsoleCLIDownload..."
+        sleep 30
+      fi
+    fi
+
+    echo "Waiting for ConsoleCLIDownload to be created..."
+    sleep 15
+  done
+  set -e
+  trap 'exit_with_failure' ERR
+
+  if [ $_cliDownloadReady -eq 0 ]; then
+    echo "WARNING: ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download was not created in expected time"
+    echo "Attempting to diagnose the issue..."
+    oc get ConsoleCLIDownload -A || true
+    oc get deployment -n multicluster-engine hcp-cli-download -o yaml || true
+    oc get route -n multicluster-engine hcp-cli-download -o yaml || true
+    oc logs -n multicluster-engine -l app=hypershift-addon-manager --tail=200 || true
+    echo "ConsoleCLIDownload creation failed, but continuing with installation..."
+    echo "You may need to manually restart hypershift-addon-manager pod if HCP CLI is needed"
+  else
+    # Download the HCP CLI
+    downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
+    if [ -n "$downURL" ]; then
+      curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
+      cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
+      chmod +x /tmp/${HYPERSHIFT_NAME}
+      cd -
+      /tmp/${HYPERSHIFT_NAME} version
+    else
+      echo "WARNING: Could not extract download URL from ConsoleCLIDownload"
+    fi
+  fi
+else
+  echo "Skipping HCP CLI download for non-x86_64 architecture: $arch"
 fi
-/tmp/${HYPERSHIFT_NAME} version
 
 # display HyperShift Operator Version and MCE version
 oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" > "$ARTIFACT_DIR/mce-version"
