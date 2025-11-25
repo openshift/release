@@ -272,7 +272,7 @@ log_info "Total Ready Pods: $TOTAL_READY_PODS/$TOTAL_PODS"
 # Show EgressIP status
 echo ""
 log_info "EgressIP Status:"
-oc get egressip -l 'metadata.name ~ eip-scale-.*' -o wide
+oc get egressip -o wide | grep -E "(^NAME|eip-scale-)"
 
 # Save summary to artifact
 cat > "$ARTIFACT_DIR/scale_setup_summary.txt" << EOF
