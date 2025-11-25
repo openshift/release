@@ -1,0 +1,80 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 200m
+      memory: 500Mi
+tests:
+- as: quay-acs-violations-check-quay310
+  cron: 0 20 24 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      ACS_OPERATOR_CHANNEL: stable
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.14
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-10-v4-14@sha256:8eeeac1ae79efac715e75231ea98c1e64a68798dc16bb74f9bd16618bfd6905d
+      QUAY_OPERATOR_CHANNEL: stable-3.10
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: 3.10.17
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-noobaa
+    - ref: quay-tests-quay-acs
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay310-ocp414-virtual-builder
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.14
+      QUAY_BUILDER_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-10@sha256:b7a602336f8f3ba73d5f896e6dfd5da63df43ed83e51b243ff7b4c6db4211e4b
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-10-v4-14@sha256:8eeeac1ae79efac715e75231ea98c1e64a68798dc16bb74f9bd16618bfd6905d
+      QUAY_OPERATOR_CHANNEL: stable-3.10
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: 3.10.17
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-resource-provisioning-tls
+    - ref: quay-tests-resource-provisioning-builder
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-builder
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-tests
+  variant: ocp-414-quay-regression
