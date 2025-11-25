@@ -1,4 +1,8 @@
 base_images:
+  azure-cli:
+    name: azure-cli
+    namespace: ""
+    tag: latest
   nested-podman:
     name: nested-podman
     namespace: ci
@@ -32,15 +36,12 @@ images:
         source_path: /go/src/github.com/Azure/ARO-HCP
   to: nested-podman-src
 - dockerfile_literal: |
-    FROM src
-    RUN cat /etc/dnf/dnf.conf || true
-    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
-    RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
-    RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
-    RUN dnf install -y azure-cli libicu
+    FROM azure-cli
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
     USER root
     RUN mkdir -p /usr/local/bin
-    RUN az bicep install && mv /root/.azure/bin/bicep /usr/local/bin
+    # RUN az bicep install && mv /root/.azure/bin/bicep /usr/local/bin
     RUN az aks install-cli --install-location /usr/local/bin/kubectl --kubelogin-install-location /usr/local/bin/kubelogin
     RUN export GOFLAGS='-mod=readonly' && \
         make install-tools && \
