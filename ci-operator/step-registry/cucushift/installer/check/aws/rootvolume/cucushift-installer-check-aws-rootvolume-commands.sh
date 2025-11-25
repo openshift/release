@@ -56,7 +56,48 @@ fi
 echo "Cluster ID: ${CLUSTER_ID}"
 echo "Region: ${REGION}"
 
+function read_install_config() {
+  local query="$1"
+  if [ ! -f "${SHARED_DIR}/install-config.yaml" ]; then
+    return
+  fi
+  yq-go r "${SHARED_DIR}/install-config.yaml" "${query}" 2>/dev/null || true
+}
+
 EXPECTED_THROUGHPUT="${AWS_GP3_THROUGHPUT:-}"
+if [ -z "${EXPECTED_THROUGHPUT}" ]; then
+  EXPECTED_THROUGHPUT=$(read_install_config 'platform.aws.defaultMachinePlatform.rootVolume.throughput')
+fi
+
+DEFAULT_SIZE="${AWS_DEFAULT_MACHINE_VOLUME_SIZE:-120}"
+EXPECTED_COMPUTE_SIZE="${AWS_COMPUTE_VOLUME_SIZE:-${DEFAULT_SIZE}}"
+EXPECTED_CONTROL_PLANE_SIZE="${AWS_CONTROL_PLANE_VOLUME_SIZE:-${DEFAULT_SIZE}}"
+
+if [ -z "${AWS_COMPUTE_VOLUME_SIZE:-}" ]; then
+  config_compute_size=$(read_install_config 'compute[0].platform.aws.rootVolume.size')
+  if [ -n "${config_compute_size}" ] && [ "${config_compute_size}" != "null" ]; then
+    EXPECTED_COMPUTE_SIZE="${config_compute_size}"
+  fi
+fi
+
+if [ -z "${AWS_CONTROL_PLANE_VOLUME_SIZE:-}" ]; then
+  config_cp_size=$(read_install_config 'controlPlane.platform.aws.rootVolume.size')
+  if [ -n "${config_cp_size}" ] && [ "${config_cp_size}" != "null" ]; then
+    EXPECTED_CONTROL_PLANE_SIZE="${config_cp_size}"
+  fi
+fi
+
+if [ -z "${EXPECTED_COMPUTE_SIZE}" ] || [ "${EXPECTED_COMPUTE_SIZE}" == "null" ]; then
+  EXPECTED_COMPUTE_SIZE="${DEFAULT_SIZE}"
+fi
+if [ -z "${EXPECTED_CONTROL_PLANE_SIZE}" ] || [ "${EXPECTED_CONTROL_PLANE_SIZE}" == "null" ]; then
+  EXPECTED_CONTROL_PLANE_SIZE="${DEFAULT_SIZE}"
+fi
+
+echo "Expected throughput: ${EXPECTED_THROUGHPUT:-N/A} MiB/s"
+echo "Expected worker rootVolume size: ${EXPECTED_COMPUTE_SIZE} GiB"
+echo "Expected control-plane rootVolume size: ${EXPECTED_CONTROL_PLANE_SIZE} GiB"
+
 ret=0
 declare -a FAILURE_SUMMARY=()
 
@@ -92,6 +133,7 @@ function log_machine_root_volume_spec() {
 function verify_nodes() {
   local role_label="$1"
   local role_name="$2"
+  local expected_size="$3"
 
   local nodes
   nodes=$(oc get nodes -l "${role_label}" -o jsonpath='{.items[*].metadata.name}')
@@ -151,17 +193,25 @@ function verify_nodes() {
       echo "ERROR: ${node} volume ${volume_id} throughput ${volume_throughput} differs from expected ${EXPECTED_THROUGHPUT} (type=${volume_type} size=${volume_size}GiB iops=${volume_iops})"
       FAILURE_SUMMARY+=("${node}: throughput ${volume_throughput}")
       ret=$((ret+1))
-    else
-      echo "PASS: ${node} volume ${volume_id} type=${volume_type} size=${volume_size}GiB iops=${volume_iops} throughput=${volume_throughput}MiB/s"
+      continue
     fi
+
+    if [ -n "${expected_size}" ] && [ "${volume_size}" -ne "${expected_size}" ]; then
+      echo "ERROR: ${node} volume ${volume_id} size ${volume_size} differs from expected ${expected_size}GiB (type=${volume_type} throughput=${volume_throughput}MiB/s)"
+      FAILURE_SUMMARY+=("${node}: size ${volume_size}")
+      ret=$((ret+1))
+      continue
+    fi
+
+    echo "PASS: ${node} volume ${volume_id} type=${volume_type} size=${volume_size}GiB iops=${volume_iops} throughput=${volume_throughput}MiB/s"
   done
 }
 
 echo "Checking worker nodes"
-verify_nodes "node-role.kubernetes.io/worker" "worker"
+verify_nodes "node-role.kubernetes.io/worker" "worker" "${EXPECTED_COMPUTE_SIZE}"
 
 echo "Checking control plane nodes"
-verify_nodes "node-role.kubernetes.io/master" "control plane"
+verify_nodes "node-role.kubernetes.io/master" "control plane" "${EXPECTED_CONTROL_PLANE_SIZE}"
 
 echo "=========================================="
 echo "Test Summary"
