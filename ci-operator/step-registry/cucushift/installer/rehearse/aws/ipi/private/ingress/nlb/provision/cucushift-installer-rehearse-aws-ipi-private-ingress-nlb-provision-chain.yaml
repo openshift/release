@@ -1,0 +1,31 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-private-ingress-nlb-provision
+  steps:
+  - ref: ipi-conf
+  - ref: ipi-conf-telemetry
+  - ref: aws-provision-vpc-shared
+  - chain: aws-provision-bastionhost
+  - ref: ipi-conf-aws-custom-vpc
+  - ref: ipi-conf-aws
+  - ref: ipi-install-monitoringpvc
+  - ref: proxy-config-generate
+  - ref: ingress-aws-conf-lbtype-nlb
+  - ref: ipi-conf-aws-usage-info
+  - chain: aws-provision-iam-user-minimal-permission
+  - chain: ipi-install
+  - ref: aws-provision-tags-for-byo-vpc
+  - ref: cucushift-installer-check-aws-custom-vpc
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  env:
+  - name: CONTROL_PLANE_INSTANCE_TYPE
+    default: "m6i.xlarge"
+    documentation: "Instance type for control plane nodes"
+  - name: COMPUTE_NODE_TYPE
+    default: "m5.xlarge"
+    documentation: "Instance type for compute nodes"
+  - name: PUBLISH
+    default: "Internal"
+    documentation: "Cluster publish strategy."
+  documentation: |-
+    Create an IPI cluster on AWS with SDN for QE e2e tests.
