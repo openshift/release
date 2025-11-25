@@ -27,7 +27,7 @@ telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 # set the secrets from the vault as env vars
 export TELEMETRY_PASSWORD=$telemetry_password
 
-export TIMEOUT=$NODE_WORKER_OUTAGE_TIMEOUT
+export TIMEOUT=$NODE_OUTAGE_TIMEOUT
 
 platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}') 
 if [ "$platform" = "AWS" ]; then

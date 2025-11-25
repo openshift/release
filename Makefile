@@ -460,7 +460,6 @@ secret-config-updater:
 	--from-file=sa.config-updater.build02.config=$(TMPDIR)/sa.config-updater.build02.config \
 	--from-file=sa.config-updater.build03.config=$(TMPDIR)/sa.config-updater.build03.config \
 	--from-file=sa.config-updater.build04.config=$(TMPDIR)/sa.config-updater.build04.config \
-	--from-file=sa.config-updater.build05.config=$(TMPDIR)/sa.config-updater.build05.config \
 	--from-file=sa.config-updater.build06.config=$(TMPDIR)/sa.config-updater.build06.config \
 	--from-file=sa.config-updater.build07.config=$(TMPDIR)/sa.config-updater.build07.config \
 	--from-file=sa.config-updater.build09.config=$(TMPDIR)/sa.config-updater.build09.config \
