@@ -481,6 +481,7 @@ function test_new_node_pools_inplace_replace_upgrade() {
   # Create a new nodepool with InPlace upgrade type
   # we need to switch to mgmt to create nodepool
   export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+  set -x
   if [[ "${platform_lower}" == "azure" ]]; then
       SUBNET_ID=$(oc get hc -A -o jsonpath='{.items[0].spec.platform.azure.subnetID}')
 
@@ -498,6 +499,7 @@ function test_new_node_pools_inplace_replace_upgrade() {
   oc wait nodepool test-np-replace -n "$HOSTEDCLUSTER_NAMESPACE" --for=condition=AllNodesHealthy --timeout=30m
   # switch back to the hosted cluster
   export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+  set +x
 
   # after nodepools are ready, the auth still exists in the global-pull-secret
   retry_until_success 10 5 verify_credentials_in_global_ps "$new_registry" "$test_new_registry_auth"
@@ -519,6 +521,7 @@ function test_new_node_pools_inplace_replace_upgrade() {
   done
 
   # Cleanup
+  set -x
   oc delete secret additional-pull-secret -n kube-system
   retry_until_success 10 5 bash -c "oc get --ignore-not-found secret global-pull-secret -n kube-system --no-headers | grep -q '^' || echo \"0\""
 
