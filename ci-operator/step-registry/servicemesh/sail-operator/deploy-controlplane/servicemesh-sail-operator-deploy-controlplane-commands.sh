@@ -58,15 +58,28 @@ if [ "${ISTIO_CONTROL_PLANE_MODE}" == "ambient" ]; then
 elif [ "${ISTIO_CONTROL_PLANE_MODE}" == "sidecar" ]; then
     echo "Deploying Istio control plane in sidecar mode"
     BUILD_WITH_CONTAINER=0 make deploy-istio-with-cni
+    oc wait --for=condition=Available=True --timeout=300s deployment/istiod -n istio-system
 else
     echo "ERROR: Unsupported ISTIO_CONTROL_PLANE_MODE=${ISTIO_CONTROL_PLANE_MODE}. Supported modes are: ambient, sidecar"
     exit 1
 fi
 
-# DEBUG: List all pods in all namespaces
+echo "Verifying Istio control plane deployment"
+oc wait --for=condition=Available=True --timeout=300s deployment/istiod -n istio-system
+
+echo "Verifying Istio CNI DaemonSet deployment"
+oc rollout status ds/istio-cni-node -n istio-cni --timeout=300s
+
+if [ "${ISTIO_CONTROL_PLANE_MODE}" == "ambient" ]; then
+    echo "Verifying Ztunnel deployment"
+    oc rollout status ds/ztunnel -n ztunnel --timeout=300s
+fi
+
+# Adding validation for DEBUG pourpose: list all pods and istio components
 echo "Listing all pods in all namespaces:"
 oc get pods --all-namespaces
 oc get istio
 oc get istiocni
+oc get ztunnel
 
 echo "Sail Operator and Istio control plane deployed successfully."
