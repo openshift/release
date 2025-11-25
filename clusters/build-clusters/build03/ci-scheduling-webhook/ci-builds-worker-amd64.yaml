@@ -255,3 +255,87 @@ spec:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
     name: build03-9lmnn-ci-builds-worker-amd64-us-east-1c
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: build03-9lmnn
+  name: build03-9lmnn-ci-builds-worker-amd64-us-east-1d
+  namespace: openshift-machine-api
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: build03-9lmnn
+      machine.openshift.io/cluster-api-machineset: build03-9lmnn-ci-builds-worker-amd64-us-east-1d
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: build03-9lmnn
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: build03-9lmnn-ci-builds-worker-amd64-us-east-1d
+    spec:
+      metadata:
+        labels:
+          ci-workload: builds
+      providerSpec:
+        value:
+          ami:
+            id: ami-0e79bb8acc37d2696
+          apiVersion: machine.openshift.io/v1beta1
+          blockDevices:
+          - ebs:
+              encrypted: true
+              iops: 5000
+              kmsKey:
+                arn: ""
+              volumeSize: 200
+              volumeType: gp3
+          credentialsSecret:
+            name: aws-cloud-credentials
+          deviceIndex: 0
+          iamInstanceProfile:
+            id: build03-9lmnn-worker-profile
+          instanceType: m6a.4xlarge
+          kind: AWSMachineProviderConfig
+          metadata:
+            creationTimestamp: null
+          metadataServiceOptions: {}
+          placement:
+            availabilityZone: us-east-1d
+            region: us-east-1
+          publicIp: true
+          securityGroups:
+          - filters:
+            - name: tag:Name
+              values:
+              - build03-9lmnn-lb
+          - filters:
+            - name: tag:Name
+              values:
+              - build03-9lmnn-node
+          subnet:
+            id: subnet-077700999227d934b
+          tags:
+          - name: kubernetes.io/cluster/build03-9lmnn
+            value: owned
+          userDataSecret:
+            name: worker-user-data
+      taints:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/ci-builds-worker
+        value: ci-builds-worker
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: build03-9lmnn-ci-builds-worker-amd64-us-east-1d
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 5
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: build03-9lmnn-ci-builds-worker-amd64-us-east-1d
