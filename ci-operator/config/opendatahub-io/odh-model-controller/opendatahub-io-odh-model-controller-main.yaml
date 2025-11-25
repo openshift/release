@@ -37,7 +37,7 @@ releases:
     release:
       architecture: multi
       channel: stable
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -204,60 +204,6 @@ tests:
           echo "LLMD_INFERENCE_SCHEDULER_IMAGE=${LLMD_INFERENCE_SCHEDULER_IMAGE}"
           echo "LLMD_ROUTING_SIDECAR_IMAGE=${LLMD_ROUTING_SIDECAR_IMAGE}"
           echo "KUBE_RBAC_PROXY_IMAGE=${KUBE_RBAC_PROXY_IMAGE}"
-
-          echo "Apply necessary prereqs for LLMISVC tests"
-          oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/prerequisites/
-          
-         echo "Waiting for Leader Worker Set Operator CSV to succeed..."
-         timeout 600 bash -c '
-           until oc get csv -n openshift-lws-operator \
-             -l operators.coreos.com/leader-worker-set.openshift-lws-operator \
-             -o jsonpath="{.items[0].status.phase}" 2>/dev/null | grep -q Succeeded; do
-             echo "  LWS CSV not ready yet"
-             sleep 10
-           done
-         '
-         
-         echo "Waiting for Service Mesh Operator (servicemeshoperator3) CSV to succeed..."
-         timeout 600 bash -c '
-           until oc get csv -n openshift-operators \
-             -l operators.coreos.com/servicemeshoperator3.openshift-operators \
-             -o jsonpath="{.items[0].status.phase}" 2>/dev/null | grep -q Succeeded; do
-             echo "  Service Mesh CSV not ready yet"
-             sleep 10
-           done
-         '
-         
-         echo "Waiting for LeaderWorkerSetOperator CRD to appear..."
-         timeout 600 bash -c '
-           until oc get crd | grep -qi leaderworkersetoperator; do
-             echo "  LWS CRD not present yet"
-             sleep 5
-           done
-         ' 
-         echo "Waiting for Sail Istio CRDs to appear..."
-         timeout 600 bash -c '
-           until oc get crd istios.sailoperator.io >/dev/null 2>&1; do
-             echo "  istios.sailoperator.io not present yet"
-             sleep 5
-           done
-         '
-         timeout 600 bash -c '
-           until oc get crd istiocnis.sailoperator.io >/dev/null 2>&1; do
-             echo "  istiocnis.sailoperator.io not present yet"
-             sleep 5
-           done
-         '
-
-          oc get crd gateways.gateway.networking.k8s.io
-          oc get crd gatewayclasses.gateway.networking.k8s.io
-          oc apply -k ./docs/samples/llmisvc/ocp-4-18-setup/installation/
-
-          echo "Wait for Installation to complete..."
-          oc wait --for=condition=Available leaderworkersetoperator/cluster --timeout=300s
-          oc wait --for=condition=Ready istiocni/default --timeout=300s
-          oc wait --for=condition=Ready istio/default --timeout=300s
-          oc get gateway openshift-ai-inference -n openshift-ingress
 
           ./test/scripts/openshift-ci/run-e2e-tests.sh "llminferenceservice and (cluster_cpu and cluster_single_node)" 2 "llm-d"
         popd
