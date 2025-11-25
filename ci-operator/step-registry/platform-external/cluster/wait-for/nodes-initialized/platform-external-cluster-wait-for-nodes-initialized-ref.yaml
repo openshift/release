@@ -1,0 +1,21 @@
+ref:
+  as: platform-external-cluster-wait-for-nodes-initialized
+  from: cli
+  commands: platform-external-cluster-wait-for-nodes-initialized-commands.sh
+  grace_period: 10m
+  timeout: 35m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Waits for CCM to initialize all worker nodes by removing the
+    node.cloudprovider.kubernetes.io/uninitialized taint.
+
+    This step addresses a timing issue in external cloud provider (UPI) setups
+    where CCM may take longer to initialize nodes compared to integrated platform (IPI).
+
+    Without this wait, the install-complete step may fail because cluster operators
+    cannot schedule pods on uninitialized worker nodes, causing timeout failures.
+
+    Timeout: 30 minutes (configurable via MAX_ITERATIONS in script)
