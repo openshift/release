@@ -44,6 +44,7 @@ ci_clone_src
 
 # Attempt downloading latest MicroShift RPMs from brew.
 # This requires VPN access, which is only enabled for the cache jobs.
+skip_brew_rpm_download=false
 if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     # See BREW_RPM_SOURCE variable definition in test/bin/common.sh
     src_path="/go/src/github.com/openshift/microshift"
@@ -51,34 +52,40 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     pushd "${src_path}" &>/dev/null
 
     # Check if if manage_brew_rpms.sh script exists
-    if ! [ -e ./test/bin/manage_brew_rpms.sh ] ; then
+    if [ "${skip_brew_rpm_download}" == false ] && ! [ -e ./test/bin/manage_brew_rpms.sh ] ; then
         echo "ERROR: ./test/bin/manage_brew_rpms.sh not found - RPM download from brew is not possible"
-        exit 0
+        skip_brew_rpm_download=true
     fi
     # Check if manage_brew_rpms.sh script supports the version_type option
-    if ! ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type' ; then
-        echo "ERROR: ./test/bin/manage_brew_rpms.sh does not support the version_type option - RPM download from brew is not possible"
-        exit 0
+    if [ "${skip_brew_rpm_download}" == false ]; then
+        if ! ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type' ; then
+            echo "ERROR: ./test/bin/manage_brew_rpms.sh does not support the version_type option - RPM download from brew is not possible"
+            skip_brew_rpm_download=true
+        fi
     fi
     # Check if brew hub site is accessible
-    bash -x ./scripts/fetch_tools.sh brew
-    if ! bash -x ./test/bin/manage_brew_rpms.sh access; then
-        echo "ERROR: Brew Hub site is not accessible"
-        exit 1
+    if [ "${skip_brew_rpm_download}" == false ]; then
+        bash -x ./scripts/fetch_tools.sh brew
+        if ! bash -x ./test/bin/manage_brew_rpms.sh access; then
+            echo "ERROR: Brew Hub site is not accessible"
+            skip_brew_rpm_download=true
+        fi
     fi
 
-    # Get the latest release type from the common_versions.sh script
-    LATEST_RELEASE_TYPE="$(awk -F= '/^LATEST_RELEASE_TYPE=/ {gsub(/[[:space:]"]/, "", $2); print $2}' ./test/bin/common_versions.sh)"
-    if [[ -z "${LATEST_RELEASE_TYPE}" ]]; then
-        LATEST_RELEASE_TYPE="ec"
-    fi
+    if [ "${skip_brew_rpm_download}" == false ]; then
+        # Get the latest release type from the common_versions.sh script
+        LATEST_RELEASE_TYPE="$(awk -F= '/^LATEST_RELEASE_TYPE=/ {gsub(/[[:space:]"]/, "", $2); print $2}' ./test/bin/common_versions.sh)"
+        if [[ -z "${LATEST_RELEASE_TYPE}" ]]; then
+            LATEST_RELEASE_TYPE="ec"
+        fi
 
-    # Download the latest RPMs from brew: latest release (ec, rc or zstream), nightly, Y-1 zstream and Y-2 zstream
-    y_version="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
-    bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "${LATEST_RELEASE_TYPE}" || echo "WARNING: Failed to download ${LATEST_RELEASE_TYPE} RPMs for 4.${y_version}"
-    bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "nightly" || echo "WARNING: Failed to download nightly RPMs for 4.${y_version}"
-    bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 1))" "${out_path}" "zstream" || echo "WARNING: Failed to download zstream RPMs for 4.$((${y_version} - 1))"
-    bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 2))" "${out_path}" "zstream"
+        # Download the latest RPMs from brew: latest release (ec, rc or zstream), nightly, Y-1 zstream and Y-2 zstream
+        y_version="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
+        bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "${LATEST_RELEASE_TYPE}" || echo "WARNING: Failed to download ${LATEST_RELEASE_TYPE} RPMs for 4.${y_version}"
+        bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "nightly" || echo "WARNING: Failed to download nightly RPMs for 4.${y_version}"
+        bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 1))" "${out_path}" "zstream" || echo "WARNING: Failed to download zstream RPMs for 4.$((${y_version} - 1))"
+        bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 2))" "${out_path}" "zstream"
+    fi
     popd &>/dev/null
 fi
 
