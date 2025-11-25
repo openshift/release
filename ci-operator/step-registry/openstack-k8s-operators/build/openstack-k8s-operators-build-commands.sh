@@ -26,11 +26,14 @@ PR_REPO_NAME=$(curl -s -X GET -H \
   https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} |
   jq -r '.head.repo.full_name')
 
-DEPENDS_ON=$(curl -s -X GET -H \
+PR_BODY=$(curl -s -X GET -H \
   -H "Accept: application/vnd.github+json" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER} |
-  jq -r '.body' | grep -iE "(depends-on).*(openstack-operator)" || true)
+  jq -r '.body')
+
+DEPENDS_ON=$(echo "$PR_BODY" | grep -iE "(depends-on).*(openstack-operator)" || true)
+DEPENDS_ON_INSTALL_YAMLS=$(echo "$PR_BODY" | grep -iE "(depends-on).*(install_yamls)" || true)
 
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
@@ -58,6 +61,17 @@ function create_openstack_namespace {
     git clone https://github.com/openstack-k8s-operators/install_yamls.git -b ${REF_BRANCH}
   fi
   cd install_yamls
+  local pr_num=""
+  # Depends-On syntax detected in the PR description: get the PR ID
+  if [[ -n $DEPENDS_ON_INSTALL_YAMLS ]]; then
+    pr_num=$(echo "$DEPENDS_ON_INSTALL_YAMLS" | rev | cut -d"/" -f1 | rev | tr -d '[:space:]')
+  fi
+  # make sure the PR ID we parse is a number
+  if [[ "$pr_num" == ?(-)+([0-9]) ]]; then
+    # checkout pr $pr_num
+    git fetch origin pull/"$pr_num"/head:PR"$pr_num"
+    git checkout PR"$pr_num"
+  fi
   make namespace
   popd
 }
@@ -105,7 +119,7 @@ function clone_openstack_operator {
   local pr_num=""
   # Depends-On syntax detected in the PR description: get the PR ID
   if [[ -n $DEPENDS_ON ]]; then
-    pr_num=$(echo "$DEPENDS_ON" | rev | cut -d"/" -f1 | rev)
+    pr_num=$(echo "$DEPENDS_ON" | rev | cut -d"/" -f1 | rev | tr -d '[:space:]')
   fi
   # make sure the PR ID we parse is a number
   if [[ "$pr_num" == ?(-)+([0-9]) ]]; then
@@ -246,7 +260,12 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
     API_MOD=$(basename $MOD)
     go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/${API_MOD}=github.com/${REPO_NAME}/${API_MOD}@${API_SHA}
     go mod tidy
-    pushd ./apis/
+    # before operator-sdk 1.41 bump, api module is in apis, later it is in api
+    if [ -d "./apis" ]; then
+      pushd ./apis/
+    else
+      pushd ./api/
+    fi
     go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/${API_MOD}=github.com/${REPO_NAME}/${API_MOD}@${API_SHA}
     go mod tidy
     popd

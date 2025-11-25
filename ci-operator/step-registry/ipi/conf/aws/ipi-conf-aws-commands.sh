@@ -213,6 +213,14 @@ else
   echo "zones already set in install-config.yaml, skipped"
 fi
 
+if [[ "${CI_NAT_REPLACE:-false}" == 'auto' ]]; then
+  # Target 50% of pull request jobs in master or main.
+  if [[ "${BUILD_ID: -1}" == [0-5] && "${JOB_NAME}" == *pull-ci-openshift-*-ma*e2e*aws* && "${JOB_NAME}" != *'microshift'* && "${JOB_NAME}" != *'hypershift'* && "${JOB_NAME}" != *'vpc'* && "${JOB_NAME}" != *'single-node'* ]]; then
+    CI_NAT_REPLACE='true'
+    echo "IMPORTANT: this job has been selected to use NAT instance instead of NAT gateway. See jupierce if abnormalities are detected."
+  fi
+fi
+
 echo "Using control plane instance type: ${CONTROL_PLANE_INSTANCE_TYPE}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
 echo "Using compute node replicas: ${worker_replicas}"
@@ -404,9 +412,9 @@ compute:
 - name: worker
   platform:
     aws:
-      dedicatedHosts:
-        hostAffinity: Host
-        hosts: []
+      hostPlacement:
+        affinity: DedicatedHost
+        dedicatedHost: []
 EOF
 
   for zone in ${WORKER_ZONES}; do
@@ -418,7 +426,7 @@ EOF
     HOST_ID=$(aws ec2 allocate-hosts --instance-type "${HOST_TYPE}.4xlarge" --auto-placement 'off' --host-recovery 'off' --tag-specifications "${HOST_SPECS}" --host-maintenance 'off' --quantity '1' --availability-zone "${zone}" --region "${aws_source_region}" | jq -r '.HostIds[0]')
 
     # We need to pass in the vars since YQ doesnt see the loop variables
-    ZONE_NAME="${zone}" HOST_ID="${HOST_ID}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.dedicatedHosts.hosts += [ { "id": strenv(HOST_ID), "zone": strenv(ZONE_NAME) } ])' "${patch_dedicated_host}"
+    ZONE_NAME="${zone}" HOST_ID="${HOST_ID}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.hostPlacement.dedicatedHost += [ { "id": strenv(HOST_ID), "zone": strenv(ZONE_NAME) } ])' "${patch_dedicated_host}"
   done
 
   # Update config with host ID
