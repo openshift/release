@@ -54,10 +54,10 @@ done
 # Install the Istio control plane in the specified mode
 if [ "${ISTIO_CONTROL_PLANE_MODE}" == "ambient" ]; then
     echo "Deploying Istio control plane in ambient mode"
-    make deploy-istio-with-ambient
+    BUILD_WITH_CONTAINER=0 make deploy-istio-with-ambient
 elif [ "${ISTIO_CONTROL_PLANE_MODE}" == "sidecar" ]; then
     echo "Deploying Istio control plane in sidecar mode"
-    make deploy-istio-with-cni
+    BUILD_WITH_CONTAINER=0 make deploy-istio-with-cni
 else
     echo "ERROR: Unsupported ISTIO_CONTROL_PLANE_MODE=${ISTIO_CONTROL_PLANE_MODE}. Supported modes are: ambient, sidecar"
     exit 1
