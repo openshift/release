@@ -30,13 +30,15 @@ else
   # Fallback: calculate manually (works on both)
   start_epoch=$(($(date +%s) - 7200)) # Subtract 2 hours (7200 seconds)
 fi
+# Define end time as 30 minutes from now
+sleep 1800
 end_epoch=$(date +%s)
 
 # Best-effort: ensure Loki is up
 oc -n "${LOKI_NAMESPACE}" wait --for=condition=Ready --timeout=300s pod -l app=loki || true
 
 # Port-forward and query
-oc -n "${LOKI_NAMESPACE}" port-forward "${LOKI_SERVICE}" 3100:3100 >/tmp/loki-pf.log 2>&1 &
+oc -n "${LOKI_NAMESPACE}" port-forward svc/"${LOKI_SERVICE}" 3100:3100 >/tmp/loki-pf.log 2>&1 &
 pf_pid=$!
 trap 'kill ${pf_pid}' EXIT
 sleep 5
