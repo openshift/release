@@ -31,6 +31,8 @@ else
   start_epoch=$(($(date +%s) - 7200)) # Subtract 2 hours (7200 seconds)
 fi
 
+sleep 900 # Wait additional 15 minutes to ensure data is ingested into Loki
+
 end_epoch=$(date +%s)
 
 # Best-effort: ensure Loki is up
