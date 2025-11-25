@@ -484,6 +484,9 @@ run_node_reboot_test() {
 # Run reboot tests
 echo "iteration,test_type,snat_count,policy_count" > "$ARTIFACT_DIR/reboot_metrics.csv"
 
+# Initialize migration metrics CSV
+echo "test_phase,metric_type,value" > "$ARTIFACT_DIR/migration_metrics.csv"
+
 for ((i=1; i<=REBOOT_RETRIES; i++)); do
     if ! run_node_reboot_test "$i"; then
         log_warning "Node reboot test iteration $i failed, but continuing..."
@@ -531,15 +534,46 @@ run_multinode_migration_test() {
     target_node=$(echo "$eligible_nodes" | head -1)
     log_info "Target node for migration: $target_node"
     
-    # Label target node as egress-assignable
-    log_info "Labeling target node $target_node as egress-assignable..."
-    oc label node "$target_node" k8s.ovn.org/egress-assignable="" --overwrite || log_warning "Failed to label target node"
+    # Check current labeling state
+    local current_has_label target_has_label
+    current_has_label=$(oc get node "$current_node" -o jsonpath='{.metadata.labels.k8s\.ovn\.org/egress-assignable}' 2>/dev/null && echo "true" || echo "false")
+    target_has_label=$(oc get node "$target_node" -o jsonpath='{.metadata.labels.k8s\.ovn\.org/egress-assignable}' 2>/dev/null && echo "true" || echo "false")
     
-    # Remove egress-assignable label from current node to force migration
-    log_info "Removing egress-assignable label from current node $current_node to trigger migration..."
-    if ! oc label node "$current_node" k8s.ovn.org/egress-assignable- 2>/dev/null; then
-        log_warning "Failed to remove label from current node, but continuing..."
+    log_info "Pre-migration label state - Current node ($current_node): $current_has_label, Target node ($target_node): $target_has_label"
+    
+    # Strategy: Ensure only target node has the egress-assignable label to force migration
+    # First, remove egress-assignable label from ALL nodes to reset state
+    log_info "Resetting egress-assignable labels on all worker nodes..."
+    local all_workers
+    mapfile -t all_workers < <(oc get nodes -l "node-role.kubernetes.io/worker" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null)
+    
+    for worker in "${all_workers[@]}"; do
+        oc label node "$worker" k8s.ovn.org/egress-assignable- 2>/dev/null || true
+        log_info "Removed egress-assignable label from node: $worker"
+    done
+    
+    # Wait a moment for the label removal to propagate
+    sleep 10
+    
+    # Label ONLY the target node as egress-assignable to force migration
+    log_info "Labeling only target node $target_node as egress-assignable to force migration..."
+    if ! oc label node "$target_node" k8s.ovn.org/egress-assignable="" --overwrite; then
+        log_error "Failed to label target node $target_node"
+        # Restore current node label as fallback
+        oc label node "$current_node" k8s.ovn.org/egress-assignable="" --overwrite || true
+        return 1
     fi
+    
+    # Verify label was applied successfully
+    local verification
+    verification=$(oc get node "$target_node" -o jsonpath='{.metadata.labels.k8s\.ovn\.org/egress-assignable}' 2>/dev/null && echo "true" || echo "false")
+    if [[ "$verification" != "true" ]]; then
+        log_error "Failed to verify target node label was applied correctly"
+        oc label node "$current_node" k8s.ovn.org/egress-assignable="" --overwrite || true
+        return 1
+    fi
+    
+    log_info "Target node $target_node successfully labeled, waiting for migration..."
     
     # Wait for egress IP to migrate
     log_info "Waiting for egress IP to migrate to $target_node..."
@@ -594,17 +628,58 @@ run_multinode_migration_test() {
     
     # Verify OVN state consistency after migration
     log_info "Verifying OVN state consistency after migration..."
-    local new_snat_count new_policy_count
+    local egress_ip
+    egress_ip=$(oc get egressip "$EIP_NAME" -o jsonpath='{.spec.egressIPs[0]}' 2>/dev/null || echo "")
     
-    if command -v timeout >/dev/null; then
-        new_snat_count=$(timeout 30 oc exec -n "$NAMESPACE" deployment/ovnkube-master -c northd -- ovn-sbctl --timeout=10 find NAT external_ip="$(oc get egressip "$EIP_NAME" -o jsonpath='{.spec.egressIPs[0]}')" 2>/dev/null | grep -c "external_ip" || echo "0")
-        new_policy_count=$(timeout 30 oc exec -n "$NAMESPACE" deployment/ovnkube-master -c northd -- ovn-nbctl --timeout=10 find Logical_Router_Static_Route 2>/dev/null | grep -c "nexthop.*$(oc get egressip "$EIP_NAME" -o jsonpath='{.spec.egressIPs[0]}')" || echo "0")
-    else
-        new_snat_count=$(oc exec -n "$NAMESPACE" deployment/ovnkube-master -c northd -- ovn-sbctl --timeout=10 find NAT external_ip="$(oc get egressip "$EIP_NAME" -o jsonpath='{.spec.egressIPs[0]}')" 2>/dev/null | grep -c "external_ip" || echo "0")
-        new_policy_count=$(oc exec -n "$NAMESPACE" deployment/ovnkube-master -c northd -- ovn-nbctl --timeout=10 find Logical_Router_Static_Route 2>/dev/null | grep -c "nexthop.*$(oc get egressip "$EIP_NAME" -o jsonpath='{.spec.egressIPs[0]}')" || echo "0")
+    if [[ -z "$egress_ip" ]]; then
+        log_warning "Could not retrieve egress IP for validation"
+        return 1
     fi
     
-    log_info "Post-migration OVN state - SNAT: $new_snat_count, LR policy: $new_policy_count"
+    # Check SNAT rules on both original and target nodes
+    local original_snat_count target_snat_count new_policy_count
+    
+    # Get OVN pod on original node (should have 0 SNAT rules for this egress IP)
+    local original_ovn_pod target_ovn_pod
+    original_ovn_pod=$(oc get pods -n "$NAMESPACE" -o wide | grep "ovnkube-node" | grep "$current_node" | awk '{print $1}' | head -1)
+    target_ovn_pod=$(oc get pods -n "$NAMESPACE" -o wide | grep "ovnkube-node" | grep "$target_node" | awk '{print $1}' | head -1)
+    
+    if [[ -n "$original_ovn_pod" ]]; then
+        original_snat_count=$(oc exec -n "$NAMESPACE" "$original_ovn_pod" -c ovnkube-controller -- ovn-sbctl --timeout=10 find NAT external_ip="$egress_ip" 2>/dev/null | grep -c "external_ip" || echo "0")
+        log_info "Original node ($current_node) SNAT count: $original_snat_count"
+    else
+        log_warning "Could not find OVN pod on original node $current_node"
+        original_snat_count="unknown"
+    fi
+    
+    if [[ -n "$target_ovn_pod" ]]; then
+        target_snat_count=$(oc exec -n "$NAMESPACE" "$target_ovn_pod" -c ovnkube-controller -- ovn-sbctl --timeout=10 find NAT external_ip="$egress_ip" 2>/dev/null | grep -c "external_ip" || echo "0")
+        log_info "Target node ($target_node) SNAT count: $target_snat_count"
+    else
+        log_warning "Could not find OVN pod on target node $target_node"
+        target_snat_count="unknown"
+    fi
+    
+    # Check logical router policies globally
+    if command -v timeout >/dev/null; then
+        new_policy_count=$(timeout 30 oc exec -n "$NAMESPACE" deployment/ovnkube-master -c northd -- ovn-nbctl --timeout=10 find Logical_Router_Static_Route 2>/dev/null | grep -c "nexthop.*$egress_ip" || echo "0")
+    else
+        new_policy_count=$(oc exec -n "$NAMESPACE" deployment/ovnkube-master -c northd -- ovn-nbctl --timeout=10 find Logical_Router_Static_Route 2>/dev/null | grep -c "nexthop.*$egress_ip" || echo "0")
+    fi
+    
+    log_info "Post-migration OVN state - Original node SNAT: $original_snat_count, Target node SNAT: $target_snat_count, LR policies: $new_policy_count"
+    
+    # Validate migration success: original node should have 0 SNAT rules
+    if [[ "$original_snat_count" != "unknown" && "$original_snat_count" -gt 0 ]]; then
+        log_warning "⚠️  Original node still has $original_snat_count SNAT rules after migration (expected 0)"
+    elif [[ "$original_snat_count" == "0" ]]; then
+        log_success "✅ Original node correctly has 0 SNAT rules after migration"
+    fi
+    
+    # Save migration metrics
+    echo "migration,original_node_snat,${original_snat_count}" >> "$ARTIFACT_DIR/migration_metrics.csv"
+    echo "migration,target_node_snat,${target_snat_count}" >> "$ARTIFACT_DIR/migration_metrics.csv"
+    echo "migration,logical_router_policies,${new_policy_count}" >> "$ARTIFACT_DIR/migration_metrics.csv"
     
     # Restore egress-assignable label to original node for cleanup
     log_info "Restoring egress-assignable label to original node..."
@@ -643,6 +718,10 @@ fi
 
 if [[ -f "$ARTIFACT_DIR/reboot_metrics.csv" ]]; then
     log_info "Reboot test metrics saved to: $ARTIFACT_DIR/reboot_metrics.csv"
+fi
+
+if [[ -f "$ARTIFACT_DIR/migration_metrics.csv" ]]; then
+    log_info "Migration test metrics saved to: $ARTIFACT_DIR/migration_metrics.csv"
 fi
 
 log_success "🎉 OpenShift QE Egress IP resilience testing completed successfully!"
