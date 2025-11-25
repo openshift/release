@@ -50,10 +50,12 @@ log_info "  - Total pods: $TOTAL_PODS"
 log_info "  - Expected SNAT rules: $TOTAL_PODS"
 log_info "  - Expected LRP rules: $TOTAL_PODS"
 
-# Function to count SNAT rules for all EgressIPs
-count_snat_rules() {
-    local total_snat=0
-    local ovn_master_pod
+# Function to discover OVN master pod and container
+discover_ovn_master() {
+    local ovn_master_pod ovn_container
+    
+    log_info "Searching for OVN master pods in namespace: $NAMESPACE"
+    oc get pods -n "$NAMESPACE" -o wide | head -10 || log_error "Failed to list pods in $NAMESPACE"
     
     ovn_master_pod=$(oc get pods -n "$NAMESPACE" -o wide | grep "ovnkube-master" | awk '{print $1}' | head -1)
     
@@ -61,11 +63,46 @@ count_snat_rules() {
         log_error "No ovnkube-master pod found in namespace $NAMESPACE"
         log_info "Available pods in $NAMESPACE:"
         oc get pods -n "$NAMESPACE" | grep -E "(ovnkube|ovn)" || echo "No OVN pods found"
-        echo "0"
         return 1
     fi
     
     log_info "Using OVN master pod: $ovn_master_pod"
+    
+    # Discover containers in OVN master pod
+    log_info "Discovering containers in OVN master pod..."
+    oc get pod -n "$NAMESPACE" "$ovn_master_pod" -o jsonpath='{.spec.containers[*].name}' || log_error "Failed to get container names"
+    
+    # Try different container names for ovn-sbctl access
+    for container in "northd" "ovnkube-master" "ovn-northd" "sbdb" "nbdb"; do
+        if oc exec -n "$NAMESPACE" "$ovn_master_pod" -c "$container" -- echo "test" &>/dev/null; then
+            log_info "Found accessible container: $container"
+            ovn_container="$container"
+            break
+        fi
+    done
+    
+    if [[ -z "$ovn_container" ]]; then
+        log_error "Cannot find accessible container in OVN master pod $ovn_master_pod"
+        return 1
+    fi
+    
+    log_info "Using container: $ovn_container"
+    echo "$ovn_master_pod:$ovn_container"
+}
+
+# Function to count SNAT rules for all EgressIPs
+count_snat_rules() {
+    local total_snat=0
+    local ovn_info ovn_master_pod ovn_container
+    
+    # Discover OVN master pod and container
+    if ! ovn_info=$(discover_ovn_master); then
+        echo "0"
+        return 1
+    fi
+    
+    ovn_master_pod="${ovn_info%:*}"
+    ovn_container="${ovn_info#*:}"
     
     # Count SNAT rules for each EgressIP
     for ((i=1; i<=EIP_COUNT; i++)); do
@@ -74,11 +111,32 @@ count_snat_rules() {
         egress_ip=$(oc get egressip "$eip_name" -o jsonpath='{.spec.egressIPs[0]}' 2>/dev/null || echo "")
         
         if [[ -n "$egress_ip" ]]; then
+            log_info "Checking SNAT rules for $eip_name with IP $egress_ip"
+            
+            # First verify pod exists and is ready
+            local pod_status
+            pod_status=$(oc get pod -n "$NAMESPACE" "$ovn_master_pod" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            if [[ "$pod_status" != "Running" ]]; then
+                log_error "OVN master pod $ovn_master_pod is not running (status: $pod_status)"
+                echo "0"
+                return 1
+            fi
+            
+            # Try to execute the SNAT count command with error handling
             local snat_count
-            snat_count=$(oc exec -n "$NAMESPACE" "$ovn_master_pod" -c northd -- \
-                ovn-sbctl --timeout=30 find NAT external_ip="$egress_ip" 2>/dev/null | grep -c "external_ip" || echo "0")
+            log_info "Executing SNAT rule query for $egress_ip..."
+            if ! snat_count=$(oc exec -n "$NAMESPACE" "$ovn_master_pod" -c "$ovn_container" -- \
+                ovn-sbctl --timeout=30 find NAT external_ip="$egress_ip" 2>&1 | grep -c "external_ip" || echo "0"); then
+                log_error "Failed to execute SNAT rule query for $eip_name"
+                log_error "Command output: $snat_count"
+                echo "0"
+                return 1
+            fi
+            
             total_snat=$((total_snat + snat_count))
             log_info "EgressIP $eip_name ($egress_ip): $snat_count SNAT rules"
+        else
+            log_warning "EgressIP $eip_name has no assigned IP address"
         fi
     done
     
@@ -88,19 +146,16 @@ count_snat_rules() {
 # Function to count LRP (Logical Router Policy) rules for all EgressIPs  
 count_lrp_rules() {
     local total_lrp=0
-    local ovn_master_pod
+    local ovn_info ovn_master_pod ovn_container
     
-    ovn_master_pod=$(oc get pods -n "$NAMESPACE" -o wide | grep "ovnkube-master" | awk '{print $1}' | head -1)
-    
-    if [[ -z "$ovn_master_pod" ]]; then
-        log_error "No ovnkube-master pod found in namespace $NAMESPACE"
-        log_info "Available pods in $NAMESPACE:"
-        oc get pods -n "$NAMESPACE" | grep -E "(ovnkube|ovn)" || echo "No OVN pods found"
+    # Discover OVN master pod and container
+    if ! ovn_info=$(discover_ovn_master); then
         echo "0"
         return 1
     fi
     
-    log_info "Using OVN master pod: $ovn_master_pod"
+    ovn_master_pod="${ovn_info%:*}"
+    ovn_container="${ovn_info#*:}"
     
     # Count LRP rules for each EgressIP
     for ((i=1; i<=EIP_COUNT; i++)); do
@@ -110,7 +165,7 @@ count_lrp_rules() {
         
         if [[ -n "$egress_ip" ]]; then
             local lrp_count
-            lrp_count=$(oc exec -n "$NAMESPACE" "$ovn_master_pod" -c northd -- \
+            lrp_count=$(oc exec -n "$NAMESPACE" "$ovn_master_pod" -c "$ovn_container" -- \
                 ovn-nbctl --timeout=30 find Logical_Router_Policy nexthop="$egress_ip" 2>/dev/null | grep -c "nexthop" || echo "0")
             total_lrp=$((total_lrp + lrp_count))
             log_info "EgressIP $eip_name ($egress_ip): $lrp_count LRP rules"
@@ -124,9 +179,16 @@ count_lrp_rules() {
 count_snat_rules_by_node() {
     local target_node="$1"
     local total_snat=0
-    local ovn_master_pod
+    local ovn_info ovn_master_pod ovn_container
     
-    ovn_master_pod=$(oc get pods -n "$NAMESPACE" -o wide | grep "ovnkube-master" | awk '{print $1}' | head -1)
+    # Discover OVN master pod and container
+    if ! ovn_info=$(discover_ovn_master); then
+        echo "0"
+        return 1
+    fi
+    
+    ovn_master_pod="${ovn_info%:*}"
+    ovn_container="${ovn_info#*:}"
     
     # Get all EgressIPs assigned to the target node
     for ((i=1; i<=EIP_COUNT; i++)); do
@@ -140,7 +202,7 @@ count_snat_rules_by_node() {
             
             if [[ -n "$egress_ip" ]]; then
                 local snat_count
-                snat_count=$(oc exec -n "$NAMESPACE" "$ovn_master_pod" -c northd -- \
+                snat_count=$(oc exec -n "$NAMESPACE" "$ovn_master_pod" -c "$ovn_container" -- \
                     ovn-sbctl --timeout=30 find NAT external_ip="$egress_ip" 2>/dev/null | grep -c "external_ip" || echo "0")
                 total_snat=$((total_snat + snat_count))
             fi
