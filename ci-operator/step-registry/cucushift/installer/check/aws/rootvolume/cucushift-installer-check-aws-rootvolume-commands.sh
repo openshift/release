@@ -73,10 +73,18 @@ DEFAULT_SIZE="${AWS_DEFAULT_MACHINE_VOLUME_SIZE:-120}"
 EXPECTED_COMPUTE_SIZE="${AWS_COMPUTE_VOLUME_SIZE:-${DEFAULT_SIZE}}"
 EXPECTED_CONTROL_PLANE_SIZE="${AWS_CONTROL_PLANE_VOLUME_SIZE:-${DEFAULT_SIZE}}"
 
+# Read defaultMachinePlatform.rootVolume.size as fallback
+default_size=$(read_install_config 'platform.aws.defaultMachinePlatform.rootVolume.size')
+if [ -n "${default_size}" ] && [ "${default_size}" != "null" ]; then
+  DEFAULT_SIZE="${default_size}"
+fi
+
 if [ -z "${AWS_COMPUTE_VOLUME_SIZE:-}" ]; then
   config_compute_size=$(read_install_config 'compute[0].platform.aws.rootVolume.size')
   if [ -n "${config_compute_size}" ] && [ "${config_compute_size}" != "null" ]; then
     EXPECTED_COMPUTE_SIZE="${config_compute_size}"
+  elif [ -n "${default_size}" ] && [ "${default_size}" != "null" ]; then
+    EXPECTED_COMPUTE_SIZE="${default_size}"
   fi
 fi
 
@@ -84,6 +92,8 @@ if [ -z "${AWS_CONTROL_PLANE_VOLUME_SIZE:-}" ]; then
   config_cp_size=$(read_install_config 'controlPlane.platform.aws.rootVolume.size')
   if [ -n "${config_cp_size}" ] && [ "${config_cp_size}" != "null" ]; then
     EXPECTED_CONTROL_PLANE_SIZE="${config_cp_size}"
+  elif [ -n "${default_size}" ] && [ "${default_size}" != "null" ]; then
+    EXPECTED_CONTROL_PLANE_SIZE="${default_size}"
   fi
 fi
 
