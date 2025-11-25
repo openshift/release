@@ -50,23 +50,36 @@ storage:
       inline: |
         #!/bin/bash
         set -e -o pipefail
-        NODECONF=/etc/systemd/system/kubelet.service.d/20-providerid.conf
-        if [ -e "\${NODECONF}" ]; then
-            echo "Not replacing existing \${NODECONF}"
+
+        NODEENV=/etc/kubernetes/node.env
+
+        # Check if node environment already has KUBELET_PROVIDERID
+        if [ -e "\${NODEENV}" ] && grep -Fq "KUBELET_PROVIDERID" \${NODEENV}; then
+            echo "Not replacing existing \${NODEENV}"
             exit 0
         fi
 
-        PROVIDER_ID=${PROVIDER_ID_COMMAND}
+        # Fetch instance metadata
+        # Note: AFTERBURN variables not available in UPI/External installations
+        ${PROVIDER_ID_FETCH_COMMAND}
 
-        if [[ -z "\${PROVIDER_ID}" ]]; then
-            echo "Can not obtain provider-id from the metadata service."
+        # Fail if metadata cannot be retrieved
+        if [[ -z "\${INSTANCE_ID}" ]] || [[ -z "\${AVAILABILITY_ZONE}" ]]; then
+            echo "Cannot obtain instance-id and availability zone from metadata service."
             exit 1
-        fi 
+        fi
 
-        cat > "\${NODECONF}" <<EOF
-        [Service]
-        Environment="KUBELET_PROVIDERID=\${PROVIDER_ID}"
-        EOF
+        # Write provider ID to node environment file
+        cat >> "\${NODEENV}" <<ENVEOF
+        KUBELET_PROVIDERID=${PROVIDER_ID_FORMAT}
+        ENVEOF
+
+        # Remove legacy systemd drop-in file if it exists
+        LEGACY_NODECONF=/etc/systemd/system/kubelet.service.d/20-providerid.conf
+        if [ -e "\${LEGACY_NODECONF}" ]; then
+            rm -f "\${LEGACY_NODECONF}"
+            echo "Removed legacy \${LEGACY_NODECONF}"
+        fi
 systemd:
   units:
   - name: kubelet-providerid.service
@@ -79,6 +92,8 @@ systemd:
       [Service]
       ExecStart=/usr/local/bin/kubelet-providerid
       Type=oneshot
+      StandardOutput=journal+console
+      StandardError=journal+console
       [Install]
       WantedBy=network-online.target
 EOF
@@ -95,9 +110,21 @@ function process_butane() {
 if [[ "${PLATFORM_EXTERNAL_CCM_ENABLED-}" == "yes" ]]; then
   echo "Creating MachineConfig for Provider ID"
   case $PROVIDER_NAME in
-      "aws") PROVIDER_ID_COMMAND="aws:///\$(curl -fSs http://169.254.169.254/2022-09-24/meta-data/placement/availability-zone)/\$(curl -fSs http://169.254.169.254/2022-09-24/meta-data/instance-id)" ;;
-      "oci") PROVIDER_ID_COMMAND="\$(curl -H \"Authorization: Bearer Oracle\" -sL http://169.254.169.254/opc/v2/instance/ | jq -r .id)" ;;
-      *) echo "Unkonwn Provider: ${PROVIDER_NAME}"; exit 1;;
+      "aws")
+          PROVIDER_ID_FETCH_COMMAND='INSTANCE_ID=\$(curl -fSs --max-time 5 http://169.254.169.254/2022-09-24/meta-data/instance-id)
+        AVAILABILITY_ZONE=\$(curl -fSs --max-time 5 http://169.254.169.254/2022-09-24/meta-data/placement/availability-zone)'
+          PROVIDER_ID_FORMAT='aws:///\${AVAILABILITY_ZONE}/\${INSTANCE_ID}'
+          ;;
+      "oci")
+          PROVIDER_ID_FETCH_COMMAND='INSTANCE_DATA=\$(curl -H "Authorization: Bearer Oracle" -sL --max-time 5 http://169.254.169.254/opc/v2/instance/)
+        INSTANCE_ID=\$(echo "\${INSTANCE_DATA}" | jq -r .id)
+        AVAILABILITY_ZONE=\$(echo "\${INSTANCE_DATA}" | jq -r .canonicalRegionName)'
+          PROVIDER_ID_FORMAT='oci://\${INSTANCE_ID}'
+          ;;
+      *)
+          echo "Unknown Provider: ${PROVIDER_NAME}"
+          exit 1
+          ;;
   esac
 
   create_machineconfig_kubelet "master"
