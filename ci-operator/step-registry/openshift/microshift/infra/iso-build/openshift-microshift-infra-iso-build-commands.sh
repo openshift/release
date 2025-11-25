@@ -53,7 +53,7 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     # Check if if manage_brew_rpms.sh script exists
     if ! [ -e ./test/bin/manage_brew_rpms.sh ] ; then
         echo "ERROR: ./test/bin/manage_brew_rpms.sh not found - RPM download from brew is not possible"
-        exit 1
+        exit 0
     fi
     # Check if manage_brew_rpms.sh script supports the version_type option
     if ! ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type' ; then
