@@ -23,7 +23,8 @@ if [ -n "${E2E_BENCHMARKING_PR}" ]; then
   git clone $REPO_URL
   pushd e2e-benchmarking
 
-  git pull origin pull/${E2E_BENCHMARKING_PR}/head:${E2E_BENCHMARKING_PR} --rebase
+  git fetch origin pull/${E2E_BENCHMARKING_PR}/head:${E2E_BENCHMARKING_PR}
+  git rebase ${E2E_BENCHMARKING_PR}
   git switch ${E2E_BENCHMARKING_PR}
   popd
 else
