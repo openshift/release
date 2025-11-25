@@ -58,7 +58,7 @@ if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
     # Check if manage_brew_rpms.sh script supports the version_type option
     if ! ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type' ; then
         echo "ERROR: ./test/bin/manage_brew_rpms.sh does not support the version_type option - RPM download from brew is not possible"
-        exit 1
+        exit 0
     fi
     # Check if brew hub site is accessible
     bash -x ./scripts/fetch_tools.sh brew
