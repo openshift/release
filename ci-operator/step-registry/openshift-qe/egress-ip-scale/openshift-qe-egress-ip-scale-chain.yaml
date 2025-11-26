@@ -1,0 +1,67 @@
+chain:
+  as: openshift-qe-egress-ip-scale
+  steps:
+  - ref: openshift-qe-egress-ip-scale-setup
+  - ref: redhat-chaos-pod-scenarios-custom
+  - ref: redhat-chaos-node-disruptions-worker-outage
+  - ref: openshift-qe-egress-ip-scale-tests
+  env:
+  # Scaled cluster chaos testing environment variables
+  - name: TARGET_NAMESPACE
+    default: "openshift-ovn-kubernetes"
+  - name: POD_LABEL
+    default: "app=ovnkube-node"
+  - name: DISRUPTION_COUNT
+    default: "15"
+  - name: EXPECTED_POD_COUNT
+    default: "10"
+  - name: KILL_TIMEOUT
+    default: "300"
+  - name: EXPECTED_RECOVERY_TIME
+    default: "180"
+  - name: ENABLE_ALERTS
+    default: "True"
+  - name: CHECK_CRITICAL_ALERTS
+    default: "True"
+  - name: WAIT_DURATION
+    default: "600"
+  - name: TELEMETRY_ENABLED
+    default: "True"
+  - name: TELEMETRY_RUN_TAG
+    default: "-egress-ip-scale-pod-disruption"
+  - name: TELEMETRY_GROUP
+    default: "prow"
+  - name: JUNIT_TESTCASE
+    default: '[Egress-IP-Scale] OVN pod disruption resilience test at scale'
+  # Scaled node disruption chaos environment variables
+  - name: ACTION
+    default: "node_reboot_scenario"
+  - name: LABEL_SELECTOR
+    default: "node-role.kubernetes.io/worker="
+  - name: RUNS
+    default: "8"
+  - name: NODE_OUTAGE_TIMEOUT
+    default: "240"
+  - name: INSTANCE_COUNT
+    default: "3"
+  # Scale-specific egress IP configuration
+  - name: EGRESS_IP_COUNT
+    default: "5"
+  - name: EGRESS_NODES_COUNT
+    default: "10"
+  - name: SCALE_TEST_WORKLOADS
+    default: "20"
+  documentation: |-
+    Executes the scaled OpenShift QE egress IP test suite with chaos engineering 
+    on a 10-node cluster configuration.
+    
+    This chain orchestrates:
+    1. Scaled infrastructure setup (10 egress-assignable nodes, 5 egress IPs)
+    2. Enhanced chaos engineering pod disruption (targeting 15 ovnkube-node pods)
+    3. Scaled chaos engineering node disruption (3 parallel node reboots)
+    4. Scale workload generation (20 concurrent test workloads)
+    5. Post-chaos validation and performance metrics collection
+    
+    The test suite validates egress IP functionality under scaled chaos scenarios,
+    ensuring proper recovery and load balancing across multiple egress IPs and
+    nodes using standardized chaos testing infrastructure at enterprise scale.
