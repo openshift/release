@@ -127,8 +127,8 @@ spec:
 EOF
 }
 
-if [ "${MAISTRA_BUILDER_IMAGE:-}" == "" ]; then
-    echo "SKIP: the step servicemesh-istio-e2e is going to be skipped because MAISTRA_BUILDER_IMAGE is not set"
+if [ "${SKIP_CREATE_TEST_RESOURCES:-}" == "true" ]; then
+    echo "SKIP: the step servicemesh-istio-e2e is going to be skipped because SKIP_CREATE_TEST_RESOURCES is set to true"
     exit 0
 fi
 

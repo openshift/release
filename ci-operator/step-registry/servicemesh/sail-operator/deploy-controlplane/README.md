@@ -5,6 +5,7 @@ This step deploys the Istio control plane using the Sail Operator in an OpenShif
 - `KUBECONFIG`: Path to the kubeconfig file for the target OpenShift cluster.
 - `ISTIO_CONTROL_PLANE_MODE`: The mode of the Istio control plane to deploy, only allowed value is `ambient` and `sidecar`. The default is `sidecar`.
 - `SAIL_OPERATOR_CHANNEL`: The channel of the Sail Operator to use in the subscription. Default is `1.28-nightly` to ensure compatibility with the latest Istio versions from master branch in the Sail Operator.
+- `SKIP_CREATE_TEST_RESOURCES`: Needs to be set to `'true'`, skips the creation of test resources during the deployment. This means that the cluster will be created but Masitra namespace and pods will not be created. This Maistra pods are used for OSSM tests specifically.
 
 ## Step Overview
 1. **Deploy Sail Operator**: The step first applies the Sail Operator subscription to install the operator in the `openshift-operators` namespace. It waits for the Sail Operator deployment to become available.
@@ -23,6 +24,7 @@ To use this step in your CI/CD pipeline, include it in your job configuration an
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       ISTIO_CONTROL_PLANE_MODE: ambient
+      SKIP_CREATE_TEST_RESOURCES: 'true'
     test:
     - ref: servicemesh-sail-operator-deploy-controlplane
     workflow: servicemesh-istio-e2e-hypershift
