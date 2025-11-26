@@ -53,3 +53,5 @@ bash +x ./../execute_alc_interop_commands.sh || :
 
 # Copy the test cases results to an external directory
 cp -r ../tests/cypress/results $ARTIFACT_DIR/
+
+oc get policies -n policies

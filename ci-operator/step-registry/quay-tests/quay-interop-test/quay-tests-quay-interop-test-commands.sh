@@ -54,3 +54,4 @@ echo "The Quay hostname is $registryEndpoint"
 export CYPRESS_QUAY_ENDPOINT=$registry
 yarn run smoke || true
 
+oc get policies -n policies

@@ -26,6 +26,8 @@ export HUB_OCP_PASSWORD
 # run the test execution script
 ./fetch_clusters_commands.sh
 
+oc get policies -n policies
+
 if [ -s /tmp/ci/managed.cluster.name ] && ! grep -q "null" /tmp/ci/managed.cluster.name; then
     echo "managed.cluster.name file was found saving as artifact."
     cp -r /tmp/ci/managed.cluster.name $SHARED_DIR/

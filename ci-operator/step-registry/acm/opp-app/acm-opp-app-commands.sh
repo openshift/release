@@ -17,7 +17,7 @@ chmod +x /tmp/jq
 git clone https://github.com/stolostron/policy-collection.git
 cd policy-collection/deploy/
 
-echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp
+echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/tanfengshuang/grc-demo.git -a e2e-opp
 
 # Wait for the Quay resources to be created
 # How do I check this?
@@ -66,3 +66,4 @@ while [ $x -lt 10 ]; do
 	sleep 30
 done
 
+oc get policies -n policies

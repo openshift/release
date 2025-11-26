@@ -78,3 +78,5 @@ bash +x ./execute_obs_interop_commands.sh || :
 
 # Copy the test cases results to an external directory
 cp -r tests/pkg/tests $ARTIFACT_DIR/
+
+oc get policies -n policies

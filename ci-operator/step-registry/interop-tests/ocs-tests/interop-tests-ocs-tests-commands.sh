@@ -150,3 +150,5 @@ fi
 if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
 	oc apply -f /tmp/acm-policy-subscription-backup.yaml
 fi
+
+oc get policies -n policies

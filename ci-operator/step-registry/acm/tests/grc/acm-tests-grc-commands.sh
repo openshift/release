@@ -31,3 +31,5 @@ export RBAC_PASS
 
 # Copy the test cases results to an external directory
 cp -r test-output/cypress $ARTIFACT_DIR/
+
+oc get policies -n policies
