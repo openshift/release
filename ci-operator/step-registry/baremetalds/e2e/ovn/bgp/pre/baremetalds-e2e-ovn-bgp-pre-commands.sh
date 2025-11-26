@@ -272,8 +272,8 @@ until oc rollout status daemonset -n openshift-frr-k8s frr-k8s --timeout 2m &> /
   sleep 5
 done
 
-echo "Waiting for deploy 'frr-k8s-webhook-server' to be created..."
-until oc wait -n openshift-frr-k8s deployment frr-k8s-webhook-server --for condition=Available --timeout 2m &> /dev/null; do
+echo "Waiting for all deployments in openshift-frr-k8s namespace to be created..."
+until oc wait -n openshift-frr-k8s deployment --all --for condition=Available --timeout 2m &> /dev/null; do
   sleep 5
 done
 

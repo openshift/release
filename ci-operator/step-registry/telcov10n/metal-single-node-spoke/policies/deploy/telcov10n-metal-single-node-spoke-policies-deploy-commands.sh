@@ -50,7 +50,7 @@ function push_source_crs {
   cp -a ${HOME}/ztp/source-crs site-policies/${SPOKE_CLUSTER_NAME}/
   touch site-policies/${SPOKE_CLUSTER_NAME}/".ts-$(date -u +%s%N)"
   git add .
-  git commit -m 'Generated PGT'
+  git commit -m 'Generated PolicyGenerator CRs'
   GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git push origin main || {
   GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git pull -r origin main &&
   GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i ${ssh_pri_key_file}" git push origin main ; }
@@ -70,24 +70,25 @@ function generate_policy_related_files {
   ns_padded="000${SPOKE_CLUSTER_NAME}"
   ns_tail="${ns_padded: -4}"
 
-  jq -c '.[]' <<< "$(yq -o json <<< ${PGT_RELATED_FILES})" | while read -r entry; do
+  jq -c '.[]' <<< "$(yq -o json <<< ${PG_RELATED_FILES})" | while read -r entry; do
     # Extract the filename and content
     filename=$(echo "$entry" | jq -r '.filename')
     content=$(echo "$entry" | jq -r '.content')
 
     # Create the file and write the content
     echo "mkdir -pv ${policies_path}/$(dirname $filename)"
-    echo "cat <<EOPGT >| ${policies_path}/$(basename $filename)"
-    if [ "$(echo -e "$content" | yq eval '.kind')" == "PolicyGenTemplate" ]; then
+    echo "cat <<'EOPGT' >| ${policies_path}/$(basename $filename)"
+    if [ "$(echo -e "$content" | yq eval '.kind')" == "PolicyGenerator" ]; then
+      # PolicyGenerator: update namespace, add prowId label selector, and update catalog source image
       echo -e "$content" | \
-        yq eval '. | select(.metadata.namespace) .metadata.namespace += "'${ns_tail}'"' | \
-        yq eval '. | select(.spec.bindingRules) .spec.bindingRules.prowId = "'${SPOKE_CLUSTER_NAME}'"' | \
-        yq eval '(.spec.sourceFiles[] | select(.metadata.name == "'${CATALOGSOURCE_NAME:-}'").spec.image) = "'${catatlog_index_img:-}'"'
+        yq eval '. | select(.policyDefaults.namespace) .policyDefaults.namespace += "'${ns_tail}'"' | \
+        yq eval '.policyDefaults.placement.labelSelector.matchExpressions += [{"key": "prowId", "operator": "In", "values": ["'${SPOKE_CLUSTER_NAME}'"]}]' | \
+        yq eval '(.policies[].manifests[] | select(.path == "source-crs/DefaultCatsrc.yaml") | .patches[] | select(.metadata.name == "'${CATALOGSOURCE_NAME:-}'").spec.image) = "'${catatlog_index_img:-}'"'
     else
+      # Other resources (Namespace, ManagedClusterSetBinding, etc.)
       echo -e "$content" | \
         yq eval '. | select(.kind == "Namespace") .metadata.name += "'${ns_tail}'"' | \
-        yq eval '. | select(.metadata.namespace) .metadata.namespace += "'${ns_tail}'"' | \
-        yq eval '. | select(.spec.bindingRules) .spec.bindingRules.prowId = "'${SPOKE_CLUSTER_NAME}'"'
+        yq eval '. | select(.metadata.namespace) .metadata.namespace += "'${ns_tail}'"'
     fi
     echo "EOPGT"
 
@@ -96,7 +97,7 @@ function generate_policy_related_files {
 
 function push_policies {
 
-  echo "************ telcov10n Pushing Policy Gen Templates files ************"
+  echo "************ telcov10n Pushing PolicyGenerator files ************"
 
   gitea_ssh_uri="$(cat ${SHARED_DIR}/gitea-ssh-uri.txt)"
   ssh_pri_key_file=${SHARED_DIR}/ssh-key-${GITEA_NAMESPACE}
@@ -120,9 +121,9 @@ cd \${ztp_repo_dir}
 policies_path="site-policies/${SPOKE_CLUSTER_NAME}"
 mkdir -pv \${policies_path}
 touch \${policies_path}/.ts-$(date -u +%s%N)
-############## BEGIN of Policy GenTemplate files #####################################################
+############## BEGIN of PolicyGenerator files #####################################################
 $(generate_policy_related_files "site-policies/${SPOKE_CLUSTER_NAME}")
-############## END of Policy GenTemplate files #######################################################
+############## END of PolicyGenerator files #######################################################
 
 cat \${ztp_repo_dir}/clusters/kustomization.yaml >| \${ztp_repo_dir}/site-policies/kustomization.yaml
 
@@ -139,7 +140,7 @@ EOF
 
 function are_there_polices_to_be_defined {
 
-  num_of_policies=$(jq -c '.[]' <<< "$(yq -o json <<< ${PGT_RELATED_FILES})"|wc -l)
+  num_of_policies=$(jq -c '.[]' <<< "$(yq -o json <<< ${PG_RELATED_FILES})"|wc -l)
   if [[ "${num_of_policies}" == "0" ]]; then
     echo "no"
   else

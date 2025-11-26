@@ -216,3 +216,76 @@ spec:
     apiVersion: machine.openshift.io/v1beta1
     kind: MachineSet
     name: hosted-mgmt-z6sfr-worker-amd64-us-east-1c
+---
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  name: hosted-mgmt-z6sfr-worker-amd64-us-east-1d
+  namespace: openshift-machine-api
+  labels:
+    machine.openshift.io/cluster-api-cluster: hosted-mgmt-z6sfr
+spec:
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: hosted-mgmt-z6sfr
+      machine.openshift.io/cluster-api-machineset: hosted-mgmt-z6sfr-worker-amd64-us-east-1d
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: hosted-mgmt-z6sfr
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: hosted-mgmt-z6sfr-worker-amd64-us-east-1d
+    spec:
+      providerSpec:
+        value:
+          userDataSecret:
+            name: worker-user-data
+          placement:
+            availabilityZone: us-east-1d
+            region: us-east-1
+          credentialsSecret:
+            name: aws-cloud-credentials
+          instanceType: m6a.2xlarge
+          metadata:
+            creationTimestamp: null
+          publicIp: true
+          blockDevices:
+            - ebs:
+                encrypted: true
+                iops: 0
+                kmsKey:
+                  arn: ''
+                volumeSize: 800
+                volumeType: gp3
+          securityGroups:
+            - filters:
+                - name: 'tag:Name'
+                  values:
+                    - hosted-mgmt-z6sfr-worker-sg
+          kind: AWSMachineProviderConfig
+          metadataServiceOptions: {}
+          tags:
+            - name: kubernetes.io/cluster/hosted-mgmt-z6sfr
+              value: owned
+          deviceIndex: 0
+          ami:
+            id: ami-057df4d0cb8cbae0d
+          subnet:
+            id: subnet-0aa4f6df684e6beaa
+          apiVersion: machine.openshift.io/v1beta1
+          iamInstanceProfile:
+            id: hosted-mgmt-z6sfr-worker-profile
+---
+apiVersion: autoscaling.openshift.io/v1beta1
+kind: MachineAutoscaler
+metadata:
+  name: hosted-mgmt-z6sfr-worker-amd64-us-east-1d
+  namespace: openshift-machine-api
+spec:
+  maxReplicas: 5
+  minReplicas: 0
+  scaleTargetRef:
+    apiVersion: machine.openshift.io/v1beta1
+    kind: MachineSet
+    name: hosted-mgmt-z6sfr-worker-amd64-us-east-1d

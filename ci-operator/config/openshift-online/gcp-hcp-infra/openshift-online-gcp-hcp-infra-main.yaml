@@ -1,13 +1,10 @@
+binary_build_commands: make terraform-init
 build_root:
-  project_image:
-    build_args:
-    - name: TERRAFORM_VERSION
-      value: 1.13.1-1
-    dockerfile_literal: |
-      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-      ARG TERRAFORM_VERSION
-      RUN dnf config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
-      RUN dnf install -y "terraform${TERRAFORM_VERSION:+-${TERRAFORM_VERSION}}"
+  image_stream_tag:
+    name: gcp-hcp-infra-terraform
+    namespace: ci
+    tag: latest
+  use_build_cache: true
 resources:
   '*':
     limits:
@@ -28,6 +25,11 @@ tests:
   commands: make check-orphan-modules
   container:
     from: src
+- as: generate-bin
+  commands: make terraform-init
+  container:
+    from: bin
+  postsubmit: true
 zz_generated_metadata:
   branch: main
   org: openshift-online

@@ -86,6 +86,16 @@ releases:
       include_built_images: true
       name: 4.21-priv
       namespace: ocp-private
+  latest-416:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
+  latest-417:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
   latest-418:
     candidate:
       product: ocp
@@ -111,6 +121,16 @@ releases:
       product: ocp
       stream: ci
       version: "4.21"
+  n3minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
+  n4minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -129,7 +149,6 @@ tests:
   commands: make verify
   container:
     from: custom-verify-src
-  timeout: 1h0m0s
 - as: unit
   commands: make test
   container:
@@ -142,10 +161,16 @@ tests:
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
+      OCP_IMAGE_N3: release:n3minor
+      OCP_IMAGE_N4: release:n4minor
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aks-4-20
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
@@ -155,11 +180,23 @@ tests:
       OCP_IMAGE_LATEST: release:latest-420
       OCP_IMAGE_N1: release:latest-419
       OCP_IMAGE_N2: release:latest-418
+      OCP_IMAGE_N3: release:latest-417
+      OCP_IMAGE_N4: release:latest-416
       OCP_IMAGE_PREVIOUS: release:initial-420
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
+    workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-override
+  run_if_changed: (/overrides\.yaml$)
+  steps:
+    cluster_profile: hypershift
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: centralus
+      TEST_CPO_OVERRIDE: "1"
     workflow: hypershift-azure-aks-e2e
 - as: e2e-aws
   capabilities:
@@ -170,6 +207,8 @@ tests:
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
+      OCP_IMAGE_N3: release:n3minor
+      OCP_IMAGE_N4: release:n4minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
@@ -182,6 +221,8 @@ tests:
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
+      OCP_IMAGE_N3: release:n3minor
+      OCP_IMAGE_N4: release:n4minor
     env:
       CI_TESTS_RUN: (^(TestCreateCluster$|TestCreateClusterV2$))
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
@@ -195,6 +236,8 @@ tests:
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
+      OCP_IMAGE_N3: release:n3minor
+      OCP_IMAGE_N4: release:n4minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
@@ -234,6 +277,8 @@ tests:
       OCP_IMAGE_LATEST: release:latest-420
       OCP_IMAGE_N1: release:latest-419
       OCP_IMAGE_N2: release:latest-418
+      OCP_IMAGE_N3: release:latest-417
+      OCP_IMAGE_N4: release:latest-416
       OCP_IMAGE_PREVIOUS: release:initial-420
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
@@ -388,6 +433,8 @@ tests:
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
+      OCP_IMAGE_N3: release:n3minor
+      OCP_IMAGE_N4: release:n4minor
     env:
       CI_TESTS_RUN: ^TestKarpenter$
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"

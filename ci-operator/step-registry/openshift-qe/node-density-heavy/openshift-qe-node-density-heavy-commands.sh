@@ -59,13 +59,6 @@ export ADDITIONAL_PARAMS
 
 ./run.sh
 
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-
-jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> "${SHARED_DIR}"/index_data.json
-
-cp "${SHARED_DIR}"/index_data.json "${SHARED_DIR}"/${WORKLOAD}-index_data.json 
-cp "${SHARED_DIR}"/${WORKLOAD}-index_data.json  "${ARTIFACT_DIR}"/${WORKLOAD}-index_data.json
-
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
     cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"

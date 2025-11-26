@@ -81,13 +81,13 @@ tests:
   as: e2e-ovn-step-registry
   optional: true
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-4
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-4
     env:
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
@@ -100,13 +100,13 @@ tests:
   as: e2e-ovn-hybrid-step-registry
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-5
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-hybrid
 - as: e2e-ovn-ipsec-step-registry
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-5
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-ipsec
@@ -122,13 +122,13 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-serial-ipsec
-  timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -138,7 +138,8 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6-ipsec
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -147,10 +148,9 @@ tests:
         NETWORK_TYPE=OVNKubernetes
       EXTRA_MG_ARGS: --host-network
     workflow: baremetalds-e2e-ovn-ipsec
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     env:
       CUSTOM_VXLAN_PORT: "true"
     test:
@@ -220,7 +220,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
-  timeout: 5h30m0s
 - as: e2e-gcp-ovn
   steps:
     cluster_profile: gcp
@@ -240,7 +239,7 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -270,7 +269,7 @@ tests:
 - as: e2e-aws-ovn-clusternetwork-cidr-expansion
   cron: 0 3 * * 0,2,4,6
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-cidr-expansion
@@ -285,7 +284,7 @@ tests:
   as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-single-node
@@ -316,10 +315,10 @@ tests:
     - chain: network-mtu-migration-increase
     - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-ovn
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-network-mtu-migration-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -332,12 +331,11 @@ tests:
     - chain: network-mtu-migration-increase
     - chain: baremetalds-ipi-test
     workflow: baremetalds-e2e-ovn-ipv6
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
@@ -354,7 +352,7 @@ tests:
   as: e2e-aws-hypershift-ovn-kubevirt
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: hypershift-kubevirt-conformance
 - always_run: false
   as: qe-perfscale-aws-ovn-medium-cluster-density
@@ -373,7 +371,6 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-cluster-density-v2
-  timeout: 5h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-small-cluster-density
   optional: true
@@ -390,7 +387,6 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-cluster-density-v2
-  timeout: 5h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-medium-node-density-cni
   optional: true
@@ -408,7 +404,6 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
-  timeout: 5h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-small-node-density-cni
   optional: true
@@ -425,10 +420,10 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
-  timeout: 5h0m0s
 - always_run: false
   as: frrk8s-e2e
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: ^bindata\/network\/frr-k8s.*$
   steps:
@@ -465,17 +460,17 @@ tests:
     test:
     - ref: go-verify-deps
 - as: e2e-metal-ipi-ovn-dualstack-bgp
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack
-  timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -17,7 +17,7 @@ OMR_AWS_SECRET_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key)
 OMR_BREW_USERNAME=$(cat /var/run/quay-qe-brew-secret/username)
 OMR_BREW_PASSWORD=$(cat /var/run/quay-qe-brew-secret/password)
 if [ -z "${OMR_IMAGE_ENV+x}" ]; then
-    OMR_IMAGE_TAG="brew.registry.redhat.io/rh-osbs/${OMR_IMAGE}"
+    OMR_IMAGE_TAG="${OMR_IMAGE}"
 else
    OMR_IMAGE_TAG="brew.registry.redhat.io/rh-osbs/${OMR_IMAGE_ENV}"
 fi
