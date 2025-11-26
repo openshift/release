@@ -17,9 +17,12 @@ fi
 echo "Extracting cluster names from e2e test artifacts..."
 
 CLUSTER_NAMES=""
-E2E_LOG="${ARTIFACT_DIR}/../hypershift-azure-run-e2e/build-log.txt"
 
-if [[ -f "${E2E_LOG}" ]]; then
+# Find the e2e test log - it could be in various locations depending on CI structure
+# Use find to search for it under /logs/artifacts
+E2E_LOG=$(find /logs/artifacts -name "build-log.txt" -path "*hypershift-azure-run-e2e*" 2>/dev/null | head -1)
+
+if [[ -n "${E2E_LOG}" && -f "${E2E_LOG}" ]]; then
   echo "Found e2e test log at: ${E2E_LOG}"
 
   # Extract cluster names from log entries like:
@@ -36,7 +39,7 @@ if [[ -f "${E2E_LOG}" ]]; then
     echo "No cluster names found in test log"
   fi
 else
-  echo "E2E test log not found at: ${E2E_LOG}"
+  echo "E2E test log not found under /logs/artifacts"
   echo "This may be expected for non-e2e test workflows"
 fi
 
