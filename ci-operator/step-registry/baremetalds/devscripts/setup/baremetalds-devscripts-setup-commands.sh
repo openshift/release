@@ -473,3 +473,25 @@ EOF
 
 # Save console URL in `console.url` file so that ci-chat-bot could report success
 scp "${SSHOPTS[@]}" "root@${IP}:/tmp/console.url" "${SHARED_DIR}/"
+
+# Copy extra_baremetalhosts.json if it exists (when NUM_EXTRA_WORKERS > 0)
+ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF'
+set +e
+EXTRA_BMH_FILE=$(ls /root/dev-scripts/ocp/*/extra_baremetalhosts.json 2>/dev/null | head -n1)
+if [[ -f "$EXTRA_BMH_FILE" ]]; then
+  echo "Found extra_baremetalhosts.json at: $EXTRA_BMH_FILE"
+  cp "$EXTRA_BMH_FILE" /tmp/extra_baremetalhosts.json
+  echo "Copied extra_baremetalhosts.json to /tmp for transfer"
+  exit 0
+else
+  echo "No extra_baremetalhosts.json found (NUM_EXTRA_WORKERS may be 0)"
+  exit 1
+fi
+EOF
+
+# Only copy if the file was found and copied to /tmp
+if ssh "${SSHOPTS[@]}" "root@${IP}" test -f /tmp/extra_baremetalhosts.json; then
+  scp "${SSHOPTS[@]}" "root@${IP}:/tmp/extra_baremetalhosts.json" "${SHARED_DIR}/"
+  echo "Extra baremetalhosts file copied to ${SHARED_DIR}/extra_baremetalhosts.json"
+  echo "Number of extra workers available: $(jq 'length' "${SHARED_DIR}/extra_baremetalhosts.json" 2>/dev/null || echo "unknown")"
+fi
