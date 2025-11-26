@@ -1330,6 +1330,30 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build10
+    context: ci/prow/labels
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-labels
+    rerun_command: /test labels
+    run_if_changed: ^core-services/prow/02_config/_labels\.yaml$
+    spec:
+      containers:
+      - command:
+        - hack/validate-labels.py
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )labels,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build10
     context: ci/prow/ordered-prow-config
     decorate: true
     labels:
