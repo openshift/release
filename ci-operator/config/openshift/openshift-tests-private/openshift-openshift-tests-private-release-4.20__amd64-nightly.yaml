@@ -3314,7 +3314,43 @@ tests:
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-vsphere-ipi
-- as: baremetalds-ipi-ovn-dualstack-primaryv6-f30-netobserv
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f30-netobserv-v2
+  capabilities:
+  - intranet
+  cron: 26 14 12 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: 76537|82637|53844|85887
+      TEST_TIMEOUT: "55"
+    post:
+    - as: debug-pause
+      commands: |
+        echo "Post-test pause initiated."
+        sleep 21600
+      from: cli
+      resources:
+        requests:
+          cpu: 10m
+    - chain: cucushift-installer-rehearse-baremetalds-ipi-ofcir-deprovision
+    - ref: send-results-to-reportportal
+    test:
+    - ref: netobserv-apply-redhat-operators
+    - ref: netobserv-deploy-nfs-provisioner
+    - ref: idp-htpasswd
+    - ref: cucushift-pre
+    - ref: netobserv-enable-full-ipsec
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f30-netobserv-v1
   capabilities:
   - intranet
   cron: 26 14 12 * *
@@ -3345,6 +3381,41 @@ tests:
     - ref: netobserv-apply-redhat-operators
     - ref: netobserv-deploy-nfs-provisioner
     - ref: netobserv-enable-full-ipsec
+    - ref: idp-htpasswd
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f30-netobserv-v0
+  capabilities:
+  - intranet
+  cron: 26 14 12 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: 76537|82637|53844|85887
+      TEST_TIMEOUT: "55"
+    post:
+    - as: debug-pause
+      commands: |
+        echo "Post-test pause initiated."
+        sleep 21600
+      from: cli
+      resources:
+        requests:
+          cpu: 10m
+    - chain: cucushift-installer-rehearse-baremetalds-ipi-ofcir-deprovision
+    - ref: send-results-to-reportportal
+    test:
+    - ref: netobserv-apply-redhat-operators
+    - ref: netobserv-deploy-nfs-provisioner
     - ref: idp-htpasswd
     - ref: cucushift-pre
     - ref: openshift-extended-test
