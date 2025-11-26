@@ -105,16 +105,20 @@ tests:
     - as: test
       cli: latest
       commands: |
-        # Verify binaries are available
-        openshift-tests --version
-        cluster-kube-apiserver-operator-tests-ext --version
-        openshift-tests list suites
-        # Also run the operator-specific tests via make (as fallback or additional tests)
-        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+        # Run operator-specific e2e tests
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_operator.xml --warn-undefined-variables
+
+        # Run OpenShift e2e tests for kube-apiserver-operator
+        openshift-tests run openshift/cluster-kube-apiserver-operator/private \
+          -o "${ARTIFACT_DIR}/e2e.log" \
+          --junit-dir "${ARTIFACT_DIR}/junit"
       from: src
       resources:
+        limits:
+          memory: 10Gi
         requests:
-          cpu: 100m
+          cpu: "3"
+          memory: 600Mi
       timeout: 4h0m0s
     workflow: ipi-gcp
 - always_run: false
