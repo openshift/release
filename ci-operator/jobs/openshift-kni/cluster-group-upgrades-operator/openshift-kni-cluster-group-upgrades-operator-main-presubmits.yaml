@@ -73,6 +73,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/cluster-group-upgrades-operator-coverall
         - --target=ci-job
         command:
         - ci-operator
@@ -83,6 +84,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/cluster-group-upgrades-operator-coverall
+          name: cluster-group-upgrades-operator-coverall
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -97,6 +101,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: cluster-group-upgrades-operator-coverall
+        secret:
+          secretName: cluster-group-upgrades-operator-coverall
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher

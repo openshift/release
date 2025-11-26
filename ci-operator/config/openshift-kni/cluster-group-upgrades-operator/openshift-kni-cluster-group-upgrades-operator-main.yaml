@@ -6,7 +6,10 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
+- build_args:
+  - name: COVER
+    value: "true"
+  dockerfile_path: Dockerfile
   from: base
   to: cluster-group-upgrades-operator
 - dockerfile_path: Dockerfile.precache
@@ -54,8 +57,14 @@ tests:
     export XDG_CONFIG_HOME=/tmp/.config
     export XDG_DATA_HOME=/tmp/.local/share
     make ci-job
+    make coveralls-download
+    export COVERALLS_REPO_TOKEN=$(cat /etc/coveralls/TOKEN)
+    ./bin/coveralls report --job-flag "unit-tests" --build-number=$(git rev-parse HEAD) coverage.out
   container:
     from: src
+  secrets:
+  - mount_path: /etc/coveralls
+    name: cluster-group-upgrades-operator-coverall
   skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: integration
   skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -97,7 +106,19 @@ tests:
         KUBECONFIG="${SHARED_DIR}/kubeconfig"
         export KUBECONFIG
         cp $(echo "${KUBECONFIG}") /go/src/github.com/openshift-kni/cluster-group-upgrades-operator/kubeconfig
+        ./hack/add-sidecar-csv.sh
+        sleep 60
         make complete-kuttl-test
+        ./hack/extract-coverage.sh
+        sed -i 's/\/workspace/\./g' ./runtime-coverage/coverage.out
+        make coveralls-download
+        export COVERALLS_REPO_TOKEN=$(cat /etc/coveralls/TOKEN)
+        ./bin/coveralls report --job-flag "integration-tests" --build-number=$(git rev-parse HEAD) ./runtime-coverage/coverage.out
+      credentials:
+      - collection: ""
+        mount_path: /etc/coveralls
+        name: cluster-group-upgrades-operator-coverall
+        namespace: test-credentials
       from: src
       resources:
         requests:
