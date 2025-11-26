@@ -64,7 +64,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not tp_only and not slow" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_periodic_4.21
+        pytest.sh -k "not tp_only and not interval" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_periodic
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -987,61 +987,6 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: openshift-e2e-aws-single-node
-- as: insights-operator-e2e-tests-slow-tests
-  cron: 0 0 * * 6
-  steps:
-    cluster_profile: gcp
-    pre:
-    - chain: ipi-gcp-pre
-    - ref: insights-live
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        pytest.sh -k "slow and not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_slow_tests_4.21
-      credentials:
-      - collection: ""
-        mount_path: /secrets
-        name: insights-qa
-        namespace: test-credentials
-      - collection: ""
-        mount_path: /secret/aws/aws-bucket
-        name: aws-bucket
-        namespace: test-credentials
-      - collection: ""
-        mount_path: /secret/aws/aws-access-key-id
-        name: aws-access-key-id
-        namespace: test-credentials
-      - collection: ""
-        mount_path: /secret/aws/aws-region
-        name: aws-region
-        namespace: test-credentials
-      - collection: ""
-        mount_path: /secret/aws/aws-secret-access-key
-        name: aws-secret-access-key
-        namespace: test-credentials
-      - collection: ""
-        mount_path: /secret/insights-rp-access/
-        name: insights-rp-token
-        namespace: test-credentials
-      env:
-      - default: /secret/aws/aws-access-key-id/aws-access-key-id
-        name: AWS_ACCESS_KEY_ID_PATH
-      - default: /secret/aws/aws-bucket/aws-bucket
-        name: AWS_BUCKET_PATH
-      - default: /secret/aws/aws-region/aws-region
-        name: AWS_REGION_PATH
-      - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
-        name: AWS_SECRET_ACCESS_KEY_PATH
-      - default: /secret/insights-rp-access/insights-rp-token
-        name: RP_API_KEY
-      from: insights-operator-tests
-      grace_period: 30s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
-    workflow: ipi-gcp
 - as: fips-image-scan-operator
   cron: 0 2 * * 2
   steps:
@@ -1061,8 +1006,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -k "not tp_only and not slow and not UI" --junitxml=$(pwd)/test-report.xml
-        --rp_enabled --rp_name=hosted-hypershift-insights-operator-e2e-tests_4.21
+      commands: pytest.sh -k "not tp_only and not UI and not interval" --junitxml=$(pwd)/test-report.xml
+        --rp_enabled --rp_name=hosted-hypershift-insights-operator-e2e-tests
       credentials:
       - collection: ""
         mount_path: /secrets
