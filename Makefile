@@ -22,12 +22,16 @@ help:
 
 all:  core services
 
-check: check-core check-services check-boskos
+check: check-core check-services check-boskos check-labels
 	@echo "Service config check: PASS"
 
 check-boskos:
 	hack/validate-boskos.sh
 	@echo "Boskos config check: PASS"
+
+check-labels: python-help
+	python3 hack/validate-labels.py
+	@echo "Labels config check: PASS"
 
 check-core:
 	core-services/_hack/validate-core-services.sh core-services
