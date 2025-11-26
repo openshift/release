@@ -921,7 +921,7 @@ export TF_LOG=debug
 
 echo "8<--------8<--------8<--------8<-------- BEGIN: create cluster 8<--------8<--------8<--------8<--------"
 echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
-openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
+openshift-install --log-level=debug  --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 ret=${PIPESTATUS[0]}
 echo "ret=${ret}"
 if [ ${ret} -gt 0 ]; then
