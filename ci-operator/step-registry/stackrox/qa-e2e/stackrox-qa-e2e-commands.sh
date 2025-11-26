@@ -1,5 +1,9 @@
 #!/bin/bash
 
+set -o errexit
+set -o nounset
+set -o pipefail
+
 function install_yq() {
     # Install yq manually if not found in image
       echo "Installing yq"
@@ -24,8 +28,8 @@ function mapTestsForComponentReadiness() {
         results_file="${1}"
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
-            echo "Mapping Test Suite Name To: ACS-lp-interop"
-            /tmp/bin/yq eval -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+            echo "Mapping Test Suite Name To: ACSLatest-lp-interop"
+            /tmp/bin/yq eval -ox -iI0 '.testsuite."+@name" = "ACSLatest-lp-interop"' "$results_file" || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
@@ -42,7 +46,8 @@ function cleanup-collect() {
       # Keep a copy of all the original Junit files before modifying them
       cp -r "${ARTIFACT_DIR}"/junit-* "${original_results}" || echo "Warning: couldn't copy original files" >&2
 
-      find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
+      # Safely handle filenames with spaces
+      find "${ARTIFACT_DIR}" -type f -iname "*.xml" -print0 | while IFS= read -r -d '' result_file; do
         # Map tests if needed for related use cases
         mapTestsForComponentReadiness "${result_file}"
       done

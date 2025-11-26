@@ -1,0 +1,504 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM quay.io/multi-arch/yq:4.30.5 as yq4
+      FROM quay.io/openshift-kni/ztp-site-generator:4.20.0 AS ztp-gen
+      WORKDIR /home/ztp
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ci_telco-runner_latest
+      COPY --from=yq4 /usr/bin/yq /usr/bin/yq
+      COPY --from=ztp-gen /home/ztp /output/ztp
+      RUN \
+        curl -fsSL -o /tmp/get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && \
+        chmod 700 /tmp/get_helm.sh && \
+        /tmp/get_helm.sh && \
+        rm -f /tmp/get_helm.sh && \
+        pip3 install --no-cache-dir "pytest==8.2.2" "pytest-shell==0.3.2" "requests[socks]==2.32.3"
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: telcov10n-metal-single-node-spoke
+  capabilities:
+  - intranet
+  cron: 0 22 31 2 5
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "0"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      CATALOGSOURCE_DISPLAY_NAME: Red Hat Telco PreGA Operators 4.21
+      CATALOGSOURCE_NAME: prega-operators-4-20
+      DISCONNECTED: "false"
+      DU_PROFILE: v4.21
+      GITEA_NAMESPACE: ztp-gitea
+      IMAGE_INDEX_OCP_VERSION: "4.20"
+      MCH_NAMESPACE: open-cluster-management
+      RESERVE_BOOTSTRAP: "false"
+      SHARED_HUB_CLUSTER_PROFILE: ztp-hub-preserved-prod-cluster_profile_dir
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: telcov10n-metal-single-node-spoke-tests
+    - ref: telcov10n-jiras
+    workflow: telcov10n-metal-single-node-spoke
+- as: telcov10n-metal-single-node-spoke-kpis
+  capabilities:
+  - intranet
+  cron: 0 22 31 2 5
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: 10.6.157.20
+      BIOS_SETTINGS: |-
+        ---
+        WorkloadProfile: TelcoOptimizedProfile
+      BIOS_VALIDATIONS: |-
+        ---
+        # Settings are based on https://docs.openshift.com/container-platform/4.17/edge_computing/ztp-reference-cluster-configuration-for-vdu.html
+        # Additional settings taken from https://access.redhat.com/articles/7032040
+        CpuInterconnectBusLinkPower: Disabled # Uncore Frequency Scaling
+        EnergyEfficientTurbo: Disabled
+        EnergyPerformanceBias: MaxPower
+        LogicalProc: Enabled # Enabel Hyper-Threading (SMT)
+        PackageCStates: Disabled # Enable or Disable C0/C1 state
+        ProcAvxP1: Level2
+        ProcC1E: Disabled # Disable C1E state
+        ProcCStates: Enabled # Performance P-limit; Enabled - OS controlled
+        ProcPwrPerf: SysDbpmTelco # CPU Power and Performance Policy
+        ProcTurboMode: Enabled # Enable turbo boost
+        SecureBoot: Disabled # TODO: SecureBoot is disabled on this setup - starting OCP 4.17 it's required, unless it interferes with sideloading kernel
+        SecureBootMode: DeployedMode
+        SecureBootPolicy: Standard
+        SriovGlobalEnable: Enabled
+        SubNumaCluster: Disabled
+        UncoreFrequency: MaxUFS # Uncore Frequency
+      CATALOGSOURCE_DISPLAY_NAME: Red Hat Telco PreGA Operators 4.20
+      CATALOGSOURCE_NAME: prega-operators-4-20
+      DU_PROFILE: v4.21
+      GITEA_NAMESPACE: ztp-gitea
+      IMAGE_INDEX_OCP_VERSION: "4.20"
+      INTERNAL_NET_CIDR: 10.6.157.0/24
+      MCH_NAMESPACE: open-cluster-management
+      PG_RELATED_FILES: |-
+        - filename: kustomization.yaml
+          content: |-
+            generators:
+            - common-ranGen.yaml
+            - group-du-sno-ranGen.yaml
+            - group-du-sno-validator-ranGen.yaml
+            - spree-03.yaml
+            resources:
+            - ns.yaml
+        - filename: ns.yaml
+          content: |-
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: ztp-common
+            ---
+            apiVersion: cluster.open-cluster-management.io/v1beta2
+            kind: ManagedClusterSetBinding
+            metadata:
+              name: global
+              namespace: ztp-common
+            spec:
+              clusterSet: global
+            ---
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: ztp-group
+            ---
+            apiVersion: cluster.open-cluster-management.io/v1beta2
+            kind: ManagedClusterSetBinding
+            metadata:
+              name: global
+              namespace: ztp-group
+            spec:
+              clusterSet: global
+            ---
+            apiVersion: v1
+            kind: Namespace
+            metadata:
+              name: ztp-site
+            ---
+            apiVersion: cluster.open-cluster-management.io/v1beta2
+            kind: ManagedClusterSetBinding
+            metadata:
+              name: global
+              namespace: ztp-site
+            spec:
+              clusterSet: global
+        - filename: common-ranGen.yaml
+          content: |-
+            ---
+            apiVersion: policy.open-cluster-management.io/v1
+            kind: PolicyGenerator
+            metadata:
+              name: common
+            placementBindingDefaults:
+              name: common-placement-binding
+            policyDefaults:
+              namespace: ztp-common
+              placement:
+                labelSelector:
+                  matchExpressions:
+                    - key: common
+                      operator: In
+                      values:
+                        - "true"
+            policies:
+              - name: common-config-policy
+                policyAnnotations:
+                  ran.openshift.io/ztp-deploy-wave: "1"
+                manifests:
+                  - path: source-crs/OperatorHub.yaml
+                    patches:
+                      - spec:
+                          sources:
+                            - disabled: true
+                              name: community-operators
+                            - disabled: false
+                              name: certified-operators
+                            - disabled: true
+                              name: redhat-operators
+                            - disabled: true
+                              name: redhat-marketplace
+                  - path: source-crs/DefaultCatsrc.yaml
+                    patches:
+                      - metadata:
+                          name: prega-operators-4-20
+                        spec:
+                          displayName: Red Hat Custom Operators Catalog
+                          image: quay.io/prega/prega-operator-index:v4.20.0
+              - name: common-subscriptions-policy
+                policyAnnotations:
+                  ran.openshift.io/ztp-deploy-wave: "2"
+                manifests:
+                  - path: source-crs/SriovSubscriptionNS.yaml
+                  - path: source-crs/SriovSubscriptionOperGroup.yaml
+                  - path: source-crs/SriovSubscription.yaml
+                    patches:
+                      - spec:
+                          source: prega-operators-4-20
+                  - path: source-crs/SriovOperatorStatus.yaml
+                  - path: source-crs/AcceleratorsNS.yaml
+                  - path: source-crs/AcceleratorsOperGroup.yaml
+                  - path: source-crs/AcceleratorsSubscription.yaml
+                    patches:
+                      - spec:
+                          source: certified-operators
+                  - path: source-crs/PtpSubscriptionNS.yaml
+                  - path: source-crs/PtpSubscriptionOperGroup.yaml
+                  - path: source-crs/PtpSubscription.yaml
+                    patches:
+                      - spec:
+                          source: prega-operators-4-20
+                  - path: source-crs/PtpOperatorStatus.yaml
+                  - path: source-crs/ClusterLogNS.yaml
+                  - path: source-crs/ClusterLogOperGroup.yaml
+                  - path: source-crs/ClusterLogSubscription.yaml
+                    patches:
+                      - spec:
+                          source: prega-operators-4-20
+                          channel: ""
+                  - path: source-crs/ClusterLogOperatorStatus.yaml
+                  - path: source-crs/ClusterLogServiceAccount.yaml
+                  - path: source-crs/ClusterLogServiceAccountAuditBinding.yaml
+                  - path: source-crs/ClusterLogServiceAccountInfrastructureBinding.yaml
+                  - path: source-crs/StorageNS.yaml
+                  - path: source-crs/StorageOperGroup.yaml
+                  - path: source-crs/StorageSubscription.yaml
+                    patches:
+                      - spec:
+                          source: prega-operators-4-20
+                  - path: source-crs/StorageOperatorStatus.yaml
+        - filename: group-du-sno-ranGen.yaml
+          content: |-
+            ---
+            apiVersion: policy.open-cluster-management.io/v1
+            kind: PolicyGenerator
+            metadata:
+              name: group-du-sno
+            placementBindingDefaults:
+              name: group-du-sno-placement-binding
+            policyDefaults:
+              namespace: ztp-group
+              placement:
+                labelSelector:
+                  matchExpressions:
+                    - key: group-du-sno
+                      operator: Exists
+            policies:
+              - name: group-du-sno-config-policy
+                policyAnnotations:
+                  ran.openshift.io/ztp-deploy-wave: "10"
+                manifests:
+                  - path: source-crs/StorageLV.yaml
+                    patches:
+                      - metadata:
+                          name: local-disks
+                        spec:
+                          storageClassDevices:
+                            - storageClassName: general
+                              devicePaths:
+                                - /dev/disk/by-path/pci-0000:45:00.0-nvme-1
+                  - path: source-crs/DisableOLMPprof.yaml
+                  - path: source-crs/ClusterLogForwarder.yaml
+                    patches:
+                      - spec:
+                          outputs:
+                            - type: "kafka"
+                              name: kafka-open
+                              kafka:
+                                url: "tcp://vran-qe-kafka.kni-qe-11.lab.eng.rdu2.redhat.com:9092/vran-qe"
+                          filters:
+                            - name: test-labels
+                              type: openshiftLabels
+                              openshiftLabels:
+                                label1: test1
+                                label2: test2
+                                label3: test3
+                                label4: test4
+                          pipelines:
+                            - name: all-to-default
+                              inputRefs:
+                                - audit
+                                - infrastructure
+                              filterRefs:
+                                - test-labels
+                              outputRefs:
+                                - kafka-open
+                  - path: source-crs/PtpOperatorConfig.yaml
+                  - path: source-crs/PtpConfigSlaveForEvent.yaml
+                    patches:
+                      - spec:
+                          profile:
+                            - name: "slave"
+                              interface: "ens2f0"
+                    openapi:
+                      path: schema.openapi
+                  - path: source-crs/SriovOperatorConfigForSNO.yaml
+                    complianceType: musthave
+                    patches:
+                      - spec:
+                          configDaemonNodeSelector:
+                            $patch: replace
+                            node-role.kubernetes.io/master: ""
+                  - path: source-crs/DisableSnoNetworkDiag.yaml
+                  - path: source-crs/PerformanceProfile.yaml
+                    patches:
+                      - spec:
+                          cpu:
+                            isolated: "2-31,34-63"
+                            reserved: "0-1,32-33"
+                          hugepages:
+                            defaultHugepagesSize: 1G
+                            pages:
+                              - size: 1G
+                                count: 32
+                          machineConfigPoolSelector:
+                            $patch: replace
+                            pools.operator.machineconfiguration.openshift.io/master: ""
+                          nodeSelector:
+                            $patch: replace
+                            node-role.kubernetes.io/master: ""
+                          realTimeKernel:
+                            enabled: true
+                          workloadHints:
+                            realTime: true
+                            highPowerConsumption: false
+                            perPodPowerManagement: false
+                  - path: source-crs/TunedPerformancePatch.yaml
+        - filename: group-du-sno-validator-ranGen.yaml
+          content: |-
+            apiVersion: policy.open-cluster-management.io/v1
+            kind: PolicyGenerator
+            metadata:
+              name: group-du-sno-validator
+            placementBindingDefaults:
+              name: group-du-sno-validator-placement-binding
+            policyDefaults:
+              namespace: ztp-group
+              placement:
+                labelSelector:
+                  matchExpressions:
+                    - key: group-du-sno
+                      operator: Exists
+                    - key: ztp-done
+                      operator: DoesNotExist
+            policies:
+              - name: group-du-sno-validator-du-policy
+                policyAnnotations:
+                  ran.openshift.io/ztp-deploy-wave: "10000"
+                remediationAction: inform
+                manifests:
+                  - path: source-crs/validatorCRs/informDuValidatorMaster.yaml
+        - filename: spree-03.yaml
+          content: |-
+            ---
+            apiVersion: policy.open-cluster-management.io/v1
+            kind: PolicyGenerator
+            metadata:
+              name: spree-03
+            placementBindingDefaults:
+              name: spree-03-placement-binding
+            policyDefaults:
+              namespace: ztp-site
+              placement:
+                labelSelector:
+                  matchExpressions:
+                    - key: group-du-sno
+                      operator: Exists
+            policies:
+              - name: spree-03-config-policy
+                policyAnnotations:
+                  ran.openshift.io/ztp-deploy-wave: "10"
+                manifests:
+                  - path: source-crs/SriovNetwork.yaml
+                    patches:
+                      - metadata:
+                          name: "sriov-nw-du-fh"
+                        spec:
+                          resourceName: du_fh
+                          vlan: 140
+                  - path: source-crs/SriovNetworkNodePolicy.yaml
+                    patches:
+                      - metadata:
+                          name: "sriov-nnp-du-fh"
+                        spec:
+                          deviceType: vfio-pci
+                          isRdma: false
+                          nicSelector:
+                            pfNames: []
+                            rootDevices:
+                              - 0000:ca:00.2
+                            vendor: "8086"
+                            deviceID: "1593"
+                          numVfs: 8
+                          priority: 10
+                          resourceName: du_fh
+                    openapi:
+                      path: schema.openapi
+                  - path: source-crs/SriovNetwork.yaml
+                    patches:
+                      - metadata:
+                          name: "sriov-nw-du-mh"
+                        spec:
+                          resourceName: du_mh
+                          vlan: 150
+                  - path: source-crs/SriovNetworkNodePolicy.yaml
+                    patches:
+                      - metadata:
+                          name: "sriov-nnp-du-mh"
+                        spec:
+                          deviceType: vfio-pci
+                          isRdma: false
+                          nicSelector:
+                            pfNames: []
+                            rootDevices:
+                              - 0000:ca:00.3
+                            vendor: "8086"
+                            deviceID: "1593"
+                          numVfs: 8
+                          priority: 10
+                          resourceName: du_mh
+                    openapi:
+                      path: schema.openapi
+        - filename: schema.openapi
+          content: |-
+            openapi: 3.0.0
+            info:
+              title: Kubernetes CRD OpenAPI Schema
+              version: v1
+            paths: {}
+            components:
+              schemas:
+                # PtpConfig schema for profile field merging
+                io.openshift.ptp.v1.PtpConfig:
+                  type: object
+                  properties:
+                    spec:
+                      type: object
+                      properties:
+                        profile:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              name:
+                                type: string
+                              interface:
+                                type: string
+                              ptp4lOpts:
+                                type: string
+                              phc2sysOpts:
+                                type: string
+                              ptp4lConf:
+                                type: string
+                            required:
+                              - name
+                          x-kubernetes-list-map-keys:
+                            - name
+                          x-kubernetes-list-type: map
+
+                # SriovNetworkNodePolicy schema for rootDevices field merging
+                io.openshift.sriovnetwork.v1.SriovNetworkNodePolicy:
+                  type: object
+                  properties:
+                    spec:
+                      type: object
+                      properties:
+                        deviceType:
+                          type: string
+                        isRdma:
+                          type: boolean
+                        nicSelector:
+                          type: object
+                          properties:
+                            pfNames:
+                              type: array
+                              items:
+                                type: string
+                              x-kubernetes-list-type: atomic
+                            rootDevices:
+                              type: array
+                              items:
+                                type: string
+                              x-kubernetes-list-type: atomic
+                            vendor:
+                              type: string
+                            deviceID:
+                              type: string
+                        numVfs:
+                          type: integer
+                        priority:
+                          type: integer
+                        resourceName:
+                          type: string
+      SHARED_HUB_CLUSTER_PROFILE: ztp-hub-preserved-prod-cluster_profile_dir
+      SOCKS5_PROXY: socks5h://10.6.157.20:3124
+    test:
+    - ref: telcov10n-metal-single-node-spoke-kpis-tests-telco-operators
+    - ref: telcov10n-metal-single-node-spoke-kpis-tests-oslat
+    - ref: telcov10n-metal-single-node-spoke-kpis-tests-cpu-util
+    workflow: telcov10n-metal-single-node-spoke-kpis
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: nightly-4.22
