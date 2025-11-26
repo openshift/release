@@ -68,6 +68,13 @@ EXPECTED_THROUGHPUT="${AWS_GP3_THROUGHPUT:-}"
 if [ -z "${EXPECTED_THROUGHPUT}" ]; then
   EXPECTED_THROUGHPUT=$(read_install_config 'platform.aws.defaultMachinePlatform.rootVolume.throughput')
 fi
+# If still empty, try reading from split configuration (compute or controlPlane)
+if [ -z "${EXPECTED_THROUGHPUT}" ] || [ "${EXPECTED_THROUGHPUT}" == "null" ]; then
+  EXPECTED_THROUGHPUT=$(read_install_config 'compute[0].platform.aws.rootVolume.throughput')
+fi
+if [ -z "${EXPECTED_THROUGHPUT}" ] || [ "${EXPECTED_THROUGHPUT}" == "null" ]; then
+  EXPECTED_THROUGHPUT=$(read_install_config 'controlPlane.platform.aws.rootVolume.throughput')
+fi
 
 DEFAULT_SIZE="${AWS_DEFAULT_MACHINE_VOLUME_SIZE:-120}"
 EXPECTED_COMPUTE_SIZE="${AWS_COMPUTE_VOLUME_SIZE:-${DEFAULT_SIZE}}"
