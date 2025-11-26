@@ -280,7 +280,7 @@ then
 	source "${SHARED_DIR}/must-gather-image.sh"
 else
 	# Use must-gather PR #514 for testing cloud load balancer collection
-	MUST_GATHER_IMAGE=${MUST_GATHER_IMAGE:-"registry.build06.ci.openshift.org/ci-op-s3t0iq0k"}
+	MUST_GATHER_IMAGE=${MUST_GATHER_IMAGE:-"registry.ci.openshift.org/ci/must-gather:pr-514"}
 fi
 
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
