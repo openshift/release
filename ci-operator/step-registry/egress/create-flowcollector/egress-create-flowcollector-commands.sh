@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 set -x
 
-: "${NAMESPACE:=netobserv}"
+: "${NETOBSERV_NS:=netobserv}"
 
 update_flowcollector() {
   FLOWCOLLECTOR=/tmp/flowcollector.yaml
@@ -35,7 +35,7 @@ spec:
     lokiStack:
       name: loki
     mode: Monolithic
-  namespace: ${NAMESPACE}
+  namespace: ${NETOBSERV_NS}
   processor:
     logLevel: info
     logTypes: Flows
@@ -56,13 +56,19 @@ oc apply -f $FLOWCOLLECTOR
 sleep 30
 echo "====> Waiting for flowlogs-pipeline daemonset to be created"
 while :; do
-  oc get daemonset flowlogs-pipeline -n ${NAMESPACE} && break
+  oc get daemonset flowlogs-pipeline -n ${NETOBSERV_NS} && break
+  sleep 1
+done
+
+echo "====> Waiting for netobserv-ebpf-agent daemonset to be created"
+while :; do
+  oc get daemonset netobserv-ebpf-agent -n ${NETOBSERV_NS}-privileged && break
   sleep 1
 done
 
 echo "====> Waiting for console-plugin deployment to be created"
 while :; do
-  oc get deployment netobserv-plugin -n ${NAMESPACE} && break
+  oc get deployment netobserv-plugin -n ${NETOBSERV_NS} && break
   sleep 1
 done
 
@@ -83,7 +89,3 @@ if [ "${rc}" == 1 ]; then
   exit $rc
 fi
 
-echo "====> FlowCollector creation completed successfully"
-
-# Reset namespace context to avoid CI system trying to create secrets in netobserv namespace
-oc project default >/dev/null 2>&1 || true
