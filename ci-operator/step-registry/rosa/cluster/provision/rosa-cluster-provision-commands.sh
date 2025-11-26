@@ -759,6 +759,7 @@ while [ $retry_count -lt $max_retries ]; do
 
   # Execute command and capture both output and exit code
   cmd_output=$(eval "${cmd}" 2>&1)
+  echo $cmd_output
   exit_code=$?
 
   # Write output to temp file
