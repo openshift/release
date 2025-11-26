@@ -392,8 +392,8 @@ update_github_ldap_mapping_config_map:
 .PHONY: update_github_ldap_mapping_config_map
 
 download_dp_crd:
-	curl -o clusters/build-clusters/common/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/master/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
-	curl -o clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml https://raw.githubusercontent.com/openshift/ci-tools/master/pkg/api/pullrequestpayloadqualification/v1/ci.openshift.io_pullrequestpayloadqualificationruns.yaml
+	curl -o clusters/build-clusters/common/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
+	curl -o clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/pullrequestpayloadqualification/v1/ci.openshift.io_pullrequestpayloadqualificationruns.yaml
 .PHONY: download_dp_crd
 
 download_crt_crd:
