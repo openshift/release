@@ -48,8 +48,12 @@ curl -sG "http://127.0.0.1:3100/loki/api/v1/query_range" \
 # Process the results: group by (SrcK8S_Namespace, SrcK8S_OwnerName, SrcK8S_Name, SrcPort, Proto) and deduplicate
 processed_json="${ARTIFACT_DIR}/loki-query-range-grouped.json"
 jq -c '
-  # Extract all log entries from all streams and parse JSON log lines
-  [.data.result[].values[][1] | fromjson] |
+  # Extract all log entries from all streams, merge stream metadata with parsed JSON log lines
+  [.data.result[] | 
+    .stream as $stream |
+    .values[] | 
+    .[1] | fromjson | . + $stream
+  ] |
   # Select only the required fields for each entry
   map({
     SrcK8S_Namespace: .SrcK8S_Namespace,
@@ -100,12 +104,11 @@ if jq -e '. | length > 0' "${processed_json}" >/dev/null 2>&1; then
   # Flatten all entries from all groups and convert to CSV
   jq -r '
     # Extract all entries from all groups
-    [.[].entries[]] |
+    [.[].entries[]] as $entries |
     # CSV header
-    ["SrcK8S_Namespace", "SrcK8S_OwnerName", "SrcK8S_Name", "SrcPort", "Proto", "DstK8S_OwnerType", "DstK8S_OwnerName", "DstAddr", "DstPort"],
+    (["SrcK8S_Namespace", "SrcK8S_OwnerName", "SrcK8S_Name", "SrcPort", "Proto", "DstK8S_OwnerType", "DstK8S_OwnerName", "DstAddr", "DstPort"] | @csv),
     # CSV rows
-    .[] | [.SrcK8S_Namespace, .SrcK8S_OwnerName, .SrcK8S_Name, .SrcPort, .Proto, .DstK8S_OwnerType, .DstK8S_OwnerName, .DstAddr, .DstPort] |
-    @csv
+    ($entries[] | [.SrcK8S_Namespace, .SrcK8S_OwnerName, .SrcK8S_Name, .SrcPort, .Proto, .DstK8S_OwnerType, .DstK8S_OwnerName, .DstAddr, .DstPort] | @csv)
   ' "${processed_json}" > "${csv_file}" || {
     echo "Failed to generate CSV file" >&2
   }
