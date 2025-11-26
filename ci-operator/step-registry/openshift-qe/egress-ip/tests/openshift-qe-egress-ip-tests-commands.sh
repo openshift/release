@@ -445,6 +445,14 @@ run_node_reboot_test() {
         fi
     fi
     
+    # Check if any reboot command succeeded
+    if [[ "$reboot_success" == "false" ]]; then
+        log_error "All reboot methods failed for node $selected_node"
+        return 1
+    fi
+    
+    log_info "Reboot command executed successfully, monitoring node state..."
+    
     # Wait for node to go NotReady with enhanced validation
     local elapsed=0
     local node_notready_timeout=300
