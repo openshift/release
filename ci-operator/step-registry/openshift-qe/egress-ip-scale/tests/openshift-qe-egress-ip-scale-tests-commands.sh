@@ -56,7 +56,6 @@ log_info "Validating egress IP assignments after chaos testing..."
 
 # Check all egress IP assignments
 assigned_count=0
-migrated_count=0
 healthy_assignments=()
 
 for ((i=1; i<=EGRESS_IP_COUNT; i++)); do

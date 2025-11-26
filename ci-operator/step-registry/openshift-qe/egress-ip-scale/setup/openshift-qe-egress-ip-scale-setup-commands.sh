@@ -50,7 +50,7 @@ fi
 
 # Get cluster nodes and validate scale
 log_info "Validating cluster scale requirements..."
-worker_nodes=($(oc get nodes -l node-role.kubernetes.io/worker= --no-headers -o custom-columns=":metadata.name" | head -n "$EGRESS_NODES_COUNT"))
+mapfile -t worker_nodes < <(oc get nodes -l node-role.kubernetes.io/worker= --no-headers -o custom-columns=":metadata.name" | head -n "$EGRESS_NODES_COUNT")
 
 if [[ ${#worker_nodes[@]} -lt $EGRESS_NODES_COUNT ]]; then
     error_exit "Insufficient worker nodes. Found ${#worker_nodes[@]}, need $EGRESS_NODES_COUNT"
