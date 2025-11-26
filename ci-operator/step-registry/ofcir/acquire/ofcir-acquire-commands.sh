@@ -77,7 +77,7 @@ cat > "${SHARED_DIR}/packet-conf.sh" <<-EOF
 EOF
 
 function getCIR(){
-    OFCIRURL="https://ofcir-service.ofcir-system.svc.cluster.local/v1/ofcir"
+    OFCIRURL="https://ofcir.apps-int.master.ci.devcluster.openshift.com/v1/ofcir"
     OFCIRTOKEN="$(cat "${CLUSTER_PROFILE_DIR}/ofcir-auth-token")"
     echo "Attempting to acquire a Host from OFCIR"
     IPFILE=$SHARED_DIR/server-ip

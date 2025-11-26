@@ -45,7 +45,14 @@ kubelet:
 fi
 tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 cd ~/microshift
-./scripts/devenv-builder/configure-vm.sh --force-firewall --pull-images ${configure_vm_args} /tmp/pull-secret
+
+# Check if --skip-dnf-update is available
+SKIP_DNF_UPDATE_OPT=""
+if grep -q -- '--skip-dnf-update' ./scripts/devenv-builder/configure-vm.sh; then
+  SKIP_DNF_UPDATE_OPT="--skip-dnf-update"
+fi
+
+./scripts/devenv-builder/configure-vm.sh \${SKIP_DNF_UPDATE_OPT} --force-firewall --pull-images ${configure_vm_args} /tmp/pull-secret
 EOF
 chmod +x /tmp/install.sh
 

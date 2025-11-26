@@ -64,12 +64,15 @@ cat > packing-test-infra.yaml <<-EOF
         dest: "{{ SHARED_DIR }}/ansible.cfg"
         content: |
           [defaults]
-          callback_whitelist = profile_tasks
+          callbacks_enabled = profile_tasks
           host_key_checking = False
 
           verbosity = 2
-          stdout_callback = yaml
+          stdout_callback = ansible.builtin.default
           bin_ansible_callbacks = True
+
+          [callback_default]
+          result_format = yaml
 
           [ssh_connection]
           retries = 10

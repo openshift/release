@@ -45,7 +45,7 @@ tests:
         ]
       SKIP_TESTS: tests/e2e-openshift/must-gather tests/e2e-targetallocator/* tests/e2e-targetallocator-cr/*
         tests/e2e-multi-instrumentation/* tests/e2e-otel/* tests/e2e-opampbridge/*
-        tests/e2e-pdb/* tests/e2e-instrumentation/* tests/e2e-prometheuscr/*
+        tests/e2e-pdb/* tests/e2e-instrumentation/* tests/e2e-prometheuscr/* tests/e2e-otel/google*
     test:
     - as: install-opentelemetry-operator
       cli: latest
@@ -55,13 +55,16 @@ tests:
         oc label namespace openshift-opentelemetry-operator openshift.io/cluster-monitoring="true"
         operator-sdk run bundle --timeout=5m --security-context-config restricted -n openshift-opentelemetry-operator "$MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE"
         oc wait --for condition=Available -n openshift-opentelemetry-operator deployment opentelemetry-operator-controller-manager
+      env:
+      - default: ""
+        name: MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE
       from: operator-sdk
       resources:
         requests:
           cpu: 1000m
           memory: 400Mi
     - ref: install-operators
-    - ref: distributed-tracing-tests-opentelemetry-downstream
+    - ref: distributed-tracing-tests-opentelemetry-stage
     workflow: openshift-observability-ibm-p
 zz_generated_metadata:
   branch: main

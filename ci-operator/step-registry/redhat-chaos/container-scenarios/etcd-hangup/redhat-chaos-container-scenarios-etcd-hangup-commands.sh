@@ -20,6 +20,8 @@ export ENABLE_ALERTS=False
 telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 export TELEMETRY_PASSWORD=$telemetry_password
 
+export EXPECTED_RECOVERY_TIME=$CONTAINER_ETCD_RECOVERY_TIME
+
 console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
 export HEALTH_CHECK_URL=https://$console_url
 set -o nounset

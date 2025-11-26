@@ -31,6 +31,9 @@ process_inventory() {
 
 main() {
 
+    echo "Save cluster version to SHARED_DIR"
+    echo "${VERSION}" > "${SHARED_DIR}/cluster_version"
+
     echo "Set CLUSTER_NAME env var"
     if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
         CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")

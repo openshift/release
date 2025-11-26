@@ -26,15 +26,15 @@ chain:
         fi
 
         CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-        
+
         CRED_COMMAND=""
         # >= 2.6
         if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
-          CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")  
+          CRED_COMMAND=$(echo "--role-arn $(cat ${SHARED_DIR}/hcp-role-arn) --sts-creds ${SHARED_DIR}/sts-creds.json")
         else
           CRED_COMMAND=$(echo "--aws-creds ${CLUSTER_PROFILE_DIR}/.awscred")
         fi
-      
+
         echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
         /tmp/${HYPERSHIFT_NAME} destroy cluster aws ${CRED_COMMAND} \
           --name ${CLUSTER_NAME} \
@@ -43,12 +43,12 @@ chain:
           --namespace local-cluster \
           --cluster-grace-period 40m
         echo "$(date) Finished deleting cluster"
-        
+
         oc delete managedcluster ${CLUSTER_NAME} --ignore-not-found
         echo "$(date) Finished destroying hypershift managed cluster"
       from_image:
         namespace: ocp
-        name: "4.12"
+        name: "4.16"
         tag: upi-installer
       grace_period: 5m0s
       resources:
@@ -56,3 +56,20 @@ chain:
           cpu: 100m
           memory: 100Mi
       timeout: 30m0s
+    - as: destroy-aws-iam-cli-role
+      cli: latest
+      commands: |-
+        set -exuo pipefail
+        if [[ -f "${SHARED_DIR}/hcp-role-arn" && -f ${SHARED_DIR}/sts-creds.json ]]; then
+            hcp_role_arn="$(cat ${SHARED_DIR}/hcp-role-arn)"
+            CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+            echo "arn: $hcp_role_arn was created during the test, need to destroy it"
+            bin/hypershift destroy iam aws --infra-id $CLUSTER_NAME --role-arn $hcp_role_arn --sts-creds ${SHARED_DIR}/sts-creds.json
+        fi
+      from: hypershift-operator
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 15m0s

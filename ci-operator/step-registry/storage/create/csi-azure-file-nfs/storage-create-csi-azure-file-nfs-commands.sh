@@ -42,6 +42,9 @@ SnapshotClass:
   FromName: true
 DriverInfo:
   Name: file.csi.azure.com
+  SupportedSizeRange:
+    Min: 100Gi
+    Max: 1Ti
   Capabilities:
     persistence: true
     exec: true

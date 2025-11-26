@@ -30,26 +30,25 @@ function mapTestsForComponentReadiness() {
 
 set -x
 
-unset CI
-
 exit_code=0
 scripts/openshift-CI-kuttl-tests.sh
-kubectl kuttl test test/openshift/e2e/sequential --config test/openshift/e2e/sequential/kuttl-test.yaml --report xml || exit_code=1
+unset CI
+make ginkgo
+./bin/ginkgo -v --trace  --junit-report=openshift-gitops-sequential-e2e.xml -r ./test/openshift/e2e/ginkgo/sequential || exit_code=1
 
-
-# Move results to Artifacts directory
-cp ./kuttl-test.xml ${ARTIFACT_DIR}/junit_gitops-sequential.xml
+# Find report
+cat openshift-gitops-sequential-e2e.xml || cat "$(find . -name "*openshift-gitops-sequential-e2e.xml")"
 
 original_results="${ARTIFACT_DIR}/original_results/"
 mkdir "${original_results}"
 
 # Keep a copy of all the original Junit file before modifying it
-cp "${ARTIFACT_DIR}/junit_gitops-sequential.xml" "${original_results}/junit_gitops-sequential.xml"
+cp "openshift-gitops-sequential-e2e.xml" "${original_results}/openshift-gitops-sequential-e2e.xml"
 
 # Map tests if needed for related use cases
-mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit_gitops-sequential.xml"
+mapTestsForComponentReadiness "${original_results}/openshift-gitops-sequential-e2e.xml"
 
  # Send junit file to shared dir for Data Router Reporter step
-cp "${ARTIFACT_DIR}/junit_gitops-sequential.xml" "${SHARED_DIR}"
+cp "openshift-gitops-sequential-e2e.xml" "${SHARED_DIR}"
 
 exit $exit_code

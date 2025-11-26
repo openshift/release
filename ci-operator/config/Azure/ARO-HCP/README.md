@@ -1,3 +1,13 @@
+# ARO-HCP CI Configuration
+
+This directory contains CI/CD configuration for the Azure ARO-HCP (Hosted Control Plane) project.
+
+## Configuration Files
+
+- **`Azure-ARO-HCP-main.yaml`** - Presubmit and postsubmit jobs (runs on PRs and merges)
+- **`Azure-ARO-HCP-main__periodic.yaml`** - Scheduled periodic jobs (cluster creation, E2E tests, cleanup)
+- **`Azure-ARO-HCP-main__image-updater.yaml`** - Automated image digest update job - Mon-Fri
+
 # Adding New Production Regions to ARO-HCP Testing
 
 This guide shows how to add periodic CI tests for new ARO-HCP production regions.

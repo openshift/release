@@ -41,11 +41,7 @@ fi
 EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE} --pods-per-namespace ${PODS_PER_NAMESPACE} --netpol-per-namespace ${NETPOL_PER_NAMESPACE} --local-pods ${LOCAL_PODS} --single-ports ${SINGLE_PORTS} --port-ranges ${PORT_RANGES} --remotes-namespaces ${REMOTE_NAMESPACES} --remotes-pods ${REMOTE_PODS} --cidrs ${CIDR}"
 export EXTRA_FLAGS
 
-rm -f ${SHARED_DIR}/index.json
 ./run.sh
-
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)

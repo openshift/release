@@ -30,10 +30,16 @@ function install_opm() {
     run_command "curl -L --retry 5 https://github.com/operator-framework/operator-registry/releases/download/v1.26.2/linux-amd64-opm -o ${TOOLS_DIR}/opm && chmod +x ${TOOLS_DIR}/opm"
 }
 
+function install_oc() {
+    echo "Install oc"
+    run_command "curl -L --retry 5 https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/stable/$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/;')/openshift-client-linux.tar.gz | tar -xz -C ${TOOLS_DIR} oc && chmod +x ${TOOLS_DIR}/oc"
+}
+
 function install_deps() {
     run_command "mkdir -p ${TOOLS_DIR}"
     run_command "export PATH=${TOOLS_DIR}:${PATH}"
     install_opm
+    install_oc # we need a modern client
 }
 
 function install_secret() {
@@ -56,8 +62,8 @@ function deploy_operators() {
 }
 
 set_proxy
+install_deps
 run_command "oc whoami"
 run_command "which oc && oc version -o yaml"
-install_deps
 install_secret
 deploy_operators

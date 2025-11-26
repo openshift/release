@@ -2,7 +2,7 @@
 # Install, config and execute Regulus, the dataplane test suite.
 #
 # Background:
-#   For BM we support multiple profiles. Currently there are 2 profiles: metal-perscale-cpt (cloud31)
+#   For BM we support multiple profiles. Currently there are 2 profiles: metal-perfscale-cpt (cloud31)
 #   and metal-perfscale-jetlag (cloud48). More profiles are coming. Multiple profiles ramifications are:
 #       1. The current BM Prow design has cloud31 as the only cloud reachable from Prow pod.
 #       2. Dictated by "1.", jetlag always runs on cloud31 bastion to instantiatep cloud31 or cloud48 cluster.

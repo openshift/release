@@ -11,6 +11,7 @@ CONSOLE_CLIENT_SECRET_NAME=authid-console-openshift-console
 
 HOSTED_CLUSTER_RELEASE=$(yq-v4 'select(.kind == "HostedCluster") | .spec.release.image' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
 HOSTED_CLUSTER_NAME=$(yq-v4 'select(.kind == "HostedCluster") | .metadata.name' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
+HOSTED_CLUSTER_NS=$(yq-v4 'select(.kind == "Namespace") | .metadata.name' "${SHARED_DIR}"/hypershift_create_cluster_render.yaml)
 yq-v4 "select(.metadata.name == \"$HOSTED_CLUSTER_NAME-pull-secret\") | .data.\".dockerconfigjson\"" "${SHARED_DIR}"/hypershift_create_cluster_render.yaml | base64 -d > /tmp/hosted_cluster_pull_secret
 HOSTED_CLUSTER_VERSION=$(oc image info -a /tmp/hosted_cluster_pull_secret $HOSTED_CLUSTER_RELEASE | grep -o 'io.openshift.release=.*' | grep -Eo '=4\.[0-9]+' | grep -Eo '[^=]+')
 echo "$HOSTED_CLUSTER_VERSION" > "${SHARED_DIR}"/hosted_cluster_version
@@ -94,7 +95,7 @@ if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.20)}") == "1"  ]]; then
     if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.18)}") == "1"  ]]; then
         # Once the ExternalOIDCWithUIDAndExtraClaimMappings feature PRs are merged and backported to 4.18, remove the `curl` line
         if curl -sS https://raw.githubusercontent.com/openshift/api/refs/heads/release-"$HOSTED_CLUSTER_VERSION"/payload-manifests/featuregates/featureGate-Hypershift-Default.yaml | yq-v4 '.status.featureGates[].enabled' | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
-            CREATED_CLAIM_MAPPINGS=$(oc get hc/"$HOSTED_CLUSTER_NAME" -o jsonpath='{.spec.configuration.authentication.oidcProviders[*].claimMappings}')
+            CREATED_CLAIM_MAPPINGS=$(oc get hc/"$HOSTED_CLUSTER_NAME" -o jsonpath='{.spec.configuration.authentication.oidcProviders[*].claimMappings}' -n $HOSTED_CLUSTER_NS)
             if jq '.uid' <<< "$CREATED_CLAIM_MAPPINGS" | grep -q testuid && jq -c '.extra' <<< "$CREATED_CLAIM_MAPPINGS" | grep -q 'bar.*foo'; then
                 echo "HostedCluster: External OIDC uid and extra settings are honored."
             else
@@ -109,9 +110,9 @@ fi
 if [ "${HYPERSHIFT_MANAGED_SERVICE:-}" = "ARO-HCP" ] && [ "$(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.19)}")" = "1" ]; then
     echo "Creating an empty secret for the console client"
     # The secret will be populated by the day2 operator in the hosted cluster.
-    oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters
-    oc annotate secret "$CONSOLE_CLIENT_SECRET_NAME" -n clusters hypershift.openshift.io/hosted-cluster-sourced=true
+    oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n $HOSTED_CLUSTER_NS
+    oc annotate secret "$CONSOLE_CLIENT_SECRET_NAME" -n $HOSTED_CLUSTER_NS hypershift.openshift.io/hosted-cluster-sourced=true
 else
     echo "Creating the console client secret"
-    oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n clusters --from-literal=clientSecret="$CONSOLE_CLIENT_SECRET"
+    oc create secret generic "$CONSOLE_CLIENT_SECRET_NAME" -n $HOSTED_CLUSTER_NS --from-literal=clientSecret="$CONSOLE_CLIENT_SECRET"
 fi
