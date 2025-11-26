@@ -10,15 +10,15 @@ build_root:
     tag: rhel-9-release-golang-1.24-openshift-4.20
 images:
 - context_dir: .
-  dockerfile_path: Dockerfiles/Dockerfile
+  dockerfile_path: Dockerfiles/rhoai.Dockerfile
   from: ubi
   to: opendatahub-operator-rhoai
 operator:
   bundles:
   - as: opendatahub-operator-rhoai-bundle
-    dockerfile_path: Dockerfiles/bundle.Dockerfile
+    dockerfile_path: Dockerfiles/rhoai-bundle.Dockerfile
   substitutions:
-  - pullspec: REPLACE_IMAGE:latest
+  - pullspec: REPLACE_IMAGE:latest-rhoai
     with: pipeline:opendatahub-operator-rhoai
 releases:
   latest:
@@ -54,6 +54,8 @@ tests:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
     cluster_profile: gcp-opendatahub
+    dependencies:
+      OO_INDEX: opendatahub-operator-rhoai-bundle
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
       OO_CHANNEL: stable
