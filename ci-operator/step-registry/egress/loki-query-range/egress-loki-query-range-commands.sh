@@ -45,9 +45,6 @@ curl -sG "http://127.0.0.1:3100/loki/api/v1/query_range" \
   --data-urlencode "step=${LOKI_STEP}" \
   > "${out_json}"
 
-#echo "Waiting for 2 hours to ensure data is ingested into Loki"
-#sleep 2h # wait for the data to be ingested into Loki
-
 # Process the results: group by (SrcK8S_Namespace, SrcK8S_OwnerName, SrcK8S_Name, SrcPort, Proto) and deduplicate
 processed_json="${ARTIFACT_DIR}/loki-query-range-grouped.json"
 jq -c '
