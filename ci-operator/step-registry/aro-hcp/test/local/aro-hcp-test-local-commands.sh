@@ -2,7 +2,6 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
 
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
@@ -57,10 +56,14 @@ start_port_forward() {
 monitor_port_forward() {
     echo "Starting port-forward monitor..."
     while true; do
-        if [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+        if curl -s --connect-timeout 2 --max-time 3 "http://localhost:$LOCAL_PORT/" >/dev/null 2>&1; then
             sleep 5
         else
-            echo "Port-forward died! Restarting..."
+            echo "Port $LOCAL_PORT not responding, restarting port-forward..."
+            if [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+                kill "$(cat "$PIDFILE")" 2>/dev/null || true
+                rm -f "$PIDFILE"
+            fi
             if ! start_port_forward; then
                 echo "Failed to restart port-forward, retrying in 10s..."
                 sleep 10
