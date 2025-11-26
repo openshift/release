@@ -4,6 +4,7 @@ set -euo pipefail
 # Define the paths to the JSON files
 declare -r KONFLUX_CA_BUNDLE="/var/run/vault/dt-secrets/stage-registry-cert.pem"
 declare -r KONFLUX_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.json"
+declare -r KONFLUX_OPERATOR_ART_IMAGE_SHARE="/var/run/vault/deploy-konflux-operator-art-image-share"
 
 declare IDMS_NAME=${IDMS_NAME}
 declare CATALOG_SOURCE=${METALLB_CATALOG_SOURCE}
@@ -74,7 +75,9 @@ function apply_image_config {
 
 function update_global_auth {
 	# Define the new dockerconfig path
+	local art_image_share_dockerconfig="${KONFLUX_OPERATOR_ART_IMAGE_SHARE}/.dockerconfigjson"
 	local new_dockerconfig="/tmp/new-dockerconfigjson"
+	local tmp_dockerconfig="${new_dockerconfig}-tmp"
 	local konflux_auth_user
 	local konflux_auth_password
 	local konflux_registry_auth
@@ -96,7 +99,12 @@ function update_global_auth {
 	brew_registry_auth=$(echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0)
 
 	# Create a new dockerconfig with the konflux registry credentials without the "email" field
-	jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"https://registry.stage.redhat.io\": {\"auth\": \"$konflux_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" >"$new_dockerconfig"
+	jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"https://registry.stage.redhat.io\": {\"auth\": \"$konflux_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" >"${tmp_dockerconfig}"
+
+	# Add konflux operator art image share credentials
+	jq -s '{"auths": (.[0].auths + .[1].auths)}' "${tmp_dockerconfig}" "${art_image_share_dockerconfig}" > "${new_dockerconfig}"
+
+	rm -f "${tmp_dockerconfig}"
 
 	# update global auth
 	local -i ret=0
