@@ -24,6 +24,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
+      JETLAG_PR: "739"
       TYPE: sno
     workflow: openshift-qe-installer-bm-deploy
 - always_run: false
@@ -34,6 +35,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
+      JETLAG_PR: "739"
       PUBLIC_VLAN: "false"
       TYPE: sno
     workflow: openshift-qe-installer-bm-deploy
@@ -46,6 +48,7 @@ tests:
     cluster_profile: metal-perfscale-jetlag
     env:
       BOND: "true"
+      JETLAG_PR: "739"
       PUBLIC_VLAN: "false"
       TYPE: sno
     workflow: openshift-qe-installer-bm-deploy
@@ -57,6 +60,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-selfsched
     env:
+      JETLAG_PR: "739"
       TYPE: sno
     workflow: openshift-qe-installer-bm-self-sched-deploy
 - always_run: false
@@ -67,6 +71,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
+      JETLAG_PR: "739"
       NUM_WORKER_NODES: "2"
     workflow: openshift-qe-installer-bm-deploy
 - always_run: false
@@ -77,6 +82,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
+      JETLAG_PR: "739"
       PUBLIC_VLAN: "false"
       TYPE: mno
     workflow: openshift-qe-installer-bm-deploy
@@ -89,6 +95,20 @@ tests:
     cluster_profile: metal-perfscale-jetlag
     env:
       BOND: "true"
+      JETLAG_PR: "739"
+      PUBLIC_VLAN: "false"
+      TYPE: mno
+    workflow: openshift-qe-installer-bm-deploy
+- always_run: false
+  as: deploy-mno-ipv6
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      IP_STACK: ipv6
+      JETLAG_PR: "739"
       PUBLIC_VLAN: "false"
       TYPE: mno
     workflow: openshift-qe-installer-bm-deploy
@@ -100,6 +120,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
+      JETLAG_PR: "739"
       NUM_WORKER_NODES: "0"
     workflow: openshift-qe-installer-bm-deploy
 - always_run: false
@@ -110,6 +131,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
+      JETLAG_PR: "739"
       NUM_WORKER_NODES: "0"
       PUBLIC_VLAN: "false"
     workflow: openshift-qe-installer-bm-deploy
@@ -122,6 +144,7 @@ tests:
     cluster_profile: metal-perfscale-jetlag
     env:
       BOND: "true"
+      JETLAG_PR: "739"
       NUM_WORKER_NODES: "0"
       PUBLIC_VLAN: "false"
     workflow: openshift-qe-installer-bm-deploy
@@ -133,6 +156,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
+      JETLAG_PR: "739"
       NUM_HYBRID_WORKER_NODES: "2"
       NUM_NODES: "1"
       NUM_WORKER_NODES: "1"
@@ -153,6 +177,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
+      JETLAG_PR: "739"
       NUM_HYBRID_WORKER_NODES: "2"
       NUM_NODES: "1"
       NUM_WORKER_NODES: "1"
@@ -174,6 +199,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
+      JETLAG_PR: "739"
       NUM_TARGET_WORKER_NODES: "2"
       NUM_WORKER_NODES: "1"
     test:
@@ -187,6 +213,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
+      JETLAG_PR: "739"
       NUM_TARGET_WORKER_NODES: "1"
       TYPE: sno
     test:
@@ -200,6 +227,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
+      JETLAG_PR: "739"
       NUM_NODES: "1"
       NUM_WORKER_NODES: "2"
       STARTING_NODE: "1"
@@ -219,6 +247,7 @@ tests:
   steps:
     cluster_profile: metal-perfscale-jetlag
     env:
+      JETLAG_PR: "739"
       NUM_NODES: "1"
       NUM_WORKER_NODES: "2"
       PUBLIC_VLAN: "false"
@@ -231,6 +260,56 @@ tests:
     - ref: openshift-qe-installer-bm-prereqs
     - ref: openshift-qe-installer-bm-deploy
     - ref: openshift-qe-cluster-health
+- always_run: false
+  as: deploy-vmno-dualstack
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      IP_STACK: dual
+      JETLAG_PR: "739"
+      NUM_NODES: "1"
+      NUM_WORKER_NODES: "2"
+      PUBLIC_VLAN: "false"
+      STARTING_NODE: "1"
+      TYPE: vmno
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-poweroff
+    - ref: openshift-qe-installer-bm-foreman
+    - ref: openshift-qe-installer-bm-prereqs
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-cluster-health
+- always_run: false
+  as: deploy-mno-dualstack-bond
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      BOND: "true"
+      IP_STACK: dual
+      JETLAG_PR: "739"
+      PUBLIC_VLAN: "false"
+      TYPE: mno
+    workflow: openshift-qe-installer-bm-deploy
+- always_run: false
+  as: deploy-sno-dualstack-bond
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-jetlag
+    env:
+      BOND: "true"
+      IP_STACK: dual
+      JETLAG_PR: "739"
+      PUBLIC_VLAN: "false"
+      TYPE: sno
+    workflow: openshift-qe-installer-bm-deploy
 zz_generated_metadata:
   branch: main
   org: redhat-performance
