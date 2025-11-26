@@ -10,15 +10,17 @@ build_root:
     tag: rhel-9-release-golang-1.24-openshift-4.20
 images:
 - context_dir: .
-  dockerfile_path: Dockerfiles/Dockerfile
+  dockerfile_path: Dockerfiles/rhoai.Dockerfile
   from: ubi
-  to: opendatahub-operator
+  to: opendatahub-operator-rhoai
 operator:
   bundles:
-  - dockerfile_path: Dockerfiles/bundle.Dockerfile
+  - as: opendatahub-operator-rhoai-bundle
+    dockerfile_path: Dockerfiles/rhoai-bundle.Dockerfile
+    skip_building_index: true
   substitutions:
-  - pullspec: REPLACE_IMAGE:latest
-    with: pipeline:opendatahub-operator
+  - pullspec: REPLACE_IMAGE:latest-rhoai
+    with: pipeline:opendatahub-operator-rhoai
 releases:
   latest:
     release:
@@ -33,7 +35,7 @@ tests:
 - as: opendatahub-operator-pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: opendatahub-operator
+      SOURCE_IMAGE_REF: opendatahub-operator-rhoai
     env:
       IMAGE_REPO: opendatahub-operator
     workflow: opendatahub-io-ci-image-mirror
@@ -42,7 +44,7 @@ tests:
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: opendatahub-operator
+      SOURCE_IMAGE_REF: opendatahub-operator-rhoai
     env:
       IMAGE_REPO: opendatahub-operator
       RELEASE_VERSION: rhoai
@@ -64,7 +66,7 @@ tests:
       cli: latest
       commands: |
         unset GOFLAGS
-        make e2e-test -e E2E_TEST_FLAGS="-timeout 60m" -e OPERATOR_NAMESPACE=redhat-ods-operator
+        make e2e-test -e E2E_TEST_FLAGS="-timeout 60m" -e OPERATOR_NAMESPACE=redhat-ods-operator -e ODH_PLATFORM_TYPE=rhoai
       from: src
       resources:
         requests:
