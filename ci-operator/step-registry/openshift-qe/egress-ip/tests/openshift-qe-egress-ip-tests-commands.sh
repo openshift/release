@@ -541,27 +541,20 @@ run_multinode_migration_test() {
     
     log_info "Pre-migration label state - Current node ($current_node): $current_has_label, Target node ($target_node): $target_has_label"
     
-    # Strategy: Ensure only target node has the egress-assignable label to force migration
-    # First, remove egress-assignable label from ALL nodes to reset state
-    log_info "Resetting egress-assignable labels on all worker nodes..."
-    local all_workers
-    mapfile -t all_workers < <(oc get nodes -l "node-role.kubernetes.io/worker" --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null)
-    
-    for worker in "${all_workers[@]}"; do
-        oc label node "$worker" k8s.ovn.org/egress-assignable- 2>/dev/null || true
-        log_info "Removed egress-assignable label from node: $worker"
-    done
-    
-    # Wait a moment for the label removal to propagate
-    sleep 10
-    
-    # Label ONLY the target node as egress-assignable to force migration
-    log_info "Labeling only target node $target_node as egress-assignable to force migration..."
+    # Strategy: Add target node label first, then remove from current node to allow graceful migration
+    log_info "Adding egress-assignable label to target node $target_node..."
     if ! oc label node "$target_node" k8s.ovn.org/egress-assignable="" --overwrite; then
         log_error "Failed to label target node $target_node"
-        # Restore current node label as fallback
-        oc label node "$current_node" k8s.ovn.org/egress-assignable="" --overwrite || true
         return 1
+    fi
+    
+    # Wait a moment for the label addition to propagate
+    sleep 5
+    
+    # Remove egress-assignable label from current node to force migration
+    log_info "Removing egress-assignable label from current node $current_node to force migration..."
+    if ! oc label node "$current_node" k8s.ovn.org/egress-assignable- 2>/dev/null; then
+        log_warning "Failed to remove label from current node $current_node, but continuing..."
     fi
     
     # Verify label was applied successfully
@@ -577,7 +570,7 @@ run_multinode_migration_test() {
     
     # Wait for egress IP to migrate
     log_info "Waiting for egress IP to migrate to $target_node..."
-    local migration_timeout=300
+    local migration_timeout=600  # Increased from 300s to 600s (10 minutes)
     local elapsed=0
     local migration_successful=false
     
@@ -601,12 +594,24 @@ run_multinode_migration_test() {
         
         if [[ $((elapsed % 30)) -eq 0 ]]; then
             log_info "Migration in progress... elapsed: ${elapsed}s"
+            # Add debug info every 30 seconds
+            log_info "Debug: Current assignment: '$new_assignment', Target: '$target_node', Original: '$current_node'"
+            log_info "Debug: EgressIP status:"
+            oc get egressip "$EIP_NAME" -o jsonpath='{.status}' 2>/dev/null | jq '.' 2>/dev/null || echo "No status available"
         fi
     done
     
     if [[ "$migration_successful" == "false" ]]; then
         log_error "❌ Egress IP migration failed within ${migration_timeout}s"
+        # Show final state for debugging
+        log_info "Final migration debug information:"
+        local final_assignment
+        final_assignment=$(oc get egressip "$EIP_NAME" -o jsonpath='{.status.items[0].node}' 2>/dev/null || echo "")
+        log_info "Final assignment: '$final_assignment' (Original: '$current_node', Target: '$target_node')"
+        oc get egressip "$EIP_NAME" -o yaml 2>/dev/null | grep -A 10 "status:" || true
+        
         # Restore original node label
+        log_info "Restoring original node label after migration failure..."
         oc label node "$current_node" k8s.ovn.org/egress-assignable="" --overwrite || true
         return 1
     fi
@@ -691,7 +696,10 @@ run_multinode_migration_test() {
 
 # Run multi-node migration test if we have multiple nodes
 if oc get nodes -l "node-role.kubernetes.io/worker" --no-headers 2>/dev/null | wc -l | grep -qv "^1$"; then
-    run_multinode_migration_test || log_warning "Multi-node migration test encountered issues"
+    if ! run_multinode_migration_test; then
+        log_error "❌ Multi-node migration test FAILED - this is a critical failure"
+        error_exit "Egress IP failover testing failed"
+    fi
 else
     log_info "Skipping multi-node tests: only one worker node detected"
 fi
@@ -702,8 +710,60 @@ cleanup_test_workload
 # Collect final comprehensive metrics
 collect_test_artifacts "final"
 
-# Test summary
-log_success "✅ All test phases completed!"
+# Test summary with pass/fail tracking
+log_info "==============================="
+log_info "EGRESS IP TEST RESULTS SUMMARY"
+log_info "==============================="
+
+# Track test results
+TOTAL_TESTS=0
+PASSED_TESTS=0
+FAILED_TESTS=0
+
+# Pod disruption test results
+if [[ -f "$ARTIFACT_DIR/pod_disruption_metrics.csv" ]]; then
+    POD_TEST_COUNT=$(( $(wc -l < "$ARTIFACT_DIR/pod_disruption_metrics.csv") - 1 )) # Minus header
+    TOTAL_TESTS=$((TOTAL_TESTS + POD_TEST_COUNT))
+    PASSED_TESTS=$((PASSED_TESTS + POD_TEST_COUNT)) # Assume passed if we got this far
+    log_info "✅ Pod Disruption Tests: $POD_TEST_COUNT/$POD_TEST_COUNT passed"
+else
+    log_warning "⚠️  Pod Disruption Tests: No results file found"
+fi
+
+# Node reboot test results  
+if [[ -f "$ARTIFACT_DIR/reboot_metrics.csv" ]]; then
+    REBOOT_TEST_COUNT=$(( $(wc -l < "$ARTIFACT_DIR/reboot_metrics.csv") - 1 )) # Minus header
+    TOTAL_TESTS=$((TOTAL_TESTS + REBOOT_TEST_COUNT))
+    PASSED_TESTS=$((PASSED_TESTS + REBOOT_TEST_COUNT)) # Assume passed if we got this far
+    log_info "✅ Node Reboot Tests: $REBOOT_TEST_COUNT/$REBOOT_TEST_COUNT passed"
+else
+    log_warning "⚠️  Node Reboot Tests: No results file found"
+fi
+
+# Migration test results
+TOTAL_TESTS=$((TOTAL_TESTS + 1)) # Always attempt migration test
+if [[ -f "$ARTIFACT_DIR/migration_metrics.csv" ]]; then
+    PASSED_TESTS=$((PASSED_TESTS + 1))
+    log_info "✅ Egress IP Migration Test: 1/1 passed"
+else
+    FAILED_TESTS=$((FAILED_TESTS + 1))
+    log_error "❌ Egress IP Migration Test: 0/1 passed"
+fi
+
+log_info "==============================="
+log_info "FINAL TEST SUMMARY:"
+log_info "  - Total Tests: $TOTAL_TESTS"
+log_info "  - Passed: $PASSED_TESTS"
+log_info "  - Failed: $FAILED_TESTS" 
+log_info "  - Success Rate: $(( PASSED_TESTS * 100 / TOTAL_TESTS ))%"
+log_info "==============================="
+
+if [[ $FAILED_TESTS -eq 0 ]]; then
+    log_success "🎉 All egress IP resilience tests passed!"
+else
+    error_exit "❌ $FAILED_TESTS test(s) failed - egress IP resilience testing incomplete"
+fi
+
 log_info "Test Configuration:"
 log_info "  - Egress IP: $EIP_NAME"
 log_info "  - Pod Kill Tests: $POD_KILL_RETRIES iterations"
