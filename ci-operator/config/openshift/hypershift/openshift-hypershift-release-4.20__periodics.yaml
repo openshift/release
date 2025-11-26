@@ -57,6 +57,10 @@ releases:
       product: ocp
       stream: nightly
       version: "4.20"
+  oldest-supported-z-rollback:
+    release:
+      channel: fast
+      version: 4.20.0
 resources:
   '*':
     limits:
@@ -136,6 +140,17 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
+- as: e2e-azure-upgrade-rollback-oldest-supported
+  cron: 0 20 * * *
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_LATEST: release:oldest-supported-z-rollback
+      OCP_IMAGE_PREVIOUS: release:latest
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+    workflow: hypershift-azure-aks-e2e
 - as: e2e-aws-conformance-cilium
   minimum_interval: 168h
   steps:
