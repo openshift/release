@@ -383,61 +383,171 @@ run_node_reboot_test() {
     
     log_info "Before reboot - SNAT: $old_snat_count, LR policy: $old_policy_count"
     
-    # Reboot the selected node with enhanced detection
-    log_info "Rebooting node $selected_node using aggressive reboot method..."
+    # Get system uptime before reboot attempt
+    log_info "Recording system state before reboot..."
+    local pre_reboot_uptime boot_time_before
+    pre_reboot_uptime=$(oc debug node/"$selected_node" --quiet=true -- chroot /host bash -c "cat /proc/uptime | cut -d' ' -f1" 2>/dev/null || echo "0")
+    boot_time_before=$(oc debug node/"$selected_node" --quiet=true -- chroot /host bash -c "stat -c %Y /proc/1" 2>/dev/null || echo "0")
     
-    # Method 1: Try systemctl reboot first
-    log_info "Attempting systemctl reboot..."
-    if ! oc debug node/"$selected_node" -- chroot /host bash -c "systemctl reboot" 2>/dev/null; then
-        log_warning "systemctl reboot command may have failed, trying alternative method..."
+    log_info "Pre-reboot uptime: ${pre_reboot_uptime}s, boot time: $boot_time_before"
+    
+    # Reboot the selected node with enhanced methods and proper privileges
+    log_info "Rebooting node $selected_node using enhanced reboot methods..."
+    
+    local reboot_success=false
+    
+    # Method 1: Try systemctl reboot with proper privileges
+    log_info "Attempting privileged systemctl reboot..."
+    if oc debug node/"$selected_node" --quiet=true -- chroot /host bash -c "
+        # Ensure we have proper privileges
+        if [[ \$(id -u) -eq 0 ]]; then
+            # Sync filesystem first
+            sync
+            # Use systemctl with force flag
+            systemctl reboot --force --force
+        else
+            echo 'ERROR: Not running as root'
+            exit 1
+        fi" 2>/dev/null; then
+        log_info "systemctl reboot command executed successfully"
+        reboot_success=true
+    else
+        log_warning "systemctl reboot failed, trying alternative methods..."
         
-        # Method 2: Use SysRq trigger for more aggressive reboot
-        log_info "Attempting SysRq trigger reboot..."
-        if ! oc debug node/"$selected_node" -- chroot /host bash -c "echo 1 > /proc/sys/kernel/sysrq && echo b > /proc/sysrq-trigger" 2>/dev/null; then
-            log_warning "SysRq reboot command may have failed, but continuing with test..."
+        # Method 2: Use SysRq trigger with proper setup
+        log_info "Attempting SysRq trigger reboot with enhanced privileges..."
+        if oc debug node/"$selected_node" --quiet=true -- chroot /host bash -c "
+            # Enable SysRq and perform immediate reboot
+            echo 1 > /proc/sys/kernel/sysrq 2>/dev/null || true
+            sync
+            # Send SIGTERM to all processes first
+            echo i > /proc/sysrq-trigger 2>/dev/null || true
+            sleep 2
+            # Force immediate reboot
+            echo b > /proc/sysrq-trigger" 2>/dev/null; then
+            log_info "SysRq reboot command executed"
+            reboot_success=true
+        else
+            log_warning "SysRq reboot failed, trying final method..."
+            
+            # Method 3: Direct kernel reboot call
+            log_info "Attempting direct kernel reboot call..."
+            if oc debug node/"$selected_node" --quiet=true -- chroot /host bash -c "
+                # Try using reboot syscall directly
+                sync
+                /sbin/reboot -f" 2>/dev/null; then
+                log_info "Direct reboot command executed"
+                reboot_success=true
+            else
+                log_error "All reboot methods failed for node $selected_node"
+                return 1
+            fi
         fi
     fi
     
-    # Wait for node to go NotReady
+    # Wait for node to go NotReady with enhanced validation
     local elapsed=0
     local node_notready_timeout=300
     local notready_detected=false
+    
+    log_info "Waiting for node $selected_node to go NotReady (indicates reboot started)..."
     
     while [[ $elapsed -lt $node_notready_timeout ]]; do
         local status
         status=$(oc get node "$selected_node" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
         if [[ "$status" != "True" ]]; then
-            log_info "Node $selected_node is NotReady (rebooting)"
+            log_success "Node $selected_node is NotReady (reboot initiated successfully)"
             notready_detected=true
             break
         fi
+        
+        # Check every 30 seconds if reboot actually started by monitoring system uptime
+        if [[ $((elapsed % 30)) -eq 0 ]] && [[ $elapsed -gt 0 ]]; then
+            local current_uptime
+            current_uptime=$(oc debug node/"$selected_node" --quiet=true -- chroot /host bash -c "cat /proc/uptime | cut -d' ' -f1" 2>/dev/null || echo "$pre_reboot_uptime")
+            
+            # If uptime decreased, reboot happened but node may still appear Ready briefly
+            if [[ $(echo "$current_uptime < $pre_reboot_uptime" | bc -l) -eq 1 ]] 2>/dev/null; then
+                log_success "Reboot detected: uptime decreased from ${pre_reboot_uptime}s to ${current_uptime}s"
+                notready_detected=true
+                break
+            fi
+            
+            log_info "Still waiting for reboot... Current uptime: ${current_uptime}s (elapsed: ${elapsed}s)"
+        fi
+        
         sleep 5
         elapsed=$((elapsed + 5))
     done
     
     if [[ "$notready_detected" == "false" ]]; then
-        log_warning "Node $selected_node did not go NotReady within timeout, but continuing..."
+        log_error "❌ Node $selected_node did not reboot within timeout - REBOOT TEST FAILED"
+        
+        # Verify no reboot occurred by checking uptime
+        local final_uptime
+        final_uptime=$(oc debug node/"$selected_node" --quiet=true -- chroot /host bash -c "cat /proc/uptime | cut -d' ' -f1" 2>/dev/null || echo "0")
+        
+        log_error "Uptime verification: Pre-reboot: ${pre_reboot_uptime}s, Current: ${final_uptime}s"
+        
+        if [[ $(echo "$final_uptime >= $pre_reboot_uptime" | bc -l) -eq 1 ]] 2>/dev/null; then
+            log_error "Node uptime confirms no reboot occurred - failing test"
+            return 1
+        fi
     fi
     
-    # Wait for node to become Ready again
+    # Wait for node to become Ready again with reboot validation
     elapsed=0
     local node_ready_timeout=1200
     local ready_detected=false
+    local actual_reboot_confirmed=false
+    
+    log_info "Waiting for node $selected_node to become Ready after reboot..."
     
     while [[ $elapsed -lt $node_ready_timeout ]]; do
         local status
         status=$(oc get node "$selected_node" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
         if [[ "$status" == "True" ]]; then
-            log_info "Node $selected_node is Ready again"
+            log_success "Node $selected_node is Ready again"
             ready_detected=true
+            
+            # Final validation: Check if reboot actually happened by comparing boot times
+            sleep 5  # Give time for system to fully stabilize
+            local post_reboot_uptime boot_time_after
+            post_reboot_uptime=$(oc debug node/"$selected_node" --quiet=true -- chroot /host bash -c "cat /proc/uptime | cut -d' ' -f1" 2>/dev/null || echo "999999")
+            boot_time_after=$(oc debug node/"$selected_node" --quiet=true -- chroot /host bash -c "stat -c %Y /proc/1" 2>/dev/null || echo "$boot_time_before")
+            
+            # Check if uptime reset (indicating successful reboot)
+            if [[ $(echo "$post_reboot_uptime < $pre_reboot_uptime" | bc -l) -eq 1 ]] 2>/dev/null; then
+                log_success "✅ Reboot confirmed: uptime reset from ${pre_reboot_uptime}s to ${post_reboot_uptime}s"
+                actual_reboot_confirmed=true
+            elif [[ "$boot_time_after" != "$boot_time_before" ]]; then
+                log_success "✅ Reboot confirmed: boot time changed from $boot_time_before to $boot_time_after"
+                actual_reboot_confirmed=true
+            else
+                log_warning "⚠️ Node became Ready but reboot validation unclear - uptime: ${pre_reboot_uptime}s → ${post_reboot_uptime}s"
+            fi
+            
             break
         fi
+        
+        # Progress update every minute
+        if [[ $((elapsed % 60)) -eq 0 ]] && [[ $elapsed -gt 0 ]]; then
+            log_info "Still waiting for node to become Ready... (${elapsed}s/${node_ready_timeout}s)"
+        fi
+        
         sleep 10
         elapsed=$((elapsed + 10))
     done
     
     if [[ "$ready_detected" == "false" ]]; then
         log_error "Node $selected_node did not become Ready within ${node_ready_timeout}s"
+        return 1
+    fi
+    
+    # Fail test if reboot was not confirmed
+    if [[ "$actual_reboot_confirmed" == "false" ]]; then
+        log_error "❌ Node became Ready but reboot validation failed - test cannot continue"
+        log_error "This indicates the node never actually rebooted despite appearing to recover"
         return 1
     fi
     
