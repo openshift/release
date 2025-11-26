@@ -12,6 +12,8 @@ ELK_USERNAME=$(cat /var/run/quay-qe-elk-secret/username)
 ELK_PASSWORD=$(cat /var/run/quay-qe-elk-secret/password)
 ELK_HOST=$(cat /var/run/quay-qe-elk-secret/hostname)
 ELK_SERVER="https://${ELK_USERNAME}:${ELK_PASSWORD}@${ELK_HOST}"
+echo $ELK_SERVER > ${SHARED_DIR}/ES_SERVER
+echo "quay-vegeta-results*" > ${SHARED_DIR}/ES_INDEX
 ADDITIONAL_PARAMS=$(printf '{"quayVersion": "%s"}' "${QUAY_OPERATOR_CHANNEL}")
 echo "QUAY_ROUTE: $QUAY_ROUTE"
 
@@ -32,6 +34,9 @@ oc new-project "$quay_perf_namespace"
 oc adm policy add-scc-to-user privileged system:serviceaccount:"$quay_perf_namespace":default
 
 sleep 360s #Wait for all pods ready
+
+WORKLOAD_START_TIME=$(($(date +%s) - 600))
+echo $WORKLOAD_START_TIME > ${SHARED_DIR}/workload_start_time.txt
 
 # 2, Deploy Quay performance test job
 
@@ -105,7 +110,7 @@ spec:
     spec:
       containers:
       - name: python
-        image: quay.io/quay-qetest/quay-load:latest
+        image: quay.io/vchalla/quay-load:latest
         securityContext:
           privileged: true
         env:
@@ -124,11 +129,21 @@ spec:
           - name: ES_INDEX
             value: "quay-vegeta"
           - name: PUSH_PULL_IMAGE
-            value: "quay.io/quay-qetest/quay-load:latest"
+            value: "quay.io/vchalla/quay-load:latest"
+          - name: CUSTOM_BUILD_IMAGE
+            value: "${CUSTOM_BUILD_IMAGE}"
+          - name: TEST_BATCH_SIZE
+            value: "${TEST_BATCH_SIZE}"
           - name: PUSH_PULL_ES_INDEX
             value: "quay-push-pull"
+          - name: SKIP_PUSH
+            value: "${SKIP_PUSH}"
+          - name: PULL_LAYERS
+            value: "${PULL_LAYERS}"
           - name: PUSH_PULL_NUMBERS
             value:  "${PUSH_PULL_NUMBERS}"
+          - name: PULL_REPO_PREFIX
+            value: "${PULL_REPO_PREFIX}"
           - name: TARGET_HIT_SIZE
             value: "${HITSIZE}"
           - name: CONCURRENCY
@@ -180,6 +195,8 @@ date
 
 end_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 echo "job end $end_time and status $JOB_STATUS"
+WORKLOAD_END_TIME=$(date +%s)
+echo $WORKLOAD_END_TIME > ${SHARED_DIR}/workload_end_time.txt
 
 # 4, Send the performance test data to ELK
 # original: https://github.com/cloud-bulldozer/e2e-benchmarking/blob/master/utils/index.sh
@@ -187,6 +204,7 @@ echo "job end $end_time and status $JOB_STATUS"
 export ES_SERVER="${ELK_SERVER}"
 export BUILD_ID="${BUILD_ID}"
 export UUID="${TEST_UUID}"
+echo $UUID > ${SHARED_DIR}/UUID
 export JOB_STATUS="$JOB_STATUS"
 export JOB_START="$start_time"
 export JOB_END="$end_time"
