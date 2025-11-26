@@ -34,7 +34,7 @@ function collect-results() {
     if [[ $MAP_TESTS == "true" ]]; then
       install_yq_if_not_exists
       original_results="${ARTIFACT_DIR}/original_results/"
-      mkdir "${original_results}" || true
+      mkdir -p "${original_results}"
       echo "Collecting original results in ${original_results}"
 
       # Keep a copy of all the original Junit files before modifying them
