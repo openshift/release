@@ -1,0 +1,55 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+images:
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY src/ /opt/app-root/src
+    WORKDIR /opt/app-root/src/hyperfleet-api
+    USER root
+    RUN dnf install -y go make
+    RUN go install gotest.tools/gotestsum@latest
+    COPY $(go env GOPATH)/bin/gotestsum /usr/bin/gotestsum
+    RUN dnf clean all
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-api
+  to: podman-test
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 1G
+tests:
+- as: integration
+  capabilities:
+  - nested-podman
+  commands: |
+    export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
+    podman system service --time=120 &
+    systemctl --user start podman.socket || true
+    export TESTCONTAINERS_RYUK_DISABLED=true
+    make generate
+    make test-integration
+  container:
+    from: podman-test
+  nested_podman: true
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-api
+  variant: presubmits
