@@ -1,0 +1,1 @@
+../../proxy/post/servicemesh-proxy-post-commands.sh

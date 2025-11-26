@@ -1,0 +1,1 @@
+../../proxy/e2e/servicemesh-proxy-e2e-commands.sh
