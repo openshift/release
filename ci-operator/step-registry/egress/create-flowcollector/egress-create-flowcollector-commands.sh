@@ -82,3 +82,8 @@ if [ "${rc}" == 1 ]; then
   echo "flowcollector did not become Ready after 180 secs!!!"
   exit $rc
 fi
+
+echo "====> FlowCollector creation completed successfully"
+
+# Reset namespace context to avoid CI system trying to create secrets in netobserv namespace
+oc project default >/dev/null 2>&1 || true
