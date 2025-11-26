@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: ship-status
+  labels:
+    app: dashboard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      serviceAccountName: ship-status
+      containers:
+      - name: oauth-proxy
+        image: quay.io/openshift/origin-oauth-proxy:4.20
+        args:
+          - -provider=openshift
+          - -http-address=:8443
+          - -https-address=
+          - -upstream=http://localhost:8080
+          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - --cookie-secret-file=/etc/secrets/session_secret
+          - --cookie-samesite=none
+          - --cookie-secure=true
+          - --cookie-domain=.ci.openshift.org
+          - --skip-auth-preflight
+          - --redirect-url=https://protected.ship-status.ci.openshift.org/oauth/callback
+          - --client-id=system:serviceaccount:ship-status:ship-status
+          - --client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+          - '--openshift-sar={"resource": "namespaces", "verb": "get"}'
+          - '--openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
+          - --signature-key=sha256:$(HMAC_SECRET)
+        ports:
+        - containerPort: 8443
+          name: http
+        env:
+        - name: HMAC_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: dashboard-hmac
+              key: hmac
+        readinessProbe:
+          tcpSocket:
+            port: 8443
+        volumeMounts:
+        - name: oauth-proxy-cookie-secret
+          mountPath: /etc/secrets
+          readOnly: true
+        - name: hmac-secret
+          mountPath: /etc/secrets/hmac-secret
+          readOnly: true
+      - name: dashboard
+        image: quay-proxy.ci.openshift.org/openshift/ci:ship-status-dash_dashboard_latest
+        command: ["./dashboard"]
+        args:
+          - "--config=/app/config/config.yaml"
+          - "--dsn=$(DATABASE_DSN)"
+          - "--port=8080"
+          - "--hmac-secret-file=/etc/secrets/hmac-secret/hmac"
+          - "--cors-origin=https://ship-status.ci.openshift.org"
+        ports:
+          - containerPort: 8080
+            protocol: TCP
+        env:
+          - name: DATABASE_DSN
+            valueFrom:
+              secretKeyRef:
+                name: postgres
+                key: dsn
+        volumeMounts:
+          - name: config
+            mountPath: /app/config
+            readOnly: true
+          - name: hmac-secret
+            mountPath: /etc/secrets/hmac-secret
+            readOnly: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+        - name: config
+          configMap:
+            name: dashboard-config
+        - name: oauth-proxy-cookie-secret
+          secret:
+            secretName: oauth-proxy-cookie-secret
+        - name: hmac-secret
+          secret:
+            secretName: dashboard-hmac
+            items:
+              - key: hmac
+                path: hmac
