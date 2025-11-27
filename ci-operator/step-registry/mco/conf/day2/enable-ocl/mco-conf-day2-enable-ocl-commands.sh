@@ -56,7 +56,7 @@ function debug_and_exit() {
     echo '####################################################'
     echo ''
     echo 'Builder pods logs'
-    run_command "oc logs -l machineconfiguration.openshift.io/on-cluster-layering"
+    run_command "oc logs -l machineconfiguration.openshift.io/on-cluster-layering -n openshift-machine-config-operator"
     exit 255
 }
 
@@ -66,6 +66,16 @@ if  [[ -z "$MCO_CONF_DAY2_OCL_POOLS" ]]; then
 fi
 
 set_proxy
+
+# Determine the registry to use for OCL builds (use mirror registry for disconnected clusters)
+if [ -f "${SHARED_DIR}/mirror_registry_url" ]; then
+    MIRROR_REGISTRY=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+    OCL_REGISTRY="${MIRROR_REGISTRY}/mcoqe/layering"
+    echo "Using mirror registry for OCL builds: ${OCL_REGISTRY}"
+else
+    OCL_REGISTRY="quay.io/mcoqe/layering"
+    echo "Using quay.io for OCL builds: ${OCL_REGISTRY}"
+fi
 
 IFS=" " read -r -a mcp_arr <<<"$MCO_CONF_DAY2_OCL_POOLS"
 # Currently only v1 or v1alpha are provided and they are mutually exclusive. If anything  changes we want this step to fail, that's why we get [*] in the jsonpath
@@ -100,7 +110,7 @@ spec:
       name: $(oc get secret -n openshift-config pull-secret -o json | jq "del(.metadata.namespace, .metadata.creationTimestamp, .metadata.resourceVersion, .metadata.uid, .metadata.name)" | jq '.metadata.name="pull-copy"' | oc -n openshift-machine-config-operator create -f - &> /dev/null; echo -n "pull-copy")
     renderedImagePushSecret:
       name: $(oc get secret -n openshift-config pull-secret -o json | jq "del(.metadata.namespace, .metadata.creationTimestamp, .metadata.resourceVersion, .metadata.uid, .metadata.name)" | jq '.metadata.name="pull-copy"' | oc -n openshift-machine-config-operator create -f - &> /dev/null; echo -n "pull-copy")
-    renderedImagePushspec: "quay.io/mcoqe/layering:ocl-$custom_mcp_name"
+    renderedImagePushspec: "${OCL_REGISTRY}:ocl-$custom_mcp_name"
     containerFile:
         - content: |-
             LABEL maintainer="mco-qe-team" quay.expires-after=$MCO_CONF_DAY2_OCL_IMG_EXPIRATION_TIME
@@ -132,7 +142,7 @@ spec:
     name: $(oc get secret -n openshift-config pull-secret -o json | jq "del(.metadata.namespace, .metadata.creationTimestamp, .metadata.resourceVersion, .metadata.uid, .metadata.name)" | jq '.metadata.name="pull-copy"' | oc -n openshift-machine-config-operator create -f - &> /dev/null; echo -n "pull-copy")
   renderedImagePushSecret:
     name: $(oc get secret -n openshift-config pull-secret -o json | jq "del(.metadata.namespace, .metadata.creationTimestamp, .metadata.resourceVersion, .metadata.uid, .metadata.name)" | jq '.metadata.name="pull-copy"' | oc -n openshift-machine-config-operator create -f - &> /dev/null; echo -n "pull-copy")
-  renderedImagePushSpec: "quay.io/mcoqe/layering:ocl-$custom_mcp_name"
+  renderedImagePushSpec: "${OCL_REGISTRY}:ocl-$custom_mcp_name"
   containerFile:
       - content: |-
           LABEL maintainer="mco-qe-team" quay.expires-after=$MCO_CONF_DAY2_OCL_IMG_EXPIRATION_TIME
