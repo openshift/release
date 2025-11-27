@@ -5,7 +5,7 @@ set -o pipefail
 
 job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
 export job_id
-export CLUSTER_NAME="hcp-s390x-mgmt-ci-$job_id"
+export CLUSTER_NAME="${CLUSTER_NAME_PREFIX}-${job_id}"
 CLUSTER_ARCH=s390x
 export CLUSTER_ARCH
 #export CLUSTER_VERSION="4.19.0"

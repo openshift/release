@@ -1,0 +1,37 @@
+ref:
+  as: hypershift-mce-ibmz-create-hcpvirt
+  cli: latest
+  env:
+    - name: MCE_VERSION
+      default: "2.4"
+      documentation: "version of the mce.(2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10)"
+    - name: HYPERSHIFT_BASEDOMAIN
+      documentation: "Base domain for hosted cluster"
+    - name: HYPERSHIFT_NODE_COUNT
+      documentation: "The number of ibmz nodes to join the kubevirt cluster"
+    - name: HC_NS
+      documentation: "Hosted Cluster namespace"
+    - name: AGENT_IBMZ_CREDENTIALS
+      default: /etc/hypershift-agent-ibmz-credentials
+    - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
+      default: "SingleReplica"
+      documentation: "Availability policy for hosted cluster components. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
+    - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
+      default: "SingleReplica"
+      documentation: "Availability policy for infrastructure services in guest cluster. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
+  commands: hypershift-mce-ibmz-create-hcpvirt-commands.sh
+  from: dev-scripts
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 1h
+  credentials:
+    - mount_path: /etc/hypershift-agent-ibmz-credentials
+      name: hypershift-agent-ibmz-credentials
+      namespace: test-credentials
+  dependencies:
+    - env: OCP_IMAGE_MULTI
+      name: release:multi-latest
+    
