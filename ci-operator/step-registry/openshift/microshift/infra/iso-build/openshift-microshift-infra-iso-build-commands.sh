@@ -42,51 +42,53 @@ chmod +x /tmp/iso.sh
 #
 ci_clone_src
 
-# Attempt downloading latest MicroShift RPMs from brew.
-# This requires VPN access, which is only enabled for the cache jobs.
-skip_brew_rpm_download=false
-if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
+download_brew_rpms() {
     # See BREW_RPM_SOURCE variable definition in test/bin/common.sh
     src_path="/go/src/github.com/openshift/microshift"
     out_path="${src_path}/_output/test-images/brew-rpms"
     pushd "${src_path}" &>/dev/null
 
-    # Check if if manage_brew_rpms.sh script exists
-    if [ "${skip_brew_rpm_download}" == false ] && ! [ -e ./test/bin/manage_brew_rpms.sh ] ; then
-        echo "ERROR: ./test/bin/manage_brew_rpms.sh not found - RPM download from brew is not possible"
-        skip_brew_rpm_download=true
+    # Check if if manage_brew_rpms.sh script exists but do not fail to support old branches (release-4.18 and previous releases)
+    if ! [ -e ./test/bin/manage_brew_rpms.sh ] ; then
+        echo "./test/bin/manage_brew_rpms.sh not found - RPM download from brew is not possible"
+        return 0
     fi
-    # Check if manage_brew_rpms.sh script supports the version_type option
-    if [ "${skip_brew_rpm_download}" == false ]; then
-        if ! ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type' ; then
-            echo "ERROR: ./test/bin/manage_brew_rpms.sh does not support the version_type option - RPM download from brew is not possible"
-            skip_brew_rpm_download=true
-        fi
+    # Check if manage_brew_rpms.sh script supports the version_type option  but do not fail to support old branches (release-4.19 and previous releases)
+    if ! ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type' ; then
+        echo "./test/bin/manage_brew_rpms.sh does not support the version_type option - RPM download from brew is not possible"
+        return 0
     fi
     # Check if brew hub site is accessible
-    if [ "${skip_brew_rpm_download}" == false ]; then
-        bash -x ./scripts/fetch_tools.sh brew
-        if ! bash -x ./test/bin/manage_brew_rpms.sh access; then
-            echo "ERROR: Brew Hub site is not accessible"
-            skip_brew_rpm_download=true
-        fi
+    bash -x ./scripts/fetch_tools.sh brew
+    if ! bash -x ./test/bin/manage_brew_rpms.sh access; then
+        echo "ERROR: Brew Hub site is not accessible"
+        return 1
     fi
 
-    if [ "${skip_brew_rpm_download}" == false ]; then
-        # Get the latest release type from the common_versions.sh script
-        LATEST_RELEASE_TYPE="$(awk -F= '/^LATEST_RELEASE_TYPE=/ {gsub(/[[:space:]"]/, "", $2); print $2}' ./test/bin/common_versions.sh)"
-        if [[ -z "${LATEST_RELEASE_TYPE}" ]]; then
-            LATEST_RELEASE_TYPE="ec"
-        fi
-
-        # Download the latest RPMs from brew: latest release (ec, rc or zstream), nightly, Y-1 zstream and Y-2 zstream
-        y_version="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
-        bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "${LATEST_RELEASE_TYPE}" || echo "WARNING: Failed to download ${LATEST_RELEASE_TYPE} RPMs for 4.${y_version}"
-        bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "nightly" || echo "WARNING: Failed to download nightly RPMs for 4.${y_version}"
-        bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 1))" "${out_path}" "zstream" || echo "WARNING: Failed to download zstream RPMs for 4.$((${y_version} - 1))"
-        bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 2))" "${out_path}" "zstream"
+    # Get the latest release type from the common_versions.sh script
+    LATEST_RELEASE_TYPE="$(awk -F= '/^LATEST_RELEASE_TYPE=/ {gsub(/[[:space:]"]/, "", $2); print $2}' ./test/bin/common_versions.sh)"
+    if [[ -z "${LATEST_RELEASE_TYPE}" ]]; then
+        LATEST_RELEASE_TYPE="ec"
     fi
+
+    # Download the latest RPMs from brew: latest release (ec, rc or zstream), nightly, Y-1 zstream and Y-2 zstream
+    y_version="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
+    bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "${LATEST_RELEASE_TYPE}" || echo "WARNING: Failed to download ${LATEST_RELEASE_TYPE} RPMs for 4.${y_version}"
+    bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "nightly" || echo "WARNING: Failed to download nightly RPMs for 4.${y_version}"
+    bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 1))" "${out_path}" "zstream" || echo "WARNING: Failed to download zstream RPMs for 4.$((${y_version} - 1))"
+    bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 2))" "${out_path}" "zstream" || ( echo "WARNING: Failed to download zstream RPMs for 4.$((${y_version} - 2))" && return 1 )
+
     popd &>/dev/null
+    return 0
+}
+
+# Attempt downloading latest MicroShift RPMs from brew.
+# This requires VPN access, which is only enabled for the cache jobs.
+brew_rpm_download_failed=false
+if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
+    if ! download_brew_rpms; then
+        brew_rpm_download_failed=true
+    fi
 fi
 
 # Archive the sources, potentially including MicroShift RPMs from brew
@@ -121,6 +123,10 @@ finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs" "${ARTIFACT_DIR}" || true
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx_error.log" "${ARTIFACT_DIR}" || true
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx.log" "${ARTIFACT_DIR}" || true
+  if [ "${brew_rpm_download_failed}" == true ]; then
+    echo "ERROR: Failed to download RPMs from brew"
+    exit 1
+  fi
 }
 trap 'finalize' EXIT
 
