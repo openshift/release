@@ -391,33 +391,57 @@ run_node_reboot_test() {
     
     local reboot_success=false
     
-    # Method 1: Standard systemctl reboot
+    # Check if oc debug will work by testing namespace access
+    log_info "Verifying cluster access for debug operations..."
+    if ! oc get nodes "$selected_node" &>/dev/null; then
+        log_error "Cannot access node $selected_node - cluster connectivity issue"
+        log_warning "Skipping reboot test due to cluster access problems"
+        return 1
+    fi
+    
+    # Method 1: Standard systemctl reboot with better error handling
     log_info "Attempting standard systemctl reboot..."
-    if oc debug node/"$selected_node" --quiet -- chroot /host bash -c "sync && systemctl reboot"; then
+    local debug_output
+    debug_output=$(oc debug node/"$selected_node" --quiet -- chroot /host bash -c "sync && systemctl reboot" 2>&1)
+    local debug_exit_code=$?
+    
+    if [[ $debug_exit_code -eq 0 ]] || [[ "$debug_output" =~ "Connection.*closed|Connection.*reset|EOF" ]]; then
+        # Connection drop is actually expected during reboot
         reboot_success=true
-        log_info "Standard systemctl reboot initiated successfully"
+        log_info "Standard systemctl reboot initiated successfully (connection drop indicates success)"
     else
-        log_warning "Standard systemctl reboot failed, trying alternative..."
+        log_warning "Standard systemctl reboot failed: $debug_output"
+        log_warning "Trying alternative methods..."
         
         # Method 2: Direct echo to reboot trigger
         log_info "Attempting reboot via /proc/sys/kernel/restart..."
-        if oc debug node/"$selected_node" --quiet -- chroot /host bash -c "sync && echo 1 > /proc/sys/kernel/restart" 2>/dev/null; then
+        debug_output=$(oc debug node/"$selected_node" --quiet -- chroot /host bash -c "sync && echo 1 > /proc/sys/kernel/restart" 2>&1)
+        debug_exit_code=$?
+        
+        if [[ $debug_exit_code -eq 0 ]] || [[ "$debug_output" =~ "Connection.*closed|Connection.*reset|EOF" ]]; then
             reboot_success=true
             log_info "Reboot via kernel restart trigger initiated successfully"
         else
-            log_warning "Kernel restart trigger failed, trying SysRq..."
+            log_warning "Kernel restart trigger failed: $debug_output"
+            log_warning "Trying final method..."
             
             # Method 3: SysRq reboot
             log_info "Attempting SysRq reboot..."
-            if oc debug node/"$selected_node" --quiet -- chroot /host bash -c "sync && echo b > /proc/sysrq-trigger" 2>/dev/null; then
+            debug_output=$(oc debug node/"$selected_node" --quiet -- chroot /host bash -c "sync && echo b > /proc/sysrq-trigger" 2>&1)
+            debug_exit_code=$?
+            
+            if [[ $debug_exit_code -eq 0 ]] || [[ "$debug_output" =~ "Connection.*closed|Connection.*reset|EOF" ]]; then
                 reboot_success=true
                 log_info "SysRq reboot initiated successfully"
+            else
+                log_error "SysRq reboot failed: $debug_output"
             fi
         fi
     fi
     
     if [[ "$reboot_success" != "true" ]]; then
         log_error "All reboot methods failed for node $selected_node"
+        log_warning "This may be due to CI environment limitations or namespace cleanup"
         log_info "Skipping reboot test for this iteration"
         return 1
     fi
@@ -566,52 +590,54 @@ run_multinode_migration_test() {
     
     log_info "Pre-migration label state - Current node ($current_node): $current_has_label, Target node ($target_node): $target_has_label"
     
-    # Strategy: Ensure target node is properly labeled before removing from current node
-    log_info "Checking if target node $target_node needs egress-assignable label..."
+    # Safe migration strategy: Use EgressIP nodeSelector to force migration without breaking assignment
+    log_info "Using nodeSelector-based migration to prevent EgressIP orphaning..."
     
-    # Only add label if target node doesn't already have it
+    # Ensure both nodes have egress-assignable labels initially
+    log_info "Ensuring both nodes have proper egress labels..."
     if [[ "$target_has_label" != "true" ]]; then
         log_info "Adding egress-assignable label to target node $target_node..."
         if ! oc label node "$target_node" k8s.ovn.org/egress-assignable="" --overwrite; then
             log_error "Failed to label target node $target_node"
             return 1
         fi
-        
-        # Verify label was applied successfully before proceeding
-        local verification_attempts=0
-        local label_verified=false
-        while [[ $verification_attempts -lt 6 ]]; do
-            sleep 2
-            local verification
-            verification=$(oc get node "$target_node" -o jsonpath='{.metadata.labels.k8s\.ovn\.org/egress-assignable}' 2>/dev/null || echo "")
-            if [[ -n "$verification" ]]; then
-                log_success "Target node $target_node successfully labeled"
-                label_verified=true
-                break
-            fi
-            verification_attempts=$((verification_attempts + 1))
-            log_info "Waiting for label to propagate... attempt $verification_attempts/6"
-        done
-        
-        if [[ "$label_verified" != "true" ]]; then
-            log_error "Failed to verify target node label was applied correctly after 12 seconds"
-            return 1
-        fi
-    else
-        log_info "Target node $target_node already has egress-assignable label"
+        sleep 5
     fi
     
-    # Wait for label propagation to ensure egress controller sees it
-    sleep 10
+    if [[ "$current_has_label" != "true" ]]; then
+        log_info "Adding egress-assignable label to current node $current_node..."
+        if ! oc label node "$current_node" k8s.ovn.org/egress-assignable="" --overwrite; then
+            log_error "Failed to label current node $current_node"
+            return 1
+        fi
+        sleep 5
+    fi
     
-    # Only remove label from current node if we have a verified target
-    log_info "Removing egress-assignable label from current node $current_node to force migration..."
-    if ! oc label node "$current_node" k8s.ovn.org/egress-assignable- 2>/dev/null; then
-        log_error "Failed to remove label from current node $current_node"
+    # Add a unique temporary label to the target node for nodeSelector
+    local temp_label="temp-egress-target-$(date +%s)"
+    
+    # Set up cleanup function for this migration attempt
+    cleanup_migration() {
+        log_info "Performing migration cleanup..."
+        oc label node "$target_node" "$temp_label-" 2>/dev/null || true
+        oc patch egressip "$EIP_NAME" --type='json' -p='[{"op": "remove", "path": "/spec/nodeSelector"}]' 2>/dev/null || true
+    }
+    
+    log_info "Adding temporary label $temp_label to target node $target_node..."
+    if ! oc label node "$target_node" "$temp_label=true"; then
+        log_error "Failed to add temporary label to target node"
         return 1
     fi
     
-    log_info "Target node $target_node successfully labeled, waiting for migration..."
+    # Modify the EgressIP to use nodeSelector pointing to target node
+    log_info "Updating EgressIP nodeSelector to force migration to $target_node..."
+    if ! oc patch egressip "$EIP_NAME" --type='merge' -p="{\"spec\":{\"nodeSelector\":{\"matchLabels\":{\"$temp_label\":\"true\"}}}}"; then
+        log_error "Failed to update EgressIP nodeSelector"
+        cleanup_migration
+        return 1
+    fi
+    
+    log_info "EgressIP nodeSelector updated, waiting for migration to $target_node..."
     
     # Wait for egress IP to migrate
     log_info "Waiting for egress IP to migrate to $target_node..."
@@ -655,9 +681,8 @@ run_multinode_migration_test() {
         log_info "Final assignment: '$final_assignment' (Original: '$current_node', Target: '$target_node')"
         oc get egressip "$EIP_NAME" -o yaml 2>/dev/null | grep -A 10 "status:" || true
         
-        # Restore original node label
-        log_info "Restoring original node label after migration failure..."
-        oc label node "$current_node" k8s.ovn.org/egress-assignable="" --overwrite || true
+        # Cleanup after migration failure
+        cleanup_migration
         return 1
     fi
     
@@ -731,7 +756,10 @@ run_multinode_migration_test() {
     echo "migration,target_node_snat,${target_snat_count}" >> "$ARTIFACT_DIR/migration_metrics.csv"
     echo "migration,logical_router_policies,${new_policy_count}" >> "$ARTIFACT_DIR/migration_metrics.csv"
     
-    # Restore egress-assignable label to original node for cleanup
+    # Clean up migration test by removing nodeSelector and temporary label
+    cleanup_migration
+    
+    # Restore egress-assignable label to original node for normal operation
     log_info "Restoring egress-assignable label to original node..."
     oc label node "$current_node" k8s.ovn.org/egress-assignable="" --overwrite || log_warning "Failed to restore original node label"
     
