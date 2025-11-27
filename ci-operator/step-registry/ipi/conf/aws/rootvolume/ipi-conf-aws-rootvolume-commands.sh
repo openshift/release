@@ -10,9 +10,9 @@ function append_throughput_if_needed() {
   local volume_type="$1"
   local patch_file="$2"
 
-  if [[ "${volume_type}" == "gp3" && -n "${AWS_GP3_THROUGHPUT:-}" ]]; then
+  if [[ "${volume_type}" == "gp3" && -n "${AWS_DEFAULT_GP3_THROUGHPUT:-}" ]]; then
     cat >> "${patch_file}" << EOF
-        throughput: ${AWS_GP3_THROUGHPUT}
+        throughput: ${AWS_DEFAULT_GP3_THROUGHPUT}
 EOF
   fi
 }
@@ -45,16 +45,16 @@ compute:
 EOF
   cat "${PATCH}"
   yq-go m -x -i "${CONFIG}" "${PATCH}"
-elif [[ -n "${AWS_GP3_THROUGHPUT:-}" ]]; then
-  # Fallback to common throughput value if compute-specific value is not set
-  echo "Setting compute rootVolume throughput only: ${AWS_GP3_THROUGHPUT}"
+elif [[ -n "${AWS_DEFAULT_GP3_THROUGHPUT:-}" ]]; then
+  # Fallback to defaultMachinePlatform throughput value if compute-specific value is not set
+  echo "Setting compute rootVolume throughput only: ${AWS_DEFAULT_GP3_THROUGHPUT}"
   PATCH=$(mktemp)
   cat >> "${PATCH}" << EOF
 compute:
 - platform:
     aws:
       rootVolume:
-        throughput: ${AWS_GP3_THROUGHPUT}
+        throughput: ${AWS_DEFAULT_GP3_THROUGHPUT}
 EOF
   cat "${PATCH}"
   yq-go m -x -i "${CONFIG}" "${PATCH}"
@@ -88,16 +88,16 @@ controlPlane:
 EOF
   cat "${PATCH}"
   yq-go m -x -i "${CONFIG}" "${PATCH}"
-elif [[ -n "${AWS_GP3_THROUGHPUT:-}" ]]; then
-  # Fallback to common throughput value if controlPlane-specific value is not set
-  echo "Setting controlPlane rootVolume throughput only: ${AWS_GP3_THROUGHPUT}"
+elif [[ -n "${AWS_DEFAULT_GP3_THROUGHPUT:-}" ]]; then
+  # Fallback to defaultMachinePlatform throughput value if controlPlane-specific value is not set
+  echo "Setting controlPlane rootVolume throughput only: ${AWS_DEFAULT_GP3_THROUGHPUT}"
   PATCH=$(mktemp)
   cat >> "${PATCH}" << EOF
 controlPlane:
   platform:
     aws:
       rootVolume:
-        throughput: ${AWS_GP3_THROUGHPUT}
+        throughput: ${AWS_DEFAULT_GP3_THROUGHPUT}
 EOF
   cat "${PATCH}"
   yq-go m -x -i "${CONFIG}" "${PATCH}"
