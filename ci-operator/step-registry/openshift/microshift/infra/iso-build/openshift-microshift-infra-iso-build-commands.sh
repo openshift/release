@@ -79,6 +79,7 @@ download_brew_rpms() {
     bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 2))" "${out_path}" "zstream" || ( echo "WARNING: Failed to download zstream RPMs for 4.$((${y_version} - 2))" && return 1 )
 
     popd &>/dev/null
+    return 0
 }
 
 # Attempt downloading latest MicroShift RPMs from brew.
