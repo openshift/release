@@ -23,6 +23,7 @@ export QUAY_ACCESS_TOKEN
 echo "Run extended-platform-tests"
 extended-platform-tests run all --dry-run | grep -E ${QUAY_UPGRADE_TESTCASE} | extended-platform-tests run --timeout 240m --junit-dir="${ARTIFACT_DIR}" -f - || true
 
+
 function handle_result {
 
   ## Correct ginkgo report numbers
