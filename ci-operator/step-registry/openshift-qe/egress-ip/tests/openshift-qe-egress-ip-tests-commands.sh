@@ -405,7 +405,7 @@ run_node_reboot_test() {
     debug_output=$(oc debug node/"$selected_node" --quiet -- chroot /host bash -c "sync && systemctl reboot" 2>&1)
     local debug_exit_code=$?
     
-    if [[ $debug_exit_code -eq 0 ]] || [[ "$debug_output" =~ "Connection.*closed|Connection.*reset|EOF" ]]; then
+    if [[ $debug_exit_code -eq 0 ]] || [[ "$debug_output" =~ Connection.*closed|Connection.*reset|EOF ]]; then
         # Connection drop is actually expected during reboot
         reboot_success=true
         log_info "Standard systemctl reboot initiated successfully (connection drop indicates success)"
@@ -418,7 +418,7 @@ run_node_reboot_test() {
         debug_output=$(oc debug node/"$selected_node" --quiet -- chroot /host bash -c "sync && echo 1 > /proc/sys/kernel/restart" 2>&1)
         debug_exit_code=$?
         
-        if [[ $debug_exit_code -eq 0 ]] || [[ "$debug_output" =~ "Connection.*closed|Connection.*reset|EOF" ]]; then
+        if [[ $debug_exit_code -eq 0 ]] || [[ "$debug_output" =~ Connection.*closed|Connection.*reset|EOF ]]; then
             reboot_success=true
             log_info "Reboot via kernel restart trigger initiated successfully"
         else
@@ -430,7 +430,7 @@ run_node_reboot_test() {
             debug_output=$(oc debug node/"$selected_node" --quiet -- chroot /host bash -c "sync && echo b > /proc/sysrq-trigger" 2>&1)
             debug_exit_code=$?
             
-            if [[ $debug_exit_code -eq 0 ]] || [[ "$debug_output" =~ "Connection.*closed|Connection.*reset|EOF" ]]; then
+            if [[ $debug_exit_code -eq 0 ]] || [[ "$debug_output" =~ Connection.*closed|Connection.*reset|EOF ]]; then
                 reboot_success=true
                 log_info "SysRq reboot initiated successfully"
             else
@@ -614,7 +614,8 @@ run_multinode_migration_test() {
     fi
     
     # Add a unique temporary label to the target node for nodeSelector
-    local temp_label="temp-egress-target-$(date +%s)"
+    local temp_label
+    temp_label="temp-egress-target-$(date +%s)"
     
     # Set up cleanup function for this migration attempt
     cleanup_migration() {
