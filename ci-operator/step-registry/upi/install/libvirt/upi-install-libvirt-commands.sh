@@ -163,7 +163,6 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
       --pool ${BOOT_ARTIFACTS_POOL_NAME} \
       --file ${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD_NAME}
 
-
   # On power, the rootfs needs to be staged for download via apache
   if [ "$ARCH" == "ppc64le" ]; then
       cat << EOF > ${INSTALL_DIR}/rootfs.xml
