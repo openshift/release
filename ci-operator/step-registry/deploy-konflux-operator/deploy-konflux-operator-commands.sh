@@ -6,7 +6,13 @@ set -o pipefail
 
 PULL_SECRET=/var/run/vault/deploy-konflux-operator-art-image-share
 TOOLS_DIR=/tmp/bin
-DEPLOY_KONFLUX_OPERATOR_VERSION=v5.0
+DEPLOY_KONFLUX_OPERATOR_VERSION=v7.0
+export KONFLUX_DEPLOY_OPERATOR=${KONFLUX_DEPLOY_SUBSCRIPTION:-"true"}
+
+if [[ -n "${DEPLOY_KONFLUX_OPERATORS:-}" && -n "${DEPLOY_KONFLUX_FBC_TAGS:-}" ]]; then
+    echo "ERROR: DEPLOY_KONFLUX_OPERATORS and DEPLOY_KONFLUX_FBC_TAGS cannot be set at the same time"
+    exit 1
+fi
 
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
@@ -58,7 +64,15 @@ function deploy_operators() {
     run_command "cd $(mktemp -d)"
     run_command "git clone --depth 1 --branch ${DEPLOY_KONFLUX_OPERATOR_VERSION} https://github.com/ajaggapa/deploy-konflux-operator.git"
     run_command "chmod -R a+x deploy-konflux-operator"
-    run_command "deploy-konflux-operator/deploy-operator.sh --operator ${DEPLOY_KONFLUX_OPERATORS}"
+
+    declare args=()
+    if [[ -n "${DEPLOY_KONFLUX_OPERATORS:-}" ]]; then
+        args+=(--operator "${DEPLOY_KONFLUX_OPERATORS}")
+    fi
+    if [[ -n "${DEPLOY_KONFLUX_FBC_TAGS:-}" ]]; then
+        args+=(--fbc-tag "${DEPLOY_KONFLUX_FBC_TAGS}")
+    fi
+    run_command "deploy-konflux-operator/deploy-operator.sh ${args[*]}"
 }
 
 set_proxy
