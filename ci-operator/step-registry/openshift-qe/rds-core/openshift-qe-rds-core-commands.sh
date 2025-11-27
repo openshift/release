@@ -23,8 +23,8 @@ if [ -n "${E2E_BENCHMARKING_PR}" ]; then
   git clone $REPO_URL
   pushd e2e-benchmarking
   # Update GIT Global user settings
-  git config --global user.name "Tu Nombre"
-  git config --global user.email "tu.email@example.com"
+  git config --global user.name "RedHat Performance"
+  git config --global user.email "redhat-performance@redhat.com"
 
   git pull origin pull/${E2E_BENCHMARKING_PR}/head:${E2E_BENCHMARKING_PR} --rebase
   git switch ${E2E_BENCHMARKING_PR}

@@ -114,7 +114,7 @@ tests:
     - ref: openshift-qe-installer-bm-regulus
     workflow: openshift-qe-installer-bm-deploy
 - always_run: false
-  as: telco-core-cpt-without-deploy
+  as: cpt-controlplane-0churn-without-deploy
   capabilities:
   - intranet
   restrict_network_access: false
@@ -122,11 +122,54 @@ tests:
     cluster_profile: metal-perfscale-telco
     env:
       CHURN: "true"
+      CHURN_CYCLES: "2"
       E2E_BENCHMARKING_PR: "816"
       EXTRA_FLAGS: --gc-metrics=true --gc=true
       ITERATIONS: "8"
       KUBEBURNER_OCP_PR: "335"
-      PERFORMANCE_PROFILE: worker-profile-1
+      PERFORMANCE_PROFILE: customcnf
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - ref: openshift-qe-cluster-health
+    - ref: openshift-qe-rds-core
+- always_run: false
+  as: cpt-controlplane-25churn-without-deploy
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-telco
+    env:
+      CHURN: "true"
+      CHURN_CYCLES: "2"
+      CHURN_PERCENT: "25"
+      E2E_BENCHMARKING_PR: "816"
+      EXTRA_FLAGS: --gc-metrics=true --gc=true
+      ITERATIONS: "8"
+      KUBEBURNER_OCP_PR: "335"
+      PERFORMANCE_PROFILE: customcnf
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-load-kubeconfig
+    - ref: openshift-qe-cluster-health
+    - ref: openshift-qe-rds-core
+- always_run: false
+  as: cpt-controlplane-100churn-without-deploy
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-telco
+    env:
+      CHURN: "true"
+      CHURN_CYCLES: "2"
+      CHURN_PERCENT: "100"
+      E2E_BENCHMARKING_PR: "816"
+      EXTRA_FLAGS: --gc-metrics=true --gc=true
+      ITERATIONS: "8"
+      KUBEBURNER_OCP_PR: "335"
+      PERFORMANCE_PROFILE: customcnf
     test:
     - ref: openshift-qe-installer-bm-ping
     - ref: openshift-qe-installer-bm-load-kubeconfig
