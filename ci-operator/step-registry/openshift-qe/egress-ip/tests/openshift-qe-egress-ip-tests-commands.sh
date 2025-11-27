@@ -590,84 +590,46 @@ run_multinode_migration_test() {
     
     log_info "Pre-migration label state - Current node ($current_node): $current_has_label, Target node ($target_node): $target_has_label"
     
-    # Safe migration strategy: Use EgressIP nodeSelector to force migration without breaking assignment
-    log_info "Using nodeSelector-based migration to prevent EgressIP orphaning..."
+    # Team-approved migration strategy: Remove egress-assignable label to force failover
+    log_info "Using label-removal migration strategy (team-approved approach)..."
     
-    # Ensure both nodes have egress-assignable labels initially
-    log_info "Ensuring both nodes have proper egress labels..."
+    # Ensure target node has egress-assignable label first
+    log_info "Ensuring target node has proper egress label..."
     if [[ "$target_has_label" != "true" ]]; then
         log_info "Adding egress-assignable label to target node $target_node..."
         if ! oc label node "$target_node" k8s.ovn.org/egress-assignable="" --overwrite; then
             log_error "Failed to label target node $target_node"
             return 1
         fi
-        sleep 5
+        
+        # Wait for controller to recognize the new eligible node
+        log_info "Waiting for controller to recognize target node as eligible..."
+        sleep 15
     fi
     
-    if [[ "$current_has_label" != "true" ]]; then
-        log_info "Adding egress-assignable label to current node $current_node..."
-        if ! oc label node "$current_node" k8s.ovn.org/egress-assignable="" --overwrite; then
-            log_error "Failed to label current node $current_node"
-            return 1
-        fi
-        sleep 5
+    # Verify target node is ready and has the label
+    local verification
+    verification=$(oc get node "$target_node" -o jsonpath='{.metadata.labels.k8s\.ovn\.org/egress-assignable}' 2>/dev/null || echo "")
+    if [[ -z "$verification" ]]; then
+        log_error "Target node $target_node does not have egress-assignable label after setup"
+        return 1
     fi
     
-    # Add a unique temporary label to the target node for nodeSelector
-    local temp_label
-    temp_label="temp-egress-target-$(date +%s)"
-    
-    # Set up cleanup function for this migration attempt
+    # Set up cleanup function for this migration attempt  
     cleanup_migration() {
         log_info "Performing migration cleanup..."
-        oc label node "$target_node" "$temp_label-" 2>/dev/null || true
-        oc patch egressip "$EIP_NAME" --type='json' -p='[{"op": "remove", "path": "/spec/nodeSelector"}]' 2>/dev/null || true
+        # Restore egress-assignable label to original node if migration fails
+        oc label node "$current_node" k8s.ovn.org/egress-assignable="" --overwrite 2>/dev/null || true
     }
     
-    log_info "Adding temporary label $temp_label to target node $target_node..."
-    if ! oc label node "$target_node" "$temp_label=true"; then
-        log_error "Failed to add temporary label to target node"
+    # Remove egress-assignable label from current node to force migration
+    log_info "Removing egress-assignable label from current node $current_node to force migration..."
+    if ! oc label node "$current_node" k8s.ovn.org/egress-assignable- 2>/dev/null; then
+        log_error "Failed to remove egress-assignable label from current node $current_node"
         return 1
     fi
     
-    # Modify the EgressIP to use nodeSelector pointing to target node
-    log_info "Updating EgressIP nodeSelector to force migration to $target_node..."
-    local patch_output
-    patch_output=$(oc patch egressip "$EIP_NAME" --type='merge' -p="{\"spec\":{\"nodeSelector\":{\"matchLabels\":{\"$temp_label\":\"true\"}}}}" 2>&1)
-    
-    # Check if nodeSelector field is not supported
-    if [[ "$patch_output" =~ "unknown field" ]] || [[ "$patch_output" =~ "nodeSelector" ]]; then
-        log_warning "EgressIP nodeSelector field not supported in this OpenShift version"
-        log_info "Patch output: $patch_output"
-        log_info "========================================"
-        log_info "🔧 DEBUG MODE: Starting 2-hour debug sleep"
-        log_info "========================================"
-        log_info "Use this time to investigate:"
-        log_info "1. Check EgressIP CRD: oc get crd egressips.k8s.ovn.org -o yaml"
-        log_info "2. Check current EgressIP spec: oc get egressip $EIP_NAME -o yaml"
-        log_info "3. Try manual migration methods"
-        log_info "4. Check available EgressIP fields and capabilities"
-        log_info ""
-        log_info "Current state:"
-        log_info "- EgressIP: $EIP_NAME"
-        log_info "- Current node: $current_node"  
-        log_info "- Target node: $target_node"
-        log_info "- Temp label: $temp_label"
-        log_info ""
-        log_info "Sleeping for 2 hours (7200 seconds)... Use Ctrl+C to interrupt"
-        sleep 7200
-        log_info "Debug sleep completed, continuing with test..."
-        cleanup_migration
-        return 1
-    fi
-    
-    if ! echo "$patch_output" | grep -q "patched"; then
-        log_error "Failed to update EgressIP nodeSelector: $patch_output"
-        cleanup_migration
-        return 1
-    fi
-    
-    log_info "EgressIP nodeSelector updated, waiting for migration to $target_node..."
+    log_info "Label removed from current node, waiting for migration to $target_node..."
     
     # Wait for egress IP to migrate
     log_info "Waiting for egress IP to migrate to $target_node..."
@@ -786,8 +748,8 @@ run_multinode_migration_test() {
     echo "migration,target_node_snat,${target_snat_count}" >> "$ARTIFACT_DIR/migration_metrics.csv"
     echo "migration,logical_router_policies,${new_policy_count}" >> "$ARTIFACT_DIR/migration_metrics.csv"
     
-    # Clean up migration test by removing nodeSelector and temporary label
-    cleanup_migration
+    # Clean up migration test
+    log_info "Cleaning up migration test configuration..."
     
     # Restore egress-assignable label to original node for normal operation
     log_info "Restoring egress-assignable label to original node..."
