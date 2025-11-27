@@ -48,12 +48,12 @@ download_brew_rpms() {
     out_path="${src_path}/_output/test-images/brew-rpms"
     pushd "${src_path}" &>/dev/null
 
-    # Check if if manage_brew_rpms.sh script exists
+    # Check if if manage_brew_rpms.sh script exists but do not fail to support old branches (release-4.18 and previous releases)
     if ! [ -e ./test/bin/manage_brew_rpms.sh ] ; then
         echo "./test/bin/manage_brew_rpms.sh not found - RPM download from brew is not possible"
         return 0
     fi
-    # Check if manage_brew_rpms.sh script supports the version_type option
+    # Check if manage_brew_rpms.sh script supports the version_type option  but do not fail to support old branches (release-4.19 and previous releases)
     if ! ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type' ; then
         echo "./test/bin/manage_brew_rpms.sh does not support the version_type option - RPM download from brew is not possible"
         return 0
