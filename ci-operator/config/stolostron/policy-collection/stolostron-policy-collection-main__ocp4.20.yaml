@@ -66,15 +66,8 @@ tests:
   steps:
     cluster_profile: aws-cspi-qe
     env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      COMPUTE_NODE_TYPE: m6a.2xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp","opp-aws-lp","opp-lp"]'
-      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
-      FIREWATCH_DEFAULT_JIRA_EPIC: LPINTEROP-5702
-      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      KCFG_SRC_SFX: ftan--external-cluster-ocp
+      KUBECONFIG_ORIGIN: vault
       ODF_VERSION_MAJOR_MINOR: "4.19"
       OPERATORS: |
         [
@@ -82,22 +75,11 @@ tests:
         ]
       TEST_IMPORTANCE: LEVEL0
       TEST_SCENARIOS: Cluster_Observability
-      ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
     - ref: acm-must-gather
     - ref: acm-inspector
-    - ref: acm-tests-clc-destroy
     - ref: gather-aws-console
-    - chain: ipi-deprovision
-    - ref: firewatch-report-issues
-    pre:
-    - ref: ipi-conf
-    - ref: ipi-conf-telemetry
-    - ref: ipi-conf-aws-custom-az
-    - ref: ipi-conf-aws
-    - ref: ipi-install-monitoringpvc
-    - chain: ipi-install
     test:
     - ref: install-operators
     - ref: acm-mch
@@ -113,6 +95,7 @@ tests:
     - ref: quay-tests-quay-interop-test
     - ref: acm-opp-app
     - ref: openshift-extended-test
+    workflow: external-cluster
 - as: interop-opp-vsphere
   capabilities:
   - intranet
