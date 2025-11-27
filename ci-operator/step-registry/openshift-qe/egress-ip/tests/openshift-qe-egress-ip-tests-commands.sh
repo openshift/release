@@ -632,8 +632,37 @@ run_multinode_migration_test() {
     
     # Modify the EgressIP to use nodeSelector pointing to target node
     log_info "Updating EgressIP nodeSelector to force migration to $target_node..."
-    if ! oc patch egressip "$EIP_NAME" --type='merge' -p="{\"spec\":{\"nodeSelector\":{\"matchLabels\":{\"$temp_label\":\"true\"}}}}"; then
-        log_error "Failed to update EgressIP nodeSelector"
+    local patch_output
+    patch_output=$(oc patch egressip "$EIP_NAME" --type='merge' -p="{\"spec\":{\"nodeSelector\":{\"matchLabels\":{\"$temp_label\":\"true\"}}}}" 2>&1)
+    
+    # Check if nodeSelector field is not supported
+    if [[ "$patch_output" =~ "unknown field" ]] || [[ "$patch_output" =~ "nodeSelector" ]]; then
+        log_warning "EgressIP nodeSelector field not supported in this OpenShift version"
+        log_info "Patch output: $patch_output"
+        log_info "========================================"
+        log_info "🔧 DEBUG MODE: Starting 2-hour debug sleep"
+        log_info "========================================"
+        log_info "Use this time to investigate:"
+        log_info "1. Check EgressIP CRD: oc get crd egressips.k8s.ovn.org -o yaml"
+        log_info "2. Check current EgressIP spec: oc get egressip $EIP_NAME -o yaml"
+        log_info "3. Try manual migration methods"
+        log_info "4. Check available EgressIP fields and capabilities"
+        log_info ""
+        log_info "Current state:"
+        log_info "- EgressIP: $EIP_NAME"
+        log_info "- Current node: $current_node"  
+        log_info "- Target node: $target_node"
+        log_info "- Temp label: $temp_label"
+        log_info ""
+        log_info "Sleeping for 2 hours (7200 seconds)... Use Ctrl+C to interrupt"
+        sleep 7200
+        log_info "Debug sleep completed, continuing with test..."
+        cleanup_migration
+        return 1
+    fi
+    
+    if ! echo "$patch_output" | grep -q "patched"; then
+        log_error "Failed to update EgressIP nodeSelector: $patch_output"
         cleanup_migration
         return 1
     fi
