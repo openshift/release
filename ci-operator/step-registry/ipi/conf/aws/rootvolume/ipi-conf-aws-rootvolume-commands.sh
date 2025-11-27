@@ -17,6 +17,7 @@ EOF
   fi
 }
 
+# Handle compute rootVolume configuration
 if [[ "${AWS_COMPUTE_VOLUME_TYPE}" != "" ]]; then
   echo "Compute volume type: ${AWS_COMPUTE_VOLUME_TYPE}"
   PATCH=$(mktemp)
@@ -31,8 +32,35 @@ EOF
   append_throughput_if_needed "${AWS_COMPUTE_VOLUME_TYPE}" "${PATCH}"
   cat "${PATCH}"
   yq-go m -x -i "${CONFIG}" "${PATCH}"
+elif [[ -n "${AWS_COMPUTE_GP3_THROUGHPUT:-}" ]]; then
+  # Only set throughput if volume type is not specified (inherit from defaultMachinePlatform)
+  echo "Setting compute rootVolume throughput only: ${AWS_COMPUTE_GP3_THROUGHPUT}"
+  PATCH=$(mktemp)
+  cat >> "${PATCH}" << EOF
+compute:
+- platform:
+    aws:
+      rootVolume:
+        throughput: ${AWS_COMPUTE_GP3_THROUGHPUT}
+EOF
+  cat "${PATCH}"
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+elif [[ -n "${AWS_GP3_THROUGHPUT:-}" ]]; then
+  # Fallback to common throughput value if compute-specific value is not set
+  echo "Setting compute rootVolume throughput only: ${AWS_GP3_THROUGHPUT}"
+  PATCH=$(mktemp)
+  cat >> "${PATCH}" << EOF
+compute:
+- platform:
+    aws:
+      rootVolume:
+        throughput: ${AWS_GP3_THROUGHPUT}
+EOF
+  cat "${PATCH}"
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
 fi
 
+# Handle controlPlane rootVolume configuration
 if [[ "${AWS_CONTROL_PLANE_VOLUME_TYPE}" != "" ]]; then
   echo "Control plane volume type: ${AWS_CONTROL_PLANE_VOLUME_TYPE}"
   PATCH=$(mktemp)
@@ -45,6 +73,32 @@ controlPlane:
         size: ${AWS_CONTROL_PLANE_VOLUME_SIZE}
 EOF
   append_throughput_if_needed "${AWS_CONTROL_PLANE_VOLUME_TYPE}" "${PATCH}"
+  cat "${PATCH}"
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+elif [[ -n "${AWS_CONTROL_PLANE_GP3_THROUGHPUT:-}" ]]; then
+  # Only set throughput if volume type is not specified (inherit from defaultMachinePlatform)
+  echo "Setting controlPlane rootVolume throughput only: ${AWS_CONTROL_PLANE_GP3_THROUGHPUT}"
+  PATCH=$(mktemp)
+  cat >> "${PATCH}" << EOF
+controlPlane:
+  platform:
+    aws:
+      rootVolume:
+        throughput: ${AWS_CONTROL_PLANE_GP3_THROUGHPUT}
+EOF
+  cat "${PATCH}"
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+elif [[ -n "${AWS_GP3_THROUGHPUT:-}" ]]; then
+  # Fallback to common throughput value if controlPlane-specific value is not set
+  echo "Setting controlPlane rootVolume throughput only: ${AWS_GP3_THROUGHPUT}"
+  PATCH=$(mktemp)
+  cat >> "${PATCH}" << EOF
+controlPlane:
+  platform:
+    aws:
+      rootVolume:
+        throughput: ${AWS_GP3_THROUGHPUT}
+EOF
   cat "${PATCH}"
   yq-go m -x -i "${CONFIG}" "${PATCH}"
 fi

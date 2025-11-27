@@ -64,54 +64,44 @@ function read_install_config() {
   yq-go r "${SHARED_DIR}/install-config.yaml" "${query}" 2>/dev/null || true
 }
 
-EXPECTED_THROUGHPUT="${AWS_GP3_THROUGHPUT:-}"
-if [ -z "${EXPECTED_THROUGHPUT}" ]; then
-  EXPECTED_THROUGHPUT=$(read_install_config 'platform.aws.defaultMachinePlatform.rootVolume.throughput')
-fi
-# If still empty, try reading from split configuration (compute or controlPlane)
-if [ -z "${EXPECTED_THROUGHPUT}" ] || [ "${EXPECTED_THROUGHPUT}" == "null" ]; then
-  EXPECTED_THROUGHPUT=$(read_install_config 'compute[0].platform.aws.rootVolume.throughput')
-fi
-if [ -z "${EXPECTED_THROUGHPUT}" ] || [ "${EXPECTED_THROUGHPUT}" == "null" ]; then
-  EXPECTED_THROUGHPUT=$(read_install_config 'controlPlane.platform.aws.rootVolume.throughput')
-fi
+# Read throughput values from install-config.yaml
+# Priority: split config > defaultMachinePlatform
+COMPUTE_THROUGHPUT=$(read_install_config 'compute[0].platform.aws.rootVolume.throughput')
+CONTROL_PLANE_THROUGHPUT=$(read_install_config 'controlPlane.platform.aws.rootVolume.throughput')
+DEFAULT_THROUGHPUT=$(read_install_config 'platform.aws.defaultMachinePlatform.rootVolume.throughput')
 
-DEFAULT_SIZE="${AWS_DEFAULT_MACHINE_VOLUME_SIZE:-120}"
-EXPECTED_COMPUTE_SIZE="${AWS_COMPUTE_VOLUME_SIZE:-${DEFAULT_SIZE}}"
-EXPECTED_CONTROL_PLANE_SIZE="${AWS_CONTROL_PLANE_VOLUME_SIZE:-${DEFAULT_SIZE}}"
+# Determine expected throughput: split config overrides defaultMachinePlatform
+EXPECTED_COMPUTE_THROUGHPUT="${COMPUTE_THROUGHPUT}"
+[ -z "${EXPECTED_COMPUTE_THROUGHPUT}" ] || [ "${EXPECTED_COMPUTE_THROUGHPUT}" == "null" ] && \
+  EXPECTED_COMPUTE_THROUGHPUT="${DEFAULT_THROUGHPUT}"
 
-# Read defaultMachinePlatform.rootVolume.size as fallback
-default_size=$(read_install_config 'platform.aws.defaultMachinePlatform.rootVolume.size')
-if [ -n "${default_size}" ] && [ "${default_size}" != "null" ]; then
-  DEFAULT_SIZE="${default_size}"
-fi
+EXPECTED_CONTROL_PLANE_THROUGHPUT="${CONTROL_PLANE_THROUGHPUT}"
+[ -z "${EXPECTED_CONTROL_PLANE_THROUGHPUT}" ] || [ "${EXPECTED_CONTROL_PLANE_THROUGHPUT}" == "null" ] && \
+  EXPECTED_CONTROL_PLANE_THROUGHPUT="${DEFAULT_THROUGHPUT}"
 
-if [ -z "${AWS_COMPUTE_VOLUME_SIZE:-}" ]; then
-  config_compute_size=$(read_install_config 'compute[0].platform.aws.rootVolume.size')
-  if [ -n "${config_compute_size}" ] && [ "${config_compute_size}" != "null" ]; then
-    EXPECTED_COMPUTE_SIZE="${config_compute_size}"
-  elif [ -n "${default_size}" ] && [ "${default_size}" != "null" ]; then
-    EXPECTED_COMPUTE_SIZE="${default_size}"
-  fi
-fi
+# Read size values from install-config.yaml
+# Priority: split config > defaultMachinePlatform
+COMPUTE_SIZE=$(read_install_config 'compute[0].platform.aws.rootVolume.size')
+CONTROL_PLANE_SIZE=$(read_install_config 'controlPlane.platform.aws.rootVolume.size')
+DEFAULT_SIZE=$(read_install_config 'platform.aws.defaultMachinePlatform.rootVolume.size')
 
-if [ -z "${AWS_CONTROL_PLANE_VOLUME_SIZE:-}" ]; then
-  config_cp_size=$(read_install_config 'controlPlane.platform.aws.rootVolume.size')
-  if [ -n "${config_cp_size}" ] && [ "${config_cp_size}" != "null" ]; then
-    EXPECTED_CONTROL_PLANE_SIZE="${config_cp_size}"
-  elif [ -n "${default_size}" ] && [ "${default_size}" != "null" ]; then
-    EXPECTED_CONTROL_PLANE_SIZE="${default_size}"
-  fi
-fi
-
-if [ -z "${EXPECTED_COMPUTE_SIZE}" ] || [ "${EXPECTED_COMPUTE_SIZE}" == "null" ]; then
+# Determine expected size: split config overrides defaultMachinePlatform
+EXPECTED_COMPUTE_SIZE="${COMPUTE_SIZE}"
+[ -z "${EXPECTED_COMPUTE_SIZE}" ] || [ "${EXPECTED_COMPUTE_SIZE}" == "null" ] && \
   EXPECTED_COMPUTE_SIZE="${DEFAULT_SIZE}"
-fi
-if [ -z "${EXPECTED_CONTROL_PLANE_SIZE}" ] || [ "${EXPECTED_CONTROL_PLANE_SIZE}" == "null" ]; then
-  EXPECTED_CONTROL_PLANE_SIZE="${DEFAULT_SIZE}"
-fi
 
-echo "Expected throughput: ${EXPECTED_THROUGHPUT:-N/A} MiB/s"
+EXPECTED_CONTROL_PLANE_SIZE="${CONTROL_PLANE_SIZE}"
+[ -z "${EXPECTED_CONTROL_PLANE_SIZE}" ] || [ "${EXPECTED_CONTROL_PLANE_SIZE}" == "null" ] && \
+  EXPECTED_CONTROL_PLANE_SIZE="${DEFAULT_SIZE}"
+
+# Fallback to default if still empty
+[ -z "${EXPECTED_COMPUTE_SIZE}" ] || [ "${EXPECTED_COMPUTE_SIZE}" == "null" ] && \
+  EXPECTED_COMPUTE_SIZE="120"
+[ -z "${EXPECTED_CONTROL_PLANE_SIZE}" ] || [ "${EXPECTED_CONTROL_PLANE_SIZE}" == "null" ] && \
+  EXPECTED_CONTROL_PLANE_SIZE="120"
+
+echo "Expected compute throughput: ${EXPECTED_COMPUTE_THROUGHPUT:-N/A} MiB/s"
+echo "Expected control plane throughput: ${EXPECTED_CONTROL_PLANE_THROUGHPUT:-N/A} MiB/s"
 echo "Expected worker rootVolume size: ${EXPECTED_COMPUTE_SIZE} GiB"
 echo "Expected control-plane rootVolume size: ${EXPECTED_CONTROL_PLANE_SIZE} GiB"
 
@@ -151,6 +141,7 @@ function verify_nodes() {
   local role_label="$1"
   local role_name="$2"
   local expected_size="$3"
+  local expected_throughput="$4"
 
   local nodes
   nodes=$(oc get nodes -l "${role_label}" -o jsonpath='{.items[*].metadata.name}')
@@ -206,8 +197,8 @@ function verify_nodes() {
       continue
     fi
 
-    if [ -n "${EXPECTED_THROUGHPUT}" ] && [ "${volume_throughput}" -ne "${EXPECTED_THROUGHPUT}" ]; then
-      echo "ERROR: ${node} volume ${volume_id} throughput ${volume_throughput} differs from expected ${EXPECTED_THROUGHPUT} (type=${volume_type} size=${volume_size}GiB iops=${volume_iops})"
+    if [ -n "${expected_throughput}" ] && [ "${volume_throughput}" -ne "${expected_throughput}" ]; then
+      echo "ERROR: ${node} volume ${volume_id} throughput ${volume_throughput} differs from expected ${expected_throughput} (type=${volume_type} size=${volume_size}GiB iops=${volume_iops})"
       FAILURE_SUMMARY+=("${node}: throughput ${volume_throughput}")
       ret=$((ret+1))
       continue
@@ -225,10 +216,10 @@ function verify_nodes() {
 }
 
 echo "Checking worker nodes"
-verify_nodes "node-role.kubernetes.io/worker" "worker" "${EXPECTED_COMPUTE_SIZE}"
+verify_nodes "node-role.kubernetes.io/worker" "worker" "${EXPECTED_COMPUTE_SIZE}" "${EXPECTED_COMPUTE_THROUGHPUT}"
 
 echo "Checking control plane nodes"
-verify_nodes "node-role.kubernetes.io/master" "control plane" "${EXPECTED_CONTROL_PLANE_SIZE}"
+verify_nodes "node-role.kubernetes.io/master" "control plane" "${EXPECTED_CONTROL_PLANE_SIZE}" "${EXPECTED_CONTROL_PLANE_THROUGHPUT}"
 
 echo "=========================================="
 echo "Test Summary"
