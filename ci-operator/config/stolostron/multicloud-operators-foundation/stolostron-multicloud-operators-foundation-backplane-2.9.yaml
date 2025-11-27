@@ -7,12 +7,16 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.23-linux
+  stolostron_builder_go1.24-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.24-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.23-linux
+    tag: go1.24-linux
 images:
 - additional_architectures:
   - arm64
@@ -76,6 +80,8 @@ tests:
     from: test-bin
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e
+  capabilities:
+  - arm64
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     dependencies:
@@ -132,6 +138,8 @@ tests:
         requests:
           cpu: 100m
 - as: pr-image-mirror
+  capabilities:
+  - arm64
   steps:
     dependencies:
       SOURCE_IMAGE_REF: multicloud-manager

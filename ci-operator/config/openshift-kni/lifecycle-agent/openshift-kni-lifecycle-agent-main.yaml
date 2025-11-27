@@ -1,10 +1,10 @@
 base_images:
   installer:
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
     tag: installer
   previous-lca:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp-kni
     tag: lifecycle-agent-operator-bundle
   ubi9-minimal:
@@ -28,18 +28,20 @@ operator:
     with: pipeline:lifecycle-agent-operator
 promotion:
   to:
-  - name: "4.20"
+  - name: "4.21"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
+      reference_policy: Local
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.21"
       namespace: ocp
+      reference_policy: Local
 resources:
   '*':
     limits:
@@ -104,42 +106,40 @@ tests:
   optional: true
   skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       LCA_PULL_REF: lifecycle-agent-operator
       OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
       TARGET_LCA_REF: pipeline:previous-lca
     env:
       OCP_BASE_IMAGE_SOURCE: ci
-      OCP_BASE_VERSION: "4.20"
+      OCP_BASE_VERSION: "4.21"
       OCP_TARGET_IMAGE_SOURCE: ci
-      OCP_TARGET_VERSION: "4.19"
+      OCP_TARGET_VERSION: "4.20"
       SEED_IMAGE_TAG_FORMAT: presubmit
     workflow: openshift-image-based-upgrade-presubmit
-  timeout: 4h0m0s
 - as: ibi-e2e-flow
   optional: true
   skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     dependencies:
       INSTALLER_PULL_REF: pipeline:installer
       LCA_PULL_REF: lifecycle-agent-operator
       OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
     env:
       OCP_BASE_IMAGE_SOURCE: ci
-      OCP_BASE_VERSION: "4.20"
+      OCP_BASE_VERSION: "4.21"
       SEED_IMAGE_TAG_FORMAT: presubmit
       SEED_IMAGE_TAG_PREFIX: ibi
     workflow: openshift-image-based-install
-  timeout: 3h0m0s
 - as: security
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
       PROJECT_NAME: lifecycle-agent
-      SNYK_CODE_ADDITIONAL_ARGS: --policy-path=.snyk
+      SNYK_CODE_ADDITIONAL_ARGS: --policy-path=.snyk --severity-threshold=high
     workflow: openshift-ci-security
 zz_generated_metadata:
   branch: main

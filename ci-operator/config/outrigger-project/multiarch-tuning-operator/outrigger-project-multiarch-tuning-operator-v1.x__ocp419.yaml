@@ -27,6 +27,8 @@ images:
 operator:
   bundles:
   - as: multiarch-tuning-operator-bundle
+    capabilities:
+    - arm64
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: registry.ci.openshift.org/origin/multiarch-tuning-operator:v1.x
@@ -67,27 +69,26 @@ resources:
       cpu: 300m
       memory: 400Mi
 tests:
-- as: e2e-gcp
+- as: e2e-azure
   capabilities:
   - arm64
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
   steps:
-    cluster_profile: gcp
+    cluster_profile: azure-arm64
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
       OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: t2a-standard-4
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     test:
     - ref: ipi-install-heterogeneous
     - ref: multiarch-tuning-operator-e2e-olm-kustomize
-    workflow: ipi-gcp
-  timeout: 6h0m0s
+    workflow: ipi-azure
 - always_run: false
   as: e2e-aws-ovn-proxy-mto-origin
   capabilities:
@@ -127,7 +128,6 @@ tests:
     - chain: multiarch-tuning-operator
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-proxy
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-mto-origin-post
   cluster: build01
   postsubmit: true
@@ -164,7 +164,6 @@ tests:
     - chain: multiarch-tuning-operator
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: v1.x
   org: outrigger-project

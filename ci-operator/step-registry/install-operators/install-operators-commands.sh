@@ -32,6 +32,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     operator_group=$(jq --raw-output '.operator_group // ""' <<< "$operator_obj")
     operator_target_namespaces=$(jq --raw-output '.target_namespaces // ""' <<< "$operator_obj")
     operator_config=$(jq --raw-output '.config // ""' <<< "$operator_obj")
+    operator_skip_checking=$(jq --raw-output '.skip_checking// ""' <<< "$operator_obj")
 
     # If name not defined, exit.
     if [[ -z "${operator_name}" ]]; then
@@ -203,9 +204,12 @@ EOF
         echo
         echo "CSV ${CSV} Describe"
         oc describe csv "${CSV}" -n "${operator_install_namespace}"
-        exit 1
+        if [[ "${operator_skip_checking}" == "true" ]]; then
+            echo "'${operator_name}' installation failed, but maybe not all needed CRDs are available yet... continue"
+        else
+            exit 1
+        fi
+    else
+        echo "Successfully installed ${operator_name}"
     fi
-
-    echo "Successfully installed ${operator_name}"
-
 done

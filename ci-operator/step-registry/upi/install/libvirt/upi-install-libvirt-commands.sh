@@ -73,6 +73,11 @@ VIRSH="mock-nss.sh virsh --connect ${LIBVIRT_CONNECTION}"
 if [[ $(${VIRSH} pool-list | grep ${POOL_NAME}) ]]; then
   echo "Storage pool ${POOL_NAME} already exists. Skipping..."
 else
+  if [[ $(${VIRSH} pool-list --all | grep ${POOL_NAME}) ]]; then
+    echo "Storage pool ${POOL_NAME} already exists in inactive state. Deleting it.."
+    ${VIRSH} pool-destroy "${POOL_NAME}"
+    ${VIRSH} pool-undefine "${POOL_NAME}"
+  fi
   echo "Creating storage pool..."
   ${VIRSH} pool-define-as \
     --name ${POOL_NAME} \
@@ -201,16 +206,21 @@ else
   RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
   QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
   VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}-$(date +%s).qcow2"
+  VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
+  DOWNLOAD_NEW_IMAGE=true
 
   # Check if we need to update the source volume
-  CURRENT_SOURCE_VOLUME=$(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true)
-  if [[ -z "${CURRENT_SOURCE_VOLUME}" || "${CURRENT_SOURCE_VOLUME}" != "${VOLUME_NAME}" ]]; then
+  for CURRENT_SOURCE_VOLUME in $(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true); do
+    if [[ "${CURRENT_SOURCE_VOLUME}" == "${VOLUME_NAME}" ]]; then
+      DOWNLOAD_NEW_IMAGE=false
     # Delete the old source volume
-    if [[ ! -z "${CURRENT_SOURCE_VOLUME}" ]]; then
-      echo "Deleting ${CURRENT_SOURCE_VOLUME} source volume..."
-      ${VIRSH} vol-delete --pool ${POOL_NAME} ${CURRENT_SOURCE_VOLUME}
+    else
+        echo "Deleting ${CURRENT_SOURCE_VOLUME} source volume..."
+        ${VIRSH} vol-delete --pool ${POOL_NAME} ${CURRENT_SOURCE_VOLUME}
     fi
+  done
 
+  if [[ "${DOWNLOAD_NEW_IMAGE}" == true ]]; then
     # Download the new rhcos image
     echo "Downloading new rhcos image..."
     curl -L "${QCOW_URL}" | gunzip -c > ${INSTALL_DIR}/${VOLUME_NAME} || true

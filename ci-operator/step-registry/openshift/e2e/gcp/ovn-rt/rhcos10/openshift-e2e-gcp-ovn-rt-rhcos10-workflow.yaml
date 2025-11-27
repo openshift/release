@@ -1,0 +1,24 @@
+workflow:
+  as: openshift-e2e-gcp-ovn-rt-rhcos10
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: ovn-conf
+    - ref: ipi-conf-debug-kdump-configure-logs
+    - ref: rhcos-conf-rhcos10
+    - chain: ipi-install-stableinitial
+    - ref: optional-operators-configure-realtime-tuned-profile
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    env:
+      FAIL_ON_CORE_DUMP: "false"
+      RT_ENABLED: "true"
+      COMPUTE_NODE_TYPE: n2-standard-8
+  documentation: |-
+    The Openshift E2E OVN workflow with RHCOS10

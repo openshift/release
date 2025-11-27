@@ -1,41 +1,41 @@
 base_images:
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: "4.22"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: dpu-operator
 - dockerfile_path: Dockerfile.CNI.rhel
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: dpu-cni
 - dockerfile_path: Dockerfile.daemon.rhel
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: dpu-daemon
 - dockerfile_literal: |
     FROM base
@@ -81,19 +81,25 @@ tests:
   container:
     from: custom-src
 - as: make-test
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     workflow: dpu-operator-tests-workflow
 - as: make-e2e-test
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     workflow: dpu-operator-e2e-tests-workflow
-  timeout: 8h0m0s
 - as: make-e2e-test-marvell
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     workflow: dpu-operator-e2e-tests-marvell
-  timeout: 8h0m0s
+- as: make-e2e-test-ptl
+  capabilities:
+  - intranet
+  steps:
+    workflow: dpu-operator-e2e-tests-ptl
 - as: verify-deps
   steps:
     env:

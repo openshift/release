@@ -23,6 +23,7 @@ ENABLE_PROXY=${ENABLE_PROXY:-false}
 BYO_OIDC=${BYO_OIDC:-false}
 ENABLE_AUDIT_LOG=${ENABLE_AUDIT_LOG:-false}
 FIPS=${FIPS:-false}
+POD_CIDR=${POD_CIDR:-""}
 PRIVATE=${PRIVATE:-false}
 PRIVATE_LINK=${PRIVATE_LINK:-false}
 PRIVATE_SUBNET_ONLY="false"
@@ -375,7 +376,7 @@ if [[ "$DISABLE_SCP_CHECKS" == "true" ]]; then
 fi
 
 DISABLE_WORKLOAD_MONITORING_SWITCH=""
-if [[ "$DISABLE_WORKLOAD_MONITORING" == "true" ]]; then
+if [[ "$DISABLE_WORKLOAD_MONITORING" == "true" ]] && [[ "$HOSTED_CP" == "false" ]]; then
   DISABLE_WORKLOAD_MONITORING_SWITCH="--disable-workload-monitoring"
 fi
 
@@ -506,6 +507,13 @@ fi
 FIPS_SWITCH=""
 if [[ "$FIPS" == "true" ]]; then
   FIPS_SWITCH="--fips"
+fi
+
+# Override the default Pod CIDR for larger clusters
+POD_CIDR_SWITCH=""
+if [[ -n "${POD_CIDR}" ]]; then
+  POD_CIDR_SWITCH="--pod-cidr ${POD_CIDR}"
+  record_cluster "pod_cidr" ${POD_CIDR}
 fi
 
 PRIVATE_SWITCH=""
@@ -683,6 +691,10 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "    SHARED_VPC_BASE_DOMAIN: ${SHARED_VPC_BASE_DOMAIN}"
 fi
 
+if [[ -n "${POD_CIDR}" ]]; then
+  echo "  Pod CIDR: ${POD_CIDR}"
+fi
+
 # Record installation start time
 record_cluster "timers" "global_start" "$(date +'%s')"
 
@@ -706,6 +718,7 @@ ${ETCD_ENCRYPTION_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
 ${SUBNET_ID_SWITCH} \
 ${FIPS_SWITCH} \
+${POD_CIDR_SWITCH} \
 ${PRIVATE_SWITCH} \
 ${PRIVATE_LINK_SWITCH} \
 ${PROXY_SWITCH} \
@@ -735,8 +748,44 @@ fi
 
 echo "$cmdout"
 CLUSTER_INFO_WITHOUT_MASK="$(mktemp)"
-eval "${cmd}" > "${CLUSTER_INFO_WITHOUT_MASK}"
-exit_code=$?
+
+# Retry logic for command execution
+retry_count=0
+max_retries=3
+exit_code=1
+
+while [ $retry_count -lt $max_retries ]; do
+  echo "Attempt $((retry_count + 1)) of $max_retries..."
+
+  # Execute command and capture both output and exit code
+  cmd_output=$(eval "${cmd}" 2>&1)
+  exit_code=$?
+
+  # Write output to temp file
+  echo "$cmd_output" > "${CLUSTER_INFO_WITHOUT_MASK}"
+
+  # Check if output contains a retryable error message
+  # If you find yourself here in the future for other errors another possible
+  # option would be to check for non zero return code within some short period
+  # of time like 10 seconds, but that would require some understanding of what
+  # may have happened on the backend that may preclude retrying with the same inputs.
+  # Successful provision calls seem to vary in duration considerably, from 40s to 8min
+  if [[ "$cmd_output" == *"dose not have release image for"* ]]; then
+    echo "Error detected: 'dose not have release image for' found in output"
+    retry_count=$((retry_count + 1))
+
+    if [ $retry_count -lt $max_retries ]; then
+      echo "Sleeping for 10 minutes before retry..."
+      sleep 600  # 10 minutes = 600 seconds
+    else
+      echo "Max retries reached. Continuing with last attempt result."
+    fi
+  else
+    # Success or different error - break out of retry loop
+    echo "Command completed without the specific error. Exit code: $exit_code"
+    break
+  fi
+done
 
 # Used by gather steps to generate JUnit
 echo $exit_code > "${SHARED_DIR}/install-status.txt"

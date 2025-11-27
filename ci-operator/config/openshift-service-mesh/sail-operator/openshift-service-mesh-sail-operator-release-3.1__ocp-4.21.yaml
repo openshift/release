@@ -1,0 +1,44 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: upstream-1.26
+  use_build_cache: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "2"
+      memory: 2Gi
+tests:
+- as: e2e-ocp
+  skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.26-80a1b41acf1fe5b60c2b49153f6d3f9ed3a82a0d
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-sail-operator-e2e-ocp
+    workflow: servicemesh-istio-e2e-profile
+zz_generated_metadata:
+  branch: release-3.1
+  org: openshift-service-mesh
+  repo: sail-operator
+  variant: ocp-4.21

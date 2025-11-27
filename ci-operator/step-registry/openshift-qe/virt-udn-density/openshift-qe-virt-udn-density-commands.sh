@@ -4,6 +4,17 @@ set -o nounset
 set -o pipefail
 set -x
 cat /etc/os-release
+
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 oc config view
 oc projects
 pushd /tmp
@@ -24,12 +35,6 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=virt-udn-density
 
-current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
-
-# A non-indexed warmup run
-ES_SERVER="" EXTRA_FLAGS="--layer3=${ENABLE_L3} --iteration=${current_worker_count}" CHURN=false ./run.sh
-
-# The measurable run
 EXTRA_FLAGS+=" --metrics-profile metrics.yml,cnv-metrics.yml --gc-metrics=true --iteration=${ITERATIONS} --layer3=${ENABLE_L3} --vmi-ready-threshold=${VMI_READY_THRESHOLD}s --profile-type=${PROFILE_TYPE}"
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
@@ -39,12 +44,7 @@ fi
 
 export EXTRA_FLAGS
 
-rm -f ${SHARED_DIR}/index.json
-
 ./run.sh
-
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = ${ITERATIONS}" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)

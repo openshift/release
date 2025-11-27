@@ -5,7 +5,287 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
+    context: ci/prow/4.20-upgrade-from-stable-4.19-e2e-aws-ovn-upgrade
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/variant: 4.20-upgrade-from-stable-4.19
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-network-operator-release-4.20-4.20-upgrade-from-stable-4.19-e2e-aws-ovn-upgrade
+    optional: true
+    rerun_command: /test 4.20-upgrade-from-stable-4.19-e2e-aws-ovn-upgrade
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-upgrade
+        - --variant=4.20-upgrade-from-stable-4.19
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.20-upgrade-from-stable-4.19-e2e-aws-ovn-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build09
+    context: ci/prow/4.20-upgrade-from-stable-4.19-e2e-azure-ovn-upgrade
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure4
+      ci-operator.openshift.io/variant: 4.20-upgrade-from-stable-4.19
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-network-operator-release-4.20-4.20-upgrade-from-stable-4.19-e2e-azure-ovn-upgrade
+    optional: true
+    rerun_command: /test 4.20-upgrade-from-stable-4.19-e2e-azure-ovn-upgrade
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-azure-ovn-upgrade
+        - --variant=4.20-upgrade-from-stable-4.19
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.20-upgrade-from-stable-4.19-e2e-azure-ovn-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build02
+    context: ci/prow/4.20-upgrade-from-stable-4.19-e2e-gcp-ovn-upgrade
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-3
+      ci-operator.openshift.io/variant: 4.20-upgrade-from-stable-4.19
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-network-operator-release-4.20-4.20-upgrade-from-stable-4.19-e2e-gcp-ovn-upgrade
+    optional: true
+    rerun_command: /test 4.20-upgrade-from-stable-4.19-e2e-gcp-ovn-upgrade
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-gcp-ovn-upgrade
+        - --variant=4.20-upgrade-from-stable-4.19
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.20-upgrade-from-stable-4.19-e2e-gcp-ovn-upgrade,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build09
+    context: ci/prow/4.20-upgrade-from-stable-4.19-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: 4.20-upgrade-from-stable-4.19
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-network-operator-release-4.20-4.20-upgrade-from-stable-4.19-images
+    rerun_command: /test 4.20-upgrade-from-stable-4.19-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=4.20-upgrade-from-stable-4.19
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.20-upgrade-from-stable-4.19-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build01
     context: ci/prow/e2e-aws-hypershift-ovn-kubevirt
     decorate: true
     labels:
@@ -78,7 +358,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-hypershift-conformance
     decorate: true
     labels:
@@ -146,11 +426,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-hypershift-conformance,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-local-to-shared-gateway-mode-migration
     decorate: true
     labels:
@@ -223,23 +503,23 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
-    context: ci/prow/e2e-aws-ovn-serial
+    cluster: build01
+    context: ci/prow/e2e-aws-ovn-serial-1of2
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-network-operator-release-4.20-e2e-aws-ovn-serial
-    optional: true
-    rerun_command: /test e2e-aws-ovn-serial
+    name: pull-ci-openshift-cluster-network-operator-release-4.20-e2e-aws-ovn-serial-1of2
+    rerun_command: /test e2e-aws-ovn-serial-1of2
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 1"
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ovn-serial
@@ -290,17 +570,88 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-1of2,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
+    context: ci/prow/e2e-aws-ovn-serial-2of2
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-network-operator-release-4.20-e2e-aws-ovn-serial-2of2
+    rerun_command: /test e2e-aws-ovn-serial-2of2
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 2"
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-serial
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-2of2,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-serial-ipsec
     decorate: true
-    decoration_config:
-      timeout: 6h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-2
@@ -367,11 +718,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-ipsec,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-shared-to-local-gateway-mode-migration
     decorate: true
     labels:
@@ -440,11 +791,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-shared-to-local-gateway-mode-migration,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-single-node
     decorate: true
     labels:
@@ -517,7 +868,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-techpreview-serial
     decorate: true
     labels:
@@ -590,7 +941,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
@@ -662,7 +1013,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-upgrade-ipsec
     decorate: true
     labels:
@@ -734,7 +1085,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/e2e-aws-ovn-windows
     decorate: true
     labels:
@@ -802,11 +1153,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-windows,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build09
     context: ci/prow/e2e-azure-ovn
     decorate: true
     labels:
@@ -879,7 +1230,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build09
     context: ci/prow/e2e-azure-ovn-dualstack
     decorate: true
     labels:
@@ -952,7 +1303,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build09
     context: ci/prow/e2e-azure-ovn-manual-oidc
     decorate: true
     labels:
@@ -1025,11 +1376,9 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build09
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
-    decoration_config:
-      timeout: 5h30m0s
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-2
@@ -1099,7 +1448,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     labels:
@@ -1171,7 +1520,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     labels:
@@ -1243,7 +1592,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
     labels:
@@ -1315,15 +1664,13 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp
     decorate: true
-    decoration_config:
-      timeout: 5h0m0s
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.20-e2e-metal-ipi-ovn-dualstack-bgp
@@ -1390,15 +1737,13 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp-local-gw
     decorate: true
-    decoration_config:
-      timeout: 5h0m0s
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.20-e2e-metal-ipi-ovn-dualstack-bgp-local-gw
@@ -1465,13 +1810,13 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.20-e2e-metal-ipi-ovn-ipv6
@@ -1538,15 +1883,13 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-metal-ipi-ovn-ipv6-ipsec
     decorate: true
-    decoration_config:
-      timeout: 6h0m0s
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.20-e2e-metal-ipi-ovn-ipv6-ipsec
@@ -1609,15 +1952,13 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6-ipsec,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-network-mtu-migration-ovn-ipv4
     decorate: true
-    decoration_config:
-      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp-3
@@ -1684,19 +2025,17 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-network-mtu-migration-ovn-ipv4,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build09
     context: ci/prow/e2e-network-mtu-migration-ovn-ipv6
     decorate: true
-    decoration_config:
-      timeout: 5h0m0s
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.20-e2e-network-mtu-migration-ovn-ipv6
@@ -1760,11 +2099,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-network-mtu-migration-ovn-ipv6,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/e2e-openstack-ovn
     decorate: true
     labels:
@@ -1833,11 +2172,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
     labels:
@@ -1910,7 +2249,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/e2e-ovn-ipsec-step-registry
     decorate: true
     labels:
@@ -1978,11 +2317,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ovn-ipsec-step-registry,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/e2e-ovn-step-registry
     decorate: true
     labels:
@@ -2051,7 +2390,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ovn-step-registry,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
@@ -2124,7 +2463,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
@@ -2347,13 +2686,13 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build09
     context: ci/prow/frrk8s-e2e
     decorate: true
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-network-operator-release-4.20-frrk8s-e2e
@@ -2422,7 +2761,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build09
     context: ci/prow/hypershift-e2e-aks
     decorate: true
     labels:
@@ -2494,7 +2833,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build09
     context: ci/prow/images
     decorate: true
     labels:
@@ -2548,7 +2887,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build09
     context: ci/prow/lint
     decorate: true
     labels:
@@ -2601,11 +2940,144 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
-    context: ci/prow/qe-perfscale-aws-ovn-medium-cluster-density
+    cluster: build01
+    context: ci/prow/okd-scos-e2e-aws-ovn
     decorate: true
     decoration_config:
-      timeout: 5h0m0s
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci-operator.openshift.io/variant: okd-scos
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-network-operator-release-4.20-okd-scos-e2e-aws-ovn
+    optional: true
+    rerun_command: /test okd-scos-e2e-aws-ovn
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn
+        - --variant=okd-scos
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-scos-e2e-aws-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build09
+    context: ci/prow/okd-scos-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: okd-scos
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-network-operator-release-4.20-okd-scos-images
+    rerun_command: /test okd-scos-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=[release:latest]
+        - --variant=okd-scos
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build01
+    context: ci/prow/qe-perfscale-aws-ovn-medium-cluster-density
+    decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
@@ -2676,11 +3148,9 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/qe-perfscale-aws-ovn-medium-node-density-cni
     decorate: true
-    decoration_config:
-      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
@@ -2751,11 +3221,9 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/qe-perfscale-aws-ovn-small-cluster-density
     decorate: true
-    decoration_config:
-      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
@@ -2826,11 +3294,9 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build01
     context: ci/prow/qe-perfscale-aws-ovn-small-node-density-cni
     decorate: true
-    decoration_config:
-      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
@@ -2901,7 +3367,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build09
     context: ci/prow/security
     decorate: true
     labels:
@@ -2962,7 +3428,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build09
     context: ci/prow/unit
     decorate: true
     labels:
@@ -3015,7 +3481,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build09
     context: ci/prow/verify
     decorate: true
     labels:
@@ -3068,7 +3534,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build11
+    cluster: build09
     context: ci/prow/verify-deps
     decorate: true
     labels:

@@ -147,19 +147,17 @@ tests:
   steps:
     cluster_profile: azure-2
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
-- as: e2e-azure-ovn-upgrade-out-of-change
+- always_run: false
+  as: e2e-azure-ovn-upgrade-out-of-change
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: azure-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
 - always_run: false
@@ -218,10 +216,9 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-gcp
-  timeout: 5h0m0s
-- as: e2e-gcp-op-techpreview
+- always_run: false
+  as: e2e-gcp-op-techpreview
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp
     env:
@@ -241,9 +238,9 @@ tests:
   steps:
     cluster_profile: aws-3
     workflow: openshift-upgrade-aws
-- as: e2e-aws-ovn-upgrade-out-of-change
+- always_run: false
+  as: e2e-aws-ovn-upgrade-out-of-change
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: aws
     dependencies:
@@ -297,24 +294,24 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi-zones
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-vsphere-ovn-zones
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-zones
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -357,7 +354,8 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-metal-assisted
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted

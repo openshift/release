@@ -128,7 +128,8 @@ chainsaw test \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \
 --test-dir \
-tests/e2e-instrumentation || any_errors=true
+tests/e2e-instrumentation \
+tests/e2e-multi-instrumentation || any_errors=true
 
 # Check if any errors occurred
 if $any_errors; then

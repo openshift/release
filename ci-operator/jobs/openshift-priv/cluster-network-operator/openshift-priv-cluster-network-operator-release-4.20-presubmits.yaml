@@ -1,11 +1,11 @@
 presubmits:
   openshift-priv/cluster-network-operator:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-aws-hypershift-ovn-kubevirt
     decorate: true
     decoration_config:
@@ -166,11 +166,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-hypershift-conformance,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-local-to-shared-gateway-mode-migration
     decorate: true
     decoration_config:
@@ -253,8 +253,8 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
-    context: ci/prow/e2e-aws-ovn-serial
+    cluster: build10
+    context: ci/prow/e2e-aws-ovn-serial-1of2
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -266,16 +266,16 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-network-operator-release-4.20-e2e-aws-ovn-serial
-    optional: true
+    name: pull-ci-openshift-priv-cluster-network-operator-release-4.20-e2e-aws-ovn-serial-1of2
     path_alias: github.com/openshift/cluster-network-operator
-    rerun_command: /test e2e-aws-ovn-serial
+    rerun_command: /test e2e-aws-ovn-serial-1of2
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 1"
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
@@ -330,20 +330,102 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-1of2,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
+    context: ci/prow/e2e-aws-ovn-serial-2of2
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cluster-network-operator-release-4.20-e2e-aws-ovn-serial-2of2
+    path_alias: github.com/openshift/cluster-network-operator
+    rerun_command: /test e2e-aws-ovn-serial-2of2
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 2"
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-serial
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-2of2,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.20$
+    - ^release-4\.20-
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-serial-ipsec
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
-      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -416,11 +498,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-serial-ipsec,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-shared-to-local-gateway-mode-migration
     decorate: true
     decoration_config:
@@ -499,11 +581,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-shared-to-local-gateway-mode-migration,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-single-node
     decorate: true
     decoration_config:
@@ -586,7 +668,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-techpreview-serial
     decorate: true
     decoration_config:
@@ -669,7 +751,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     decoration_config:
@@ -751,7 +833,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-upgrade-ipsec
     decorate: true
     decoration_config:
@@ -833,7 +915,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-aws-ovn-windows
     decorate: true
     decoration_config:
@@ -911,7 +993,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-windows,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
@@ -1171,7 +1253,6 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
-      timeout: 5h30m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
@@ -1247,7 +1328,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     decoration_config:
@@ -1329,7 +1410,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
     decoration_config:
@@ -1411,7 +1492,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
     decoration_config:
@@ -1493,19 +1574,18 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build07
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
-      timeout: 5h0m0s
     hidden: true
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-network-operator-release-4.20-e2e-metal-ipi-ovn-dualstack-bgp
@@ -1577,19 +1657,18 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build07
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp-local-gw
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
-      timeout: 5h0m0s
     hidden: true
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-network-operator-release-4.20-e2e-metal-ipi-ovn-dualstack-bgp-local-gw
@@ -1661,7 +1740,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build07
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     decoration_config:
@@ -1670,9 +1749,9 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-network-operator-release-4.20-e2e-metal-ipi-ovn-ipv6
@@ -1744,19 +1823,18 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build07
     context: ci/prow/e2e-metal-ipi-ovn-ipv6-ipsec
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
-      timeout: 6h0m0s
     hidden: true
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-network-operator-release-4.20-e2e-metal-ipi-ovn-ipv6-ipsec
@@ -1824,18 +1902,17 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6-ipsec,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-network-mtu-migration-ovn-ipv4
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
-      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
@@ -1908,23 +1985,22 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-network-mtu-migration-ovn-ipv4,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build07
     context: ci/prow/e2e-network-mtu-migration-ovn-ipv6
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
-      timeout: 5h0m0s
     hidden: true
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-network-operator-release-4.20-e2e-network-mtu-migration-ovn-ipv6
@@ -1993,11 +2069,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-network-mtu-migration-ovn-ipv6,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-openstack-ovn
     decorate: true
     decoration_config:
@@ -2076,11 +2152,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
     decoration_config:
@@ -2163,7 +2239,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-ovn-ipsec-step-registry
     decorate: true
     decoration_config:
@@ -2241,11 +2317,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ovn-ipsec-step-registry,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/e2e-ovn-step-registry
     decorate: true
     decoration_config:
@@ -2324,7 +2400,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ovn-step-registry,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
@@ -2407,7 +2483,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
@@ -2660,7 +2736,7 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build05
+    cluster: build07
     context: ci/prow/frrk8s-e2e
     decorate: true
     decoration_config:
@@ -2669,9 +2745,9 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
+      capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cluster-network-operator-release-4.20-frrk8s-e2e
@@ -2953,14 +3029,13 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/qe-perfscale-aws-ovn-medium-cluster-density
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
-      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -3037,14 +3112,13 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/qe-perfscale-aws-ovn-medium-node-density-cni
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
-      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -3121,14 +3195,13 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/qe-perfscale-aws-ovn-small-cluster-density
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
-      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -3205,14 +3278,13 @@ presubmits:
     branches:
     - ^release-4\.20$
     - ^release-4\.20-
-    cluster: build07
+    cluster: build10
     context: ci/prow/qe-perfscale-aws-ovn-small-node-density-cni
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
-      timeout: 5h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws

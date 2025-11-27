@@ -11,18 +11,18 @@ base_images:
     name: 4.21-priv
     namespace: ocp-private
     tag: must-gather
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.20
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    tag: rhel-8-golang-1.24-openshift-4.21
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
   tests-base:
     name: 4.21-priv
     namespace: ocp-private
@@ -34,35 +34,35 @@ canonical_go_repository: github.com/openshift/oc
 images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cli
 - dockerfile_path: images/tools/Dockerfile
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: tools
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: tests-base
   inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: tests
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: must-gather-base
   inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: must-gather
 - context_dir: images/deployer
   dockerfile_path: Dockerfile.rhel
@@ -71,12 +71,12 @@ images:
 - dockerfile_path: images/cli-artifacts/Dockerfile.rhel
   from: cli
   inputs:
-    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
+    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cli-artifacts
 - context_dir: images/recycler/
   dockerfile_path: Dockerfile.rhel
@@ -152,14 +152,13 @@ tests:
     from: test-bin
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-serial
   shard_count: 2
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-5
     workflow: openshift-e2e-aws-serial
-  timeout: 5h0m0s
 - as: e2e-agnostic-ovn-cmd
   steps:
     cluster_profile: azure4
@@ -168,24 +167,28 @@ tests:
     workflow: openshift-e2e-azure
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     workflow: openshift-upgrade-aws
-- as: e2e-aws-certrotation
+- always_run: false
+  as: e2e-aws-certrotation
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-5
     test:
     - ref: openshift-oc-certrotation
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-builds
+- always_run: false
+  as: e2e-aws-ovn-builds
   optional: true
   run_if_changed: ^(pkg/.*build.*)|^(pkg/.*newapp.*)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-5
     workflow: openshift-e2e-aws-builds
-- as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -194,19 +197,19 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-  timeout: 5h0m0s
 - as: security
   optional: true
   steps:
     workflow: openshift-ci-security
-- as: e2e-agent-compact-ipv4
-  cluster: build05
+- always_run: false
+  as: e2e-agent-compact-ipv4
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: ^(pkg/cli/admin/nodeimage/|go.mod)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-priv

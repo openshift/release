@@ -27,6 +27,8 @@ images:
 operator:
   bundles:
   - as: multiarch-tuning-operator-bundle
+    capabilities:
+    - arm64
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: registry.ci.openshift.org/origin/multiarch-tuning-operator:main
@@ -72,7 +74,7 @@ tests:
   - arm64
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-arm64
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
       OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
@@ -87,7 +89,6 @@ tests:
     - ref: ipi-install-heterogeneous
     - ref: multiarch-tuning-operator-e2e-olm-kustomize
     workflow: ipi-gcp
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-proxy-mto-origin
   capabilities:
@@ -105,6 +106,7 @@ tests:
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       MTO_OPERATOR_INSTALL_METHOD: catalog
+      MTO_PROJECT_NAME: openshift
       OCP_ARCH: arm64
       SUBSCRIPTION_CHANNEL_OVERRIDE: main
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
@@ -126,7 +128,6 @@ tests:
     - chain: multiarch-tuning-operator
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-proxy
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-mto-origin-post
   cluster: build01
   postsubmit: true
@@ -143,6 +144,7 @@ tests:
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       MTO_OPERATOR_INSTALL_METHOD: catalog
+      MTO_PROJECT_NAME: openshift
       OCP_ARCH: arm64
       SUBSCRIPTION_CHANNEL_OVERRIDE: main
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
@@ -162,7 +164,6 @@ tests:
     - chain: multiarch-tuning-operator
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-ovn
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift

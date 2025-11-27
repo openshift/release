@@ -40,7 +40,7 @@ echo "Create reports directory"
 mkdir -pv /tmp/reports
 
 echo "Copy reports to reports directory"
-cp "${SHARED_DIR}"/report_*.xml /tmp/reports/ 2>/dev/null || echo "No report_*.xml files found"
+cp "${SHARED_DIR}"/junit_*.xml /tmp/reports/ 2>/dev/null || echo "No report_*.xml files found"
 
 echo "Create junit directory"
 mkdir -pv /tmp/junit

@@ -72,6 +72,16 @@ if [[ ${OCP_IMAGE_N2} != "${OCP_IMAGE_LATEST}" ]]; then
   N2_NP_VERSION_TEST_ARGS="--e2e.n2-minor-release-image=${OCP_IMAGE_N2}"
 fi
 
+N3_NP_VERSION_TEST_ARGS=""
+if [[ ${OCP_IMAGE_N3} != "${OCP_IMAGE_LATEST}" ]]; then
+  N3_NP_VERSION_TEST_ARGS="--e2e.n3-minor-release-image=${OCP_IMAGE_N3}"
+fi
+
+N4_NP_VERSION_TEST_ARGS=""
+if [[ ${OCP_IMAGE_N4} != "${OCP_IMAGE_LATEST}" ]]; then
+  N4_NP_VERSION_TEST_ARGS="--e2e.n4-minor-release-image=${OCP_IMAGE_N4}"
+fi
+
 MI_ARGS=""
 if [[ "${AUTH_THROUGH_CERTS}" == "true" ]]; then
   MI_ARGS="--e2e.azure-managed-identities-file=${AZURE_MANAGED_IDENTITIES_LOCATION}"
@@ -87,10 +97,10 @@ if [[ "${AZURE_MULTI_ARCH:-}" == "true" ]]; then
   AZURE_MULTI_ARCH_PARAMS="--e2e.azure-multi-arch=true"
 fi
 
-KMS_ARGS=""
-if [[ "${ENABLE_AKS_KMS:-}" == "true" ]]; then
-    KMS_ARGS+="--e2e.azure-encryption-key-id=${AKS_KMS_KEY} "
-    KMS_ARGS+="--e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET}"
+MARKETPLACE_IMAGE_PARAMS=""
+# Use environment variables if set, otherwise use defaults based on version
+if [[ -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU:-}" && -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION:-}" ]]; then
+  MARKETPLACE_IMAGE_PARAMS="--e2e.azure-marketplace-publisher ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER} --e2e.azure-marketplace-offer ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER} --e2e.azure-marketplace-sku ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU} --e2e.azure-marketplace-version ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
 fi
 
 hack/ci-test-e2e.sh -test.v \
@@ -107,14 +117,14 @@ hack/ci-test-e2e.sh -test.v \
     ${AKS_ANNOTATIONS:-} \
     ${N1_NP_VERSION_TEST_ARGS:-} \
     ${N2_NP_VERSION_TEST_ARGS:-} \
+    ${N3_NP_VERSION_TEST_ARGS:-} \
+    ${N4_NP_VERSION_TEST_ARGS:-} \
     ${MI_ARGS:-} \
     ${DP_ARGS:-} \
     ${AZURE_MULTI_ARCH_PARAMS:-} \
-    ${KMS_ARGS:-} \
-  --e2e.azure-marketplace-publisher "azureopenshift" \
-  --e2e.azure-marketplace-offer "aro4" \
-  --e2e.azure-marketplace-sku "aro_419" \
-  --e2e.azure-marketplace-version "419.6.20250523" \
+  --e2e.azure-encryption-key-id=${AKS_KMS_KEY} \
+  --e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET} \
+  ${MARKETPLACE_IMAGE_PARAMS} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
 wait $!

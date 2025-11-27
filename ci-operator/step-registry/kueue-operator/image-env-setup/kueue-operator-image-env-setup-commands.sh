@@ -18,21 +18,6 @@ spec:
       source: registry.redhat.io/kueue/kueue-rhel9
 EOF
 
-oc apply -f - <<EOF
-apiVersion: config.openshift.io/v1
-kind: ImageTagMirrorSet
-metadata:
-  name: kueue-mirrorset
-spec:
-  imageTagMirrors:
-    - mirrors:
-        - quay.io/redhat-user-workloads/kueue-operator-tenant/${OPERATOR_COMPONENT}
-      source: registry.redhat.io/kueue/kueue-rhel9-operator
-    - mirrors:
-        - quay.io/redhat-user-workloads/kueue-operator-tenant/${OPERAND_COMPONENT}
-      source: registry.redhat.io/kueue/kueue-rhel9
-EOF
-
 echo "Current PWD: $(pwd)"
 ls -lah
 REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")

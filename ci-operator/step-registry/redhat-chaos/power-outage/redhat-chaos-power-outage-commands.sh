@@ -70,6 +70,7 @@ telemetry_password=$(cat "/secret/telemetry/telemetry_password")
 # set the secrets from the vault as env vars
 export TELEMETRY_PASSWORD=$telemetry_password
 
+export TIMEOUT=$POWER_OUTAGE_TIMEOUT
 
 ./power-outage/prow_run.sh
 rc=$?

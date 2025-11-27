@@ -6,6 +6,14 @@ set -x
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+target_bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+
+# Check if target bastion is in maintenance mode
+if ssh ${SSH_ARGS} -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p root@${bastion}" root@${target_bastion} 'test -f /root/pause'; then
+  echo "The cluster is on maintenance mode. Remove the file /root/pause in the bastion host when the maintenance is over"
+  exit 1
+fi
+
 CRUCIBLE_URL=$(cat ${CLUSTER_PROFILE_DIR}/crucible_url)
 JETLAG_PR=${JETLAG_PR:-}
 REPO_NAME=${REPO_NAME:-}
@@ -24,8 +32,10 @@ export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
 
-
 echo "Starting deployment on lab $LAB, cloud $LAB_CLOUD ..."
+
+echo "Removing bastion self-reference from resolv.conf ..."
+ssh ${SSH_ARGS} root@${bastion} "sed -i '\$!{/^nameserver/d}' /etc/resolv.conf"
 
 cat <<EOF >>/tmp/all.yml
 ---
@@ -47,16 +57,86 @@ use_bastion_registry: false
 install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 payload_url: "${RELEASE_IMAGE_LATEST}"
+image_type: "minimal-iso"
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
+  echo "Private network deployment"
+  echo -e "enable_bond: $BOND" >> /tmp/all.yml
   echo -e "controlplane_network: 192.168.216.1/21\ncontrolplane_network_prefix: 21" >> /tmp/all.yml
+
+  # Create proxy configuration for private VLAN deployments
+  cat > ${SHARED_DIR}/proxy-conf.sh << 'PROXY_EOF'
+#!/bin/bash
+
+echo "Loading proxy configuration"
+
+cleanup_ssh() {
+  # Kill the SOCKS proxy running on the jumphost
+  ssh ${SSH_ARGS} root@${jumphost} "pkill -f 'ssh root@${bastion} -fNT -D'" 2>/dev/null || true
+  # Kill local SSH processes
+  pkill ssh
+}
+
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+
+# Generate a random port between 10000-65535 for SOCKS proxy
+SOCKS_PORT=$((RANDOM % 55536 + 10000))
+
+# Step 1: Start SOCKS proxy on jumphost connecting to bastion (runs in background on jumphost)
+ssh ${SSH_ARGS} root@${jumphost} "ssh root@${bastion} -fNT -D 0.0.0.0:${SOCKS_PORT}" &
+
+# Step 2: Forward the SOCKS proxy from jumphost back to CI host
+ssh ${SSH_ARGS} root@${jumphost} -fNT -L ${SOCKS_PORT}:localhost:${SOCKS_PORT}
+
+# Give SSH tunnels a moment to establish
+sleep 3
+
+# Configure proxy settings for oc commands
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+export https_proxy=socks5://localhost:${SOCKS_PORT}
+export http_proxy=socks5://localhost:${SOCKS_PORT}
+
+# Configure oc to use the proxy
+oc --kubeconfig=${SHARED_DIR}/kubeconfig config set-cluster "$(oc config current-context)" --proxy-url=socks5://localhost:${SOCKS_PORT}
+
+trap 'cleanup_ssh' EXIT
+PROXY_EOF
 fi
 
-if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
-  HV_NIC_INTERFACE=$(cat "${CLUSTER_PROFILE_DIR}/config" | jq ".hypervisor_nic_interface")
-  export HV_NIC_INTERFACE
+if [[ "$TYPE" == "vmno" ]]; then
+  # Load VMNO configuration from cluster profile
+  HV_COUNT=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r ".hv_count")
+  HV_VM_CPU_COUNT=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r ".hv_vm_cpu_count")
+  HV_VM_MEMORY_SIZE=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r ".hv_vm_memory_size")
+  HV_VM_DISK_SIZE=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r ".hv_vm_disk_size")
 
+  # Extract hardware model from bastion hostname
+  HV_HW_NAME=$(cat ${CLUSTER_PROFILE_DIR}/bastion | cut -d'.' -f1 | awk -F'-' '{print $NF}')
+
+  # Convert hv_vm_disk JSON to YAML format with proper indentation
+  HV_VM_DISK_YAML=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r '.hv_vm_disk | to_entries | map("      " + .key + ": " + (.value | tostring)) | join("\n")')
+
+  cat <<EOF >>/tmp/all.yml
+hv_ssh_pass: $LOGIN
+hv_ip_offset: 0
+hv_vm_ip_offset: 20
+compact_cluster_dns_count: 0
+standard_cluster_dns_count: 0
+hv_count: $HV_COUNT
+hv_vm_cpu_count: $HV_VM_CPU_COUNT
+hv_vm_memory_size: $HV_VM_MEMORY_SIZE
+hv_vm_disk_size: $HV_VM_DISK_SIZE
+hw_vm_counts:
+  $LAB:
+    $HV_HW_NAME:
+$HV_VM_DISK_YAML
+EOF
+fi
+
+if [[ "$TYPE" == "hmno" ]]; then
   cat <<EOF >>/tmp/all.yml
 hybrid_worker_count: $NUM_HYBRID_WORKER_NODES
 hv_ip_offset: 0
@@ -65,7 +145,7 @@ hv_inventory: true
 compact_cluster_dns_count: 0
 standard_cluster_dns_count: 0
 hv_ssh_pass: $LOGIN
-hypervisor_nic_interface_idx: $HV_NIC_INTERFACE
+cluster_type: mno
 EOF
   cat <<EOF >>/tmp/hv.yml
 install_tc: false
@@ -77,9 +157,26 @@ compact_cluster_dns_count: 0
 standard_cluster_dns_count: 0
 hv_vm_generate_manifests: false
 sno_cluster_count: 0
-hypervisor_nic_interface_idx: $HV_NIC_INTERFACE
 EOF
 fi
+
+if [[ "$TYPE" == "vmno" ]]; then
+  cat <<EOF >>/tmp/hv.yml
+install_tc: true
+lab: $LAB
+ssh_public_key_file: ~/.ssh/id_rsa.pub
+use_bastion_registry: false
+setup_coredns: false
+setup_hv_vm_dhcp: false
+compact_cluster_dns_count: 0
+standard_cluster_dns_count: 0
+hv_vm_generate_manifests: false
+sno_cluster_count: 0
+EOF
+fi
+
+echo "This is the final all.yml file:"
+cat /tmp/all.yml
 
 envsubst < /tmp/all.yml > /tmp/all-updated.yml
 
@@ -100,6 +197,22 @@ podman pod rm $(podman pod ps -q)   || echo 'No podman pods to delete'
 podman stop $(podman ps -aq)        || echo 'No podman containers to stop'
 podman rm $(podman ps -aq)          || echo 'No podman containers to delete'
 rm -rf /opt/*
+
+# Find connection that owns the default gateway
+default_gw_conn=$(
+  nmcli -t -f NAME,DEVICE connection show --active |
+    grep "$(ip route | awk '/default/ {print $5; exit}')" |
+    cut -d: -f1
+)
+# Read active connection names safely into an array
+readarray -t conns < <(nmcli -t -f NAME connection show --active)
+# Loop and delete all except the default one
+for c in "${conns[@]}"; do
+  if [[ "$c" != "$default_gw_conn" && "$c" != "lo" && "$c" != "cni-podman0" ]]; then
+    echo "Deleting: $c"
+    nmcli connection delete "$c"
+  fi
+done
 EOF
 
 # Override JETLAG_BRANCH to main when JETLAG_LATEST is true
@@ -135,13 +248,15 @@ scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/v
 scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:${jetlag_repo}/pull_secret.txt
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 
-if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
+if [[ "$TYPE" == "hmno" || "$TYPE" == "vmno" ]]; then
   scp -q ${SSH_ARGS} /tmp/hv.yml root@${bastion}:${jetlag_repo}/ansible/vars/hv.yml
 fi
 
 
 if [[ ${TYPE} == 'sno' ]]; then
   KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}/kubeconfig'
+elif [[ ${TYPE} == 'hmno' ]]; then
+  KUBECONFIG_SRC=/root/mno/kubeconfig
 else
   KUBECONFIG_SRC=/root/${TYPE}/kubeconfig
 fi
@@ -169,12 +284,16 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/clean-resources.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
-   if [[ ! -z \"$NUM_HYBRID_WORKER_NODES\" ]]; then
+   if [[ \"$TYPE\" == \"hmno\" || \"$TYPE\" == \"vmno\" ]]; then
      export ANSIBLE_HOST_KEY_CHECKING=False
      ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/hv-setup.yml -v | tee /tmp/ansible-hv-setup-$(date +%s)
      ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/hv-vm-create.yml -v | tee /tmp/ansible-hv-vm-create-$(date +%s)
    fi
-   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
+   if [[ \"$TYPE\" == \"hmno\" || \"$TYPE\" == \"vmno\" ]]; then
+     ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/mno-deploy.yml -v | tee /tmp/ansible-mno-deploy-$(date +%s)
+   else
+     ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
+   fi
    mkdir -p /root/$LAB/$LAB_CLOUD/$TYPE
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=${KUBECONFIG_SRC} dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig flat=true'
    deactivate

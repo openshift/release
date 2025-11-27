@@ -1,4 +1,12 @@
 base_images:
+  ocp_4.21_cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  ocp_4.21_installer:
+    name: "4.21"
+    namespace: ocp
+    tag: installer
   origin_scos-4.21_base-stream9:
     name: scos-4.21
     namespace: origin
@@ -21,10 +29,15 @@ images:
   dockerfile_path: Dockerfile
   from: origin_scos-4.21_base-stream9
   inputs:
+    ocp_4.21_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:cli
+    ocp_4.21_installer:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:installer
     origin_scos-4.21_installer:
       as:
       - builder
-      - registry.ci.openshift.org/ocp/4.20:installer
   to: machine-os-images
 promotion:
   to:
@@ -45,7 +58,6 @@ tests:
 - always_run: false
   as: e2e-aws-ovn
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws

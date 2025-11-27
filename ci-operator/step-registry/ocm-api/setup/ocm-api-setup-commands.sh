@@ -18,6 +18,25 @@ export VERSION=${VERSION:-}
 export CHANNEL_GROUP=${CHANNEL_GROUP:-}
 export NAME_PREFIX=${NAME_PREFIX:-}
 
+function gcloud_auth() {
+  local service_project_id
+
+  if ! which gcloud; then
+    GCLOUD_TAR="google-cloud-sdk-468.0.0-linux-x86_64.tar.gz"
+    GCLOUD_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
+    logger "INFO" "gcloud not installed, installing from $GCLOUD_URL"
+    pushd ${HOME}
+    curl -O "$GCLOUD_URL"
+    tar -xzf "$GCLOUD_TAR"
+    export PATH=${HOME}/google-cloud-sdk/bin:${PATH}
+    popd
+  fi
+
+  # login to the service project
+  service_project_id="$(jq -r -c .project_id "${GCP_SHARED_CREDENTIALS_FILE}")"
+  gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
+  gcloud config set project "${service_project_id}"
+}
 # Log in
 OCM_VERSION=$(ocm version)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
@@ -34,21 +53,24 @@ make cmds
 chmod +x ./testcmd/*
 cp ./testcmd/* $ocmTempDir/
 export PATH=$ocmTempDir:$PATH
-
 export ORG_MEMBER_TOKEN=${OCM_TOKEN}
+export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json
 export CLUSTER_PROFILE=${TEST_PROFILE}
-export CLUSTER_PROFILE_DIR=${SHARED_DIR}
+export CLUSTER_PROFILE_DIR=${ocmTempDir}
 export OCM_ENV=${OCM_LOGIN_ENV}
 export OCPE2E_TEST=true
 export DEBUG=false
 export QE_FLAG="prow-test"
 export QE_USAGE="prow-test"
 
+gcloud_auth
 
+logger "INFO" "Start to prepare cluster: cms --ginkgo.v --ginkgo.no-color --ginkgo.timeout 2h --ginkgo.focus CreateClusterByYAMLProfile --ginkgo.label-filter feature-cluster-creation "
 cms --ginkgo.v --ginkgo.no-color --ginkgo.timeout 2h --ginkgo.focus CreateClusterByYAMLProfile --ginkgo.label-filter feature-cluster-creation 
 
-IDline=$(cat $SHARED_DIR/cluster.ini|grep "^\s*ID\s*=");
+IDline=$(cat $CLUSTER_PROFILE_DIR/cluster.ini|grep "^\s*ID\s*=");
 echo $IDline|awk -F " " '{print $NF}' > "${SHARED_DIR}/cluster-id"
+cp $CLUSTER_PROFILE_DIR/cluster.ini ${SHARED_DIR}/
 
 # Store the cluster information
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
@@ -67,3 +89,4 @@ echo "${PRODUCT_ID}" > "${SHARED_DIR}/cluster-type"
 
 INFRA_ID=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.infra_id')
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
+

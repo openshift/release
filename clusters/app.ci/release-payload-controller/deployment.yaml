@@ -12,7 +12,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-payload-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
   name: release-payload-controller
   namespace: ci
 spec:
@@ -31,7 +34,8 @@ spec:
         - start
         - --namespace=ci
         - -v=6
-        image: release-payload-controller:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-payload-controller_latest
+        imagePullPolicy: Always
         name: controller
         resources:
           limits:

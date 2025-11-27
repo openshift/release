@@ -4,13 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export AWS_SHARED_CREDENTIALS_FILE="/var/run/aws/.awscred"
+# https://docs.aws.amazon.com/cli/latest/topic/config-vars.html
 export AWS_DEFAULT_REGION=us-east-1
 export AWS_DEFAULT_OUTPUT=json
 
-if [ -z "${AWS_PROFILE:-}" ]; then
-  unset AWS_PROFILE
-fi 
+if [ "${BASE_DOMAIN}" = "shiftstack.devcluster.openshift.com" ]; then
+  # Creds managed by the ShiftStack team controlling the shiftstack.devcluster.openshift.com zone
+  export AWS_SHARED_CREDENTIALS_FILE="/var/run/aws/.awscred"
+else
+  # Global creds for all other zones
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+fi
+if [ ! -f "${AWS_SHARED_CREDENTIALS_FILE}" ]; then
+  echo "Credentials file is not correctly mounted"
+fi
 
 TMP_DIR=$(mktemp -d)
 
@@ -22,9 +29,9 @@ fi
 
 echo "Getting the hosted zone ID for domain: ${BASE_DOMAIN}"
 HOSTED_ZONE_ID="$(aws route53 list-hosted-zones-by-name \
-            --dns-name "${BASE_DOMAIN}" \
-            --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${BASE_DOMAIN}.\`].Id" \
-            --output text)"
+  --dns-name "${BASE_DOMAIN}" \
+  --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${BASE_DOMAIN}.\`].Id" \
+  --output text)"
 
 cat > "${SHARED_DIR}/dns_up.json" <<EOF
 {

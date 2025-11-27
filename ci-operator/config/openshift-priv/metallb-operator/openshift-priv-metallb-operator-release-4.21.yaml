@@ -15,26 +15,26 @@ base_images:
     name: 4.21-priv
     namespace: ocp-private
     tag: metallb-frr
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/metallb-operator
 images:
 - dockerfile_path: Dockerfile.openshift
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: metallb-operator
 - dockerfile_path: bundleci.Dockerfile
   to: metallb-operator-bundle
@@ -44,13 +44,13 @@ operator:
     dockerfile_path: bundleci.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: quay.io/openshift/origin-metallb:4.20
+  - pullspec: quay.io/openshift/origin-metallb:.*
     with: pipeline:metallb
-  - pullspec: quay.io/openshift/origin-metallb-operator:4.20
+  - pullspec: quay.io/openshift/origin-metallb-operator:.*
     with: pipeline:metallb-operator
-  - pullspec: quay.io/openshift/origin-metallb-frr:4.20
+  - pullspec: quay.io/openshift/origin-metallb-frr:.*
     with: pipeline:metallb-frr
-  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:4.20
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:.*
     with: pipeline:kube-rbac-proxy
 promotion:
   to:
@@ -117,7 +117,8 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: metallb-e2e-metal
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:

@@ -4,9 +4,15 @@ workflow:
     env:
       TEST_PARALLEL: 1
       COMPUTE_NODE_REPLICAS: 2
+      COMPUTE_NODE_TYPE: "t3a.xlarge"
+      CONTROL_PLANE_INSTANCE_TYPE: "t3a.xlarge"
       CONTROL_PLANE_REPLICAS: 3
       SPOT_INSTANCES: "false"
       FORCE_SUCCESS_EXIT: "no"
+      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
+      MUST_GATHER_TIMEOUT: "35m"
+      ENABLE_MUST_GATHER: "true"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
     pre:
     - chain: ipi-conf-aws
     - chain: aws-provision-iam-user-minimal-permission
@@ -14,10 +20,13 @@ workflow:
     - chain: ipi-install
     - chain: sandboxed-containers-operator-pre
     post:
-    - ref: cucushift-installer-wait
+    - ref: sandboxed-containers-operator-gather-must-gather
+    - ref: sandboxed-containers-operator-post
     - chain: ipi-aws-post
     test:
     - ref: openshift-extended-test
+    - ref: cucushift-installer-wait
+      timeout: 12h10m0s
   documentation: |-
     This workflow run openshift-extented-test on an AWS cluster with
     the sandboxed containers deployed.

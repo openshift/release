@@ -7,8 +7,16 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-operator-init:
     name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
     namespace: hypershift
     tag: latest
   manila-csi-driver-operator-test:
@@ -23,10 +31,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
-  openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.20
   openstack-cinder-csi-driver-operator-test:
     name: "4.20"
     namespace: ocp
@@ -35,11 +39,6 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- inputs:
-    openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.20
-  to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
     ocp_4.20_base-rhel9:
@@ -49,12 +48,6 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: hypershift
-- dockerfile_path: Dockerfile.e2e
-  inputs:
-    openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.20
-  to: hypershift-tests
 - dockerfile_literal: |
     FROM base
     RUN dnf install -y python3-pip
@@ -62,10 +55,7 @@ images:
   to: custom-verify-src
 promotion:
   to:
-  - excluded_images:
-    - hypershift-operator
-    - hypershift-tests
-    name: "4.20"
+  - name: "4.20"
     namespace: ocp
 releases:
   initial:
@@ -78,37 +68,57 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.20"
+      version: "4.19"
   latest:
     integration:
       include_built_images: true
       name: "4.20"
       namespace: ocp
+  latest-415:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.15"
+  latest-416:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.16"
   latest-417:
     candidate:
       product: ocp
       stream: ci
-      version: "4.20"
+      version: "4.17"
   latest-418:
     candidate:
       product: ocp
       stream: ci
-      version: "4.20"
+      version: "4.18"
   latest-419:
     candidate:
       product: ocp
       stream: ci
-      version: "4.20"
+      version: "4.19"
   n1minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.20"
+      version: "4.19"
   n2minor:
     candidate:
       product: ocp
       stream: ci
-      version: "4.20"
+      version: "4.18"
+  n3minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.17"
+  n4minor:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.16"
 resources:
   '*':
     limits:
@@ -127,7 +137,6 @@ tests:
   commands: make verify
   container:
     from: custom-verify-src
-  skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
 - as: unit
   commands: make test
   container:
@@ -140,9 +149,10 @@ tests:
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
+      OCP_IMAGE_N3: release:n3minor
+      OCP_IMAGE_N4: release:n4minor
     env:
       AUTH_THROUGH_CERTS: "true"
-      ENABLE_AKS_KMS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
@@ -154,10 +164,11 @@ tests:
       OCP_IMAGE_LATEST: release:latest-419
       OCP_IMAGE_N1: release:latest-418
       OCP_IMAGE_N2: release:latest-417
+      OCP_IMAGE_N3: release:latest-416
+      OCP_IMAGE_N4: release:latest-415
       OCP_IMAGE_PREVIOUS: release:initial-419
     env:
       AUTH_THROUGH_CERTS: "true"
-      ENABLE_AKS_KMS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
@@ -170,6 +181,8 @@ tests:
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
+      OCP_IMAGE_N3: release:n3minor
+      OCP_IMAGE_N4: release:n4minor
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
@@ -234,6 +247,8 @@ tests:
       OCP_IMAGE_LATEST: release:latest-419
       OCP_IMAGE_N1: release:latest-418
       OCP_IMAGE_N2: release:latest-417
+      OCP_IMAGE_N3: release:latest-416
+      OCP_IMAGE_N4: release:latest-415
       OCP_IMAGE_PREVIOUS: release:initial-419
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
@@ -256,7 +271,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"

@@ -58,10 +58,6 @@ export WORKLOAD=cluster-density-v2
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
-# Run a non-indexed warmup for scheduling inconsistencies
-ES_SERVER="" ITERATIONS=${current_worker_count} CHURN=false EXTRA_FLAGS='--pod-ready-threshold=2m' ./run.sh
-
-# The measurable run
 iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
@@ -79,15 +75,7 @@ fi
 export EXTRA_FLAGS
 export ADDITIONAL_PARAMS
 
-rm -f ${SHARED_DIR}/index.json
 ./run.sh
-
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
-
-cp "${SHARED_DIR}"/index_data.json "${SHARED_DIR}"/${WORKLOAD}-index_data.json 
-cp "${SHARED_DIR}"/${WORKLOAD}-index_data.json  "${ARTIFACT_DIR}"/${WORKLOAD}-index_data.json
-
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build03
     context: ci/prow/build
     decorate: true
     decoration_config:
@@ -61,7 +61,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build03
     context: ci/prow/e2e
     decorate: true
     decoration_config:
@@ -130,7 +130,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -185,7 +185,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build03
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -240,7 +240,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build03
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -295,7 +295,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -346,3 +346,59 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/yaml-lint
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-sippy-main-yaml-lint
+    rerun_command: /test yaml-lint
+    run_if_changed: \.ya?ml$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=yaml-lint
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )yaml-lint,?($|\s.*)
