@@ -84,11 +84,8 @@ download_brew_rpms() {
 
 # Attempt downloading latest MicroShift RPMs from brew.
 # This requires VPN access, which is only enabled for the cache jobs.
-brew_rpm_download_failed=false
 if [[ "${JOB_NAME}" =~ .*-cache.* ]] ; then
-    if ! download_brew_rpms; then
-        brew_rpm_download_failed=true
-    fi
+    download_brew_rpms
 fi
 
 # Archive the sources, potentially including MicroShift RPMs from brew
@@ -123,10 +120,6 @@ finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs" "${ARTIFACT_DIR}" || true
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx_error.log" "${ARTIFACT_DIR}" || true
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/nginx.log" "${ARTIFACT_DIR}" || true
-  if [ "${brew_rpm_download_failed}" == true ]; then
-    echo "ERROR: Failed to download RPMs from brew"
-    exit 1
-  fi
 }
 trap 'finalize' EXIT
 
