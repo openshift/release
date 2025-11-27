@@ -73,6 +73,7 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
   BMC_NETWORK="${2}"
   IPI_BOOTSTRAP_IP="${3}"
   IP_ARRAY=("${@:4}")
+
   for ip in "${IP_ARRAY[@]}"; do
     # TODO: change to firewalld or nftables
     if [[ "${IPI_BOOTSTRAP_IP}" != "UPI" ]]; then
@@ -86,6 +87,22 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${fw_ip[@]}"
   fi
 EOF
 
-# mirror-images-by-oc-adm will run only if a specific file is found, see step code
-cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"
+# every passed variable after a bash array gets merged into the same array
+# this is the reason why RELEASE_IMAGE_LATEST is passed as 1st variable and this is a separated script
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${RELEASE_IMAGE_LATEST}" "${IP_ARRAY[@]}" <<'EOF'
+  set -o nounset
+  set -o errexit
+  RELEASE_IMAGE_LATEST="${1}"
+  IP_ARRAY=("${@:2}")
 
+  IFS=$'\n' PROW_BUILDFARM_IPS=($(getent hosts ${RELEASE_IMAGE_LATEST%%/*} | cut -d' ' -f1))
+
+  for ip in "${IP_ARRAY[@]}"; do
+    for buildfarm_ip in "${PROW_BUILDFARM_IPS[@]}"; do
+      iptables -A FORWARD -s "${ip}" -d "${buildfarm_ip}" -j ACCEPT
+    done
+  done
+EOF
+
+# mirror-images-by-oc-adm will run only if a specific file is found, see step code
+#cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"
