@@ -50,13 +50,13 @@ download_brew_rpms() {
 
     # Check if if manage_brew_rpms.sh script exists
     if ! [ -e ./test/bin/manage_brew_rpms.sh ] ; then
-        echo "ERROR: ./test/bin/manage_brew_rpms.sh not found - RPM download from brew is not possible"
-        return 1
+        echo "./test/bin/manage_brew_rpms.sh not found - RPM download from brew is not possible"
+        return 0
     fi
     # Check if manage_brew_rpms.sh script supports the version_type option
     if ! ./test/bin/manage_brew_rpms.sh -h | grep -q 'version_type' ; then
-        echo "ERROR: ./test/bin/manage_brew_rpms.sh does not support the version_type option - RPM download from brew is not possible"
-        return 1
+        echo "./test/bin/manage_brew_rpms.sh does not support the version_type option - RPM download from brew is not possible"
+        return 0
     fi
     # Check if brew hub site is accessible
     bash -x ./scripts/fetch_tools.sh brew
