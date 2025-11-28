@@ -6,7 +6,7 @@ set -o pipefail
 
 PULL_SECRET=/var/run/vault/deploy-konflux-operator-art-image-share
 TOOLS_DIR=/tmp/bin
-DEPLOY_KONFLUX_OPERATOR_VERSION=v5.0
+DEPLOY_KONFLUX_OPERATOR_VERSION=v6.0
 
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
@@ -39,7 +39,7 @@ function install_deps() {
     run_command "mkdir -p ${TOOLS_DIR}"
     run_command "export PATH=${TOOLS_DIR}:${PATH}"
     install_opm
-    install_oc # we need a modern client
+    #install_oc # we need a modern client
 }
 
 function install_secret() {
