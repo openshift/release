@@ -96,18 +96,18 @@ EXPECTED_CONTROL_PLANE_SIZE="${CONTROL_PLANE_SIZE}"
 
 # Verify that size values can be read from install-config
 if [ -z "${EXPECTED_COMPUTE_SIZE}" ] || [ "${EXPECTED_COMPUTE_SIZE}" == "null" ]; then
-  echo "ERROR: Unable to read compute rootVolume size from install-config.yaml"
+  echo "ERROR: Unable to read worker rootVolume size from install-config.yaml"
   exit 1
 fi
 if [ -z "${EXPECTED_CONTROL_PLANE_SIZE}" ] || [ "${EXPECTED_CONTROL_PLANE_SIZE}" == "null" ]; then
-  echo "ERROR: Unable to read control plane rootVolume size from install-config.yaml"
+  echo "ERROR: Unable to read control-plane rootVolume size from install-config.yaml"
   exit 1
 fi
 
-echo "Expected compute throughput: ${EXPECTED_COMPUTE_THROUGHPUT:-N/A} MiB/s"
-echo "Expected control plane throughput: ${EXPECTED_CONTROL_PLANE_THROUGHPUT:-N/A} MiB/s"
 echo "Expected worker rootVolume size: ${EXPECTED_COMPUTE_SIZE} GiB"
+echo "Expected worker throughput: ${EXPECTED_COMPUTE_THROUGHPUT:-N/A} MiB/s"
 echo "Expected control-plane rootVolume size: ${EXPECTED_CONTROL_PLANE_SIZE} GiB"
+echo "Expected control-plane throughput: ${EXPECTED_CONTROL_PLANE_THROUGHPUT:-N/A} MiB/s"
 
 ret=0
 declare -a FAILURE_SUMMARY=()
@@ -222,8 +222,8 @@ function verify_nodes() {
 echo "Checking worker nodes"
 verify_nodes "node-role.kubernetes.io/worker" "worker" "${EXPECTED_COMPUTE_SIZE}" "${EXPECTED_COMPUTE_THROUGHPUT}"
 
-echo "Checking control plane nodes"
-verify_nodes "node-role.kubernetes.io/master" "control plane" "${EXPECTED_CONTROL_PLANE_SIZE}" "${EXPECTED_CONTROL_PLANE_THROUGHPUT}"
+echo "Checking control-plane nodes"
+verify_nodes "node-role.kubernetes.io/master" "control-plane" "${EXPECTED_CONTROL_PLANE_SIZE}" "${EXPECTED_CONTROL_PLANE_THROUGHPUT}"
 
 echo "=========================================="
 echo "Test Summary"
