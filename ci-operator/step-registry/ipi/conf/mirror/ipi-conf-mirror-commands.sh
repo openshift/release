@@ -36,7 +36,7 @@ else
     echo >> "${additional_trust_bundle}"
     cat /var/run/vault/mirror-registry/client_ca.crt >> "${additional_trust_bundle}"
 fi
-
+echo "Debugging..."
 if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   echo >> "${additional_trust_bundle}"
   cat "${CLUSTER_PROFILE_DIR}/shift-ca-chain.cert.pem" >> "${additional_trust_bundle}"

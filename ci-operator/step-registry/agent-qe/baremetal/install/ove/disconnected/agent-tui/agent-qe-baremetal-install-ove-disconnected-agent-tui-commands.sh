@@ -64,4 +64,5 @@ for pid in "${pids[@]}"; do
 #    exit 1
   fi
 done
+echo "debugging...."
 echo "Agent TUI execution completed successfully!"

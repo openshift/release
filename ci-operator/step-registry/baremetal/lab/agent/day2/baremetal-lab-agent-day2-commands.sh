@@ -62,6 +62,8 @@ if [ "${ADDITIONAL_WORKERS_DAY2}" != "true" ]; then
    exit 0
 fi
 
+total_workers="${ADDITIONAL_WORKERS_DAY2}"
+
 function mount_virtual_media() {
   local host="${1}"
   local iso_path="${2}"
@@ -167,18 +169,36 @@ done
 day2_IPs=${day2_IPs%,}
 touch /tmp/output.txt
 
-echo "Monitoring day2 workers and pending CSRs..."
+function wait_for_text_and_approve_csrs() {
+  local text="$1"
+  for ((i=0; i<10; i++)); do
+    count=$(grep -o "'$text'" /tmp/output.txt | wc -l | tr -d ' ')
+    count=${count:-0}
+    if [ "$count" -eq "$total_workers" ]; then
+      echo "'$text' count matches the total workers count. Approving CSRs..."
+      sleep 10
+      pending_csrs=$(oc get csr | grep Pending | awk '{print $1}')
+      for csr in $pending_csrs; do
+        echo "Approving CSR: $csr"
+        oc adm certificate approve "$csr"
+      done
+      break
+    fi
 
-/tmp/oc adm node-image monitor --ip-addresses "${day2_IPs}" -a "${day2_pull_secret}" --insecure=true 2>&1 | \
-  tee /tmp/output.txt | while IFS= read -r line; do
-  echo "$line"
-  if [[ "$line" = *"with signerName kubernetes.io/kube-apiserver-client-kubelet and username system:serviceaccount:openshift-machine-config-operator:node-bootstrapper is Pending and awaiting approval"* ]] || [[ "$line" = *"with signerName kubernetes.io/kubelet-serving and username "*" is Pending and awaiting approval"* ]]; then
-    node_ip=$(echo "$line" | sed 's/^.*Node \(.*\): CSR.*$/\1/')
-    csr=$(echo "$line" | sed 's/^.*CSR \([^ ]*\).*$/\1/')
-    echo "Approving CSR $csr for node $node_ip"
-    oc adm certificate approve "$csr"
-  fi
-done
+    echo "Waiting 30s before next check..."
+    sleep 30
+  done
+}
+
+echo "Monitoring additional worker nodes IPs ${day2_IPs} to join the cluster"
+sleep 60
+oc adm node-image monitor --ip-addresses "${day2_IPs}" -a "${day2_pull_secret}" --insecure=true 2>&1 | tee /tmp/output.txt &
+echo "Adding a 30-minute delay to allow all worker nodes to reach the state 'Kubelet is running'."
+sleep 30m
+
+wait_for_text_and_approve_csrs "Kubelet"
+echo "Approving next sets of CSRs..."
+wait_for_text_and_approve_csrs "Node joined"
 
 EXIT_STATUS="${PIPESTATUS[0]}"
 rm -f "${day2_pull_secret}"
