@@ -6,7 +6,7 @@ set -o pipefail
 
 PULL_SECRET=/var/run/vault/deploy-konflux-operator-art-image-share
 TOOLS_DIR=/tmp/bin
-DEPLOY_KONFLUX_OPERATOR_VERSION=v7.0
+DEPLOY_KONFLUX_OPERATOR_VERSION=v7.1
 
 if [[ -n "${KONFLUX_TARGET_OPERATORS:-}" && -n "${KONFLUX_TARGET_FBC_TAGS:-}" ]]; then
     echo "ERROR: KONFLUX_TARGET_OPERATORS and KONFLUX_TARGET_FBC_TAGS cannot be set at the same time"
