@@ -647,6 +647,129 @@ done
 
 log_success "Node reboot testing completed"
 
+# Phase 2.5: Real Traffic Validation (Addresses @huiran0826 feedback) 
+log_info "==============================="
+log_info "PHASE 2.5: Real Egress IP Traffic Validation"
+log_info "==============================="
+
+log_info "Testing actual egress IP traffic flow to external services..."
+log_info "This addresses @huiran0826's feedback to use real traffic checking instead of SNAT/LRP checking"
+
+validate_real_egress_traffic() {
+    local eip_address
+    eip_address=$(oc get egressip "$EIP_NAME" -o jsonpath='{.spec.egressIPs[0]}' 2>/dev/null || echo "")
+    
+    if [[ -z "$eip_address" ]]; then
+        log_error "Could not get egress IP address for $EIP_NAME"
+        return 1
+    fi
+    
+    log_info "Expected egress IP: $eip_address"
+    
+    # Create temporary test pod that matches the egress IP selectors
+    log_info "Creating test pod that matches egress IP selectors..."
+    cat << EOF | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: egress-traffic-test
+  labels:
+    egress: $EIP_NAME
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: traffic-validator
+  namespace: egress-traffic-test
+  labels:
+    app: "egress-test-app"
+    egress-enabled: "true"
+spec:
+  containers:
+  - name: curl-container
+    image: quay.io/openshift/origin-network-tools:latest
+    command: ["/bin/sleep", "300"]
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "50m"
+      limits:
+        memory: "128Mi"
+        cpu: "100m"
+  restartPolicy: Never
+EOF
+    
+    # Wait for pod to be ready
+    log_info "Waiting for traffic test pod to be ready..."
+    if ! oc wait --for=condition=Ready pod/traffic-validator -n egress-traffic-test --timeout=60s; then
+        log_error "Traffic test pod did not become ready"
+        oc delete namespace egress-traffic-test --ignore-not-found=true &>/dev/null
+        return 1
+    fi
+    
+    # Test 1: httpbin.org (returns source IP in JSON)
+    log_info "Testing external connectivity via httpbin.org..."
+    local actual_source_ip
+    actual_source_ip=$(oc exec -n egress-traffic-test traffic-validator -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
+    
+    if [[ -n "$actual_source_ip" ]]; then
+        if [[ "$actual_source_ip" == "$eip_address" ]]; then
+            log_success "✅ REAL TRAFFIC VALIDATION PASSED"
+            log_success "    External service sees correct egress IP: $actual_source_ip"
+            echo "httpbin_test,PASS,$actual_source_ip" >> "$ARTIFACT_DIR/real_traffic_validation.csv"
+            oc delete namespace egress-traffic-test --ignore-not-found=true &>/dev/null
+            return 0
+        else
+            log_error "❌ REAL TRAFFIC VALIDATION FAILED"
+            log_error "    Expected egress IP: $eip_address"
+            log_error "    Actual source IP seen by external service: $actual_source_ip"
+            echo "httpbin_test,FAIL,$actual_source_ip" >> "$ARTIFACT_DIR/real_traffic_validation.csv"
+        fi
+    else
+        log_warning "Could not reach httpbin.org - trying backup service"
+        echo "httpbin_test,FAIL,no_connectivity" >> "$ARTIFACT_DIR/real_traffic_validation.csv"
+    fi
+    
+    # Test 2: ifconfig.me (backup service)
+    log_info "Testing with backup external service (ifconfig.me)..."
+    local backup_source_ip
+    backup_source_ip=$(oc exec -n egress-traffic-test traffic-validator -- timeout 20 curl -s https://ifconfig.me 2>/dev/null | tr -d '\r\n ' || echo "")
+    
+    if [[ -n "$backup_source_ip" ]]; then
+        if [[ "$backup_source_ip" == "$eip_address" ]]; then
+            log_success "✅ BACKUP TRAFFIC VALIDATION PASSED"
+            log_success "    External service sees correct egress IP: $backup_source_ip"
+            echo "ifconfig_test,PASS,$backup_source_ip" >> "$ARTIFACT_DIR/real_traffic_validation.csv"
+            oc delete namespace egress-traffic-test --ignore-not-found=true &>/dev/null
+            return 0
+        else
+            log_error "❌ BACKUP TRAFFIC VALIDATION ALSO FAILED"
+            log_error "    Expected egress IP: $eip_address"
+            log_error "    Actual source IP: $backup_source_ip"
+            echo "ifconfig_test,FAIL,$backup_source_ip" >> "$ARTIFACT_DIR/real_traffic_validation.csv"
+        fi
+    else
+        log_error "Could not reach any external services"
+        echo "ifconfig_test,FAIL,no_connectivity" >> "$ARTIFACT_DIR/real_traffic_validation.csv"
+    fi
+    
+    # Cleanup
+    oc delete namespace egress-traffic-test --ignore-not-found=true &>/dev/null
+    return 1
+}
+
+# Initialize traffic validation results
+echo "service,result,source_ip" > "$ARTIFACT_DIR/real_traffic_validation.csv"
+
+# Run traffic validation
+if validate_real_egress_traffic; then
+    log_success "✅ Real egress IP traffic validation completed successfully"
+    TRAFFIC_VALIDATION_PASSED=true
+else
+    log_error "❌ Real egress IP traffic validation failed"
+    TRAFFIC_VALIDATION_PASSED=false
+fi
+
 # Final validation and summary
 log_info "==============================="
 log_info "FINAL VALIDATION & SUMMARY"
@@ -944,7 +1067,13 @@ fi
 log_info "==============================="
 
 if [[ $FAILED_TESTS -eq 0 ]]; then
-    log_success "🎉 All egress IP resilience tests passed!"
+    if [[ "$TRAFFIC_VALIDATION_PASSED" == "true" ]]; then
+    log_success "🎉 All egress IP resilience tests AND real traffic validation passed!"
+    log_success "✅ This validates both OVN rule management AND actual traffic flow"
+else
+    log_warning "⚠️ Resilience tests passed but real traffic validation failed"
+    log_warning "This indicates OVN rules are correct but actual traffic is not flowing properly"
+fi
 else
     error_exit "❌ $FAILED_TESTS test(s) failed - egress IP resilience testing incomplete"
 fi

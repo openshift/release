@@ -440,6 +440,106 @@ else
     fi
 fi
 
+# Phase 2.5: Real Traffic Validation (Addresses @huiran0826 feedback)
+log_info "==============================="
+log_info "PHASE 2.5: Real Egress IP Traffic Validation"
+log_info "==============================="
+
+log_info "Testing actual traffic flow through egress IPs to external services..."
+log_info "This validates real traffic usage instead of just SNAT/LRP rule checking"
+
+# Function to test actual egress traffic
+test_egress_traffic() {
+    local eip_name="$1"
+    local expected_eip="$2"
+    local namespace="${NAMESPACE_PREFIX}$(echo "$eip_name" | grep -o '[0-9]*$')"
+    
+    log_info "Testing traffic for $eip_name with IP $expected_eip in namespace $namespace"
+    
+    # Get a test pod from this namespace
+    local test_pod
+    test_pod=$(oc get pods -n "$namespace" -l app=scale-test-pod --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    
+    if [[ -z "$test_pod" ]]; then
+        log_warning "No running pods found in namespace $namespace for traffic testing"
+        return 1
+    fi
+    
+    log_info "Using test pod: $test_pod in namespace $namespace"
+    
+    # Test external connectivity and verify source IP
+    local actual_source_ip
+    actual_source_ip=$(oc exec -n "$namespace" "$test_pod" -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
+    
+    if [[ -n "$actual_source_ip" ]]; then
+        if [[ "$actual_source_ip" == "$expected_eip" ]]; then
+            log_success "✅ REAL TRAFFIC TEST PASSED for $eip_name"
+            log_success "    External service sees correct egress IP: $actual_source_ip"
+            echo "$eip_name,traffic_test,PASS,$actual_source_ip" >> "$ARTIFACT_DIR/traffic_validation.csv"
+            return 0
+        else
+            log_error "❌ REAL TRAFFIC TEST FAILED for $eip_name"
+            log_error "    Expected: $expected_eip, Actual: $actual_source_ip"
+            
+            # Try backup service
+            log_info "Trying backup external service (ifconfig.me)..."
+            local backup_ip
+            backup_ip=$(oc exec -n "$namespace" "$test_pod" -- timeout 20 curl -s https://ifconfig.me 2>/dev/null | tr -d '\r\n ' || echo "")
+            
+            if [[ "$backup_ip" == "$expected_eip" ]]; then
+                log_success "✅ BACKUP TRAFFIC TEST PASSED for $eip_name: $backup_ip"
+                echo "$eip_name,traffic_test,PASS,$backup_ip" >> "$ARTIFACT_DIR/traffic_validation.csv"
+                return 0
+            else
+                log_error "❌ BACKUP TRAFFIC TEST ALSO FAILED: expected $expected_eip, got '$backup_ip'"
+                echo "$eip_name,traffic_test,FAIL,$actual_source_ip" >> "$ARTIFACT_DIR/traffic_validation.csv"
+                return 1
+            fi
+        fi
+    else
+        log_error "❌ Could not reach external services from pod $test_pod"
+        echo "$eip_name,traffic_test,FAIL,no_connectivity" >> "$ARTIFACT_DIR/traffic_validation.csv"
+        return 1
+    fi
+}
+
+# Initialize traffic validation results
+echo "egressip,test_type,result,source_ip" > "$ARTIFACT_DIR/traffic_validation.csv"
+
+# Test traffic for each EgressIP
+traffic_tests_passed=0
+traffic_tests_failed=0
+
+for ((i=1; i<=EIP_COUNT; i++)); do
+    eip_name="eip-scale-$i"
+    egress_ip=$(oc get egressip "$eip_name" -o jsonpath='{.spec.egressIPs[0]}' 2>/dev/null || echo "")
+    
+    if [[ -n "$egress_ip" ]]; then
+        if test_egress_traffic "$eip_name" "$egress_ip"; then
+            traffic_tests_passed=$((traffic_tests_passed + 1))
+        else
+            traffic_tests_failed=$((traffic_tests_failed + 1))
+        fi
+        sleep 2  # Brief pause between tests
+    else
+        log_warning "Skipping traffic test for $eip_name - no IP defined"
+        traffic_tests_failed=$((traffic_tests_failed + 1))
+    fi
+done
+
+log_info "Real Traffic Validation Results:"
+log_info "  - Tests Passed: $traffic_tests_passed"
+log_info "  - Tests Failed: $traffic_tests_failed"
+log_info "  - Success Rate: $((traffic_tests_passed * 100 / (traffic_tests_passed + traffic_tests_failed)))%"
+
+if [[ $traffic_tests_passed -eq 0 ]]; then
+    log_error "❌ ALL TRAFFIC TESTS FAILED - This indicates egress IPs are not working for actual traffic"
+elif [[ $traffic_tests_failed -gt 0 ]]; then
+    log_warning "⚠️  Some traffic tests failed - partial egress IP functionality"
+else
+    log_success "✅ ALL TRAFFIC TESTS PASSED - Egress IPs are working correctly for real traffic"
+fi
+
 # Phase 3: Final Validation
 log_info "==============================="
 log_info "PHASE 3: Final Validation"
@@ -466,11 +566,18 @@ log_info "  - Passed: $PASSED_TESTS"
 log_info "  - Failed: $FAILED_TESTS"
 log_info "  - Success rate: $((PASSED_TESTS * 100 / TOTAL_TESTS))%" 2>/dev/null || log_info "  - Success rate: 0%"
 log_info ""
-log_info "Final Rule Counts:"
+log_info "Real Traffic Validation Results:"
+log_info "  - Traffic tests passed: $traffic_tests_passed"
+log_info "  - Traffic tests failed: $traffic_tests_failed"
+log_info "  - Traffic success rate: $((traffic_tests_passed * 100 / (traffic_tests_passed + traffic_tests_failed)))%"
+log_info ""
+log_info "Final Rule Counts (Reference):"
 FINAL_SNAT=$(count_snat_rules)
 FINAL_LRP=$(count_lrp_rules)
 log_info "  - SNAT rules: $FINAL_SNAT/$TOTAL_PODS"
 log_info "  - LRP rules: $FINAL_LRP/$TOTAL_PODS"
+log_info ""
+log_info "NOTE: Primary validation is real traffic flow, SNAT/LRP counts are reference only"
 
 # Create comprehensive summary file
 cat > "$ARTIFACT_DIR/scale_test_summary.txt" << EOF
@@ -498,11 +605,19 @@ Test completed at: $(date)
 Total runtime: $SECONDS seconds
 EOF
 
-if [[ $FAILED_TESTS -eq 0 ]]; then
+if [[ $FAILED_TESTS -eq 0 ]] && [[ $traffic_tests_failed -eq 0 ]]; then
     log_success "🎉 Scale test completed successfully with all validations passed!"
+    log_success "✅ Both SNAT/LRP rule validation AND real traffic validation passed"
+elif [[ $traffic_tests_passed -gt 0 ]]; then
+    log_warning "⚠️ Scale test completed with some issues:"
+    log_warning "  - SNAT/LRP validation failures: $FAILED_TESTS"
+    log_warning "  - Traffic validation failures: $traffic_tests_failed"
+    log_warning "  - Traffic validation successes: $traffic_tests_passed"
+    log_info "Check detailed results in: $ARTIFACT_DIR/rule_validation.csv and $ARTIFACT_DIR/traffic_validation.csv"
 else
-    log_warning "⚠️ Scale test completed with $FAILED_TESTS failed validations"
-    log_info "Check detailed results in: $ARTIFACT_DIR/rule_validation.csv"
+    log_error "❌ Scale test failed - no successful traffic validations"
+    log_error "This indicates egress IPs are not working for actual traffic flow"
+    log_info "Check detailed results in: $ARTIFACT_DIR/rule_validation.csv and $ARTIFACT_DIR/traffic_validation.csv"
 fi
 
 log_info "Comprehensive results saved to: $ARTIFACT_DIR/"
