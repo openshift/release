@@ -69,19 +69,6 @@ compute:
 EOF
   cat "${PATCH}"
   yq-go m -x -i "${CONFIG}" "${PATCH}"
-elif [[ -n "${AWS_DEFAULT_GP3_THROUGHPUT:-}" ]]; then
-  # Fallback to defaultMachinePlatform throughput value if compute-specific value is not set
-  echo "Setting compute rootVolume throughput only: ${AWS_DEFAULT_GP3_THROUGHPUT}"
-  PATCH=$(mktemp)
-  cat >> "${PATCH}" << EOF
-compute:
-- platform:
-    aws:
-      rootVolume:
-        throughput: ${AWS_DEFAULT_GP3_THROUGHPUT}
-EOF
-  cat "${PATCH}"
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
 fi
 
 # Handle controlPlane rootVolume configuration
@@ -109,19 +96,6 @@ controlPlane:
     aws:
       rootVolume:
         throughput: ${AWS_CONTROL_PLANE_GP3_THROUGHPUT}
-EOF
-  cat "${PATCH}"
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
-elif [[ -n "${AWS_DEFAULT_GP3_THROUGHPUT:-}" ]]; then
-  # Fallback to defaultMachinePlatform throughput value if controlPlane-specific value is not set
-  echo "Setting controlPlane rootVolume throughput only: ${AWS_DEFAULT_GP3_THROUGHPUT}"
-  PATCH=$(mktemp)
-  cat >> "${PATCH}" << EOF
-controlPlane:
-  platform:
-    aws:
-      rootVolume:
-        throughput: ${AWS_DEFAULT_GP3_THROUGHPUT}
 EOF
   cat "${PATCH}"
   yq-go m -x -i "${CONFIG}" "${PATCH}"
