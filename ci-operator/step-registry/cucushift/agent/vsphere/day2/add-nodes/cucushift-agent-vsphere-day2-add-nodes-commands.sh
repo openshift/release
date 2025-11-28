@@ -154,9 +154,6 @@ oc adm node-image create --dir="${dir}" --insecure=true
 echo "node_${folder_name}.iso" >"${SHARED_DIR}"/node-iso.txt
 node_iso=$(<"${SHARED_DIR}"/node-iso.txt)
 
-echo "Download node iso for debugging....."
-sleep 20m
-
 echo "uploading ${node_iso} to iso-datastore.."
 
 for ((i = 0; i < 3; i++)); do
@@ -213,38 +210,38 @@ for ((i = 0; i < total_workers; i++)); do
     -on=true "/${vsphere_datacenter}/vm/${folder_name}/${vm_name}"
 done
 
-# To check if there are pending CSRs
-function wait_for_pending_csrs_and_approve() {
-  for ((i = 0; i < 3; i++)); do
-    pending_csrs=$(oc get csr | grep Pending | awk '{print $1}')
-    if [ -n "$pending_csrs" ]; then
+function wait_for_text_and_approve_csrs() {
+  local text="$1"
+  for ((i=0; i<10; i++)); do
+    count=$(grep -o "$text" /tmp/output.txt | wc -l | tr -d ' ')
+    count=${count:-0}
+
+    if [ "$count" -eq "$total_workers" ]; then
+      echo "'$text' count matches the total workers count. Approving CSRs..."
+      sleep 10
+      pending_csrs=$(oc get csr | grep Pending | awk '{print $1}')
       for csr in $pending_csrs; do
         echo "Approving CSR: $csr"
         oc adm certificate approve "$csr"
       done
-      echo "All pending CSRs approved."
       break
     fi
-    echo "No pending CSRs found. Waiting..."
+
+    echo "Waiting 30s before next check..."
     sleep 30
   done
 }
 
 echo "Monitoring additional worker nodes IPs ${ipv4_addresses} to join the cluster"
 sleep 60
-oc adm node-image monitor --ip-addresses "${ipv4_addresses%,}" 2>&1 | tee output.txt &
+oc adm node-image monitor --ip-addresses "${ipv4_addresses%,}" 2>&1 | tee /tmp/output.txt &
+echo "Adding a 7-minute delay to allow all worker nodes to reach the state 'Kubelet is running'."
+sleep 7m
 
-for ((i = 0; i < 20; i++)); do
-  if grep -q "Kubelet" output.txt; then
-    # TODO: Handle CSR approvals based on pending CSRs that require DNS entries for nodes.
-    wait_for_pending_csrs_and_approve
-    sleep 20
-    wait_for_pending_csrs_and_approve
-    break
-  fi
-  sleep 30
-done
+wait_for_text_and_approve_csrs "Kubelet"
+echo "Approving next sets of CSRs..."
+wait_for_text_and_approve_csrs "Node joined"
 
-# Add operators status checking until monitoring enhanced to do this
+## Add operators status checking until monitoring enhanced to do this
 echo "Ensure that all the cluster operators remain stable and ready"
 oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m

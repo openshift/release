@@ -25,7 +25,10 @@ unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
 #echo "Installing from initial release $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
-oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" registry.build10.ci.openshift.org/ci-ln-mxk5lb2/release:latest \
+#oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" \
+#  --command=openshift-install --to=/tmp
+
+oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" registry.build09.ci.openshift.org/ci-ln-ivj3i6b/release:latest \
   --command=openshift-install --to=/tmp
 
 echo "Creating agent image..."

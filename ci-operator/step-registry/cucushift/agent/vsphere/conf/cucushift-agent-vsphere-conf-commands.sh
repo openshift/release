@@ -66,11 +66,12 @@ rendezvous_ip_address=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$
 
 echo "${rendezvous_ip_address}" >"${SHARED_DIR}"/node-zero-ip.txt
 
+#cp "${CLUSTER_PROFILE_DIR}"/pull-secret /tmp/pull-secret
+#oc registry login --to /tmp/pull-secret
 cp /var/run/vault/secrets/.dockerconfigjson /tmp/pull-secret
 #oc registry login --to /tmp/pull-secret
 pull_secret_path=/tmp/pull-secret
-sleep 300
-echo "start debugging..."
+
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
 # Create base-domain.txt
 echo "vmc-ci.devcluster.openshift.com" >"${SHARED_DIR}"/base-domain.txt
