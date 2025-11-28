@@ -14,17 +14,22 @@ function append_throughput_if_needed() {
 
   case "${volume_type}" in
     gp3)
+      local throughput=""
       if [[ -n "${compute_throughput}" ]]; then
-        cat >> "${patch_file}" << EOF
-        throughput: ${compute_throughput}
-EOF
+        throughput="${compute_throughput}"
       elif [[ -n "${control_plane_throughput}" ]]; then
-        cat >> "${patch_file}" << EOF
-        throughput: ${control_plane_throughput}
-EOF
+        throughput="${control_plane_throughput}"
       elif [[ -n "${AWS_DEFAULT_GP3_THROUGHPUT:-}" ]]; then
+        throughput="${AWS_DEFAULT_GP3_THROUGHPUT}"
+      fi
+
+      if [[ -n "${throughput}" ]]; then
+        # Calculate minimum iops required: throughput / iops <= 0.25, so iops >= throughput / 0.25
+        # Round up to nearest 100 for safety
+        local min_iops=$(( (throughput * 4 + 99) / 100 * 100 ))
         cat >> "${patch_file}" << EOF
-        throughput: ${AWS_DEFAULT_GP3_THROUGHPUT}
+        iops: ${min_iops}
+        throughput: ${throughput}
 EOF
       fi
       ;;
