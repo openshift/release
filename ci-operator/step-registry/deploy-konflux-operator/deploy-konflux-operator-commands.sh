@@ -7,10 +7,9 @@ set -o pipefail
 PULL_SECRET=/var/run/vault/deploy-konflux-operator-art-image-share
 TOOLS_DIR=/tmp/bin
 DEPLOY_KONFLUX_OPERATOR_VERSION=v7.0
-export KONFLUX_DEPLOY_OPERATOR=${KONFLUX_DEPLOY_SUBSCRIPTION:-"true"}
 
-if [[ -n "${DEPLOY_KONFLUX_OPERATORS:-}" && -n "${DEPLOY_KONFLUX_FBC_TAGS:-}" ]]; then
-    echo "ERROR: DEPLOY_KONFLUX_OPERATORS and DEPLOY_KONFLUX_FBC_TAGS cannot be set at the same time"
+if [[ -n "${KONFLUX_TARGET_OPERATORS:-}" && -n "${KONFLUX_TARGET_FBC_TAGS:-}" ]]; then
+    echo "ERROR: KONFLUX_TARGET_OPERATORS and KONFLUX_TARGET_FBC_TAGS cannot be set at the same time"
     exit 1
 fi
 
@@ -66,11 +65,11 @@ function deploy_operators() {
     run_command "chmod -R a+x deploy-konflux-operator"
 
     declare args=()
-    if [[ -n "${DEPLOY_KONFLUX_OPERATORS:-}" ]]; then
-        args+=(--operator "${DEPLOY_KONFLUX_OPERATORS}")
+    if [[ -n "${KONFLUX_TARGET_OPERATORS:-}" ]]; then
+        args+=(--operator "${KONFLUX_TARGET_OPERATORS}")
     fi
-    if [[ -n "${DEPLOY_KONFLUX_FBC_TAGS:-}" ]]; then
-        args+=(--fbc-tag "${DEPLOY_KONFLUX_FBC_TAGS}")
+    if [[ -n "${KONFLUX_TARGET_FBC_TAGS:-}" ]]; then
+        args+=(--fbc-tag "${KONFLUX_TARGET_FBC_TAGS}")
     fi
     run_command "deploy-konflux-operator/deploy-operator.sh ${args[*]}"
 }
