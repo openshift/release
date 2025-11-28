@@ -94,7 +94,7 @@ export CLUSTER_NAME="hcp-s390x-mgmt-ci-$job_id"
 # Login to IBM Cloud
 # -----------------------------
 echo "Logging in to IBM Cloud..."
-ibmcloud login --apikey "$IC_API_KEY" -r "$REGION" -g "$RESOURCE_GROUP" || { echo "Login failed"; exit 1; }
+ibmcloud login --apikey "$IC_API_KEY" -r "$IC_REGION" -g "$RESOURCE_GROUP" || { echo "Login failed"; exit 1; }
 
 # Fetching the VSI list with the Zone field
 # ------------------------------

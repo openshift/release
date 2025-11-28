@@ -131,7 +131,7 @@ export IC_API_KEY
 
 # Login to IBM cloud
 echo "Logging in to IBM Cloud..."
-ibmcloud login --apikey "$IC_API_KEY" -r "$REGION" -g "$RESOURCE_GROUP" || { echo "Login failed"; exit 1; }
+ibmcloud login --apikey "$IC_API_KEY" -r "$IC_REGION" -g "$RESOURCE_GROUP" || { echo "Login failed"; exit 1; }
 echo "Login successful."
 
 # To get the bastion node IP

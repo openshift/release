@@ -90,7 +90,7 @@ done
 # 1. Login to IBM Cloud
 # -----------------------------
 echo "Logging in to IBM Cloud..."
-ibmcloud login --apikey "$IC_API_KEY" -r "$REGION" -g "$RESOURCE_GROUP" || { echo "Login failed"; exit 1; }
+ibmcloud login --apikey "$IC_API_KEY" -r "$IC_REGION" -g "$RESOURCE_GROUP" || { echo "Login failed"; exit 1; }
 
 # -------------------------
 # 2. Fetch ALL reserved IPs of all VSIs
