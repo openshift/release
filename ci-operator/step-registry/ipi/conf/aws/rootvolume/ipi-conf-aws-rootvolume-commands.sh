@@ -15,6 +15,7 @@ function append_throughput_if_needed() {
   case "${volume_type}" in
     gp3)
       local throughput=""
+      # Priority: compute_throughput > control_plane_throughput > AWS_DEFAULT_GP3_THROUGHPUT
       if [[ -n "${compute_throughput}" ]]; then
         throughput="${compute_throughput}"
       elif [[ -n "${control_plane_throughput}" ]]; then
