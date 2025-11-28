@@ -462,9 +462,10 @@ run_node_reboot_test() {
     fi
     
     # Check if we're in CI environment with namespace cleanup issues
-    local namespace_check
-    namespace_check=$(oc get namespace "$(oc config view --minify --output 'jsonpath={..namespace}')" 2>&1)
-    if [[ "$namespace_check" =~ "not found" ]]; then
+    # Test if oc debug fails due to namespace issues
+    local debug_test_output
+    debug_test_output=$(oc debug node/"$selected_node" --quiet -- echo "test" 2>&1)
+    if [[ "$debug_test_output" =~ "not found"|"namespaces.*not found"|"unable to get namespace" ]]; then
         log_warning "Detected CI environment with namespace cleanup - oc debug will not work"
         log_info "Simulating reboot test by checking node readiness patterns instead"
         
@@ -827,7 +828,7 @@ run_multinode_migration_test() {
     target_ovn_pod=$(oc get pods -n "$NAMESPACE" -o wide | grep "ovnkube-node" | grep "$target_node" | awk '{print $1}' | head -1)
     
     if [[ -n "$original_ovn_pod" ]]; then
-        original_snat_count=$(oc exec -n "$NAMESPACE" "$original_ovn_pod" -c ovnkube-controller -- ovn-sbctl --timeout=10 find NAT external_ip="$egress_ip" 2>/dev/null | grep -c "external_ip" || echo "0")
+        original_snat_count=$(oc exec -n "$NAMESPACE" "$original_ovn_pod" -c ovnkube-controller -- ovn-sbctl --timeout=10 find NAT external_ip="$egress_ip" 2>/dev/null | grep -c "external_ip" | tr -d '\n' || echo "0")
         log_info "Original node ($current_node) SNAT count: $original_snat_count"
     else
         log_warning "Could not find OVN pod on original node $current_node"
@@ -835,7 +836,7 @@ run_multinode_migration_test() {
     fi
     
     if [[ -n "$target_ovn_pod" ]]; then
-        target_snat_count=$(oc exec -n "$NAMESPACE" "$target_ovn_pod" -c ovnkube-controller -- ovn-sbctl --timeout=10 find NAT external_ip="$egress_ip" 2>/dev/null | grep -c "external_ip" || echo "0")
+        target_snat_count=$(oc exec -n "$NAMESPACE" "$target_ovn_pod" -c ovnkube-controller -- ovn-sbctl --timeout=10 find NAT external_ip="$egress_ip" 2>/dev/null | grep -c "external_ip" | tr -d '\n' || echo "0")
         log_info "Target node ($target_node) SNAT count: $target_snat_count"
     else
         log_warning "Could not find OVN pod on target node $target_node"
@@ -844,9 +845,9 @@ run_multinode_migration_test() {
     
     # Check logical router policies globally
     if command -v timeout >/dev/null; then
-        new_policy_count=$(timeout 30 oc exec -n "$NAMESPACE" deployment/ovnkube-master -c northd -- ovn-nbctl --timeout=10 find Logical_Router_Static_Route 2>/dev/null | grep -c "nexthop.*$egress_ip" || echo "0")
+        new_policy_count=$(timeout 30 oc exec -n "$NAMESPACE" deployment/ovnkube-master -c northd -- ovn-nbctl --timeout=10 find Logical_Router_Static_Route 2>/dev/null | grep -c "nexthop.*$egress_ip" | tr -d '\n' || echo "0")
     else
-        new_policy_count=$(oc exec -n "$NAMESPACE" deployment/ovnkube-master -c northd -- ovn-nbctl --timeout=10 find Logical_Router_Static_Route 2>/dev/null | grep -c "nexthop.*$egress_ip" || echo "0")
+        new_policy_count=$(oc exec -n "$NAMESPACE" deployment/ovnkube-master -c northd -- ovn-nbctl --timeout=10 find Logical_Router_Static_Route 2>/dev/null | grep -c "nexthop.*$egress_ip" | tr -d '\n' || echo "0")
     fi
     
     log_info "Post-migration OVN state - Original node SNAT: $original_snat_count, Target node SNAT: $target_snat_count, LR policies: $new_policy_count"
