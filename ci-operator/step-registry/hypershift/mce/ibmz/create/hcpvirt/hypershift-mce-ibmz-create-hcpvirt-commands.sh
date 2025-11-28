@@ -236,7 +236,7 @@ echo "✔ HAProxy updated successfully on bastion $BASTION_FIP"
 
 # Download hosted cluster kubeconfig
 echo "$(date) Create hosted cluster kubeconfig"
-${HYPERSHIFT_CLI_NAME} create kubeconfig kubevirt --namespace=${HC_NS} --name=${HC_NAME} >${SHARED_DIR}/virt_kubeconfig
+${HYPERSHIFT_CLI_NAME} create kubeconfig kubevirt --namespace=${HC_NS} --name=${HC_NAME} >${SHARED_DIR}/nested_kubeconfig
 echo "${HC_NAME}" > "${SHARED_DIR}/cluster-name"
 
 # Get NodePort
@@ -244,10 +244,10 @@ NODEPORT=$(oc get svc kube-apiserver -n $HC_NS -o jsonpath='{.spec.ports[?(@.por
 echo "Kube-apiserver NodePort: $NODEPORT"
 
 # Update kubeconfig server URL
-sed -i "s#server: https://.*:6443#server: https://${BASTION_FIP}:${NODEPORT}#g" ${SHARED_DIR}/virt_kubeconfig
+sed -i "s#server: https://.*:6443#server: https://${BASTION_FIP}:${NODEPORT}#g" ${SHARED_DIR}/nested_kubeconfig
 
 # Get the HTTP & HTTPS node port
-HOSTED_KUBECONFIG="${SHARED_DIR}/virt_kubeconfig"
+HOSTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 HTTP_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
   get svc router-nodeport-default -n openshift-ingress \
   -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}')
@@ -348,8 +348,8 @@ echo "*.apps.${DNS_ZONE_NAME}  -->  ${LB_EXTERNAL_IP}"
 
 # Verifying the Hosted Cluster status
 echo "$(date) Checking the Hosted Cluster status"
-oc get no --kubeconfig="${SHARED_DIR}/virt_kubeconfig"
-oc --kubeconfig="${SHARED_DIR}/virt_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
+oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
 
 echo "$(date) Successfully completed the Hosted cluster creation with type Kubevirt"
 
