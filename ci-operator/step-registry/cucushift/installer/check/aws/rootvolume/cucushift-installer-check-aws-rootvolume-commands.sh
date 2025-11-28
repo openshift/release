@@ -94,11 +94,15 @@ EXPECTED_CONTROL_PLANE_SIZE="${CONTROL_PLANE_SIZE}"
 [ -z "${EXPECTED_CONTROL_PLANE_SIZE}" ] || [ "${EXPECTED_CONTROL_PLANE_SIZE}" == "null" ] && \
   EXPECTED_CONTROL_PLANE_SIZE="${DEFAULT_SIZE}"
 
-# Fallback to default if still empty
-[ -z "${EXPECTED_COMPUTE_SIZE}" ] || [ "${EXPECTED_COMPUTE_SIZE}" == "null" ] && \
-  EXPECTED_COMPUTE_SIZE="120"
-[ -z "${EXPECTED_CONTROL_PLANE_SIZE}" ] || [ "${EXPECTED_CONTROL_PLANE_SIZE}" == "null" ] && \
-  EXPECTED_CONTROL_PLANE_SIZE="120"
+# Verify that size values can be read from install-config
+if [ -z "${EXPECTED_COMPUTE_SIZE}" ] || [ "${EXPECTED_COMPUTE_SIZE}" == "null" ]; then
+  echo "ERROR: Unable to read compute rootVolume size from install-config.yaml"
+  exit 1
+fi
+if [ -z "${EXPECTED_CONTROL_PLANE_SIZE}" ] || [ "${EXPECTED_CONTROL_PLANE_SIZE}" == "null" ]; then
+  echo "ERROR: Unable to read control plane rootVolume size from install-config.yaml"
+  exit 1
+fi
 
 echo "Expected compute throughput: ${EXPECTED_COMPUTE_THROUGHPUT:-N/A} MiB/s"
 echo "Expected control plane throughput: ${EXPECTED_CONTROL_PLANE_THROUGHPUT:-N/A} MiB/s"
