@@ -2,7 +2,7 @@ base_images:
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
+    tag: "9"
 build_root:
   image_stream_tag:
     name: release
@@ -13,6 +13,21 @@ images:
   dockerfile_path: Containerfile
   from: ubi_minimal
   to: odh-model-controller
+- dockerfile_literal: |-
+    FROM registry.access.redhat.com/ubi9/python-311:1
+
+    # Prow expects to be able to check out a repo under /go
+    USER 0:0
+    WORKDIR /go
+    RUN chown 1001:0 .
+
+    USER 1001:0
+
+    # The VENV that is activated by default conflicts with KServe
+    # scripts. These variables are set to empty to not activate any
+    # VENV by default.
+    ENV BASH_ENV="" ENV="" PROMPT_COMMAND=""
+  to: odhmc-kserve-tests
 promotion:
   to:
   - namespace: opendatahub-io
@@ -20,9 +35,9 @@ promotion:
 releases:
   latest:
     release:
-      architecture: amd64
+      architecture: multi
       channel: stable
-      version: "4.15"
+      version: "4.18"
 resources:
   '*':
     limits:
@@ -36,6 +51,106 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
+- always_run: false
+  as: e2e-odh-kserve
+  optional: true
+  skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.*/)?(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: raw
+      cli: latest
+      commands: |
+        set -euxo pipefail
+
+        echo "ODH_MODEL_CONTROLLER_IMAGE=${ODH_MODEL_CONTROLLER_IMAGE}"
+
+        git clone https://github.com/opendatahub-io/kserve.git /tmp/kserve
+        pushd /tmp/kserve
+          git fetch --all --tags
+          git checkout stable-2.x
+
+          export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
+          export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"
+
+          echo "Loading environment variables from params.env"
+          #Parse params.env into shell vars with underscores instead of dashes
+          while IFS='=' read -r key value; do
+            case "$key" in
+              ''|\#*) continue ;;
+            esac
+            key="${key%%[[:space:]]*}"
+            value="${value##[[:space:]]}"
+            sane_key="${key//-/_}"
+            printf -v "$sane_key" '%s' "$value"
+          done < config/overlays/odh/params.env
+
+          export KSERVE_CONTROLLER_IMAGE="${kserve_controller}"
+          export KSERVE_AGENT_IMAGE="${kserve_agent}"
+          export KSERVE_ROUTER_IMAGE="${kserve_router}"
+          export KSERVE_STORAGE_INITIALIZER_IMAGE="${kserve_storage_initializer}"
+          export LLMD_IMAGE="${kserve_llm_d}"
+          export LLMD_INFERENCE_SCHEDULER_IMAGE="${kserve_llm_d_inference_scheduler}"
+          export LLMD_ROUTING_SIDECAR_IMAGE="${kserve_llm_d_routing_sidecar}"
+          export OAUTH_PROXY_IMAGE="${oauth_proxy}"
+
+          echo "Loaded all images from params.env:"
+          echo "KSERVE_CONTROLLER_IMAGE=${KSERVE_CONTROLLER_IMAGE}"
+          echo "KSERVE_AGENT_IMAGE=${KSERVE_AGENT_IMAGE}"
+          echo "KSERVE_ROUTER_IMAGE=${KSERVE_ROUTER_IMAGE}"
+          echo "KSERVE_STORAGE_INITIALIZER_IMAGE=${KSERVE_STORAGE_INITIALIZER_IMAGE}"
+          echo "LLMD_IMAGE=${LLMD_IMAGE}"
+          echo "LLMD_INFERENCE_SCHEDULER_IMAGE=${LLMD_INFERENCE_SCHEDULER_IMAGE}"
+          echo "LLMD_ROUTING_SIDECAR_IMAGE=${LLMD_ROUTING_SIDECAR_IMAGE}"
+          echo "OAUTH_PROXY_IMAGE=${OAUTH_PROXY_IMAGE}"
+
+          ./test/scripts/openshift-ci/run-e2e-tests.sh raw 2 raw
+        popd
+      dependencies:
+      - env: ODH_MODEL_CONTROLLER_IMAGE
+        name: odh-model-controller
+      from: odhmc-kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: |
+        cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log "${ARTIFACT_DIR}/" || true
+      from: odhmc-kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: kserve-must-gather
+      best_effort: true
+      cli: latest
+      commands: |
+        oc adm must-gather \
+          --image=quay.io/modh/must-gather:rhoai-2.24 \
+          --dest-dir "${ARTIFACT_DIR}/gather-kserve" \
+          -- "export COMPONENT=kserve; /usr/bin/gather"
+      from: odhmc-kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: odhmc-kserve-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    workflow: hypershift-hostedcluster-workflow
 - as: pr-image-mirror
   skip_if_only_changed: ^(?:config|\.github|hack)/|\.md$|^(?:\.gitignore|\.pre-commit-config\.yaml|OWNERS|PROJECT|LICENSE|\.dockerignore|Makefile)$
   steps:

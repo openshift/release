@@ -6,7 +6,7 @@ set -o pipefail
 
 git clone https://github.com/IshwarKanse/opentelemetry-operator.git /tmp/otel-tests
 cd /tmp/otel-tests 
-git checkout rhosdt-3.7
+git checkout rhosdt-3.8
 
 #Enable user workload monitoring
 oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml

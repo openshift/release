@@ -488,7 +488,10 @@ function ci_custom_link_report() {
       <a class="summary-link" target="_blank" href="${url_prefix}/">
         📁 Scenarios Directory
       </a>
-      <a class="summary-link" target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${step_name}/build-log.txt">
+      <a class="summary-link" target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/openshift-microshift-e2e-metal-tests/build-log.txt">
+        📃 Scenarios Log
+      </a>
+      <a class="summary-link" target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/${job_url_path}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/openshift-microshift-infra-iso-build/build-log.txt">
         📃 Build Log
       </a>
     </div>

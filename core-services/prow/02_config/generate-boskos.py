@@ -237,6 +237,9 @@ CONFIG = {
         'usgovvirginia': 5,
         'usgovtexas': 5
     },
+    'aro-hcp-dev-quota-slice': {
+        'default': 10,
+    },    
     'azure-sustaining-autorelease-412-quota-slice': {
         'eastus': 60,
     },
@@ -247,10 +250,10 @@ CONFIG = {
         'default': 1,
     },
     'aro-hcp-stg-quota-slice': {
-        'default': 1,
+        'default': 3,
     },
     'aro-hcp-prod-quota-slice': {
-        'default': 1,
+        'default': 3,
     },
     'aro-hcp-dev-quota-slice': {
         'default': 10,
@@ -403,6 +406,9 @@ CONFIG = {
     },
     'hypershift-quota-slice': {
         'default': 50,
+    },
+    'powervc-1-quota-slice': {
+        'default': 4,
     },
     'powervs-1-quota-slice': {
         'mon01': 1,
@@ -617,9 +623,7 @@ CONFIG = {
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
-
-# Removing lease libvirt-ppc64le-s2s-1-* lease due to deployment failure.
-for i in (0, 2):
+for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):

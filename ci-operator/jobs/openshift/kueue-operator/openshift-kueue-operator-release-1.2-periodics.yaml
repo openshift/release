@@ -1,6 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build10
+  cron: 4 2 * * *
   decorate: true
   extra_refs:
   - base_ref: release-1.2
@@ -10,7 +11,6 @@ periodics:
     capability/arm64: arm64
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  minimum_interval: 96h
   name: periodic-ci-openshift-kueue-operator-release-1.2-test-e2e-4-18
   reporter_config:
     slack:
@@ -75,6 +75,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
+  cron: 5 3 * * *
   decorate: true
   extra_refs:
   - base_ref: release-1.2
@@ -84,7 +85,6 @@ periodics:
     capability/arm64: arm64
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  minimum_interval: 96h
   name: periodic-ci-openshift-kueue-operator-release-1.2-test-e2e-4-19
   reporter_config:
     slack:
@@ -149,6 +149,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
+  cron: 14 0 * * *
   decorate: true
   extra_refs:
   - base_ref: release-1.2
@@ -160,7 +161,6 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  minimum_interval: 96h
   name: periodic-ci-openshift-kueue-operator-release-1.2-test-e2e-4-19-arm64
   reporter_config:
     slack:
@@ -227,7 +227,86 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
+  cluster: build06
+  cron: 38 0 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: release-1.2
+    org: openshift
+    repo: kueue-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kueue-operator-release-1.2-test-e2e-4-19-fips
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> :volcano:'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=test-e2e-4-19-fips
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
   cluster: build10
+  cron: 9 1 * * *
   decorate: true
   extra_refs:
   - base_ref: release-1.2
@@ -237,7 +316,6 @@ periodics:
     capability/arm64: arm64
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  minimum_interval: 96h
   name: periodic-ci-openshift-kueue-operator-release-1.2-test-e2e-4-20
   reporter_config:
     slack:
@@ -302,6 +380,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build10
+  cron: 3 1 * * *
   decorate: true
   extra_refs:
   - base_ref: release-1.2
@@ -313,7 +392,6 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: gcp
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  minimum_interval: 96h
   name: periodic-ci-openshift-kueue-operator-release-1.2-test-e2e-disconnected
   spec:
     containers:
