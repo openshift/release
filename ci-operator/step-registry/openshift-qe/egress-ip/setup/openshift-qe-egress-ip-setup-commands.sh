@@ -83,6 +83,10 @@ spec:
   namespaceSelector:
     matchLabels:
       egress: egressip1
+  podSelector:
+    matchLabels:
+      app: "egress-test-app"
+      egress-enabled: "true"
   nodeSelector:
     matchLabels:
       k8s.ovn.org/egress-assignable: ""

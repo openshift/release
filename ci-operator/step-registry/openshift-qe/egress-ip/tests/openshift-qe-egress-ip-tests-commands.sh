@@ -110,7 +110,72 @@ validate_post_disruption() {
     
     log_success "Egress IP $EIP_NAME still assigned to: $current_node"
     
-    # Verify NAT rules are restored
+    # REAL TRAFFIC VALIDATION (instead of just SNAT/LRP checking)
+    log_info "Validating actual egress IP traffic flow to external services..."
+    
+    local eip_address
+    eip_address=$(oc get egressip "$EIP_NAME" -o jsonpath='{.spec.egressIPs[0]}' 2>/dev/null || echo "")
+    
+    if [[ -n "$eip_address" ]]; then
+        # Create temporary test pod to validate traffic
+        cat << EOF | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: egress-test-temp
+  labels:
+    egress: egressip1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: traffic-test-pod
+  namespace: egress-test-temp
+  labels:
+    app: "egress-test-app"
+    egress-enabled: "true"
+spec:
+  containers:
+  - name: curl-container
+    image: quay.io/openshift/origin-network-tools:latest
+    command: ["/bin/sleep", "300"]
+  restartPolicy: Never
+EOF
+        
+        # Wait for pod readiness
+        if oc wait --for=condition=Ready pod/traffic-test-pod -n egress-test-temp --timeout=60s; then
+            # Test actual external traffic flow
+            local actual_source_ip
+            actual_source_ip=$(oc exec -n egress-test-temp traffic-test-pod -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
+            
+            if [[ "$actual_source_ip" == "$eip_address" ]]; then
+                log_success "✅ REAL TRAFFIC VALIDATION PASSED: External service sees egress IP $eip_address"
+                echo "post_disruption,traffic_validation,PASS,$eip_address" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+            else
+                log_warning "⚠️  Traffic validation: Expected $eip_address, got '$actual_source_ip'. Trying backup service..."
+                
+                # Backup test with ifconfig.me
+                local backup_ip
+                backup_ip=$(oc exec -n egress-test-temp traffic-test-pod -- timeout 20 curl -s https://ifconfig.me 2>/dev/null | tr -d '\r\n ' || echo "")
+                
+                if [[ "$backup_ip" == "$eip_address" ]]; then
+                    log_success "✅ BACKUP TRAFFIC VALIDATION PASSED: $backup_ip"
+                    echo "post_disruption,traffic_validation,PASS,$eip_address" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                else
+                    log_error "❌ REAL TRAFFIC VALIDATION FAILED: Expected $eip_address, external services see '$actual_source_ip' / '$backup_ip'"
+                    echo "post_disruption,traffic_validation,FAIL,$actual_source_ip" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                fi
+            fi
+        else
+            log_warning "⚠️  Test pod not ready, skipping traffic validation"
+            echo "post_disruption,traffic_validation,SKIP,pod_not_ready" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+        fi
+        
+        # Cleanup
+        oc delete namespace egress-test-temp --ignore-not-found=true &>/dev/null
+    fi
+    
+    # Keep minimal NAT count for reference (not primary validation)
     local worker_pods
     worker_pods=$(oc get pods -n "$NAMESPACE" -l app=ovnkube-node -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
     
@@ -122,8 +187,8 @@ validate_post_disruption() {
         total_nat_count=$((total_nat_count + count))
     done
     
-    log_info "Post-disruption egress IP NAT count: $total_nat_count"
-    echo "post_disruption,pod_disruption,$total_nat_count" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+    log_info "Reference NAT count: $total_nat_count (note: primary validation is real traffic flow)"
+    echo "post_disruption,nat_count,$total_nat_count" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
     
     return 0
 }
@@ -200,7 +265,72 @@ validate_post_reboot() {
     
     log_success "Egress IPs reassigned to nodes: ${egress_nodes[*]}"
     
-    # Verify NAT and policy rules are restored
+    # REAL TRAFFIC VALIDATION (instead of just SNAT/LRP checking)
+    log_info "Validating actual egress IP traffic flow after node reboot..."
+    
+    local eip_address
+    eip_address=$(oc get egressip "$EIP_NAME" -o jsonpath='{.spec.egressIPs[0]}' 2>/dev/null || echo "")
+    
+    if [[ -n "$eip_address" ]]; then
+        # Create temporary test pod to validate traffic
+        cat << EOF | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: egress-reboot-test
+  labels:
+    egress: egressip1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: reboot-traffic-test
+  namespace: egress-reboot-test
+  labels:
+    app: "egress-test-app"
+    egress-enabled: "true"
+spec:
+  containers:
+  - name: curl-container
+    image: quay.io/openshift/origin-network-tools:latest
+    command: ["/bin/sleep", "300"]
+  restartPolicy: Never
+EOF
+        
+        # Wait for pod readiness
+        if oc wait --for=condition=Ready pod/reboot-traffic-test -n egress-reboot-test --timeout=90s; then
+            # Test actual external traffic flow
+            local actual_source_ip
+            actual_source_ip=$(oc exec -n egress-reboot-test reboot-traffic-test -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
+            
+            if [[ "$actual_source_ip" == "$eip_address" ]]; then
+                log_success "✅ POST-REBOOT TRAFFIC VALIDATION PASSED: External service sees egress IP $eip_address"
+                echo "post_reboot,traffic_validation,PASS,$eip_address" >> "$ARTIFACT_DIR/reboot_metrics.csv"
+            else
+                log_warning "⚠️  Traffic validation: Expected $eip_address, got '$actual_source_ip'. Trying backup service..."
+                
+                # Backup test with ifconfig.me
+                local backup_ip
+                backup_ip=$(oc exec -n egress-reboot-test reboot-traffic-test -- timeout 20 curl -s https://ifconfig.me 2>/dev/null | tr -d '\r\n ' || echo "")
+                
+                if [[ "$backup_ip" == "$eip_address" ]]; then
+                    log_success "✅ BACKUP POST-REBOOT TRAFFIC VALIDATION PASSED: $backup_ip"
+                    echo "post_reboot,traffic_validation,PASS,$eip_address" >> "$ARTIFACT_DIR/reboot_metrics.csv"
+                else
+                    log_error "❌ POST-REBOOT TRAFFIC VALIDATION FAILED: Expected $eip_address, external services see '$actual_source_ip' / '$backup_ip'"
+                    echo "post_reboot,traffic_validation,FAIL,$actual_source_ip" >> "$ARTIFACT_DIR/reboot_metrics.csv"
+                fi
+            fi
+        else
+            log_warning "⚠️  Test pod not ready after reboot, skipping traffic validation"
+            echo "post_reboot,traffic_validation,SKIP,pod_not_ready" >> "$ARTIFACT_DIR/reboot_metrics.csv"
+        fi
+        
+        # Cleanup
+        oc delete namespace egress-reboot-test --ignore-not-found=true &>/dev/null
+    fi
+    
+    # Keep minimal SNAT/LR policy counts for reference (not primary validation)
     local worker_pods
     worker_pods=$(oc get pods -n "$NAMESPACE" -l app=ovnkube-node -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
     
@@ -219,8 +349,8 @@ validate_post_reboot() {
         total_policy_count=$((total_policy_count + policy))
     done
     
-    log_info "Post-reboot node metrics - SNAT: $total_snat_count, LR policy: $total_policy_count"
-    echo "post_reboot,node_reboot,$total_snat_count,$total_policy_count" >> "$ARTIFACT_DIR/reboot_metrics.csv"
+    log_info "Reference metrics - SNAT: $total_snat_count, LR policy: $total_policy_count (note: primary validation is real traffic flow)"
+    echo "post_reboot,snat_lr_reference,$total_snat_count,$total_policy_count" >> "$ARTIFACT_DIR/reboot_metrics.csv"
     
     return 0
 }
