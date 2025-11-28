@@ -448,65 +448,6 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
-- as: e2e-openstack-ovn
-  run_if_changed: openstack|(^data/.*/rhcos\.json)
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      TEST_SUITE: experimental/reliability/minimal
-    workflow: openshift-e2e-openstack-ipi
-- always_run: false
-  as: e2e-openstack-upi
-  optional: true
-  run_if_changed: (^images/openstack/)|(^docs/user/openstack/install_upi\.md$)|(^upi/openstack/)
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      OPENSTACK_TEST_SKIPS: The OpenStack platform creates Worker nodes in a server
-        group\|The OpenStack platform creates Control plane nodes in a server group
-      TEST_SUITE: experimental/reliability/minimal
-    workflow: openshift-e2e-openstack-upi
-- always_run: false
-  as: e2e-openstack-sdn-parallel
-  optional: true
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: OpenShiftSDN
-      TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-e2e-openstack-ipi
-- always_run: false
-  as: e2e-openstack-nfv-intel
-  optional: true
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-nfv
-    workflow: openshift-e2e-openstack-nfv
-- always_run: false
-  as: e2e-openstack-proxy
-  optional: true
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-vh-mecha-central
-    workflow: openshift-e2e-openstack-proxy
-- always_run: false
-  as: e2e-openstack-externallb-techpreview
-  optional: true
-  steps:
-    cluster_profile: openstack-vh-mecha-central
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: openshift-e2e-openstack-external-lb
-- as: openstack-manifests
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-vexxhost
-    workflow: openshift-manifests-openstack
 - as: e2e-vsphere-ovn
   run_if_changed: vsphere
   steps:
@@ -589,19 +530,6 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-- always_run: false
-  as: e2e-openstack-kuryr
-  optional: true
-  run_if_changed: (openstack|gophercloud)
-  steps:
-    cluster_profile: openstack-vh-mecha-az0
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-    test:
-    - ref: openstack-noop
-    workflow: openshift-e2e-openstack-ipi
 - always_run: false
   as: e2e-azurestack
   optional: true
