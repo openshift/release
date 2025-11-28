@@ -9,12 +9,30 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 function append_throughput_if_needed() {
   local volume_type="$1"
   local patch_file="$2"
+  local compute_throughput="${3:-}"
+  local control_plane_throughput="${4:-}"
 
-  if [[ "${volume_type}" == "gp3" && -n "${AWS_DEFAULT_GP3_THROUGHPUT:-}" ]]; then
-    cat >> "${patch_file}" << EOF
+  case "${volume_type}" in
+    gp3)
+      if [[ -n "${compute_throughput}" ]]; then
+        cat >> "${patch_file}" << EOF
+        throughput: ${compute_throughput}
+EOF
+      elif [[ -n "${control_plane_throughput}" ]]; then
+        cat >> "${patch_file}" << EOF
+        throughput: ${control_plane_throughput}
+EOF
+      elif [[ -n "${AWS_DEFAULT_GP3_THROUGHPUT:-}" ]]; then
+        cat >> "${patch_file}" << EOF
         throughput: ${AWS_DEFAULT_GP3_THROUGHPUT}
 EOF
-  fi
+      fi
+      ;;
+    # Future: add support for other volume types that support throughput
+    # gp2)
+    #   # gp2 does not support throughput configuration
+    #   ;;
+  esac
 }
 
 # Handle compute rootVolume configuration
@@ -29,7 +47,7 @@ compute:
         type: ${AWS_COMPUTE_VOLUME_TYPE}
         size: ${AWS_COMPUTE_VOLUME_SIZE}
 EOF
-  append_throughput_if_needed "${AWS_COMPUTE_VOLUME_TYPE}" "${PATCH}"
+  append_throughput_if_needed "${AWS_COMPUTE_VOLUME_TYPE}" "${PATCH}" "${AWS_COMPUTE_GP3_THROUGHPUT:-}" ""
   cat "${PATCH}"
   yq-go m -x -i "${CONFIG}" "${PATCH}"
 elif [[ -n "${AWS_COMPUTE_GP3_THROUGHPUT:-}" ]]; then
@@ -72,7 +90,7 @@ controlPlane:
         type: ${AWS_CONTROL_PLANE_VOLUME_TYPE}
         size: ${AWS_CONTROL_PLANE_VOLUME_SIZE}
 EOF
-  append_throughput_if_needed "${AWS_CONTROL_PLANE_VOLUME_TYPE}" "${PATCH}"
+  append_throughput_if_needed "${AWS_CONTROL_PLANE_VOLUME_TYPE}" "${PATCH}" "" "${AWS_CONTROL_PLANE_GP3_THROUGHPUT:-}"
   cat "${PATCH}"
   yq-go m -x -i "${CONFIG}" "${PATCH}"
 elif [[ -n "${AWS_CONTROL_PLANE_GP3_THROUGHPUT:-}" ]]; then
