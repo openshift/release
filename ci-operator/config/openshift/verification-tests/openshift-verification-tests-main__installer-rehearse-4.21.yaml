@@ -65,13 +65,9 @@ tests:
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
-      AZURE_COMPUTE_MULTIDISK_MOUNT_PATH: /var/lib/containers
-      AZURE_COMPUTE_MULTIDISK_TYPE: user-defined
-      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[''AzureMultiDisk=true'', ''MultiDiskSetup=true'']'
+      FEATURE_GATES: '["AzureClusterHostedDNSInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
-    workflow: cucushift-installer-rehearse-azure-ipi-multidisk
+    workflow: cucushift-installer-rehearse-azure-ipi-custom-dns
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
@@ -89,15 +85,19 @@ tests:
     cluster_profile: gcp-qe
     env:
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-dns
-- as: installer-rehearse-gcp-private
+    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints
+- as: installer-rehearse-gcp-proxy
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-dns-private
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-workload-identity
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:

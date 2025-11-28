@@ -1,0 +1,50 @@
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.buildroot
+images:
+- dockerfile_path: images/dashboard/Dockerfile
+  to: dashboard
+- dockerfile_path: images/mock-oauth-proxy/Dockerfile
+  to: mock-oauth-proxy
+- dockerfile_path: images/migrate/Dockerfile
+  to: migrate
+promotion:
+  to:
+  - excluded_images:
+    - mock-oauth-proxy
+    - migrate
+    namespace: ship-status-dash
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: HOME=/tmp make lint
+  container:
+    from: src
+- as: unit
+  commands: |
+    export GOCACHE=/tmp/gocache
+    make test
+  container:
+    from: src
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    as: latest
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.18"
+  steps:
+    workflow: ship-status-dash-e2e
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ship-status-dash

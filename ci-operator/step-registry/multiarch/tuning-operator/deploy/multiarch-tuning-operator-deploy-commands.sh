@@ -88,7 +88,7 @@ if [[ -n "$KUSTOMIZE_ENV" ]]; then
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - github.com/openshift/multiarch-tuning-operator/deploy/envs/${KUSTOMIZE_ENV}?ref=${MTO_BRANCH:-main}
+  - "github.com/${MTO_PROJECT_NAME:-outrigger-project}/multiarch-tuning-operator/deploy/envs/${KUSTOMIZE_ENV}?ref=${MTO_BRANCH:-main}"
 patches:
 EOF
     if [[ -n "$CATALOG_IMAGE_OVERRIDE" ]]; then

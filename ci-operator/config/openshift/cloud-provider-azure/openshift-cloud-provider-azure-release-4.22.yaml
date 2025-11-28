@@ -11,18 +11,10 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
-  ocp_4.20_base-rhel9:
-    name: "4.22"
-    namespace: ocp
-    tag: base-rhel9
   ocp_4.21_base-rhel9:
     name: "4.22"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
   ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
@@ -34,7 +26,7 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.20"
+    tag: "4.21"
 binary_build_commands: make binaries
 build_root:
   from_repository: true
@@ -42,24 +34,18 @@ canonical_go_repository: github.com/kubernetes-sigs/cloud-provider-azure
 images:
 - dockerfile_path: openshift-hack/images/cloud-controller-manager-openshift.Dockerfile
   inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: azure-cloud-controller-manager
-- dockerfile_path: openshift-hack/images/cloud-node-manager-openshift.Dockerfile
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
     ocp_4.21_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: azure-cloud-controller-manager
+- dockerfile_path: openshift-hack/images/cloud-node-manager-openshift.Dockerfile
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
@@ -137,14 +123,12 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
-- always_run: false
-  as: e2e-azurestack-ipi
+- as: e2e-azurestack-ipi
   cluster: build01
-  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azurestack-dev
     workflow: openshift-e2e-azurestack
-  timeout: 6h0m0s
 - as: e2e-azure-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -162,7 +146,6 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-azure-ipi
-  timeout: 7h0m0s
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-main}

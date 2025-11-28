@@ -1,6 +1,11 @@
 #!/bin/bash
 
 set -x
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 HC_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
 export HC_NAME
 hcp_ns="${HC_NS}-${HC_NAME}"

@@ -37,15 +37,13 @@ else
   exit 1
 fi
 
-# We need to modify BASE_DOMAIN based on which account this job is running.
 if [[ -z "$BASE_DOMAIN" ]]; then
-	if [[ "${CLUSTER_PROFILE_NAME}" == "aws" ]]; then
-		BASE_DOMAIN='hypershift.origin-ci-int-aws.dev.rhcloud.com'
-	else
-		BASE_DOMAIN="hypershift.${CLUSTER_PROFILE_NAME}.ci.openshift.org"
+	if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+		BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
 	fi
 fi
 
+DOMAIN=""
 [[ ! -z "$BASE_DOMAIN" ]] && DOMAIN=${BASE_DOMAIN}
 [[ ! -z "$HYPERSHIFT_BASE_DOMAIN" ]] && DOMAIN=${HYPERSHIFT_BASE_DOMAIN}
 echo "DOMAIN is ${DOMAIN}"

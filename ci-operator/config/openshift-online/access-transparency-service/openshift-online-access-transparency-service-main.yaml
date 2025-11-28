@@ -42,6 +42,21 @@ tests:
   container:
     from: golang-plus
   nested_podman: true
+- as: integration
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    cp /opt/app-root/ats-secrets/* /opt/app-root/src/access-transparency-service/secrets/
+    make db/setup
+    make test-integration
+  container:
+    from: golang-plus
+  nested_podman: true
+  secrets:
+  - mount_path: /opt/app-root/ats-secrets
+    name: openshift-online-ats-secrets
 zz_generated_metadata:
   branch: main
   org: openshift-online

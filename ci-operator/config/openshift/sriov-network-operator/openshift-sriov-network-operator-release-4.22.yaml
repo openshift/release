@@ -1,16 +1,8 @@
 base_images:
-  ocp_4.20_base-rhel9:
-    name: "4.22"
-    namespace: ocp
-    tag: base-rhel9
   ocp_4.21_base-rhel9:
     name: "4.22"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
   ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
@@ -52,39 +44,27 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.ocp
   inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
     ocp_4.21_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: sriov-network-operator
 - dockerfile_path: Dockerfile.sriov-network-config-daemon.ocp
   inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: sriov-network-config-daemon
-- dockerfile_path: Dockerfile.webhook.ocp
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
     ocp_4.21_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: sriov-network-config-daemon
+- dockerfile_path: Dockerfile.webhook.ocp
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
@@ -147,11 +127,15 @@ tests:
   container:
     from: src
 - as: pkg
-  commands: make test-pkg
+  commands: CLUSTER_TYPE=openshift make test-pkg
   container:
     from: src
 - as: api
-  commands: make test-api
+  commands: CLUSTER_TYPE=openshift make test-api
+  container:
+    from: src
+- as: cmd
+  commands: CLUSTER_TYPE=openshift make test-cmd
   container:
     from: src
 - as: operator-e2e
@@ -278,8 +262,8 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+      timeout: 4h0m0s
     workflow: telco5g-sriov
-  timeout: 6h0m0s
 - as: verify-deps
   steps:
     env:
@@ -346,8 +330,8 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+      timeout: 4h0m0s
     workflow: telco5g-sno-ztp-cnf
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

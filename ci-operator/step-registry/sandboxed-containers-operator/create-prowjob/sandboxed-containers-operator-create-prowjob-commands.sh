@@ -1,6 +1,6 @@
 #!/bin/bash
 # script to create prowjobs in ci-operator/config/openshift/sandboxed-containers-operator using environment variables.
-# Usage: 
+# Usage:
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh gen    # Generate prowjob configuration
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh run    # Run prowjobs
 # should be run in a branch of a fork of https://github.com/openshift/release/
@@ -201,6 +201,12 @@ validate_and_set_defaults() {
         exit 1
     fi
 
+    # Trustee URL Configuration (defaults to empty string)
+    TRUSTEE_URL="${TRUSTEE_URL:-""}"
+
+    # Init Data Configuration (defaults to empty string)
+    INITDATA="${INITDATA:-''}"
+
     # Catalog Source Configuration
     echo "Configuring catalog sources..."
 
@@ -253,8 +259,8 @@ validate_and_set_defaults() {
     else # GA
       CATALOG_SOURCE_NAME="redhat-operators"
       TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
-      CATALOG_SOURCE_IMAGE="none"
-      TRUSTEE_CATALOG_SOURCE_IMAGE="none"
+      CATALOG_SOURCE_IMAGE=""
+      TRUSTEE_CATALOG_SOURCE_IMAGE=""
     fi
 }
 
@@ -263,8 +269,9 @@ show_usage() {
     echo "Usage: $0 <command>"
     echo ""
     echo "Commands:"
-    echo "  create  Create prowjob configuration files"
-    echo "  run     Run prowjobs from YAML configuration"
+    echo "  create            Create prowjob configuration files"
+    echo "  run               Run prowjobs from YAML configuration"
+	echo "  update_templates  Regenerate the ci-operator/config/openshift/sandboxed-containers-operator templates using default values (unless overridden)"
     echo ""
     echo "Examples:"
     echo "  $0 create"
@@ -287,6 +294,8 @@ show_usage() {
     echo "  CUSTOM_AZURE_REGION            - Azure region (default: eastus)"
     echo "  OSC_CATALOG_TAG                - OSC catalog tag (auto-detected if not provided)"
     echo "  TRUSTEE_CATALOG_TAG            - Trustee catalog tag (auto-detected if not provided)"
+    echo "  TRUSTEE_URL                    - Trustee URL (default: empty)"
+    echo "  INITDATA                       - Initdata from Trustee(default: empty) The gzipped and base64 encoded initdata.toml file from Trustee"
 }
 
 # Main function
@@ -310,6 +319,9 @@ main() {
         run)
             command_run "$@"
             ;;
+		update_templates)
+			command_update_templates
+			;;
         *)
             echo "ERROR: Unknown command '${COMMAND}'"
             echo ""
@@ -317,6 +329,71 @@ main() {
             exit 1
             ;;
     esac
+}
+
+# Generate one variant of our workflow
+generate_workflow() {
+  local platform=$1       # e.g. azure or aws
+  local profile=$2        # e.g. azure-qe or aws-sandboxed-containers-operator
+  local workflow=$3       # e.g. sandboxed-containers-operator-e2e-azure
+  local workload=$4       # e.g. kata, peerpods, coco
+  local cron="0 0 31 2 1"
+
+  echo "- as: ${platform}-ipi-${workload}"
+  echo "  cron: ${cron}"
+  echo "  steps:"
+  echo "    cluster_profile: ${profile}"
+  echo "    env:"
+
+  # Collect environment variables into a temporary array
+  local env_vars=()
+
+  # Platform-specific
+  if [[ $platform == "azure" ]]; then
+    env_vars+=("BASE_DOMAIN: qe.azure.devcluster.openshift.com")
+    env_vars+=("CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}")
+  elif [[ $platform == "aws" ]]; then
+    env_vars+=("AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}")
+  fi
+
+  # Common
+  env_vars+=(
+    "CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE:-\"\"}"
+    "CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}"
+    "ENABLE_MUST_GATHER: \"${ENABLE_MUST_GATHER}\""
+    "EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}"
+    "INITDATA: ${INITDATA:-\"\"}"
+    "INSTALL_KATA_RPM: \"${INSTALL_KATA_RPM}\""
+    "KATA_RPM_VERSION: ${KATA_RPM_VERSION:-\"\"}"
+    "MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}"
+    "MUST_GATHER_ON_FAILURE_ONLY: \"${MUST_GATHER_ON_FAILURE_ONLY}\""
+    "SLEEP_DURATION: ${SLEEP_DURATION}"
+    "TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&"
+    "TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}"
+    "TEST_SCENARIOS: ${TEST_SCENARIOS}"
+    "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
+    "TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE:-\"\"}"
+    "TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}"
+    "TRUSTEE_URL: ${TRUSTEE_URL:-\"\"}"
+  )
+
+  # Workload-specific
+  case $workload in
+    kata)
+      # nothing extra for kata beyond defaults
+      ;;
+    peerpods|coco)
+      env_vars+=("ENABLEPEERPODS: \"true\"")
+      env_vars+=("RUNTIMECLASS: kata-remote")
+      env_vars+=("WORKLOAD_TO_TEST: ${workload/peerpods/peer-pods}")
+      ;;
+  esac
+
+  # Sort and print alphabetically
+  printf '%s\n' "${env_vars[@]}" | sort | sed 's/^/      /'
+
+  echo "    workflow: ${workflow}"
+  echo "  timeout: 24h0m0s"
 }
 
 # Function to create prowjob configuration
@@ -341,8 +418,6 @@ command_create() {
     # Create the prowjob configuration file
 
     cat > "${OUTPUT_FILE}" <<EOF
-#  DO NOT EDIT DIRECTLY.
-#  This is generated by the sandboxed-containers-operator-create-prowjob-commands.sh script.
 base_images:
   tests-private:
     name: tests-private
@@ -364,131 +439,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: azure-ipi-kata
-  cron: 0 0 31 2 1
-  steps:
-    cluster_profile: azure-qe
-    env:
-      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
-      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
-      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
-      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
-      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
-      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
-      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
-      SLEEP_DURATION: ${SLEEP_DURATION}
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: ${TEST_SCENARIOS}
-      TEST_TIMEOUT: "${TEST_TIMEOUT}"
-      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
-      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
-    workflow: sandboxed-containers-operator-e2e-azure
-- as: azure-ipi-peerpods
-  cron: 0 0 31 2 1
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
-      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
-      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
-      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
-      ENABLEPEERPODS: "true"
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
-      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
-      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
-      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
-      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
-      RUNTIMECLASS: kata-remote
-      SLEEP_DURATION: ${SLEEP_DURATION}
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: ${TEST_SCENARIOS}
-      TEST_TIMEOUT: "${TEST_TIMEOUT}"
-      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
-      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
-      WORKLOAD_TO_TEST: peer-pods
-    workflow: sandboxed-containers-operator-e2e-azure
-- as: azure-ipi-coco
-  cron: 0 0 31 2 1
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
-      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
-      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
-      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
-      ENABLEPEERPODS: "true"
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
-      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
-      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
-      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
-      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
-      RUNTIMECLASS: kata-remote
-      SLEEP_DURATION: ${SLEEP_DURATION}
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: ${TEST_SCENARIOS}
-      TEST_TIMEOUT: "${TEST_TIMEOUT}"
-      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
-      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
-      WORKLOAD_TO_TEST: coco
-    workflow: sandboxed-containers-operator-e2e-azure
-- as: aws-ipi-peerpods
-  cron: 0 0 31 2 1
-  steps:
-    cluster_profile: aws
-    env:
-      AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}
-      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
-      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
-      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
-      ENABLEPEERPODS: "true"
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
-      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
-      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
-      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
-      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
-      RUNTIMECLASS: kata-remote
-      SLEEP_DURATION: ${SLEEP_DURATION}
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: ${TEST_SCENARIOS}
-      TEST_TIMEOUT: "${TEST_TIMEOUT}"
-      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
-      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
-      WORKLOAD_TO_TEST: peer-pods
-    workflow: sandboxed-containers-operator-e2e-aws
-- as: aws-ipi-coco
-  cron: 0 0 31 2 1
-  steps:
-    cluster_profile: aws
-    env:
-      AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}
-      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
-      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
-      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
-      ENABLEPEERPODS: "true"
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
-      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
-      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
-      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
-      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
-      RUNTIMECLASS: kata-remote
-      SLEEP_DURATION: ${SLEEP_DURATION}
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: ${TEST_SCENARIOS}
-      TEST_TIMEOUT: "${TEST_TIMEOUT}"
-      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
-      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
-      WORKLOAD_TO_TEST: coco
-    workflow: sandboxed-containers-operator-e2e-aws
+EOF
+generate_workflow azure azure-qe sandboxed-containers-operator-e2e-azure kata >> "${OUTPUT_FILE}"
+generate_workflow azure azure-qe sandboxed-containers-operator-e2e-azure peerpods >> "${OUTPUT_FILE}"
+generate_workflow azure azure-qe sandboxed-containers-operator-e2e-azure coco >> "${OUTPUT_FILE}"
+generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws peerpods >> "${OUTPUT_FILE}"
+generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws coco >> "${OUTPUT_FILE}"
+	cat >> "${OUTPUT_FILE}" <<EOF
 zz_generated_metadata:
   branch: devel
   org: openshift
@@ -723,6 +680,23 @@ command_run() {
     echo ""
     echo "Job triggering completed!"
     echo "Check the output_*.json and status_*.json files for details"
+}
+
+command_update_templates() {
+	local target_dir
+	local files
+	target_dir="$(realpath "$(dirname "${BASH_SOURCE[0]}")")/../../../config/openshift/sandboxed-containers-operator"
+	files="$(ls openshift-sandboxed-containers-operator-devel__downstream-{candidate,release}*.yaml 2>/dev/null)" ||:
+	if [ -n "$files" ]; then
+		echo "There are previously generated workflows, do you want to delete them? ${PWD}"
+		rm -i $files
+	fi
+	KATA_RPM_VERSION=3.21.0-3.rhaos4.19.el9 TEST_RELEASE_TYPE=Pre-GA "$(dirname "${BASH_SOURCE[0]}")"/sandboxed-containers-operator-create-prowjob-commands.sh create
+	INSTALL_KATA_RPM=false TEST_RELEASE_TYPE=GA "$(dirname "${BASH_SOURCE[0]}")"/sandboxed-containers-operator-create-prowjob-commands.sh create
+	mv openshift-sandboxed-containers-operator-devel__downstream-candidate*.yaml "${target_dir}/openshift-sandboxed-containers-operator-devel__downstream-candidate.yaml"
+	mv openshift-sandboxed-containers-operator-devel__downstream-release*.yaml "${target_dir}/openshift-sandboxed-containers-operator-devel__downstream-release.yaml"
+	echo
+	echo "Review the changes by 'git diff', then run 'make ci-operator-config && make jobs'"
 }
 
 # Call main function with all command line arguments

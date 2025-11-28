@@ -31,6 +31,9 @@ process_inventory() {
 
 main() {
 
+    echo "Save cluster version to SHARED_DIR"
+    echo "${VERSION}" > "${SHARED_DIR}/cluster_version"
+
     echo "Set CLUSTER_NAME env var"
     if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
         CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
@@ -66,6 +69,11 @@ main() {
     done
 
     cd /eco-ci-cd
+
+    echo "Clean old clusters"
+    ansible-playbook ./playbooks/compute/delete_old_clusters.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py
+
     echo "Deploy OCP for compute-nto testing"
     ansible-playbook ./playbooks/deploy-ocp-hybrid-multinode.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \

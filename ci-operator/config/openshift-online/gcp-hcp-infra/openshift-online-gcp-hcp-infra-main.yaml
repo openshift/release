@@ -1,0 +1,36 @@
+binary_build_commands: make terraform-init
+build_root:
+  image_stream_tag:
+    name: gcp-hcp-infra-terraform
+    namespace: ci
+    tag: latest
+  use_build_cache: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: "8"
+      memory: 4Gi
+tests:
+- as: terraform-validate
+  commands: make terraform-validate
+  container:
+    from: src
+- as: terraform-test
+  commands: make terraform-test
+  container:
+    from: src
+- as: check-orphan-modules
+  commands: make check-orphan-modules
+  container:
+    from: src
+- as: generate-bin
+  commands: make terraform-init
+  container:
+    from: bin
+  postsubmit: true
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: gcp-hcp-infra

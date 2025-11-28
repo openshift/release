@@ -70,7 +70,8 @@ tests:
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-agnostic-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -167,7 +168,21 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-oidc
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-oidc JUNITFILE=${ARTIFACT_DIR}/junit_report.xml
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
     workflow: ipi-gcp
 - always_run: false
   as: e2e-aws-single-node
@@ -180,7 +195,6 @@ tests:
     make test-operator-integration
   container:
     from: src
-  optional: true
 zz_generated_metadata:
   branch: master
   org: openshift

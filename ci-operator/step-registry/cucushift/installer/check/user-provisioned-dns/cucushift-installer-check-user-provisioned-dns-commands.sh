@@ -62,7 +62,7 @@ azure4|azuremag|azurestack)
     ;;
 esac
 
-# REGION="${LEASED_RESOURCE}"
+REGION="${LEASED_RESOURCE}"
 INFRA_ID=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 # CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
@@ -83,9 +83,9 @@ aws|aws-arm64|aws-usgov)
     # records in public zone
     if [[ ${PUBLISH_STRATEGY} != "Internal" ]]; then
         echo "Checking records in public zone."
-        PUBLIC_ZONE_ID=$(aws route53 list-hosted-zones-by-name | jq --arg name "${BASE_DOMAIN}." -r '.HostedZones | .[] | select(.Name=="\($name)") | .Id' | awk -F / '{printf $3}')
+        PUBLIC_ZONE_ID=$(aws --region "$REGION" route53 list-hosted-zones-by-name | jq --arg name "${BASE_DOMAIN}." -r '.HostedZones | .[] | select(.Name=="\($name)") | .Id' | awk -F / '{printf $3}')
         if [[ -n "${PUBLIC_ZONE_ID}" ]]; then
-            PUBLIC_RECORD_SETS=$(aws route53 list-resource-record-sets --hosted-zone-id=${PUBLIC_ZONE_ID} --output json | jq '.ResourceRecordSets[].Name' |grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
+            PUBLIC_RECORD_SETS=$(aws --region "$REGION" route53 list-resource-record-sets --hosted-zone-id=${PUBLIC_ZONE_ID} --output json | jq '.ResourceRecordSets[].Name' |grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
 
             if [[ -n "${PUBLIC_RECORD_SETS}" ]]; then
                 echo "ERROR: Found DNS records for ${CLUSTER_NAME}.${BASE_DOMAIN}"
@@ -101,7 +101,7 @@ aws|aws-arm64|aws-usgov)
 
     # private zone
     echo "Checking private hosted zone for ${CLUSTER_NAME}.${BASE_DOMAIN}"
-    PRIVATE_HOSTED_ZONE=$(aws route53 list-hosted-zones --hosted-zone-type PrivateHostedZone | jq -r '.HostedZones[].Name' | grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
+    PRIVATE_HOSTED_ZONE=$(aws --region "$REGION" route53 list-hosted-zones --hosted-zone-type PrivateHostedZone | jq -r '.HostedZones[].Name' | grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
     if [[ ${PRIVATE_HOSTED_ZONE} != "" ]]; then
         echo "ERROR: Found private zone: ${PRIVATE_HOSTED_ZONE}"
         ret=$((ret+1))
@@ -146,34 +146,45 @@ azure4|azuremag|azurestack)
     if [[ -z "${CLUSTER_RESOURCE_GROUP}" ]]; then
         CLUSTER_RESOURCE_GROUP="${INFRA_ID}-rg"
     fi
-    dns_records_list=""
-
-    if [[ "${PUBLISH_STRATEGY}" == "External" ]]; then
-        dns_records_list="api.${CLUSTER_NAME} *.apps.${CLUSTER_NAME}"
-    elif [[ "${PUBLISH_STRATEGY}" == "Mixed" ]]; then
-        api_publish_strategy=$(yq-go r "${INSTALL_CONFIG}" 'operatorPublishingStrategy.apiserver')
-        ingress_publish_strategy=$(yq-go r "${INSTALL_CONFIG}" 'operatorPublishingStrategy.ingress')
-        if [[ "${api_publish_strategy}" == "External" ]] || [[ -z "${api_publish_strategy}" ]]; then
-             dns_records_list="api.${CLUSTER_NAME}"
-        fi
-
-        if [[ "${ingress_publish_strategy}" == "External" ]] || [[ -z "${ingress_publish_strategy}" ]]; then
-             dns_records_list="${dns_records_list} *.apps.${CLUSTER_NAME}"
+    base_domain_exist="false"
+    if [[ -n "${BASE_DOMAIN_RG}" ]]; then
+        if az network dns zone list -g ${BASE_DOMAIN_RG} --query '[].name' -otsv | grep -q ${BASE_DOMAIN}; then
+            base_domain_exist="true"
         fi
     fi
 
-    if [[ -n "${dns_records_list}" ]]; then
-        echo "Checking records in public zone."
-        for record in ${dns_records_list}; do
-            public_record_sets=$(az network dns record-set list -g ${BASE_DOMAIN_RG} -z ${BASE_DOMAIN} --query "[?contains(name, '${record}')]" -otsv)
-            if [[ -z "${public_record_sets}" ]]; then
-                echo "PASS: record ${record} is not found in base domain ${BASE_DOMAIN}!"
-            else
-               echo "ERROR: found record ${record} in base domain ${BASE_DOMAIN}!"
-               echo "${public_record_sets}"
-               ret=$((ret+1))
+    if [[ -z "${BASE_DOMAIN_RG}" ]] || [[ "${base_domain_exist}" == "false" ]]; then
+        echo "BASE_DOMAIN_RG is empty or does not exist, skip the public dns zone check..."
+    else
+        dns_records_list=""
+
+        if [[ "${PUBLISH_STRATEGY}" == "External" ]]; then
+            dns_records_list="api.${CLUSTER_NAME} *.apps.${CLUSTER_NAME}"
+        elif [[ "${PUBLISH_STRATEGY}" == "Mixed" ]]; then
+            api_publish_strategy=$(yq-go r "${INSTALL_CONFIG}" 'operatorPublishingStrategy.apiserver')
+            ingress_publish_strategy=$(yq-go r "${INSTALL_CONFIG}" 'operatorPublishingStrategy.ingress')
+            if [[ "${api_publish_strategy}" == "External" ]] || [[ -z "${api_publish_strategy}" ]]; then
+                dns_records_list="api.${CLUSTER_NAME}"
             fi
-        done
+
+            if [[ "${ingress_publish_strategy}" == "External" ]] || [[ -z "${ingress_publish_strategy}" ]]; then
+                dns_records_list="${dns_records_list} *.apps.${CLUSTER_NAME}"
+            fi
+        fi
+
+        if [[ -n "${dns_records_list}" ]]; then
+            echo "Checking records in public zone."
+            for record in ${dns_records_list}; do
+                public_record_sets=$(az network dns record-set list -g ${BASE_DOMAIN_RG} -z ${BASE_DOMAIN} --query "[?contains(name, '${record}')]" -otsv)
+                if [[ -z "${public_record_sets}" ]]; then
+                    echo "PASS: record ${record} is not found in base domain ${BASE_DOMAIN}!"
+                else
+                    echo "ERROR: found record ${record} in base domain ${BASE_DOMAIN}!"
+                    echo "${public_record_sets}"
+                    ret=$((ret+1))
+                fi
+            done
+        fi
     fi
 
     # private zone

@@ -87,18 +87,21 @@ tests:
     workflow: openshift-e2e-aws-ovn
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
@@ -155,7 +158,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-azure-ovn
-  timeout: 5h30m0s
 - as: e2e-gcp-ovn
   steps:
     cluster_profile: gcp-3
@@ -248,7 +250,6 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-cluster-density-v2
-  timeout: 5h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-small-cluster-density
   optional: true
@@ -264,7 +265,6 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-cluster-density-v2
-  timeout: 5h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-medium-node-density-cni
   optional: true
@@ -281,7 +281,6 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
-  timeout: 5h0m0s
 - always_run: false
   as: qe-perfscale-aws-ovn-small-node-density-cni
   optional: true
@@ -297,7 +296,6 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-cni
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-aws-ovn-network-migration
   optional: true
@@ -332,7 +330,6 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     workflow: openshift-e2e-aws-sdn
-  timeout: 3h0m0s
 - always_run: false
   as: e2e-aws-live-migration-sdn-ovn-rollback
   optional: true
@@ -349,7 +346,6 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     workflow: openshift-e2e-aws-sdn
-  timeout: 4h0m0s
 - always_run: false
   as: e2e-aws-ovn-fdp-qe
   optional: true
@@ -361,6 +357,23 @@ tests:
     test:
     - chain: openshift-e2e-test-network-qe
     workflow: openshift-e2e-aws-ovn
+- always_run: false
+  as: e2e-metal-ovn-fdp-qe-ipv6
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+      EXTRA_MG_ARGS: --host-network
+      PARALLEL: "1"
+      TEST_TIMEOUT: "60"
+    test:
+    - chain: openshift-e2e-test-network-qe
+    workflow: baremetalds-e2e-ovn-ipv6
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv
