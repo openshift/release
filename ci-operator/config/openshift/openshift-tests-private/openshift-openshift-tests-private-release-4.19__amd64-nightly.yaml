@@ -96,11 +96,16 @@ releases:
       product: ocp
       stream: nightly
       version: "4.19"
-  n2minor:
+  n1minor:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.18"
+  n3minor:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.16"
   target:
     candidate:
       architecture: multi
@@ -3823,14 +3828,74 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce
-- as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-n2minor-mgmt-f28
+- as: baremetalds-hypershift-agent-mce-n1minor-guest-f28
   capabilities:
   - intranet
-  cron: 58 1 7 * *
+  cron: 32 12 4 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
-      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n1minor
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-hypershift-agent-mce-n1minor-mgmt-f28
+  capabilities:
+  - intranet
+  cron: 7 20 27 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n1minor
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce
+- as: baremetalds-hypershift-agent-mce-n3minor-guest-f28
+  capabilities:
+  - intranet
+  cron: 28 15 4 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n3minor
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-hypershift-agent-mce-n3minor-mgmt-f28
+  capabilities:
+  - intranet
+  cron: 6 8 5 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n3minor
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce
+- as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-n1minor-mgmt-f28
+  capabilities:
+  - intranet
+  cron: 28 22 26 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n1minor
     env:
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
       MCE_VERSION: "2.9"
@@ -3838,14 +3903,14 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce
-- as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-n2minor-guest-f28
+- as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-n1minor-guest-f28
   capabilities:
   - intranet
-  cron: 24 20 15 * *
+  cron: 35 8 3 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
-      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n1minor
     env:
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
       MCE_VERSION: "2.9"
@@ -3855,24 +3920,82 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
-- as: aws-ipi-ovn-hypershift-mce-n2minor-mgmt-f28
-  cron: 35 5 2 * *
+- as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-n3minor-mgmt-f28
+  capabilities:
+  - intranet
+  cron: 2 17 22 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n3minor
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.19
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce
+- as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-n3minor-guest-f28
+  capabilities:
+  - intranet
+  cron: 16 6 3 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n3minor
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.19
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-n1minor-mgmt-f28
+  cron: 23 6 17 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
-      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n1minor
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       MCE_VERSION: "2.9"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
-- as: aws-ipi-ovn-hypershift-mce-n2minor-guest-f28
-  cron: 12 15 4 * *
+- as: aws-ipi-ovn-hypershift-mce-n1minor-guest-f28
+  cron: 47 14 7 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
-      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n1minor
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_VERSION: "2.9"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: aws-ipi-ovn-hypershift-mce-n3minor-mgmt-f28
+  cron: 27 14 23 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n3minor
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_VERSION: "2.9"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
+- as: aws-ipi-ovn-hypershift-mce-n3minor-guest-f28
+  cron: 13 20 7 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n3minor
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       MCE_VERSION: "2.9"
