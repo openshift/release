@@ -29,21 +29,29 @@ sleep 60
 # Using a label for this now instead
 oc label managedcluster local-cluster oppapps=httpd-example
 
-# Wait for Deployment to be ready (Available)
-oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=1000s || \
-( echo "❌ FATAL ERROR: Deployment did not become Available within the timeout." && exit 1 )
-
-# check to see if the application deployed successfully
+# Check the status
+oc get policies -n policies | grep example
+oc get build -n e2e-opp
 oc get po -n e2e-opp
-echo ""
 oc get deployment -n e2e-opp
-echo ""
-oc get event -n e2e-opp
-echo ""
+
+LATEST_BUILD_NAME=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null)
+BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null)
+
+if [ "$BUILD_STATUS" == "Failed" ]; then
+    # Check the error info
+    oc get event -n e2e-opp
+    oc describe buildconfig httpd-example -n e2e-opp
+    OPERATOR_POD_NAME=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}')
+    oc logs $OPERATOR_POD_NAME -n openshift-operators -c manager --tail=20
+
+    echo "!!! Build ${LATEST_BUILD_NAME} failed. Starting a new Build..."
+    oc start-build httpd-example -n e2e-opp
+fi
+
+# Check some other info after the application deployed successfully
 oc get cm -n openshift-config opp-ingres-ca -o yaml
-echo ""
 oc get quayintegration quay -o yaml
-echo ""
 oc get secret -n policies quay-integration -o yaml
 
 
