@@ -67,4 +67,3 @@ while [ $x -lt 10 ]; do
 	sleep 30
 done
 
-Sleep 7h
