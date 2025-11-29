@@ -213,24 +213,29 @@ echo "Generated HAProxy section:"
 cat "$haproxy_section"
 
 # Update HAProxy on bastion
-ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" bash <<EOF
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" bash << 'EOF'
 # Backup existing HAProxy config
-cp $HAPROXY_REMOTE_CFG ${HAPROXY_REMOTE_CFG}.bak_\$(date +%F_%H%M%S)
+cp "$HAPROXY_REMOTE_CFG" "${HAPROXY_REMOTE_CFG}.bak_$(date +%F_%H%M%S)"
 
 # Remove old cluster section if exists
-if grep -q 'hosted2-api-server' $HAPROXY_REMOTE_CFG; then
-    sed -i '/hosted2-api-server/,/^$/d' $HAPROXY_REMOTE_CFG
+if grep -q 'hosted2-api-server' "$HAPROXY_REMOTE_CFG"; then
+    sed -i '/hosted2-api-server/,/^$/d' "$HAPROXY_REMOTE_CFG"
 fi
 
-# Append new section
-cat >> $HAPROXY_REMOTE_CFG <<HASECTION
+EOF
+
+# Now append the LOCAL haproxy section content remotely
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" \
+  "cat >> \"$HAPROXY_REMOTE_CFG\"" << HASECTION
 $(cat "$haproxy_section")
 HASECTION
 
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" bash << 'EOF'
 # Restart HAProxy
 systemctl restart haproxy
 systemctl status haproxy --no-pager
 EOF
+
 
 echo "✔ HAProxy updated successfully on bastion $BASTION_FIP"
 

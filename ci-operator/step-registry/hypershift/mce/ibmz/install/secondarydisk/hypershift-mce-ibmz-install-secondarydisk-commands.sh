@@ -10,7 +10,7 @@ export IC_API_KEY
 
 # Check if the system architecture is supported to perform the e2e installation
 arch=$(uname -m)
-if [[ ! " x86_64 s390x arm64 amd64 " =~ " $arch " ]]; then
+if [[ ! " x86_64 s390x arm64 amd64 " =~ $arch ]]; then
     echo "Error: Unsupported System Architecture : $arch."
     echo "Automation runs only on s390x, x86_64, amd64, and arm64 architectures."
     exit 1
@@ -18,16 +18,9 @@ fi
 
 # Setting OS and Arch names required to install CLI's
 if [[ "$OSTYPE" == "linux"* ]]; then
-    linux_type=$(grep '^ID=' /etc/os-release | cut -d '=' -f 2)
-    oc_os="linux"
     jq_os="linux"
-    ic_os="linux"
-    nmstate_os="linux"
 elif [[ "$OSTYPE" == "darwin"* ]]; then
-    oc_os="mac"
     jq_os="macos"
-    ic_os="osx"
-    nmstate_os="macos"
 else
     echo "Unsupported OS: $OSTYPE. Automation supports only on Linux and macOS."
     exit 1
@@ -35,15 +28,12 @@ fi
 
 case "$arch" in
     x86_64 | amd64)
-        nmstate_arch="x64"
         jq_arch="amd64"
         ;;
     arm64)
-        nmstate_arch="aarch64"
         jq_arch="$arch"
         ;;
     *)
-        nmstate_arch="$arch"
         jq_arch="$arch"
         ;;
 esac

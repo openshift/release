@@ -10,7 +10,7 @@ export IC_API_KEY
 
 # Check if the system architecture is supported to perform the e2e installation
 arch=$(uname -m)
-if [[ ! " x86_64 s390x arm64 amd64 " =~ " $arch " ]]; then
+if [[ ! " x86_64 s390x arm64 amd64 " =~  $arch  ]]; then
     echo "Error: Unsupported System Architecture : $arch."
     echo "Automation runs only on s390x, x86_64, amd64, and arm64 architectures."
     exit 1
@@ -18,16 +18,9 @@ fi
 
 # Setting OS and Arch names required to install CLI's
 if [[ "$OSTYPE" == "linux"* ]]; then
-    linux_type=$(grep '^ID=' /etc/os-release | cut -d '=' -f 2)
-    oc_os="linux"
     jq_os="linux"
-    ic_os="linux"
-    nmstate_os="linux"
 elif [[ "$OSTYPE" == "darwin"* ]]; then
-    oc_os="mac"
     jq_os="macos"
-    ic_os="osx"
-    nmstate_os="macos"
 else
     echo "Unsupported OS: $OSTYPE. Automation supports only on Linux and macOS."
     exit 1
@@ -35,15 +28,12 @@ fi
 
 case "$arch" in
     x86_64 | amd64)
-        nmstate_arch="x64"
         jq_arch="amd64"
         ;;
     arm64)
-        nmstate_arch="aarch64"
         jq_arch="$arch"
         ;;
     *)
-        nmstate_arch="$arch"
         jq_arch="$arch"
         ;;
 esac
@@ -95,18 +85,22 @@ ibmcloud login --apikey "$IC_API_KEY" -r "$IC_REGION" -g "$RESOURCE_GROUP" || { 
 # -------------------------
 # 2. Fetch ALL reserved IPs of all VSIs
 # -------------------------
-ALL_RESERVED_IPS=($(ibmcloud is instances --json | \
-  jq -r '.[] | .primary_network_interface.primary_ip.address'))
+mapfile -t ALL_RESERVED_IPS < <(
+  ibmcloud is instances --json |
+    jq -r '.[] | .primary_network_interface.primary_ip.address'
+)
 
-echo "All Reserved IPs: ${ALL_RESERVED_IPS[@]}"
+echo "All Reserved IPs:" "${ALL_RESERVED_IPS[@]}"
 
 # -------------------------
 # 3. Fetch only CONTROL node IPs
 # -------------------------
-CONTROL_RIP=($(ibmcloud is instances --json | \
-  jq -r '.[] | select(.name | test("control")) | .primary_network_interface.primary_ip.address'))
+mapfile -t CONTROL_RIP < <(
+  ibmcloud is instances --json |
+    jq -r '.[] | select(.name | test("control")) | .primary_network_interface.primary_ip.address'
+)
 
-echo "Control node Reserved IPs: ${CONTROL_RIP[@]}"
+echo "All Reserved IPs:" "${CONTROL_RIP[@]}"
 
 # -------------------------
 # 4. Pick one control node subnet for MetalLB
