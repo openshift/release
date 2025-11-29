@@ -226,7 +226,7 @@ EOF
 
 # Now append the LOCAL haproxy section content remotely
 ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" \
-  "cat >> \"$HAPROXY_REMOTE_CFG\"" << HASECTION
+  "cat >> \"$HAPROXY_REMOTE_CFG\"" << 'HASECTION'
 $(cat "$haproxy_section")
 HASECTION
 
