@@ -29,7 +29,7 @@ sleep 60
 # Using a label for this now instead
 oc label managedcluster local-cluster oppapps=httpd-example
 
-sleep 60
+sleep 360
 
 # check to see if the application deployed successfully
 
