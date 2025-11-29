@@ -29,10 +29,13 @@ sleep 60
 # Using a label for this now instead
 oc label managedcluster local-cluster oppapps=httpd-example
 
-sleep 60
+# Wait for Deployment to be ready (Available)
+oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=1000s || \
+( echo "❌ FATAL ERROR: Deployment did not become Available within the timeout." && exit 1 )
 
-# check to see if the application deployed successfully
-
+# Check to see if the application deployed successfully
+oc get policies -n policies | grep example
+echo ""
 oc get po -n e2e-opp
 echo ""
 oc get deployment -n e2e-opp
@@ -45,7 +48,7 @@ oc get quayintegration quay -o yaml
 echo ""
 oc get secret -n policies quay-integration -o yaml
 
-# run other tests
+# Run other tests
 
 # Obtain details about the test application from ACS
 ACS_PASSWORD=`oc get secret -n stackrox central-htpasswd -o json | /tmp/jq .data.password | sed 's/"//g' | base64 -d`
@@ -65,5 +68,3 @@ while [ $x -lt 10 ]; do
 	let x=$x+1
 	sleep 30
 done
-
-oc get policies -n policies
