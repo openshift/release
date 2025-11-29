@@ -29,10 +29,11 @@ sleep 60
 # Using a label for this now instead
 oc label managedcluster local-cluster oppapps=httpd-example
 
-sleep 360
+# Wait for Deployment to be ready (Available)
+oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=1000s || \
+( echo "❌ FATAL ERROR: Deployment did not become Available within the timeout." && exit 1 )
 
 # check to see if the application deployed successfully
-
 oc get po -n e2e-opp
 echo ""
 oc get deployment -n e2e-opp
