@@ -55,24 +55,36 @@ oc get quayintegration quay -o yaml
 oc get secret -n policies quay-integration -o yaml
 
 
-# run other tests
+# Run other tests
 
 # Obtain details about the test application from ACS
 ACS_PASSWORD=`oc get secret -n stackrox central-htpasswd -o json | /tmp/jq .data.password | sed 's/"//g' | base64 -d`
 JQ_FILTER='.images[] | select(.name | contains("httpd-example"))'
 ACS_HOST=`oc get secret -n stackrox sensor-tls -o json | /tmp/jq '.data."acs-host"' | sed 's/"//g' | base64 -d`
-ACS_COMMAND="curl -k -u "admin:${ACS_PASSWORD}" https://$ACS_HOST/v1/images"
-x=1
-while [ $x -lt 10 ]; do
-	HTTPD_IMAGE_JSON=`$ACS_COMMAND | /tmp/jq "$JQ_FILTER"`
-	ID=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .id`
-	if [ "$ID" != "" ]; then
-		CVES=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .cves`
-		image=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .name`
-		echo "Found $CVES CVEs for image $image"
-		break
-	fi
-	let x=$x+1
-	sleep 30
-done
+ACS_COMMAND="curl -s -k -u "admin:${ACS_PASSWORD}" https://$ACS_HOST/v1/images"
 
+set +e
+x=1
+RETRIES=10
+while [ $x -lt $RETRIES ]; do
+    HTTPD_IMAGE_JSON=`$ACS_COMMAND | /tmp/jq "$JQ_FILTER"`
+    ID=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .id`
+    if [ "$ID" != "" ]; then
+        CVES=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .cves`
+        image=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .name`
+        echo "Found $CVES CVEs for image $image"
+        break
+    fi
+
+    let x=$x+1
+
+    # Check if this is the final attempt (x is about to exceed the limit)
+    if [ $x -eq $RETRIES ]; then
+        echo "ERROR: Image ID not found after $((RETRIES - 1)) attempts. Exiting with failure."
+        exit 1
+    fi
+
+    echo "Try $x/$((RETRIES - 1)): ID not found. Checking again in 30 seconds."
+    sleep 30
+done
+set -e
