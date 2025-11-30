@@ -252,7 +252,8 @@ EOF
         assigned_node=$(oc get egressip "$eip_name" -o jsonpath='{.status.items[0].node}' 2>/dev/null || echo "unassigned")
         
         # Count pods in corresponding namespace
-        local namespace="${NAMESPACE_PREFIX}$i"
+        local namespace
+        namespace="${NAMESPACE_PREFIX}$i"
         local ready_pods
         ready_pods=$(oc get pods -n "$namespace" -l app=scale-test-pod --field-selector=status.phase=Running --no-headers | wc -l)
         
@@ -452,7 +453,8 @@ log_info "This validates real traffic usage instead of just SNAT/LRP rule checki
 test_egress_traffic() {
     local eip_name="$1"
     local expected_eip="$2"
-    local namespace="${NAMESPACE_PREFIX}$(echo "$eip_name" | grep -o '[0-9]*$')"
+    local namespace
+    namespace="${NAMESPACE_PREFIX}$(echo "$eip_name" | grep -o '[0-9]*$')"
     
     log_info "Testing traffic for $eip_name with IP $expected_eip in namespace $namespace"
     

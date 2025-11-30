@@ -412,7 +412,8 @@ run_node_reboot_test() {
     fi
     
     # Pick one randomly
-    local selected_node=${egress_nodes[$((RANDOM % ${#egress_nodes[@]}))]}
+    local selected_node
+    selected_node=${egress_nodes[$((RANDOM % ${#egress_nodes[@]}))]}
     log_info "Selected node for reboot: $selected_node"
     
     # Get worker pods before reboot
