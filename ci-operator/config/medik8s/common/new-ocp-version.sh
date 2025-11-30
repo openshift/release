@@ -25,8 +25,8 @@ for repo in */ ; do
   echo "updating $repo"
   cd $repo
   # find latest release
-  release=$(ls | grep .yaml | grep release | sed -r 's#^medik8s-'"$repo"'-(.*)__.*$#\1#g' | uniq | sort | tail -1)
-  for branch in main $release; do
+  # release=$(ls | grep .yaml | grep release | sed -r 's#^medik8s-'"$repo"'-(.*)__.*$#\1#g' | sort -u -V | tail -1)
+  for branch in main; do
     echo "branch: $branch"
     # find newest OCP version
     version=$(ls | grep .yaml | grep "__" | grep medik8s-$repo-$branch | sed -r 's#^.*__(.*)\.yaml$#\1#g' | sort | tail -1)
