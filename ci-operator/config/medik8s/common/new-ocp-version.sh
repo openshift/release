@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+echo "Don't forget to update the OPERATOR_RELEASED_VERSION in the previous config files for 'main'"
+
 # check we are in the correct directory
 if [ "${PWD##*/}" != "common" ]; then
   echo "Please run this script from the ci-operator/config/medik8s/common directory"
