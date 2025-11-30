@@ -3,6 +3,10 @@ base_images:
     name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
   ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
@@ -86,6 +90,31 @@ tests:
     from: src
   optional: true
   skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
+- as: e2e-gcp-operator
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_BUNDLE: must-gather-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: must-gather-operator
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc -n must-gather-operator rollout status deployment must-gather-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-gcp
 zz_generated_metadata:
   branch: release-4.21
   org: openshift-priv

@@ -23,9 +23,12 @@ build_root:
       # Switch back to the default non-root user (1001) for security
       USER 1001
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.epp
   from: ubi_minimal
   to: llm-d-inference-scheduler
+- dockerfile_path: Dockerfile.sidecar
+  from: ubi_minimal
+  to: llm-d-routing-sidecar
 promotion:
   to:
   - namespace: opendatahub-io
@@ -51,7 +54,7 @@ tests:
   container:
     from: src
 - always_run: false
-  as: pr-image-mirror
+  as: pr-image-mirror-inference-scheduler
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$|^\.github/
   steps:
     dependencies:
@@ -60,7 +63,7 @@ tests:
       IMAGE_REPO: llm-d-inference-scheduler
     workflow: opendatahub-io-ci-image-mirror
 - always_run: false
-  as: fast-image-mirror
+  as: fast-image-mirror-inference-scheduler
   postsubmit: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$|^\.github/
   steps:
@@ -68,6 +71,26 @@ tests:
       SOURCE_IMAGE_REF: llm-d-inference-scheduler
     env:
       IMAGE_REPO: llm-d-inference-scheduler
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: pr-image-mirror-routing-sidecar
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: llm-d-routing-sidecar
+    env:
+      IMAGE_REPO: llm-d-routing-sidecar
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-routing-sidecar
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: llm-d-routing-sidecar
+    env:
+      IMAGE_REPO: llm-d-routing-sidecar
       RELEASE_VERSION: fast
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
