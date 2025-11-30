@@ -47,6 +47,13 @@ for _ in {1..60}; do
     sleep 10
 done
 
+echo "****************** DEBUG_LOG ********************"
+OPERATOR_POD_NAME=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}')
+oc logs $OPERATOR_POD_NAME -n openshift-operators -c manager --tail=50
+oc get quayintegration quay -o yaml
+echo "****************** DEBUG_LOG ********************"
+
+
 #Trigget Quay E2E Testing
 registryEndpoint="$(oc -n "$quay_ns" get quayregistry "$quay_registry" -o jsonpath='{.status.registryEndpoint}')"
 registry="${registryEndpoint#https://}"

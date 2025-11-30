@@ -62,6 +62,7 @@ JQ_FILTER='.images[] | select(.name | contains("httpd-example"))'
 ACS_HOST=`oc get secret -n stackrox sensor-tls -o json | /tmp/jq '.data."acs-host"' | sed 's/"//g' | base64 -d`
 ACS_COMMAND="curl -s -k -u "admin:${ACS_PASSWORD}" https://$ACS_HOST/v1/images"
 
+set +e
 x=1
 RETRIES=10
 while [ $x -lt $RETRIES ]; do
@@ -85,3 +86,4 @@ while [ $x -lt $RETRIES ]; do
     echo "Try $x/$((RETRIES - 1)): ID not found. Checking again in 30 seconds."
     sleep 30
 done
+set -e
