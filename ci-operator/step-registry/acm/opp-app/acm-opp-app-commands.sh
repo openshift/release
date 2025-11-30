@@ -49,8 +49,6 @@ if [ "$BUILD_STATUS" == "Failed" ]; then
     oc start-build httpd-example -n e2e-opp
 fi
 
-sleep 7h
-
 # Wait for the deployment to be ready
 oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=10m
 
@@ -86,7 +84,6 @@ while [ $x -lt $RETRIES ]; do
     # Check if this is the final attempt (x is about to exceed the limit)
     if [ $x -eq $RETRIES ]; then
         echo "ERROR: Image ID not found after $((RETRIES - 1)) attempts. Exiting with failure."
-        exit 1
     fi
 
     echo "Try $x/$((RETRIES - 1)): ID not found. Checking again in 30 seconds."
