@@ -67,5 +67,5 @@ echo "BackingStore status"
 # 4. 测试 S3 endpoint
 echo "test S3 endpoint"
   oc get route -n openshift-storage s3
-  curl -k https://$(oc get route s3 -n openshift-storage -o jsonpath='{.spec.host}')
+  curl -k https://"$(oc get route s3 -n openshift-storage -o jsonpath='{.spec.host}')"
 set -e
