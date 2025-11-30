@@ -49,6 +49,8 @@ if [ "$BUILD_STATUS" == "Failed" ]; then
     oc start-build httpd-example -n e2e-opp
 fi
 
+sleep 7h
+
 # Wait for the deployment to be ready
 oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=10m
 
