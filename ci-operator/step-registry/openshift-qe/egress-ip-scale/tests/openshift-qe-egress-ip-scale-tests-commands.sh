@@ -118,9 +118,89 @@ done
 log_info "Workload recovery status: $ready_workloads/$EGRESS_IP_COUNT workloads fully recovered"
 log_info "Total ready replicas: $total_ready_replicas"
 
-# Phase 3: OVN Scale Metrics Collection
+# Phase 3: Real Traffic Validation for Scale Testing
 log_info "==============================="
-log_info "PHASE 3: Post-Chaos OVN Scale Metrics"
+log_info "PHASE 3: Scale Real Traffic Validation"
+log_info "==============================="
+
+log_info "🌐 Testing actual egress IP traffic flow for scale workloads..."
+
+# Test traffic for each assigned egress IP
+traffic_validation_results=()
+for assignment in "${healthy_assignments[@]}"; do
+    IFS=':' read -r eip_name assigned_node eip_address <<< "$assignment"
+    
+    log_info "🌍 Testing real traffic for $eip_name ($eip_address) on node $assigned_node..."
+    
+    # Create temporary test pod for this egress IP
+    namespace_name="egress-scale-traffic-$eip_address"
+    namespace_name=$(echo "$namespace_name" | tr '.' '-')  # Replace dots with hyphens for valid namespace name
+    
+    cat << EOF | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: $namespace_name
+  labels:
+    egress-test-scale: "${eip_name#egressip-scale-}"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: scale-traffic-test
+  namespace: $namespace_name
+  labels:
+    egress-pod-scale: "${eip_name#egressip-scale-}"
+spec:
+  containers:
+  - name: curl-container
+    image: quay.io/openshift/origin-network-tools:latest
+    command: ["/bin/sleep", "300"]
+  restartPolicy: Never
+EOF
+
+    if oc wait --for=condition=Ready pod/scale-traffic-test -n "$namespace_name" --timeout=90s; then
+        log_info "📍 Network diagnostics for $eip_name:"
+        oc exec -n "$namespace_name" scale-traffic-test -- ip route show | head -5 || true
+        
+        # Ping test to verify basic connectivity
+        log_info "🏓 Ping test for $eip_name to Google DNS:"
+        oc exec -n "$namespace_name" scale-traffic-test -- ping -c 2 8.8.8.8 2>&1 | tee -a "$ARTIFACT_DIR/scale_ping_tests.log" || log_warning "⚠️  Ping failed for $eip_name"
+        
+        # HTTP request to verify egress IP
+        log_info "📤 Testing HTTP traffic for $eip_name..."
+        actual_ip=$(oc exec -n "$namespace_name" scale-traffic-test -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
+        
+        if [[ "$actual_ip" == "$eip_address" ]]; then
+            log_success "✅ SCALE TRAFFIC VALIDATION PASSED for $eip_name: External service sees $eip_address"
+            traffic_validation_results+=("$eip_name:PASS:$eip_address")
+        else
+            log_warning "⚠️  SCALE TRAFFIC VALIDATION WARNING for $eip_name: Expected $eip_address, got '$actual_ip'"
+            traffic_validation_results+=("$eip_name:WARNING:$actual_ip")
+        fi
+    else
+        log_warning "⚠️  Scale traffic test pod not ready for $eip_name"
+        traffic_validation_results+=("$eip_name:SKIP:pod_not_ready")
+    fi
+    
+    # Cleanup
+    oc delete namespace "$namespace_name" --ignore-not-found=true &>/dev/null &
+done
+
+# Log traffic validation summary
+log_info "🌍 Scale traffic validation summary:"
+for result in "${traffic_validation_results[@]}"; do
+    IFS=':' read -r eip_name status detected_ip <<< "$result"
+    case $status in
+        "PASS") log_success "✅ $eip_name: Traffic validation PASSED ($detected_ip)" ;;
+        "WARNING") log_warning "⚠️  $eip_name: Traffic validation WARNING (detected: $detected_ip)" ;;
+        "SKIP") log_info "ℹ️  $eip_name: Traffic validation SKIPPED ($detected_ip)" ;;
+    esac
+done
+
+# Phase 4: OVN Scale Metrics Collection
+log_info "==============================="
+log_info "PHASE 4: Post-Chaos OVN Scale Metrics"
 log_info "==============================="
 
 log_info "Collecting OVN scale metrics after chaos testing..."
@@ -153,9 +233,9 @@ log_info "  - OVN Pods: $ovn_pod_count"
 log_info "  - Total NAT Rules: $total_nat_rules"
 log_info "  - Total LR Policies: $total_lr_policies"
 
-# Phase 4: Scale Performance Impact Analysis
+# Phase 5: Scale Performance Impact Analysis
 log_info "==============================="
-log_info "PHASE 4: Scale Performance Impact Analysis"
+log_info "PHASE 5: Scale Performance Impact Analysis"
 log_info "==============================="
 
 # Calculate performance impact ratios
@@ -181,9 +261,9 @@ else
     log_warning "⚠️  Baseline metrics not found - cannot calculate retention rates"
 fi
 
-# Phase 5: Detailed Scale Test Results
+# Phase 6: Detailed Scale Test Results  
 log_info "==============================="
-log_info "PHASE 5: Generate Scale Test Results"
+log_info "PHASE 6: Generate Scale Test Results"
 log_info "==============================="
 
 # Save comprehensive scale test results
@@ -215,7 +295,7 @@ cat > "$ARTIFACT_DIR/scale_test_results.json" << EOF
 }
 EOF
 
-# Phase 6: Final Scale Test Summary
+# Phase 7: Final Scale Test Summary
 log_info "==============================="
 log_info "FINAL SCALE TEST SUMMARY"
 log_info "==============================="

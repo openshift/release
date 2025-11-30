@@ -144,9 +144,51 @@ EOF
         
         # Wait for pod readiness
         if oc wait --for=condition=Ready pod/traffic-test-pod -n egress-test-temp --timeout=60s; then
-            # Test actual external traffic flow
+            log_info "🌐 Starting comprehensive network connectivity tests..."
+            
+            # Network diagnostic tests
+            log_info "📍 Pod network interface information:"
+            oc exec -n egress-test-temp traffic-test-pod -- ip addr show || true
+            
+            log_info "📍 Pod routing table:"
+            oc exec -n egress-test-temp traffic-test-pod -- ip route show || true
+            
+            # Test connectivity to various endpoints with detailed logging
+            log_info "🏓 Testing network connectivity with ping tests..."
+            
+            # Ping Google DNS (external connectivity test)
+            log_info "📡 Ping test to Google DNS (8.8.8.8):"
+            oc exec -n egress-test-temp traffic-test-pod -- ping -c 3 8.8.8.8 2>&1 | tee -a "$ARTIFACT_DIR/ping_tests.log" || log_warning "⚠️  Google DNS ping failed"
+            
+            # Ping httpbin.org (primary test service)
+            log_info "📡 Ping test to httpbin.org:"
+            httpbin_ip=$(oc exec -n egress-test-temp traffic-test-pod -- nslookup httpbin.org 2>/dev/null | grep "Address:" | tail -1 | awk '{print $2}' || echo "")
+            if [[ -n "$httpbin_ip" ]]; then
+                log_info "🎯 httpbin.org resolves to: $httpbin_ip"
+                oc exec -n egress-test-temp traffic-test-pod -- ping -c 3 "$httpbin_ip" 2>&1 | tee -a "$ARTIFACT_DIR/ping_tests.log" || log_warning "⚠️  httpbin.org ping failed"
+            fi
+            
+            # Test inter-cluster connectivity (ping other egress IPs if they exist)
+            log_info "🔗 Testing inter-egress IP connectivity..."
+            egress_ips=$(oc get egressip -o jsonpath='{.items[*].spec.egressIPs[*]}' 2>/dev/null || echo "")
+            if [[ -n "$egress_ips" ]]; then
+                for other_eip in $egress_ips; do
+                    if [[ "$other_eip" != "$eip_address" ]]; then
+                        log_info "📡 Ping test to other egress IP $other_eip:"
+                        oc exec -n egress-test-temp traffic-test-pod -- ping -c 2 "$other_eip" 2>&1 | tee -a "$ARTIFACT_DIR/ping_tests.log" || log_info "ℹ️  Inter-EIP ping to $other_eip: not directly reachable (expected for egress IPs)"
+                    fi
+                done
+            fi
+            
+            # Test actual external traffic flow with enhanced logging
+            log_info "🌍 Testing external HTTP traffic to verify egress IP functionality..."
             local actual_source_ip
-            actual_source_ip=$(oc exec -n egress-test-temp traffic-test-pod -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
+            log_info "📤 Making HTTP request to https://httpbin.org/ip..."
+            curl_output=$(oc exec -n egress-test-temp traffic-test-pod -- timeout 30 curl -v -s https://httpbin.org/ip 2>&1 || echo "")
+            log_info "📥 Full curl output:"
+            echo "$curl_output" | tee -a "$ARTIFACT_DIR/curl_debug.log"
+            
+            actual_source_ip=$(echo "$curl_output" | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
             
             if [[ "$actual_source_ip" == "$eip_address" ]]; then
                 log_success "✅ REAL TRAFFIC VALIDATION PASSED: External service sees egress IP $eip_address"
@@ -154,9 +196,14 @@ EOF
             else
                 log_warning "⚠️  Traffic validation: Expected $eip_address, got '$actual_source_ip'. Trying backup service..."
                 
-                # Backup test with ifconfig.me
+                # Backup test with ifconfig.me with enhanced logging
                 local backup_ip
-                backup_ip=$(oc exec -n egress-test-temp traffic-test-pod -- timeout 20 curl -s https://ifconfig.me 2>/dev/null | tr -d '\r\n ' || echo "")
+                log_info "📤 Making backup HTTP request to https://ifconfig.me..."
+                backup_curl_output=$(oc exec -n egress-test-temp traffic-test-pod -- timeout 20 curl -v -s https://ifconfig.me 2>&1 || echo "")
+                log_info "📥 Backup curl output:"
+                echo "$backup_curl_output" | tee -a "$ARTIFACT_DIR/curl_debug.log"
+                
+                backup_ip=$(echo "$backup_curl_output" | grep -v ">" | grep -v "<" | grep -v "*" | grep -v "%" | tr -d '\r\n ' | head -1 || echo "")
                 
                 if [[ "$backup_ip" == "$eip_address" ]]; then
                     log_success "✅ BACKUP TRAFFIC VALIDATION PASSED: $backup_ip"
@@ -164,6 +211,7 @@ EOF
                 else
                     log_error "❌ REAL TRAFFIC VALIDATION FAILED: Expected $eip_address, external services see '$actual_source_ip' / '$backup_ip'"
                     echo "post_disruption,traffic_validation,FAIL,$actual_source_ip" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                    return 1
                 fi
             fi
         else
@@ -299,19 +347,58 @@ EOF
         
         # Wait for pod readiness
         if oc wait --for=condition=Ready pod/reboot-traffic-test -n egress-reboot-test --timeout=90s; then
-            # Test actual external traffic flow
+            log_info "🌐 Starting post-reboot network connectivity tests..."
+            
+            # Network diagnostic tests after reboot
+            log_info "📍 Post-reboot pod network interface information:"
+            oc exec -n egress-reboot-test reboot-traffic-test -- ip addr show || true
+            
+            log_info "📍 Post-reboot pod routing table:"
+            oc exec -n egress-reboot-test reboot-traffic-test -- ip route show || true
+            
+            # Test connectivity after reboot with detailed logging
+            log_info "🏓 Testing post-reboot network connectivity with ping tests..."
+            
+            # Ping Google DNS (external connectivity test after reboot)
+            log_info "📡 Post-reboot ping test to Google DNS (8.8.8.8):"
+            oc exec -n egress-reboot-test reboot-traffic-test -- ping -c 3 8.8.8.8 2>&1 | tee -a "$ARTIFACT_DIR/post_reboot_ping_tests.log" || log_warning "⚠️  Post-reboot Google DNS ping failed"
+            
+            # Test inter-cluster connectivity after reboot
+            log_info "🔗 Testing post-reboot inter-egress IP connectivity..."
+            egress_ips=$(oc get egressip -o jsonpath='{.items[*].spec.egressIPs[*]}' 2>/dev/null || echo "")
+            if [[ -n "$egress_ips" ]]; then
+                for other_eip in $egress_ips; do
+                    if [[ "$other_eip" != "$eip_address" ]]; then
+                        log_info "📡 Post-reboot ping test to other egress IP $other_eip:"
+                        oc exec -n egress-reboot-test reboot-traffic-test -- ping -c 2 "$other_eip" 2>&1 | tee -a "$ARTIFACT_DIR/post_reboot_ping_tests.log" || log_info "ℹ️  Post-reboot inter-EIP ping to $other_eip: not directly reachable (expected)"
+                    fi
+                done
+            fi
+            
+            # Test actual external traffic flow after reboot with enhanced logging
+            log_info "🌍 Testing post-reboot external HTTP traffic to verify egress IP functionality..."
             local actual_source_ip
-            actual_source_ip=$(oc exec -n egress-reboot-test reboot-traffic-test -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
+            log_info "📤 Making post-reboot HTTP request to https://httpbin.org/ip..."
+            curl_output=$(oc exec -n egress-reboot-test reboot-traffic-test -- timeout 30 curl -v -s https://httpbin.org/ip 2>&1 || echo "")
+            log_info "📥 Post-reboot full curl output:"
+            echo "$curl_output" | tee -a "$ARTIFACT_DIR/post_reboot_curl_debug.log"
+            
+            actual_source_ip=$(echo "$curl_output" | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
             
             if [[ "$actual_source_ip" == "$eip_address" ]]; then
                 log_success "✅ POST-REBOOT TRAFFIC VALIDATION PASSED: External service sees egress IP $eip_address"
                 echo "post_reboot,traffic_validation,PASS,$eip_address" >> "$ARTIFACT_DIR/reboot_metrics.csv"
             else
-                log_warning "⚠️  Traffic validation: Expected $eip_address, got '$actual_source_ip'. Trying backup service..."
+                log_warning "⚠️  Post-reboot traffic validation: Expected $eip_address, got '$actual_source_ip'. Trying backup service..."
                 
-                # Backup test with ifconfig.me
+                # Backup test with ifconfig.me with enhanced logging
                 local backup_ip
-                backup_ip=$(oc exec -n egress-reboot-test reboot-traffic-test -- timeout 20 curl -s https://ifconfig.me 2>/dev/null | tr -d '\r\n ' || echo "")
+                log_info "📤 Making post-reboot backup HTTP request to https://ifconfig.me..."
+                backup_curl_output=$(oc exec -n egress-reboot-test reboot-traffic-test -- timeout 20 curl -v -s https://ifconfig.me 2>&1 || echo "")
+                log_info "📥 Post-reboot backup curl output:"
+                echo "$backup_curl_output" | tee -a "$ARTIFACT_DIR/post_reboot_curl_debug.log"
+                
+                backup_ip=$(echo "$backup_curl_output" | grep -v ">" | grep -v "<" | grep -v "*" | grep -v "%" | tr -d '\r\n ' | head -1 || echo "")
                 
                 if [[ "$backup_ip" == "$eip_address" ]]; then
                     log_success "✅ BACKUP POST-REBOOT TRAFFIC VALIDATION PASSED: $backup_ip"
@@ -319,6 +406,7 @@ EOF
                 else
                     log_error "❌ POST-REBOOT TRAFFIC VALIDATION FAILED: Expected $eip_address, external services see '$actual_source_ip' / '$backup_ip'"
                     echo "post_reboot,traffic_validation,FAIL,$actual_source_ip" >> "$ARTIFACT_DIR/reboot_metrics.csv"
+                    return 1
                 fi
             fi
         else
