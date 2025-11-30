@@ -46,3 +46,26 @@ for try in $(seq "${RETRIES}"); do
     sleep 30
   fi
 done
+
+set +e
+# 1. NooBaa endpoint pod 稳定性
+echo "NooBaa endpoint pod stable"
+oc get pod -n openshift-storage -l noobaa-s3=noobaa
+
+echo "check pod restart:"
+oc get pod -n openshift-storage -l noobaa-s3=noobaa -o jsonpath='{.items[*].status.containerStatuses[*].restartCount}'
+
+#  2. CPU 使用情况
+echo "CPU usage"
+oc adm top pod -n openshift-storage | grep endpoint
+
+#  3. BackingStore 状态
+echo "BackingStore status"
+  oc get backingstore -n openshift-storage
+  oc describe backingstore noobaa-pv-backing-store -n openshift-storage
+
+# 4. 测试 S3 endpoint
+echo "test S3 endpoint"
+  oc get route -n openshift-storage s3
+  curl -k https://$(oc get route s3 -n openshift-storage -o jsonpath='{.spec.host}')
+set -e
