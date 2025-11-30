@@ -203,7 +203,7 @@ EOF
                 log_info "📥 Backup curl output:"
                 echo "$backup_curl_output" | tee -a "$ARTIFACT_DIR/curl_debug.log"
                 
-                backup_ip=$(echo "$backup_curl_output" | grep -v ">" | grep -v "<" | grep -v "*" | grep -v "%" | tr -d '\r\n ' | head -1 || echo "")
+                backup_ip=$(echo "$backup_curl_output" | grep -v ">" | grep -v "<" | grep -v "\*" | grep -v "%" | tr -d '\r\n ' | head -1 || echo "")
                 
                 if [[ "$backup_ip" == "$eip_address" ]]; then
                     log_success "✅ BACKUP TRAFFIC VALIDATION PASSED: $backup_ip"
@@ -398,7 +398,7 @@ EOF
                 log_info "📥 Post-reboot backup curl output:"
                 echo "$backup_curl_output" | tee -a "$ARTIFACT_DIR/post_reboot_curl_debug.log"
                 
-                backup_ip=$(echo "$backup_curl_output" | grep -v ">" | grep -v "<" | grep -v "*" | grep -v "%" | tr -d '\r\n ' | head -1 || echo "")
+                backup_ip=$(echo "$backup_curl_output" | grep -v ">" | grep -v "<" | grep -v "\*" | grep -v "%" | tr -d '\r\n ' | head -1 || echo "")
                 
                 if [[ "$backup_ip" == "$eip_address" ]]; then
                     log_success "✅ BACKUP POST-REBOOT TRAFFIC VALIDATION PASSED: $backup_ip"
