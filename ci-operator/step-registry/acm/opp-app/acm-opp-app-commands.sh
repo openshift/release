@@ -48,6 +48,9 @@ if [ "$BUILD_STATUS" == "Failed" ]; then
     oc start-build httpd-example -n e2e-opp
 fi
 
+# Wait for the deployment to be ready
+oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=10m
+
 # Check some other info after the application deployed successfully
 oc get cm -n openshift-config opp-ingres-ca -o yaml
 oc get quayintegration quay -o yaml
