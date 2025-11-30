@@ -57,11 +57,103 @@ validate_node_name() {
 
 check_prerequisites() {
     # Check if required tools are available
-    for tool in oc jq; do
-        if ! command -v "$tool" >/dev/null 2>&1; then
-            error_exit "$tool command not found - required for test execution"
+    if ! command -v "oc" >/dev/null 2>&1; then
+        error_exit "oc command not found - required for test execution"
+    fi
+    
+    # Install jq if not available (common in CI environments)
+    if ! command -v "jq" >/dev/null 2>&1; then
+        log_info "jq not found, attempting to install..."
+        if command -v "dnf" >/dev/null 2>&1; then
+            dnf install -y jq 2>/dev/null || {
+                log_warning "Failed to install jq via dnf, trying alternative methods..."
+                install_jq_fallback
+            }
+        elif command -v "yum" >/dev/null 2>&1; then
+            yum install -y jq 2>/dev/null || {
+                log_warning "Failed to install jq via yum, trying alternative methods..."
+                install_jq_fallback
+            }
+        else
+            install_jq_fallback
         fi
-    done
+        
+        # Verify installation
+        if ! command -v "jq" >/dev/null 2>&1; then
+            log_warning "jq installation failed, will use fallback JSON parsing"
+            export JQ_AVAILABLE=false
+        else
+            export JQ_AVAILABLE=true
+            log_success "jq installed successfully"
+        fi
+    else
+        export JQ_AVAILABLE=true
+    fi
+}
+
+install_jq_fallback() {
+    log_info "Attempting to install jq from binary..."
+    # Try to download jq binary directly
+    if command -v "curl" >/dev/null 2>&1; then
+        curl -L -o /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null && {
+            chmod +x /tmp/jq
+            if /tmp/jq --version >/dev/null 2>&1; then
+                cp /tmp/jq /usr/local/bin/jq 2>/dev/null || {
+                    # If can't copy to system path, create local symlink
+                    export PATH="/tmp:$PATH"
+                }
+                log_success "jq binary installed successfully"
+                return 0
+            fi
+        }
+    fi
+    
+    if command -v "wget" >/dev/null 2>&1; then
+        wget -O /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null && {
+            chmod +x /tmp/jq
+            if /tmp/jq --version >/dev/null 2>&1; then
+                cp /tmp/jq /usr/local/bin/jq 2>/dev/null || {
+                    export PATH="/tmp:$PATH"
+                }
+                log_success "jq binary installed successfully"
+                return 0
+            fi
+        }
+    fi
+    
+    log_warning "All jq installation methods failed"
+    return 1
+}
+
+# JSON parsing fallback for when jq is not available
+parse_json_fallback() {
+    local json_input="$1"
+    local jq_expression="$2"
+    
+    # Simple JSON parsing fallbacks for common expressions used in script
+    case "$jq_expression" in
+        ".status // {}")
+            # Extract status field or return empty object
+            if echo "$json_input" | grep -q '"status"'; then
+                echo "$json_input" | sed -n 's/.*"status":\s*\({[^}]*}\).*/\1/p' || echo '{}'
+            else
+                echo '{}'
+            fi
+            ;;
+        ".origin" | ".origin // empty")
+            # Extract origin field (for httpbin.org responses)
+            echo "$json_input" | sed -n 's/.*"origin":\s*"\([^"]*\)".*/\1/p'
+            ;;
+        ".[]")
+            # Array iteration - simplified
+            echo "$json_input"
+            ;;
+        *)
+            # For complex expressions, try basic sed parsing or return empty
+            log_warning "Unsupported JSON expression for fallback: $jq_expression"
+            echo "{}"
+            ;;
+    esac
 }
 
 error_exit() {
@@ -91,7 +183,11 @@ EOF
     local eip_status eip_json
     eip_json=$(oc get egressip "$EIP_NAME" -o json 2>/dev/null || echo '{}')
     if [[ -n "$eip_json" && "$eip_json" != '{}' ]]; then
-        eip_status=$(echo "$eip_json" | jq -c '.status // {}' 2>/dev/null || echo '{}')
+        if [[ "$JQ_AVAILABLE" == "true" ]]; then
+            eip_status=$(echo "$eip_json" | jq -c '.status // {}' 2>/dev/null || echo '{}')
+        else
+            eip_status=$(parse_json_fallback "$eip_json" '.status // {}')
+        fi
         if [[ -z "$eip_status" ]]; then
             eip_status='{}'
         fi
@@ -102,7 +198,13 @@ EOF
     
     # Collect recent egress IP events
     local eip_events
-    eip_events=$(oc get events --field-selector involvedObject.name="$EIP_NAME" --sort-by='.lastTimestamp' -o json 2>/dev/null | jq -c '[.items[] | {type, reason, message, firstTimestamp, lastTimestamp}]' 2>/dev/null || echo '[]')
+    if [[ "$JQ_AVAILABLE" == "true" ]]; then
+        eip_events=$(oc get events --field-selector involvedObject.name="$EIP_NAME" --sort-by='.lastTimestamp' -o json 2>/dev/null | jq -c '[.items[] | {type, reason, message, firstTimestamp, lastTimestamp}]' 2>/dev/null || echo '[]')
+    else
+        # Simplified events collection without jq
+        eip_events='[]'
+        log_warning "Event collection limited without jq"
+    fi
     echo "    \"recent_events\": $eip_events" >> "$metrics_file"
     
     cat >> "$metrics_file" << EOF
@@ -711,7 +813,14 @@ EOF
     # Test 1: httpbin.org (returns source IP in JSON)
     log_info "Testing external connectivity via httpbin.org..."
     local actual_source_ip
-    actual_source_ip=$(oc exec -n egress-traffic-test traffic-validator -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
+    if [[ "$JQ_AVAILABLE" == "true" ]]; then
+        actual_source_ip=$(oc exec -n egress-traffic-test traffic-validator -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
+    else
+        # Parse JSON response without jq
+        local response
+        response=$(oc exec -n egress-traffic-test traffic-validator -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null || echo "")
+        actual_source_ip=$(parse_json_fallback "$response" '.origin' | cut -d',' -f1 | tr -d ' ')
+    fi
     
     if [[ -n "$actual_source_ip" ]]; then
         if [[ "$actual_source_ip" == "$eip_address" ]]; then
@@ -900,7 +1009,11 @@ run_multinode_migration_test() {
             # Add debug info every 30 seconds
             log_info "Debug: Current assignment: '$new_assignment', Target: '$target_node', Original: '$current_node'"
             log_info "Debug: EgressIP status:"
-            oc get egressip "$EIP_NAME" -o jsonpath='{.status}' 2>/dev/null | jq '.' 2>/dev/null || echo "No status available"
+            if [[ "$JQ_AVAILABLE" == "true" ]]; then
+                oc get egressip "$EIP_NAME" -o jsonpath='{.status}' 2>/dev/null | jq '.' 2>/dev/null || echo "No status available"
+            else
+                oc get egressip "$EIP_NAME" -o jsonpath='{.status}' 2>/dev/null || echo "No status available"
+            fi
         fi
     done
     

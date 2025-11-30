@@ -471,7 +471,14 @@ test_egress_traffic() {
     
     # Test external connectivity and verify source IP
     local actual_source_ip
-    actual_source_ip=$(oc exec -n "$namespace" "$test_pod" -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
+    if command -v "jq" >/dev/null 2>&1; then
+        actual_source_ip=$(oc exec -n "$namespace" "$test_pod" -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
+    else
+        # Parse JSON response without jq
+        local response
+        response=$(oc exec -n "$namespace" "$test_pod" -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null || echo "")
+        actual_source_ip=$(echo "$response" | sed -n 's/.*"origin":\s*"\([^"]*\)".*/\1/p' | cut -d',' -f1 | tr -d ' ')
+    fi
     
     if [[ -n "$actual_source_ip" ]]; then
         if [[ "$actual_source_ip" == "$expected_eip" ]]; then
