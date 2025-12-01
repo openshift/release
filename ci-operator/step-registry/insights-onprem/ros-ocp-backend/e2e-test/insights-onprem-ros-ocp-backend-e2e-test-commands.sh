@@ -4,8 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "========== Image Tag Resolution =========="
+echo "========== Dependency Installation =========="
+# Install yq if not available
+if ! command -v yq &> /dev/null; then
+    echo "yq not found, installing..."
+    curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /tmp/yq
+    chmod +x /tmp/yq
+    export PATH="/tmp:${PATH}"
+    echo "yq installed successfully"
+else
+    echo "yq is already installed"
+fi
 
+echo "========== Image Tag Resolution =========="
 export IMAGE_TAG
 
 # Get job type and PR information from JOB_SPEC
