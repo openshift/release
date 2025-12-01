@@ -232,7 +232,7 @@ spec:
   installNamespace: open-cluster-management-agent-addon
 EOF
 
-sleep 60
+sleep 1800
 
 # wait for hypershift operator to come online
 _hypershiftReady=0
