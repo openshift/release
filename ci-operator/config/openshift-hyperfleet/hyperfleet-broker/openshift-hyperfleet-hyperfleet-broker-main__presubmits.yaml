@@ -1,0 +1,54 @@
+base_images:
+  jasee_openshift-build_rhel-9-golang-1.25:
+    name: openshift-build
+    namespace: jasee
+    tag: rhel-9-golang-1.25
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: openshift-build
+    namespace: jasee
+    tag: rhel-9-golang-1.25
+images:
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY src/ /opt/app-root/src
+    WORKDIR /opt/app-root/src/hyperfleet-broker
+    USER root
+    RUN dnf install -y go make
+    RUN dnf clean all
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-broker
+  to: golang-test
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 2Gi
+tests:
+- as: integration
+  capabilities:
+  - nested-podman
+  commands: |
+    go get github.com/testcontainers/testcontainers-go
+    export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
+    podman system service --time=120 $(DOCKER_HOST) &
+    systemctl --user start podman.socket || true
+    export TESTCONTAINERS_RYUK_DISABLED=true
+    go mod tidy
+    make test-integration
+  container:
+    from: golang-test
+  nested_podman: true
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-broker
+  variant: presubmits
