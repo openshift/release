@@ -97,6 +97,28 @@ tests:
       WORKLOAD_TO_TEST: coco
     workflow: sandboxed-containers-operator-e2e-azure
   timeout: 24h0m0s
+- as: aro-ipi-peerpods
+  cron: 0 0 31 2 1
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ARO_CLUSTER_VERSION: "4.18"
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.0-1762437975
+      CATALOG_SOURCE_NAME: brew-catalog
+      ENABLE_MUST_GATHER: "true"
+      ENABLEPEERPODS: "true"
+      EXPECTED_OPERATOR_VERSION: 1.11.0
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 3.21.0-3.rhaos4.19.el9
+      RUNTIMECLASS: kata-remote
+      SLEEP_DURATION: 0h
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
+      TEST_RELEASE_TYPE: Pre-GA
+      TEST_SCENARIOS: sig-kata.*Kata Author
+      TEST_TIMEOUT: "75"
+      WORKLOAD_TO_TEST: peer-pods
+    workflow: sandboxed-containers-operator-e2e-aro
+  timeout: 24h0m0s
 - as: aws-ipi-peerpods
   cron: 0 0 31 2 1
   steps:

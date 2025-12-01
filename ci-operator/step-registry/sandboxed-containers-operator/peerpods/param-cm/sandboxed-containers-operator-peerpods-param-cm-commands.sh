@@ -99,12 +99,12 @@ create_ssh_key() {
 }
 
 handle_azure() {
+    local IS_ARO
     local AZURE_RESOURCE_GROUP
     local AZURE_AUTH_LOCATION
     local AZURE_CLIENT_SECRET
     local AZURE_TENANT_ID
     local AZURE_CLIENT_ID
-    local AZURE_VNET_ID
     local AZURE_VNET_NAME
     local AZURE_SUBNET_ID
     local AZURE_SUBNET_NAME
@@ -112,14 +112,13 @@ handle_azure() {
     local AZURE_REGION
     local PP_REGION
     local PP_RESOURCE_GROUP
-    local PP_VNET_ID
     local PP_VNET_NAME
     local PP_SUBNET_NAME
     local PP_SUBNET_ID
     local PP_RESOURCE_GROUP
     local PP_NSG_ID
-    local PP_NSG_NAME
 
+    IS_ARO=$(oc get crd clusters.aro.openshift.io &>/dev/null && echo true || echo false)
     # Note: Keep the following commands in sync with https://raw.githubusercontent.com/kata-containers/kata-containers/refs/heads/main/ci/openshift-ci/peer-pods-azure.sh
     # as much as possible.
 
@@ -146,12 +145,33 @@ handle_azure() {
     fi
     AZURE_SUBSCRIPTION_ID="$(jq -r .data.azure_subscription_id azure_credentials.json|base64 -d)"
     rm -f azure_credentials.json
-
-    AZURE_RESOURCE_GROUP=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')
+    # Login to Azure for NAT gateway creation
     az login --service-principal --username "${AZURE_CLIENT_ID}" --password "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
-    # Recommended on az sites to refresh the subscription
     az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
-    # This command still sometimes fails directly after login
+
+    if [[ "${IS_ARO}" == "true" ]]; then
+        # On ARO we have to assign extra roles and add NSG using upper-cloud
+        # credentials
+        local AZURE_NSG_NAME
+        local CLUSTER_NAME
+        local RG_SCOPE_ID
+        local SP_CLIENT_ID
+        AZURE_RESOURCE_GROUP="$(cat "${SHARED_DIR}/resourcegroup")"
+        CLUSTER_NAME="$(cat "${SHARED_DIR}/cluster-name")"
+        AZURE_REGION="${LEASED_RESOURCE}"
+        SP_CLIENT_ID="$(az aro show --name "${CLUSTER_NAME}" --resource-group "${AZURE_RESOURCE_GROUP}" --query "servicePrincipalProfile.clientId" -o tsv)"
+        RG_SCOPE_ID="$(az group show --name "${AZURE_RESOURCE_GROUP}" --query "id" -o tsv)"
+        az role assignment create --assignee "${SP_CLIENT_ID}" --role "Network Contributor" --scope "${RG_SCOPE_ID}"
+        az role assignment create --assignee "${SP_CLIENT_ID}" --role "Contributor" --scope "${RG_SCOPE_ID}"
+        AZURE_NSG_NAME="$(oc get configmap cloud-conf -n openshift-cloud-controller-manager -o json | jq -r '.data."cloud.conf" | fromjson' | jq -r '.securityGroupName')"
+        az network nsg create -g "${AZURE_RESOURCE_GROUP}" -n "${AZURE_NSG_NAME}" -l "${AZURE_REGION}" || echo "::warning:: NSG create failed, probably already existing"
+    else
+        # On normal cluster wait for it to be Available
+        echo "Waiting for OpenShift infrastructure to be ready..."
+        oc wait --for=condition=Available --timeout=600s infrastructure/cluster
+        AZURE_RESOURCE_GROUP=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')
+        AZURE_REGION=$(az group show --resource-group "${AZURE_RESOURCE_GROUP}" --query "{Location:location}" --output tsv)
+    fi
     for I in {1..30}; do
 	    AZURE_VNET_NAME=$(az network vnet list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[].{Name:name}" --output tsv ||:)
 	    if [[ -z "${AZURE_VNET_NAME}" ]]; then
@@ -168,7 +188,6 @@ handle_azure() {
     AZURE_SUBNET_NAME=$(az network vnet subnet list --resource-group "${AZURE_RESOURCE_GROUP}" --vnet-name "${AZURE_VNET_NAME}" --query "[].{Id:name} | [? contains(Id, 'worker')]" --output tsv)
     AZURE_SUBNET_ID=$(az network vnet subnet list --resource-group "${AZURE_RESOURCE_GROUP}" --vnet-name "${AZURE_VNET_NAME}" --query "[].{Id:id} | [? contains(Id, 'worker')]" --output tsv)
     AZURE_NSG_ID=$(az network nsg list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[].{Id:id}" --output tsv)
-    AZURE_REGION=$(az group show --resource-group "${AZURE_RESOURCE_GROUP}" --query "{Location:location}" --output tsv)
 
     # Downstream version generates podvm, no need to peer to eastus
     # (keeping the PP_* variables to be close to upstream setup)
@@ -195,8 +214,6 @@ handle_azure() {
         --vnet-name "${PP_VNET_NAME}" \
         --name "${PP_SUBNET_NAME}" \
         --nat-gateway MyNatGateway
-
-    # Start the downstream-only commands
 
     create_ssh_key
 
