@@ -63,3 +63,8 @@ if [ -f /tmp/virtual_media_mount_failed ]; then
   echo "Failed to mount the ISO image in one or more hosts"
   exit 1
 fi
+
+CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
+    touch /var/builds/"${CLUSTER_NAME}"/preserve
