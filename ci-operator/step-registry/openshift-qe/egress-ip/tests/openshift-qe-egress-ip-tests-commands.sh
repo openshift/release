@@ -135,10 +135,24 @@ metadata:
     app: "egress-test-app"
     egress-enabled: "true"
 spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - name: curl-container
     image: quay.io/openshift/origin-network-tools:latest
     command: ["/bin/sleep", "300"]
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 1001
+      capabilities:
+        drop:
+        - ALL
+      seccompProfile:
+        type: RuntimeDefault
   restartPolicy: Never
 EOF
         
@@ -338,10 +352,24 @@ metadata:
     app: "egress-test-app"
     egress-enabled: "true"
 spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - name: curl-container
     image: quay.io/openshift/origin-network-tools:latest
     command: ["/bin/sleep", "300"]
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 1001
+      capabilities:
+        drop:
+        - ALL
+      seccompProfile:
+        type: RuntimeDefault
   restartPolicy: Never
 EOF
         
