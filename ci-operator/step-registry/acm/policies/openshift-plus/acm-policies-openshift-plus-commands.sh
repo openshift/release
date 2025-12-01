@@ -68,7 +68,7 @@ echo "BackingStore status"
 echo "test S3 endpoint"
   oc get route -n openshift-storage s3
   curl -k https://"$(oc get route s3 -n openshift-storage -o jsonpath='{.spec.host}')"
-set -e
+
 
 
 
@@ -180,9 +180,7 @@ echo 检查 Quay 存储的 secret 和 configmap
   oc get secret obc-local-quay-registry-quay-datastore -n local-quay
   oc get configmap obc-local-quay-registry-quay-datastore -n local-quay
 
-
-
-
+set -e
 
 
 
