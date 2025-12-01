@@ -71,7 +71,8 @@ echo "${rendezvous_ip_address}" >"${SHARED_DIR}"/node-zero-ip.txt
 cp /var/run/vault/secrets/.dockerconfigjson /tmp/pull-secret
 #oc registry login --to /tmp/pull-secret
 pull_secret_path=/tmp/pull-secret
-
+echo "start debugging..."
+sleep 10m
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
 # Create base-domain.txt
 echo "vmc-ci.devcluster.openshift.com" >"${SHARED_DIR}"/base-domain.txt

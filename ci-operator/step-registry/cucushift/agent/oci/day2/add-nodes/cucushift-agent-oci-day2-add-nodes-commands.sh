@@ -24,4 +24,4 @@ echo "uploading node.iso to iso-datastore.."
 oci os object put -bn "${BUCKET_NAME}" --file node.x86_64.iso -ns "${NAMESPACE_NAME}"
 
 echo "start debugging...."
-sleep 2h
+sleep 4h
