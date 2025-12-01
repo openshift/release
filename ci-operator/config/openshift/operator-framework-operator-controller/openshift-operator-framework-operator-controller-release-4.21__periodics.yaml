@@ -11,6 +11,10 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
+  libvirt-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: libvirt-installer
   ocm-cli:
     name: ocm-cli
     namespace: ci
@@ -57,6 +61,12 @@ releases:
   ppc64le-latest:
     candidate:
       architecture: ppc64le
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  s390x-latest:
+    candidate:
+      architecture: s390x
       product: ocp
       stream: nightly
       version: "4.21"
@@ -372,6 +382,160 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-ovn
+- as: e2e-agent-sno-ipv6-extended-f7
+  capabilities:
+  - intranet
+  cron: 11 11 1-31/7 * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV6
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/fast
+    workflow: agent-e2e-generic-conformance
+- as: e2e-aws-ovn-fips-extended-f2
+  cron: 5 15 1-31/2 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      FIPS_ENABLED: "true"
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/fast
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-fips-techpreview-extended-f1
+  cron: 34 14 * * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/fast
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-fips-slow-extended-f2
+  cron: 36 11 1-31/2 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      FIPS_ENABLED: "true"
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/slow
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-fips-techpreview-slow-extended-f2
+  cron: 25 11 1-31/2 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/slow
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-e2e-aws
+- as: e2e-metal-ovn-two-node-arbiter-extended-f4
+  capabilities:
+  - intranet
+  cron: 23 10 1-31/4 * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/fast
+    workflow: baremetalds-two-node-arbiter
+- as: e2e-compact-ovn-remote-libvirt-s390x-extended-f2
+  capabilities:
+  - sshd-bastion
+  cron: 24 17 1-31/2 * *
+  steps:
+    cluster_profile: libvirt-s390x-2
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "4.21"
+      COMPUTE_COUNT: "0"
+      TEST_SUITE: olmv1/extended/candidate/fast
+      TEST_TYPE: suite
+      VOLUME_CAPACITY: 64GB
+    workflow: openshift-e2e-libvirt-upi
+- as: e2e-ovn-remote-libvirt-ppc64le-extended-f2
+  cluster: build10
+  cron: 30 20 1-31/2 * *
+  steps:
+    cluster_profile: libvirt-ppc64le-s2s
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:ppc64le-latest
+    env:
+      ARCH: ppc64le
+      BRANCH: "4.21"
+      DOMAIN_MEMORY: "34816"
+      ETCD_DISK_SPEED: slow
+      TEST_SUITE: olmv1/extended/candidate/fast
+      TEST_TYPE: suite
+      USE_RAMFS: "true"
+    workflow: openshift-e2e-libvirt-upi
+- as: e2e-aws-ovn-proxy-extended-f2
+  cron: 7 4 1-31/2 * *
+  steps:
+    cluster_profile: aws-5
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SKIPS: ""
+      TEST_SUITE: olmv1/extended/candidate/fast
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-proxy
+- as: e2e-aws-ovn-proxy-techpreview-extended-f2
+  cron: 12 10 1-31/2 * *
+  steps:
+    cluster_profile: aws-5
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SKIPS: ""
+      TEST_SUITE: olmv1/extended/candidate/fast
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-proxy
+- as: e2e-aws-ovn-proxy-slow-extended-f2
+  cron: 43 19 1-31/2 * *
+  steps:
+    cluster_profile: aws-5
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SKIPS: ""
+      TEST_SUITE: olmv1/extended/candidate/slow
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-proxy
+- as: e2e-aws-ovn-proxy-techpreview-slow-extended-f2
+  cron: 42 0 1-31/2 * *
+  steps:
+    cluster_profile: aws-5
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SKIPS: ""
+      TEST_SUITE: olmv1/extended/candidate/slow
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-proxy
 zz_generated_metadata:
   branch: release-4.21
   org: openshift
