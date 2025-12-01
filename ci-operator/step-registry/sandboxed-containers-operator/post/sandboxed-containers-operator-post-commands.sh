@@ -92,6 +92,44 @@ cleanup_aws() {
 	exit 0
 }
 
+# Remove our NSG on ARO+peer-pods (do nothing on plain azure)
+cleanup_azure() {
+	local IS_ARO
+	IS_ARO=$(oc get crd clusters.aro.openshift.io &>/dev/null && echo true || echo false)
+	if [[ "${IS_ARO}" != "true" ]]; then
+		echo "We are not on ARO"
+		return
+	fi
+	if [[ "${ENABLEPEERPODS:-no}" != "true" ]]; then
+		echo "Peer-pods not enabled"
+		return
+	fi
+
+	RESOURCEGROUP=${RESOURCEGROUP:=$(cat "${SHARED_DIR}/resourcegroup")}
+	AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+	AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
+	AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
+	AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+	az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+
+	# delete kataconfig (to prevent starting new podvms)
+	oc delete kataconfigs.kataconfiguration.openshift.io --all --wait=false || echo "::warning:: Failed to delete kata-config"
+
+	# Delete potentially left-behind VMs
+	az vm list --resource-group "${RESOURCEGROUP}" --query "[?starts_with(name, 'podvm-')].name" --output tsv | xargs -I {} az vm delete --resource-group "${RESOURCEGROUP}" --name {} --yes --force-deletion 1 --no-wait
+	echo "Deletion initiated. Waiting up to 60 seconds for all VMs to be removed..."
+	SECONDS=0
+	while [[ "${SECONDS}" -lt 60 ]] && az vm list --resource-group "${RESOURCEGROUP}" --query "[?starts_with(name, 'podvm-')].name" --output tsv | grep -q .; do
+		sleep 5
+	done
+	[[ "${SECONDS}" -ge 60 ]] && echo "::error:: Failed to delete all vms in 60s" && az vm list --resource-group "${RESOURCEGROUP}" --query "[?starts_with(name, 'podvm-')].name" --output tsv
+
+	# Now delete the NSG
+	AZURE_NSG_NAME="$(oc get configmap cloud-conf -n openshift-cloud-controller-manager -o json | jq -r '.data."cloud.conf" | fromjson' | jq -r '.securityGroupName')"
+	# Ignore failures (perhaps not created)
+	az network nsg delete -g "${RESOURCEGROUP}" -n "${AZURE_NSG_NAME}" || echo "::warning:: Failed to delete nsg: az network nsg delete -g '${RESOURCEGROUP}' -n '${AZURE_NSG_NAME}'"
+}
+
 # First check if PODVM_IMAGE was provided or generated
 if [[ "${PODVM_IMAGE_URL}" ]]; then
   echo "Skipping cleanup, custom PODVM_IMAGE_URL=${PODVM_IMAGE_URL} specified"
@@ -104,6 +142,8 @@ provider="$(oc get infrastructure -n cluster -o json | jq '.items[].status.platf
 case ${provider} in
 	aws)
 		cleanup_aws ;;
+	azure)
+		cleanup_azure ;;
 	*)
 		echo "No post defined for provider ${provider}, skipping cleanup"
 		exit 0;;
