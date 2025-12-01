@@ -799,6 +799,15 @@ spec:
       limits:
         memory: "128Mi"
         cpu: "100m"
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 1000
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+        - ALL
   restartPolicy: Never
 EOF
     
