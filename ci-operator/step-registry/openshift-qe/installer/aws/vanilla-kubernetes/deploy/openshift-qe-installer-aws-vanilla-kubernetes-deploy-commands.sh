@@ -23,6 +23,13 @@ echo "Creating cluster: ${NAME}"
 echo "State store: ${STATE_STORE}"
 echo "OIDC store: ${OIDC_STORE}"
 
+python --version
+pushd /tmp
+python -m virtualenv ./venv_qe
+source ./venv_qe/bin/activate
+
+pip install awscliv2
+
 # Create S3 buckets for kops state and OIDC (check if they exist first)
 echo "Checking/creating S3 bucket for kops state store..."
 if ! aws s3 ls "${STATE_STORE}" >/dev/null 2>&1; then
@@ -54,12 +61,12 @@ fi
 
 # Download latest kops binary
 echo "Downloading latest kops binary..."
-curl -Lo /tmp/kops "https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | jq -r '.tag_name')/kops-linux-amd64"
-chmod +x /tmp/kops
+curl -Lo kops "https://github.com/kubernetes/kops/releases/download/$(curl -s https://api.github.com/repos/kubernetes/kops/releases/latest | jq -r '.tag_name')/kops-linux-amd64"
+chmod +x kops
 
 # Create cluster configuration
 echo "Creating kops cluster configuration..."
-/tmp/kops create cluster "${NAME}" \
+./kops create cluster "${NAME}" \
   --cloud=aws \
   --zones=$REGION \
   --node-count=$NUM_NODES \
@@ -73,7 +80,7 @@ echo "Creating kops cluster configuration..."
 
 # Wait for cluster to be ready
 echo "Waiting for cluster to become ready..."
-/tmp/kops validate cluster --wait 15m
+./kops validate cluster --wait 15m
 
 # Verify cluster is working
 echo "Verifying cluster..."
