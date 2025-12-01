@@ -6,7 +6,8 @@ set -o pipefail
 set -v
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-NAME=$(cat "${CLUSTER_PROFILE_DIR}/cloud_name")
+NAME=$(cat "${SHARED_DIR}/kops_name")
+STATE_STORE=$(cat "${SHARED_DIR}/kops_name")
 
 # Download latest kops binary
 echo "Downloading latest kops binary..."
@@ -16,6 +17,6 @@ chmod +x kops
 
 # Cleanup (delete cluster)
 echo "Cleaning up cluster..."
-./kops delete cluster --name="${NAME}" --yes
+./kops delete cluster --name="${NAME}" --state="${STATE_STORE}" --yes
 
 echo "Cleanup completed (S3 buckets preserved for reuse)."

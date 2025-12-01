@@ -10,7 +10,7 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 # Generate unique cluster name with timestamp
 TIMESTAMP=$(date +%Y%m%d%H%M%S)
 export NAME="kops-test-${TIMESTAMP}.${BASE_DOMAIN}"
-echo $NAME > ${SHARED_DIR}/cloud_name
+echo $NAME > ${SHARED_DIR}/kops_name
 
 # Install awscli
 #python --version
@@ -22,6 +22,7 @@ pushd /tmp
 # S3 bucket names (fixed names)
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 STATE_STORE="s3://kops-state-${ACCOUNT_ID}"
+echo $STATE_STORE > ${SHARED_DIR}/kops_state
 OIDC_STORE="s3://kops-oidc-${ACCOUNT_ID}"
 
 export KOPS_STATE_STORE="${STATE_STORE}"
@@ -84,8 +85,8 @@ echo "Waiting for cluster to become ready..."
 
 # Verify cluster is working
 echo "Verifying cluster..."
-kubectl get nodes
-kubectl get pods -A
+oc get nodes
+oc get pods -A
 ls ~/.kube/config
 
 # Export the kubeconfig so next steps can reuse it
