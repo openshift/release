@@ -87,15 +87,15 @@ def download_import_rhcos_ova():
     vsphere_portgroup = os.environ.get("vsphere_portgroup")
 
     ova_import_json_string = f'''
-{
-    "DiskProvisioning": "thin",
+{{
+   "DiskProvisioning": "thin",
    "MarkAsTemplate": false,
    "PowerOn": false,
    "InjectOvfEnv": false,
    "WaitForIP": false,
-   "Name": {vm_template},
-   "NetworkMapping":[{"Name":"VM Network","Network":"{vsphere_portgroup}"}]
-}
+   "Name": "{vm_template}",
+   "NetworkMapping":[{{"Name":"VM Network","Network":"{vsphere_portgroup}"}}]
+}}
 '''
 
     with open("/tmp/rhcos.json", "w") as rf:
@@ -209,7 +209,7 @@ frontend router-http
 frontend router-https
   bind *:443
   default_backend router-https
-  
+
 {%- for epname, port in endpoints.items() %}
     {% set health_check = "check check-ssl" %}
     {% if epname == "router-http" %}
@@ -220,7 +220,7 @@ backend {{ epname }}
   balance roundrobin
   option tcp-check
   default-server verify none inter 10s downinter 5s rise 2 fall 3 slowstart 60s maxconn 250 maxqueue 256 weight 100
-  
+
   {%- for ip in ipaddresses %}
   server {{ epname }}-{{ ip |replace(".", "-") }} {{ ip }}:{{ port }} {{ health_check }}
   {%- endfor %}
@@ -251,7 +251,7 @@ storage:
   files:
     - path: "/etc/haproxy/haproxy.conf"
       contents:
-        local: {haproxy_config_path.split('/')[-1]} 
+        local: {haproxy_config_path.split('/')[-1]}
       mode: 0644
 systemd:
   units:
