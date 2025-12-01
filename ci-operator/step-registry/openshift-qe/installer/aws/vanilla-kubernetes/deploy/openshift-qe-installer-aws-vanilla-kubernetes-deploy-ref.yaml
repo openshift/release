@@ -1,0 +1,51 @@
+ref:
+  as: openshift-qe-installer-aws-vanilla-kubernetes-deploy
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-installer-aws-vanilla-kubernetes-deploy-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: ocp-perfscale-prod-es-creds
+    mount_path: /prod-secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: BASE_DOMAIN
+    default: "perfscale.devcluster.openshift.com"
+    documentation: |-
+      Add args for e2e-benchmarking kube-burner-ocp cmd.
+  - name: CNI
+    default: "cilium"
+    documentation: |-
+      CNI to deploy.
+  - name: FLAVOR
+    default: "t3.medium"
+    documentation: |-
+      Flavor or the VMs.
+  - name: NUM_NODES
+    default: "2"
+    documentation: |-
+      Number of non-control plane nodes.
+  - name: NUM_NODES_CONTROL_PLANE
+    default: "1"
+    documentation: |-
+      Number of control plane nodes.
+  - name: REGION
+    default: "us-west-2b"
+    documentation: |-
+      AWS region.
+  - name: VERSION
+    default: "1.31.12"
+    documentation: |-
+      Kubernetes version.
+  documentation: >-
+    This step deploys a vanila Kubernetes cluster on AWS.
+  timeout: 2h30m
