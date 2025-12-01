@@ -12,6 +12,13 @@ TIMESTAMP=$(date +%Y%m%d%H%M%S)
 export NAME="kops-test-${TIMESTAMP}.${BASE_DOMAIN}"
 echo $NAME > ${SHARED_DIR}/cloud_name
 
+# Install awscli
+python --version
+pushd /tmp
+python -m virtualenv ./venv_qe
+source ./venv_qe/bin/activate
+pip install awscliv2
+
 # S3 bucket names (fixed names)
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 STATE_STORE="s3://kops-state-${ACCOUNT_ID}"
@@ -22,13 +29,6 @@ export KOPS_STATE_STORE="${STATE_STORE}"
 echo "Creating cluster: ${NAME}"
 echo "State store: ${STATE_STORE}"
 echo "OIDC store: ${OIDC_STORE}"
-
-python --version
-pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
-
-pip install awscliv2
 
 # Create S3 buckets for kops state and OIDC (check if they exist first)
 echo "Checking/creating S3 bucket for kops state store..."
