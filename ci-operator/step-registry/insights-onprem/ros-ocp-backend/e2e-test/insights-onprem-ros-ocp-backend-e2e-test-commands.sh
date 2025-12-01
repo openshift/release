@@ -17,6 +17,17 @@ else
     echo "yq is already installed"
 fi
 
+# Install kubectl if not available
+if ! command -v kubectl &> /dev/null; then
+    echo "kubectl not found, installing..."
+    curl -sL "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o /tmp/kubectl
+    chmod +x /tmp/kubectl
+    export PATH="/tmp:${PATH}"
+    echo "kubectl installed successfully"
+else
+    echo "kubectl is already installed"
+fi
+
 # Install helm if not available
 if ! command -v helm &> /dev/null; then
     echo "helm not found, installing..."
