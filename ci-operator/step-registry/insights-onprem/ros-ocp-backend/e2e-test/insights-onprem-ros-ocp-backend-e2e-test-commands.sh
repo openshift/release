@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 echo "========== Dependency Installation =========="
+
 # Install yq if not available
 if ! command -v yq &> /dev/null; then
     echo "yq not found, installing..."
@@ -16,7 +17,21 @@ else
     echo "yq is already installed"
 fi
 
+# Install helm if not available
+if ! command -v helm &> /dev/null; then
+    echo "helm not found, installing..."
+    curl -sL https://get.helm.sh/helm-v3.13.0-linux-amd64.tar.gz -o /tmp/helm.tar.gz
+    tar -xzf /tmp/helm.tar.gz -C /tmp
+    mv /tmp/linux-amd64/helm /tmp/helm
+    chmod +x /tmp/helm
+    export PATH="/tmp:${PATH}"
+    echo "helm installed successfully"
+else
+    echo "helm is already installed"
+fi
+
 echo "========== Image Tag Resolution =========="
+
 export IMAGE_TAG
 
 # Get job type and PR information from JOB_SPEC
