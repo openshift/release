@@ -1,0 +1,173 @@
+From 26e61727ad82401e17d755600b177e49a3a64b41 Mon Sep 17 00:00:00 2001
+From: arkadeepsen <arsen@redhat.com>
+Date: Fri, 21 Nov 2025 19:54:49 +0530
+Subject: [PATCH] Add step for increasing log level of ovnk pods
+
+---
+ .../ovn/openshift-e2e-gcp-ovn-workflow.yaml   |  1 +
+ .../ovn/conf/max-log-level/OWNERS             |  4 +
+ .../ovn-conf-max-log-level-commands.sh        | 94 +++++++++++++++++++
+ .../ovn-conf-max-log-level-ref.metadata.json  | 11 +++
+ .../ovn-conf-max-log-level-ref.yaml           | 10 ++
+ 5 files changed, 120 insertions(+)
+ create mode 100644 ci-operator/step-registry/ovn/conf/max-log-level/OWNERS
+ create mode 100755 ci-operator/step-registry/ovn/conf/max-log-level/ovn-conf-max-log-level-commands.sh
+ create mode 100644 ci-operator/step-registry/ovn/conf/max-log-level/ovn-conf-max-log-level-ref.metadata.json
+ create mode 100644 ci-operator/step-registry/ovn/conf/max-log-level/ovn-conf-max-log-level-ref.yaml
+
+diff --git a/ci-operator/step-registry/openshift/e2e/gcp/ovn/openshift-e2e-gcp-ovn-workflow.yaml b/ci-operator/step-registry/openshift/e2e/gcp/ovn/openshift-e2e-gcp-ovn-workflow.yaml
+index be8d9ffe1e323..7a03744f58588 100644
+--- a/ci-operator/step-registry/openshift/e2e/gcp/ovn/openshift-e2e-gcp-ovn-workflow.yaml
++++ b/ci-operator/step-registry/openshift/e2e/gcp/ovn/openshift-e2e-gcp-ovn-workflow.yaml
+@@ -6,6 +6,7 @@ workflow:
+     - chain: ipi-conf-gcp
+     - ref: ovn-conf
+     - chain: ipi-install
++    - ref: ovn-conf-max-log-level
+     test:
+     - ref: openshift-e2e-test
+     post:
+diff --git a/ci-operator/step-registry/ovn/conf/max-log-level/OWNERS b/ci-operator/step-registry/ovn/conf/max-log-level/OWNERS
+new file mode 100644
+index 0000000000000..da45b2c911132
+--- /dev/null
++++ b/ci-operator/step-registry/ovn/conf/max-log-level/OWNERS
+@@ -0,0 +1,4 @@
++approvers:
++- core-networking-approvers
++reviewers:
++- core-networking-reviewers
+diff --git a/ci-operator/step-registry/ovn/conf/max-log-level/ovn-conf-max-log-level-commands.sh b/ci-operator/step-registry/ovn/conf/max-log-level/ovn-conf-max-log-level-commands.sh
+new file mode 100755
+index 0000000000000..0fd09226b9136
+--- /dev/null
++++ b/ci-operator/step-registry/ovn/conf/max-log-level/ovn-conf-max-log-level-commands.sh
+@@ -0,0 +1,94 @@
++#!/bin/bash
++set -o errexit
++set -o nounset
++set -o pipefail
++
++
++NAMESPACE="openshift-ovn-kubernetes"
++CONFIGMAP_NAME="env-overrides"
++
++# Get all node names
++NODE_NAMES=$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
++
++# Construct the configmap YAML on the fly
++CM_YAML=$(cat <<EOF
++apiVersion: v1
++kind: ConfigMap
++metadata:
++  name: ${CONFIGMAP_NAME}
++  namespace: ${NAMESPACE}
++data:
++EOF
++)
++
++for NODE in ${NODE_NAMES}; do
++  CM_YAML="${CM_YAML}
++  ${NODE}: |
++    OVN_KUBE_LOG_LEVEL=5
++    OVN_LOG_LEVEL=dbg
++"
++done
++
++CM_YAML="${CM_YAML}
++  _master: |
++    OVN_KUBE_LOG_LEVEL=5
++    OVN_LOG_LEVEL=dbg
++"
++
++# Apply the configmap
++echo "${CM_YAML}" | oc apply -f -
++
++echo "ConfigMap '${CONFIGMAP_NAME}' applied to namespace '${NAMESPACE}'."
++
++# Rollout restart the daemonset and deployment
++oc -n ${NAMESPACE} rollout restart ds/ovnkube-node
++oc -n ${NAMESPACE} rollout restart deployment/ovnkube-control-plane
++
++echo "Rollout restart of ovnkube-node and ovnkube-control-plane triggered."
++
++# Wait for rollouts to complete with a timeout
++echo "Waiting for rollout of daemonset ovnkube-node to complete..."
++oc -n ${NAMESPACE} rollout status ds/ovnkube-node --timeout=300s
++
++echo "Waiting for rollout of deployment ovnkube-control-plane to complete..."
++oc -n ${NAMESPACE} rollout status deployment/ovnkube-control-plane --timeout=300s
++
++echo "Both ovnkube-node and ovnkube-control-plane rolled out successfully."
++
++# Check actual process log levels in running containers
++echo "Verifying actual process log levels..."
++
++# Check ovnkube-cluster-manager in ovnkube-control-plane pods
++echo "Checking ovnkube-cluster-manager log level in ovnkube-control-plane pods..."
++for POD in $(oc -n ${NAMESPACE} get pods -l app=ovnkube-control-plane -o jsonpath='{.items[*].metadata.name}'); do
++  echo "  Pod: ${POD}"
++  if oc exec -n ${NAMESPACE} ${POD} -c ovnkube-cluster-manager -- pgrep -a -f init-cluster-manager 2>/dev/null | grep -i -- "--loglevel 5"; then
++    echo "    ovnkube-cluster-manager: --loglevel 5 FOUND"
++  else
++    echo "    ovnkube-cluster-manager: --loglevel 5 NOT FOUND"
++  fi
++done
++
++# Check ovnkube-controller in ovnkube-node pods
++echo "Checking ovnkube-controller log level in ovnkube-node pods..."
++for POD in $(oc -n ${NAMESPACE} get pods -l app=ovnkube-node -o jsonpath='{.items[*].metadata.name}'); do
++  echo "  Pod: ${POD}"
++  if oc exec -n ${NAMESPACE} ${POD} -c ovnkube-controller -- pgrep -a -f init-ovnkube-controller 2>/dev/null | grep -i -- "--loglevel 5"; then
++    echo "    ovnkube-controller: --loglevel 5 FOUND"
++  else
++    echo "    ovnkube-controller: --loglevel 5 NOT FOUND"
++  fi
++done
++
++# Check ovn-controller debug level in ovnkube-node pods
++echo "Checking ovn-controller debug level in ovnkube-node pods..."
++for POD in $(oc -n ${NAMESPACE} get pods -l app=ovnkube-node -o jsonpath='{.items[*].metadata.name}'); do
++  echo "  Pod: ${POD}"
++  if oc exec -n ${NAMESPACE} ${POD} -c ovn-controller -- pgrep -a -f ovn-controller 2>/dev/null | grep -i -- -vconsole:dbg; then
++    echo "    ovn-controller: DEBUG ENABLED"
++  else
++    echo "    ovn-controller: DEBUG NOT ENABLED"
++  fi
++done
++
++echo "Process log level verification complete."
+diff --git a/ci-operator/step-registry/ovn/conf/max-log-level/ovn-conf-max-log-level-ref.metadata.json b/ci-operator/step-registry/ovn/conf/max-log-level/ovn-conf-max-log-level-ref.metadata.json
+new file mode 100644
+index 0000000000000..a1f3171040a97
+--- /dev/null
++++ b/ci-operator/step-registry/ovn/conf/max-log-level/ovn-conf-max-log-level-ref.metadata.json
+@@ -0,0 +1,11 @@
++{
++	"path": "ovn/conf/max-log-level/ovn-conf-max-log-level-ref.yaml",
++	"owners": {
++		"approvers": [
++			"core-networking-approvers"
++		],
++		"reviewers": [
++			"core-networking-reviewers"
++		]
++	}
++}
+\ No newline at end of file
+diff --git a/ci-operator/step-registry/ovn/conf/max-log-level/ovn-conf-max-log-level-ref.yaml b/ci-operator/step-registry/ovn/conf/max-log-level/ovn-conf-max-log-level-ref.yaml
+new file mode 100644
+index 0000000000000..1af7e76c03126
+--- /dev/null
++++ b/ci-operator/step-registry/ovn/conf/max-log-level/ovn-conf-max-log-level-ref.yaml
+@@ -0,0 +1,10 @@
++ref:
++  as: ovn-conf-max-log-level
++  from: cli
++  commands: ovn-conf-max-log-level-commands.sh
++  resources:
++    requests:
++      cpu: 10m
++      memory: 100Mi
++  documentation: |-
++    The ovn configure step changes the log level of the ovnkube-node and ovnkube-control-plane pods to debug
