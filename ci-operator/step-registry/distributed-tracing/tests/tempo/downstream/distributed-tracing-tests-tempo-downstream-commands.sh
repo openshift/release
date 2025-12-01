@@ -53,6 +53,7 @@ unset NAMESPACE
 
 # Execute Tempo e2e tests
 chainsaw test \
+--quiet \
 --config .chainsaw-openshift.yaml \
 --report-name "junit_tempo_e2e" \
 --report-path "$ARTIFACT_DIR" \
