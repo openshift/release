@@ -13,11 +13,11 @@ export NAME="kops-test-${TIMESTAMP}.${BASE_DOMAIN}"
 echo $NAME > ${SHARED_DIR}/cloud_name
 
 # Install awscli
-python --version
+#python --version
 pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
-pip install awscliv2
+#python -m virtualenv ./venv_qe
+#source ./venv_qe/bin/activate
+#pip install awscliv2
 
 # S3 bucket names (fixed names)
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
