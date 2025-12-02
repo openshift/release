@@ -59,8 +59,14 @@ tests:
     export XDG_CONFIG_HOME=/tmp/.config
     export XDG_DATA_HOME=/tmp/.local/share
     make ci-job
+    make coveralls-download
+    export COVERALLS_REPO_TOKEN=$(cat /etc/coveralls/TOKEN)
+    ./bin/coveralls report --job-flag "unit-tests" --build-number=$(git rev-parse HEAD) coverage.out
   container:
     from: src
+  secrets:
+  - mount_path: /etc/coveralls
+    name: lifecycle-agent-coverall
 - always_run: false
   as: integration
   skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
@@ -118,7 +124,6 @@ tests:
       OCP_TARGET_VERSION: "4.20"
       SEED_IMAGE_TAG_FORMAT: presubmit
     workflow: openshift-image-based-upgrade-presubmit
-  timeout: 4h0m0s
 - as: ibi-e2e-flow
   optional: true
   skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
@@ -134,7 +139,6 @@ tests:
       SEED_IMAGE_TAG_FORMAT: presubmit
       SEED_IMAGE_TAG_PREFIX: ibi
     workflow: openshift-image-based-install
-  timeout: 3h0m0s
 - as: security
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

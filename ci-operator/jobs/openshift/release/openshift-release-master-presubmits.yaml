@@ -255,6 +255,61 @@ presubmits:
     - ^master$
     - ^master-
     cluster: app.ci
+    context: ci/build-farm/build05-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build05
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build05-dry
+    optional: true
+    rerun_command: /test build05-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build05
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build05_id
+          valueFrom:
+            secretKeyRef:
+              key: build05-id
+              name: build05-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build05.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build05-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: app.ci
     context: ci/build-farm/app-ci-config-dry
     decorate: true
     labels:
@@ -579,55 +634,6 @@ presubmits:
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )build04-dry,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: app.ci
-    context: ci/build-farm/build05-dry
-    decorate: true
-    labels:
-      ci.openshift.io/build-farm: build05
-      ci.openshift.io/generator: cluster-init
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-build05-dry
-    rerun_command: /test build05-dry
-    run_if_changed: ^clusters/.*
-    spec:
-      containers:
-      - args:
-        - --config-dir=clusters/build-clusters/build05
-        - --as=
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-        command:
-        - applyconfig
-        env:
-        - name: HOME
-          value: /tmp
-        image: quay.io/openshift/ci-public:ci_applyconfig_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-        - mountPath: /tmp
-          name: tmp
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.build05.config
-            path: kubeconfig
-          secretName: config-updater
-      - emptyDir: {}
-        name: tmp
-    trigger: (?m)^/test( | .* )build05-dry,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1116,7 +1122,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20251109-98a0c9d48
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20251125-e3ae8cf22
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1318,6 +1324,30 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )jira-lifecycle-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build10
+    context: ci/prow/labels
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-labels
+    rerun_command: /test labels
+    run_if_changed: ^core-services/prow/02_config/_labels\.yaml$
+    spec:
+      containers:
+      - command:
+        - hack/validate-labels.py
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )labels,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

@@ -1,0 +1,98 @@
+ref:
+  as: ipi-conf-powervc
+  from: openstack-installer
+  commands: ipi-conf-powervc-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: powervc-creds
+    mount_path: /var/run/powervc-ipi-cicd-secrets/powervc-creds
+  env:
+  - name: ARCH
+  - name: BRANCH
+  - name: CONTROL_PLANE_REPLICAS
+    default: "3"
+    documentation: |-
+      The number of control plane nodes to create for the cluster.
+
+      This variable should only be supplied in consultation with the etcd team. The
+      etcd operator has to explicitly support the specified number of control plane
+      nodes and values not documented below will result in unhealthy and/or
+      unsupportable clusters.
+
+      Valid values include:
+      * "" (default) - 3 control plane nodes. The standard for stand-alone clusters.
+      * "1" - Supportable for single-node OpenShift (SNO).
+      * "5" - Supportable only for select customers.
+  - name: WORKER_REPLICAS
+    default: "2"
+    documentation: |-
+      The number of worker nodes to create for the cluster.
+
+      Valid values include:
+      * "" (default) - 2 worker nodes. The standard for stand-alone clusters.
+      * "0" - Supportable for single-node OpenShift (SNO).
+  - name: BASE_DOMAIN
+    default: "ipi-ppc64le.cis.ibm.net"
+    documentation: |-
+      A fully-qualified domain or subdomain name. The base domain of the cloud
+      provider is used for setting baseDomain variable of the install
+      configuration of the cluster.
+  - name: BASTION_IMAGE_NAME
+    default: "CentOS-Stream2-GenericCloud-10-20241118.0.ppc64le"
+    documentation: |-
+      The image name to use for the bastion node.
+  - name: CLOUD
+    default: "ocp-ci"
+    documentation: |-
+      The name of the cloud in the clouds.yaml file.
+  - name: COMPUTE_NODE_TYPE
+    default: "s1022"
+    documentation: |-
+      The instance type to use for compute nodes.
+  - name: FLAVOR
+    default: "ocp-ci-flavor1"
+    documentation: |-
+      The instance flavor to use for the bastion node.
+  - name: NETWORK_NAME
+    default: "vlan1400"
+    documentation: |-
+      The network to use for the bastion node.
+  - name: RHCOS_IMAGE_NAME
+    default: "rhcos-9.6.20250826-1-openstack-ppc64le"
+    documentation: |-
+      The RHCOS image name to use for the cluster.
+  - name: OPTIONAL_INSTALL_CONFIG_PARMS
+    default: ""
+    documentation: |-
+      Is a list of parameters to remove from the install-config.yaml file.
+
+      Valid values include:
+      * "" (default) - do nothing
+      * "parm1 parm2 ..." - space separated list of paramters to remove
+  - name: CLUSTER_NAME_MODIFIER
+    default: ""
+    documentation: |-
+      Creates a distinguishable hostname between different CI jobs running in the same zone.
+  - name: FEATURE_SET
+    default: ""
+    documentation: |-
+      This field sets the cluster feature set. This is used to enable custom features such as tech preview features.
+  - name: FEATURE_GATES
+    default: ""
+    documentation: |-
+      This field sets the cluster feature gates. This is used to enable custom features. Only to be used in conjunction with FEATURE_SET=CustomNoUpgrade.
+      The field should be a valid YAML list of strings. Each string in the list should be of the format "featureName=true|false".
+      E.g. "['Feature1=true', 'Feature2=false']"
+  documentation: >-
+    This step configures an install-config.yaml file to depoloy to the IBM
+    Cloud CI project.
+    An existing install-config.yaml file should already exist in the shared
+    directory.
+    The file is modified to configure the cluster to run in the IBM Cloud CI
+    project.
+    The resulting file remains in the shared directory for future consumption.

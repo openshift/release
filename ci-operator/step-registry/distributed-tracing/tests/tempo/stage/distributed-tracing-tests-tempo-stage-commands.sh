@@ -16,7 +16,7 @@ mkdir -p /tmp/go/bin $GOCACHE \
 
 git clone https://github.com/IshwarKanse/tempo-operator.git /tmp/tempo-tests
 cd /tmp/tempo-tests
-git checkout rhosdt-3.7
+git checkout rhosdt-3.8
 make build
 
 #Enable user workload monitoring.
@@ -47,6 +47,7 @@ unset NAMESPACE
 
 # Execute Tempo e2e tests
 chainsaw test \
+--quiet \
 --config .chainsaw-openshift.yaml \
 --report-name "junit_tempo_e2e" \
 --report-path "$ARTIFACT_DIR" \

@@ -1,6 +1,6 @@
 #!/bin/bash
 # script to create prowjobs in ci-operator/config/openshift/sandboxed-containers-operator using environment variables.
-# Usage: 
+# Usage:
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh gen    # Generate prowjob configuration
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh run    # Run prowjobs
 # should be run in a branch of a fork of https://github.com/openshift/release/
@@ -201,6 +201,12 @@ validate_and_set_defaults() {
         exit 1
     fi
 
+    # Trustee URL Configuration (defaults to empty string)
+    TRUSTEE_URL="${TRUSTEE_URL:-""}"
+
+    # Init Data Configuration (defaults to empty string)
+    INITDATA="${INITDATA:-''}"
+
     # Catalog Source Configuration
     echo "Configuring catalog sources..."
 
@@ -288,6 +294,8 @@ show_usage() {
     echo "  CUSTOM_AZURE_REGION            - Azure region (default: eastus)"
     echo "  OSC_CATALOG_TAG                - OSC catalog tag (auto-detected if not provided)"
     echo "  TRUSTEE_CATALOG_TAG            - Trustee catalog tag (auto-detected if not provided)"
+    echo "  TRUSTEE_URL                    - Trustee URL (default: empty)"
+    echo "  INITDATA                       - Initdata from Trustee(default: empty) The gzipped and base64 encoded initdata.toml file from Trustee"
 }
 
 # Main function
@@ -354,6 +362,7 @@ generate_workflow() {
     "CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}"
     "ENABLE_MUST_GATHER: \"${ENABLE_MUST_GATHER}\""
     "EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}"
+    "INITDATA: ${INITDATA:-\"\"}"
     "INSTALL_KATA_RPM: \"${INSTALL_KATA_RPM}\""
     "KATA_RPM_VERSION: ${KATA_RPM_VERSION:-\"\"}"
     "MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}"
@@ -365,6 +374,7 @@ generate_workflow() {
     "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
     "TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE:-\"\"}"
     "TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}"
+    "TRUSTEE_URL: ${TRUSTEE_URL:-\"\"}"
   )
 
   # Workload-specific
