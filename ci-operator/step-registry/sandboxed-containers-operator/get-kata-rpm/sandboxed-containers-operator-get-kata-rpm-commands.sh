@@ -47,8 +47,10 @@ fi
 ls -lh kata-containers.rpm
 
 # checks for a bad URL
-if [ "$(grep -q 'title.*404 Not Found' kata-containers.rpm)" ] && [ "$(grep -q 'p.The requested URL was not found' kata-containers.rpm)" ]; then
-    echo "ERROR: curl couldn't find ${kata_rpm_build_url} $(head -20 kata_containers.rpm)"
+if grep -q 'title.*404 Not Found' kata-containers.rpm && \
+    grep -q 'p.*The requested URL was not found' kata-containers.rpm ; then
+    echo "ERROR: curl couldn't find ${kata_rpm_build_url}"
+    echo -e "kata-containers.rpm content:\n$(head -20 kata-containers.rpm)"
     exit 3
 fi
 
