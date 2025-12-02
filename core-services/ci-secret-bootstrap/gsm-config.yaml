@@ -1,0 +1,308 @@
+cluster_groups:
+  bastion:
+    - build01
+    - build02
+  build_farm:
+    - app.ci
+    - build01
+    - build02
+    - build03
+    - build04
+    - build05
+    - build06
+    - build07
+    - build08
+    - build09
+    - build10
+    - build11
+    - core-ci
+    - vsphere02
+  managed_clusters:
+    - app.ci
+    - build01
+    - build02
+    - build03
+    - build04
+    - build05
+    - build06
+    - build07
+    - build08
+    - build09
+    - build10
+    - build11
+    - core-ci
+    - hosted-mgmt
+  non_app_ci:
+    - build01
+    - build02
+    - build03
+    - build04
+    - build05
+    - build06
+    - build07
+    - build08
+    - build09
+    - build10
+    - build11
+    - core-ci
+    - vsphere02
+  openshift_config_pull_secret:
+    - build01
+    - build02
+    - build03
+    - build04
+    - build06
+    - build07
+    - build08
+    - build09
+    - build10
+    - build11
+    - core-ci
+    - hosted-mgmt
+    - vsphere02
+  osd_global_pull_secret:
+    - build05
+components:
+  build-farm-common:
+    - collection: build_farm
+      secrets:
+        - sa--dot--deck--dot--${CLUSTER}--dot--config
+        - sa--dot--sinker--dot--${CLUSTER}--dot--token--dot--txt
+dockerconfig_templates: # Reusable dockerconfig patterns
+  standard-pull-secret: # DESIGN showcase
+    registries:
+      - registry_url: registry.ci.openshift.org
+        collection: build_farm
+        auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+      - registry_url: cloud.openshift.com
+        collection: cloud--dot--openshift--dot--com-pull-secret
+        auth_field: auth
+        email_field: email
+      - registry_url: quay.io
+        collection: quay--dot--io-pull-secret
+        auth_field: auth
+        email_field: email
+      - registry_url: quay-proxy.ci.openshift.org
+        collection: quayio-ci-read-only-robot
+        auth_field: auth
+      - registry_url: quay.io/openshift/ci
+        collection: quayio-ci-read-only-robot
+        auth_field: auth
+      - registry_url: registry.connect.redhat.com
+        collection: registry--dot--connect--dot--redhat--dot--com-pull-secret
+        auth_field: auth
+        email_field: email
+      - registry_url: registry.redhat.io
+        collection: registry--dot--redhat--dot--io-pull-secret
+        auth_field: auth
+        email_field: email
+  standard-pull-secret-multi-arch: # DESIGN showcase
+    extends: standard-pull-secret
+    additional_registries:
+      - registry_url: quay.io/multi-arch
+        collection: quay--dot--io/multi-arch
+        auth_field: auth
+  standard-pull-secret-build-farm: # DESIGN showcase
+    extends: standard-pull-secret
+    additional_registries:
+      - registry_url: registry.${CLUSTER}.ci.openshift.org
+        collection: build_farm
+        auth_field: token_image-puller_${CLUSTER}_reg_auth_value--dot--txt
+
+bundles:
+  - name: simple-user-credentials # DESIGN showcase
+    gsm_secrets:
+      - collection: some-user-collection
+        secrets:
+          - username
+          - password
+          - name: token
+            as: renamed-token
+  # this would create a secret named 'ci-operator', on each cluster that's in cluster_groups,
+  # with 2 keys, 'kubeconfig' and 'sa.ci-operator.${CLUSTER}.token.txt'
+  - name: ci-operator
+    gsm_secrets:
+      - collection: build_farm
+        secrets:
+          - name: sa--dot--ci-operator--dot--${CLUSTER}--dot--config
+            as: kubeconfig # how the key will be named on filesystem/in k8s secret
+          - sa--dot--ci-operator--dot--${CLUSTER}--dot--token--dot--txt # --dot-- will be automatically replaced with .
+    sync_to_cluster: true
+    targets:
+      - namespace: test-credentials
+        cluster_groups: [ non_app_ci ] # ← ${CLUSTER} resolved per-cluster
+  - name: ci-pull-credentials
+    dockerconfig:
+      as: .dockerconfigjson
+      extends: standard-pull-secret
+      additional_registries: # TODO: check that I haven't missed anything
+        - registry_url: quay.io/openshift/network-edge-testing
+          collection: quayio-ci-read-only-robot
+          auth_field: auth
+        - registry_url: qci-pull-through-cache-us-east-1-ci.apps.ci.l2s4.p1.openshiftapps.com
+          collection: quayio-ci-read-only-robot
+          auth_field: auth
+    sync_to_cluster: true
+    targets:
+      # ci-secret-bootstrap config also defines type, e.g. type: kubernetes.io/dockerconfigjson -- is it needed?
+      - cluster_groups: [ non_app_ci ]
+        namespace: ci
+      - cluster_groups: [ build_farm ]
+        namespace: test-credentials
+      - cluster: app.ci
+        namespace: ci-release
+      - cluster: app.ci
+        namespace: ci-release-priv
+      - cluster: app.ci
+        namespace: ci-release-ppc64le
+      - cluster: app.ci
+        namespace: ci-release-ppc64le-priv
+      - cluster: app.ci
+        namespace: ci-release-s390x
+      - cluster: app.ci
+        namespace: ci-release-s390x-priv
+      - cluster: app.ci
+        namespace: ci-release-arm64
+      - cluster: app.ci
+        namespace: ci-release-arm64-priv
+  - name: gce-sa-credentials-gcs-publisher
+    gsm_secrets:
+      - collection: gcs-publisher
+        secrets:
+          - name: credentials--dot--json
+            as: service-account.json
+    sync_to_cluster: true
+    targets:
+      - cluster_groups: [ build_farm ]
+        namespace: ci
+      - cluster_groups: [ build_farm ]
+        namespace: test-credentials
+      - cluster: hosted-mgmt
+        namespace: ci
+  - name: hive-hive-credentials
+    gsm_secrets:
+      - collection: build_farm
+        secrets:
+          - name: sa--dot--hive--dot--hosted-mgmt--dot--config
+            as: kubeconfig
+          - sa--dot--hive-dot--hosted-mgmt-dot--token-dot--txt
+    sync_to_cluster: true
+    targets:
+      - cluster_groups: [ non_app_ci ]
+        namespace: ci
+      - cluster_groups: [ non_app_ci ]
+        namespace: test-credentials
+  - name: hypershift-workload-credentials
+    gsm_secrets:
+      - collection: build_farm
+        secrets:
+          - name: sa--dot--hypershift-workload--dot--hosted-mgmt--dot--config
+            as: kubeconfig
+          - sa--dot--hypershift-workload-dot--hosted-mgmt-dot--token-dot--txt
+    sync_to_cluster: true
+    targets:
+      - cluster_groups: [ build_farm ]
+        namespace: ci
+      - cluster_groups: [ build_farm ]
+        namespace: test-credentials
+      - cluster: hosted-mgmt
+        namespace: ci
+  - name: insights-live
+    gsm_secrets:
+      - collection: insights-ci-account
+        secrets:
+          - insights-live--dot--yaml
+    sync_to_cluster: true
+    targets:
+      - namespace: test-credentials
+        cluster_groups: [ non_app_ci ]
+  - name: manifest-tool-local-pusher
+    dockerconfig:
+      as: .dockerconfigjson
+      registries:
+        - collection: build_farm
+          auth_field: token_image-pusher_app--dot--ci_reg_auth_value--dot--txt
+          registry_url: image-registry.openshift-image-registry.svc:5000
+        - collection: build_farm
+          auth_field: token_image-pusher_app--dot--ci_reg_auth_value--dot--txt
+          registry_url: registry.ci.openshift.org
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+        #type: kubernetes.io/dockerconfigjson
+      - cluster: app.ci
+        namespace: test-credentials
+        #type: kubernetes.io/dockerconfigjson
+  #todo: repeat this for the rest of the clusters...
+  - name: registry-pull-credentials
+    dockerconfig:
+      as: .dockerconfigjson
+      registries:
+        - collection: build_farm
+          auth_field: token_image-puller_build01_reg_auth_value--dot--txt
+          registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+        - collection: build_farm
+          auth_field: token_image-puller_build01_reg_auth_value--dot--txt
+          registry_url: image-registry.openshift-image-registry.svc:5000
+        - collection: build_farm
+          auth_field: token_image-puller_build01_reg_auth_value--dot--txt
+          registry_url: registry.build01.ci.openshift.org
+        - collection: build_farm
+          auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+          registry_url: registry.ci.openshift.org
+        - collection: quay--dot--io-pull-secret
+          auth_field: auth
+          email_field: email
+          registry_url: quay.io
+        - collection: quayio-ci-read-only-robot
+          auth_field: auth
+          registry_url: quay-proxy.ci.openshift.org
+        - collection: quayio-ci-read-only-robot
+          auth_field: auth
+          registry_url: quay.io/openshift/ci
+        - collection: quayio-ci-read-only-robot
+          auth_field: auth
+          registry_url: quay.io/openshift/network-edge-testing
+        - collection: quayio-ci-read-only-robot
+          auth_field: auth
+          registry_url: qci-pull-through-cache-us-east-1-ci.apps.ci.l2s4.p1.openshiftapps.com
+    sync_to_cluster: true
+    targets:
+      - cluster: build01
+        namespace: ci
+      - cluster: build01
+        namespace: test-credentials
+      - cluster: build01
+        namespace: keel
+      - cluster: build01
+        namespace: ocp
+  #todo: repeat this for the rest of the clusters...
+  - name: registry-push-credentials-ci-central
+    dockerconfig:
+      as: .dockerconfigjson
+      registries:
+        - auth_field: token_image-pusher_app--dot--ci_reg_auth_value--dot--txt
+          collection: build_farm
+          registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+        - auth_field: token_image-pusher_app--dot--ci_reg_auth_value--dot--txt
+          collection: build_farm
+          registry_url: image-registry.openshift-image-registry.svc:5000
+        - auth_field: token_image-pusher_app--dot--ci_reg_auth_value--dot--txt
+          collection: build_farm
+          registry_url: registry.ci.openshift.org
+    sync_to_cluster: true
+    targets:
+      - cluster: app.ci
+        namespace: ci
+      - cluster: app.ci
+        namespace: test-credentials
+  - name: snyk-credentials
+    gsm_secrets:
+      - collection: snyk-credentials # todo: make this in test-platform-infra?
+        secrets:
+          - api-token
+    sync_to_cluster: true
+    targets:
+      - namespace: test-credentials
+        cluster_groups: [ build_farm ]
