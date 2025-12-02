@@ -4,7 +4,10 @@
 # on each worker node. The RPM is going to be installed by the test automation code.
 
 # By default it's going to skip the rpm installation
-[[ "${INSTALL_KATA_RPM}" != "true" ]] && exit 0
+if [[ "${INSTALL_KATA_RPM}" != "true" ]]; then
+	echo "INSTALL_KATA_RPM=${INSTALL_KATA_RPM}. Do not install the Kata RPM"
+	exit 0
+fi
 
 cd /tmp || exit 1
 
@@ -20,8 +23,10 @@ else
     KATA_RPM_BUILD_URL="${KATA_RPM_BASE_URL}/${ver}/${build}/${arch}/kata-containers-${KATA_RPM_VERSION}.${arch}.rpm"
 fi
 
+echo "Get the authentication credentials for Brew"
 brew_auth="$(oc get -n openshift-config secret/pull-secret -ojson  | jq -r '.data.".dockerconfigjson"' |  base64 -d | jq -r '.auths."registry.redhat.io".auth' | base64 -d)"
 
+echo "Download the RPM from Brew"
 OUTPUT="$(curl -L -k -o kata-containers.rpm -u "${brew_auth}" "${KATA_RPM_BUILD_URL}" 2>&1)"
 err=$?
 if [ $err -ne 0 ]; then
@@ -29,6 +34,8 @@ if [ $err -ne 0 ]; then
     echo "ERROR: ${OUTPUT}"
     exit 2
 fi
+
+ls -lh kata-containers.rpm
 
 # checks for a bad URL
 if [ "$(grep -q 'title.*404 Not Found' kata-containers.rpm)" ] && [ "$(grep -q 'p.The requested URL was not found' kata-containers.rpm)" ]; then
@@ -38,7 +45,7 @@ fi
 
 KATA_RPM_MD5SUM=$(md5sum kata-containers.rpm | cut -d' ' -f1)
 
-# Upload and check against KATA_RPM_MD5SUM
+echo "Upload to workers and check against the rpm md5sum"
 FAILED_NODES=""
 nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
 for node in $nodes;do
