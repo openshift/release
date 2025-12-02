@@ -36,11 +36,11 @@ echo "Get the authentication credentials for Brew"
 brew_auth="$(oc get -n openshift-config secret/pull-secret -ojson  | jq -r '.data.".dockerconfigjson"' |  base64 -d | jq -r '.auths."registry.redhat.io".auth' | base64 -d)"
 
 echo "Download the RPM from Brew"
-OUTPUT="$(curl -L -k -o kata-containers.rpm -u "${brew_auth}" "${KATA_RPM_BUILD_URL}" 2>&1)"
-err=$?
+err=0
+output="$(curl -L -k -o kata-containers.rpm -u "${brew_auth}" "${KATA_RPM_BUILD_URL}" 2>&1)" || err=$?
 if [ $err -ne 0 ]; then
     echo "ERROR: curl error ${err} trying to get ${KATA_RPM_BUILD_URL}"
-    echo "ERROR: ${OUTPUT}"
+    echo "ERROR: ${output}"
     exit 2
 fi
 
