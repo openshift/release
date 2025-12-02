@@ -22,14 +22,14 @@ cd /tmp || exit 1
 
 arch=$(uname -m)
 if [ -n "${KATA_RPM_BUILD_TASK}" ];then
-    KATA_RPM_BASE_TASK_URL=$(cat /usr/local/sandboxed-containers-operator-ci-secrets/secrets/KATA_RPM_BUILD_TASK_BASE_URL)
+    kata_rpm_base_task_url="https://download.devel.redhat.com/brewroot/work/tasks"
     # To the base URL it's appended the "last four digits of task ID"/"full task ID"
-    KATA_RPM_BUILD_URL="${KATA_RPM_BASE_TASK_URL}/${KATA_RPM_BUILD_TASK: -4}/${KATA_RPM_BUILD_TASK}/kata-containers-${KATA_RPM_VERSION}.${arch}.rpm"
+    kata_rpm_build_url="${kata_rpm_base_task_url}/${KATA_RPM_BUILD_TASK: -4}/${KATA_RPM_BUILD_TASK}/kata-containers-${KATA_RPM_VERSION}.${arch}.rpm"
 else
     ver=$(echo "$KATA_RPM_VERSION" | cut -d- -f1)
     build=$(echo "$KATA_RPM_VERSION" | cut -d- -f2)
-    KATA_RPM_BASE_URL=$(cat /usr/local/sandboxed-containers-operator-ci-secrets/secrets/KATA_RPM_BASE_URL)
-    KATA_RPM_BUILD_URL="${KATA_RPM_BASE_URL}/${ver}/${build}/${arch}/kata-containers-${KATA_RPM_VERSION}.${arch}.rpm"
+    kata_rpm_base_url="https://download.devel.redhat.com/brewroot/vol/rhel-9/packages/kata-containers"
+    kata_rpm_build_url="${kata_rpm_base_url}/${ver}/${build}/${arch}/kata-containers-${KATA_RPM_VERSION}.${arch}.rpm"
 fi
 
 echo "Get the authentication credentials for Brew"
@@ -37,9 +37,9 @@ brew_auth="$(oc get -n openshift-config secret/pull-secret -ojson  | jq -r '.dat
 
 echo "Download the RPM from Brew"
 err=0
-output="$(curl -L -k -o kata-containers.rpm -u "${brew_auth}" "${KATA_RPM_BUILD_URL}" 2>&1)" || err=$?
+output="$(curl -L -k -o kata-containers.rpm -u "${brew_auth}" "${kata_rpm_build_url}" 2>&1)" || err=$?
 if [ $err -ne 0 ]; then
-    echo "ERROR: curl error ${err} trying to get ${KATA_RPM_BUILD_URL}"
+    echo "ERROR: curl error ${err} trying to get ${kata_rpm_build_url}"
     echo "ERROR: ${output}"
     exit 2
 fi
@@ -48,7 +48,7 @@ ls -lh kata-containers.rpm
 
 # checks for a bad URL
 if [ "$(grep -q 'title.*404 Not Found' kata-containers.rpm)" ] && [ "$(grep -q 'p.The requested URL was not found' kata-containers.rpm)" ]; then
-    echo "ERROR: curl couldn't find ${KATA_RPM_BUILD_URL} $(head -20 kata_containers.rpm)"
+    echo "ERROR: curl couldn't find ${kata_rpm_build_url} $(head -20 kata_containers.rpm)"
     exit 3
 fi
 
