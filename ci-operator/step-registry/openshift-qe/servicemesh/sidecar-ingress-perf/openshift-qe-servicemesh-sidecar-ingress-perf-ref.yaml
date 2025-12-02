@@ -1,0 +1,52 @@
+ref:
+  as: openshift-qe-servicemesh-sidecar-ingress-perf
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-servicemesh-sidecar-ingress-perf-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: INGRESS_PERF_VERSION
+    default: "default"
+    documentation: |-
+      Override the ingress-perf version
+  - name: CONFIG
+    default: "config/standard-servicemesh.yml"
+    documentation: |-
+      Use the standard servicemesh configuration file.
+  - name: LOG_LEVEL
+    default: "info"
+    documentation: |-
+      Default LOG_LEVEL is set info
+  - name: ITERATIONS
+    default: "5"
+    documentation: |-
+      Defaults to 5 Iterations
+  - name: ADDITIONAL_PARAMS
+    default: '{}'
+    documentation: |-
+      JSON value to upload additonal metadata to the fingerprint
+  - name: GATEWAY_API
+    default: "false"
+    documentation: |-
+      Ingress-perf is compatible with the OpenShift implementation of the Gateway API, provided by OpenShift Service Mesh. To enable this, set it to "true".
+  - name: SERVICE_MESH
+    default: "sidecar"
+    documentation: |-
+      Define the service mesh to use: sidecar
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the PerfScale's ingress-perf workload for the sidecar service mesh in the deployed cluster

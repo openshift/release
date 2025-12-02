@@ -1,0 +1,1 @@
+../configure-ns/openshift-qe-servicemesh-configure-ns-commands.sh
