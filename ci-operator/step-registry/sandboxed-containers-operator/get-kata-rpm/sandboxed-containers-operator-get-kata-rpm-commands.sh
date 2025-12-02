@@ -33,7 +33,7 @@ else
 fi
 
 echo "Get the authentication credentials for Brew"
-brew_auth="$(oc get -n openshift-config secret/pull-secret -ojson  | jq -r '.data.".dockerconfigjson"' |  base64 -d | jq -r '.auths."registry.redhat.io".auth' | base64 -d)"
+brew_auth=${BREW_AUTH:-"$(oc get -n openshift-config secret/pull-secret -ojson  | jq -r '.data.".dockerconfigjson"' |  base64 -d | jq -r '.auths."registry.redhat.io".auth' | base64 -d)"}
 
 echo "Download the RPM from Brew"
 err=0
