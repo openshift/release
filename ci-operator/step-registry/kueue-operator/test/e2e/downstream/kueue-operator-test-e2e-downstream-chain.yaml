@@ -1,0 +1,60 @@
+chain:
+  as: kueue-operator-test-e2e-downstream
+  steps:
+  - ref: kueue-operator-image-env-setup
+  - ref: cert-manager-install-operator
+  - as: run-sdk
+    commands: |
+      source "${SHARED_DIR}/env"
+      echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE" --security-context-config=restricted
+    from: operator-sdk
+    resources:
+      requests:
+        cpu: 200m
+        memory: 300Mi
+  - ref: kueue-operator-image-patch
+  - as: kueue-operator-jobset-install-operator
+    cli: latest
+    commands: |
+      CURRENT_BRANCH=$(git branch --show-current)
+      if [[ "$CURRENT_BRANCH" == "release-1.0" || "$CURRENT_BRANCH" == "release-1.1" ]]; then
+          echo "Skipping step due to JobSet not being supported in ${CURRENT_BRANCH}"
+          exit 0
+      fi
+      make install-jobset-operator
+    from: kueue-operator-src
+    resources:
+      requests:
+        cpu: 300m
+        memory: 500Mi
+  - as: kueue-operator-lws-install-operator
+    cli: latest
+    commands: |
+      CURRENT_BRANCH=$(git branch --show-current)
+      if [[ "$CURRENT_BRANCH" == "release-1.0" || "$CURRENT_BRANCH" == "release-1.1" ]]; then
+          echo "Skipping step due to LeaderWorkerSet not being supported in ${CURRENT_BRANCH}"
+          exit 0
+      fi
+      make install-lws-operator
+    from: kueue-operator-src
+    resources:
+      requests:
+        cpu: 300m
+        memory: 500Mi
+  - as: e2e-kueue
+    cli: latest
+    env:
+    - name: CONTAINER_IMAGE
+      default: ""
+    commands: |
+      source "${SHARED_DIR}/env"
+      echo "Running tests with CONTAINER_IMAGE=${CONTAINER_IMAGE}"
+      make e2e-ci-test
+    from: kueue-operator-src
+    resources:
+      requests:
+        cpu: "4"
+        memory: "4Gi"
+  documentation: |-
+    This chain runs the downstream e2e test suite for The Kueue operator.

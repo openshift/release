@@ -1,7 +1,7 @@
 presubmits:
   Azure/ARO-HCP:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -18,6 +18,7 @@ presubmits:
     name: pull-ci-Azure-ARO-HCP-main-e2e-parallel
     optional: true
     rerun_command: /test e2e-parallel
+    skip_if_only_changed: ^(?:action\.yml|AGENTS\.md|CLAUDE\.md|CODEOWNERS|CONTRIBUTING\.md|\.bingo/|\.cursor/|demo/|\.devcontainer/|docs/|\.editorconfig|GEMINI\.md|generate-repo\.sh|generate-tag\.sh|get-digest\.sh|get-tag-sha\.sh|\.gitattributes|\.gitguardian\.yaml|\.github/|\.gitignore|\.gitleaks\.toml|\.golangci\.yml|hack/|LICENSE|\.mega-linter\.yml|README\.md|SECURITY\.md|svc-deploy\.sh|\.vscode/|\.yamlfmt\.yaml|\.yamllint\.yml)$|\.md$
     spec:
       containers:
       - args:
@@ -267,6 +268,14 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-Azure-ARO-HCP-main-integration-e2e-parallel
     optional: true
+    reporter_config:
+      slack:
+        channel: '#aro-hcp-prow-failures-int'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
     rerun_command: /test integration-e2e-parallel
     spec:
       containers:
@@ -399,6 +408,14 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-Azure-ARO-HCP-main-prod-e2e-parallel
     optional: true
+    reporter_config:
+      slack:
+        channel: '#aro-hcp-prow-failures-prod'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
     rerun_command: /test prod-e2e-parallel
     spec:
       containers:
@@ -474,6 +491,14 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-Azure-ARO-HCP-main-stage-e2e-parallel
     optional: true
+    reporter_config:
+      slack:
+        channel: '#aro-hcp-prow-failures-stg'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
     rerun_command: /test stage-e2e-parallel
     spec:
       containers:

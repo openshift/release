@@ -158,7 +158,15 @@ NOTIFICATION_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1
 DEFAULT_TAG_EXPIRATION: 2w
 TAG_EXPIRATION_OPTIONS:
   - 2w
+  - 4w
+  - 8w
   - 1d
+REDIS_FLUSH_INTERVAL_SECONDS: 30
+FEATURE_IMAGE_PULL_STATS: true
+PULL_METRICS_REDIS:
+        host: quay-quay-redis
+        port: 6379
+        db: 1
 EOF
 
 oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
