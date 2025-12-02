@@ -1,0 +1,37 @@
+ref:
+  as: ipi-install-powervc-install
+  from: openstack-installer
+  grace_period: 2h
+  commands: ipi-install-powervc-install-commands.sh
+  cli: latest
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  credentials:
+  - namespace: test-credentials
+    name: loki-stage-collector-test-secret
+    mount_path: /var/run/loki-secret
+  - namespace: test-credentials
+    name: powervc-creds
+    mount_path: /var/run/powervc-ipi-cicd-secrets/powervc-creds
+  env:
+  - name: BASE_DOMAIN
+    default: "ipi-ppc64le.cis.ibm.net"
+    documentation: |-
+      A fully-qualified domain or subdomain name. The base domain of the cloud
+      provider is used for setting baseDomain variable of the install
+      configuration of the cluster.
+  - name: OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP
+    default: ""
+    documentation: "Keep bootstrap resources after install. Warning: this should only be used for debugging purposes, and poses a risk to cluster stability."
+  - name: OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP
+    default: ""
+    documentation: "Send bootstrap logs to Loki. Warning: this should only be used for debugging purposes."
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  documentation: |-
+    The IPI install step runs the OpenShift Installer in order to bring up an OpenShift cluster, using the provided cluster profile to choose a target IaaS platform. Anything that needs to be configured using manifests should generate them before this step and put them in the SHARED_DIR so that this step can pull in the manifests. Files with name manifest_(manifest_name).yml|yaml end up in $INSTALL_DIR/manifests, while files with name tls_(tls_asset_name).key|pub end up in $INSTALL_DIR/tls.
