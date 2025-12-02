@@ -152,6 +152,71 @@ done
 
 echo "Selected MetalLB Safe Range: ${METALLB_RANGE_START}-${METALLB_RANGE_END}"
 
+echo "install metallb operator"
+# create the install namespace
+oc apply -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metallb-system
+  labels:
+    openshift.io/cluster-monitoring: "true"
+EOF
+
+# deploy new operator group
+oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: metallb-system
+  namespace: metallb-system
+spec: {}
+EOF
+
+# subscribe to the operator
+cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: metallb-operator
+  namespace: metallb-system
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: metallb-operator
+  source: "${METALLB_OPERATOR_SUB_SOURCE}"
+  sourceNamespace: openshift-marketplace
+EOF
+
+RETRIES=30
+CSV=
+for i in $(seq "${RETRIES}") max; do
+  [[ "${i}" == "max" ]] && break
+  sleep 30
+  if [[ -z "${CSV}" ]]; then
+    echo "[Retry ${i}/${RETRIES}] The subscription is not yet available. Trying to get it..."
+    CSV=$(oc get subscription -n metallb-system metallb-operator -o jsonpath='{.status.installedCSV}')
+    continue
+  fi
+
+  if [[ $(oc get csv -n metallb-system ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
+    echo "metallb-operator is deployed"
+    break
+  fi
+  echo "Try ${i}/${RETRIES}: metallb-operator is not deployed yet. Checking again in 30 seconds"
+done
+
+if [[ "$i" == "max" ]]; then
+  echo "Error: Failed to deploy metallb-operator"
+  echo "csv ${CSV} YAML"
+  oc get csv "${CSV}" -n metallb-system -o yaml
+  echo
+  echo "csv ${CSV} Describe"
+  oc describe csv "${CSV}" -n metallb-system
+  exit 1
+fi
+echo "successfully installed metallb-operator"
+
 # Install metallb operator
 
 oc create -f - <<EOF
