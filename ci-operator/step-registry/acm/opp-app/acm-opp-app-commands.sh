@@ -133,14 +133,18 @@ echo "Waiting for httpd-example image to appear in ACS (max $((RETRIES * RETRY_I
 for attempt in $(seq 1 $RETRIES); do
     echo "Attempt $attempt/$RETRIES: Querying ACS for httpd-example image..."
 
+    # Query ACS API and check for valid response
     ACS_RESPONSE=$($ACS_COMMAND 2>&1)
-    if [ $? -ne 0 ]; then
-        echo "WARNING: ACS API call failed: $ACS_RESPONSE"
+
+    # Check if response is empty or contains error
+    if [ -z "$ACS_RESPONSE" ]; then
+        echo "WARNING: ACS API returned empty response"
         if [ $attempt -eq $RETRIES ]; then
             echo "ERROR: ACS API unreachable after $RETRIES attempts"
             exit 1
         fi
-    else
+    # Check if response contains JSON array (valid API response starts with {)
+    elif echo "$ACS_RESPONSE" | grep -q '^{'; then
         HTTPD_IMAGE_JSON=$(echo "$ACS_RESPONSE" | /tmp/jq "$JQ_FILTER" 2>/dev/null)
         ID=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq -r '.id' 2>/dev/null)
 
@@ -150,11 +154,19 @@ for attempt in $(seq 1 $RETRIES); do
             echo "✓ Success: Found $CVES CVEs for image $IMAGE_NAME"
             echo "Image ID: $ID"
             exit 0
+        else
+            echo "Image not found in ACS response yet"
+        fi
+    else
+        echo "WARNING: ACS API call failed with: ${ACS_RESPONSE:0:200}"
+        if [ $attempt -eq $RETRIES ]; then
+            echo "ERROR: ACS API unreachable after $RETRIES attempts"
+            exit 1
         fi
     fi
 
     if [ $attempt -lt $RETRIES ]; then
-        echo "Image not found yet, waiting ${RETRY_INTERVAL}s before retry..."
+        echo "Waiting ${RETRY_INTERVAL}s before retry..."
         sleep $RETRY_INTERVAL
     fi
 done
