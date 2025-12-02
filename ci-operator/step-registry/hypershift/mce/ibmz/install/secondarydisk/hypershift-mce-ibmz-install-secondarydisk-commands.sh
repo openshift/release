@@ -50,6 +50,9 @@ fi
 jq --version
 
 # Install IBM Cloud CLI
+export PATH="$HOME/.tmp/bin:$PATH"
+mkdir -p "$HOME/.tmp/bin"
+
 if ! command -v ibmcloud &> /dev/null; then
     set -e
     echo "ibmcloud CLI is not installed. Installing it now..."
