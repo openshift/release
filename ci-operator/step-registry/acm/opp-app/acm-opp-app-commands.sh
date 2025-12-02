@@ -11,26 +11,33 @@ set -o pipefail
 # cd to writable directory
 cd /tmp/
 
-curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /tmp/jq
+echo "Downloading jq..."
+if ! curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq; then
+    echo "ERROR: Failed to download jq"
+    exit 1
+fi
 chmod +x /tmp/jq
+
+# Verify jq is working
+if ! /tmp/jq --version >/dev/null 2>&1; then
+    echo "ERROR: jq download succeeded but binary is not executable"
+    exit 1
+fi
+echo "jq installed successfully"
 
 git clone https://github.com/stolostron/policy-collection.git
 cd policy-collection/deploy/
 
 echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/tanfengshuang/grc-demo.git -a e2e-opp
-
-# Wait for the Quay resources to be created
-# How do I check this?
-
 sleep 60
 
 # Patch the placement for the opp example app build
 #oc patch -n policies placement placement-policy-build-example-httpd --type=json '-p=[{"op": "replace", "path": "/spec/predicates", "value": [{"requiredClusterSelector":{"labelSelector":{"matchExpressions":[{"key": "name", "operator": "In", "values": ["local-cluster"]}]}}}]}]'
 # Using a label for this now instead
-oc label managedcluster local-cluster oppapps=httpd-example
+oc label managedcluster local-cluster oppapps=httpd-example --overwrite
 
 # Check the status
-oc get policies -n policies | grep example
+oc get policies -n policies | grep example || true
 oc get build -n e2e-opp
 oc get po -n e2e-opp
 oc get deployment -n e2e-opp
@@ -38,21 +45,61 @@ oc get deployment -n e2e-opp
 LATEST_BUILD_NAME=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null)
 BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null)
 
-if [ "$BUILD_STATUS" == "Failed" ]; then
-    # Check the error info
-    oc get event -n e2e-opp
-    oc describe buildconfig httpd-example -n e2e-opp
-    OPERATOR_POD_NAME=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}')
-    oc logs $OPERATOR_POD_NAME -n openshift-operators -c manager --tail=20
+echo "Initial build status: ${LATEST_BUILD_NAME} is ${BUILD_STATUS}"
 
-    echo "!!! Build ${LATEST_BUILD_NAME} failed. Starting a new Build..."
-    oc start-build httpd-example -n e2e-opp
+# Wait for the build to complete (max 10 minutes)
+echo "Waiting for build ${LATEST_BUILD_NAME} to complete..."
+BUILD_TIMEOUT=600  # 10 minutes
+BUILD_ELAPSED=0
+BUILD_CHECK_INTERVAL=15
+
+while [ $BUILD_ELAPSED -lt $BUILD_TIMEOUT ]; do
+    BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null)
+    echo "Build status at ${BUILD_ELAPSED}s: ${BUILD_STATUS}"
+
+    if [ "$BUILD_STATUS" == "Complete" ]; then
+        echo "Build ${LATEST_BUILD_NAME} completed successfully"
+        break
+    elif [ "$BUILD_STATUS" == "Failed" ] || [ "$BUILD_STATUS" == "Error" ] || [ "$BUILD_STATUS" == "Cancelled" ]; then
+        echo "!!! Build ${LATEST_BUILD_NAME} failed with status: ${BUILD_STATUS}"
+
+        # Check the error info
+        oc get event -n e2e-opp
+        oc describe buildconfig httpd-example -n e2e-opp
+        oc describe build "$LATEST_BUILD_NAME" -n e2e-opp
+        
+        echo "=== Quay Bridge Operator Logs ==="
+        OPERATOR_POD_NAME=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        oc logs $OPERATOR_POD_NAME -n openshift-operators -c manager --tail=50 || true
+
+        echo "!!! Starting a new build..."
+        LATEST_BUILD_NAME=$(oc start-build httpd-example -n e2e-opp -o name | cut -d'/' -f2)
+        echo "New build started: ${LATEST_BUILD_NAME}"
+        BUILD_ELAPSED=0  # Reset timer for new build
+        continue
+    fi
+
+    sleep $BUILD_CHECK_INTERVAL
+    BUILD_ELAPSED=$((BUILD_ELAPSED + BUILD_CHECK_INTERVAL))
+done
+
+# Final check
+BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null)
+if [ "$BUILD_STATUS" != "Complete" ]; then
+    echo "!!! ERROR: Build did not complete within ${BUILD_TIMEOUT}s. Final status: ${BUILD_STATUS}"
+    oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o yaml
+    exit 1
 fi
 
 # Wait for the deployment to be ready
-oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=10m
+echo "Waiting for deployment to be available..."
+oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=5m
 
-# Check some other info after the application deployed successfully
+# Check the info after the application deployed successfully
+oc get policies -n policies | grep example || true
+oc get build -n e2e-opp
+oc get po -n e2e-opp
+oc get deployment -n e2e-opp
 oc get cm -n openshift-config opp-ingres-ca -o yaml
 oc get quayintegration quay -o yaml
 oc get secret -n policies quay-integration -o yaml
@@ -61,32 +108,57 @@ oc get secret -n policies quay-integration -o yaml
 # Run other tests
 
 # Obtain details about the test application from ACS
-ACS_PASSWORD=`oc get secret -n stackrox central-htpasswd -o json | /tmp/jq .data.password | sed 's/"//g' | base64 -d`
+echo "=== Testing ACS Integration ==="
+echo "Fetching ACS credentials..."
+ACS_PASSWORD=$(oc get secret -n stackrox central-htpasswd -o json 2>/dev/null | /tmp/jq -r '.data.password' | base64 -d)
+if [ -z "$ACS_PASSWORD" ]; then
+    echo "ERROR: Failed to retrieve ACS password"
+    exit 1
+fi
+
+ACS_HOST=$(oc get secret -n stackrox sensor-tls -o json 2>/dev/null | /tmp/jq -r '.data."acs-host"' | base64 -d)
+if [ -z "$ACS_HOST" ]; then
+    echo "ERROR: Failed to retrieve ACS host"
+    exit 1
+fi
+echo "ACS Host: ${ACS_HOST}"
+
 JQ_FILTER='.images[] | select(.name | contains("httpd-example"))'
-ACS_HOST=`oc get secret -n stackrox sensor-tls -o json | /tmp/jq '.data."acs-host"' | sed 's/"//g' | base64 -d`
-ACS_COMMAND="curl -s -k -u "admin:${ACS_PASSWORD}" https://$ACS_HOST/v1/images"
+ACS_COMMAND="curl -s -k -u admin:${ACS_PASSWORD} https://$ACS_HOST/v1/images"
 
-set +e
-x=1
 RETRIES=10
-while [ $x -lt $RETRIES ]; do
-    HTTPD_IMAGE_JSON=`$ACS_COMMAND | /tmp/jq "$JQ_FILTER"`
-    ID=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .id`
-    if [ "$ID" != "" ]; then
-        CVES=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .cves`
-        image=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .name`
-        echo "Found $CVES CVEs for image $image"
-        break
+RETRY_INTERVAL=30
+echo "Waiting for httpd-example image to appear in ACS (max $((RETRIES * RETRY_INTERVAL))s)..."
+
+for attempt in $(seq 1 $RETRIES); do
+    echo "Attempt $attempt/$RETRIES: Querying ACS for httpd-example image..."
+
+    ACS_RESPONSE=$($ACS_COMMAND 2>&1)
+    if [ $? -ne 0 ]; then
+        echo "WARNING: ACS API call failed: $ACS_RESPONSE"
+        if [ $attempt -eq $RETRIES ]; then
+            echo "ERROR: ACS API unreachable after $RETRIES attempts"
+            exit 1
+        fi
+    else
+        HTTPD_IMAGE_JSON=$(echo "$ACS_RESPONSE" | /tmp/jq "$JQ_FILTER" 2>/dev/null)
+        ID=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq -r '.id' 2>/dev/null)
+
+        if [ -n "$ID" ] && [ "$ID" != "null" ]; then
+            CVES=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq '.cves')
+            IMAGE_NAME=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq -r '.name')
+            echo "✓ Success: Found $CVES CVEs for image $IMAGE_NAME"
+            echo "Image ID: $ID"
+            exit 0
+        fi
     fi
 
-    let x=$x+1
-
-    # Check if this is the final attempt (x is about to exceed the limit)
-    if [ $x -eq $RETRIES ]; then
-        echo "ERROR: Image ID not found after $((RETRIES - 1)) attempts. Exiting with failure."
+    if [ $attempt -lt $RETRIES ]; then
+        echo "Image not found yet, waiting ${RETRY_INTERVAL}s before retry..."
+        sleep $RETRY_INTERVAL
     fi
-
-    echo "Try $x/$((RETRIES - 1)): ID not found. Checking again in 30 seconds."
-    sleep 30
 done
-set -e
+
+echo "ERROR: httpd-example image not found in ACS after $((RETRIES * RETRY_INTERVAL))s"
+echo "This may indicate an issue with ACS integration or image scanning"
+exit 1
