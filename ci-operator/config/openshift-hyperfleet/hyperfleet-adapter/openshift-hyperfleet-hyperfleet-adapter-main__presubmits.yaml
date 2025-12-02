@@ -1,0 +1,104 @@
+base_images:
+  jasee_openshift-build_rhel-9-golang-1.25:
+    name: openshift-build
+    namespace: jasee
+    tag: rhel-9-golang-1.25
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: openshift-build
+    namespace: jasee
+    tag: rhel-9-golang-1.25
+images:
+- dockerfile_path: test/Dockerfile.integration
+  to: hyperfleet-integration-test
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY src/ /opt/app-root/src
+    WORKDIR /opt/app-root/src/hyperfleet-adapter
+    USER root
+    RUN dnf install -y go make
+    RUN dnf clean all
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-adapter
+  to: golang-test
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: integration-test
+  capabilities:
+  - nested-podman
+  steps:
+    test:
+    - as: integration
+      commands: |
+        go get github.com/testcontainers/testcontainers-go
+        export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
+        podman system service --time=120 &
+        systemctl --user start podman.socket || true
+        export TESTCONTAINERS_RYUK_DISABLED=true
+
+        # 1. Set up the directory
+        export DOCKER_CONFIG="$HOME/.docker"
+        mkdir -p "$DOCKER_CONFIG"
+
+        # 2. Define the Prow secret path
+        PROW_SECRET="/var/secrets/registry-pull-secret/.dockerconfigjson"
+
+        if [ -f "$PROW_SECRET" ]; then
+            echo "🔍 Found Prow secret. Checking format..."
+
+            # Check if 'auths' key exists. If not, it's the legacy format.
+            if grep -q '"auths":' "$PROW_SECRET"; then
+                echo "✅ Secret is already in modern format. Copying..."
+                cp "$PROW_SECRET" "$DOCKER_CONFIG/config.json"
+            else
+                echo "⚠️  Legacy format detected. Reformatting to modern config.json..."
+                # If jq is installed (standard in OpenShift CI images)
+                if command -v jq &> /dev/null; then
+                    jq '{"auths": .}' "$PROW_SECRET" > "$DOCKER_CONFIG/config.json"
+                else
+                    # Fallback for environments without jq
+                    echo "{\"auths\": $(cat $PROW_SECRET)}" > "$DOCKER_CONFIG/config.json"
+                fi
+            fi
+        else
+            echo "❌ Error: Prow push secret not found at $PROW_SECRET"
+        fi
+
+        # 3. Force the environment variables
+        export REGISTRY_AUTH_FILE="$DOCKER_CONFIG/config.json"
+        export DOCKER_CONFIG="$DOCKER_CONFIG"
+
+        echo "✅ Docker auth configured."
+        
+        make test-integration
+      credentials:
+      - collection: ""
+        mount_path: /var/secrets/registry-pull-secret
+        name: registry-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: INTEGRATION_ENVTEST_IMAGE
+        name: hyperfleet-integration-test
+      from: golang-test
+      nested_podman: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-adapter
+  variant: presubmits
