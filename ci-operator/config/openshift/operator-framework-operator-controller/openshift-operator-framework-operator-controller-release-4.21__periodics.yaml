@@ -7,6 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  gcp-pd-csi-driver-operator-test:
+    name: "4.21"
+    namespace: ocp
+    tag: gcp-pd-csi-driver-operator-test
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -536,6 +540,76 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
+- as: e2e-gcp-ovn-extended-f2
+  cron: 8 8 1-31/2 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/fast
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-ovn-slow-extended-f3
+  cron: 56 0 1-31/3 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/slow
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-ovn-csi-extended-f3
+  cron: 29 21 1-31/3 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/fast
+    workflow: openshift-e2e-gcp-csi
+- as: e2e-gcp-ovn-csi-slow-extended-f4
+  cron: 3 23 1-31/4 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/slow
+    workflow: openshift-e2e-gcp-csi
+- as: e2e-aws-ovn-upi-extended-f2
+  cron: 16 21 1-31/2 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/fast
+    workflow: openshift-e2e-aws-upi
+- as: e2e-aws-ovn-upi-slow-extended-f3
+  cron: 13 2 1-31/3 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/slow
+    workflow: openshift-e2e-aws-upi
+- as: e2e-aws-ovn-upi-techpreview-extended-f2
+  cron: 45 16 1-31/2 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/fast
+    workflow: openshift-e2e-aws-upi
+- as: e2e-aws-ovn-upi-techpreview-slow-extended-f3
+  cron: 23 5 1-31/3 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/slow
+    workflow: openshift-e2e-aws-upi
 zz_generated_metadata:
   branch: release-4.21
   org: openshift
