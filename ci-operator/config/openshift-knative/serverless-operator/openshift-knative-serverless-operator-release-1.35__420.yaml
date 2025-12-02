@@ -122,11 +122,16 @@ images:
       as:
       - $GO_BUILDER
   to: serverless-metadata-webhook
+promotion:
+  to:
+  - additional_images:
+      serverless-operator-src: src
+    namespace: knative
+    tag: release-1.35.2
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: fast
       version: "4.20"
 resources:
   '*':
@@ -136,17 +141,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: kitchensink-e2e
+- as: kitchensink-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
   optional: true
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -193,7 +200,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -221,18 +227,21 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- always_run: false
-  as: kitchensink-upgrade
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: kitchensink-upgrade
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
   optional: true
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -279,7 +288,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -307,18 +315,21 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- always_run: false
-  as: mesh-e2e
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: mesh-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
   optional: true
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -365,7 +376,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -393,18 +403,21 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- always_run: false
-  as: mesh-upgrade
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: mesh-upgrade
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
   optional: true
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -451,7 +464,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -479,17 +491,20 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- always_run: false
-  as: operator-e2e
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -536,7 +551,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -564,19 +578,21 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- always_run: false
-  as: test-soak
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: test-soak
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
   optional: true
   run_if_changed: test/soak
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -623,7 +639,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -651,17 +666,20 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- always_run: false
-  as: test-upgrade
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: test-upgrade
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -708,7 +726,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -736,19 +753,21 @@ tests:
         requests:
           cpu: 100m
       timeout: 1h30m0s
-    workflow: ipi-aws
-- always_run: false
-  as: ui-e2e
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: ui-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
   optional: true
   run_if_changed: test/ui
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -795,7 +814,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -823,18 +841,21 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- always_run: false
-  as: upstream-e2e
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: upstream-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
   optional: true
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -881,7 +902,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -909,18 +929,21 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- always_run: false
-  as: upstream-e2e-kafka
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: upstream-e2e-kafka
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
   optional: true
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -967,7 +990,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -995,7 +1017,8 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-1.35
   org: openshift-knative
