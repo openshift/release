@@ -147,7 +147,6 @@ handle_azure() {
     rm -f azure_credentials.json
     # Login to Azure for NAT gateway creation
     az login --service-principal --username "${AZURE_CLIENT_ID}" --password "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
-    # Recommended on az sites to refresh the subscription
     az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
 
     if [[ "${IS_ARO}" == "true" ]]; then
@@ -158,8 +157,8 @@ handle_azure() {
         local RG_SCOPE_ID
         local SP_CLIENT_ID
         AZURE_RESOURCE_GROUP="$(cat "${SHARED_DIR}/resourcegroup")"
+        AZURE_REGION=$(az group show --resource-group "${AZURE_RESOURCE_GROUP}" --query "{Location:location}" --output tsv)
         CLUSTER_NAME="$(cat "${SHARED_DIR}/cluster-name")"
-        AZURE_REGION="${LEASED_RESOURCE}"
         SP_CLIENT_ID="$(az aro show --name "${CLUSTER_NAME}" --resource-group "${AZURE_RESOURCE_GROUP}" --query "servicePrincipalProfile.clientId" -o tsv)"
         RG_SCOPE_ID="$(az group show --name "${AZURE_RESOURCE_GROUP}" --query "id" -o tsv)"
         az role assignment create --assignee "${SP_CLIENT_ID}" --role "Network Contributor" --scope "${RG_SCOPE_ID}"
