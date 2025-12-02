@@ -59,6 +59,11 @@ KATA_RPM_MD5SUM=$(md5sum kata-containers.rpm | cut -d' ' -f1)
 echo "Upload to workers and check against the rpm md5sum"
 FAILED_NODES=""
 nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
+if [[ -z "${nodes}" ]]; then
+	echo "ERROR: workers not found"
+	exit 1
+fi
+
 for node in $nodes;do
     dd if=kata-containers.rpm| oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
     OUTPUT=$(oc debug -n default "${node}" -- bash -c "md5sum  /host/var/local/kata-containers.rpm")
