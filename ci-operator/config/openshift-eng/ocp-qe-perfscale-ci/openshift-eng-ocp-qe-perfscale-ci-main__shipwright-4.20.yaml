@@ -1,0 +1,52 @@
+base_images:
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: candidate
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: shipwright-24nodes
+  cron: 0 4 2 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      CLUSTER_TAGS: TicketId:382
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      EXTRA_FLAGS: --timeout=6h
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      MUST_GATHER_TIMEOUT: 90m
+      OPENSHIFT_VERSION: "4.20"
+      PROFILE_TYPE: reporting
+      REPLICAS: "24"
+    test:
+    - chain: openshift-qe-shipwright-workflow
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: shipwright-4.20-candidate-x86

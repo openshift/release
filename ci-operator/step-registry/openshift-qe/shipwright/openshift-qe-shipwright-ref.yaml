@@ -1,0 +1,54 @@
+ref:
+  as: openshift-qe-shipwright
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: NAMESPACE
+    default: "perf-test"
+    documentation: |-
+      The namespace prefix to use for the images that are goign to be built.
+  - name: START
+    default: "1"
+    documentation: |-
+      The start index for iterations.
+  - name: END
+    default: "50"
+    documentation: |-
+      The end index for iterations.
+  - name: BURST_SIZE
+    default: "50"
+    documentation: |-
+      The number of images to build in parallel.
+  - name: SLEEP_TIME
+    default: "1"
+    documentation: |-
+      The sleep time between bursts of iterations.
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  commands: openshift-qe-shipwright-commands.sh
+  timeout: 8h
+  credentials:
+  - namespace: test-credentials
+    name: ocp-perfscale-prod-es-creds
+    mount_path: /prod-secret
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the Shipwright test suite in the deployed cluster.
