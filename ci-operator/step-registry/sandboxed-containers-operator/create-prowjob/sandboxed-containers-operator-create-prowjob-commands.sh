@@ -358,6 +358,8 @@ generate_workflow() {
     env_vars+=("CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}")
   elif [[ $platform == "aro" ]]; then
     env_vars+=("ARO_CLUSTER_VERSION: \"${ARO_CLUSTER_VERSION}\"")
+    env_vars+=("LOCATION: ${CUSTOM_AZURE_REGION}")
+    env_vars+=("HYPERSHIFT_AZURE_LOCATION: ${CUSTOM_AZURE_REGION}")
     kata_rpm_version="${kata_rpm_version//$OCP_VERSION/$ARO_CLUSTER_VERSION}"
   elif [[ $platform == "aws" ]]; then
     env_vars+=("AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}")
