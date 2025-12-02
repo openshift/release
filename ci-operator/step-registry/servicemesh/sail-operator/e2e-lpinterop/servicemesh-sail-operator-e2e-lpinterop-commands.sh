@@ -72,6 +72,7 @@ ret_code=0
 mkdir ./test_artifacts
 ARTIFACTS="$(pwd)/test_artifacts"
 export ARTIFACTS
+sleep 3h
 #execute test, do not terminate when there is some failure since we want to archive junit files
 make test.e2e.ocp || ret_code=$?
 
