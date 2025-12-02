@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gpu-scheduling-webhook
+  namespace: gpu-scheduling-webhook
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: gpu-scheduling-webhook-serving-cert
+spec:
+  ports:
+  - name: main
+    port: 443
+    protocol: TCP
+    targetPort: 9443
+  selector:
+    app: gpu-scheduling-webhook
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  labels:
+    app: gpu-scheduling-webhook
+  name: gpu-scheduling-webhook
+  namespace: gpu-scheduling-webhook
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gpu-scheduling-webhook
+  template:
+    metadata:
+      labels:
+        app: gpu-scheduling-webhook
+        ci.openshift.io/gpu-scheduling-webhook: ""
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/infra
+        operator: Exists
+      containers:
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_gpu-scheduling-webhook_latest
+        command:
+        - /usr/bin/gpu-scheduling-webhook
+        args:
+        - --port=9443
+        - --cert-dir=/etc/pki/tls/certs/admission
+        name: webhook
+        imagePullPolicy: Always
+        ports:
+        - name: main
+          containerPort: 9443
+        volumeMounts:
+        - name: serving-cert
+          mountPath: /etc/pki/tls/certs/admission
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 7
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 5
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+      volumes:
+      - name: serving-cert
+        secret:
+          defaultMode: 420
+          secretName: gpu-scheduling-webhook-serving-cert
