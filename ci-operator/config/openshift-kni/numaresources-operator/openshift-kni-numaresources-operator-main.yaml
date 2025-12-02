@@ -18,7 +18,6 @@ build_root:
     dockerfile_path: Dockerfile.tools
 images:
 - dockerfile_path: Dockerfile.must-gather
-  from: os-min9
   to: numaresources-must-gather
 - dockerfile_path: Dockerfile.openshift
   from: os-min9
@@ -153,7 +152,10 @@ tests:
     test:
     - as: must-gather-e2e-test
       cli: latest
-      commands: make test-must-gather-e2e
+      commands: E2E_NROP_MUSTGATHER_IMAGE_REF=${MUSTGATHER_IMAGE} make test-must-gather-e2e
+      dependencies:
+      - env: MUSTGATHER_IMAGE
+        name: pipeline:numaresources-must-gather
       from: src
       resources:
         requests:

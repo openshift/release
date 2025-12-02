@@ -6,7 +6,7 @@ set -o pipefail
 
 git clone https://github.com/IshwarKanse/opentelemetry-operator.git /tmp/otel-tests
 cd /tmp/otel-tests 
-git checkout rhosdt-3.7
+git checkout rhosdt-3.8
 
 #Enable user workload monitoring
 oc apply -f tests/e2e-openshift/otlp-metrics-traces/01-workload-monitoring.yaml
@@ -49,6 +49,7 @@ fi
 
 # Execute OpenTelemetry e2e tests
 chainsaw test \
+--quiet \
 --report-name "junit_otel_e2e" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \
@@ -67,6 +68,7 @@ tests/e2e-targetallocator || any_errors=true
 
 # Execute sidecar-related tests with version-dependent selector
 chainsaw test \
+--quiet \
 --report-name "junit_otel_e2e_sidecar_prometheuscr" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \
@@ -88,6 +90,7 @@ fi
 
 # Execute OpenTelemetry e2e tests
 chainsaw test \
+--quiet \
 --report-name "junit_otel_metadata_filters" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \

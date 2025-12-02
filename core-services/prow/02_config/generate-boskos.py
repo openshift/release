@@ -250,10 +250,10 @@ CONFIG = {
         'default': 1,
     },
     'aro-hcp-stg-quota-slice': {
-        'default': 1,
+        'default': 3,
     },
     'aro-hcp-prod-quota-slice': {
-        'default': 1,
+        'default': 3,
     },
     'aro-hcp-dev-quota-slice': {
         'default': 10,
@@ -406,6 +406,9 @@ CONFIG = {
     },
     'hypershift-quota-slice': {
         'default': 50,
+    },
+    'powervc-1-quota-slice': {
+        'default': 4,
     },
     'powervs-1-quota-slice': {
         'mon01': 1,
