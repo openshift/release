@@ -26,7 +26,7 @@ SCENARIO_SOURCES=$(get_source_dir "${SCENARIO_TYPE}")
 # then TERM is queued until the ssh completes. This might be too long to fit in the grace period
 # and get abruptly killed, which prevents gathering logs.
 # shellcheck disable=SC2029
-ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} EXCLUDE_CNCF_CONFORMANCE=${EXCLUDE_CNCF_CONFORMANCE} /home/${HOST_USER}/microshift/test/bin/ci_phase_test.sh" &
+ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} EXCLUDE_CNCF_CONFORMANCE=${EXCLUDE_CNCF_CONFORMANCE} TEST_EXECUTION_TIMEOUT=${TEST_EXECUTION_TIMEOUT:-} /home/${HOST_USER}/microshift/test/bin/ci_phase_test.sh" &
 # Run wait -n since we only have one background command. Should this change, please update the exit
 # status handling.
 wait -n
