@@ -1,0 +1,64 @@
+base_images:
+  jasee_openshift-build_rhel-9-golang-1.25:
+    name: openshift-build
+    namespace: jasee
+    tag: rhel-9-golang-1.25
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: openshift-build
+    namespace: jasee
+    tag: rhel-9-golang-1.25
+images:
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY src/ /opt/app-root/src
+    WORKDIR /opt/app-root/src/hyperfleet-sentinel
+    USER root
+    RUN dnf install -y make go
+    RUN dnf clean all
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-sentinel
+  to: podman-test
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  capabilities:
+  - nested-podman
+  commands: |
+    make generate
+    export HOME=/tmp
+    export GOCACHE=/tmp/go-build
+    export GOMODCACHE=/tmp/go-mod
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export PATH="$(go env GOPATH)/bin:$PATH"
+    unset GOFLAGS
+    go install -mod=mod github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+    make lint
+  container:
+    from: podman-test
+  nested_podman: true
+- as: unit
+  capabilities:
+  - nested-podman
+  commands: |
+    make generate
+    make test-unit
+  container:
+    from: podman-test
+  nested_podman: true
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-sentinel
