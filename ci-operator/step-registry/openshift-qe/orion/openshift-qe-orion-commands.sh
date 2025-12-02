@@ -60,6 +60,10 @@ export ES_SERVER
 pip install .
 EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
 
+if [[ ! -z "${ORION_ARGS:-}" ]]; then
+    EXTRA_FLAGS+=" ${ORION_ARGS}"
+fi
+
 if [[ ! -z "$UUID" ]]; then
     EXTRA_FLAGS+=" --uuid ${UUID}"
 fi
