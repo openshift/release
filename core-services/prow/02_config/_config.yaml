@@ -70,10 +70,13 @@ deck:
     rerun_auth_configs:
       github_team_slugs:
       - org: openshift
+        slug: openshift-team-hypershift
+      - org: openshift
         slug: test-platform
       github_users:
       - aleskandro
-      - bryan-cox
+      - apahim
+      - cblecker
       - liangquanLi930
   - repo: openshift/verification-tests
     rerun_auth_configs:
@@ -171,6 +174,10 @@ deck:
       '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-eng/agent-qe-infra: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-eng/ship-help-bot: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      openshift-hyperfleet/hyperfleet-adapter: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      openshift-hyperfleet/hyperfleet-api: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      openshift-hyperfleet/hyperfleet-broker: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      openshift-hyperfleet/hyperfleet-sentinel: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-kni/eco-ci-cd-private: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-online/access-transparency-service: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-online/gcp-hcp: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
@@ -338,10 +345,10 @@ plank:
             memory: 250Mi
       timeout: 8h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20251109-98a0c9d48
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20251109-98a0c9d48
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20251109-98a0c9d48
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20251109-98a0c9d48
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20251125-e3ae8cf22
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20251125-e3ae8cf22
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20251125-e3ae8cf22
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20251125-e3ae8cf22
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -420,6 +427,34 @@ plank:
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
     repo: openshift-online/gcp-hcp
   - config:
+      gcs_configuration:
+        bucket: qe-private-deck
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+    repo: openshift-hyperfleet/hyperfleet-api
+  - config:
+      gcs_configuration:
+        bucket: qe-private-deck
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+    repo: openshift-hyperfleet/hyperfleet-adapter
+  - config:
+      gcs_configuration:
+        bucket: qe-private-deck
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+    repo: openshift-hyperfleet/hyperfleet-sentinel
+  - config:
+      gcs_configuration:
+        bucket: qe-private-deck
+        mediaTypes:
+          log: text/plain
+      gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
+    repo: openshift-hyperfleet/hyperfleet-broker
+  - config:
       timeout: 36h0m0s
     repo: openshift-kni/eco-ci-cd
   - config:
@@ -457,6 +492,10 @@ plank:
     '*': https://prow.ci.openshift.org/view/
     openshift-eng/agent-qe-infra: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-eng/ship-help-bot: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    openshift-hyperfleet/hyperfleet-adapter: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    openshift-hyperfleet/hyperfleet-api: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    openshift-hyperfleet/hyperfleet-broker: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    openshift-hyperfleet/hyperfleet-sentinel: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-kni/eco-ci-cd-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-online/access-transparency-service: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-online/gcp-hcp: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
@@ -490,6 +529,18 @@ plank:
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift-eng/ship-help-bot: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-hyperfleet/hyperfleet-adapter: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-hyperfleet/hyperfleet-api: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-hyperfleet/hyperfleet-broker: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-hyperfleet/hyperfleet-sentinel: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift-kni/eco-ci-cd-private: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
@@ -633,6 +684,10 @@ tide:
             skip-unknown-contexts: true
       maistra:
         skip-unknown-contexts: true
+      opendatahub-io:
+        repos:
+          odh-dashboard:
+            skip-unknown-contexts: true
       openshift:
         repos:
           assisted-installer:
@@ -701,6 +756,10 @@ tide:
     '*': https://prow.ci.openshift.org/pr
     openshift-eng/agent-qe-infra: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-eng/ship-help-bot: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
+    openshift-hyperfleet/hyperfleet-adapter: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
+    openshift-hyperfleet/hyperfleet-api: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
+    openshift-hyperfleet/hyperfleet-broker: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
+    openshift-hyperfleet/hyperfleet-sentinel: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-kni/eco-ci-cd-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-online/gcp-hcp: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr

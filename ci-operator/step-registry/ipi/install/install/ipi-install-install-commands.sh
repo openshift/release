@@ -783,9 +783,9 @@ done <   <( find "${SHARED_DIR}" \( -name "openshift_manifests_[0-9]*.yml" -o -n
 
 # Collect bootstrap logs for all azure clusters
 case "${CLUSTER_TYPE}" in
-azure4|azure-arm64) OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=true ;;
+azure4|azure-arm64) OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-true} ;;
 esac
-if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
+if [ "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" == "true" ]; then
   set +o errexit
   # Inject promtail in bootstrap.ign
   ${INSTALLER_BINARY} --dir="${dir}" create ignition-configs &
@@ -810,24 +810,10 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
 case $CLUSTER_TYPE in
-  vsphere*)
-    # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
-    max=1
-    ;;
-  aws*)
-    # Do not retry because aws resources can collide when re-using installer assets
-    max=1
-    ;;
-  azure*)
-    # Do not retry because azure resources always collide when re-using installer assets
-    max=1
-    ;;
-  ibmcloud*)
-    # Do not retry because IBMCloud resources will has BucketAlreadyExists error when re-using installer assets
-    max=1
-    ;;
   *)
-    max=3
+  # Installs are stable enough to not benefit from retries; and not all platforms support retries.
+  # If a platform could benefit from retries (e.g. flaking due to resource contention), add a case for the platform above.
+    max=1
     ;;
 esac
 ret=4

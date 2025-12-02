@@ -376,7 +376,7 @@ if [[ "$DISABLE_SCP_CHECKS" == "true" ]]; then
 fi
 
 DISABLE_WORKLOAD_MONITORING_SWITCH=""
-if [[ "$DISABLE_WORKLOAD_MONITORING" == "true" ]]; then
+if [[ "$DISABLE_WORKLOAD_MONITORING" == "true" ]] && [[ "$HOSTED_CP" == "false" ]]; then
   DISABLE_WORKLOAD_MONITORING_SWITCH="--disable-workload-monitoring"
 fi
 

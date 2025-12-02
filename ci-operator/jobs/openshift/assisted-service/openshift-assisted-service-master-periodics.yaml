@@ -3,8 +3,6 @@ periodics:
   cluster: build03
   cron: 00 07 * * 2,4,6
   decorate: true
-  decoration_config:
-    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -79,8 +77,6 @@ periodics:
   cluster: build03
   cron: 00 01 * * 2,4,6
   decorate: true
-  decoration_config:
-    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -155,8 +151,6 @@ periodics:
   cluster: build03
   cron: 00 01 * * 2,4,6
   decorate: true
-  decoration_config:
-    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -231,8 +225,6 @@ periodics:
   cluster: build03
   cron: 00 05 * * 2,4,6
   decorate: true
-  decoration_config:
-    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -307,8 +299,6 @@ periodics:
   cluster: build03
   cron: 00 03 * * 2,4,6
   decorate: true
-  decoration_config:
-    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -383,8 +373,6 @@ periodics:
   cluster: build03
   cron: 00 05 * * 1,4
   decorate: true
-  decoration_config:
-    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -459,8 +447,6 @@ periodics:
   cluster: build03
   cron: 00 01 * * 2,4,6
   decorate: true
-  decoration_config:
-    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -535,8 +521,6 @@ periodics:
   cluster: build03
   cron: 00 07 * * 2,4,6
   decorate: true
-  decoration_config:
-    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -611,8 +595,6 @@ periodics:
   cluster: build03
   cron: 00 05 * * 2,4,6
   decorate: true
-  decoration_config:
-    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -687,8 +669,6 @@ periodics:
   cluster: build03
   cron: 00 03 * * 2,4,6
   decorate: true
-  decoration_config:
-    timeout: 6h0m0s
   extra_refs:
   - base_ref: master
     org: openshift
@@ -711,6 +691,80 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-ai-operator-ztp-sno-day2-workers-periodic
+      - --variant=edge
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 15 10 * * 2,4,6
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: assisted-service
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: edge
+    ci.openshift.io/generator: prowgen
+    job-release: "4.20"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-dual-primary-v6-compact-4-20-periodic
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-metal-assisted-dual-primary-v6-compact-4-20-periodic
       - --variant=edge
       command:
       - ci-operator
