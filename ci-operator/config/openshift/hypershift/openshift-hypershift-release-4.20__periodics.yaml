@@ -171,7 +171,14 @@ tests:
   minimum_interval: 168h
   steps:
     cluster_profile: hypershift
+    workflow: hypershift-aws-conformance-cilium
+- as: e2e-aws-conformance-cilium-private
+  minimum_interval: 168h
+  steps:
+    cluster_profile: aws-qe
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_ARGS: --disable-monitor=apiserver-incluster-availability,service-type-load-balancer-availability
       TEST_SKIPS: Netpol NetworkPolicy between server and client should allow egress
         access to server in CIDR block \[Feature:NetworkPolicy\] \[Suite:openshift/conformance/parallel\]
         \[Suite:k8s\]\| Netpol NetworkPolicy between server and client should ensure
@@ -187,8 +194,59 @@ tests:
         should work with TCP (when fully idled) \[Suite:openshift/conformance/parallel\]\|
         Unidling with Deployments \[apigroup:route.openshift.io\] should work with
         UDP \[Suite:openshift/conformance/parallel\]\| DNS should answer queries using
-        the local DNS endpoint \[Suite:openshift/conformance/parallel\]
-    workflow: hypershift-aws-conformance-cilium
+        the local DNS endpoint \[Suite:openshift/conformance/parallel\]\|Ensure HTTPRoute
+        object is created
+    test:
+    - chain: hypershift-conformance
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-guest-cilium
+- as: e2e-kubevirt-metal-conformance-cilium
+  minimum_interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.18
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
+      REDHAT_OPERATORS_INDEX_TAG: v4.18
+    workflow: hypershift-kubevirt-baremetalds-conformance-cilium
+- as: e2e-aws-conformance-calico
+  minimum_interval: 168h
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance-calico
+- as: e2e-aws-conformance-calico-private
+  minimum_interval: 168h
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
+      TEST_ARGS: --disable-monitor=apiserver-incluster-availability,service-type-load-balancer-availability
+      TEST_SKIPS: The default cluster RBAC policy should have correct RBAC rules\|
+        Cluster scoped load balancer healthcheck port and path should be 10256/healthz\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should
+        provide named network metrics\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with UDP\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with UDP\|pod should not start for sysctls not on whitelist \[apigroup:k8s.cni.cncf.io\]
+        net.ipv4.conf.IFNAME.arp_filter\| pod should not start for sysctls not on
+        whitelist \[apigroup:k8s.cni.cncf.io\] net.ipv4.conf.all.send_redirects\|
+        sysctl allowlist update should start a pod with custom sysctl only when the
+        sysctl is added to whitelist\|Ensure HTTPRoute object is created
+    test:
+    - chain: hypershift-conformance
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-guest-calico
+- as: e2e-kubevirt-metal-conformance-calico
+  minimum_interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.18
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-18
+      REDHAT_OPERATORS_INDEX_TAG: v4.18
+    workflow: hypershift-kubevirt-baremetalds-conformance-calico
 - as: e2e-aws-external-oidc
   minimum_interval: 8h
   steps:
