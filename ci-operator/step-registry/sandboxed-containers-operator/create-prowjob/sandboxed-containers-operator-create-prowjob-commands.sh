@@ -206,7 +206,7 @@ validate_and_set_defaults() {
     TRUSTEE_URL="${TRUSTEE_URL:-""}"
 
     # Init Data Configuration (defaults to empty string)
-    INITDATA="${INITDATA:-''}"
+    INITDATA="${INITDATA:-""}"
 
     # Catalog Source Configuration
     echo "Configuring catalog sources..."
