@@ -54,10 +54,10 @@ if grep -q 'title.*404 Not Found' kata-containers.rpm && \
     exit 3
 fi
 
-KATA_RPM_MD5SUM=$(md5sum kata-containers.rpm | cut -d' ' -f1)
+kata_rpm_md5sum=$(md5sum kata-containers.rpm | cut -d' ' -f1)
 
 echo "Upload to workers and check against the rpm md5sum"
-FAILED_NODES=""
+failed_nodes=""
 nodes=$(oc get node -l node-role.kubernetes.io/worker= -o name)
 if [[ -z "${nodes}" ]]; then
 	echo "ERROR: workers not found"
@@ -66,15 +66,15 @@ fi
 
 for node in $nodes;do
     dd if=kata-containers.rpm| oc debug -n default -T "${node}" -- dd of=/host/var/local/kata-containers.rpm
-    OUTPUT=$(oc debug -n default "${node}" -- bash -c "md5sum  /host/var/local/kata-containers.rpm")
-    if [ "$(echo "${OUTPUT}" | grep -q "${KATA_RPM_MD5SUM}")" ]; then
-        FAILED_NODES="${node}:${OUTPUT} ${FAILED_NODES}"
+    output=$(oc debug -n default "${node}" -- bash -c "md5sum  /host/var/local/kata-containers.rpm | cut -d' ' -f1")
+    if [ "${output}" != "${kata_rpm_md5sum}" ]; then
+        failed_nodes="${node}:${output} ${failed_nodes}"
     fi
 done
 
 # check for failures
-if [ "${FAILED_NODES}" != "" ]; then
-    echo "calculated checksum: ${KATA_RPM_MD5SUM}"
-    echo "ERROR: uploads failed on nodes ${FAILED_NODES}"
+if [ "${failed_nodes}" != "" ]; then
+    echo "calculated checksum: ${kata_rpm_md5sum}"
+    echo "ERROR: uploads failed on nodes ${failed_nodes}"
     exit 4
 fi
