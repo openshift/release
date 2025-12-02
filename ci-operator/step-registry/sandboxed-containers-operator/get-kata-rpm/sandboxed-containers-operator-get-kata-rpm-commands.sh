@@ -3,6 +3,15 @@
 # Download and copy the kata containers RPM to /host/var/local/kata-containers.rpm
 # on each worker node. The RPM is going to be installed by the test automation code.
 
+set -o nounset
+set -o errexit
+set -o pipefail
+
+# Initialize step parameters
+INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-false}"
+KATA_RPM_BUILD_TASK="${KATA_RPM_BUILD_TASK:-}"
+KATA_RPM_VERSION="${KATA_RPM_VERSION:-}"
+
 # By default it's going to skip the rpm installation
 if [[ "${INSTALL_KATA_RPM}" != "true" ]]; then
 	echo "INSTALL_KATA_RPM=${INSTALL_KATA_RPM}. Do not install the Kata RPM"
