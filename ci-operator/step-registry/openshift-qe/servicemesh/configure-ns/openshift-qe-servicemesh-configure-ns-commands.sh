@@ -5,6 +5,7 @@ set -o pipefail
 set -x
 
 MESH_MODE=${MESH_MODE}
+WAYPOINT=${WAYPOINT:-false}
 
 # Ensure STRIC mTLS is enabled
 oc apply -f - <<EOF
