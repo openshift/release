@@ -6,4 +6,4 @@ set -x
 
 bastion=$(cat "/secret/address")
 
-ping -c 5 $bastion
+ping -c 600 $bastion

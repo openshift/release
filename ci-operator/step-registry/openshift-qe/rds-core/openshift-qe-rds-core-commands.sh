@@ -12,6 +12,13 @@ pushd /tmp
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+
+ping $bastion > "${ARTIFACT_DIR}/bastion-ping-cluster-health.log" 2>&1 &
+
+# Store the PID of the background task
+BACKGROUND_PID=$!
+
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
@@ -47,3 +54,7 @@ if [ "$CHURN" == "true" ]; then
 fi
 
 WORKLOAD=rds-core PERFORMANCE_PROFILE=${PERFORMANCE_PROFILE} EXTRA_FLAGS="${EXTRA_FLAGS} --profile-type=${PROFILE_TYPE}" ./run.sh
+
+# Kill the background process if it is still running
+kill $BACKGROUND_PID
+
