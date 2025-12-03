@@ -152,6 +152,64 @@ done
 
 echo "Selected MetalLB Safe Range: ${METALLB_RANGE_START}-${METALLB_RANGE_END}"
 
+# Create ImageContentSourcePolicy
+oc apply -f - <<EOF
+---
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: brew-registry
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry.redhat.io
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry.stage.redhat.io
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry-proxy.engineering.redhat.com
+EOF
+
+# Create LSO catalog Source
+oc apply -f - <<EOF
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: redhat-operators-stage
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  publisher: redhat
+  displayName: Red Hat Operators v4.19 Stage
+  image: quay.io/openshift-release-dev/ocp-release-nightly:iib-int-index-art-operators-4.19
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+
+METALLB_OPERATOR_SUB_SOURCE=$(
+cat <<EOF | awk '/name:/ {print $2; exit}'
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: redhat-operators-stage
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  publisher: redhat
+  displayName: Red Hat Operators v4.19 Stage
+  image: quay.io/openshift-release-dev/ocp-release-nightly:iib-int-index-art-operators-4.19
+  updateStrategy:
+    registryPoll:
+      interval: 15m
+EOF
+)
+
+echo "$METALLB_OPERATOR_SUB_SOURCE"
+
 echo "install metallb operator"
 # create the install namespace
 oc apply -f - <<EOF
@@ -248,3 +306,11 @@ spec:
   ipAddressPools:
    - metallb
 EOF
+
+if oc get pods -n hypershift 2>/dev/null | grep -E "Running" >/dev/null; then
+    echo "✅ Successfully installed metallb-operator."
+else
+    echo "❌ metallb-operator installation failed."
+    exit 1
+fi
+
