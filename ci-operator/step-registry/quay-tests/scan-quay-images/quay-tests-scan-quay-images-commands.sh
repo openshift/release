@@ -9,7 +9,7 @@ quay_security_testing_hostname="$(cat ${SHARED_DIR}/QUAY_SECURITY_TESTING_HOST_N
 QUAY_REGISTRY_REDHAT_IO_USERNAME=$(cat /var/run/quay-qe-registry-redhat-io-secret/username)
 QUAY_REGISTRY_REDHAT_IO_PASSWORD=$(cat /var/run/quay-qe-registry-redhat-io-secret/password)
 
-if [[ "${QUAY_VERSION}" == "3.16"]]; then
+if [[ "${QUAY_VERSION}" == "3.16" ]]; then
   QUAY_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-v3-16-username)
   QUAY_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-v3-16-password)
   QUAY_CLAIR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-clair-v3-16-username)
