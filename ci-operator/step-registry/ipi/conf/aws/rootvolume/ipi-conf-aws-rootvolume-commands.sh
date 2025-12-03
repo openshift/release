@@ -47,7 +47,8 @@ if [[ "${AWS_COMPUTE_VOLUME_TYPE}" != "" ]]; then
   PATCH=$(mktemp)
   cat >> "${PATCH}" << EOF
 compute:
-- platform:
+- name: worker
+  platform:
     aws:
       rootVolume:
         type: ${AWS_COMPUTE_VOLUME_TYPE}
@@ -62,7 +63,8 @@ elif [[ -n "${AWS_COMPUTE_GP3_THROUGHPUT:-}" ]]; then
   PATCH=$(mktemp)
   cat >> "${PATCH}" << EOF
 compute:
-- platform:
+- name: worker
+  platform:
     aws:
       rootVolume:
         throughput: ${AWS_COMPUTE_GP3_THROUGHPUT}
