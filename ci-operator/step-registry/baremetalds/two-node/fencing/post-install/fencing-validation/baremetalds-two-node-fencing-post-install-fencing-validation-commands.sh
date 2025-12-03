@@ -28,11 +28,10 @@ LOG_DISRUPTIVE="${ARTIFACT_DIR}/fencing-validator-disruptive.log"
 # Non-disruptive validation (run from tests pod, transport=ocdebug)
 echo "[INFO] Running non-disruptive fencing_validator (transport=ocdebug)…"
 set +e
-TRANSPORT=ocdebug "${LOCAL_SCRIPT}" \
+NAMESPACE= TRANSPORT=ocdebug "${LOCAL_SCRIPT}" \
   --timeout 1800 2>&1 | tee "${LOG_NON_DISRUPTIVE}"
 RC_NON_DISRUPTIVE="${PIPESTATUS[0]}"
 set -e
-
 echo "[INFO] fencing_validator (non-disruptive) exit code: ${RC_NON_DISRUPTIVE}"
 if [[ "${RC_NON_DISRUPTIVE}" -ne 0 ]]; then
   echo "[ERROR] Non-disruptive fencing_validator run failed with code ${RC_NON_DISRUPTIVE}."
@@ -43,7 +42,7 @@ fi
 if [[ "${DISRUPTIVE_FENCING:-false}" == "true" ]]; then
   echo "[INFO] DISRUPTIVE_FENCING=true; running disruptive fencing_validator (transport=ocdebug)…"
   set +e
-  TRANSPORT=ocdebug "${LOCAL_SCRIPT}" \
+  NAMESPACE= TRANSPORT=ocdebug "${LOCAL_SCRIPT}" \
     --timeout 1800 --disruptive 2>&1 | tee "${LOG_DISRUPTIVE}"
   RC_DISRUPTIVE="${PIPESTATUS[0]}"
   set -e
