@@ -3328,17 +3328,27 @@ tests:
         NETWORK_TYPE=OVNKubernetes
       TEST_FILTERS: Network_Observability
       TEST_IMPORTANCE: .*
-      TEST_SCENARIOS: 76537|82637|53844|85887
+      TEST_SCENARIOS: 76537|53844|85887
       TEST_TIMEOUT: "55"
     test:
     - ref: netobserv-apply-redhat-operators
-    - ref: netobserv-deploy-nfs-provisioner
-    - ref: netobserv-enable-full-ipsec
-    - ref: idp-htpasswd
+    - ref: baremetal-lab-nfs-provisioner
     - ref: cucushift-pre
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: vsphere-ipi-amd-f28-netobserv-ipsec
+  cron: 20 8 3,10,19,26 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: 82637
+      TEST_TIMEOUT: "55"
+    test:
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
 - as: vsphere-ipi-longduration-mco-fips-proxy-g1-f14
   cron: 24 14 11,25 * *
   steps:
