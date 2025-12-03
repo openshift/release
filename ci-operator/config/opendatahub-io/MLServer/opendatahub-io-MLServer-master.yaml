@@ -1,0 +1,45 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: mlserver
+promotion:
+  to:
+  - namespace: opendatahub-io
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: pr-image-mirror-mlserver
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: mlserver
+    env:
+      IMAGE_REPO: mlserver
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: fast-image-mirror-mlserver
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: mlserver
+    env:
+      IMAGE_REPO: mlserver
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: master
+  org: opendatahub-io
+  repo: MLServer
