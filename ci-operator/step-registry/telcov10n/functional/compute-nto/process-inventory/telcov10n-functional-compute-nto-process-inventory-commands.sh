@@ -65,24 +65,6 @@ main() {
         process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
     done
 
-    cd /eco-ci-cd
-
-    echo "Clean old clusters"
-    ansible-playbook ./playbooks/compute/delete_old_clusters.yml \
-        -i ./inventories/ocp-deployment/build-inventory.py
-
-    echo "Deploy SNO OCP for compute-nto testing"
-    ansible-playbook ./playbooks/deploy-ocp-sno.yml \
-        -i ./inventories/ocp-deployment/build-inventory.py \
-        --extra-vars "release=${VERSION}" \
-        --extra-vars "cluster_name=${CLUSTER_NAME}" \
-        --extra-vars "ocp_version_facts_release_type=${OCP_VERSION_RELEASE_TYPE}" \
-        --extra-vars "ocp_version_release_age_max_days=${OCP_VERSION_RELEASE_AGE_MAX_DAYS}" \
-        --extra-vars "disconnected=${DISCONNECTED}" \
-        --extra-vars "ipv4_only=${IPV4_ONLY}" \
-        --extra-vars "ipv6_only=${IPV6_ONLY}" \
-        --extra-vars "extra_manifest_dir=${EXTRA_MANIFEST_DIR}"
-
     echo "Store inventory in SHARED_DIR"
     cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/
     cp -r /eco-ci-cd/inventories/ocp-deployment/group_vars/* "${SHARED_DIR}"/
