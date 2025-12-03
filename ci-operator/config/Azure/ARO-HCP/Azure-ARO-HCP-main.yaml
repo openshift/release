@@ -1,8 +1,8 @@
 base_images:
-  aro-hcp-e2e-base:
-    name: rh_ee_ves
-    namespace: aro-hcp-e2e-base
-    tag: latest
+  aro-hcp-e2e-base-image:
+    name: aro-hcp-e2e-base
+    namespace: rh_ee_ves
+    tag: v1.0
   nested-podman:
     name: nested-podman
     namespace: ci
@@ -56,16 +56,17 @@ images:
   from: src
   to: aro-hcp-frontend
 - dockerfile_literal: |
-    FROM aro-hcp-e2e-base
+    FROM aro-hcp-e2e-base-image
+    USER root
     COPY /src /opt/app-root/src/github.com/Azure
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-    USER root
+    ENV GOBIN="$(go env GOPATH)/bin"
+    ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
     RUN export GOFLAGS='-mod=readonly' && \
         make install-tools && \
         make -C tooling/templatize templatize && \
         make -C test/ aro-hcp-tests prow-job-executor
-    ENV PATH="/usr/local/bin:$PATH"
-  from: src
+  from: aro-hcp-e2e-base-image
   inputs:
     src:
       paths:
