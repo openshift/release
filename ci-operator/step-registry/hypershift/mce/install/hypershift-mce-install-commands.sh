@@ -205,7 +205,7 @@ oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"c
 echo "wait for mce to Available"
 oc wait --timeout=20m --for=condition=Available MultiClusterEngine/multiclusterengine-sample
 
-oc apply -f - <<EOF
+oc create -f - <<EOF
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
 metadata:
