@@ -307,7 +307,7 @@ spec:
    - metallb
 EOF
 
-if oc get pods -n hypershift 2>/dev/null | grep -E "Running" >/dev/null; then
+if oc get pods -n metallb-system 2>/dev/null | grep -E "Running" >/dev/null; then
     echo "✅ Successfully installed metallb-operator."
 else
     echo "❌ metallb-operator installation failed."
