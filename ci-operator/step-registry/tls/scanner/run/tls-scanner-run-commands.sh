@@ -164,6 +164,16 @@ echo "Monitoring logs for scanner completion..."
 SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
 mkdir -p "${SCANNER_ARTIFACT_DIR}"
 
+# Create run_info.json for downstream tools
+cat <<EOF > "${SCANNER_ARTIFACT_DIR}/run_info.json"
+{
+  "pr_number": "${PULL_NUMBER:-}",
+  "job_name": "${JOB_NAME:-}",
+  "prow_job_id": "${PROW_JOB_ID:-}",
+  "run_date": "$(date --utc +%Y-%m-%dT%H:%M:%SZ)"
+}
+EOF
+
 start_wait=$(date +%s)
 while true; do
     current_time=$(date +%s)
