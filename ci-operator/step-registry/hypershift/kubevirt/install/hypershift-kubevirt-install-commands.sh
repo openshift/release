@@ -12,6 +12,23 @@ then
 fi
 
 
+function add_brew_pullsecret() {
+  REGISTRY="brew.registry.redhat.io"
+  USERNAME="${BREW_IMAGE_REGISTRY_USERNAME}"
+  PASSWORD=$(cat "${BREW_IMAGE_REGISTRY_TOKEN_PATH}")
+
+  oc extract secret/pull-secret -n openshift-config --keys=/tmp/.dockerconfigjson --to=. --confirm
+
+  jq --arg reg "$REGISTRY" --arg user "$USERNAME" --arg pass "$PASSWORD" \
+     '.auths[$reg] = {auth: ($user + ":" + $pass | @base64)}' \
+     /tmp/.dockerconfigjson > /tmp/.dockerconfigjson.new
+
+  oc set data secret/pull-secret -n openshift-config --from-file=/tmp/.dockerconfigjson=/tmp/.dockerconfigjson.new
+
+  rm /tmp/.dockerconfigjson /tmp/.dockerconfigjson.new
+}
+
+
 # Get yq tool
 YQ="/tmp/yq"
 curl -L -o ${YQ} https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
@@ -33,6 +50,11 @@ else
   CNV_RELEASE_CHANNEL=nightly-$(ocp_version)
   CNV_PRERELEASE_CATALOG_IMAGE=quay.io/openshift-cnv/nightly-catalog:$(ocp_version)
 fi
+
+### debug ###
+CNV_PRERELEASE_CATALOG_IMAGE=brew.registry.redhat.io/rh-osbs/iib:1071354
+CNV_SUBSCRIPTION_CHANNEL=stable
+### debug ###
 
 # The kubevirt tests require wildcard routes to be allowed
 oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
@@ -57,12 +79,14 @@ if [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]
   # Add pullsecret for cnv nightly channel from quay.io/openshift-cnv
   QUAY_USERNAME=openshift-cnv+openshift_ci
   QUAY_PASSWORD=$(cat /etc/cnv-nightly-pull-credentials/openshift_cnv_pullsecret)
-  oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
+  oc get secret pull-secret -n openshift-config -o json | jq -r '.data."/tmp/.dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
   QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
   jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io/openshift-cnv": {"auth":$QUAY_AUTH,"email":""}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
   mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
-  oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
+  oc set data secret/pull-secret -n openshift-config --from-file=/tmp/.dockerconfigjson=/tmp/global-pull-secret.json
   rm /tmp/global-pull-secret.json
+
+  add_brew_pullsecret
 
   sleep 5
   oc wait mcp master worker --for condition=updated --timeout=20m
