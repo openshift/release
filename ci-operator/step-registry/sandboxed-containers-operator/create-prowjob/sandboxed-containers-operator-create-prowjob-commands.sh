@@ -143,7 +143,7 @@ validate_and_set_defaults() {
     EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.1}"
 
     # Kata RPM Configuration
-    INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-true}"
+    INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-false}"
     if [[ "${INSTALL_KATA_RPM}" != "true" && "${INSTALL_KATA_RPM}" != "false" ]]; then
         echo "ERROR: INSTALL_KATA_RPM should be 'true' or 'false', got: ${INSTALL_KATA_RPM}"
         exit 1
@@ -172,6 +172,7 @@ validate_and_set_defaults() {
         PROW_RUN_TYPE="release"
         CATALOG_SOURCE_NAME="redhat-operators"
         TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
+        INSTALL_KATA_RPM="false"
     fi
 
     # After the tests finish, wait before killing the cluster
