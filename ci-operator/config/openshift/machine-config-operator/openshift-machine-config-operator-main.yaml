@@ -52,7 +52,16 @@ base_images:
     namespace: ocp
     tag: rhel-coreos
 build_root:
-  from_repository: true
+  project_image:
+    context_dir: .
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21 AS final
+      RUN dnf install -y skopeo && \
+        make install-tools
+    inputs:
+      ocp_4.21_base-rhel9:
+        as:
+        - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
@@ -107,7 +116,7 @@ tests:
 - as: unit
   commands: make test-unit
   container:
-    from: src
+    from: root
 - always_run: false
   as: e2e-agent-compact-ipv4
   capabilities:
@@ -142,7 +151,7 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e
-      from: src
+      from: root
       resources:
         requests:
           cpu: 100m
@@ -194,11 +203,11 @@ tests:
   commands: |
     make verify
   container:
-    from: src
+    from: root
 - as: bootstrap-unit
   commands: make bootstrap-e2e
   container:
-    from: src
+    from: root
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - always_run: false
@@ -218,7 +227,7 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e
-      from: src
+      from: root
       resources:
         requests:
           cpu: 100m
@@ -235,7 +244,7 @@ tests:
       dependencies:
       - env: MCO_OS_IMAGE_URL
         name: pipeline:custom-os-image
-      from: src
+      from: root
       resources:
         requests:
           cpu: 100m
@@ -252,7 +261,7 @@ tests:
       dependencies:
       - env: MCO_OS_IMAGE_URL
         name: pipeline:custom-os-image
-      from: src
+      from: root
       resources:
         requests:
           cpu: 100m
@@ -269,7 +278,7 @@ tests:
       dependencies:
       - env: MCO_OS_IMAGE_URL
         name: pipeline:custom-os-image
-      from: src
+      from: root
       resources:
         requests:
           cpu: 100m
@@ -286,7 +295,7 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e-ocl
-      from: src
+      from: root
       resources:
         requests:
           cpu: 100m
@@ -303,7 +312,7 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e-techpreview
-      from: src
+      from: root
       resources:
         requests:
           cpu: 100m
@@ -488,7 +497,7 @@ tests:
       dependencies:
       - env: MCO_OS_IMAGE_URL
         name: pipeline:custom-os-image
-      from: src
+      from: root
       resources:
         requests:
           cpu: 100m
