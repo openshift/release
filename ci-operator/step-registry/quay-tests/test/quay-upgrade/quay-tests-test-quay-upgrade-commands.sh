@@ -58,4 +58,4 @@ function handle_result {
 
 handle_result
 
-echo "extended-platform-tests complete" 
+echo "extended-platform-tests complete!" 
