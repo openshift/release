@@ -1,6 +1,10 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-set -ex
+set -o nounset
+set -o errexit
+set -o pipefail
+set -x
+
 
 # The kubevirt tests require wildcard routes to be allowed
 oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
@@ -38,26 +42,6 @@ spec:
   - openshift-cnv
 EOF
 
-VIRT_OPERATOR_SUB_SOURCE=$(
-cat <<EOF | awk '/name:/ {print $2; exit}'
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: redhat-operators-stage
-  namespace: openshift-marketplace
-spec:
-  sourceType: grpc
-  publisher: redhat
-  displayName: Red Hat Operators v4.19 Stage
-  image: quay.io/openshift-release-dev/ocp-release-nightly:iib-int-index-art-operators-4.19
-  updateStrategy:
-    registryPoll:
-      interval: 15m
-EOF
-)
-
-echo "$VIRT_OPERATOR_SUB_SOURCE"
-
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -70,7 +54,7 @@ spec:
   channel: stable
   installPlanApproval: Automatic
   name: kubevirt-hyperconverged
-  source: "${VIRT_OPERATOR_SUB_SOURCE}"
+  source: redhat-operators
   sourceNamespace: openshift-marketplace
 EOF
 
@@ -128,33 +112,39 @@ EOF
 
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
 
-if oc get pods -n openshift-cnv 2>/dev/null | grep -E "Running" >/dev/null; then
-    echo "✅ Successfully installed virtualtisation operator."
-else
-    echo "❌ virtualtisation operator installation failed."
+TIMEOUT=900     # 15 minutes
+INTERVAL=10
+
+echo "⏳ Waiting for all pods in openshift-cnv to become Running..."
+
+for ((i=0; i<=TIMEOUT; i+=INTERVAL)); do
+
+    # Count non-running pods
+    NOT_READY=$(oc get pods -n openshift-cnv --no-headers 2>/dev/null \
+        | awk '{print $3}' \
+        | grep -vE "Running|Completed" | wc -l)
+
+    # Count total pods
+    TOTAL=$(oc get pods -n openshift-cnv --no-headers 2>/dev/null | wc -l)
+
+    if [[ $TOTAL -gt 0 && $NOT_READY -eq 0 ]]; then
+        echo "✅ All pods in openshift-cnv are Running."
+        break
+    fi
+
+    echo "Still waiting... $NOT_READY pods not ready yet (checked $i sec)"
+    sleep $INTERVAL
+done
+
+# Final check after timeout
+if [[ $NOT_READY -ne 0 ]]; then
+    echo "❌ virtualization operator installation failed — some pods are not in Running state."
+    oc get pods -n openshift-cnv
     exit 1
 fi
+
 
 echo "Installing VM console logger in order to aid debugging potential VM boot issues"
 oc apply -f https://raw.githubusercontent.com/davidvossel/kubevirt-console-debugger/main/kubevirt-console-logger.yaml
 
 
-if [ "$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')" == "Azure" ];
-then
-  # Pin cpuModel to Broadwell in case of Azure cluster, to avoid discrepancies between the cluster nodes
-  PATCH_COMMAND="oc patch hco kubevirt-hyperconverged -n openshift-cnv --type=json -p='[{\"op\": \"add\", \"path\": \"/spec/defaultCPUModel\", \"value\": \"Broadwell\"}]'"
-  MAX_RETRIES=5
-  for ((i=1; i<=MAX_RETRIES; i++)); do
-    echo "Attempt $i of $MAX_RETRIES..."
-    if eval $PATCH_COMMAND; then
-      echo "Patch succeeded."
-      exit 0
-    else
-      echo "Patch failed. Retrying in 2 seconds..."
-      sleep 2
-    fi
-  done
-
-  echo "Patch failed after $MAX_RETRIES attempts."
-  exit 1
-fi
