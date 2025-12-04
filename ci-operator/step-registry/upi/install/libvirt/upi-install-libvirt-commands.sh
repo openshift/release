@@ -207,6 +207,7 @@ else
   RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
   QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
   VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
+  EXPECTED_CHECKSUM=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.uncompressed-sha256")
   DOWNLOAD_NEW_IMAGE=true
 
   # Check if we need to update the source volume
@@ -224,7 +225,22 @@ else
     # Download the new rhcos image
     echo "Downloading new rhcos image..."
     curl -L "${QCOW_URL}" | gunzip -c > ${INSTALL_DIR}/${VOLUME_NAME} || true
+    actual_checksum=$(sha256sum ${INSTALL_DIR}/${VOLUME_NAME} | awk '{print $1}')
+    if [[ "${actual_checksum}" == "${EXPECTED_CHECKSUM}" ]]; then
+      echo "Checksum verified for ${VOLUME_NAME}"
+    else
+      echo "Checksum mismatch, retrying ..."
+      rm -f ${INSTALL_DIR}/${VOLUME_NAME}
+      curl -L "${QCOW_URL}" | gunzip -c > ${INSTALL_DIR}/${VOLUME_NAME}
+      actual_checksum=$(sha256sum ${INSTALL_DIR}/${VOLUME_NAME} | awk '{print $1}')
 
+      if [[ "${actual_checksum}" == "${EXPECTED_CHECKSUM}" ]]; then
+        echo "Checksum verified for ${VOLUME_NAME}"
+      else
+        echo "Checksum of downloaded image didn't match expected checksum. download incomplete."
+        exit 1
+      fi
+    fi
     # Resize the rhcos image to match the volume capacity
     echo "Resizing rhcos image to match volume capacity..."
     qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
