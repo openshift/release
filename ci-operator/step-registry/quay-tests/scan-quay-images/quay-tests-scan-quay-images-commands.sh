@@ -40,7 +40,7 @@ quay_redis_image_tag="${QUAY_REDIS_IMAGE}"
       
 function scan_quay_images(){
     ssh -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@$1 "sudo trivy image $2 --username $3 --password $4 > $5_image_vulnerability-report" || true
-    scp -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@$1:/home/ec2-user/$3_image_vulnerability-report $ARTIFACT_DIR/$3_image_vulnerability-report || true
+    scp -o StrictHostKeyChecking=no -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@$1:/home/ec2-user/$5_image_vulnerability-report $ARTIFACT_DIR/$5_image_vulnerability-report || true
 }
 
 function scan_quay_redis_images(){
