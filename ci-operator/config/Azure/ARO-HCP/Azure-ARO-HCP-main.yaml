@@ -1,8 +1,8 @@
 base_images:
-  aro-hcp-e2e-base:
+  aro-hcp-e2e-base-image:
     name: aro-hcp-e2e-base
     namespace: rh_ee_ves
-    tag: v1.0
+    tag: "v1.0"
   nested-podman:
     name: nested-podman
     namespace: ci
@@ -36,13 +36,10 @@ images:
         source_path: /go/src/github.com/Azure/ARO-HCP
   to: nested-podman-src
 - dockerfile_literal: |
-    FROM aro-hcp-e2e-base
+    FROM aro-hcp-e2e-base-image
     USER root
     COPY /src /opt/app-root/src/github.com/Azure
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-    RUN echo "Current PATH: $PATH"
-    RUN ls -la /usr/bin/az || echo "az not found in /usr/bin"
-    RUN find /usr -name "az" 2>/dev/null || echo "az not found in /usr"
     ENV PATH="/usr/local/bin:/usr/bin:$PATH"
     RUN which az && echo $PATH
     RUN export GOFLAGS='-mod=readonly' && \
