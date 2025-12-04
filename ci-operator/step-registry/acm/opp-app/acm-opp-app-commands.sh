@@ -209,7 +209,7 @@ run_test_case_1() {
         if [ "$BUILD_STATUS" != "Complete" ]; then
             echo "ERROR: Build timeout. Final status: ${BUILD_STATUS}"
             oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o yaml || true
-            false
+            test_failed=true
         fi
     fi
 
@@ -301,7 +301,7 @@ run_test_case_2() {
             echo "Details for $policy:"
             oc get policy -n policies "$policy" -o yaml || true
         done
-        false
+        test_failed=true
     fi
 
     # Disable trap and record result based on test_failed flag
@@ -369,7 +369,7 @@ run_test_case_3() {
         [ $attempt -lt $RETRIES ] && sleep $RETRY_INTERVAL
     done
 
-    [ "$IMAGE_FOUND" = false ] && { echo "ERROR: Image not found in ACS"; false; }
+    [ "$IMAGE_FOUND" = false ] && { echo "ERROR: Image not found in ACS"; test_failed=true; }
 
     # Disable trap and record result based on test_failed flag
     set +e
