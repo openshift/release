@@ -4,6 +4,19 @@ set -o pipefail
 set -x
 MOUNTED_HOST_INVENTORY="/var/host_variables"
 
+function copy_to_shared_dir() {
+	if [ -z "$1" ]
+	then
+		echo "missing directory to copy"
+		exit 1
+	fi
+
+	echo "copying files to $1..."
+	for filename in $1/*; do cp $filename "${SHARED_DIR}/$(basename $1)_$(basename $filename)"; done
+
+}
+
+
 process_inventory() {
     local directory="$1"
     local dest_file="$2"
@@ -66,8 +79,8 @@ main() {
     done
 
     echo "Store inventory in SHARED_DIR"
-    cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/
-    cp -r /eco-ci-cd/inventories/ocp-deployment/group_vars/* "${SHARED_DIR}"/
+    copy_to_shared_dir /eco-ci-cd/inventories/ocp-deployment/host_vars
+    copy_to_shared_dir /eco-ci-cd/inventories/ocp-deployment/group_vars
 }
 
 main
