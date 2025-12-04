@@ -39,3 +39,5 @@ elif [ $? == 127 ]; then
 else
   echo "Failed to collect the agent logs."
 fi
+
+sleep 3600
