@@ -31,7 +31,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "$SHARED_DIR/hosts.yaml"); do
         ${root_dev_hctl:+hctl: ${root_dev_hctl}}
       bmc:
         address: ${redfish_scheme}://${bmc_address}${redfish_base_uri}
-        disableCertificateVerification: true
+        disableCertificateVerification: false
         username: ${redfish_user}
         password: ${redfish_password}
       networkConfig:
