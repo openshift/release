@@ -14,6 +14,7 @@ set -o pipefail
 # Endpoint for the Gangway API (https://docs.prow.k8s.io/docs/components/optional/gangway/)
 # used to interact with Prow via REST API
 GANGWAY_API_ENDPOINT="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions"
+ARO_CLUSTER_VERSION="${ARO_CLUSTER_VERSION:-4.17}"
 
 # Function to get latest OSC catalog tag
 get_latest_osc_catalog_tag() {
@@ -205,7 +206,7 @@ validate_and_set_defaults() {
     TRUSTEE_URL="${TRUSTEE_URL:-""}"
 
     # Init Data Configuration (defaults to empty string)
-    INITDATA="${INITDATA:-''}"
+    INITDATA="${INITDATA:-""}"
 
     # Catalog Source Configuration
     echo "Configuring catalog sources..."
@@ -279,6 +280,7 @@ show_usage() {
     echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata"
     echo ""
     echo "Environment variables for 'create' command:"
+    echo "  ARO_CLUSTER_VERSION            - ARO cluster version (default: ${ARO_CLUSTER_VERSION})"
     echo "  OCP_VERSION                    - OpenShift version (default: 4.19)"
     echo "  TEST_RELEASE_TYPE              - Test release type: Pre-GA or GA (default: Pre-GA)"
     echo "  EXPECTED_OSC_VERSION           - Expected OSC version (default: 1.10.1)"
@@ -347,11 +349,18 @@ generate_workflow() {
 
   # Collect environment variables into a temporary array
   local env_vars=()
+  local kata_rpm_version
+  kata_rpm_version="${KATA_RPM_VERSION:-}"
 
   # Platform-specific
   if [[ $platform == "azure" ]]; then
     env_vars+=("BASE_DOMAIN: qe.azure.devcluster.openshift.com")
     env_vars+=("CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}")
+  elif [[ $platform == "aro" ]]; then
+    env_vars+=("ARO_CLUSTER_VERSION: \"${ARO_CLUSTER_VERSION}\"")
+    env_vars+=("LOCATION: ${CUSTOM_AZURE_REGION}")
+    env_vars+=("HYPERSHIFT_AZURE_LOCATION: ${CUSTOM_AZURE_REGION}")
+    kata_rpm_version="${kata_rpm_version//$OCP_VERSION/$ARO_CLUSTER_VERSION}"
   elif [[ $platform == "aws" ]]; then
     env_vars+=("AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}")
   fi
@@ -364,7 +373,7 @@ generate_workflow() {
     "EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}"
     "INITDATA: ${INITDATA:-\"\"}"
     "INSTALL_KATA_RPM: \"${INSTALL_KATA_RPM}\""
-    "KATA_RPM_VERSION: ${KATA_RPM_VERSION:-\"\"}"
+    "KATA_RPM_VERSION: ${kata_rpm_version:-\"\"}"
     "MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}"
     "MUST_GATHER_ON_FAILURE_ONLY: \"${MUST_GATHER_ON_FAILURE_ONLY}\""
     "SLEEP_DURATION: ${SLEEP_DURATION}"
@@ -443,6 +452,8 @@ EOF
 generate_workflow azure azure-qe sandboxed-containers-operator-e2e-azure kata >> "${OUTPUT_FILE}"
 generate_workflow azure azure-qe sandboxed-containers-operator-e2e-azure peerpods >> "${OUTPUT_FILE}"
 generate_workflow azure azure-qe sandboxed-containers-operator-e2e-azure coco >> "${OUTPUT_FILE}"
+generate_workflow aro azure-qe sandboxed-containers-operator-e2e-aro peerpods >> "${OUTPUT_FILE}"
+generate_workflow aro azure-qe sandboxed-containers-operator-e2e-aro coco >> "${OUTPUT_FILE}"
 generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws peerpods >> "${OUTPUT_FILE}"
 generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws coco >> "${OUTPUT_FILE}"
 	cat >> "${OUTPUT_FILE}" <<EOF
@@ -484,6 +495,7 @@ EOF
     echo "=========================================="
     echo "Configuration details:"
     echo "  • OCP Version: ${OCP_VERSION}"
+    echo "  • ARO Version: ${ARO_CLUSTER_VERSION}"
     echo "  • Prow Run Type: ${PROW_RUN_TYPE}"
     echo "  • Test Release Type: ${TEST_RELEASE_TYPE}"
     echo "  • Expected OSC Version: ${EXPECTED_OSC_VERSION}"
