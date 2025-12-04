@@ -11,11 +11,26 @@ base_images:
     name: hyperconverged-cluster-bundle
     namespace: ci
     tag: 1.17.0-unstable
+  ocp_4.21_cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
 binary_build_commands: make install
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.21_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:cli
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: kubevirt-must-gather
 releases:
   initial:
@@ -116,7 +131,37 @@ tests:
     - as: test-all-images
       cli: latest
       commands: |
-        oc annotate --overwrite -n kubevirt-hyperconverged $(oc get csv -n kubevirt-hyperconverged -l operators.coreos.com/community-kubevirt-hyperconverged.kubevirt-hyperconverged -o name) operators.openshift.io/must-gather-image=${KMG_IMAGE}
+        CSV=$(oc get csv -n kubevirt-hyperconverged -l operators.coreos.com/community-kubevirt-hyperconverged.kubevirt-hyperconverged -o name)
+        ORIG_MG_IMG=$(oc get -n kubevirt-hyperconverged ${CSV} -o json | jq -r '.metadata.annotations["operators.openshift.io/must-gather-image"]')
+        # update the must gather image to the image under test.
+        oc annotate --overwrite -n kubevirt-hyperconverged ${CSV} operators.openshift.io/must-gather-image=${KMG_IMAGE}
+        #
+        # Since we using the "AllNamespaces" installMode, the CSV is created in all the namespaces.
+        # oc adm must-gather --all-images collect the "operators.openshift.io/must-gather-image"
+        # annotations in the cluster, so it gets both the image under test that we just overwrote,
+        # and the original image from other copies of the CSV in other namespaces. the result is
+        # that both the image under test and original image are running in parallel.
+        #
+        # Once we change the annotation of main CSV - the one in the installation namespace, OLM
+        # will update the other copies of the CSV. We must wait until all of them are getting the
+        # update, before running must gather, to make sure only one image of kubevirt must gather
+        # will be run.
+        TIMEOUT_SEC=60
+        for i in $(seq 1 ${TIMEOUT_SEC}); do
+          NUM_CSV_W_ORIG_IMG=$(oc get csv -A -o json | jq '[.items[] | select(.metadata.annotations["operators.openshift.io/must-gather-image"] == "'"${ORIG_MG_IMG}"'") | .metadata.name] | length')
+          if [[ ${NUM_CSV_W_ORIG_IMG} == 0 ]]; then
+            echo "all CSVs are updated with the new image"
+            break
+          fi
+          if [[ $i == ${TIMEOUT_SEC} ]]; then
+            echo "timeout waiting for the CSVs to get the new must-gather image"
+            break
+          else
+            echo "Not all the CSVs were updated with the new image; trying again ($i/${TIMEOUT_SEC})"
+            sleep 1
+          fi
+        done
+        # now we can safely run must gather
         oc adm must-gather --all-images --dest-dir=${ARTIFACT_DIR}/must-gather-output
         mkdir -p ${ARTIFACT_DIR}/junit
         (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:product --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v --ginkgo.skip "should validate inspect and node-logs parameters usage on all the relevant logged commands" )
@@ -205,7 +250,37 @@ tests:
     - as: test-all-images
       cli: latest
       commands: |
-        oc annotate --overwrite -n kubevirt-hyperconverged $(oc get csv -n kubevirt-hyperconverged -l operators.coreos.com/community-kubevirt-hyperconverged.kubevirt-hyperconverged -o name) operators.openshift.io/must-gather-image=${KMG_IMAGE}
+        CSV=$(oc get csv -n kubevirt-hyperconverged -l operators.coreos.com/community-kubevirt-hyperconverged.kubevirt-hyperconverged -o name)
+        ORIG_MG_IMG=$(oc get -n kubevirt-hyperconverged ${CSV} -o json | jq -r '.metadata.annotations["operators.openshift.io/must-gather-image"]')
+        # update the must gather image to the image under test.
+        oc annotate --overwrite -n kubevirt-hyperconverged ${CSV} operators.openshift.io/must-gather-image=${KMG_IMAGE}
+        #
+        # Since we using the "AllNamespaces" installMode, the CSV is created in all the namespaces.
+        # oc adm must-gather --all-images collect the "operators.openshift.io/must-gather-image"
+        # annotations in the cluster, so it gets both the image under test that we just overwrote,
+        # and the original image from other copies of the CSV in other namespaces. the result is
+        # that both the image under test and original image are running in parallel.
+        #
+        # Once we change the annotation of main CSV - the one in the installation namespace, OLM
+        # will update the other copies of the CSV. We must wait until all of them are getting the
+        # update, before running must gather, to make sure only one image of kubevirt must gather
+        # will be run.
+        TIMEOUT_SEC=60
+        for i in $(seq 1 ${TIMEOUT_SEC}); do
+          NUM_CSV_W_ORIG_IMG=$(oc get csv -A -o json | jq '[.items[] | select(.metadata.annotations["operators.openshift.io/must-gather-image"] == "'"${ORIG_MG_IMG}"'") | .metadata.name] | length')
+          if [[ ${NUM_CSV_W_ORIG_IMG} == 0 ]]; then
+            echo "all CSVs are updated with the new image"
+            break
+          fi
+          if [[ $i == ${TIMEOUT_SEC} ]]; then
+            echo "timeout waiting for the CSVs to get the new must-gather image"
+            break
+          else
+            echo "Not all the CSVs were updated with the new image; trying again ($i/${TIMEOUT_SEC})"
+            sleep 1
+          fi
+        done
+        # now we can safely run must gather
         oc adm must-gather --all-images --dest-dir=${ARTIFACT_DIR}/must-gather-output
         mkdir -p ${ARTIFACT_DIR}/junit
         (cd ${ARTIFACT_DIR}; KUBECONFIG=${KUBECONFIG} /go/bin/must-gather.test --ginkgo.label-filter=level:product --ginkgo.junit-report=${ARTIFACT_DIR}/junit/report.xml --ginkgo.v --ginkgo.skip "should validate inspect and node-logs parameters usage on all the relevant logged commands" )

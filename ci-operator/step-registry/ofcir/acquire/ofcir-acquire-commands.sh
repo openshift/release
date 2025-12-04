@@ -77,7 +77,7 @@ cat > "${SHARED_DIR}/packet-conf.sh" <<-EOF
 EOF
 
 function getCIR(){
-    OFCIRURL="https://ofcir-service.ofcir-system.svc.cluster.local/v1/ofcir"
+    OFCIRURL="https://ofcir.apps-int.master.ci.devcluster.openshift.com/v1/ofcir"
     OFCIRTOKEN="$(cat "${CLUSTER_PROFILE_DIR}/ofcir-auth-token")"
     echo "Attempting to acquire a Host from OFCIR"
     IPFILE=$SHARED_DIR/server-ip
@@ -129,6 +129,7 @@ CIRTYPE=host_el9
 [ "$CLUSTERTYPE" == "assisted_large_el9" ] && CIRTYPE=assisted_large_el9
 [ "$CLUSTERTYPE" == "assisted_medium_el9" ] && CIRTYPE=assisted_medium_el9
 [ "$CLUSTERTYPE" == "assisted_small_el9" ] && CIRTYPE=assisted_small_el9
+[ "$CLUSTERTYPE" == "assisted_amd64_el9" ] && CIRTYPE=assisted_amd64_el9
 
 getCIR && exit_with_success
 exit_with_failure "Failed to create ci resource: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"

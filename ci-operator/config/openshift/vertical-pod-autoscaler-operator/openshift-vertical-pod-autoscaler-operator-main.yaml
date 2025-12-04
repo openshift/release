@@ -218,6 +218,63 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-operator-components
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: deploy
+      cli: latest
+      commands: KUBECTL=$(which oc) make deploy
+      dependencies:
+      - env: OPERATOR_IMG
+        name: vertical-pod-autoscaler-operator
+      - env: OPERAND_IMG
+        name: vertical-pod-autoscaler
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: admission-controller
+      cli: latest
+      commands: SUITE=admission-controller KUBECTL=$(which oc) make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: recommender
+      cli: latest
+      commands: SUITE=recommender KUBECTL=$(which oc) make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: updater
+      cli: latest
+      commands: SUITE=updater KUBECTL=$(which oc) make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-operator-actuation
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: test
+      cli: latest
+      commands: SUITE=actuation make e2e-ci
+      dependencies:
+      - env: OPERATOR_IMG
+        name: vertical-pod-autoscaler-operator
+      - env: OPERAND_IMG
+        name: vertical-pod-autoscaler
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: scorecard
   optional: true
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$

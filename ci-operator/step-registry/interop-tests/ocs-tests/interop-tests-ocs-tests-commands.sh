@@ -47,8 +47,9 @@ function mapTestsForComponentReadiness() {
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
             install_yq_if_not_exists
-            echo "Mapping Test Suite Name To: CNV-lp-interop"
-            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
+            export REPORTPORTAL_CMP
+            echo "Mapping Test Suite Name To: ${REPORTPORTAL_CMP}"
+            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name=env(REPORTPORTAL_CMP)' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
@@ -87,6 +88,25 @@ REPORTING:
 DEPLOYMENT:
   skip_download_client: True
 __EOF__
+
+# Append ENV_DATA in ocs-tests config file for vsphere platform
+if [[ -f "${SHARED_DIR}/vsphere_context.sh" ]]; then
+    declare vsphere_datacenter
+    declare vsphere_datastore
+    declare vsphere_cluster
+    source "${SHARED_DIR}/vsphere_context.sh"
+    source "${SHARED_DIR}/govc.sh"
+
+    cat >> "${LOGS_CONFIG}" << __APPENDED_ENV_DATA__
+ENV_DATA:
+  platform: "vsphere"
+  vsphere_user: "${GOVC_USERNAME}"
+  vsphere_password: "${GOVC_PASSWORD}"
+  vsphere_datacenter: "${vsphere_datacenter}"
+  vsphere_cluster: "${vsphere_cluster}"
+  vsphere_datastore: "${vsphere_datastore}"
+__APPENDED_ENV_DATA__
+fi
 
 
 set -x

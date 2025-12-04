@@ -49,34 +49,34 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-metal-ipi-bm
-  cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$
+  capabilities:
+  - intranet
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ovn-ipv4
-  timeout: 5h30m0s
 - as: e2e-metal-ipi-virtualmedia
-  cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$
+  capabilities:
+  - intranet
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
-  timeout: 5h30m0s
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$
+  capabilities:
+  - intranet
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
-  timeout: 5h30m0s
 - as: check-requirements
   commands: |-
     #!/bin/bash
     set -euxo pipefail
-    # this could also come from the "CLONEREFS_OPTIONS" env variable
-    export CHECK_RELEASE="main"
+    # Automatically set based on the branch being tested
+    export CHECK_RELEASE=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref // .refs.base_ref')
     make check-reqs
   container:
     from: src

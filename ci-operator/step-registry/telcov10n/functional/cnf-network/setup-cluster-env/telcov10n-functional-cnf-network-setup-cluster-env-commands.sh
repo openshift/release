@@ -12,8 +12,7 @@ fi
 echo "Setup pipeline environment"
 cd /eco-ci-cd/
 export ANSIBLE_REMOTE_TEMP="/tmp"
-ansible-playbook ./playbooks/setup-cluster-env.yml --extra-vars "release=${VERSION} dest_directory=${SHARED_DIR}"
-
+ansible-playbook ./playbooks/setup-cluster-env.yml --extra-vars "release=${VERSION} dest_directory=${SHARED_DIR} release_age_max_days=${RELEASE_AGE_MAX_DAYS}"
 echo "Cluster name"
 cat ${SHARED_DIR}/cluster_name
 

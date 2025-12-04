@@ -15,9 +15,9 @@ GKE_CLUSTER_NAME=$(cat /tmp/secrets/GKE_CLUSTER_NAME)
 GKE_CLUSTER_REGION=$(cat /tmp/secrets/GKE_CLUSTER_REGION)
 GOOGLE_CLOUD_PROJECT=$(cat /tmp/secrets/GOOGLE_CLOUD_PROJECT)
 echo "Authenticating with GKE"
-gcloud_auth "${GKE_SERVICE_ACCOUNT_NAME}" "/tmp/secrets/GKE_SERVICE_ACCOUNT_KEY"
+gcloud auth activate-service-account "${GKE_SERVICE_ACCOUNT_NAME}" --key-file "/tmp/secrets/GKE_SERVICE_ACCOUNT_KEY"
 echo "Getting GKE credentials"
-gcloud_gke_get_credentials "${GKE_CLUSTER_NAME}" "${GKE_CLUSTER_REGION}" "${GOOGLE_CLOUD_PROJECT}"
+gcloud container clusters get-credentials "${GKE_CLUSTER_NAME}" --region "${GKE_CLUSTER_REGION}" --project "${GOOGLE_CLOUD_PROJECT}"
 echo "Getting GKE cluster URL"
 K8S_CLUSTER_URL=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
 export K8S_CLUSTER_URL
@@ -199,13 +199,6 @@ fi
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
-
-echo "========== Namespace Configuration =========="
-NAME_SPACE="showcase-k8s-ci-nightly"
-NAME_SPACE_RBAC="showcase-rbac-k8s-ci-nightly"
-export NAME_SPACE NAME_SPACE_RBAC
-echo "NAME_SPACE: $NAME_SPACE"
-echo "NAME_SPACE_RBAC: $NAME_SPACE_RBAC"
 
 echo "========== Test Execution =========="
 echo "Executing openshift-ci-tests.sh"

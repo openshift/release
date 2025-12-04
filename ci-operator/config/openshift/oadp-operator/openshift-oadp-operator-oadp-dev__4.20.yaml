@@ -34,11 +34,37 @@ resources:
       memory: 512Mi
 tests:
 - always_run: false
-  as: e2e-test-aws
-  optional: true
+  as: e2e-test-cli-aws
   run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: dev
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      cli: latest
+      commands: make TEST_CLI=true test-e2e
+      credentials:
+      - collection: ""
+        mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: e2e-test-aws
+  run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
+  steps:
+    cluster_profile: aws-4
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -115,7 +141,6 @@ tests:
     workflow: optional-operators-ci-aws
 - always_run: false
   as: e2e-test-kubevirt-aws
-  optional: true
   run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
   steps:
     cluster_profile: aws
@@ -144,7 +169,7 @@ tests:
 - as: e2e-test-kubevirt-aws-periodic
   cron: 0 4 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -169,10 +194,9 @@ tests:
     workflow: optional-operators-ci-aws
 - always_run: false
   as: e2e-test-hcp-aws
-  optional: true
   run_if_changed: .+\.go|go\.(\bmod\b|\bsum\b)|Makefile|Dockerfile|.dockerignore|.*\.ya{0,1}ml|build/.+|.sh
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -198,7 +222,7 @@ tests:
 - as: e2e-test-hcp-aws-periodic
   cron: 0 5 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-5
     dependencies:
       OO_INDEX: ci-index
     env:
@@ -224,7 +248,7 @@ tests:
 - as: e2e-test-hcp-external-aws-periodic
   cron: 0 6 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-5
     dependencies:
       OO_INDEX: ci-index
     env:
