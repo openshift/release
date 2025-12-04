@@ -5,44 +5,6 @@ set -o errexit
 set -o pipefail
 set -x
 
-# Create ImageContentSourcePolicy
-oc apply -f - <<EOF
----
-apiVersion: operator.openshift.io/v1alpha1
-kind: ImageContentSourcePolicy
-metadata:
-  name: brew-registry
-spec:
-  repositoryDigestMirrors:
-  - mirrors:
-    - brew.registry.redhat.io
-    source: registry.redhat.io
-  - mirrors:
-    - brew.registry.redhat.io
-    source: registry.stage.redhat.io
-  - mirrors:
-    - brew.registry.redhat.io
-    source: registry-proxy.engineering.redhat.com
-EOF
-
-# Create LSO catalog Source
-oc apply -f - <<EOF
----
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  name: redhat-operators-lso
-  namespace: openshift-marketplace
-spec:
-  sourceType: grpc
-  publisher: redhat
-  displayName: Red Hat Operators v4.19 Stage
-  image: quay.io/openshift-release-dev/ocp-release-nightly:iib-int-index-art-operators-4.19
-  updateStrategy:
-    registryPoll:
-      interval: 15m
-EOF
-
 timeout=300       # seconds
 interval=10       # seconds
 elapsed=0
@@ -51,7 +13,7 @@ echo "⏳ Waiting for Local Storage Operator packagemanifest to appear..."
 
 while true; do
     if oc get packagemanifests -n openshift-marketplace 2>/dev/null \
-        | grep -iq "local-storage"; then
+        | grep -i "local-storage"; then
         echo "✅ Local Storage Operator packagemanifest found!"
         break
     fi
@@ -70,7 +32,7 @@ cat <<EOF | awk '/name:/ {print $2; exit}'
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: redhat-operators-lso
+  name: redhat-operators-stage
   namespace: openshift-marketplace
 spec:
   sourceType: grpc

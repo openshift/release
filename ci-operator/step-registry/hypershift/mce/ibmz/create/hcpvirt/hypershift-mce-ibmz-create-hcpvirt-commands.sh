@@ -353,8 +353,21 @@ echo "*.apps.${DNS_ZONE_NAME}  -->  ${LB_EXTERNAL_IP}"
 
 # Verifying the Hosted Cluster status
 echo "$(date) Checking the Hosted Cluster status"
-oc get no --kubeconfig="${SHARED_DIR}/nested_kubeconfig"
-oc --kubeconfig="${SHARED_DIR}/nested_kubeconfig" wait --all=true co --for=condition=Available=True --timeout=30m
+
+if oc wait node --all \
+    --for=condition=Ready \
+    --timeout=5m \
+    --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
+    --insecure-skip-tls-verify; then
+
+    echo "✅ All nodes are Ready"
+
+else
+    echo "❌ Some nodes failed to become Ready"
+    oc get nodes --kubeconfig="${SHARED_DIR}/nested_kubeconfig" --insecure-skip-tls-verify -o wide
+    exit 1
+fi
+
 
 echo "$(date) Successfully completed the Hosted cluster creation with type Kubevirt"
 
