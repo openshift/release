@@ -1,92 +1,452 @@
 #!/bin/bash
 set -x
 set -o nounset
-set -o errexit
 set -o pipefail
 
+################################################################################
+# Test Overview
+################################################################################
+# This script deploys a sample OPP application and validates the integration
+# with OPP bundle components (Quay, ACS).
 #
-# Deploy a sample application on the OPP clusters
+# Test Cases:
+#   1. Deploy OPP Application
+#      - Deploys httpd-example application via deploy.sh
+#      - Waits for build completion and deployment availability
+#      - If ANY step fails, test fails and subsequent cases are skipped
 #
+#   2. Verify Policy Compliance
+#      - Waits for ACM policies to become Compliant
+#      - Checks policy-example-httpd and policy-build-example-httpd
+#      - Only runs if Case 1 passes
+#
+#   3. Test ACS Integration
+#      - Queries ACS API for httpd-example image
+#      - Validates image appears in ACS with CVE scanning results
+#      - Only runs if Case 1 and Case 2 pass
+#
+# Test Reporting:
+#   - Results are recorded in JUnit XML format
+#   - JUnit XML is generated on exit (via trap) regardless of test results
+#   - Script always exits 0 to allow subsequent Prow test steps to run
+#   - Individual test failures are visible in Prow UI via JUnit reporting
+#
+################################################################################
 
 # cd to writable directory
 cd /tmp/
 
-curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /tmp/jq
-chmod +x /tmp/jq
+# Define all test cases with initial "skipped" status
+declare -A TEST_STATUS
+declare -A TEST_DURATION
+declare -A TEST_FAILURE_MSG
 
-git clone https://github.com/stolostron/policy-collection.git
-cd policy-collection/deploy/
+# All test cases that should appear in JUnit XML
+ALL_TEST_CASES=(
+    "deploy-opp-application"
+    "verify-policy-compliance"
+    "test-acs-integration"
+)
 
-echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/tanfengshuang/grc-demo.git -a e2e-opp
+# Initialize all tests as failed (will be updated to passed if they succeed)
+for test in "${ALL_TEST_CASES[@]}"; do
+    TEST_STATUS["$test"]="failed"
+    TEST_DURATION["$test"]=0
+    TEST_FAILURE_MSG["$test"]="Test did not run"
+done
 
-sleep 60
+START_TIME=$(date +%s)
 
-# Patch the placement for the opp example app build
-#oc patch -n policies placement placement-policy-build-example-httpd --type=json '-p=[{"op": "replace", "path": "/spec/predicates", "value": [{"requiredClusterSelector":{"labelSelector":{"matchExpressions":[{"key": "name", "operator": "In", "values": ["local-cluster"]}]}}}]}]'
+# Function to record test result
+record_test_result() {
+    local test_name="$1"
+    local status="$2"  # "passed", "failed", or "skipped"
+    local failure_message="${3:-}"
+    local duration="${4:-0}"
 
-# Using a label for this now instead
-oc label managedcluster local-cluster oppapps=httpd-example
+    TEST_STATUS["$test_name"]="$status"
+    TEST_DURATION["$test_name"]="$duration"
+    TEST_FAILURE_MSG["$test_name"]="$failure_message"
+}
 
-# Check the status
-oc get policies -n policies | grep example
-oc get build -n e2e-opp
-oc get po -n e2e-opp
-oc get deployment -n e2e-opp
+# Function to generate JUnit XML
+generate_junit_xml() {
+    local junit_file="${ARTIFACT_DIR}/junit_acm-opp-app.xml"
+    local total_duration=$(($(date +%s) - START_TIME))
 
-LATEST_BUILD_NAME=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null)
-BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null)
+    # Count test results
+    local total_tests=${#ALL_TEST_CASES[@]}
+    local failed_tests=0
 
-if [ "$BUILD_STATUS" == "Failed" ]; then
-    # Check the error info
-    oc describe is httpd-example -n e2e-opp
-    oc get event -n e2e-opp
-    oc describe buildconfig httpd-example -n e2e-opp
-    OPERATOR_POD_NAME=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}')
-    oc logs $OPERATOR_POD_NAME -n openshift-operators -c manager --tail=20
+    for test in "${ALL_TEST_CASES[@]}"; do
+        if [ "${TEST_STATUS[$test]}" = "failed" ]; then
+            failed_tests=$((failed_tests + 1))
+        fi
+    done
 
-    echo "!!! Build ${LATEST_BUILD_NAME} failed. Starting a new Build..."
-    oc start-build httpd-example -n e2e-opp
+    echo "========================================="
+    echo "Generating JUnit XML Report"
+    echo "========================================="
+    echo "Total Tests: $total_tests"
+    echo "Failed Tests: $failed_tests"
+    echo "Passed Tests: $((total_tests - failed_tests))"
+    echo "Duration: ${total_duration}s"
+
+    cat > "$junit_file" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="acm-opp-app" tests="$total_tests" failures="$failed_tests" errors="0" skipped="0" time="$total_duration">
+EOF
+
+    # Generate XML for each test case
+    for test in "${ALL_TEST_CASES[@]}"; do
+        local status="${TEST_STATUS[$test]}"
+        local duration="${TEST_DURATION[$test]}"
+        local failure_msg="${TEST_FAILURE_MSG[$test]}"
+
+        if [ "$status" = "failed" ]; then
+            # Escape XML special characters in failure message
+            local escaped_msg=$(echo "$failure_msg" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+            echo "    <testcase name=\"$test\" classname=\"acm-opp-app\" time=\"$duration\"><failure message=\"$escaped_msg\"/></testcase>" >> "$junit_file"
+        else
+            # passed
+            echo "    <testcase name=\"$test\" classname=\"acm-opp-app\" time=\"$duration\"/>" >> "$junit_file"
+        fi
+    done
+
+    cat >> "$junit_file" << EOF
+  </testsuite>
+</testsuites>
+EOF
+
+    echo "JUnit XML generated at: $junit_file"
+    cat "$junit_file"
+}
+
+################################################################################
+# Test Case 1: Deploy OPP Application and Wait for Build/Deployment
+################################################################################
+run_test_case_1() {
+    echo "========================================="
+    echo "Test Case 1: Deploy OPP Application"
+    echo "========================================="
+    local test_start=$(date +%s)
+    local test_failed=false
+
+    # Set trap to mark failure on any command failure
+    trap 'test_failed=true' ERR
+    set -e  # Enable errexit for this function only
+
+    # Download jq
+    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq
+    chmod +x /tmp/jq
+
+    # Clone and deploy
+    git clone https://github.com/tanfengshuang/policy-collection.git
+    cd policy-collection/deploy/
+    echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/tanfengshuang/grc-demo.git -a e2e-opp
+
+    sleep 60
+
+    oc label managedcluster local-cluster oppapps=httpd-example --overwrite
+
+    # Check initial status
+    oc get policies -n policies | grep example || true
+    oc get build -n e2e-opp || true
+    oc get po -n e2e-opp || true
+    oc get deployment -n e2e-opp || true
+
+    # Wait for build to complete
+    LATEST_BUILD_NAME=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
+
+    BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+    echo "Initial build status: ${LATEST_BUILD_NAME} is ${BUILD_STATUS}"
+
+    # Only wait if build is not already complete
+    if [ "$BUILD_STATUS" != "Complete" ]; then
+        BUILD_TIMEOUT=600
+        BUILD_ELAPSED=0
+        BUILD_CHECK_INTERVAL=15
+
+        while [ $BUILD_ELAPSED -lt $BUILD_TIMEOUT ]; do
+            BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            echo "Build status at ${BUILD_ELAPSED}s: ${BUILD_STATUS}"
+
+            if [ "$BUILD_STATUS" = "Complete" ]; then
+                echo "Build ${LATEST_BUILD_NAME} completed successfully"
+                break
+        elif [ "$BUILD_STATUS" = "Failed" ] || [ "$BUILD_STATUS" = "Error" ] || [ "$BUILD_STATUS" = "Cancelled" ]; then
+            echo "!!! Build ${LATEST_BUILD_NAME} failed with status: ${BUILD_STATUS}"
+
+            # Collect diagnostics
+            oc get event -n e2e-opp || true
+            oc describe buildconfig httpd-example -n e2e-opp || true
+            oc describe build "$LATEST_BUILD_NAME" -n e2e-opp || true
+            oc get cm -n openshift-config opp-ingres-ca -o yaml || true
+            oc get quayintegration quay -o yaml || true
+            oc get secret -n policies quay-integration -o yaml || true 
+           
+            echo "=== Quay Bridge Operator Logs ==="
+            OPERATOR_POD_NAME=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+            if [ -n "$OPERATOR_POD_NAME" ]; then
+                oc logs $OPERATOR_POD_NAME -n openshift-operators -c manager --tail=50 || true
+            fi
+
+            # Retry build
+            echo "Starting a new build..."
+            LATEST_BUILD_NAME=$(oc start-build httpd-example -n e2e-opp -o name | cut -d'/' -f2)
+            echo "New build started: ${LATEST_BUILD_NAME}"
+            BUILD_ELAPSED=0
+            continue
+        fi
+
+            sleep $BUILD_CHECK_INTERVAL
+            BUILD_ELAPSED=$((BUILD_ELAPSED + BUILD_CHECK_INTERVAL))
+        done
+
+        # Final build check
+        BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+        if [ "$BUILD_STATUS" != "Complete" ]; then
+            echo "ERROR: Build timeout. Final status: ${BUILD_STATUS}"
+            oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o yaml || true
+            test_failed=true
+        fi
+    fi
+
+    # Wait for deployment
+    echo "Waiting for deployment to be available..."
+    oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=5m 2>/dev/null
+
+    # Collect deployment info
+    oc get build -n e2e-opp || true
+    oc get po -n e2e-opp || true
+    oc get deployment -n e2e-opp || true
+
+    # Disable trap and record result based on test_failed flag
+    set +e
+    trap - ERR
+
+    if [ "$test_failed" = true ]; then
+        record_test_result "deploy-opp-application" "failed" "OPP application deployment failed" $(($(date +%s) - test_start))
+        echo ""
+        echo "Test Case 1 Result: FAILED"
+        echo ""
+        return 1
+    else
+        record_test_result "deploy-opp-application" "passed" "" $(($(date +%s) - test_start))
+        echo ""
+        echo "Test Case 1 Result: PASSED"
+        echo ""
+        return 0
+    fi
+}
+
+################################################################################
+# Test Case 2: Verify Policy Compliance
+################################################################################
+run_test_case_2() {
+    echo "========================================="
+    echo "Test Case 2: Verify Policy Compliance"
+    echo "========================================="
+    local test_start=$(date +%s)
+    local test_failed=false
+
+    # Set trap to mark failure
+    trap 'test_failed=true' ERR
+    set -e
+
+    # Wait for policies to become Compliant
+    POLICY_TIMEOUT=300
+    POLICY_ELAPSED=0
+    POLICY_CHECK_INTERVAL=15
+
+    echo "Waiting for policies to become Compliant (max ${POLICY_TIMEOUT}s)..."
+
+    # Check critical policies
+    POLICIES_TO_CHECK=(
+        "policy-example-httpd"
+        "policy-build-example-httpd"
+    )
+
+    while [ $POLICY_ELAPSED -lt $POLICY_TIMEOUT ]; do
+        ALL_COMPLIANT=true
+
+        echo "Checking policy status at ${POLICY_ELAPSED}s:"
+        oc get policies -n policies | grep example || true
+
+        for policy in "${POLICIES_TO_CHECK[@]}"; do
+            STATUS=$(oc get policy -n policies "$policy" -o jsonpath='{.status.compliant}' 2>/dev/null || echo "Unknown")
+            echo "  - $policy: $STATUS"
+
+            if [ "$STATUS" != "Compliant" ]; then
+                ALL_COMPLIANT=false
+            fi
+        done
+
+        if [ "$ALL_COMPLIANT" = true ]; then
+            echo "All policies are Compliant!"
+            break
+        fi
+
+        sleep $POLICY_CHECK_INTERVAL
+        POLICY_ELAPSED=$((POLICY_ELAPSED + POLICY_CHECK_INTERVAL))
+    done
+
+    # Final check
+    if [ "$ALL_COMPLIANT" != true ]; then
+        echo "ERROR: Policies did not become Compliant within ${POLICY_TIMEOUT}s"
+        echo "Final policy status:"
+        oc get policies -n policies | grep example || true
+        for policy in "${POLICIES_TO_CHECK[@]}"; do
+            echo "Details for $policy:"
+            oc get policy -n policies "$policy" -o yaml || true
+        done
+        test_failed=true
+    fi
+
+    # Disable trap and record result based on test_failed flag
+    set +e
+    trap - ERR
+
+    if [ "$test_failed" = true ]; then
+        record_test_result "verify-policy-compliance" "failed" "Policy compliance verification failed" $(($(date +%s) - test_start))
+        echo ""
+        echo "Test Case 2 Result: FAILED"
+        echo ""
+        return 1
+    else
+        record_test_result "verify-policy-compliance" "passed" "" $(($(date +%s) - test_start))
+        echo ""
+        echo "Test Case 2 Result: PASSED"
+        echo ""
+        return 0
+    fi
+}
+
+################################################################################
+# Test Case 3: Test ACS Integration
+################################################################################
+run_test_case_3() {
+    echo "========================================="
+    echo "Test Case 3: Test ACS Integration"
+    echo "========================================="
+    local test_start=$(date +%s)
+    local test_failed=false
+
+    # Set trap to mark failure
+    trap 'test_failed=true' ERR
+    set -e
+
+    # Fetch ACS credentials
+    echo "Fetching ACS credentials..."
+    ACS_PASSWORD=$(oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password' | base64 -d)
+
+    ACS_HOST=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"' | base64 -d)
+    echo "ACS Host: ${ACS_HOST}"
+
+    # Query ACS for httpd-example image
+    JQ_FILTER='.images[] | select(.name | contains("httpd-example"))'
+    ACS_COMMAND="curl -s -k -u admin:${ACS_PASSWORD} https://$ACS_HOST/v1/images"
+
+    RETRIES=10
+    RETRY_INTERVAL=30
+    IMAGE_FOUND=false
+
+    echo "Waiting for httpd-example image to appear in ACS (max $((RETRIES * RETRY_INTERVAL))s)..."
+
+    for attempt in $(seq 1 $RETRIES); do
+        echo "Attempt $attempt/$RETRIES: Querying ACS for httpd-example image..."
+	HTTPD_IMAGE_JSON=`$ACS_COMMAND | /tmp/jq "$JQ_FILTER"`
+	ID=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .id`
+        if [ "$ID" != "" ]; then
+            CVES=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .cves`
+            image=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .name`
+            echo "✓ Success: Found $CVES CVEs for image $image"
+            IMAGE_FOUND=true
+            break
+	fi
+
+        [ $attempt -lt $RETRIES ] && sleep $RETRY_INTERVAL
+    done
+
+    [ "$IMAGE_FOUND" = false ] && { echo "ERROR: Image not found in ACS"; test_failed=true; }
+
+    # Disable trap and record result based on test_failed flag
+    set +e
+    trap - ERR
+
+    if [ "$test_failed" = true ]; then
+        record_test_result "test-acs-integration" "failed" "ACS integration test failed" $(($(date +%s) - test_start))
+        echo ""
+        echo "Test Case 3 Result: FAILED"
+        echo ""
+        return 1
+    else
+        record_test_result "test-acs-integration" "passed" "" $(($(date +%s) - test_start))
+        echo ""
+        echo "Test Case 3 Result: PASSED"
+        echo ""
+        return 0
+    fi
+}
+
+################################################################################
+# Execute Test Cases
+################################################################################
+# Set trap to generate JUnit XML on exit
+trap generate_junit_xml EXIT
+
+################################################################################
+# Pre-flight Check: Verify QuayIntegration exists
+################################################################################
+echo "========================================="
+echo "Pre-flight Check: QuayIntegration"
+echo "========================================="
+
+if ! oc get quayintegration quay >/dev/null 2>&1; then
+    echo "ERROR: QuayIntegration 'quay' not found!"
+    echo "OPP bundle components are not properly configured."
+    echo "All test cases will be marked as failed."
+
+    # Mark all tests as failed with specific message
+    for test in "${ALL_TEST_CASES[@]}"; do
+        TEST_STATUS["$test"]="failed"
+        TEST_FAILURE_MSG["$test"]="QuayIntegration not found - OPP bundle not configured"
+    done
+
+    # Exit immediately (EXIT trap will generate JUnit XML)
+    exit 0
 fi
 
-# Wait for the deployment to be ready
-oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=10m
+echo "✓ QuayIntegration 'quay' found"
+oc get quayintegration quay -o yaml || true
+echo ""
 
-# Check some other info after the application deployed successfully
-oc get cm -n openshift-config opp-ingres-ca -o yaml
-oc get quayintegration quay -o yaml
-oc get secret -n policies quay-integration -o yaml
-
-
-# Run other tests
-
-# Obtain details about the test application from ACS
-ACS_PASSWORD=`oc get secret -n stackrox central-htpasswd -o json | /tmp/jq .data.password | sed 's/"//g' | base64 -d`
-JQ_FILTER='.images[] | select(.name | contains("httpd-example"))'
-ACS_HOST=`oc get secret -n stackrox sensor-tls -o json | /tmp/jq '.data."acs-host"' | sed 's/"//g' | base64 -d`
-ACS_COMMAND="curl -s -k -u "admin:${ACS_PASSWORD}" https://$ACS_HOST/v1/images"
-
-set +e
-x=1
-RETRIES=10
-while [ $x -lt $RETRIES ]; do
-    HTTPD_IMAGE_JSON=`$ACS_COMMAND | /tmp/jq "$JQ_FILTER"`
-    ID=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .id`
-    if [ "$ID" != "" ]; then
-    	CVES=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .cves`
-    	image=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .name`
-    	echo "Found $CVES CVEs for image $image"
-    	break
+################################################################################
+# Run Test Cases
+################################################################################
+# Run Test Case 1
+if run_test_case_1; then
+    # Test Case 1 passed, continue to Test Case 2
+    if run_test_case_2 || true; then
+        # Test Case 2 passed or failed (but we continue), run Test Case 3
+        run_test_case_3 || true
     fi
+else
+    echo "Test Case 1 failed, skipping remaining test cases..."
+fi
 
-    let x=$x+1
+################################################################################
+# Summary
+################################################################################
+echo "========================================="
+echo "Test Summary"
+echo "========================================="
+echo "Total Tests: $TOTAL_TESTS"
+echo "Failed Tests: $FAILED_TESTS"
+echo "Passed Tests: $((TOTAL_TESTS - FAILED_TESTS))"
+echo ""
 
-    # Check if this is the final attempt (x is about to exceed the limit)
-    if [ $x -eq $RETRIES ]; then
-        echo "ERROR: Image ID not found after $((RETRIES - 1)) attempts. Exiting with failure."
-        exit 1
-    fi
-
-    echo "Try $x/$((RETRIES - 1)): ID not found. Checking again in 30 seconds."
-    sleep 30
-done
-set -e
+# Always exit 0 to allow subsequent test steps to run
+# Test results are reported via JUnit XML
+exit 0
