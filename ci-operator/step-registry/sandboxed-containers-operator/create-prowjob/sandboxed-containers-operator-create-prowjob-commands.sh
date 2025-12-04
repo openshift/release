@@ -114,11 +114,22 @@ get_expected_version() {
 validate_and_set_defaults() {
     echo "Validating parameters and setting defaults..."
 
-    # OCP version to test
+    # OCP version to test (can be X.Y or X.Y.Z format)
     OCP_VERSION="${OCP_VERSION:-4.19}"
-    # Validate OCP version format
-    if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
-        echo "ERROR: Invalid OCP_VERSION format. Expected format: X.Y (e.g., 4.19)"
+    # Validate OCP version format (X.Y or X.Y.Z)
+    if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+        echo "ERROR: Invalid OCP_VERSION format. Expected format: X.Y or X.Y.Z (e.g., 4.19 or 4.20.6)"
+        exit 1
+    fi
+
+    # UPI installer version - always X.Y (major.minor only)
+    UPI_INSTALLER_VERSION=$(echo "${OCP_VERSION}" | cut -d'.' -f1,2)
+
+    # OCP release channel (stable, fast, candidate, eus)
+    OCP_CHANNEL="${OCP_CHANNEL:-fast}"
+    # Validate OCP_CHANNEL
+    if [[ ! "${OCP_CHANNEL}" =~ ^(stable|fast|candidate|eus)$ ]]; then
+        echo "ERROR: OCP_CHANNEL must be one of: stable, fast, candidate, eus. Got: ${OCP_CHANNEL}"
         exit 1
     fi
 
@@ -280,6 +291,7 @@ show_usage() {
     echo ""
     echo "Environment variables for 'create' command:"
     echo "  OCP_VERSION                    - OpenShift version (default: 4.19)"
+    echo "  OCP_CHANNEL                    - Release channel: stable, fast, candidate, eus (default: fast)"
     echo "  TEST_RELEASE_TYPE              - Test release type: Pre-GA or GA (default: Pre-GA)"
     echo "  EXPECTED_OSC_VERSION           - Expected OSC version (default: 1.10.1)"
     echo "  INSTALL_KATA_RPM               - Install Kata RPM: true or false (default: true)"
@@ -424,14 +436,14 @@ base_images:
     namespace: ci
     tag: "4.21"
   upi-installer:
-    name: "${OCP_VERSION}"
+    name: "${UPI_INSTALLER_VERSION}"
     namespace: ocp
     tag: upi-installer
 releases:
   latest:
     release:
       architecture: amd64
-      channel: stable
+      channel: ${OCP_CHANNEL}
       version: "${OCP_VERSION}"
 resources:
   '*':
@@ -484,6 +496,8 @@ EOF
     echo "=========================================="
     echo "Configuration details:"
     echo "  • OCP Version: ${OCP_VERSION}"
+    echo "  • OCP Channel: ${OCP_CHANNEL}"
+    echo "  • UPI Installer Version: ${UPI_INSTALLER_VERSION}"
     echo "  • Prow Run Type: ${PROW_RUN_TYPE}"
     echo "  • Test Release Type: ${TEST_RELEASE_TYPE}"
     echo "  • Expected OSC Version: ${EXPECTED_OSC_VERSION}"
