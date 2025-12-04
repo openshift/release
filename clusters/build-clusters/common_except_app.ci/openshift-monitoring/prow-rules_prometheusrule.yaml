@@ -145,3 +145,12 @@ spec:
           on(namespace, pod)
           group_left(org, repo, type, name, id, node, pod_ip, phase)
           prow:job
+    # Alert: Pod pending too long
+    - alert: PodPendingTooLong
+      annotations:
+        message: 'Pod {{ $labels.namespace }}/{{ $labels.pod }} has been in Pending state for more than 30 minutes ({{ printf "%.0f" $value }} seconds). This may indicate resource constraints, node issues, or CSR approval problems. Check pod events and node capacity.'
+      expr: |
+        (time() - kube_pod_created{job="kube-state-metrics",namespace="ci"}) * on(namespace, pod) group_left(phase) (kube_pod_status_phase{phase="Pending",namespace="ci"} == 1) > 1800
+      for: 1m
+      labels:
+        severity: critical
