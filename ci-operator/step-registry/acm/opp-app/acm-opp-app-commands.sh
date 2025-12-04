@@ -396,6 +396,35 @@ run_test_case_3() {
 # Set trap to generate JUnit XML on exit
 trap generate_junit_xml EXIT
 
+################################################################################
+# Pre-flight Check: Verify QuayIntegration exists
+################################################################################
+echo "========================================="
+echo "Pre-flight Check: QuayIntegration"
+echo "========================================="
+
+if ! oc get quayintegration quay >/dev/null 2>&1; then
+    echo "ERROR: QuayIntegration 'quay' not found!"
+    echo "OPP bundle components are not properly configured."
+    echo "All test cases will be marked as failed."
+
+    # Mark all tests as failed with specific message
+    for test in "${ALL_TEST_CASES[@]}"; do
+        TEST_STATUS["$test"]="failed"
+        TEST_FAILURE_MSG["$test"]="QuayIntegration not found - OPP bundle not configured"
+    done
+
+    # Exit immediately (EXIT trap will generate JUnit XML)
+    exit 0
+fi
+
+echo "✓ QuayIntegration 'quay' found"
+oc get quayintegration quay -o yaml || true
+echo ""
+
+################################################################################
+# Run Test Cases
+################################################################################
 # Run Test Case 1
 if run_test_case_1; then
     # Test Case 1 passed, continue to Test Case 2
