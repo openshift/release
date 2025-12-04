@@ -142,7 +142,7 @@ run_test_case_1() {
     chmod +x /tmp/jq
 
     # Clone and deploy
-    git clone https://github.com/stolostron/policy-collection.git
+    git clone https://github.com/tanfengshuang/policy-collection.git
     cd policy-collection/deploy/
     echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/tanfengshuang/grc-demo.git -a e2e-opp
 
