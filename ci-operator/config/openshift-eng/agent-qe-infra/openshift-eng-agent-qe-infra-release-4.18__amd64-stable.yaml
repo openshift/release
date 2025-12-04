@@ -43,6 +43,25 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: baremetal-lab-agent-install-pxe
+- as: baremetal-compact-agent-ipv4-static-fips-f28
+  capabilities:
+  - intranet
+  cron: 34 21 27 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_TRUST_BUNDLE_POLICY: Always
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    test:
+    - ref: fips-check-fips-or-die
+    workflow: baremetal-lab-agent-install-network-static
 - as: baremetal-pxe-ha-agent-ipv4-static-connected-f28
   capabilities:
   - intranet

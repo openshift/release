@@ -24,8 +24,11 @@ source "${SHARED_DIR}/govc.sh"
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
-echo "Installing from initial release $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
-oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" \
+#echo "Installing from initial release $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
+#oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" \
+#  --command=openshift-install --to=/tmp
+
+oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" registry.build09.ci.openshift.org/ci-ln-ivj3i6b/release:latest \
   --command=openshift-install --to=/tmp
 
 echo "Creating agent image..."
@@ -97,7 +100,7 @@ for ((i = 0; i < total_host; i++)); do
   vm_name=${hostnames[$i]}
   echo "creating Vm $vm_name.."
   /tmp/govc vm.create \
-    -m=32768 \
+    -m=16384 \
     -g=coreos64Guest \
     -c=${cpu} \
     -disk=120GB \
