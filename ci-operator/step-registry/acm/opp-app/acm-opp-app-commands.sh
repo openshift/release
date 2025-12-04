@@ -369,7 +369,51 @@ run_test_case_3() {
         [ $attempt -lt $RETRIES ] && sleep $RETRY_INTERVAL
     done
 
-    [ "$IMAGE_FOUND" = false ] && { echo "ERROR: Image not found in ACS"; test_failed=true; }
+    if [ "$IMAGE_FOUND" = false ]; then
+        echo "ERROR: Image not found in ACS"
+
+        echo "=== Collecting diagnostic information ==="
+
+        echo "=== QuayIntegration Status ==="
+        oc get quayintegration quay -o yaml || true
+
+        echo "=== Quay Bridge Operator Logs ==="
+        QUAY_BRIDGE_POD=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        if [ -n "$QUAY_BRIDGE_POD" ]; then
+            oc logs -n openshift-operators $QUAY_BRIDGE_POD -c manager --tail=100 || true
+        else
+            echo "Quay Bridge Operator pod not found"
+        fi
+
+        echo "=== ACS Central Logs ==="
+        ACS_CENTRAL_POD=$(oc get pod -n stackrox -l app=central -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        if [ -n "$ACS_CENTRAL_POD" ]; then
+            oc logs -n stackrox $ACS_CENTRAL_POD --tail=100 || true
+        else
+            echo "ACS Central pod not found"
+        fi
+
+        echo "=== ACS Scanner Logs ==="
+        ACS_SCANNER_POD=$(oc get pod -n stackrox -l app=scanner -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        if [ -n "$ACS_SCANNER_POD" ]; then
+            oc logs -n stackrox $ACS_SCANNER_POD --tail=100 || true
+        else
+            echo "ACS Scanner pod not found"
+        fi
+
+        echo "=== Build Information ==="
+        oc get build -n e2e-opp || true
+        oc get bc -n e2e-opp httpd-example -o yaml || true
+
+        echo "=== Image Stream Information ==="
+        oc get is -n e2e-opp || true
+        oc get is -n e2e-opp httpd-example -o yaml || true
+
+        echo "=== All ACS Images (first 10) ==="
+        curl -s -k -u admin:${ACS_PASSWORD} https://$ACS_HOST/v1/images | /tmp/jq '.images[:10] | .[] | {name: .name, id: .id}' || true
+
+        test_failed=true
+    fi
 
     # Disable trap and record result based on test_failed flag
     set +e
