@@ -131,9 +131,10 @@ run_test_case_1() {
     echo "Test Case 1: Deploy OPP Application"
     echo "========================================="
     local test_start=$(date +%s)
+    local test_failed=false
 
-    # Set trap to auto-record failure on any command failure
-    trap 'record_test_result "deploy-opp-application" "failed" "OPP application deployment failed" $(($(date +%s) - test_start)); return 1' ERR
+    # Set trap to mark failure on any command failure
+    trap 'test_failed=true' ERR
     set -e  # Enable errexit for this function only
 
     # Download jq
@@ -161,17 +162,19 @@ run_test_case_1() {
     BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
     echo "Initial build status: ${LATEST_BUILD_NAME} is ${BUILD_STATUS}"
 
-    BUILD_TIMEOUT=600
-    BUILD_ELAPSED=0
-    BUILD_CHECK_INTERVAL=15
+    # Only wait if build is not already complete
+    if [ "$BUILD_STATUS" != "Complete" ]; then
+        BUILD_TIMEOUT=600
+        BUILD_ELAPSED=0
+        BUILD_CHECK_INTERVAL=15
 
-    while [ $BUILD_ELAPSED -lt $BUILD_TIMEOUT ]; do
-        BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-        echo "Build status at ${BUILD_ELAPSED}s: ${BUILD_STATUS}"
+        while [ $BUILD_ELAPSED -lt $BUILD_TIMEOUT ]; do
+            BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            echo "Build status at ${BUILD_ELAPSED}s: ${BUILD_STATUS}"
 
-        if [ "$BUILD_STATUS" = "Complete" ]; then
-            echo "Build ${LATEST_BUILD_NAME} completed successfully"
-            break
+            if [ "$BUILD_STATUS" = "Complete" ]; then
+                echo "Build ${LATEST_BUILD_NAME} completed successfully"
+                break
         elif [ "$BUILD_STATUS" = "Failed" ] || [ "$BUILD_STATUS" = "Error" ] || [ "$BUILD_STATUS" = "Cancelled" ]; then
             echo "!!! Build ${LATEST_BUILD_NAME} failed with status: ${BUILD_STATUS}"
 
@@ -179,6 +182,10 @@ run_test_case_1() {
             oc get event -n e2e-opp || true
             oc describe buildconfig httpd-example -n e2e-opp || true
             oc describe build "$LATEST_BUILD_NAME" -n e2e-opp || true
+            oc get cm -n openshift-config opp-ingres-ca -o yaml || true
+            oc get quayintegration quay -o yaml || true
+            oc get secret -n policies quay-integration -o yaml || true 
+           
             echo "=== Quay Bridge Operator Logs ==="
             OPERATOR_POD_NAME=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
             if [ -n "$OPERATOR_POD_NAME" ]; then
@@ -193,16 +200,17 @@ run_test_case_1() {
             continue
         fi
 
-        sleep $BUILD_CHECK_INTERVAL
-        BUILD_ELAPSED=$((BUILD_ELAPSED + BUILD_CHECK_INTERVAL))
-    done
+            sleep $BUILD_CHECK_INTERVAL
+            BUILD_ELAPSED=$((BUILD_ELAPSED + BUILD_CHECK_INTERVAL))
+        done
 
-    # Final build check
-    BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-    if [ "$BUILD_STATUS" != "Complete" ]; then
-        echo "ERROR: Build timeout. Final status: ${BUILD_STATUS}"
-        oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o yaml || true
-        false
+        # Final build check
+        BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+        if [ "$BUILD_STATUS" != "Complete" ]; then
+            echo "ERROR: Build timeout. Final status: ${BUILD_STATUS}"
+            oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o yaml || true
+            false
+        fi
     fi
 
     # Wait for deployment
@@ -210,22 +218,27 @@ run_test_case_1() {
     oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=5m 2>/dev/null
 
     # Collect deployment info
-    oc get policies -n policies | grep example || true
     oc get build -n e2e-opp || true
     oc get po -n e2e-opp || true
     oc get deployment -n e2e-opp || true
-    oc get cm -n openshift-config opp-ingres-ca -o yaml || true
-    oc get quayintegration quay -o yaml || true
-    oc get secret -n policies quay-integration -o yaml || true
 
-    # Test passed - disable trap and record success
+    # Disable trap and record result based on test_failed flag
     set +e
     trap - ERR
-    record_test_result "deploy-opp-application" "passed" "" $(($(date +%s) - test_start))
-    echo ""
-    echo "Test Case 1 Result: PASSED"
-    echo ""
-    return 0
+
+    if [ "$test_failed" = true ]; then
+        record_test_result "deploy-opp-application" "failed" "OPP application deployment failed" $(($(date +%s) - test_start))
+        echo ""
+        echo "Test Case 1 Result: FAILED"
+        echo ""
+        return 1
+    else
+        record_test_result "deploy-opp-application" "passed" "" $(($(date +%s) - test_start))
+        echo ""
+        echo "Test Case 1 Result: PASSED"
+        echo ""
+        return 0
+    fi
 }
 
 ################################################################################
@@ -236,9 +249,10 @@ run_test_case_2() {
     echo "Test Case 2: Verify Policy Compliance"
     echo "========================================="
     local test_start=$(date +%s)
+    local test_failed=false
 
-    # Set trap to auto-record failure
-    trap 'record_test_result "verify-policy-compliance" "failed" "Policy compliance verification failed" $(($(date +%s) - test_start)); return 1' ERR
+    # Set trap to mark failure
+    trap 'test_failed=true' ERR
     set -e
 
     # Wait for policies to become Compliant
@@ -290,14 +304,23 @@ run_test_case_2() {
         false
     fi
 
-    # Test passed - disable trap and record success
+    # Disable trap and record result based on test_failed flag
     set +e
     trap - ERR
-    record_test_result "verify-policy-compliance" "passed" "" $(($(date +%s) - test_start))
-    echo ""
-    echo "Test Case 2 Result: PASSED"
-    echo ""
-    return 0
+
+    if [ "$test_failed" = true ]; then
+        record_test_result "verify-policy-compliance" "failed" "Policy compliance verification failed" $(($(date +%s) - test_start))
+        echo ""
+        echo "Test Case 2 Result: FAILED"
+        echo ""
+        return 1
+    else
+        record_test_result "verify-policy-compliance" "passed" "" $(($(date +%s) - test_start))
+        echo ""
+        echo "Test Case 2 Result: PASSED"
+        echo ""
+        return 0
+    fi
 }
 
 ################################################################################
@@ -308,9 +331,10 @@ run_test_case_3() {
     echo "Test Case 3: Test ACS Integration"
     echo "========================================="
     local test_start=$(date +%s)
+    local test_failed=false
 
-    # Set trap to auto-record failure
-    trap 'record_test_result "test-acs-integration" "failed" "ACS integration test failed" $(($(date +%s) - test_start)); return 1' ERR
+    # Set trap to mark failure
+    trap 'test_failed=true' ERR
     set -e
 
     # Fetch ACS credentials
@@ -332,46 +356,38 @@ run_test_case_3() {
 
     for attempt in $(seq 1 $RETRIES); do
         echo "Attempt $attempt/$RETRIES: Querying ACS for httpd-example image..."
-
-        ACS_RESPONSE=$($ACS_COMMAND 2>&1 || echo "")
-
-        # Check if response is empty
-        if [ -z "$ACS_RESPONSE" ]; then
-            echo "WARNING: ACS API returned empty response"
-            [ $attempt -eq $RETRIES ] && { echo "ERROR: ACS API unreachable"; false; }
-        # Check if response is valid JSON
-        elif echo "$ACS_RESPONSE" | grep -q '^{'; then
-            HTTPD_IMAGE_JSON=$(echo "$ACS_RESPONSE" | /tmp/jq "$JQ_FILTER" 2>/dev/null || echo "")
-            ID=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq -r '.id' 2>/dev/null || echo "")
-
-            if [ -n "$ID" ] && [ "$ID" != "null" ]; then
-                CVES=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq '.cves' 2>/dev/null || echo "unknown")
-                IMAGE_NAME=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq -r '.name' 2>/dev/null || echo "httpd-example")
-                echo "✓ Success: Found $CVES CVEs for image $IMAGE_NAME"
-                echo "Image ID: $ID"
-                IMAGE_FOUND=true
-                break
-            else
-                echo "Image not found in ACS response yet"
-            fi
-        else
-            echo "WARNING: ACS API call failed with: ${ACS_RESPONSE:0:200}"
-            [ $attempt -eq $RETRIES ] && { echo "ERROR: ACS API failed"; false; }
-        fi
+	HTTPD_IMAGE_JSON=`$ACS_COMMAND | /tmp/jq "$JQ_FILTER"`
+	ID=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .id`
+        if [ "$ID" != "" ]; then
+            CVES=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .cves`
+            image=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .name`
+            echo "✓ Success: Found $CVES CVEs for image $image"
+            IMAGE_FOUND=true
+            break
+	fi
 
         [ $attempt -lt $RETRIES ] && sleep $RETRY_INTERVAL
     done
 
     [ "$IMAGE_FOUND" = false ] && { echo "ERROR: Image not found in ACS"; false; }
 
-    # Test passed - disable trap and record success
+    # Disable trap and record result based on test_failed flag
     set +e
     trap - ERR
-    record_test_result "test-acs-integration" "passed" "" $(($(date +%s) - test_start))
-    echo ""
-    echo "Test Case 3 Result: PASSED"
-    echo ""
-    return 0
+
+    if [ "$test_failed" = true ]; then
+        record_test_result "test-acs-integration" "failed" "ACS integration test failed" $(($(date +%s) - test_start))
+        echo ""
+        echo "Test Case 3 Result: FAILED"
+        echo ""
+        return 1
+    else
+        record_test_result "test-acs-integration" "passed" "" $(($(date +%s) - test_start))
+        echo ""
+        echo "Test Case 3 Result: PASSED"
+        echo ""
+        return 0
+    fi
 }
 
 ################################################################################
