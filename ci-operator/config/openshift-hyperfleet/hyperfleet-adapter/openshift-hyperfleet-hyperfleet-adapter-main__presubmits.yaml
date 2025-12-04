@@ -48,36 +48,12 @@ tests:
         systemctl --user start podman.socket || true
         export TESTCONTAINERS_RYUK_DISABLED=true
 
-        # 1. Set up the directory
         export DOCKER_CONFIG="$HOME/.docker"
         mkdir -p "$DOCKER_CONFIG"
 
-        # 2. Define the Prow secret path
         PROW_SECRET="/var/secrets/registry-pull-secret/.dockerconfigjson"
+        cp "$PROW_SECRET" "$DOCKER_CONFIG/config.json"
 
-        if [ -f "$PROW_SECRET" ]; then
-            echo "🔍 Found Prow secret. Checking format..."
-
-            # Check if 'auths' key exists. If not, it's the legacy format.
-            if grep -q '"auths":' "$PROW_SECRET"; then
-                echo "✅ Secret is already in modern format. Copying..."
-                cp "$PROW_SECRET" "$DOCKER_CONFIG/config.json"
-            else
-                echo "⚠️  Legacy format detected. Reformatting to modern config.json..."
-                # If jq is installed (standard in OpenShift CI images)
-                if command -v jq &> /dev/null; then
-                    jq '{"auths": .}' "$PROW_SECRET" > "$DOCKER_CONFIG/config.json"
-                else
-                    # Fallback for environments without jq
-                    echo "{\"auths\": $(cat $PROW_SECRET)}" > "$DOCKER_CONFIG/config.json"
-                fi
-            fi
-        else
-            echo "❌ Error: Prow push secret not found at $PROW_SECRET"
-        fi
-
-        # 3. Force the environment variables
-        export REGISTRY_AUTH_FILE="$DOCKER_CONFIG/config.json"
         export DOCKER_CONFIG="$DOCKER_CONFIG"
 
         echo "✅ Docker auth configured."
