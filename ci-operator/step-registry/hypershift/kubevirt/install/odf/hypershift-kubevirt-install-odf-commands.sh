@@ -11,8 +11,8 @@ ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp3-csi'}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-100}Gi"
 ODF_SUBSCRIPTION_SOURCE="${ODF_SUBSCRIPTION_SOURCE:-'redhat-operators'}"
 
-# TODO: update to 4.20 once ODF 4.20 is released in the official redhat-operators 4.20 catalog
-ODF_MAX_VERSION="4.19"
+# TODO: update to 4.21 once ODF 4.21 is released in the official redhat-operators 4.21 catalog
+ODF_MAX_VERSION="4.20"
 ODF_MAX_VERSION_NUMERIC=$(echo "${ODF_MAX_VERSION}" | awk -F. '{ printf "%d%02d", $1, $2 }')
 
 function ocp_version() {

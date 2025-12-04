@@ -7,10 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-base-openshift-4.19
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
   operator-sdk:
     name: "4.17"
     namespace: origin
@@ -29,9 +29,9 @@ images:
     ocp_builder_rhel-9-base-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.19
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: kueue-operator
 - additional_architectures:
   - arm64
@@ -155,25 +155,6 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
-- as: test-e2e-4-20
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.20"
-  minimum_interval: 96h
-  presubmit: true
-  steps:
-    env:
-      BUNDLE_COMPONENT: kueue-bundle-main
-      OPERAND_COMPONENT: kueue-operand-main
-      OPERATOR_COMPONENT: kueue-operator-main
-    post:
-    - chain: kueue-operator-post
-    test:
-    - chain: kueue-operator-test-e2e
 - as: test-e2e-4-19-fips
   minimum_interval: 96h
   steps:
@@ -200,6 +181,44 @@ tests:
     test:
     - chain: kueue-operator-test-e2e-dev-bundle
     workflow: hypershift-hostedcluster-workflow
+- as: test-e2e-downstream-4-20
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  minimum_interval: 96h
+  presubmit: true
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-downstream
+- as: test-e2e-upstream-4-20
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  minimum_interval: 96h
+  presubmit: true
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-upstream
 - always_run: false
   as: perfscale-payload-kueue-operator-9nodes
   optional: true

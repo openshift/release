@@ -200,13 +200,6 @@ echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
-echo "========== Namespace Configuration =========="
-NAME_SPACE="showcase-k8s-ci-nightly"
-NAME_SPACE_RBAC="showcase-rbac-k8s-ci-nightly"
-export NAME_SPACE NAME_SPACE_RBAC
-echo "NAME_SPACE: $NAME_SPACE"
-echo "NAME_SPACE_RBAC: $NAME_SPACE_RBAC"
-
 echo "========== Test Execution =========="
 echo "Executing openshift-ci-tests.sh"
 bash ./.ibm/pipelines/openshift-ci-tests.sh

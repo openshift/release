@@ -87,15 +87,15 @@ def download_import_rhcos_ova():
     vsphere_portgroup = os.environ.get("vsphere_portgroup")
 
     ova_import_json_string = f'''
-{
+{{
     "DiskProvisioning": "thin",
    "MarkAsTemplate": false,
    "PowerOn": false,
    "InjectOvfEnv": false,
    "WaitForIP": false,
-   "Name": {vm_template},
-   "NetworkMapping":[{"Name":"VM Network","Network":"{vsphere_portgroup}"}]
-}
+   "Name": "{vm_template}",
+   "NetworkMapping":[{{"Name":"VM Network","Network":"{vsphere_portgroup}"}}]
+}}
 '''
 
     with open("/tmp/rhcos.json", "w") as rf:
