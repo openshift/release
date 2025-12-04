@@ -1456,6 +1456,86 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-stack-ipi
+- as: azure-stack-ipi-proxy-fips-f28-compliance
+  cluster: build01
+  cron: 14 14 25 * *
+  steps:
+    cluster_profile: azurestack-qe
+    env:
+      CATALOG_SOURCE_NAME: compliance-operator
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~StressTest&;Disruptive&
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "55"
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: etcd-encryption
+    - ref: openshift-extended-test-disruptive
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
+- as: azure-stack-ipi-proxy-fips-f28-compliance-destructive
+  cluster: build01
+  cron: 38 18 2 * *
+  steps:
+    cluster_profile: azurestack-qe
+    env:
+      CATALOG_SOURCE_NAME: compliance-operator
+      E2E_RUN_TAGS: '@complianceoperator'
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~StressTest&;Disruptive&
+      TEST_SCENARIOS: Compliance_Operator
+      TEST_TIMEOUT: "55"
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: etcd-encryption
+    - ref: openshift-extended-test-disruptive
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
+- as: azure-stack-ipi-proxy-fips-f999-file-integrity
+  cluster: build01
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: azurestack-qe
+    env:
+      E2E_RUN_TAGS: '@fio'
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: File_Integrity_Operator
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
+- as: azure-stack-ipi-proxy-fips-f28-security-profiles
+  cluster: build01
+  cron: 56 13 26 * *
+  steps:
+    cluster_profile: azurestack-qe
+    env:
+      CATALOG_SOURCE_NAME: security-profiles-operator
+      E2E_RUN_TAGS: '@spo'
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: Security_Profiles_Operator
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-azure-stack-ipi-proxy
 - as: azure-stack-ipi-proxy-fips-f28
   cluster: build01
   cron: 29 11 18 * *
@@ -2256,83 +2336,6 @@ tests:
       FIPS_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
-- as: ibmcloud-ipi-private-fips-f28-compliance
-  cron: 4 11 12 * *
-  steps:
-    cluster_profile: ibmcloud-qe
-    env:
-      CATALOG_SOURCE_NAME: compliance-operator
-      FILTERS_ADDITIONAL: ""
-      FIPS_ENABLED: "true"
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-16@sha256:2cfdeae0edbc91d10abc38a05aa0e9d3489c65e03d0c8d1fd719e235bb842451
-      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
-      TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Compliance_Operator
-      TEST_TIMEOUT: "20"
-    test:
-    - ref: file-integrity-konflux-catalogsource
-    - ref: etcd-encryption
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
-- as: ibmcloud-ipi-private-fips-f28-compliance-destructive
-  cron: 8 12 27 * *
-  steps:
-    cluster_profile: ibmcloud-qe
-    env:
-      CATALOG_SOURCE_NAME: compliance-operator
-      E2E_RUN_TAGS: '@complianceoperator'
-      FILTERS_ADDITIONAL: ""
-      FIPS_ENABLED: "true"
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-16@sha256:2cfdeae0edbc91d10abc38a05aa0e9d3489c65e03d0c8d1fd719e235bb842451
-      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~StressTest&;Disruptive&
-      TEST_SCENARIOS: Compliance_Operator
-      TEST_TIMEOUT: "55"
-    test:
-    - ref: file-integrity-konflux-catalogsource
-    - ref: etcd-encryption
-    - ref: openshift-extended-test-disruptive
-    - ref: openshift-extended-web-tests
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
-- as: ibmcloud-ipi-private-fips-f999-file-integrity
-  cron: 8 8 29 2 *
-  steps:
-    cluster_profile: ibmcloud-qe
-    env:
-      E2E_RUN_TAGS: '@fio'
-      FILTERS_ADDITIONAL: ""
-      FIPS_ENABLED: "true"
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-fbc-4-16:latest
-      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
-      TEST_PARALLEL: "3"
-      TEST_SCENARIOS: File_Integrity_Operator
-      TEST_TIMEOUT: "30"
-    test:
-    - ref: file-integrity-konflux-catalogsource
-    - ref: openshift-extended-test
-    - ref: openshift-extended-web-tests
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
-- as: ibmcloud-ipi-private-fips-f28-security-profiles
-  cron: 6 12 24 * *
-  steps:
-    cluster_profile: ibmcloud-qe
-    env:
-      CATALOG_SOURCE_NAME: security-profiles-operator
-      E2E_RUN_TAGS: '@spo'
-      FILTERS_ADDITIONAL: ""
-      FIPS_ENABLED: "true"
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/security-profiles-operator-fbc-4-16@sha256:11162f58a6f4734a43e27caad990ce3732ae2b1af6439f3ad016e513c886dd75
-      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
-      TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Security_Profiles_Operator
-    test:
-    - ref: file-integrity-konflux-catalogsource
-    - ref: openshift-extended-test
-    - ref: openshift-extended-web-tests
-    - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
 - as: ibmcloud-ipi-proxy-private-rt-f28
   cron: 5 8 26 * *
