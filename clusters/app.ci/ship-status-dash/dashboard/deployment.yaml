@@ -11,7 +11,7 @@ metadata:
     keel.sh/trigger: poll
     keel.sh/pollSchedule: "@every 5m"
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: dashboard
@@ -21,6 +21,18 @@ spec:
         app: dashboard
     spec:
       serviceAccountName: ship-status
+      initContainers:
+      - name: db-migration
+        image: quay-proxy.ci.openshift.org/openshift/ci:ship-status-dash_migrate_latest
+        command: ["./migrate"]
+        args:
+          - "--dsn=$(DATABASE_DSN)"
+        env:
+          - name: DATABASE_DSN
+            valueFrom:
+              secretKeyRef:
+                name: postgres
+                key: dsn
       containers:
       - name: oauth-proxy
         image: quay.io/openshift/origin-oauth-proxy:4.20
