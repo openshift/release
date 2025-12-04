@@ -1,0 +1,37 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/ocp/4.19:cli
+      USER 0
+      RUN dnf install -y git && \
+          curl -fsSL https://get.helm.sh/helm-v3.17.0-linux-amd64.tar.gz -o /tmp/helm.tar.gz && \
+          tar -xzf /tmp/helm.tar.gz -C /tmp && \
+          mv /tmp/linux-amd64/helm /usr/local/bin/helm && \
+          chmod +x /usr/local/bin/helm && \
+          rm -rf /tmp/helm.tar.gz /tmp/linux-amd64
+releases:
+  latest:
+    integration:
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-azure-helm
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: trustee-e2e-azure-helm
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: trustee
+  variant: helm

@@ -1,0 +1,20 @@
+workflow:
+  as: trustee-e2e-azure-helm
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    env:
+      SLEEP_DURATION: 2h
+    pre:
+    - chain: ipi-azure-pre
+    - chain: trustee-install
+    - ref: cucushift-installer-wait
+    test:
+    - ref: trustee-test-hello-world
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-azure-post
+  documentation: |-
+    This workflow provisions an Azure cluster, installs Trustee operator via Helm,
+    and runs a simple hello world test. The cluster remains available for 2 hours
+    after tests complete for manual debugging and validation.
