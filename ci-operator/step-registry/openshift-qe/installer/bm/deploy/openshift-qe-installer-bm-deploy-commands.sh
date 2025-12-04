@@ -69,6 +69,8 @@ if [[ $PUBLIC_VLAN == "false" ]]; then
   cat > ${SHARED_DIR}/proxy-conf.sh << 'PROXY_EOF'
 #!/bin/bash
 
+echo "Loading proxy configuration"
+
 cleanup_ssh() {
   # Kill the SOCKS proxy running on the jumphost
   ssh ${SSH_ARGS} root@${jumphost} "pkill -f 'ssh root@${bastion} -fNT -D'" 2>/dev/null || true

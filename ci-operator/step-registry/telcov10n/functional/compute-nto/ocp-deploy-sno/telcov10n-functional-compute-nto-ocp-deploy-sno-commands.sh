@@ -66,6 +66,11 @@ main() {
     done
 
     cd /eco-ci-cd
+
+    echo "Clean old clusters"
+    ansible-playbook ./playbooks/compute/delete_old_clusters.yml \
+        -i ./inventories/ocp-deployment/build-inventory.py
+
     echo "Deploy SNO OCP for compute-nto testing"
     ansible-playbook ./playbooks/deploy-ocp-sno.yml \
         -i ./inventories/ocp-deployment/build-inventory.py \
