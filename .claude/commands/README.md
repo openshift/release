@@ -8,6 +8,103 @@ This directory contains custom slash commands to help developers work with the O
 
 **Purpose**: Search and discover existing step-registry steps, workflows, and chains to reuse in CI configurations.
 
+See detailed documentation below.
+
+---
+
+### `/migrate-variant-periodics` - Migrate Periodic Job Configurations
+
+**Purpose**: Migrate OpenShift periodic CI job definitions from one release version to another by copying and transforming YAML configuration files.
+
+**Usage**:
+```bash
+/migrate-variant-periodics <from_release> <to_release> [path] [--skip-existing]
+```
+
+**Parameters**:
+- `from_release` (required): Source release version (e.g., "4.17", "4.18")
+- `to_release` (required): Target release version (e.g., "4.18", "4.19")
+- `path` (optional): Directory path to search for periodic files. Default: ci-operator/config/
+- `skip_existing` (optional): Flag "--skip-existing" to automatically skip existing target files without prompting
+
+**Examples**:
+```bash
+# Migrate all periodic jobs from 4.17 to 4.18
+/migrate-variant-periodics 4.17 4.18
+
+# Migrate specific repository
+/migrate-variant-periodics 4.18 4.19 ci-operator/config/openshift/etcd
+
+# Migrate entire organization
+/migrate-variant-periodics 4.19 4.20 ci-operator/config/openshift
+
+# Migrate with automatic skip of existing files
+/migrate-variant-periodics 4.17 4.18 --skip-existing
+```
+
+**What it does**:
+- Uses the `.claude/scripts/migrate_periodic_file.py` script to automate migration
+- Transforms version references (base images, builder tags, registry paths, release names, branch metadata)
+- Regenerates randomized cron schedules to avoid thundering herd
+- Maintains existing interval schedules
+- Creates new periodic configuration files for the target release
+- Validates YAML structure
+- **Automatically runs `make update`** after migration to regenerate all downstream artifacts (Prow jobs, configs, etc.)
+
+**Implementation**:
+- The command orchestrates the migration workflow and user interactions
+- Actual file transformation is delegated to `.claude/scripts/migrate_periodic_file.py`
+- Ensures consistent transformations across all periodic files
+- Runs `make update` automatically at the end to generate job configs and update all related files
+
+**CRITICAL Security Note**:
+- ⚠️ **NEVER migrates files under `openshift-priv/`** - These are private repositories with special security considerations
+- The command automatically excludes all `ci-operator/config/openshift-priv/` files from migration
+- openshift-priv configurations must be handled separately by authorized personnel
+
+---
+
+### `/find-missing-variant-periodics` - Find Missing Periodic Configurations
+
+**Purpose**: Identify periodic job configurations that exist for one release but are missing for another.
+
+**Usage**:
+```bash
+/find-missing-variant-periodics <from_release> <to_release> [path]
+```
+
+**Parameters**:
+- `from_release` (required): Source release version to search for existing configurations
+- `to_release` (required): Target release version to check for missing configurations
+- `path` (optional): Directory path to search for periodic files. Default: ci-operator/config/
+
+**Examples**:
+```bash
+# Find all missing periodics from 4.17 to 4.18
+/find-missing-variant-periodics 4.17 4.18
+
+# Check specific repository
+/find-missing-variant-periodics 4.18 4.19 ci-operator/config/openshift/cloud-credential-operator
+
+# Check entire organization
+/find-missing-variant-periodics 4.19 4.20 ci-operator/config/openshift
+```
+
+**What it does**:
+- Read-only analysis - doesn't modify any files
+- Identifies which periodic configs exist for one release but are missing for another
+- Provides statistics (total, missing, existing counts and percentages)
+- Suggests next steps for migration
+- Use this before `/migrate-variant-periodics` to understand scope of work
+
+---
+
+## Step Finder Detailed Documentation
+
+### `/step-finder` - Step Registry Component Discovery
+
+**Purpose**: Search and discover existing step-registry steps, workflows, and chains to reuse in CI configurations.
+
 **Why Use It**: The step-registry contains over 4,400 reusable CI components (2,116 steps, 1,322 workflows, 985 chains). This command helps you find the right component instead of creating duplicates.
 
 #### Usage

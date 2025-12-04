@@ -75,33 +75,6 @@ tests:
   steps:
     cluster_profile: aws-3
     workflow: openshift-upgrade-aws
-- as: e2e-aws-operator-tests-extension
-  optional: true
-  steps:
-    cluster_profile: aws-5
-    post:
-    - chain: gather-core-dump
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    test:
-    - as: tests-extension
-      cli: latest
-      commands: |
-        echo "Build binary service-ca-operator-tests-ext"
-        make tests-ext-build
-        echo "Set up cluster access"
-        export KUBECONFIG=${SHARED_DIR}/kubeconfig
-        echo "Verify cluster is accessible"
-        oc get clusterversion
-        echo "--------------"
-
-        echo "Running make run-suite SUITE=openshift/service-ca-operator/conformance/parallel ARTIFACT_DIR=/tmp/artifacts"
-        make run-suite SUITE=openshift/service-ca-operator/conformance/parallel ARTIFACT_DIR=${ARTIFACT_DIR}
-      from: src
-      resources:
-        requests:
-          cpu: 100m
 zz_generated_metadata:
   branch: release-4.21
   org: openshift-priv

@@ -303,6 +303,8 @@ spec:
     source: registry-proxy.engineering.redhat.com
 EOF
     else
+        # Create both IDMS and ITMS together for digest-based and tag-based image references
+        # ITMS can coexist with IDMS (both are new APIs)
         cat <<EOF  | oc create -f -
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
@@ -331,26 +333,58 @@ spec:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY}
     source: registry-proxy.engineering.redhat.com
+---
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: image-policy-aosqe
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/openshifttest
+    source: quay.io/openshifttest
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators
+    source: quay.io/openshift-qe-optional-operators
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/olmqe
+    source: quay.io/olmqe
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: brew.registry.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry.stage.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry-proxy.engineering.redhat.com
 EOF
     fi
 
     if [ $? == 0 ]; then
-        echo "create the ICSP/IDMS successfully" 
+        if [[ $icsp_num -gt 0 || $kube_minor -lt 26 ]] ; then
+            echo "create the ICSP successfully"
+        else
+            echo "create the IDMS and ITMS successfully"
+        fi
 	return 0
     else
-        echo "!!! fail to create the ICSP/IDMS"
+        echo "!!! fail to create the ICSP/IDMS/ITMS"
         return 1
     fi
 }
 
 function create_catalog_sources()
-{    
+{
     echo "create QE catalogsource: $CATALOGSOURCE_NAME"
     # get cluster Major.Minor version
     # since OCP 4.15, the official catalogsource use this way. OCP4.14=K8s1.27
     # details: https://issues.redhat.com/browse/OCPBUGS-31427
     if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
-        echo "the index image as the initContainer cache image)" 
+        echo "the index image as the initContainer cache image)"
         cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -372,7 +406,7 @@ spec:
       interval: 15m
 EOF
     else
-        echo "the index image as the server image" 
+        echo "the index image as the server image"
         cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -404,7 +438,7 @@ EOF
     done
     if [[ $STATUS != "READY" ]]; then
         echo "!!! fail to create QE CatalogSource"
-        # ImagePullBackOff nothing with the imagePullSecrets 
+        # ImagePullBackOff nothing with the imagePullSecrets
         # run_command "oc get operatorgroup -n openshift-marketplace"
         # run_command "oc get sa qe-app-registry -n openshift-marketplace -o yaml"
         # run_command "oc -n openshift-marketplace get secret $(oc -n openshift-marketplace get sa qe-app-registry -o=jsonpath='{.secrets[0].name}') -o yaml"
@@ -569,5 +603,5 @@ fi
 if [ $mirror -eq 1 ]; then
     echo "Mirror operator images as cluster is C2S or SC2S"
     mirror_optional_images
-fi 
+fi
 create_catalog_sources

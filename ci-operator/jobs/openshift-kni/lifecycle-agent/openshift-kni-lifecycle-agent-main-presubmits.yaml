@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build11
     context: ci/prow/ci-index-lifecycle-agent-operator-bundle-pipeline
     decorate: true
     labels:
@@ -58,7 +58,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build11
     context: ci/prow/ci-job
     decorate: true
     labels:
@@ -72,6 +72,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/lifecycle-agent-coverall
         - --target=ci-job
         command:
         - ci-operator
@@ -85,6 +86,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/lifecycle-agent-coverall
+          name: lifecycle-agent-coverall
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -96,6 +100,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: lifecycle-agent-coverall
+        secret:
+          secretName: lifecycle-agent-coverall
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -114,8 +121,6 @@ presubmits:
     cluster: build03
     context: ci/prow/ibi-e2e-flow
     decorate: true
-    decoration_config:
-      timeout: 3h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-5
@@ -190,8 +195,6 @@ presubmits:
     cluster: build03
     context: ci/prow/ibu-e2e-flow
     decorate: true
-    decoration_config:
-      timeout: 4h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -263,7 +266,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build11
     context: ci/prow/images
     decorate: true
     labels:
@@ -389,7 +392,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build11
     context: ci/prow/markdownlint
     decorate: true
     labels:
@@ -443,7 +446,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build11
     context: ci/prow/security
     decorate: true
     labels:

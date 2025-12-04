@@ -97,8 +97,10 @@ mirror:
   - name: ${BUNDLE_IMAGE}
   - name: quay.io/openshift/origin-oauth-proxy:4.14
   - name: registry.access.redhat.com/ubi9/ubi:9.4
+  - name: registry.access.redhat.com/ubi9/ubi-minimal:latest
   - name: quay.io/operator-framework/opm:latest
   - name: docker.io/library/busybox:1.36.0
+  - name: quay.io/prometheus/busybox:latest
   - name: ${QUAY_MUST_GATHER_IMAGE}
   # Mirror Quay operator andoperand images since registry.redhat.io version may not be available during release.
   - name: ${QUAY_OPERATOR_IMAGE}
@@ -145,8 +147,14 @@ spec:
         - ${MIRROR_REGISTRY_HOST}/ubi9/ubi
       source: registry.access.redhat.com/ubi9/ubi
     - mirrors:
+        - ${MIRROR_REGISTRY_HOST}/ubi9/ubi-minimal
+      source: registry.access.redhat.com/ubi9/ubi-minimal
+    - mirrors:
         - ${MIRROR_REGISTRY_HOST}/operator-framework/opm
       source: quay.io/operator-framework/opm
+    - mirrors:
+        - ${MIRROR_REGISTRY_HOST}/prometheus/busybox
+      source: quay.io/prometheus/busybox
 
 EOF"
 

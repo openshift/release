@@ -56,9 +56,8 @@ sleep 300
 # Run ingress-perf
 popd
 pushd e2e-benchmarking/workloads/ingress-perf
-ES_INDEX="ingress-performance" ./run.sh &> "${ARTIFACT_DIR}"/ingress-perf-run.log &
+ES_INDEX="ingress-performance" WORKLOAD="ingress-perf" ./run.sh &> "${ARTIFACT_DIR}"/ingress-perf-run.log &
 WORKLOAD_PIDS["ingress-perf"]=$!
-#ingress_perf_pid=$!
 
 function check_pids(){
     pid_rc=$1
@@ -89,12 +88,6 @@ wait -n -p ended_pid
 ended_pid_rc=$?
 #shellcheck disable=SC2154
 check_pids $ended_pid_rc $ended_pid
-
-NODE_DENSITY_HEAVY_UUID=$(grep 'uuid"' "${ARTIFACT_DIR}/$WORKLOAD-run.log" | cut -d'"' -f 4)
-INGRESS_PERF_UUID=$(grep 'uuid"' "${ARTIFACT_DIR}/ingress-perf-run.log" | cut -d'"' -f 4)
-
-echo "===> $WORKLOAD UUID $NODE_DENSITY_HEAVY_UUID"
-echo "===> ingress-perf UUID $INGRESS_PERF_UUID"
 
 echo "######## $WORKLOAD run logs ########"
 cat  "${ARTIFACT_DIR}/$WORKLOAD-run.log"

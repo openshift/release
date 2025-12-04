@@ -19,7 +19,6 @@ LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmark
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/workers-scale
-export GC=$GARBAGE_COLLECTION
 
 read_profile_file() {
   local file="${1}"

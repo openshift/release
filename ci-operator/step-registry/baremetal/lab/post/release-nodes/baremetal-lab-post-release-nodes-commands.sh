@@ -46,6 +46,11 @@ sed -i "/,${CLUSTER_NAME},ci-op,/d" /etc/vips_reserved
 
 echo "Releasing lock $LOCK_FD ($LOCK)"
 flock -u $LOCK_FD
+# Delete mirror-registry tabs, if any
+if [ -f "/var/builds/${CLUSTER_NAME}/mirror_registry_url" ]; then
+    REGISTRY_PORT=$(head -n 1 "/var/builds/${CLUSTER_NAME}/mirror_registry_url" | awk -F':' '{print $2}')
+    rm -rf /opt/registry-${REGISTRY_PORT}/data/docker/registry/v2/repositories/${CLUSTER_NAME}
+fi
 # TODO normalize and sanitize paths
 rm -rf /{var/builds,opt/html,opt/dnsmasq/tftpboot,opt/nfs}/${CLUSTER_NAME}
 # Delete agent-installer images, if any

@@ -18,7 +18,7 @@ echo "Deprovisioning dedicated hosts..."
 # We get the region information from the install-config.yaml.  For the dedicated hosts, we are pulling from the patch file in
 # the event that an error occurred during creation of the dedicated host.
 REGION=$(yq-v4 -r '.platform.aws.region' ${CONFIG})
-for HOST in $(yq-v4 -r '.compute[] | select(.name == "worker") | .platform.aws.dedicatedHosts.hosts[] | .id' "${patch_dedicated_host}"); do
+for HOST in $(yq-v4 -r '.compute[] | select(.name == "worker") | .platform.aws.hostPlacement.dedicatedHost[] | .id' "${patch_dedicated_host}"); do
   echo "Release host ${HOST}"
   aws ec2 release-hosts --region "${REGION}" --host-ids "${HOST}"
 done

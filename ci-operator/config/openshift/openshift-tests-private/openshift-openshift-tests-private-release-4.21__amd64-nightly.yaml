@@ -123,7 +123,6 @@ tests:
     - ref: olmv1-performance
     - ref: openshift-qe-orion-olmv1
     workflow: cucushift-installer-rehearse-gcp-ipi
-  timeout: 2h0m0s
 - as: aws-c2s-ipi-disc-priv-fips-f7
   cron: 36 16 3,12,19,26 * *
   steps:
@@ -388,7 +387,6 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
-  timeout: 24h0m0s
 - as: aws-ipi-longduration-mco-p1-f7
   cron: 40 15 4,11,18,25 * *
   steps:
@@ -403,7 +401,6 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
-  timeout: 24h0m0s
 - as: aws-ipi-longduration-mco-p2-f7
   cron: 18 0 3,12,19,26 * *
   steps:
@@ -418,7 +415,6 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
-  timeout: 24h0m0s
 - as: aws-ipi-longduration-mco-p3-f7
   cron: 43 4 9,16,23,30 * *
   steps:
@@ -433,7 +429,6 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi
-  timeout: 24h0m0s
 - as: aws-ipi-localzone-byo-subnet-ovn-day2-f7
   cron: 9 10 7,14,21,28 * *
   steps:
@@ -807,6 +802,22 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
+      PUBLIC_ONLY: "true"
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: aws-ipi-ovn-hypershift-mgmt-global-ps-f7
+  cron: 12 18 7,14,23,30 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_CA_BUNDLE_FILE: additional-ca.crt
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      DYNAMIC_ADDITIONAL_TRUST_BUNDLE_ENABLED: "true"
+      DYNAMIC_GLOBAL_PULL_SECRET_ENABLED: "true"
+      DYNAMIC_IMAGE_REGISTRY_ENABLED: "true"
       HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
       PUBLIC_ONLY: "true"
       TEST_IMPORTANCE: Critical
@@ -1836,6 +1847,21 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-ephemeral-creds-guest
+- as: azure-aks-hypershift-ephemeral-creds-guest-global-ps-f7
+  cron: 54 1 2,9,16,25 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ADDITIONAL_CA_BUNDLE_FILE: additional-ca.crt
+      DYNAMIC_ADDITIONAL_TRUST_BUNDLE_ENABLED: "true"
+      DYNAMIC_GLOBAL_PULL_SECRET_ENABLED: "true"
+      DYNAMIC_IMAGE_REGISTRY_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_IMPORTANCE: Critical
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-ephemeral-creds-guest
 - as: azure-aks-hypershift-etcd-disk-encryption-guest-f7
   cron: 48 12 3,10,17,24 * *
   steps:
@@ -1898,7 +1924,7 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: aro_419
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 419.6.20250523
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&;~STORAGE&
       TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe
@@ -2635,9 +2661,9 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       MINIMAL_PERMISSIONS_WITHOUT_ACT_AS: "yes"
     test:
@@ -2649,9 +2675,9 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       MINIMAL_PERMISSIONS_WITHOUT_ACT_AS: "yes"
     test:
