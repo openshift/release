@@ -29,7 +29,7 @@ for try in $(seq "${RETRIES}"); do
   else
     if [ $try == $RETRIES ]; then
       if [ "$IGNORE_SECONDARY_POLICIES" == "true" ]; then
-        CANDIDATES=$(echo "$notready" | grep -v policy-acs | grep -v policy-advanced-managed-cluster-status | grep -v policy-hub-quay-bridge | grep -v policy-quay-status || true)
+        CANDIDATES=$(echo "$notready" | grep -v policy-acs | grep -v policy-advanced-managed-cluster-status | grep -v policy-hub-quay-bridge || true)
         if [ -z "$CANDIDATES" ]; then
           echo "Warning: Proceeding with OPP QE tests with some policy failures"
           exit 0
