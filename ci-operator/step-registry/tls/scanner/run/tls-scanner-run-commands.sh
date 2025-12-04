@@ -71,18 +71,26 @@ MONITOR_PID=$!
 # 4. Stream logs and wait for completion
 echo "Waiting for tls-scanner-job to complete in namespace ${NAMESPACE}..."
 
-# Get the pod name (retry a few times if not immediately available)
-for i in {1..5}; do
-  POD_NAME=$(oc get pods -n "${NAMESPACE}" -l job-name=tls-scanner-job -o jsonpath='{.items[0].metadata.name}')
+# Get the pod name (retry for up to 2 minutes - pods can take time to schedule)
+POD_NAME=""
+echo "Waiting for pod to be created..."
+for i in {1..60}; do
+  # Suppress stderr since jsonpath errors on empty list, use || true to prevent pipefail
+  POD_NAME=$(oc get pods -n "${NAMESPACE}" -l job-name=tls-scanner-job -o jsonpath='{.items[0].metadata.name}' 2>/dev/null) || true
   if [ -n "${POD_NAME}" ]; then
     break
   fi
+  echo "No pod yet, waiting... ($i/60)"
   sleep 2
 done
 
 if [ -z "${POD_NAME}" ]; then
-  echo "Error: Could not find a pod for the job."
+  echo "Error: Could not find a pod for the job after 2 minutes."
+  echo "=== Job Description ==="
   oc describe job "tls-scanner-job" -n "${NAMESPACE}"
+  echo "=== Namespace Events ==="
+  oc get events -n "${NAMESPACE}" --sort-by='.metadata.creationTimestamp'
+  kill $MONITOR_PID || true
   exit 1
 fi
 
