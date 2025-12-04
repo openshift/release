@@ -54,6 +54,22 @@ tests:
   container:
     from: podman-test
   nested_podman: true
+- as: integration
+  capabilities:
+  - nested-podman
+  commands: |
+    # Start podman service first
+    podman system service --time=120 &
+    sleep 2
+    # Now get the socket path
+    export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
+    echo "DOCKER_HOST=$DOCKER_HOST"
+    export TESTCONTAINERS_RYUK_DISABLED=true
+    make generate
+    make test-integration
+  container:
+    from: podman-test
+  nested_podman: true
 zz_generated_metadata:
   branch: main
   org: openshift-hyperfleet
