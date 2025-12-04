@@ -31,7 +31,7 @@ oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: redhat-operators-stage
+  name: redhat-operators-lso
   namespace: openshift-marketplace
 spec:
   sourceType: grpc
@@ -70,7 +70,7 @@ cat <<EOF | awk '/name:/ {print $2; exit}'
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: redhat-operators-stage
+  name: redhat-operators-lso
   namespace: openshift-marketplace
 spec:
   sourceType: grpc

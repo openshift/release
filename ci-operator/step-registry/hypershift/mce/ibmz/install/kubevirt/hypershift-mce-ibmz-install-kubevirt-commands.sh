@@ -112,17 +112,18 @@ EOF
 
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
 
-TIMEOUT=900     # 15 minutes
-INTERVAL=10
-
 echo "⏳ Waiting for all pods in openshift-cnv to become Running..."
+
+TIMEOUT=900   # 15 minutes
+INTERVAL=10
 
 for ((i=0; i<=TIMEOUT; i+=INTERVAL)); do
 
-    # Count non-running pods
+    # Count pods NOT in Running or Completed
     NOT_READY=$(oc get pods -n openshift-cnv --no-headers 2>/dev/null \
         | awk '{print $3}' \
-        | grep -vE "Running|Completed" | wc -l)
+        | grep -vE "Running" || true \
+        | wc -l)
 
     # Count total pods
     TOTAL=$(oc get pods -n openshift-cnv --no-headers 2>/dev/null | wc -l)
@@ -136,9 +137,9 @@ for ((i=0; i<=TIMEOUT; i+=INTERVAL)); do
     sleep $INTERVAL
 done
 
-# Final check after timeout
+# Final validation after timeout
 if [[ $NOT_READY -ne 0 ]]; then
-    echo "❌ virtualization operator installation failed — some pods are not in Running state."
+    echo "❌ virtualization operator installation failed — some pods are not running."
     oc get pods -n openshift-cnv
     exit 1
 fi
