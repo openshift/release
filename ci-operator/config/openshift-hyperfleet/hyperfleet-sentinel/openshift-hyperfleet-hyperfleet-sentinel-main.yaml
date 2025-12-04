@@ -58,13 +58,27 @@ tests:
   capabilities:
   - nested-podman
   commands: |
-    # Start podman service first
-    podman system service --time=120 &
-    sleep 2
-    # Now get the socket path
-    export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
+    # Get podman socket path and create parent directory
+    SOCKET_PATH=$(podman info --format '{{.Host.RemoteSocket.Path}}')
+    mkdir -p "$(dirname "${SOCKET_PATH}")"
+    export DOCKER_HOST="unix://${SOCKET_PATH}"
     echo "DOCKER_HOST=$DOCKER_HOST"
+    # Start podman API service in background
+    podman system service --time=0 "${DOCKER_HOST}" &
+    # Wait for socket to be ready
+    for i in $(seq 1 30); do
+      if curl --silent --unix-socket "${SOCKET_PATH}" http://localhost/_ping > /dev/null 2>&1; then
+        echo "Podman API is ready"
+        break
+      fi
+      echo "Waiting for podman API... ($i/30)"
+      sleep 1
+    done
+    # Verify connectivity
+    podman info > /dev/null
+    # Configure testcontainers to use podman
     export TESTCONTAINERS_RYUK_DISABLED=true
+    export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE="${SOCKET_PATH}"
     make generate
     make test-integration
   container:
