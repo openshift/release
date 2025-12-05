@@ -186,6 +186,7 @@ oc -n ${TEMPO_NAMESPACE} wait --for condition=Available deployment/tempo-sample-
 echo "Exposing Jaeger UI route (will be used in kiali ui)"
 oc expose svc tempo-sample-query-frontend --port=jaeger-ui --name=tracing-ui -n ${TEMPO_NAMESPACE}
 oc -n ${TEMPO_NAMESPACE} label route tracing-ui app.kubernetes.io/managed-by-
+oc -n ${TEMPO_NAMESPACE} get routes
 
 echo "===== Installing OpenTelemetryCollector ====="
 oc apply -n ${OTEL_NAMESPACE} -f - <<EOF
@@ -284,6 +285,7 @@ subjects:
   namespace: ${ISTIO_NAMESPACE}
 EOF
 echo "Installing KialiCR..."
+oc -n ${TEMPO_NAMESPACE} get routes
 TRACING_INGRESS_ROUTE="http://$(oc get -n ${TEMPO_NAMESPACE} route tracing-ui -o jsonpath='{.spec.host}')"
 
 oc apply -n ${ISTIO_NAMESPACE} -f - <<EOF
