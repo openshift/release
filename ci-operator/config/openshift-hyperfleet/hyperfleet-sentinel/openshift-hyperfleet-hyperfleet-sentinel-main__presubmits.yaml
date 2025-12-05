@@ -43,11 +43,12 @@ tests:
   - nested-podman
   commands: |
     export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
-    podman system service --time=120 $(DOCKER_HOST) &
+    podman system service --time=10 &
     systemctl --user start podman.socket || true
     export TESTCONTAINERS_RYUK_DISABLED=true
     export HOME=/tmp/home
     mkdir -p "$HOME/.config/containers"
+    podman pull docker.io/openapitools/openapi-generator-cli:v7.16.0
     make generate
     make test-integration
   container:
