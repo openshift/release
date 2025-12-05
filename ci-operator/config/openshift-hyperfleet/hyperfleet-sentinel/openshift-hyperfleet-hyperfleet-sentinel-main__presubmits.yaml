@@ -42,9 +42,11 @@ tests:
   capabilities:
   - nested-podman
   commands: |
-    export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
-    echo $DOCKER_HOST
-    podman system service --time=120 &
+    rm -f /tmp/storage-run-1000/podman/podman.sock
+    podman system service -t 10 unix:///tmp/storage-run-1000/podman/podman.sock &
+    sleep 10
+    export DOCKER_HOST="unix:///tmp/storage-run-1000/podman/podman.sock"
+
     systemctl --user start podman.socket || true
     export TESTCONTAINERS_RYUK_DISABLED=true
     podman info
