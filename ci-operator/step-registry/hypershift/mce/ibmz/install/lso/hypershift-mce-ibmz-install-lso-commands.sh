@@ -81,19 +81,26 @@ spec:
   sourceNamespace: openshift-marketplace
 EOF
 
-# Wait until the LSO CSV appears
-until oc get csv -n openshift-local-storage | grep -i local-storage-operator; do
+# Wait for the LSO CSV to appear
+until oc get csv -n openshift-local-storage | grep -q local-storage-operator; do
   echo "Waiting for LSO operator"
   sleep 5
 done
 
-# Extract ONLY the LSO CSV name
-CSV=$(oc get csv -n openshift-local-storage -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep local-storage-operator | head -n1)
+# Extract ONLY the correct CSV
+CSV=$(oc get csv -n openshift-local-storage -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+    | grep local-storage-operator \
+    | head -n1)
 
 echo "Found LSO CSV: $CSV"
 
-# Wait for Phase=Succeeded
-oc wait --for=jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-local-storage csv/$CSV
+# Wait for the CSV to succeed
+oc wait --for=jsonpath='{.status.phase}'=Succeeded \
+    --timeout=10m \
+    -n openshift-local-storage \
+    csv/${CSV}
+
+sleep 30
 
 # Create LocalVolumeDiscovery
 oc apply -f - <<EOF
