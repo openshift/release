@@ -17,13 +17,24 @@ git config user.email "ci-bot@redhat.com"
 echo "Setting up GitHub authentication..."
 gh auth login --with-token < /var/run/vault/hypershift-jira-agent-github-token/token
 
-# Setup Claude Code authentication
-echo "Setting up Claude Code authentication..."
-export ANTHROPIC_API_KEY=$(cat /var/run/vault/hypershift-jira-agent-anthropic-api-key/key)
+# Setup Jira authentication
+echo "Setting up Jira authentication..."
+export JIRA_API_TOKEN=$(cat /var/run/vault/hypershift-jira-agent-jira-token/token)
+
+# Claude Code authentication is configured via Vertex AI env vars (set in ref YAML)
+echo "Claude Code configured to use Vertex AI (CLAUDE_CODE_USE_VERTEX=$CLAUDE_CODE_USE_VERTEX)"
 
 # Verify Claude Code is available
 echo "Verifying Claude Code CLI..."
 claude --version || { echo "ERROR: Claude Code CLI not found"; exit 1; }
+
+# Verify ai-helpers plugins are available
+echo "Verifying ai-helpers plugins..."
+if [ -d "/opt/ai-helpers/plugins/jira" ]; then
+  echo "✅ jira@ai-helpers plugin found"
+else
+  echo "WARNING: jira@ai-helpers plugin not found at /opt/ai-helpers/plugins/jira"
+fi
 
 # Test Claude Code can authenticate
 echo "Testing Claude Code authentication..."
