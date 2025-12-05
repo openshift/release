@@ -290,4 +290,8 @@ then
   fi
 fi
 
+pkill curl || true
+pkill ssh || true
+pkill scp || true
+
 exit 0
