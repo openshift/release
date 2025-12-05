@@ -1,0 +1,77 @@
+chain:
+  as: openshift-qe-egress-ip-scale
+  steps:
+  - ref: openshift-qe-egress-ip-scale-setup
+  - ref: redhat-chaos-pod-scenarios-custom
+  - ref: redhat-chaos-node-disruptions-worker-outage
+  - ref: openshift-qe-egress-ip-scale-tests
+  env:
+  # Scaled cluster chaos testing environment variables
+  - name: TARGET_NAMESPACE
+    default: "openshift-ovn-kubernetes"
+  - name: POD_LABEL
+    default: "app=ovnkube-node"
+  - name: DISRUPTION_COUNT
+    default: "9"
+  - name: EXPECTED_POD_COUNT
+    default: "10"
+  - name: KILL_TIMEOUT
+    default: "300"
+  - name: EXPECTED_RECOVERY_TIME
+    default: "180"
+  - name: ENABLE_ALERTS
+    default: "True"
+  - name: CHECK_CRITICAL_ALERTS
+    default: "True"
+  - name: WAIT_DURATION
+    default: "600"
+  - name: TELEMETRY_ENABLED
+    default: "True"
+  - name: TELEMETRY_RUN_TAG
+    default: "-egress-ip-scale-pod-disruption"
+  - name: TELEMETRY_GROUP
+    default: "prow"
+  - name: JUNIT_TESTCASE
+    default: '[Egress-IP-Scale] OVN pod disruption resilience test at scale'
+  # Scaled node disruption chaos environment variables
+  - name: ACTION
+    default: "node_reboot_scenario"
+  - name: LABEL_SELECTOR
+    default: "node-role.kubernetes.io/worker="
+  - name: RUNS
+    default: "8"
+  - name: NODE_OUTAGE_TIMEOUT
+    default: "240"
+  - name: INSTANCE_COUNT
+    default: "3"
+  # Scale-specific egress IP configuration
+  - name: EGRESS_IP_COUNT
+    default: "5"
+  - name: EGRESS_NODES_COUNT
+    default: "10"
+  - name: SCALE_TEST_WORKLOADS
+    default: "20"
+  documentation: |-
+    SCENARIO: OpenShift Egress IP Performance and Resilience Testing at Scale
+    
+    This test validates egress IP functionality in a scaled environment (10 nodes, 5 egress IPs)
+    under chaos engineering scenarios to ensure enterprise-grade reliability.
+    
+    TEST SCENARIO DETAILS:
+    - Cluster Setup: 10-node AWS cluster with 5 egress IP configurations
+    - Workload Pattern: 20 concurrent test pods distributed across 5 egress IP groups
+    - Chaos Testing: Simulated pod disruptions (9 ovnkube-node pods) and node reboots (3 nodes)
+    - Validation Focus: Egress IP assignment stability, traffic flow continuity, and recovery metrics
+    
+    EXECUTION FLOW:
+    1. Infrastructure Setup: Configure 10 worker nodes as egress-assignable, create 5 egress IPs
+    2. Workload Deployment: Deploy test applications across different namespaces with egress IP labels
+    3. Chaos Injection: Disrupt OVN network pods and reboot worker nodes to test resilience
+    4. Traffic Validation: Verify external connectivity and proper egress IP source addressing
+    5. Performance Analysis: Measure recovery times, assignment stability, and network metrics
+    
+    SUCCESS CRITERIA: 
+    - 75%+ egress IPs maintain assignments during chaos
+    - 50%+ workloads recover successfully
+    - Network traffic flows correctly through assigned egress IPs
+    - Recovery within expected timeframes (180s for pods, 240s for nodes)
