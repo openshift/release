@@ -1,0 +1,73 @@
+base_images:
+  cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.21-openshift-4.16
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN curl --silent --location  https://rpm.nodesource.com/setup_20.x | bash - && \
+        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo bzip2 jq python3.9" && \
+        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+        ln -sf /usr/bin/python3.9 /usr/bin/python3  && \
+        python3 -m pip install requests  && \
+        yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+        yum -y install terraform xz gtk3 alsa-lib libX11-xcb && \
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
+        yum install -y ./google-chrome-stable_current_x86_64.rpm && \
+        yum clean all && rm -rf /var/cache/yum/*
+    RUN curl -Lo firefox-latest.tar.xz 'https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US' && \
+        tar xJf firefox-*.tar.xz && \
+        mv firefox /opt && \
+        ln -s /opt/firefox/firefox /usr/local/bin/firefox && \
+        firefox -v && jq --version
+    RUN VERSION="1.2.2" && \
+        curl -LO "https://github.com/oras-project/oras/releases/download/v${VERSION}/oras_${VERSION}_linux_amd64.tar.gz" && \
+        mkdir -p oras-install/ && \
+        tar -zxf oras_${VERSION}_*.tar.gz -C oras-install/ && \
+        mv oras-install/oras /usr/local/bin/ && \
+        rm -rf oras_${VERSION}_*.tar.gz oras-install/ && \
+        oras version
+  from: src
+  to: quay-test-console-1
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.16"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: dummy-test
+  cron: 0 0 15 * *
+  steps:
+    test:
+    - as: dummy-test
+      commands: |
+        echo "hello"
+      from: quay-test-console-1
+      resources:
+        requests:
+          cpu: 10m
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-tests
+  variant: workshop
