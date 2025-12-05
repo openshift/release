@@ -10,11 +10,6 @@ export CUSTOMER_SUBSCRIPTION; CUSTOMER_SUBSCRIPTION=$(cat "${CLUSTER_PROFILE_DIR
 export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscription-id")
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
 az account set --subscription "${SUBSCRIPTION_ID}"
-az bicep install || true
-az bicep version
-az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
-az account show
-
 oc version
 kubelogin --version
 export DEPLOY_ENV="prow"
@@ -54,55 +49,12 @@ else
 fi
 echo "USE_OC_LOGIN_REGISTRIES set to: ${USE_OC_LOGIN_REGISTRIES}"
 
-    IS_CI_REGISTRY=false
-    if [[ -n "${USE_OC_LOGIN_REGISTRIES:-}" ]]; then
-        echo "Checking USE_OC_LOGIN_REGISTRIES: ${USE_OC_LOGIN_REGISTRIES}"
-        for registry in ${USE_OC_LOGIN_REGISTRIES}; do
-            if [[ "${BACKEND_SOURCE_REGISTRY}" == "${registry}" ]]; then
-                IS_CI_REGISTRY=true
-                break
-            fi
-        done
-    fi
-   
-    # Setup registry authentication using oc registry login for source registry
-    echo "Setting up registry authentication for source registry."
-    AUTH_JSON=/tmp/registry-config.json
-
-    if [[ "${IS_CI_REGISTRY}" == "true" ]]; then
-        echo "Setting up registry authentication for CI source registry."
-        oc registry login --to "${AUTH_JSON}"
-    else
-        echo "CI was not true "
-    fi    
-    # ACR login to target registry
-    echo "Logging into target ACR ${TARGET_ACR}."
-    if output="$( az acr login --name "${TARGET_ACR}" --expose-token --only-show-errors --output json 2>&1 )"; then
-      RESPONSE="${output}"
-    else
-      echo "Failed to log in to ACR ${TARGET_ACR}: ${output}"
-      exit 1
-    fi
-    # TARGET_ACR_LOGIN_SERVER already set above, using ACR response to login
-    oras login --registry-config "${AUTH_JSON}" \
-               --username 00000000-0000-0000-0000-000000000000 \
-               --password-stdin \
-               "${TARGET_ACR_LOGIN_SERVER}" <<<"$( jq --raw-output .accessToken <<<"${RESPONSE}" )"
-
-    echo "Mirroring Backend image ${BACKEND_IMAGE} to ${BACKEND_TARGET_IMAGE}."
-    echo "The Backend image will still be available under it's original digest ${BACKEND_DIGEST} in the target registry."
-
-    # Use oras cp with registry config for both source and target
-    oras cp "${BACKEND_IMAGE}" "${BACKEND_TARGET_IMAGE}" --from-registry-config "${AUTH_JSON}" --to-registry-config "${AUTH_JSON}"
-    oras cp "${FRONTEND_IMAGE}" "${FRONTEND_TARGET_IMAGE}" --from-registry-config "${AUTH_JSON}" --to-registry-config "${AUTH_JSON}"
-
-# Set variables similar to your Makefile
 export OVERRIDE_CONFIG_FILE=${OVERRIDE_CONFIG_FILE:-/tmp/rp-override-config-$(date +%s).yaml}
 yq eval -n "
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${TARGET_ACR_LOGIN_SERVER}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${BACKEND_SOURCE_REGISTRY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPOSITORY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.digest = \"${BACKEND_DIGEST}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.registry = \"${TARGET_ACR_LOGIN_SERVER}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.registry = \"${FRONTEND_SOURCE_REGISTRY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.repository = \"${FRONTEND_REPOSITORY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.digest = \"${FRONTEND_DIGEST}\"
 " > ${OVERRIDE_CONFIG_FILE}
