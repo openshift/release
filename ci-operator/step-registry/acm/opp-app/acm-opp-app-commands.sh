@@ -140,6 +140,14 @@ run_test_case_1() {
 
     sleep 60
 
+    # Verify e2e-opp namespace was created
+    if ! oc get namespace e2e-opp >/dev/null 2>&1; then
+        echo "ERROR: Namespace e2e-opp not found"
+        echo "deploy.sh may have failed due to token expiration or other issues"
+        oc get namespace | grep opp || true
+        return 1
+    fi
+
     oc label managedcluster local-cluster oppapps=httpd-example --overwrite
 
     # Check initial status
@@ -149,7 +157,8 @@ run_test_case_1() {
     oc get deployment -n e2e-opp || true
 
     # Wait for build to complete
-    LATEST_BUILD_NAME=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
+    LATEST_BUILD_NAME=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+    [ -z "$LATEST_BUILD_NAME" ] && { LATEST_BUILD_NAME=$(oc start-build httpd-example -n e2e-opp -o name | cut -d'/' -f2) || { echo "ERROR: Failed to start build"; return 1; }; }
 
     BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
     echo "Initial build status: ${LATEST_BUILD_NAME} is ${BUILD_STATUS}"
