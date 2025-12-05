@@ -1,12 +1,8 @@
 base_images:
-  ocp_4.14_cli-artifacts:
-    name: "4.14"
+  ocp_4.16_cli-artifacts:
+    name: "4.16"
     namespace: ocp
     tag: cli-artifacts
-  ocp_ubi-minimal_8:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
   ocp_ubi-minimal_9:
     name: ubi-minimal
     namespace: ocp
@@ -27,10 +23,10 @@ base_images:
     name: knative-serving-src
     namespace: openshift
     tag: knative-v1.17
-  openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.23-openshift-4.19
+    tag: rhel-9-release-golang-1.23-openshift-4.19
   origin_scos-4.20_cli-artifacts:
     name: scos-4.20
     namespace: origin
@@ -45,19 +41,19 @@ build_root:
 images:
 - dockerfile_path: knative-operator/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    ocp_ubi-minimal_9:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: serverless-knative-operator
 - dockerfile_path: must-gather/Dockerfile
   inputs:
-    ocp_4.14_cli-artifacts:
+    ocp_4.16_cli-artifacts:
       as:
       - $CLI_ARTIFACTS
-    ocp_ubi-minimal_8:
+    ocp_ubi-minimal_9:
       as:
       - $RUNTIME
   to: serverless-must-gather
@@ -72,16 +68,16 @@ images:
   to: serverless-index
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    ocp_ubi-minimal_9:
       as:
       - $GO_RUNTIME
   to: serverless-bundle
 - dockerfile_path: openshift-knative-operator/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    ocp_ubi-minimal_9:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: serverless-openshift-knative-operator
@@ -106,19 +102,19 @@ images:
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    ocp_ubi-minimal_9:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: serverless-ingress
 - dockerfile_path: serving/metadata-webhook/Dockerfile
   inputs:
-    ocp_ubi-minimal_8:
+    ocp_ubi-minimal_9:
       as:
       - $GO_RUNTIME
-    openshift_release_rhel-8-release-golang-1.23-openshift-4.19:
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
       as:
       - $GO_BUILDER
   to: serverless-metadata-webhook
@@ -243,7 +239,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: firewatch-ipi-aws
-  timeout: 8h0m0s
 - always_run: false
   as: operator-e2e-interop-aws-ocp420-fips
   cron: 0 23 31 2 *
@@ -352,7 +347,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: firewatch-ipi-aws
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-knative

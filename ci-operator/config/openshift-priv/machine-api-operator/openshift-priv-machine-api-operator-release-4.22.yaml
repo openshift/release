@@ -11,18 +11,18 @@ base_images:
     name: nested-environment-builder
     namespace: ci
     tag: latest
-  ocp_4.20_base-rhel9:
+  ocp_4.21_base-rhel9:
     name: 4.22-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.20"
+    tag: "4.21"
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -30,12 +30,12 @@ canonical_go_repository: github.com/openshift/machine-api-operator
 images:
 - dockerfile_path: Dockerfile.rhel
   inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: machine-api-operator
 promotion:
   to:
@@ -91,7 +91,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|_test\.go$|vsphere
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     test:
     - as: test
       cli: latest
@@ -105,7 +105,7 @@ tests:
   as: e2e-aws-operator-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-4
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -120,7 +120,7 @@ tests:
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-4
     workflow: openshift-upgrade-aws
 - always_run: false
   as: e2e-azure-operator
@@ -143,6 +143,14 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - always_run: false
+  as: e2e-azure-operator-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
+- always_run: false
   as: e2e-gcp-ovn
   optional: true
   steps:
@@ -163,7 +171,8 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-metal-ipi
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
     cluster_profile: equinix-ocp-metal
@@ -173,7 +182,8 @@ tests:
     workflow: baremetalds-e2e
 - always_run: false
   as: e2e-metal-ipi-upgrade
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -181,7 +191,8 @@ tests:
       RUN_UPGRADE_TEST: "true"
     workflow: baremetalds-e2e-upgrade-ovn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
     cluster_profile: equinix-ocp-metal
@@ -192,7 +203,8 @@ tests:
     workflow: baremetalds-e2e
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -202,7 +214,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
   steps:
     cluster_profile: equinix-ocp-metal
@@ -213,12 +226,32 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-serial
+  timeout: 6h0m0s
 - always_run: false
   as: e2e-nutanix
   cluster: build01
   optional: true
   steps:
     cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix
+- always_run: false
+  as: e2e-nutanix-operator-multi-subnet
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      FEATURE_GATES: '["NutanixMultiSubnets=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      from: stable:cluster-api-actuator-pkg
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: openshift-e2e-nutanix
 - always_run: false
   as: e2e-vsphere-ovn
@@ -244,6 +277,7 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere-serial
+  timeout: 6h0m0s
 - always_run: false
   as: e2e-vsphere-ovn-multi-vcenter
   optional: true
@@ -281,7 +315,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-staticip
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-vsphere-host-groups-ovn-techpreview
   optional: true
@@ -300,7 +333,7 @@ tests:
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       E2E_RUN_TAGS: '@mapi'
       TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
@@ -308,7 +341,6 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi
-  timeout: 7h0m0s
 - as: verify-deps
   steps:
     env:

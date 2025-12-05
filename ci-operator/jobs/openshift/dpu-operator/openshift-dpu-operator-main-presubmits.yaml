@@ -59,13 +59,11 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build06
     context: ci/prow/make-e2e-test
     decorate: true
-    decoration_config:
-      timeout: 8h0m0s
     labels:
-      ci-operator.openshift.io/cluster: build05
+      capability/intranet: intranet
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-dpu-operator-main-make-e2e-test
@@ -122,13 +120,11 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build06
     context: ci/prow/make-e2e-test-marvell
     decorate: true
-    decoration_config:
-      timeout: 8h0m0s
     labels:
-      ci-operator.openshift.io/cluster: build05
+      capability/intranet: intranet
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-dpu-operator-main-make-e2e-test-marvell
@@ -180,6 +176,67 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )make-e2e-test-marvell,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build06
+    context: ci/prow/make-e2e-test-ptl
+    decorate: true
+    labels:
+      capability/intranet: intranet
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-dpu-operator-main-make-e2e-test-ptl
+    rerun_command: /test make-e2e-test-ptl
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=make-e2e-test-ptl
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )make-e2e-test-ptl,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -344,11 +401,11 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build06
     context: ci/prow/make-test
     decorate: true
     labels:
-      ci-operator.openshift.io/cluster: build05
+      capability/intranet: intranet
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-dpu-operator-main-make-test

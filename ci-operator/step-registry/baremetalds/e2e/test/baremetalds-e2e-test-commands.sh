@@ -259,6 +259,38 @@ function is_openshift_version_gte() {
     printf '%s\n%s' "$1" "${DS_OPENSHIFT_VERSION}" | sort -C -V
 }
 
+function build_hypervisor_config() {
+    # Build hypervisor SSH configuration for tests that need to interact with the hypervisor
+    if [[ "${ENABLE_HYPERVISOR_SSH_CONFIG:-false}" != "true" ]]; then
+        return
+    fi
+
+    if [[ ! -f "${SHARED_DIR}/server-ip" ]]; then
+        echo "Warning: ENABLE_HYPERVISOR_SSH_CONFIG is true but ${SHARED_DIR}/server-ip not found"
+        return
+    fi
+
+    HYPERVISOR_IP=$(cat "${SHARED_DIR}/server-ip")
+    export HYPERVISOR_IP
+    export HYPERVISOR_SSH_USER="root"
+
+    # Determine the correct SSH key path
+    # Using equinix-ssh-key for ARM64 hosts or packet-ssh-key for others
+    if [[ -f "${CLUSTER_PROFILE_DIR}/equinix-ssh-key" ]]; then
+        export HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/equinix-ssh-key"
+    else
+        export HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+    fi
+
+    if [[ ! -f "${HYPERVISOR_SSH_KEY}" ]]; then
+        echo "Warning: SSH key not found at ${HYPERVISOR_SSH_KEY}"
+        unset HYPERVISOR_IP HYPERVISOR_SSH_USER HYPERVISOR_SSH_KEY
+        return
+    fi
+
+    echo "Hypervisor SSH configuration: IP=${HYPERVISOR_IP}, User=${HYPERVISOR_SSH_USER}, Key=${HYPERVISOR_SSH_KEY}"
+}
+
 function upgrade() {
     mirror_release_image_for_disconnected_upgrade
     set -x
@@ -282,10 +314,18 @@ function suite() {
     fi
 
     set -x
-    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
-        --provider "${TEST_PROVIDER:-}" \
-        -o "${ARTIFACT_DIR}/e2e.log" \
-        --junit-dir "${ARTIFACT_DIR}/junit"
+    if [[ -n "${HYPERVISOR_IP:-}" ]]; then
+        openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+            --provider "${TEST_PROVIDER:-}" \
+            --with-hypervisor-json="{\"hypervisorIP\":\"${HYPERVISOR_IP}\", \"sshUser\":\"${HYPERVISOR_SSH_USER}\", \"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}" \
+            -o "${ARTIFACT_DIR}/e2e.log" \
+            --junit-dir "${ARTIFACT_DIR}/junit"
+    else
+        openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+            --provider "${TEST_PROVIDER:-}" \
+            -o "${ARTIFACT_DIR}/e2e.log" \
+            --junit-dir "${ARTIFACT_DIR}/junit"
+    fi
     set +x
 }
 
@@ -332,7 +372,13 @@ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-
 # wait for ClusterVersion to level, until https://bugzilla.redhat.com/show_bug.cgi?id=2009845 makes it back to all 4.9 releases being installed in CI
 oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
-check_clusteroperators_status
+# Skip readiness checks intentionally when the cluster is expected
+# to be in an unhealthy state (e.g., TNF in degraded mode)
+if [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]]; then
+    echo "$(date) - skipping clusteroperators status check"
+else
+    check_clusteroperators_status
+fi
 
 # wait up to 10m for the number of nodes to match the number of machines
 i=0
@@ -374,9 +420,34 @@ done
 
 # wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
 # any e2e tests that might require specific workload capacity.
-echo "$(date) - waiting for nodes to be ready..."
-oc wait nodes --all --for=condition=Ready=true --timeout=10m
-echo "$(date) - all nodes are ready"
+if [[ "${SKIP_READINESS_CHECKS:-false}" == "true" ]]; then
+  echo "$(date) - skipping node readiness check because SKIP_READINESS_CHECKS is set to true"
+else
+  echo "$(date) - waiting for nodes to be ready..."
+  oc wait nodes --all --for=condition=Ready=true --timeout=10m
+  echo "$(date) - all nodes are ready"
+fi
+
+
+# Check for image registry availability
+for _ in {1..11}; do
+  count=$(oc get configs.imageregistry.operator.openshift.io/cluster --no-headers | wc -l)
+  echo "Image registry count: ${count}"
+  if [[ ${count} -gt 0 ]]; then
+    break
+  fi
+  sleep 30
+done
+
+# Check for imagestreams availability
+for _ in {1..11}; do
+  if ! oc get imagestreams --all-namespaces; then
+    sleep 30
+  else
+    echo "$(date) - Imagestreams are available"
+    break
+  fi
+done
 
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
 echo "$(date) - waiting for non-samples imagesteams to import..."
@@ -411,10 +482,17 @@ echo "$(date) - all imagestreams are imported."
 
 # In some cases the cluster events are processed slowly by the kube-apiservers,
 # producing a late revision updates that could be missed by the previous co check.
-echo "$(date) - Waiting 10 minutes before checking again clusteroperators"
-sleep 10m
+if [[ "${SKIP_READINESS_CHECKS}" == "true" ]]; then
+    echo "$(date) - skipping secondary clusteroperators status check"
+else
+  echo "$(date) - Waiting 10 minutes before checking again clusteroperators"
+  sleep 10m
 
-check_clusteroperators_status
+  check_clusteroperators_status
+fi
+
+# Build hypervisor SSH configuration if enabled
+build_hypervisor_config
 
 case "${TEST_TYPE}" in
 upgrade-conformance)

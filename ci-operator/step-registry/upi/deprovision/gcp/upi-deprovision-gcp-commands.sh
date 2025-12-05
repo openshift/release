@@ -131,10 +131,14 @@ if [[ -v IS_XPN ]] && [[ -f "${SHARED_DIR}/xpn_sa_key_id" ]]; then
   gcloud iam service-accounts keys list --iam-account="${HOST_PROJECT_CONTROL_SERVICE_ACCOUNT}"
 fi
 
-# Delete the bootstrap deployment, but expect it to error.
-echo "$(date -u --rfc-3339=seconds) - Deleting bootstrap deployment (errors when bootstrap-complete)..."
+# Delete the bootstrap resources, but expect it to error.
 set +e
-gcloud deployment-manager deployments delete -q "${INFRA_ID}-bootstrap"
+if [[ -f "${SHARED_DIR}/04_bootstrap_deprovision.sh" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Deleting bootstrap resources (errors when bootstrap-complete)..."
+  source "${SHARED_DIR}/04_bootstrap_deprovision.sh"
+else
+  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/04_bootstrap_deprovision.sh' not found, skipped..."
+fi
 set -e
 
 # Delete XPN DNS entries
@@ -179,17 +183,62 @@ if [[ -v IS_XPN ]]; then
 fi
 set -e
 
-# Delete the deployments that should always exist.
-echo "$(date -u --rfc-3339=seconds) - Deleting worker, control-plane, and infra deployments..."
-gcloud deployment-manager deployments delete -q "${INFRA_ID}"-{worker,control-plane,infra}
-
-# Only delete these deployments when they are expected to exist.
-if [[ ! -v IS_XPN ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting security deployment..."
-  gcloud deployment-manager deployments delete -q "${INFRA_ID}-security"
-
-  if [[ ! -f "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
-    echo "$(date -u --rfc-3339=seconds) - Deleting vpc deployment..."
-    gcloud deployment-manager deployments delete -q "${INFRA_ID}-vpc"
-  fi
+# Delete other resources of the cluster, but expect it to error.
+echo "$(date -u --rfc-3339=seconds) - FYI Below deletions may error because the resources are expected to be deleted during 'ipi-deprovision-deprovision' already."
+set +e
+if [[ -f "${SHARED_DIR}/06_worker_deprovision.sh" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Deleting compute/worker machines..."
+  source "${SHARED_DIR}/06_worker_deprovision.sh"
+else
+  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/06_worker_deprovision.sh' not found, skipped..."
 fi
+
+if [[ -f "${SHARED_DIR}/05_control_plane_deprovision.sh" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Deleting control-plane machines..."
+  source "${SHARED_DIR}/05_control_plane_deprovision.sh"
+else
+  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/05_control_plane_deprovision.sh' not found, skipped..."
+fi
+
+if [[ -f "${SHARED_DIR}/03_firewall_rules_deprovision.sh" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Deleting firewall-rules..."
+  source "${SHARED_DIR}/03_firewall_rules_deprovision.sh"
+else
+  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/03_firewall_rules_deprovision.sh' not found, skipped..."
+fi
+
+if [[ -f "${SHARED_DIR}/03_iam_sa_deprovision.sh" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Deleting control-plane and compute/worker service accounts..."
+  source "${SHARED_DIR}/03_iam_sa_deprovision.sh"
+else
+  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/03_iam_sa_deprovision.sh' not found, skipped..."
+fi
+
+if [[ -f "${SHARED_DIR}/02_external_lb_deprovision.sh" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Deleting external load balancer resources..."
+  source "${SHARED_DIR}/02_external_lb_deprovision.sh"
+else
+  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/02_external_lb_deprovision.sh' not found, skipped..."
+fi
+
+if [[ -f "${SHARED_DIR}/02_internal_lb_deprovision.sh" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Deleting internal load balancer resources..."
+  source "${SHARED_DIR}/02_internal_lb_deprovision.sh"
+else
+  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/02_internal_lb_deprovision.sh' not found, skipped..."
+fi
+
+if [[ -f "${SHARED_DIR}/02_dns_priv_zone_deprovision.sh" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Deleting DNS private zone..."
+  source "${SHARED_DIR}/02_dns_priv_zone_deprovision.sh"
+else
+  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/02_dns_priv_zone_deprovision.sh' not found, skipped..."
+fi
+
+if [[ -f "${SHARED_DIR}/01_vpc_deprovision.sh" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Deleting VPC..."
+  source "${SHARED_DIR}/01_vpc_deprovision.sh"
+else
+  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/01_vpc_deprovision.sh' not found, skipped..."
+fi
+set -e

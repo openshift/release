@@ -1,4 +1,8 @@
 base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.16"
   ocp_4.16_base-rhel9:
     name: 4.16-priv
     namespace: ocp-private
@@ -108,11 +112,12 @@ tests:
   steps:
     cluster_profile: azure4
     env:
+      E2E_RUN_TAGS: '@level0 and (@mapi or @capi or @ccm)'
       TEST_FILTERS: ~ChkUpgrade&;LEVEL0
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: LEVEL0&&!qe-only
       TEST_SCENARIOS: Cluster_Infrastructure
     test:
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-azure-ipi-proxy
 - always_run: false
   as: e2e-gcp-ovn
@@ -133,7 +138,6 @@ tests:
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-openstack-ovn
   optional: true

@@ -213,6 +213,14 @@ else
   echo "zones already set in install-config.yaml, skipped"
 fi
 
+if [[ "${CI_NAT_REPLACE:-false}" == 'auto' ]]; then
+  # Target 50% of pull request jobs in master or main.
+  if [[ "${BUILD_ID: -1}" == [0-5] && "${JOB_NAME}" == *pull-ci-openshift-*-ma*e2e*aws* && "${JOB_NAME}" != *'microshift'* && "${JOB_NAME}" != *'hypershift'* && "${JOB_NAME}" != *'vpc'* && "${JOB_NAME}" != *'single-node'* ]]; then
+    CI_NAT_REPLACE='true'
+    echo "IMPORTANT: this job has been selected to use NAT instance instead of NAT gateway. See jupierce if abnormalities are detected."
+  fi
+fi
+
 echo "Using control plane instance type: ${CONTROL_PLANE_INSTANCE_TYPE}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
 echo "Using compute node replicas: ${worker_replicas}"
@@ -385,4 +393,44 @@ platform:
     userProvisionedDNS: Enabled
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
+fi
+
+# Add config for dedicated hosts to compute nodes if job is configured
+if [[ "${DEDICATED_HOST}" == "yes" ]]; then
+  echo "Detected dedicated host configured.  Starting install-config patching."
+  patch_dedicated_host="${SHARED_DIR}/install-config-dedicated-host.yaml.patch"
+
+  # Create Host for each zone.  If no zones configured, error out.  Zones can exist before script execution so we'll pull zone listing out for workers.
+  WORKER_ZONES=$(cat "${CONFIG}" | yq-v4 '.compute[] | select(.name == "worker") | .platform.aws.zones'[] )
+  if [[ "${WORKER_ZONES}" == "" ]]; then
+    echo "No zones configured,  Unable to determine where to create dedicated hosts."
+    exit
+  fi
+
+  cat > "${patch_dedicated_host}" << EOF
+compute:
+- name: worker
+  platform:
+    aws:
+      hostPlacement:
+        affinity: DedicatedHost
+        dedicatedHost: []
+EOF
+
+  for zone in ${WORKER_ZONES}; do
+    HOST_TYPE=$(echo "${COMPUTE_NODE_TYPE}" | cut -d'.' -f1)
+    echo "Creating dedicated host.  Region='${aws_source_region}' Zone='${zone}' InstanceFamily='${HOST_TYPE}'"
+
+    EXPIRATION_DATE=$(date -d '6 hours' --iso=minutes --utc)
+    HOST_SPECS='{"ResourceType":"dedicated-host","Tags":[{"Key":"Name","Value":"'${JOB_NAME_SAFE}'-'${zone}'"},{"Key":"CI-JOB","Value":"'${JOB_NAME_SAFE}'"},{"Key":"expirationDate","Value":"'${EXPIRATION_DATE}'"},{"Key":"ci-build-info","Value":"'${BUILD_ID}_${JOB_NAME}'"}]}'
+    HOST_ID=$(aws ec2 allocate-hosts --instance-type "${HOST_TYPE}.4xlarge" --auto-placement 'off' --host-recovery 'off' --tag-specifications "${HOST_SPECS}" --host-maintenance 'off' --quantity '1' --availability-zone "${zone}" --region "${aws_source_region}" | jq -r '.HostIds[0]')
+
+    # We need to pass in the vars since YQ doesnt see the loop variables
+    ZONE_NAME="${zone}" HOST_ID="${HOST_ID}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.hostPlacement.dedicatedHost += [ { "id": strenv(HOST_ID), "zone": strenv(ZONE_NAME) } ])' "${patch_dedicated_host}"
+  done
+
+  # Update config with host ID
+  echo "Patching install-config.yaml for dedicated hosts."
+  yq-go m -x -i ${CONFIG} ${patch_dedicated_host}
+  cp "${patch_dedicated_host}" "${ARTIFACT_DIR}/"
 fi

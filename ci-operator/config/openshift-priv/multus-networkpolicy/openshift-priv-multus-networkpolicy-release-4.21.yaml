@@ -44,6 +44,20 @@ tests:
 - as: e2e-aws
   steps:
     cluster_profile: aws
+    env:
+      TEST_ARGS: --run \[sig-network\]\[Feature:MultiNetworkPolicy\]
+      TEST_SUITE: openshift/conformance/serial
+    test:
+    - as: enable-multi-networkpolicy
+      cli: latest
+      commands: |
+        oc patch network.operator.openshift.io cluster --type merge -p '{"spec":{"useMultiNetworkPolicy":true}}'
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
 - as: security
   optional: true

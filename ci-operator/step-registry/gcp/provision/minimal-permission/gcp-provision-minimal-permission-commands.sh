@@ -12,8 +12,8 @@ set -o pipefail
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
-if [[ "${GCP_INSTALL_USE_MINIMAL_PERMISSIONS}" == "no" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - GCP_INSTALL_USE_MINIMAL_PERMISSIONS is no, nothing to do." && exit 0
+if [[ "${GCP_INSTALL_USE_MINIMAL_PERMISSIONS}" == "no" ]] && [[ "${GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS}" == "no" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - GCP_INSTALL_USE_MINIMAL_PERMISSIONS and GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS are no, nothing to do." && exit 0
 fi
 
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
@@ -31,9 +31,15 @@ fi
 # The IAM service account for UPI: upi-min-permissions-sa@${GOOGLE_PROJECT_ID}.iam.gserviceaccount.com
 # Currently we only deal with IPI in Prow CI.
 
-sa_filename="ipi-min-permissions-sa.json"
 if [[ "${MINIMAL_PERMISSIONS_WITHOUT_ACT_AS}" == "yes" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Going to use the IAM service account of general minimal permissions, and without 'iam.serviceAccounts.actAs'"
   sa_filename="ipi-min-perm-without-actAs-sa.json"
+elif [[ "${GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Going to use the IAM service account of minimal permissions for CCO in Manual mode"
+  sa_filename="ipi-xpn-cco-manual-permissions.json"
+else
+  echo "$(date -u --rfc-3339=seconds) - Going to use the IAM service account of general minimal permissions"
+  sa_filename="ipi-min-permissions-sa.json"
 fi
 
 if [ -f "${CLUSTER_PROFILE_DIR}/${sa_filename}" ]; then

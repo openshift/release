@@ -23,6 +23,7 @@ ENABLE_PROXY=${ENABLE_PROXY:-false}
 BYO_OIDC=${BYO_OIDC:-false}
 ENABLE_AUDIT_LOG=${ENABLE_AUDIT_LOG:-false}
 FIPS=${FIPS:-false}
+POD_CIDR=${POD_CIDR:-""}
 PRIVATE=${PRIVATE:-false}
 PRIVATE_LINK=${PRIVATE_LINK:-false}
 PRIVATE_SUBNET_ONLY="false"
@@ -375,7 +376,7 @@ if [[ "$DISABLE_SCP_CHECKS" == "true" ]]; then
 fi
 
 DISABLE_WORKLOAD_MONITORING_SWITCH=""
-if [[ "$DISABLE_WORKLOAD_MONITORING" == "true" ]]; then
+if [[ "$DISABLE_WORKLOAD_MONITORING" == "true" ]] && [[ "$HOSTED_CP" == "false" ]]; then
   DISABLE_WORKLOAD_MONITORING_SWITCH="--disable-workload-monitoring"
 fi
 
@@ -506,6 +507,13 @@ fi
 FIPS_SWITCH=""
 if [[ "$FIPS" == "true" ]]; then
   FIPS_SWITCH="--fips"
+fi
+
+# Override the default Pod CIDR for larger clusters
+POD_CIDR_SWITCH=""
+if [[ -n "${POD_CIDR}" ]]; then
+  POD_CIDR_SWITCH="--pod-cidr ${POD_CIDR}"
+  record_cluster "pod_cidr" ${POD_CIDR}
 fi
 
 PRIVATE_SWITCH=""
@@ -683,6 +691,10 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "    SHARED_VPC_BASE_DOMAIN: ${SHARED_VPC_BASE_DOMAIN}"
 fi
 
+if [[ -n "${POD_CIDR}" ]]; then
+  echo "  Pod CIDR: ${POD_CIDR}"
+fi
+
 # Record installation start time
 record_cluster "timers" "global_start" "$(date +'%s')"
 
@@ -706,6 +718,7 @@ ${ETCD_ENCRYPTION_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
 ${SUBNET_ID_SWITCH} \
 ${FIPS_SWITCH} \
+${POD_CIDR_SWITCH} \
 ${PRIVATE_SWITCH} \
 ${PRIVATE_LINK_SWITCH} \
 ${PROXY_SWITCH} \

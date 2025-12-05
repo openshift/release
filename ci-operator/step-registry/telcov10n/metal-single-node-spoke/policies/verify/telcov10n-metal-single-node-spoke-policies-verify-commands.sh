@@ -77,7 +77,7 @@ function run_tests {
 
 function are_there_polices_to_be_verified {
 
-  num_of_policies=$(jq -c '.[]' <<< "$(yq -o json <<< ${PGT_RELATED_FILES})"|wc -l)
+  num_of_policies=$(jq -c '.[]' <<< "$(yq -o json <<< ${PG_RELATED_FILES})"|wc -l)
   if [[ "${num_of_policies}" == "0" ]]; then
     echo "no"
   else

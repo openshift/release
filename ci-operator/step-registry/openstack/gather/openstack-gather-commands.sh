@@ -111,9 +111,9 @@ done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_server_show.json"
 
 touch "${ARTIFACT_DIR}/openstack_nodes.log"
 for server in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_server_list.json"); do
-	echo -e "\n$ openstack server show $server"   >> "${ARTIFACT_DIR}/openstack_nodes.log"
-	openstack server show "$server"               >> "${ARTIFACT_DIR}/openstack_nodes.log"
-	openstack console log show "$server"          &> "${ARTIFACT_DIR}/nodes/console_${server}.log"
+	echo -e "\n$ openstack server show $server"   &>> "${ARTIFACT_DIR}/openstack_nodes.log"
+	openstack server show "$server"               &>> "${ARTIFACT_DIR}/openstack_nodes.log"
+	openstack console log show "$server"          &>> "${ARTIFACT_DIR}/nodes/console_${server}.log"
 done
 
 # volumes
@@ -128,8 +128,8 @@ done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_volume_show.json"
 
 touch "${ARTIFACT_DIR}/openstack_volumes.log"
 for volume in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_volume_list.json"); do
-	echo -e "\n$ openstack volume show $volume" >> "${ARTIFACT_DIR}/openstack_volumes.log"
-	openstack volume show "$volume"             >> "${ARTIFACT_DIR}/openstack_volumes.log"
+	echo -e "\n$ openstack volume show $volume" &>> "${ARTIFACT_DIR}/openstack_volumes.log"
+	openstack volume show "$volume"             &>> "${ARTIFACT_DIR}/openstack_volumes.log"
 done
 
 # ports
@@ -144,8 +144,8 @@ done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_port_show.json"
 
 touch "${ARTIFACT_DIR}/openstack_ports.log"
 for port in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_port_list.json"); do
-	echo -e "\n$ openstack port show $port" >> "${ARTIFACT_DIR}/openstack_ports.log"
-	openstack port show "$port"             >> "${ARTIFACT_DIR}/openstack_ports.log"
+	echo -e "\n$ openstack port show $port" &>> "${ARTIFACT_DIR}/openstack_ports.log"
+	openstack port show "$port"             &>> "${ARTIFACT_DIR}/openstack_ports.log"
 done
 
 # subnets
@@ -160,8 +160,8 @@ done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_subnet_show.json"
 
 touch "${ARTIFACT_DIR}/openstack_subnets.log"
 for subnet in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_subnet_list.json"); do
-	echo -e "\n$ openstack subnet show $subnet" >> "${ARTIFACT_DIR}/openstack_subnets.log"
-	openstack subnet show "$subnet"             >> "${ARTIFACT_DIR}/openstack_subnets.log"
+	echo -e "\n$ openstack subnet show $subnet" &>> "${ARTIFACT_DIR}/openstack_subnets.log"
+	openstack subnet show "$subnet"             &>> "${ARTIFACT_DIR}/openstack_subnets.log"
 done
 
 # floating IPs
@@ -176,24 +176,8 @@ done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_fip_show.json"
 
 touch "${ARTIFACT_DIR}/openstack_fips.log"
 for fip in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"); do
-	echo -e "\n$ openstack floating ip show $fip" >> "${ARTIFACT_DIR}/openstack_fips.log"
-	openstack floating ip show "$fip"             >> "${ARTIFACT_DIR}/openstack_fips.log"
-done
-
-# load balancers
-
-openstack loadbalancer list -f json \
-    | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.name | test($CLUSTER_NAME)))' \
-    > "${ARTIFACT_DIR_JSON}/openstack_loadbalancer_list.json"
-
-for lb in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_loadbalancer_list.json"); do
-	openstack loadbalancer show "$lb" -f json
-done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_loadbalancer_show.json"
-
-touch "${ARTIFACT_DIR}/openstack_loadbalancers.log"
-for lb in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_loadbalancer_list.json"); do
-	echo -e "\n$ openstack loadbalancer show $lb" >> "${ARTIFACT_DIR}/openstack_loadbalancers.log"
-	openstack loadbalancer show "$lb"             >> "${ARTIFACT_DIR}/openstack_loadbalancers.log"
+	echo -e "\n$ openstack floating ip show $fip" &>> "${ARTIFACT_DIR}/openstack_fips.log"
+	openstack floating ip show "$fip"             &>> "${ARTIFACT_DIR}/openstack_fips.log"
 done
 
 

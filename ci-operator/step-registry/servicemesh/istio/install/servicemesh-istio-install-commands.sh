@@ -333,3 +333,14 @@ wget -N https://raw.githubusercontent.com/kiali/kiali/master/hack/use-openshift-
 chmod +x use-openshift-prometheus.sh
 ./use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -np true -ml ossm-3 -kcns ${ISTIO_NAMESPACE}
 oc wait --for condition=Successful kiali/kiali --timeout 200s -n ${ISTIO_NAMESPACE} || (oc describe -n ${ISTIO_NAMESPACE} kiali/kiali; oc describe pods -n ${ISTIO_NAMESPACE}; exit 1)
+
+echo "Installing Kiali OSSMC CR..."
+
+oc apply -n ${ISTIO_NAMESPACE} -f - <<EOF
+apiVersion: kiali.io/v1alpha1
+kind: OSSMConsole
+metadata:
+  name: ossmconsole
+EOF
+
+oc wait --for=condition=Successful OSSMConsole ossmconsole --timeout 200s -n ${ISTIO_NAMESPACE} || (oc describe -n ${ISTIO_NAMESPACE} OSSMConsole ossmconsole; oc describe pods -n ${ISTIO_NAMESPACE}; exit 1)

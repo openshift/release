@@ -23,10 +23,11 @@ echo "Waiting for the HC to be Available"
 oc wait --timeout=15m --for=condition=Available --namespace=clusters "hostedcluster/${cluster_name}"
 
 # Workaround for limitations of console operator, see OCPSTRAT-2173.
+# Console check failed until OCPBUGS-61432 fixed, this bug caused ClusterOperatorNotAvailable, the message is changed
 echo "Waiting for the console operator to be degraded"
 timeout=1800 # 30min
 SECONDS=0
-until [[ "$(oc get -n clusters hostedcluster/"${cluster_name}" -ojsonpath='{.status.conditions[?(@.type=="ClusterVersionSucceeding")]}' | grep "False" | grep "ClusterOperatorDegraded" | grep "Cluster operator console is degraded")" != "" ]]; do
+until [[ "$(oc get -n clusters hostedcluster/"${cluster_name}" -ojsonpath='{.status.conditions[?(@.type=="ClusterVersionSucceeding")]}' | grep "False" | grep "ClusterOperatorNotAvailable" | grep "Cluster operator console is not available")" != "" ]]; do
     sleep 15
     if (( SECONDS >= timeout )); then
         exit 1

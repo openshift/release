@@ -7,6 +7,10 @@ base_images:
     name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
+  ocp_4.21_cli:
+    name: 4.21-priv
+    namespace: ocp-private
+    tag: cli
   ocp_4.21_installer:
     name: 4.21-priv
     namespace: ocp-private
@@ -23,6 +27,9 @@ images:
     ocp_4.21_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_4.21_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:cli
     ocp_4.21_installer:
       as:
       - registry.ci.openshift.org/ocp/4.21:installer
@@ -55,19 +62,19 @@ tests:
     from: src
   run_if_changed: (^scripts/)|(\.sh$)|(^\.ci-operator\.yaml$)
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h30m0s
 zz_generated_metadata:
   branch: release-4.21
   org: openshift-priv

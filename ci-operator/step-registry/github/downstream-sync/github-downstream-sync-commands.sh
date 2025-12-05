@@ -93,15 +93,19 @@ git push origin "$BRANCH"
 echo "✏️  Opening Pull Request…"
 PR_TITLE="NO-JIRA: DownStream Merge [$(date +%m-%d-%Y)]"
 PR_BODY="Automated merge of upstream/${DEFAULT_BRANCH} → ${DEFAULT_BRANCH}."
+# Make it a draft if we detected conflicts (keeps Prow from auto-running presubmits).
+DRAFT=$( [[ "${CONFLICT:-false}" == "true" ]] && echo true || echo false )
 # Build the PR JSON $PAYLOAD
 PAYLOAD=$(
   jq -nc \
-    --arg title "$PR_TITLE" \
-    --arg head  "$BRANCH" \
-    --arg base  "$DEFAULT_BRANCH" \
-    --arg body  "$PR_BODY" \
-    '{title: $title, head: $head, base: $base, body: $body}'
+    --arg title     "$PR_TITLE" \
+    --arg head      "$BRANCH" \
+    --arg base      "$DEFAULT_BRANCH" \
+    --arg body      "$PR_BODY" \
+    --argjson draft "$DRAFT" \
+    '{title: $title, head: $head, base: $base, body: $body, draft: $draft}'
 )
+
 PR_NUM=$(
   curl -sS \
     -H "Authorization: token ${GITHUB_TOKEN}" \
@@ -117,12 +121,6 @@ if [[ -z "$PR_NUM" || "$PR_NUM" == "null" ]]; then
 fi
 echo "🔖 Opened PR #${PR_NUM}"
 
-echo "💬 Posting /ok-to-test and payload commands…"
-# mark it /ok-to-test and start payload jobs
-curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST \
-     -d "{\"body\":\"/ok-to-test\n/payload ${RELEASE} ci blocking\n/payload ${RELEASE} nightly blocking\"}" \
-     "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
-
 if [[ "${CONFLICT:-false}" == "true" ]]; then
   echo "🚨 Prepending MERGE CONFLICT! and holding PR #${PR_NUM}"
   NEW_TITLE="MERGE CONFLICT! ${PR_TITLE}"
@@ -132,6 +130,11 @@ if [[ "${CONFLICT:-false}" == "true" ]]; then
     "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
   echo "⚠️  PR #${PR_NUM} held for manual resolution"
   exit 1
+ else
+   echo "💬 Posting /ok-to-test and payload commands…"
+   curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST \
+        -d "{\"body\":\"/ok-to-test\n/payload ${RELEASE} ci blocking\n/payload ${RELEASE} nightly blocking\"}" \
+        "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
 fi
 
 echo "✅ Merge succeeded; PR #${PR_NUM} created."
