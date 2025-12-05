@@ -35,7 +35,7 @@ set -o pipefail
 ################################################################################
 
 # cd to writable directory
-cd /tmp/
+cd /tmp/ || exit 0
 
 # Define all test cases with initial "skipped" status
 declare -A TEST_STATUS
@@ -135,7 +135,7 @@ run_test_case_1() {
 
     # Clone and deploy
     git clone https://github.com/stolostron/policy-collection.git || { echo "ERROR: Failed to clone repository"; return 1; }
-    cd policy-collection/deploy/
+    cd policy-collection/deploy/ || { echo "ERROR: Failed to cd to deploy directory"; return 1; }
     echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || { echo "ERROR: deploy.sh failed"; return 1; }
 
     sleep 60
