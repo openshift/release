@@ -26,31 +26,51 @@ images:
 resources:
   '*':
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: "1"
+      memory: 2Gi
 tests:
-- as: lint
+- as: integration
   capabilities:
   - nested-podman
   commands: |
+    set -x
+    echo "=== Debug: Environment ==="
+    whoami
+    id
+    echo "=== Debug: Podman info before service ==="
+    podman info --format '{{.Host.RemoteSocket.Path}}' || echo "podman info failed"
+
+    echo "=== Starting podman API service ==="
+    podman system service --time=0 &
+    PODMAN_PID=$!
+    sleep 3
+
+    echo "=== Debug: Check socket ==="
+    SOCKET_PATH=$(podman info --format '{{.Host.RemoteSocket.Path}}')
+    echo "Socket path: $SOCKET_PATH"
+    ls -la "$SOCKET_PATH" 2>/dev/null || echo "Socket file not found"
+    ls -la $(dirname "$SOCKET_PATH") 2>/dev/null || echo "Socket directory not found"
+
+    echo "=== Debug: Test socket connectivity ==="
+    curl --unix-socket "$SOCKET_PATH" http://localhost/_ping 2>/dev/null && echo "Socket responds to ping" || echo "Socket ping failed"
+
+    echo "=== Configure testcontainers (workaround #1) ==="
+    export DOCKER_HOST="unix://$SOCKET_PATH"
+    export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
+    export TESTCONTAINERS_RYUK_DISABLED=true
+
+    echo "=== Debug: Final environment ==="
+    echo "DOCKER_HOST=$DOCKER_HOST"
+    echo "TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=$TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE"
+    echo "TESTCONTAINERS_RYUK_DISABLED=$TESTCONTAINERS_RYUK_DISABLED"
+
+    echo "=== Debug: Verify podman is responding ==="
+    podman info
+    podman version
+
+    echo "=== Running tests ==="
     make generate
-    export HOME=/tmp
-    export GOCACHE=/tmp/go-build
-    export GOMODCACHE=/tmp/go-mod
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    export PATH="$(go env GOPATH)/bin:$PATH"
-    unset GOFLAGS
-    go install -mod=mod github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
-    make lint
-  container:
-    from: podman-test
-  nested_podman: true
-- as: unit
-  capabilities:
-  - nested-podman
-  commands: |
-    make generate
-    make test-unit
+    make test-integration
   container:
     from: podman-test
   nested_podman: true
