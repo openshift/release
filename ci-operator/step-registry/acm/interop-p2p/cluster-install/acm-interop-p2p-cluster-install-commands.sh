@@ -150,7 +150,7 @@ ocp_release_image="$(
 )"
 
 
-echo "cluster_image: ${OCP_RELEASE_IMAGE}"
+echo "cluster_image: ${ocp_release_image}"
 
 # create clusterdeployment
 CLUSTER_DEPLOYMENT_FILE=/tmp/clusterdeployment.yaml
