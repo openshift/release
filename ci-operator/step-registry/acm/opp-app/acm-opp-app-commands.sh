@@ -35,7 +35,7 @@ set -o pipefail
 ################################################################################
 
 # cd to writable directory
-cd /tmp/
+cd /tmp/ || exit 0
 
 # Define all test cases with initial "skipped" status
 declare -A TEST_STATUS
@@ -135,10 +135,18 @@ run_test_case_1() {
 
     # Clone and deploy
     git clone https://github.com/stolostron/policy-collection.git || { echo "ERROR: Failed to clone repository"; return 1; }
-    cd policy-collection/deploy/
+    cd policy-collection/deploy/ || { echo "ERROR: Failed to cd to deploy directory"; return 1; }
     echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || { echo "ERROR: deploy.sh failed"; return 1; }
 
     sleep 60
+
+    # Verify e2e-opp namespace was created
+    if ! oc get namespace e2e-opp >/dev/null 2>&1; then
+        echo "ERROR: Namespace e2e-opp not found"
+        echo "deploy.sh may have failed due to token expiration or other issues"
+        oc get namespace | grep opp || true
+        return 1
+    fi
 
     oc label managedcluster local-cluster oppapps=httpd-example --overwrite
 
@@ -149,7 +157,8 @@ run_test_case_1() {
     oc get deployment -n e2e-opp || true
 
     # Wait for build to complete
-    LATEST_BUILD_NAME=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}')
+    LATEST_BUILD_NAME=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+    [ -z "$LATEST_BUILD_NAME" ] && { LATEST_BUILD_NAME=$(oc start-build httpd-example -n e2e-opp -o name | cut -d'/' -f2) || { echo "ERROR: Failed to start build"; return 1; }; }
 
     BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
     echo "Initial build status: ${LATEST_BUILD_NAME} is ${BUILD_STATUS}"
