@@ -38,6 +38,7 @@ echo "  HUGEPAGES_PAGES=${HUGEPAGES_PAGES}"
 echo "  HIGH_POWER_CONSUMPTION=${HIGH_POWER_CONSUMPTION}"
 echo "  PER_POD_POWER_MANAGEMENT=${PER_POD_POWER_MANAGEMENT}"
 echo "  LABEL_FILTER=${LABEL_FILTER}"
+echo "  DAY0_INSTALLATION=${DAY0_INSTALLATION}"
 
 
 echo "Configure compute and NTO cluster settings"
@@ -50,6 +51,7 @@ EXTRA_VARS="${EXTRA_VARS} rt_kernel=${RT_KERNEL}"
 EXTRA_VARS="${EXTRA_VARS} high_power_consumption=${HIGH_POWER_CONSUMPTION}"
 EXTRA_VARS="${EXTRA_VARS} per_pod_power_management=${PER_POD_POWER_MANAGEMENT}"
 EXTRA_VARS="${EXTRA_VARS} artifacts_folder=${ARTIFACT_DIR}"
+EXTRA_VARS="${EXTRA_VARS} day0_installation=${DAY0_INSTALLATION}"
 
 # Handle hugepages configuration
 if [[ "${HUGEPAGES_PAGES}" != "[]" && -n "${HUGEPAGES_PAGES}" ]]; then
