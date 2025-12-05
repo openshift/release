@@ -273,41 +273,35 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
     workflow: idp-external-oidc-entraid-aws
-- as: aws-ipi-f7-longduration-hive-remaining
+- as: aws-ipi-f7-test1
   cron: 44 0 4,11,20,27 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;~HiveSDRosa&;~HiveSpec&
-      TEST_SCENARIOS: Cluster_Operator
-      TEST_TIMEOUT: "90"
+      SLEEP_DURATION: 24h
     test:
-    - ref: openshift-extended-test-longduration
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-f7-longduration-hive-sd-rosa
+- as: aws-ipi-f7-test2
   cron: 39 8 5,12,19,28 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;HiveSDRosa&
-      TEST_SCENARIOS: Cluster_Operator
-      TEST_TIMEOUT: "90"
+      SLEEP_DURATION: 24h
     test:
-    - chain: openshift-e2e-test-qe-longrun
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-f7-longduration-hive-spec
+- as: aws-ipi-f7-test3
   cron: 10 11 4,13,20,27 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;~HiveSDRosa&;HiveSpec&
-      TEST_SCENARIOS: Cluster_Operator
-      TEST_TIMEOUT: "90"
+      SLEEP_DURATION: 24h
     test:
-    - ref: openshift-extended-test-longduration
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f14-stress-olm
   cron: 22 2 15,29 * *
@@ -318,12 +312,14 @@ tests:
     test:
     - chain: openshift-e2e-test-olm-qe-stress
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: gcp-ipi-f14-stress-olm
+- as: gcp-ipi-test1
   cron: 15 11 5,19 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      SLEEP_DURATION: 24h
     test:
-    - chain: openshift-e2e-test-olm-qe-stress
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: aws-ipi-tp-ocl-f7
   cron: 35 7 2,11,18,25 * *
@@ -1773,14 +1769,15 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-ephemeral-creds-guest
-- as: azure-ipi-f28-ota
+- as: azure-ipi-test1
   cron: 8 0 2 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      SLEEP_DURATION: 24h
     test:
-    - chain: openshift-e2e-test-ota-qe
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-confidentialvm-vmgueststateonly-mini-perm-f7
   cron: 37 14 6,13,20,29 * *
@@ -1870,27 +1867,25 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: idp-external-oidc-entraid-azure
-- as: azure-ipi-f7-longduration-part3-3
+- as: azure-ipi-test2
   cron: 36 5 1,8,15,24 * *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      TEST_SCENARIOS: Cluster_Operator
-      TEST_TIMEOUT: "100"
+      SLEEP_DURATION: 24h
     test:
-    - chain: openshift-e2e-test-qe-longrun
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-marketplace-mini-perm-f7
+- as: azure-ipi-test3
   cron: 39 10 3,12,19,26 * *
   steps:
     cluster_profile: azure-qe
     env:
-      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      OS_IMAGE_VERSION: 4.18.2025031114
+      SLEEP_DURATION: 24h
     test:
-    - chain: openshift-e2e-test-qe
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-azure-ipi-marketplace
 - as: azure-ipi-marketplace-noplan-f28-destructive
   cron: 9 14 23 * *
@@ -2684,33 +2679,24 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
-- as: gcp-ipi-f7-longduration-mco-critical
+- as: gcp-ipi-test2
   cron: 23 3 5,12,19,26 * *
   steps:
-    allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      COMPUTE_NODE_REPLICAS: "2"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: Critical
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
+      SLEEP_DURATION: 24h
     test:
-    - chain: openshift-e2e-test-mco-qe-longrun
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-f7-longduration-mco-g1
+- as: gcp-ipi-test3
   cron: 38 23 2,9,16,23 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      COMPUTE_NODE_REPLICAS: "2"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: High
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
+      SLEEP_DURATION: 24h
     test:
-    - chain: openshift-e2e-test-mco-qe-longrun
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-f7-longduration-mco-g2
   cron: 56 3 5,14,21,28 * *
@@ -3339,16 +3325,16 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy-minimal-permission
-- as: nutanix-ipi-tp-f28
+- as: nutanix-ipi-test1
   cluster: build01
   cron: 41 20 2 * *
   steps:
     cluster_profile: nutanix-qe
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FEATURE_SET: TechPreviewNoUpgrade
+      SLEEP_DURATION: 24h
     test:
-    - chain: openshift-e2e-test-qe
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-nutanix-ipi
 - as: nutanix-ipi-tp-f60-destructive
   cluster: build01
@@ -3397,7 +3383,7 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones-external-lb
-- as: nutanix-ipi-zones-f28
+- as: nutanix-ipi-zones-test1
   cluster: build01
   cron: 2 0 7 * *
   steps:
@@ -3406,8 +3392,9 @@ tests:
       COMPUTE_ZONE: failure-domain-1 failure-domain-2
       CONTROL_PLANE_ZONE: failure-domain-2 failure-domain-3
       EXTRACT_MANIFEST_INCLUDED: "true"
+      SLEEP_DURATION: 24h
     test:
-    - chain: openshift-e2e-test-qe
+    - ref: cucushift-installer-wait
     workflow: cucushift-installer-rehearse-nutanix-ipi-zones
 - as: nutanix-ipi-zones-f60-destructive
   cluster: build01
