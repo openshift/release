@@ -1,0 +1,124 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_path: Containerfile
+  to: amd-ci
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-amd-ci
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    env:
+      OCP_CLUSTER_VERSION: "4.18"
+      REMOTE_HOST: 10.1.178.14
+    post:
+    - as: e2e-amd-ci-post
+      commands: |
+        cp /var/run/amd-ci/id_rsa /tmp/id_rsa
+        chmod 600 /tmp/id_rsa
+        mkdir -p ~/.ssh
+        echo "Host *" > ~/.ssh/config
+        echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+        echo "  UserKnownHostsFile /dev/null" >> ~/.ssh/config
+        chmod 600 ~/.ssh/config
+        
+        # Ensure SSH config persists for cleanup (if needed)
+        ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${REMOTE_HOST} "
+          grep -q 'StrictHostKeyChecking no' /etc/ssh/ssh_config || \
+          (echo 'Host *' >> /etc/ssh/ssh_config && \
+           echo '  StrictHostKeyChecking no' >> /etc/ssh/ssh_config && \
+           echo '  UserKnownHostsFile /dev/null' >> /etc/ssh/ssh_config)
+        " || true
+        
+        export PULL_SECRET_PATH=/var/run/amd-ci/pull-secret
+        export SSH_KEY_PATH=/tmp/id_rsa
+        make sno-delete
+      credentials:
+      - collection: ""
+        mount_path: /var/run/amd-ci
+        name: amd-ci-credentials
+        namespace: test-credentials
+      env:
+      - name: OCP_CLUSTER_VERSION
+      - name: REMOTE_HOST
+      from: amd-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    pre:
+    - as: e2e-amd-ci-pre
+      commands: |
+        cp /var/run/amd-ci/id_rsa /tmp/id_rsa
+        chmod 600 /tmp/id_rsa
+        mkdir -p ~/.ssh
+        echo "Host *" > ~/.ssh/config
+        echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+        echo "  UserKnownHostsFile /dev/null" >> ~/.ssh/config
+        chmod 600 ~/.ssh/config
+        
+        # Set SSH options system-wide on the remote host and create sudo wrapper
+        echo "=== Configuring SSH and sudo on remote host ${REMOTE_HOST} ==="
+        ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${REMOTE_HOST} "
+          echo 'Host *' >> /etc/ssh/ssh_config && \
+          echo '  StrictHostKeyChecking no' >> /etc/ssh/ssh_config && \
+          echo '  UserKnownHostsFile /dev/null' >> /etc/ssh/ssh_config && \
+          echo 'SSH config updated.' && \
+          if ! command -v sudo &> /dev/null; then
+            echo 'Creating sudo wrapper for root...'
+            echo '#!/bin/bash' > /usr/local/bin/sudo
+            echo 'exec \"\$@\"' >> /usr/local/bin/sudo
+            chmod +x /usr/local/bin/sudo
+          fi
+        " || echo "WARNING: Failed to configure remote host"
+        
+        export PULL_SECRET_PATH=/var/run/amd-ci/pull-secret
+        export SSH_KEY_PATH=/tmp/id_rsa
+        make sno-deploy
+      credentials:
+      - collection: ""
+        mount_path: /var/run/amd-ci
+        name: amd-ci-credentials
+        namespace: test-credentials
+      env:
+      - name: OCP_CLUSTER_VERSION
+      - name: REMOTE_HOST
+      from: amd-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    test:
+    - as: e2e-amd-ci-test
+      commands: |
+        echo "TODO: Run tests"
+      credentials:
+      - collection: ""
+        mount_path: /var/run/amd-ci
+        name: amd-ci-credentials
+        namespace: test-credentials
+      env:
+      - name: OCP_CLUSTER_VERSION
+      - name: REMOTE_HOST
+      from: amd-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: amd-ci
+  variant: 4.18-stable
