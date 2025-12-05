@@ -82,7 +82,7 @@ spec:
 EOF
 
 # Wait for the LSO CSV to appear
-until oc get csv -n openshift-local-storage | grep -q local-storage-operator; do
+until oc get csv -n openshift-local-storage | grep -i local-storage-operator; do
   echo "Waiting for LSO operator"
   sleep 5
 done
