@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.4.6"
+	TAG="v0.5.2"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
 	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
@@ -89,12 +89,14 @@ CLOUD=$(yq-v4 eval '.CLOUD' "${SHARED_DIR}/powervc-conf.yaml")
 # @BUG could not update powervc-conf.yaml during install phase
 #INFRAID=$(yq-v4 eval '.INFRAID' "${SHARED_DIR}/powervc-conf.yaml")
 LEASED_RESOURCE=$(yq-v4 eval '.LEASED_RESOURCE' "${SHARED_DIR}/powervc-conf.yaml")
+SERVER_IP=$(yq-v4 eval '.SERVER_IP' "${SHARED_DIR}/powervc-conf.yaml")
 
 INFRAID=$(jq -r .infraID "${SHARED_DIR}/metadata.json")
 
 echo "CLOUD=${CLOUD}"
 echo "INFRAID=${INFRAID}"
 echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
+echo "SERVER_IP=${SERVER_IP}"
 
 export CLOUD
 export INFRAID
