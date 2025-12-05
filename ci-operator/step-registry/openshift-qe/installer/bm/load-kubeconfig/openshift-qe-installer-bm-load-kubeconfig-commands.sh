@@ -11,6 +11,11 @@ case ${KUBECONFIG_ORIGIN} in
     LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
     LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 
+    ping $bastion > "${ARTIFACT_DIR}/bastion-ping-cluster-health.log" 2>&1 &
+
+    # Store the PID of the background task
+    BACKGROUND_PID=$!
+
     if [ -z "${KUBECONFIG_PATH}" ]; then
         scp -q ${SSH_ARGS} root@${bastion}:/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig ${SHARED_DIR}/kubeconfig
     else
@@ -72,5 +77,8 @@ PROXY_EOF
     echo "Unsupported setting \`KUBECONFIG_ORIGIN=${KUBECONFIG_ORIGIN@Q}\`."
     ;;
 esac
+
+# Kill the background process if it is still running
+kill $BACKGROUND_PID
 
 exit 0
