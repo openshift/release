@@ -328,7 +328,7 @@ log "Choosing openshift version ${OPENSHIFT_VERSION}"
 # used by CI accounts like "renovate[bot]".
 TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' | tr -d '[]' || true)
 if [[ -z "$TAG_Author" ]]; then
-  TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[]' |  jq -r '.repo + "-" + .base_ref' || true)
+  TAG_Author=$(echo "${JOB_SPEC}" | jq -r '(.extra_refs // [])[] | .repo + "-" + .base_ref' | head -1 || true)
 fi
 TAG_Author=${TAG_Author:-"periodic"}
 TAG_Pull_Number=${PULL_NUMBER:-"periodic"}
