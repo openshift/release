@@ -266,7 +266,7 @@ set_proxy
 run_command "oc whoami"
 run_command "which oc && oc version -o yaml"
 update_global_auth
-sleep 5
+sleep 50000
 create_icsp_connected
 check_olm_capability
 check_marketplace
