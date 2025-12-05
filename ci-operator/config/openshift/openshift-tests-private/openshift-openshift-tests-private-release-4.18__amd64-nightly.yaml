@@ -1687,12 +1687,19 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
+      DEVSCRIPTS_CONFIG: |
+        NUM_WORKERS=3
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_MEMORY=16384
+        WORKER_MEMORY=8192
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=1
       LVM_OPERATOR_SUB_CHANNEL: stable-4.18
       MCE_VERSION: "2.8"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
     test:
-    - chain: openshift-e2e-test-hypershift-qe
+    - ref: wait
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
 - as: baremetalds-hypershift-agent-mce-guest-f28-destructive
   capabilities:
