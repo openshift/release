@@ -32,23 +32,10 @@ REGION=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.aws.
 # Handle C2S/SC2S regions
 if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   source_region=""
-  if [ -f "${CLUSTER_PROFILE_DIR}/shift_project_setting.json" ] && command -v python3 >/dev/null 2>&1; then
-    source_region=$(python3 - "$REGION" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json" <<'PY'
-import json, sys
-region = sys.argv[1]
-path = sys.argv[2]
-try:
-    with open(path, "r", encoding="utf-8") as fh:
-        data = json.load(fh)
-    value = data.get(region, {}).get("source_region")
-    if value:
-        print(value)
-except Exception:
-    pass
-PY
-)
+  if [ -f "${CLUSTER_PROFILE_DIR}/shift_project_setting.json" ] && command -v jq >/dev/null 2>&1; then
+    source_region=$(jq -r --arg region "${REGION}" '.[$region].source_region // empty' "${CLUSTER_PROFILE_DIR}/shift_project_setting.json" 2>/dev/null || true)
   fi
-  if [ -n "${source_region}" ] && [ "${source_region}" != "null" ]; then
+  if [ -n "${source_region}" ] && [ "${source_region}" != "null" ] && [ "${source_region}" != "" ]; then
     REGION=$source_region
   fi
 fi
@@ -66,9 +53,33 @@ function read_install_config() {
 
 # Read throughput values from install-config.yaml
 # Priority: split config > defaultMachinePlatform
-COMPUTE_THROUGHPUT=$(read_install_config 'compute[0].platform.aws.rootVolume.throughput')
 CONTROL_PLANE_THROUGHPUT=$(read_install_config 'controlPlane.platform.aws.rootVolume.throughput')
 DEFAULT_THROUGHPUT=$(read_install_config 'platform.aws.defaultMachinePlatform.rootVolume.throughput')
+
+# Read compute pool configurations - check all compute pools for worker and edge
+COMPUTE_THROUGHPUT=""
+COMPUTE_SIZE=""
+EDGE_THROUGHPUT=""
+EDGE_SIZE=""
+
+# Get number of compute pools
+compute_count=$(read_install_config 'compute | length' || echo "0")
+if [ "${compute_count}" -gt 0 ]; then
+  # Iterate through compute pools to find worker and edge
+  for i in $(seq 0 $((compute_count - 1))); do
+    pool_name=$(read_install_config "compute[${i}].name" || echo "")
+    if [ -z "${pool_name}" ] || [ "${pool_name}" == "worker" ]; then
+      # Default compute pool (no name or name=worker)
+      if [ -z "${COMPUTE_THROUGHPUT}" ]; then
+        COMPUTE_THROUGHPUT=$(read_install_config "compute[${i}].platform.aws.rootVolume.throughput")
+        COMPUTE_SIZE=$(read_install_config "compute[${i}].platform.aws.rootVolume.size")
+      fi
+    elif [ "${pool_name}" == "edge" ]; then
+      EDGE_THROUGHPUT=$(read_install_config "compute[${i}].platform.aws.rootVolume.throughput")
+      EDGE_SIZE=$(read_install_config "compute[${i}].platform.aws.rootVolume.size")
+    fi
+  done
+fi
 
 # Determine expected throughput: split config overrides defaultMachinePlatform
 EXPECTED_COMPUTE_THROUGHPUT="${COMPUTE_THROUGHPUT}"
@@ -79,9 +90,11 @@ EXPECTED_CONTROL_PLANE_THROUGHPUT="${CONTROL_PLANE_THROUGHPUT}"
 [ -z "${EXPECTED_CONTROL_PLANE_THROUGHPUT}" ] || [ "${EXPECTED_CONTROL_PLANE_THROUGHPUT}" == "null" ] && \
   EXPECTED_CONTROL_PLANE_THROUGHPUT="${DEFAULT_THROUGHPUT}"
 
+EXPECTED_EDGE_THROUGHPUT="${EDGE_THROUGHPUT}"
+[ -z "${EXPECTED_EDGE_THROUGHPUT}" ] || [ "${EXPECTED_EDGE_THROUGHPUT}" == "null" ] && \
+  EXPECTED_EDGE_THROUGHPUT="${DEFAULT_THROUGHPUT}"
+
 # Read size values from install-config.yaml
-# Priority: split config > defaultMachinePlatform
-COMPUTE_SIZE=$(read_install_config 'compute[0].platform.aws.rootVolume.size')
 CONTROL_PLANE_SIZE=$(read_install_config 'controlPlane.platform.aws.rootVolume.size')
 DEFAULT_SIZE=$(read_install_config 'platform.aws.defaultMachinePlatform.rootVolume.size')
 
@@ -93,6 +106,10 @@ EXPECTED_COMPUTE_SIZE="${COMPUTE_SIZE}"
 EXPECTED_CONTROL_PLANE_SIZE="${CONTROL_PLANE_SIZE}"
 [ -z "${EXPECTED_CONTROL_PLANE_SIZE}" ] || [ "${EXPECTED_CONTROL_PLANE_SIZE}" == "null" ] && \
   EXPECTED_CONTROL_PLANE_SIZE="${DEFAULT_SIZE}"
+
+EXPECTED_EDGE_SIZE="${EDGE_SIZE}"
+[ -z "${EXPECTED_EDGE_SIZE}" ] || [ "${EXPECTED_EDGE_SIZE}" == "null" ] && \
+  EXPECTED_EDGE_SIZE="${DEFAULT_SIZE}"
 
 # Verify that size values can be read from install-config
 if [ -z "${EXPECTED_COMPUTE_SIZE}" ] || [ "${EXPECTED_COMPUTE_SIZE}" == "null" ]; then
@@ -108,6 +125,10 @@ echo "Expected worker rootVolume size: ${EXPECTED_COMPUTE_SIZE} GiB"
 echo "Expected worker throughput: ${EXPECTED_COMPUTE_THROUGHPUT:-N/A} MiB/s"
 echo "Expected control-plane rootVolume size: ${EXPECTED_CONTROL_PLANE_SIZE} GiB"
 echo "Expected control-plane throughput: ${EXPECTED_CONTROL_PLANE_THROUGHPUT:-N/A} MiB/s"
+if [ -n "${EXPECTED_EDGE_SIZE}" ] && [ "${EXPECTED_EDGE_SIZE}" != "null" ]; then
+  echo "Expected edge rootVolume size: ${EXPECTED_EDGE_SIZE} GiB"
+  echo "Expected edge throughput: ${EXPECTED_EDGE_THROUGHPUT:-N/A} MiB/s"
+fi
 
 ret=0
 declare -a FAILURE_SUMMARY=()
@@ -224,6 +245,12 @@ verify_nodes "node-role.kubernetes.io/worker" "worker" "${EXPECTED_COMPUTE_SIZE}
 
 echo "Checking control-plane nodes"
 verify_nodes "node-role.kubernetes.io/master" "control-plane" "${EXPECTED_CONTROL_PLANE_SIZE}" "${EXPECTED_CONTROL_PLANE_THROUGHPUT}"
+
+# Check edge nodes if edge compute pool exists in install-config
+if [ -n "${EXPECTED_EDGE_SIZE}" ] && [ "${EXPECTED_EDGE_SIZE}" != "null" ]; then
+  echo "Checking edge nodes"
+  verify_nodes "node-role.kubernetes.io/edge" "edge" "${EXPECTED_EDGE_SIZE}" "${EXPECTED_EDGE_THROUGHPUT}"
+fi
 
 echo "=========================================="
 echo "Test Summary"
