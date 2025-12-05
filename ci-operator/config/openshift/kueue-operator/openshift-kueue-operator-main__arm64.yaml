@@ -18,6 +18,18 @@ base_images:
 build_root:
   from_repository: true
 images:
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y skopeo git && dnf clean all
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-with-oc-and-kubectl
 - build_args:
   - name: TARGETOS
     value: linux
@@ -158,6 +170,23 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e-upstream
+    workflow: ipi-aws
+- as: konflux-images-4-20
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest-4-20
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      CONTAINER_IMAGE: quay.io/curl/curl:latest
+      OCP_ARCH: arm64
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-legacy
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
