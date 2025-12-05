@@ -307,6 +307,8 @@ spec:
    - metallb
 EOF
 
+sleep 30
+
 if oc get pods -n metallb-system 2>/dev/null | grep -E "Running" >/dev/null; then
     echo "✅ Successfully installed metallb-operator."
 else

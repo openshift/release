@@ -74,20 +74,26 @@ metadata:
   name: local-storage-operator
   namespace: openshift-local-storage
 spec:
-  channel: "stable"
+  channel: stable
   installPlanApproval: Automatic
   name: local-storage-operator
   source: "${LOCAL_STORAGE_OPERATOR_SUB_SOURCE}"
   sourceNamespace: openshift-marketplace
 EOF
 
-# Wait for the operator to be ready
-until [ "$(oc get csv -n openshift-local-storage | grep local-storage-operator > /dev/null; echo $?)" == 0 ];
-  do echo "Waiting for LSO operator"
+# Wait until the LSO CSV appears
+until oc get csv -n openshift-local-storage | grep -i local-storage-operator; do
+  echo "Waiting for LSO operator"
   sleep 5
 done
-oc wait --for jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-local-storage "$(oc get csv -n openshift-local-storage -oname)"
-sleep 60
+
+# Extract ONLY the LSO CSV name
+CSV=$(oc get csv -n openshift-local-storage -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep local-storage-operator | head -n1)
+
+echo "Found LSO CSV: $CSV"
+
+# Wait for Phase=Succeeded
+oc wait --for=jsonpath='{.status.phase}'=Succeeded --timeout=10m -n openshift-local-storage csv/$CSV
 
 # Create LocalVolumeDiscovery
 oc apply -f - <<EOF
