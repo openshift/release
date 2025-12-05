@@ -1,8 +1,4 @@
 base_images:
-  ansible-runner-ovirt:
-    name: ansible-runner-ovirt
-    namespace: openshift
-    tag: latest
   base:
     name: 4.13-priv
     namespace: ocp-private
@@ -11,14 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.13
-  ovirt-prfinder:
-    name: ovirt-prfinder
-    namespace: openshift
-    tag: latest
 binary_build_commands: make build
 build_root:
   from_repository: true
-canonical_go_repository: github.com/openshift/cluster-api-provider-ovirt
+canonical_go_repository: sigs.k8s.io/cluster-api-provider-openstack
 images:
 - dockerfile_path: Dockerfile.rhel
   from: base
@@ -26,7 +18,7 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  to: ovirt-machine-controllers
+  to: openstack-machine-controllers
 promotion:
   to:
   - name: 4.13-priv
@@ -48,18 +40,22 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: go test -tags=unit ./... -v
+  commands: make test
   container:
     from: src
-- as: functional
-  commands: source ./hack/run-functional-test.sh
+- as: gofmt
+  commands: IS_CONTAINER=TRUE make fmt
   container:
     from: src
-- as: e2e-ovirt
-  steps:
-    cluster_profile: ovirt
-    workflow: openshift-e2e-ovirt-minimal
+- as: govet
+  commands: IS_CONTAINER=TRUE make vet
+  container:
+    from: src
+- as: golint
+  commands: IS_CONTAINER=TRUE make lint
+  container:
+    from: src
 zz_generated_metadata:
   branch: release-4.13
   org: openshift-priv
-  repo: cluster-api-provider-ovirt
+  repo: cluster-api-provider-openstack
