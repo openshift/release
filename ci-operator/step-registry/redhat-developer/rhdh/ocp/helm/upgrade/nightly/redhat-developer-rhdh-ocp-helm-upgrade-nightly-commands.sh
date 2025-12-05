@@ -172,10 +172,6 @@ echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
 
-echo "========== Namespace Configuration =========="
-export NAME_SPACE="showcase-upgrade-nightly"
-echo "NAME_SPACE: $NAME_SPACE"
-
 echo "========== Test Execution =========="
 echo "Executing openshift-ci-tests.sh"
 bash ./.ibm/pipelines/openshift-ci-tests.sh

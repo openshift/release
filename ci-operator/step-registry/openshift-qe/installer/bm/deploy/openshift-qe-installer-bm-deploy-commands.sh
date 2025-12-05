@@ -69,6 +69,8 @@ if [[ $PUBLIC_VLAN == "false" ]]; then
   cat > ${SHARED_DIR}/proxy-conf.sh << 'PROXY_EOF'
 #!/bin/bash
 
+echo "Loading proxy configuration"
+
 cleanup_ssh() {
   # Kill the SOCKS proxy running on the jumphost
   ssh ${SSH_ARGS} root@${jumphost} "pkill -f 'ssh root@${bastion} -fNT -D'" 2>/dev/null || true
@@ -104,7 +106,37 @@ trap 'cleanup_ssh' EXIT
 PROXY_EOF
 fi
 
-if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
+if [[ "$TYPE" == "vmno" ]]; then
+  # Load VMNO configuration from cluster profile
+  HV_COUNT=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r ".hv_count")
+  HV_VM_CPU_COUNT=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r ".hv_vm_cpu_count")
+  HV_VM_MEMORY_SIZE=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r ".hv_vm_memory_size")
+  HV_VM_DISK_SIZE=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r ".hv_vm_disk_size")
+
+  # Extract hardware model from bastion hostname
+  HV_HW_NAME=$(cat ${CLUSTER_PROFILE_DIR}/bastion | cut -d'.' -f1 | awk -F'-' '{print $NF}')
+
+  # Convert hv_vm_disk JSON to YAML format with proper indentation
+  HV_VM_DISK_YAML=$(cat ${CLUSTER_PROFILE_DIR}/config | jq -r '.hv_vm_disk | to_entries | map("      " + .key + ": " + (.value | tostring)) | join("\n")')
+
+  cat <<EOF >>/tmp/all.yml
+hv_ssh_pass: $LOGIN
+hv_ip_offset: 0
+hv_vm_ip_offset: 20
+compact_cluster_dns_count: 0
+standard_cluster_dns_count: 0
+hv_count: $HV_COUNT
+hv_vm_cpu_count: $HV_VM_CPU_COUNT
+hv_vm_memory_size: $HV_VM_MEMORY_SIZE
+hv_vm_disk_size: $HV_VM_DISK_SIZE
+hw_vm_counts:
+  $LAB:
+    $HV_HW_NAME:
+$HV_VM_DISK_YAML
+EOF
+fi
+
+if [[ "$TYPE" == "hmno" ]]; then
   cat <<EOF >>/tmp/all.yml
 hybrid_worker_count: $NUM_HYBRID_WORKER_NODES
 hv_ip_offset: 0
@@ -113,12 +145,28 @@ hv_inventory: true
 compact_cluster_dns_count: 0
 standard_cluster_dns_count: 0
 hv_ssh_pass: $LOGIN
+cluster_type: mno
 EOF
   cat <<EOF >>/tmp/hv.yml
 install_tc: false
 lab: $LAB
 ssh_public_key_file: ~/.ssh/id_rsa.pub
 use_bastion_registry: false
+setup_hv_vm_dhcp: false
+compact_cluster_dns_count: 0
+standard_cluster_dns_count: 0
+hv_vm_generate_manifests: false
+sno_cluster_count: 0
+EOF
+fi
+
+if [[ "$TYPE" == "vmno" ]]; then
+  cat <<EOF >>/tmp/hv.yml
+install_tc: true
+lab: $LAB
+ssh_public_key_file: ~/.ssh/id_rsa.pub
+use_bastion_registry: false
+setup_coredns: false
 setup_hv_vm_dhcp: false
 compact_cluster_dns_count: 0
 standard_cluster_dns_count: 0
@@ -200,13 +248,15 @@ scp -q ${SSH_ARGS} /tmp/all-updated.yml root@${bastion}:${jetlag_repo}/ansible/v
 scp -q ${SSH_ARGS} /tmp/pull-secret root@${bastion}:${jetlag_repo}/pull_secret.txt
 scp -q ${SSH_ARGS} /tmp/clean-resources.sh root@${bastion}:/tmp/
 
-if [[ ! -z "$NUM_HYBRID_WORKER_NODES" ]]; then
+if [[ "$TYPE" == "hmno" || "$TYPE" == "vmno" ]]; then
   scp -q ${SSH_ARGS} /tmp/hv.yml root@${bastion}:${jetlag_repo}/ansible/vars/hv.yml
 fi
 
 
 if [[ ${TYPE} == 'sno' ]]; then
   KUBECONFIG_SRC='/root/sno/{{ groups.sno[0] }}/kubeconfig'
+elif [[ ${TYPE} == 'hmno' ]]; then
+  KUBECONFIG_SRC=/root/mno/kubeconfig
 else
   KUBECONFIG_SRC=/root/${TYPE}/kubeconfig
 fi
@@ -234,12 +284,16 @@ ssh ${SSH_ARGS} root@${bastion} "
    ansible-playbook ansible/create-inventory.yml | tee /tmp/ansible-create-inventory-$(date +%s)
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m script -a /tmp/clean-resources.sh
    ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/setup-bastion.yml | tee /tmp/ansible-setup-bastion-$(date +%s)
-   if [[ ! -z \"$NUM_HYBRID_WORKER_NODES\" ]]; then
+   if [[ \"$TYPE\" == \"hmno\" || \"$TYPE\" == \"vmno\" ]]; then
      export ANSIBLE_HOST_KEY_CHECKING=False
      ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/hv-setup.yml -v | tee /tmp/ansible-hv-setup-$(date +%s)
      ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/hv-vm-create.yml -v | tee /tmp/ansible-hv-vm-create-$(date +%s)
    fi
-   ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
+   if [[ \"$TYPE\" == \"hmno\" || \"$TYPE\" == \"vmno\" ]]; then
+     ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/mno-deploy.yml -v | tee /tmp/ansible-mno-deploy-$(date +%s)
+   else
+     ansible-playbook -i ansible/inventory/$LAB_CLOUD.local ansible/${TYPE}-deploy.yml -v | tee /tmp/ansible-${TYPE}-deploy-$(date +%s)
+   fi
    mkdir -p /root/$LAB/$LAB_CLOUD/$TYPE
    ansible -i ansible/inventory/$LAB_CLOUD.local bastion -m fetch -a 'src=${KUBECONFIG_SRC} dest=/root/$LAB/$LAB_CLOUD/$TYPE/kubeconfig flat=true'
    deactivate

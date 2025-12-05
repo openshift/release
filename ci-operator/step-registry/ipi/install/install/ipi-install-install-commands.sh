@@ -783,9 +783,9 @@ done <   <( find "${SHARED_DIR}" \( -name "openshift_manifests_[0-9]*.yml" -o -n
 
 # Collect bootstrap logs for all azure clusters
 case "${CLUSTER_TYPE}" in
-azure4|azure-arm64) OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=true ;;
+azure4|azure-arm64) OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-true} ;;
 esac
-if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
+if [ "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" == "true" ]; then
   set +o errexit
   # Inject promtail in bootstrap.ign
   ${INSTALLER_BINARY} --dir="${dir}" create ignition-configs &

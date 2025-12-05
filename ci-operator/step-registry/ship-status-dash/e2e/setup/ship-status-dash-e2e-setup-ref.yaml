@@ -1,0 +1,27 @@
+ref:
+  as: ship-status-dash-e2e-setup
+  cli: latest
+  from: src
+  commands: ship-status-dash-e2e-setup-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: registry-pull-credentials
+    mount_path: /var/run/registry-pull-credentials-all
+  dependencies:
+  - name: "pipeline:dashboard"
+    env: DASHBOARD_IMAGE
+  - name: "pipeline:mock-oauth-proxy"
+    env: MOCK_OAUTH_PROXY_IMAGE
+  - name: "pipeline:migrate"
+    env: MIGRATE_IMAGE
+  env:
+  - name: DOCKERCONFIGJSON
+    default: "/var/run/registry-pull-credentials-all/.dockerconfigjson"
+    documentation: The path to the dockerconfigjson file
+  documentation: |-
+    Setup step for ship-status-dash e2e tests. This step prepares the test environment
+    including starting a postgres database container and setting up necessary dependencies.

@@ -1,0 +1,32 @@
+workflow:
+  as: sandboxed-containers-operator-e2e-aro
+  steps:
+    env:
+      TEST_PARALLEL: 1
+      FORCE_SUCCESS_EXIT: yes
+      MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
+      MUST_GATHER_TIMEOUT: "35m"
+      ENABLE_MUST_GATHER: "true"
+      MUST_GATHER_ON_FAILURE_ONLY: "false"
+      ARO_BYO_NSG: "true"
+      ARO_WORKER_COUNT: "3"
+      ARO_WORKER_VM_SIZE: Standard_D8s_v3
+    pre:
+    - ref: azure-provision-resourcegroup
+    - ref: aro-provision-vnet
+    - ref: aro-provision-nsg
+    - ref: aro-provision-cluster
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - chain: sandboxed-containers-operator-pre
+    post:
+    - ref: cucushift-installer-wait
+      timeout: 12h10m0s
+    - ref: sandboxed-containers-operator-gather-must-gather
+    - ref: sandboxed-containers-operator-post
+    - ref: aro-deprovision
+    test:
+    - ref: openshift-extended-test
+  documentation: |-
+    This workflow run openshift-extented-test on an Azure cluster with
+    the sandboxed containers deployed.

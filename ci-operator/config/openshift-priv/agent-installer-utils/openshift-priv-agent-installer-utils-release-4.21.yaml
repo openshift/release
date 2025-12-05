@@ -24,6 +24,16 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: agent-installer-utils
+- dockerfile_literal: |
+    FROM src AS source
+    FROM scratch
+    COPY --from=source /go/src/github.com/openshift/agent-installer-utils/tools/iso_builder /src
+    WORKDIR /src
+  inputs:
+    src:
+      as:
+      - src
+  to: agent-iso-builder
 promotion:
   to:
   - disabled: true

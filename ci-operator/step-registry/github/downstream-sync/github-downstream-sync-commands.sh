@@ -98,11 +98,11 @@ DRAFT=$( [[ "${CONFLICT:-false}" == "true" ]] && echo true || echo false )
 # Build the PR JSON $PAYLOAD
 PAYLOAD=$(
   jq -nc \
-    --arg title "$PR_TITLE" \
-    --arg head  "$BRANCH" \
-    --arg base  "$DEFAULT_BRANCH" \
-    --arg body  "$PR_BODY" \
-    --arg draft "$DRAFT" \
+    --arg title     "$PR_TITLE" \
+    --arg head      "$BRANCH" \
+    --arg base      "$DEFAULT_BRANCH" \
+    --arg body      "$PR_BODY" \
+    --argjson draft "$DRAFT" \
     '{title: $title, head: $head, base: $base, body: $body, draft: $draft}'
 )
 

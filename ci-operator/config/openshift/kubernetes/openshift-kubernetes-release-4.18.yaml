@@ -47,6 +47,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.22-openshift-4.18
+  openshift_release_rhel-9-golang-1.23-openshift-4.18:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.18
   rhel-coreos-base:
     name: "4.18"
     namespace: ocp
@@ -265,9 +269,9 @@ tests:
       size: 6Gi
 - as: verify
   commands: |
-    KUBE_VERIFY_GIT_BRANCH="${PULL_BASE_REF:-master}" ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/verify.sh
+    KUBE_VERIFY_GIT_BRANCH="release-4.18" ARTIFACTS="${ARTIFACT_DIR}" TMPDIR=/tmp/volume openshift-hack/verify.sh
   container:
-    from: src
+    from: openshift_release_rhel-9-golang-1.23-openshift-4.18
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-master}

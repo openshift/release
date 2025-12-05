@@ -52,7 +52,9 @@ VERSION_SWITCH=""
 if [[ "$CHANNEL_GROUP" != "stable" ]]; then
   # Get the X.Y from the release payload pullspec if we're using the one from CI
   if [[ "$OPENSHIFT_VERSION" == "release:latest" ]]; then
-    OPENSHIFT_VERSION=$(echo "$ORIGINAL_RELEASE_IMAGE_LATEST" | sed -E 's/.*:([0-9]+\.[0-9]+).*/\1/')
+    if [[ -n "${ORIGINAL_RELEASE_IMAGE_LATEST:-}" ]]; then
+      OPENSHIFT_VERSION=$(echo "$ORIGINAL_RELEASE_IMAGE_LATEST" | sed -E 's/.*:([0-9]+\.[0-9]+).*/\1/')
+    fi
   fi
 
   if [[ -z "$OPENSHIFT_VERSION" ]]; then

@@ -12,4 +12,19 @@ export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscripti
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
 az account set --subscription "${SUBSCRIPTION_ID}"
 
-./test/aro-hcp-tests cleanup resource-groups --expired
+cmd="./test/aro-hcp-tests cleanup resource-groups --expired"
+
+if [ -n "${CLEANUP_MODE}" ]; then
+  cmd="${cmd} --env-type ${CLEANUP_MODE}"
+fi
+
+if [ -n "${INCLUDE_LOCATION}" ]; then
+  cmd="${cmd} --include-location ${INCLUDE_LOCATION}"
+fi
+
+if [ -n "${EXCLUDE_LOCATION}" ]; then
+  cmd="${cmd} --exclude-location ${EXCLUDE_LOCATION}"
+fi
+
+echo "Running: ${cmd}"
+eval "${cmd}"
