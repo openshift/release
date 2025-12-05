@@ -62,6 +62,41 @@ EOF
   yq-go m -x -i "${CONFIG}" "${PATCH}"
 fi
 
+# Handle edge compute pool rootVolume configuration
+# Users can set AWS_EDGE_VOLUME_TYPE and AWS_EDGE_GP3_THROUGHPUT together
+if [[ "${AWS_EDGE_VOLUME_TYPE}" != "" ]]; then
+  echo "Edge volume type: ${AWS_EDGE_VOLUME_TYPE}"
+  PATCH=$(mktemp)
+  cat >> "${PATCH}" << EOF
+compute:
+- name: edge
+  platform:
+    aws:
+      rootVolume:
+        type: ${AWS_EDGE_VOLUME_TYPE}
+        size: ${AWS_EDGE_VOLUME_SIZE}
+EOF
+  append_throughput_for_gp3 "${AWS_EDGE_VOLUME_TYPE}" "${PATCH}" "${AWS_EDGE_GP3_THROUGHPUT:-}"
+  cat "${PATCH}"
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+fi
+
+# If only throughput is specified for edge (without volume type), set throughput only
+if [[ "${AWS_EDGE_VOLUME_TYPE}" == "" ]] && [[ -n "${AWS_EDGE_GP3_THROUGHPUT:-}" ]]; then
+  echo "Setting edge rootVolume throughput only: ${AWS_EDGE_GP3_THROUGHPUT}"
+  PATCH=$(mktemp)
+  cat >> "${PATCH}" << EOF
+compute:
+- name: edge
+  platform:
+    aws:
+      rootVolume:
+        throughput: ${AWS_EDGE_GP3_THROUGHPUT}
+EOF
+  cat "${PATCH}"
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+fi
+
 # Handle controlPlane rootVolume configuration
 # Users can set AWS_CONTROL_PLANE_VOLUME_TYPE and AWS_CONTROL_PLANE_GP3_THROUGHPUT together
 if [[ "${AWS_CONTROL_PLANE_VOLUME_TYPE}" != "" ]]; then
