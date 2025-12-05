@@ -21,9 +21,21 @@ gh auth login --with-token < /var/run/vault/hypershift-jira-agent-github-token/t
 echo "Setting up Claude Code authentication..."
 export ANTHROPIC_API_KEY=$(cat /var/run/vault/hypershift-jira-agent-anthropic-api-key/key)
 
+# Setup Jira authentication
+echo "Setting up Jira authentication..."
+export JIRA_API_TOKEN=$(cat /var/run/vault/hypershift-jira-agent-jira-token/token)
+
 # Verify Claude Code is available
 echo "Verifying Claude Code CLI..."
 claude --version || { echo "ERROR: Claude Code CLI not found"; exit 1; }
+
+# Verify ai-helpers plugins are available
+echo "Verifying ai-helpers plugins..."
+if [ -d "/opt/ai-helpers/plugins/jira" ]; then
+  echo "✅ jira@ai-helpers plugin found"
+else
+  echo "WARNING: jira@ai-helpers plugin not found at /opt/ai-helpers/plugins/jira"
+fi
 
 # Test Claude Code can authenticate
 echo "Testing Claude Code authentication..."

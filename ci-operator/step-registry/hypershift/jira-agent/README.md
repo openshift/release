@@ -7,9 +7,14 @@ Automated periodic job that processes Jira issues labeled with `issue-for-agent`
 This workflow implements a fully automated system for processing HyperShift Jira issues:
 
 1. **Query**: Searches Jira for unresolved issues in OCPBUGS and CNTRLPLANE projects with label `issue-for-agent`
-2. **Process**: For each issue, runs the `/jira-solve` command from the HyperShift repository non-interactively
+2. **Process**: For each issue, runs the `/jira:solve` command from the ai-helpers plugin non-interactively
 3. **Track**: Maintains state in a ConfigMap to avoid reprocessing issues
 4. **Report**: Generates summary of processed issues and results
+
+## Plugin Dependency
+
+This workflow uses the `/jira:solve` command from the [ai-helpers](https://github.com/openshift-eng/ai-helpers) plugin system.
+The `jira@ai-helpers` plugin is pre-configured in the container image and provides the issue analysis and PR creation functionality.
 
 ## Data Flow Diagram
 
@@ -48,7 +53,7 @@ flowchart TD
         CheckProcessed{Issue Already<br/>Processed?}:::decision
         CheckSuccess{Processing<br/>Successful?}:::decision
 
-        ProcessIssue[Run Claude Code CLI<br/>echo '/jira-solve ISSUE-KEY origin'<br/>--max-turns 30<br/>--dangerously-skip-permissions]:::ai
+        ProcessIssue[Run Claude Code CLI<br/>echo '/jira:solve ISSUE-KEY origin'<br/>--max-turns 30<br/>--dangerously-skip-permissions]:::ai
 
         RecordSuccess[Record to State:<br/>ISSUE-KEY TIMESTAMP PR-URL SUCCESS]:::success
         RecordFailure[Record to State:<br/>ISSUE-KEY TIMESTAMP - FAILED]:::failure
@@ -135,7 +140,7 @@ flowchart TD
 #### 2. Process (`hypershift-jira-agent-process`)
 - Queries Jira API for labeled issues
 - Loads processed issues from ConfigMap
-- Runs `/jira-solve` for each unprocessed issue using Claude Code CLI
+- Runs `/jira:solve` (from ai-helpers plugin) for each unprocessed issue using Claude Code CLI
 - Implements rate limiting (60s between issues)
 - Updates state with results
 
@@ -148,7 +153,7 @@ flowchart TD
 
 ### Secrets Required
 
-The workflow requires two secrets to be created in the `test-credentials` namespace:
+The workflow requires three secrets to be created in the `test-credentials` namespace:
 
 1. **`hypershift-jira-agent-anthropic-api-key`**
    - Key: `key`
@@ -159,6 +164,11 @@ The workflow requires two secrets to be created in the `test-credentials` namesp
    - Key: `token`
    - Value: GitHub token with PR creation permissions
    - Mount path: `/var/run/vault/hypershift-jira-agent-github-token`
+
+3. **`hypershift-jira-agent-jira-token`**
+   - Key: `token`
+   - Value: Jira Personal Access Token for authenticated API access
+   - Mount path: `/var/run/vault/hypershift-jira-agent-jira-token`
 
 These should be configured in Vault and mounted automatically.
 
@@ -201,17 +211,18 @@ OCPBUGS-12346 2025-01-15T10:05:00Z - FAILED
 
 ### Non-Interactive Execution
 
-The workflow uses Claude Code CLI's non-interactive mode:
+The workflow uses Claude Code CLI's non-interactive mode with the ai-helpers plugin:
 
 ```bash
-echo "/jira-solve ISSUE-KEY origin" | claude -p \
+echo "/jira:solve ISSUE-KEY origin" | claude -p \
   --output-format json \
   --dangerously-skip-permissions \
-  --allowedTools "Bash Read Write Edit Grep Glob WebFetch SlashCommand" \
+  --allowedTools "Bash Read Write Edit Grep Glob WebFetch Skill SlashCommand" \
   --max-turns 30
 ```
 
-This allows the `/jira-solve` command from `.claude/commands/jira-solve.md` in the HyperShift repo to run automatically without user interaction.
+This allows the `/jira:solve` command from the `jira@ai-helpers` plugin to run automatically without user interaction.
+The plugin is pre-configured in the container image via `/home/claude/.claude/settings.json`.
 
 ### Jira Query
 
@@ -232,10 +243,11 @@ Maximum issues queried and processed is controlled by `JIRA_AGENT_MAX_ISSUES` (d
 ## Container Image
 
 Uses custom image built from `tools/hypershift-jira-agent/Dockerfile` containing:
-- Claude Code CLI
+- Claude Code CLI with ai-helpers plugins pre-configured
 - GitHub CLI (gh)
-- jq, git, kubectl
-- Required dependencies
+- jq, git, kubectl, python3
+- ai-helpers repository cloned to `/opt/ai-helpers`
+- Claude settings configured with `jira@ai-helpers` plugin enabled
 
 ## Local Testing
 
@@ -303,7 +315,12 @@ Then run `make update` to regenerate job configs.
 ### Issue: PR creation fails
 - Check GitHub token permissions
 - Verify HyperShift repository access
-- Review `/jira-solve` command output in logs
+- Review `/jira:solve` command output in logs
+
+### Issue: Plugin not found
+- Verify ai-helpers repository is cloned to `/opt/ai-helpers`
+- Check Claude settings file exists at `/home/claude/.claude/settings.json`
+- Verify `jira@ai-helpers` plugin is enabled in settings
 
 ## Future Enhancements
 

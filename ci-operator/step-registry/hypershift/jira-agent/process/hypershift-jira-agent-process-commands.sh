@@ -8,6 +8,7 @@ cd /tmp/hypershift
 # Export credentials
 export ANTHROPIC_API_KEY=$(cat /var/run/vault/hypershift-jira-agent-anthropic-api-key/key)
 export GITHUB_TOKEN=$(cat /var/run/vault/hypershift-jira-agent-github-token/token)
+export JIRA_API_TOKEN=$(cat /var/run/vault/hypershift-jira-agent-jira-token/token)
 
 # GitHub CLI auth
 gh auth login --with-token <<< "$GITHUB_TOKEN"
@@ -66,14 +67,14 @@ while IFS= read -r line; do
   echo "Summary: $ISSUE_SUMMARY"
   echo "=========================================="
 
-  # Run /jira-solve command non-interactively
+  # Run /jira:solve command non-interactively (plugin from ai-helpers)
   TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
   set +e  # Don't exit on error for individual issues
-  RESULT=$(echo "/jira-solve $ISSUE_KEY origin" | claude -p \
+  RESULT=$(echo "/jira:solve $ISSUE_KEY origin" | claude -p \
     --output-format json \
     --dangerously-skip-permissions \
-    --allowedTools "Bash Read Write Edit Grep Glob WebFetch SlashCommand" \
+    --allowedTools "Bash Read Write Edit Grep Glob WebFetch Skill SlashCommand" \
     --max-turns 30 \
     2>&1)
   EXIT_CODE=$?

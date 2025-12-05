@@ -9,7 +9,7 @@ echo ""
 
 # Check prerequisites
 echo "Checking prerequisites..."
-command -v claude >/dev/null 2>&1 || { echo "ERROR: claude CLI not found. Install with: npm install -g @anthropics/claude-code"; exit 1; }
+command -v claude >/dev/null 2>&1 || { echo "ERROR: claude CLI not found. Install with: npm install -g @anthropic-ai/claude-code"; exit 1; }
 command -v gh >/dev/null 2>&1 || { echo "ERROR: gh CLI not found. Install from https://cli.github.com"; exit 1; }
 command -v jq >/dev/null 2>&1 || { echo "ERROR: jq not found. Install with: brew install jq"; exit 1; }
 
@@ -26,6 +26,18 @@ if [ -z "${GITHUB_TOKEN:-}" ]; then
 fi
 
 echo "✅ All prerequisites met"
+echo ""
+
+# Install ai-helpers plugin if not already installed
+echo "Checking ai-helpers plugin..."
+if ! claude /plugin list 2>/dev/null | grep -q "jira@ai-helpers"; then
+  echo "Installing ai-helpers plugin..."
+  claude /plugin marketplace add openshift-eng/ai-helpers 2>/dev/null || true
+  claude /plugin install jira@ai-helpers 2>/dev/null || true
+  echo "✅ ai-helpers plugin installed"
+else
+  echo "✅ ai-helpers plugin already installed"
+fi
 echo ""
 
 # Clone HyperShift repository
@@ -72,7 +84,7 @@ if [ -z "$ISSUES" ]; then
   echo "No issues found matching criteria. This is expected if no issues have the label."
   echo "You can manually test with a specific issue by running:"
   echo "  cd $HYPERSHIFT_DIR"
-  echo "  echo '/jira-solve OCPBUGS-XXXXX origin' | claude -p --dangerously-skip-permissions"
+  echo "  echo '/jira:solve OCPBUGS-XXXXX origin' | claude -p --dangerously-skip-permissions"
   exit 0
 fi
 
@@ -89,7 +101,7 @@ if [[ ! "$ANSWER" =~ ^[Yy]$ ]]; then
   echo ""
   echo "To manually test, run:"
   echo "  cd $HYPERSHIFT_DIR"
-  echo "  echo '/jira-solve ISSUE-KEY origin' | claude -p --dangerously-skip-permissions"
+  echo "  echo '/jira:solve ISSUE-KEY origin' | claude -p --dangerously-skip-permissions"
   exit 0
 fi
 
@@ -99,11 +111,11 @@ echo ""
 echo "Testing with issue: $FIRST_ISSUE"
 echo "=========================================="
 
-# Run /jira-solve command
-echo "/jira-solve $FIRST_ISSUE origin" | claude -p \
+# Run /jira:solve command (from ai-helpers plugin)
+echo "/jira:solve $FIRST_ISSUE origin" | claude -p \
   --output-format json \
   --dangerously-skip-permissions \
-  --allowedTools "Bash Read Write Edit Grep Glob WebFetch SlashCommand" \
+  --allowedTools "Bash Read Write Edit Grep Glob WebFetch Skill SlashCommand" \
   --max-turns 30 \
   | jq '.'
 
