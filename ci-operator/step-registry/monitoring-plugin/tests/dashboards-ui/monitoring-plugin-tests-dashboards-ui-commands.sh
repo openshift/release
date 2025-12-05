@@ -74,6 +74,7 @@ function copyArtifacts {
   fi
 }
 
+# # when claiming a cluster from cluster pool, it stucks
 # ## Add IDP for testing
 # # prepare users
 # users=""
@@ -140,4 +141,4 @@ ls -ltr
 npm install
 
 # Run the Cypress tests
-npm run test-cypress-monitoring
+npm run test-cypress-monitoring-dashboards
