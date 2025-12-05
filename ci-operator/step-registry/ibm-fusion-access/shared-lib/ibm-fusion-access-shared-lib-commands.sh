@@ -2,14 +2,14 @@
 set -eux -o pipefail; shopt -s inherit_errexit
 
 # ============================================================================
-# Fusion Access Shared Library Generator
+# IBM Fusion Access Shared Library Generator
 # ============================================================================
 # This script generates a shared library of bash functions for JUnit XML
-# test result reporting, used across all Fusion Access test steps.
+# test result reporting, used across all IBM Fusion Access test steps.
 #
 # Purpose:
 #   - Centralize JUnit XML reporting functions
-#   - Ensure consistent test reporting across all Fusion Access tests
+#   - Ensure consistent test reporting across all IBM Fusion Access tests
 #   - Reduce code duplication and improve maintainability
 #   - Follow OCP CI best practices for test result reporting
 #
@@ -21,16 +21,16 @@ set -eux -o pipefail; shopt -s inherit_errexit
 #   - JUnit XML Schema: https://www.ibm.com/docs/en/developer-for-zos/9.1.1?topic=formats-junit-xml-format
 # ============================================================================
 
-echo "************ Fusion Access Generating Shared Functions ************"
+echo "************ IBM Fusion Access Generating Shared Functions ************"
 
 FUNCTIONS_PATH="${SHARED_DIR}/common-fusion-access-bash-functions.sh"
 
 cat <<'EO-SHARED-FUNCTION' > "${FUNCTIONS_PATH}"
 ########################################################################
-# Fusion Access Shared Test Functions
+# IBM Fusion Access Shared Test Functions
 ########################################################################
 # Common JUnit XML test result reporting functions used by multiple
-# Fusion Access test steps.
+# IBM Fusion Access test steps.
 #
 # These functions provide standardized test result reporting that
 # integrates with OCP CI test platform, Prow/Spyglass visualization,
@@ -137,7 +137,7 @@ add_test_result() {
 #
 # Optional Global Variables:
 #   - JUNIT_SUITE_NAME: Name of the test suite (string)
-#                       Default: "Fusion Access Tests"
+#                       Default: "IBM Fusion Access Tests"
 #   - JUNIT_EXIT_ON_FAILURE: Exit with error if tests failed (boolean string)
 #                            Default: "true"
 #                            Set to "false" to suppress exit on failure
@@ -156,7 +156,7 @@ add_test_result() {
 # Example Setup:
 #   ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 #   JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_fusion_access_tests.xml"
-#   JUNIT_SUITE_NAME="Fusion Access Operator Installation Tests"
+#   JUNIT_SUITE_NAME="IBM Fusion Access Operator Installation Tests"
 #   TEST_START_TIME=$(date +%s)
 #   TESTS_TOTAL=0
 #   TESTS_FAILED=0

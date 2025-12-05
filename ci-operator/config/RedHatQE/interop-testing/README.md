@@ -54,12 +54,12 @@ Following the test cluster being provisioned, the following steps are executed i
 
 ## IBM Fusion Access Operator Interop Tests
 
-The IBM Fusion Access Operator tests verify the integration of the Fusion Access Operator with OpenShift, including IBM Storage Scale deployment and AWS EBS filesystem integration.
+The IBM Fusion Access Operator tests verify the integration of the IBM Fusion Access Operator with OpenShift, including IBM Storage Scale deployment and AWS EBS filesystem integration.
 
 ### Test Configurations
 
-- **fusion-access-operator-ocp4.20-lp-interop**: Tests Fusion Access Operator with IBM Storage Scale on OpenShift 4.20
-- **fusion-access-cnv-ocp4.20-lp-interop**: Tests Fusion Access Operator with CNV (OpenShift Virtualization) integration on OpenShift 4.20
+- **ibm-fusion-access-operator-ocp4.20-lp-interop**: Tests IBM Fusion Access Operator with IBM Storage Scale on OpenShift 4.20
+- **ibm-fusion-access-cnv-ocp4.20-lp-interop**: Tests IBM Fusion Access Operator with CNV (OpenShift Virtualization) integration on OpenShift 4.20
 
 ### Test Chains
 
@@ -68,4 +68,4 @@ The tests use modular chains for different testing scenarios:
 1. **Environment Setup Chain** ([`interop-tests-ibm-fusion-access-environment-setup-chain`](../../../step-registry/interop-tests/ibm-fusion-access/environment-setup-chain/)) - Sets up namespaces, operators, and IBM Storage Scale cluster
 2. **EBS Integration Chain** ([`interop-tests-ibm-fusion-access-ebs-integration-chain`](../../../step-registry/interop-tests/ibm-fusion-access/ebs-integration-chain/)) - Creates and tests EBS-backed IBM Storage Scale filesystems
 
-For detailed documentation on individual steps and configuration options, see the [ibm-fusion-access step registry](../../../step-registry/ibm-fusion-access/).
+For detailed documentation on individual steps and configuration options, see the [interop-tests ibm-fusion-access step registry](../../../step-registry/interop-tests/ibm-fusion-access/).
