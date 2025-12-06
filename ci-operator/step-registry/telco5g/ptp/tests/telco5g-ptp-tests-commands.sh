@@ -163,16 +163,15 @@ spec:
     sleep $sleep_time
   done
 
+  # print the build logs
+  oc -n openshift-ptp logs podman
+
   if [[ $success -eq 1 ]]; then
     echo "[INFO] index build succeeded"
   else
     echo "[ERROR] index build failed"
     exit 1
   fi
-
-  # print the build logs
-  oc -n openshift-ptp logs podman
-
 }
 
 # Define the function to retry a command with a timeout
@@ -370,6 +369,13 @@ soaktest:
             cpu_threshold_mcores: 40
     desc: "The test measures PTP CPU usage and fails if >15mcores"
 EOF
+
+
+# Setup log collection with test markers
+export COLLECT_POD_LOGS=${COLLECT_POD_LOGS:-true}
+export LOG_TEST_MARKERS=true
+export LOG_ARTIFACTS_DIR="${ARTIFACT_DIR}/pod-logs"
+mkdir -p $LOG_ARTIFACTS_DIR
 
 # Set output directory
 export JUNIT_OUTPUT_DIR=${ARTIFACT_DIR}
