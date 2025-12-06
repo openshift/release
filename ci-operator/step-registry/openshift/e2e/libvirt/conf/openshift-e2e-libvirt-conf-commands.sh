@@ -311,8 +311,8 @@ fi
 #
 
 # Until the yellow-zone network bandwidth is upgraded, we will run the following tests in their own periodic and exclude
-# them from the conformance-parallel workflow.
-if [ "${TEST_TYPE}" == "conformance-parallel" ] || [ "${TEST_TYPE}" == "heavy-build" ]; then
+# them from the conformance-parallel workflow in versions older than 4.21.
+if echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 <= 20)) { exit 0 } else { exit 1 } }' &&  [[ "${TEST_TYPE}" == "conformance-parallel" || "${TEST_TYPE}" == "heavy-build" ]]; then
     cat > "${SHARED_DIR}/temp_tests" << EOF
 "[sig-builds][Feature:Builds] Multi-stage image builds should succeed [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
 "[sig-apps][Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers should run a successful deployment with a trigger used by different containers [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
