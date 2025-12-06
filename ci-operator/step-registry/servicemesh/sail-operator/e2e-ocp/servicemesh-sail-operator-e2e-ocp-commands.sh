@@ -117,9 +117,15 @@ run_tests() {
     export KUBECONFIG=/work/ci-kubeconfig
     export BUILD_WITH_CONTAINER=\"0\"
     export DOCKER_INSECURE_REGISTRIES=\"default-route-openshift-image-registry.\$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr(\$0, index(\$0,\$2))}')\"
-    ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
+    # Check if VERSIONS_YAML_CONFIG is set and not empty
+    if [ -n \"\${VERSIONS_YAML_CONFIG}\" ]; then
+      echo 'VERSIONS_YAML_CONFIG variable is set, executing contents...'
+      export VERSIONS_YAML_FILE=\"\${VERSIONS_YAML_CONFIG}\"
+      echo \"Using VERSIONS_YAML_FILE=\${VERSIONS_YAML_FILE}\"
+      make gen
+    fi
     entrypoint ${E2E_COMMAND:-make test.e2e.ocp}
     "
 }
