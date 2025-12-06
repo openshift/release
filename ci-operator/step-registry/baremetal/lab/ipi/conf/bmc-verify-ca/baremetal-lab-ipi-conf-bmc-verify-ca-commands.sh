@@ -201,10 +201,10 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "$SHARED_DIR/hosts.yaml"); do
   # shellcheck disable=SC2154
   if upload_bmc_cert "${bmc_address}" "${CERT_FILE}" \
      "${redfish_user}" "${redfish_password}" "${name}"; then
-    ((SUCCESS_COUNT++))
+    SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
     echo "  [DEBUG] Upload succeeded, SUCCESS_COUNT=${SUCCESS_COUNT}"
   else
-    ((FAIL_COUNT++))
+    FAIL_COUNT=$((FAIL_COUNT + 1))
     echo "  [DEBUG] Upload failed, FAIL_COUNT=${FAIL_COUNT}"
   fi
 
@@ -256,4 +256,3 @@ echo "Patch file: ${SHARED_DIR}/bmc_ca_patch_install_config.yaml"
 echo ""
 echo "The bmcVerifyCA field will be merged into install-config.yaml automatically."
 echo ""
-
