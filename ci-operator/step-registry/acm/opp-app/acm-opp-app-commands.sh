@@ -13,6 +13,7 @@ set -o pipefail
 #   1. Deploy OPP Application
 #      - Deploys httpd-example application via deploy.sh
 #      - Waits for build completion and deployment availability
+#      - Verifies image is pushed to Quay registry (OPP integration)
 #      - If ANY step fails, test fails and subsequent cases are skipped
 #
 #   2. Verify Policy Compliance
@@ -214,7 +215,46 @@ run_test_case_1() {
     oc get po -n e2e-opp || true
     oc get deployment -n e2e-opp || true
 
-    return 0
+    # Verify image pushed to Quay registry (OPP integration)
+    echo "Verifying image pushed to Quay registry..."
+    QUAY_REGISTRY="registry-quay-local-quay.apps.ci-op-kp66d69k-4f127.cspilp.interop.ccitredhat.com"
+    QUAY_IMAGE_PATH="openshift_e2e-opp/httpd-example"
+    QUAY_MANIFEST_URL="https://$QUAY_REGISTRY/v2/$QUAY_IMAGE_PATH/manifests/latest"
+
+    QUAY_CHECK_RETRIES=20
+    QUAY_CHECK_INTERVAL=15
+
+    for attempt in $(seq 1 $QUAY_CHECK_RETRIES); do
+        echo "Attempt $attempt/$QUAY_CHECK_RETRIES: Checking if image exists in Quay..."
+
+        HTTP_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" "$QUAY_MANIFEST_URL" 2>/dev/null || echo "000")
+
+        if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✓ Image successfully pushed to Quay registry"
+            return 0
+        fi
+
+        echo "⚠️  Image not yet in Quay (HTTP $HTTP_STATUS), waiting..."
+        [ $attempt -lt $QUAY_CHECK_RETRIES ] && sleep $QUAY_CHECK_INTERVAL
+    done
+
+    # If we reach here, image was never pushed to Quay
+    echo "ERROR: Image failed to push to Quay after $((QUAY_CHECK_RETRIES * QUAY_CHECK_INTERVAL)) seconds"
+    echo ""
+    echo "=== Quay Bridge Operator Diagnostics ==="
+    QUAY_BRIDGE_POD=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    if [ -n "$QUAY_BRIDGE_POD" ]; then
+        echo "Quay Bridge Operator logs (last 50 lines with errors):"
+        oc logs -n openshift-operators $QUAY_BRIDGE_POD -c manager --tail=50 | grep -E "(ERROR|WARN|httpd-example|e2e-opp)" || true
+    else
+        echo "Quay Bridge Operator pod not found"
+    fi
+
+    echo ""
+    echo "=== ImageStream Status ==="
+    oc get is -n e2e-opp httpd-example -o yaml | grep -A 5 "status:" || true
+
+    return 1
 }
 
 ################################################################################
@@ -271,6 +311,7 @@ run_test_case_2() {
 ################################################################################
 run_test_case_3() {
     echo "====== Test Case 3: Test ACS Integration ======"
+    echo "NOTE: Test Case 1 has verified image is in Quay. Now waiting for ACS to scan it."
 
     # Fetch ACS credentials
     echo "Fetching ACS credentials..."
