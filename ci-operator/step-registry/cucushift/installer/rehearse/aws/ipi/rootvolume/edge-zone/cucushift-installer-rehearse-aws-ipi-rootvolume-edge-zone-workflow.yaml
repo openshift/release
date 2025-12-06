@@ -1,0 +1,31 @@
+workflow:
+  as: cucushift-installer-rehearse-aws-ipi-rootvolume-edge-zone
+  steps:
+    pre:
+      - ref: ipi-install-rbac
+      - ref: openshift-cluster-bot-rbac
+      - ref: ipi-aws-pre-edge-zones-opt-in
+      - ref: ipi-conf
+      - ref: ipi-conf-telemetry
+      - ref: ipi-conf-aws
+      - ref: ipi-conf-aws-rootvolume
+      - ref: ipi-conf-aws-edge-zone
+      - ref: ipi-install-monitoringpvc
+      - ref: ipi-conf-aws-usage-info
+      - chain: aws-provision-iam-user-minimal-permission
+      - ref: ipi-install-install-aws
+      - ref: health-check-node-count
+      - ref: ipi-install-times-collection
+      - ref: enable-qe-catalogsource
+      - ref: storage-conf-storageclass-set-default-storageclass
+      - ref: cucushift-installer-check-aws-edge-zone
+      - chain: cucushift-installer-check
+      - ref: cucushift-installer-check-aws-rootvolume
+      - ref: cucushift-installer-reportportal-marker
+    post:
+      - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+      - ref: send-results-to-reportportal
+  documentation: |-
+    This is the workflow to trigger Prow's rehearsal test for AWS root volume
+    configuration tests with edge compute pool. It includes edge zone configuration,
+    root volume configuration, and post-installation verification in the pre phase.

@@ -10,7 +10,7 @@ if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
   echo "Using default value: ${BASE_DOMAIN}"
   AWS_BASE_DOMAIN="${BASE_DOMAIN}"
 else
-  AWS_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
+  AWS_BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}"/baseDomain)
 fi
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
@@ -270,9 +270,9 @@ EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_propagate_user_tags}"
 fi
 
-cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+cp "${CLUSTER_PROFILE_DIR}"/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
-ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret "${RELEASE_IMAGE_LATEST}" --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
 ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
@@ -308,17 +308,17 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   jq --version
   if (( ocp_minor_version <= 9 && ocp_major_version == 4 )); then
     # 4.9 and below
-    curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/rhcos.json -o /tmp/ami.json
-    RHCOS_AMI=$(jq --arg r $aws_source_region -r '.amis[$r].hvm' /tmp/ami.json)
+    curl -sL https://raw.githubusercontent.com/openshift/installer/release-"${ocp_major_version}"."${ocp_minor_version}"/data/data/rhcos.json -o /tmp/ami.json
+    RHCOS_AMI=$(jq --arg r "$aws_source_region" -r '.amis[$r].hvm' /tmp/ami.json)
   else
     # 4.10 and above
-    curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/rhcos.json -o /tmp/ami.json
-    RHCOS_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
+    curl -sL https://raw.githubusercontent.com/openshift/installer/release-"${ocp_major_version}"."${ocp_minor_version}"/data/data/coreos/rhcos.json -o /tmp/ami.json
+    RHCOS_AMI=$(jq --arg r "$aws_source_region" -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
   fi
   echo "RHCOS for C2S: ${RHCOS_AMI}"
 fi
 
-if [ ! -z ${RHCOS_AMI} ]; then
+if [ -n "${RHCOS_AMI}" ]; then
   echo "patching rhcos ami to install-config.yaml"
   CONFIG_PATCH_AMI="${SHARED_DIR}/install-config-ami.yaml.patch"
   cat >> "${CONFIG_PATCH_AMI}" << EOF
@@ -431,6 +431,6 @@ EOF
 
   # Update config with host ID
   echo "Patching install-config.yaml for dedicated hosts."
-  yq-go m -x -i ${CONFIG} ${patch_dedicated_host}
+  yq-go m -x -i "${CONFIG}" "${patch_dedicated_host}"
   cp "${patch_dedicated_host}" "${ARTIFACT_DIR}/"
 fi

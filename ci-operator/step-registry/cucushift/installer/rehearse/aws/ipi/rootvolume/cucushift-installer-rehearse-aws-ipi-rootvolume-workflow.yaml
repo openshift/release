@@ -1,0 +1,20 @@
+workflow:
+  as: cucushift-installer-rehearse-aws-ipi-rootvolume
+  steps:
+    pre:
+      - chain: ipi-conf-aws
+      - ref: ipi-conf-aws-rootvolume
+      - ref: ipi-conf-aws-usage-info
+      - chain: aws-provision-iam-user-minimal-permission
+      - chain: ipi-install
+      - ref: enable-qe-catalogsource
+      - chain: cucushift-installer-check
+      - ref: cucushift-installer-check-aws-rootvolume
+      - ref: cucushift-installer-reportportal-marker
+    post:
+      - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+      - ref: send-results-to-reportportal
+  documentation: |-
+    This is the workflow to trigger Prow's rehearsal test for AWS root volume
+    configuration tests. It includes root volume configuration and post-installation
+    verification in the pre phase.

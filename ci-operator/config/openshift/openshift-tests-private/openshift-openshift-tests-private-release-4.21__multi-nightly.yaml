@@ -211,6 +211,50 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
+- as: aws-ipi-rootvolume-gp3-throughput-f7
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_DEFAULT_GP3_THROUGHPUT: "500"
+      AWS_DEFAULT_MACHINE_VOLUME_SIZE: "120"
+      AWS_DEFAULT_MACHINE_VOLUME_TYPE: gp3
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-rootvolume
+- as: aws-ipi-rootvolume-gp3-throughput-f28-destructive
+  cron: 30 6 * * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_COMPUTE_GP3_THROUGHPUT: "1000"
+      AWS_COMPUTE_VOLUME_SIZE: "120"
+      AWS_COMPUTE_VOLUME_TYPE: gp3
+      AWS_CONTROL_PLANE_GP3_THROUGHPUT: "1200"
+      AWS_CONTROL_PLANE_VOLUME_SIZE: "150"
+      AWS_CONTROL_PLANE_VOLUME_TYPE: gp3
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-rootvolume
+- as: aws-ipi-rootvolume-gp3-throughput-edge-f28-destructive
+  cron: 0 7 * * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AWS_EDGE_GP3_THROUGHPUT: "1000"
+      AWS_EDGE_VOLUME_SIZE: "120"
+      AWS_EDGE_VOLUME_TYPE: gp3
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EDGE_NODE_WORKER_NUMBER: "1"
+      EDGE_NODE_WORKER_SCHEDULABLE: "no"
+      EDGE_ZONE_TYPES: local-zone
+      ENABLE_AWS_EDGE_ZONE: "yes"
+      REQUIRED_DEFAULT_STORAGECLASS: gp2-csi
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-rootvolume-edge-zone
 - as: aws-ipi-byo-route53-compact-cloudfront-amd-f28-destructive
   cron: 32 20 19 * *
   steps:
