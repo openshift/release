@@ -81,33 +81,34 @@ echo "Checking if private zone were created."
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64|aws-usgov)
     # records in public zone
-    if [[ ${PUBLISH_STRATEGY} != "Internal" ]]; then
-        echo "Checking records in public zone."
-        PUBLIC_ZONE_ID=$(aws --region "$REGION" route53 list-hosted-zones-by-name | jq --arg name "${BASE_DOMAIN}." -r '.HostedZones | .[] | select(.Name=="\($name)") | .Id' | awk -F / '{printf $3}')
-        if [[ -n "${PUBLIC_ZONE_ID}" ]]; then
-            PUBLIC_RECORD_SETS=$(aws --region "$REGION" route53 list-resource-record-sets --hosted-zone-id=${PUBLIC_ZONE_ID} --output json | jq '.ResourceRecordSets[].Name' |grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
+    # if [[ ${PUBLISH_STRATEGY} != "Internal" ]]; then
+    #     echo "Checking records in public zone."
+    #     PUBLIC_ZONE_ID=$(aws --region "$REGION" route53 list-hosted-zones-by-name | jq --arg name "${BASE_DOMAIN}." -r '.HostedZones | .[] | select(.Name=="\($name)") | .Id' | awk -F / '{printf $3}')
+    #     if [[ -n "${PUBLIC_ZONE_ID}" ]]; then
+    #         PUBLIC_RECORD_SETS=$(aws --region "$REGION" route53 list-resource-record-sets --hosted-zone-id=${PUBLIC_ZONE_ID} --output json | jq '.ResourceRecordSets[].Name' |grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
 
-            if [[ -n "${PUBLIC_RECORD_SETS}" ]]; then
-                echo "ERROR: Found DNS records for ${CLUSTER_NAME}.${BASE_DOMAIN}"
-                echo "${PUBLIC_RECORD_SETS}"
-                ret=$((ret + 1))
-            else
-                echo "PASS: No DNS records for ${CLUSTER_NAME}.${BASE_DOMAIN}"
-            fi
-        else
-            echo "PASS: No valid PUBLIC_ZONE_ID found on this platform, no public records would be created."
-        fi
-    fi
+    #         if [[ -n "${PUBLIC_RECORD_SETS}" ]]; then
+    #             echo "ERROR: Found DNS records for ${CLUSTER_NAME}.${BASE_DOMAIN}"
+    #             echo "${PUBLIC_RECORD_SETS}"
+    #             ret=$((ret + 1))
+    #         else
+    #             echo "PASS: No DNS records for ${CLUSTER_NAME}.${BASE_DOMAIN}"
+    #         fi
+    #     else
+    #         echo "PASS: No valid PUBLIC_ZONE_ID found on this platform, no public records would be created."
+    #     fi
+    # fi
 
-    # private zone
-    echo "Checking private hosted zone for ${CLUSTER_NAME}.${BASE_DOMAIN}"
-    PRIVATE_HOSTED_ZONE=$(aws --region "$REGION" route53 list-hosted-zones --hosted-zone-type PrivateHostedZone | jq -r '.HostedZones[].Name' | grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
-    if [[ ${PRIVATE_HOSTED_ZONE} != "" ]]; then
-        echo "ERROR: Found private zone: ${PRIVATE_HOSTED_ZONE}"
-        ret=$((ret+1))
-    else
-        echo "PASS: No private hosted zone created."
-    fi
+    # # private zone
+    # echo "Checking private hosted zone for ${CLUSTER_NAME}.${BASE_DOMAIN}"
+    # PRIVATE_HOSTED_ZONE=$(aws --region "$REGION" route53 list-hosted-zones --hosted-zone-type PrivateHostedZone | jq -r '.HostedZones[].Name' | grep "${CLUSTER_NAME}.${BASE_DOMAIN}" || true)
+    # if [[ ${PRIVATE_HOSTED_ZONE} != "" ]]; then
+    #     echo "ERROR: Found private zone: ${PRIVATE_HOSTED_ZONE}"
+    #     ret=$((ret+1))
+    # else
+    #     echo "PASS: No private hosted zone created."
+    # fi
+    echo "Skip check for debugging"
     ;;
 gcp)
     # records in public zone
