@@ -1,0 +1,96 @@
+chain:
+  as: confidential-clusters-cocl-operator-lifecycle
+  steps:
+  - ref: confidential-clusters-ref-cocl-operator-install
+  - ref: confidential-clusters-ref-cocl-e2e-test
+  documentation: |-
+    This chain manages the complete lifecycle of cocl-operator deployment and testing.
+
+    The chain executes two sequential steps:
+
+    Step 1 - Operator Installation (confidential-clusters-ref-cocl-operator-install):
+      - Connects to Beaker machine via SSH
+      - Clones cocl-operator repository (configurable repo/branch via env vars):
+        * Default: https://github.com/trusted-execution-clusters/operator.git
+        * Customizable via COCL_OPERATOR_REPO and COCL_OPERATOR_BRANCH
+      - Optionally applies a patch if COCL_OPERATOR_PATCH_URL is provided
+      - Builds and deploys the operator:
+        * Executes 'make push' to build and push images to localhost:5000
+        * Executes 'make manifests' to generate Kubernetes manifests
+        * Executes 'make install' to deploy operator to cluster
+      - Performs comprehensive health checks (900-second timeout):
+        * Monitors pod status in confidential-clusters namespace
+        * Detects failures: Failed phase, CrashLoopBackOff, ImagePullBackOff, etc.
+        * Waits for all pods to reach Running or Succeeded state
+        * Describes pods and collects diagnostics if failures occur
+      - Collects installation logs and cluster state
+
+    Step 2 - E2E Tests (confidential-clusters-ref-cocl-e2e-test):
+      Executes attestation verification tests using QEMU VM:
+      - Builds QEMU VM image from Fedora CoreOS:
+        * Installs build dependencies (osbuild, podman, just, etc.)
+        * Clones investigations repository
+        * Pulls and tags FCOS container image
+        * Builds QEMU image using osbuild
+      - Starts VM and runs attestation tests:
+        * Creates VM using virt-install with libvirt
+        * Waits for VM boot (SSH port 22 check, 10-minute timeout)
+        * Collects pod logs from confidential-clusters namespace
+        * Verifies attestation in trustee pod logs:
+          - Checks POST /kbs/v0/attest requests (all must be HTTP 200)
+          - Checks GET /kbs/v0/resource requests (count must match attest)
+          - Validates strict attestation success criteria
+      - Collects test artifacts:
+        * E2E test execution logs
+        * KBS (Key Broker Service) logs
+        * VM console logs
+        * Pod logs and cluster state
+
+    Prerequisites:
+    - The infra-provision chain must have completed successfully
+    - Kind cluster must be running and accessible
+    - kubeconfig must be available at ${SHARED_DIR}/kubeconfig
+    - Beaker machine must have all build dependencies (Rust, Go, make, etc.)
+    - Beaker machine must have libvirt and virtualization packages installed
+    - SSH credentials must be available in Vault
+
+    Environment Variables:
+    Operator Installation:
+    - COCL_OPERATOR_REPO: Operator repository URL (default: trusted-execution-clusters/operator)
+    - COCL_OPERATOR_BRANCH: Repository branch (default: main)
+    - COCL_OPERATOR_PATCH_URL: Optional patch to apply (default: empty)
+    - POD_READY_TIMEOUT: Timeout for pod health checks (default: 900 seconds)
+
+    E2E Tests:
+    - E2E_TEST_TIMEOUT: Overall E2E test timeout (default: 1800 seconds / 30 minutes)
+    - VM_BOOT_TIMEOUT: VM boot verification timeout (default: 600 seconds / 10 minutes)
+    - FCOS_SOURCE_IMAGE: FCOS container image (default: quay.io/trusted-execution-clusters/fedora-coreos:42.20250705.3.0)
+    - FCOS_TARGET_IMAGE: Target tag for FCOS (default: quay.io/trusted-execution-clusters/fcos)
+    - INVESTIGATIONS_REPO: VM build scripts repository (default: trusted-execution-clusters/investigations)
+    - INVESTIGATIONS_BRANCH: Repository branch (default: main)
+
+    Outputs:
+    - ${ARTIFACT_DIR}/operator-install-logs/: Operator installation logs and pod diagnostics
+    - ${ARTIFACT_DIR}/e2e-test-logs/: E2E test execution logs, VM logs, pod logs
+    - ${ARTIFACT_DIR}/e2e-test-reports/: Test summary and results
+
+    After successful completion:
+    - cocl-operator is fully deployed and all pods are healthy
+    - E2E tests have passed:
+      * QEMU VM image built successfully
+      * VM booted and became accessible
+      * Attestation requests verified in trustee pod logs
+      * All attestation checks passed (HTTP 200 responses)
+    - Cluster is ready for additional testing or cleanup
+
+    Scope:
+    This chain is responsible for APPLICATION LAYER operations only.
+    Infrastructure management (cluster creation/deletion) is handled by other chains.
+
+    Test Coverage:
+    The E2E test step validates the complete attestation flow by:
+    1. Building a custom QEMU VM image with Fedora CoreOS
+    2. Starting the VM with confidential computing features
+    3. Verifying the VM successfully boots and becomes accessible
+    4. Collecting logs from the trustee-deployment pod
+    5. Validating all attestation requests completed successfully

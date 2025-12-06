@@ -1,0 +1,66 @@
+ref:
+  as: confidential-clusters-ref-cocl-kind-cluster-create
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  commands: confidential-clusters-ref-cocl-kind-cluster-create-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: beaker-bm
+    mount_path: /var/run/beaker-bm
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      memory: 1Gi
+  env:
+  - name: BEAKER_IP
+    default: ""
+    documentation: |-
+      IP address of the Beaker provisioned bare metal machine.
+      If not set, will read from Vault or ${SHARED_DIR}/beaker_ip
+  - name: BEAKER_USER
+    default: "root"
+    documentation: |-
+      Username for SSH access to the Beaker machine.
+      If not set, will read from Vault or default to 'root'
+  - name: KIND_CLUSTER_NAME
+    default: "kind"
+    documentation: |-
+      Name of the Kind cluster to create.
+      Defaults to 'kind' if not specified.
+  - name: CONTAINER_RUNTIME
+    default: "docker"
+    documentation: |-
+      Container runtime to use for Kind cluster (podman or docker).
+      Defaults to 'docker' if not specified.
+  - name: CLUSTER_CREATE_TIMEOUT
+    default: "900"
+    documentation: |-
+      Timeout in seconds for the kind cluster creation process.
+      Defaults to 900 seconds (15 minutes).
+  documentation: |-
+    This step creates a Kind (Kubernetes in Docker) cluster on a pre-provisioned
+    Beaker bare metal machine that has been prepared by the beaker-kind-provision step.
+
+    The step performs the following operations:
+    1. Connects to the Beaker machine via SSH using credentials from Vault
+    2. Navigates to the cocl-operator repository directory
+    3. Executes 'make cluster-up' to create the Kind cluster
+    4. Retrieves the kubeconfig and saves it to ${SHARED_DIR}/kubeconfig
+    5. Verifies the cluster is ready and accessible
+
+    Prerequisites:
+    - The beaker-kind-provision step must have completed successfully
+    - Beaker machine must have cocl-operator repository downloaded
+    - kind configuration must be ready at ~/cocl-operator-kind-setup/kind/config.yaml
+    - SSH credentials must be available in Vault
+
+    Outputs:
+    - ${SHARED_DIR}/kubeconfig: Kubernetes configuration file for accessing the cluster
+    - ${ARTIFACT_DIR}/kind-cluster-logs/: Cluster creation logs and diagnostics
+
+    After this step completes, the Kind cluster will be running and accessible
+    via kubectl using the kubeconfig from ${SHARED_DIR}/kubeconfig

@@ -1,0 +1,107 @@
+ref:
+  as: confidential-clusters-ref-cocl-e2e-test
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  commands: confidential-clusters-ref-cocl-e2e-test-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: beaker-bm
+    mount_path: /var/run/beaker-bm
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      memory: 1Gi
+  env:
+  - name: BEAKER_IP
+    default: ""
+    documentation: |-
+      IP address of the Beaker provisioned bare metal machine.
+      If not set, will read from Vault or ${SHARED_DIR}/beaker_ip
+  - name: BEAKER_USER
+    default: "root"
+    documentation: |-
+      Username for SSH access to the Beaker machine.
+      If not set, will read from Vault or default to 'root'
+  - name: E2E_TEST_TIMEOUT
+    default: "1800"
+    documentation: |-
+      Timeout in seconds for the E2E test execution.
+      Defaults to 1800 seconds (30 minutes).
+  - name: VM_BOOT_TIMEOUT
+    default: "600"
+    documentation: |-
+      Timeout in seconds for VM boot verification.
+      Defaults to 600 seconds (10 minutes).
+  - name: FCOS_SOURCE_IMAGE
+    default: "quay.io/trusted-execution-clusters/fedora-coreos:42.20250705.3.0"
+    documentation: |-
+      Fedora CoreOS source container image to use for QEMU VM.
+      Defaults to the pinned trusted-execution-clusters image.
+  - name: FCOS_TARGET_IMAGE
+    default: "quay.io/trusted-execution-clusters/fcos"
+    documentation: |-
+      Target tag for the FCOS image after pulling.
+      Used by build scripts for consistency.
+  - name: INVESTIGATIONS_REPO
+    default: "https://github.com/trusted-execution-clusters/investigations.git"
+    documentation: |-
+      Repository containing VM build and test scripts.
+      Defaults to trusted-execution-clusters/investigations.
+  - name: INVESTIGATIONS_BRANCH
+    default: "main"
+    documentation: |-
+      Branch of the investigations repository to use.
+      Defaults to 'main'.
+  documentation: |-
+    This step executes end-to-end (E2E) tests for the cocl-operator by building
+    a QEMU VM image and running attestation verification tests.
+
+    The step performs the following operations:
+    1. Connects to the Beaker machine via SSH using credentials from Vault
+    2. Builds QEMU VM image from Fedora CoreOS container:
+       - Installs build dependencies (osbuild, podman, just, etc.)
+       - Clones investigations repository
+       - Pulls FCOS container image
+       - Builds QEMU image using osbuild
+       - Moves image to /var/lib/libvirt/images/
+    3. Starts VM and runs attestation tests:
+       - Creates VM using virt-install
+       - Waits for VM to boot (SSH port 22 check)
+       - Collects pod logs from confidential-clusters namespace
+       - Verifies attestation requests in trustee pod logs
+       - Validates all attestation requests succeeded (HTTP 200)
+    4. Collects test results and artifacts:
+       - E2E test execution logs
+       - KBS (Key Broker Service) logs
+       - VM console logs
+       - Pod logs and cluster state
+
+    Prerequisites:
+    - The operator-install step must have completed successfully
+    - cocl-operator must be running and healthy in confidential-clusters namespace
+    - Kind cluster must be accessible from Beaker machine
+    - SSH credentials must be available in Vault
+    - Beaker machine must have libvirt and virtualization packages installed
+
+    Outputs:
+    - ${ARTIFACT_DIR}/e2e-test-logs/: Test execution logs, VM logs, pod logs
+    - ${ARTIFACT_DIR}/e2e-test-reports/: Test summary and results
+
+    Success Criteria:
+    - QEMU VM image builds successfully
+    - VM boots and SSH port becomes accessible
+    - Trustee pod logs show successful attestation requests
+    - All POST /kbs/v0/attest requests return HTTP 200
+    - All GET /kbs/v0/resource requests return HTTP 200
+
+    Exit Codes:
+    - 0: All tests passed (image build, VM boot, attestation verified)
+    - 1: Test execution failed (build, boot, or attestation failure)
+
+    Test Components:
+    1. QEMU VM Image Build (from e2e-build-image-for-qemu-vm)
+    2. VM Boot and Attestation Verification (from e2e-start-vm)

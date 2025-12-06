@@ -1,0 +1,245 @@
+workflow:
+  as: confidential-clusters-cocl-full-e2e
+  steps:
+    pre:
+    - chain: confidential-clusters-cocl-infra-provision
+    test:
+    - chain: confidential-clusters-cocl-operator-lifecycle
+    post:
+    - chain: confidential-clusters-cocl-cleanup
+  documentation: |-
+    This workflow provides a complete end-to-end testing pipeline for the
+    confidential-clusters cocl-operator on a Beaker bare metal machine.
+
+    ============================================================================
+    WORKFLOW PHASES
+    ============================================================================
+
+    PRE Phase: Infrastructure Provisioning
+    ----------------------------------------
+    Chain: confidential-clusters-cocl-infra-provision
+
+    Prepares the complete testing infrastructure:
+
+    1. Beaker Environment Preparation:
+       - Establishes SSH connection from CI pod to Beaker machine
+       - Installs system dependencies:
+         * Docker CE and Podman (dual container runtime)
+         * kubectl v1.29.0 (fixed version)
+         * kind v0.30.0 (fixed version)
+         * Rust (rustup with system-wide PATH)
+         * Go (via dnf)
+         * Build tools: make, gcc, jq, yq
+         * Virtualization: libvirt, qemu-kvm
+       - Downloads and configures cocl-operator repository
+       - Prepares kind cluster configuration
+
+    2. Kind Cluster Creation:
+       - Executes 'make cluster-up' on Beaker machine
+       - Sets up local container registry (localhost:5000)
+       - Retrieves and saves kubeconfig to ${SHARED_DIR}
+       - Verifies cluster accessibility
+
+    Outputs:
+    - ${SHARED_DIR}/beaker_info: Beaker configuration metadata
+    - ${SHARED_DIR}/kubeconfig: Cluster access configuration
+    - ${ARTIFACT_DIR}/beaker-logs/: Environment setup logs
+    - ${ARTIFACT_DIR}/kind-cluster-logs/: Cluster creation logs
+
+    ============================================================================
+
+    TEST Phase: Operator Deployment and Testing
+    --------------------------------------------
+    Chain: confidential-clusters-cocl-operator-lifecycle
+
+    Deploys and tests the cocl-operator:
+
+    1. Operator Installation:
+       - Clones cocl-operator repository (configurable via env vars)
+       - Optionally applies patch (COCL_OPERATOR_PATCH_URL)
+       - Builds container images: 'make push' to localhost:5000
+       - Generates manifests: 'make manifests'
+       - Installs operator: 'make install'
+       - Comprehensive health checks (900-second timeout):
+         * Monitors pod status in confidential-clusters namespace
+         * Detects failures: CrashLoopBackOff, ImagePullBackOff, etc.
+         * Waits for all pods to reach Running/Succeeded state
+         * Collects detailed diagnostics on failures
+
+    2. E2E Tests:
+       Executes attestation verification tests using QEMU VM:
+       - Builds QEMU VM image from Fedora CoreOS container
+       - Starts VM using virt-install with libvirt
+       - Waits for VM boot (SSH port 22 check, 10-minute timeout)
+       - Collects pod logs from confidential-clusters namespace
+       - Verifies attestation in trustee pod logs:
+         * All POST /kbs/v0/attest requests return HTTP 200
+         * All GET /kbs/v0/resource requests return HTTP 200
+         * Attestation count matches resource fetch count
+       - Validates complete attestation flow
+
+    Outputs:
+    - ${ARTIFACT_DIR}/operator-install-logs/: Installation logs and diagnostics
+    - ${ARTIFACT_DIR}/e2e-test-logs/: Test logs, VM logs, pod logs
+    - ${ARTIFACT_DIR}/e2e-test-reports/: Test summary and results
+
+    ============================================================================
+
+    POST Phase: Resource Cleanup
+    -----------------------------
+    Chain: confidential-clusters-cocl-cleanup
+
+    Cleans up all test resources (always runs, even if tests fail):
+
+    1. Pre-Cleanup Documentation:
+       - Collects current system state
+       - Archives important logs before deletion
+
+    2. Resource Cleanup:
+       - Deletes Kind cluster
+       - Removes container images (configurable)
+       - Cleans up temporary files and directories
+       - Removes cocl-operator working directories
+       - Optionally restarts container services
+
+    3. Post-Cleanup Verification:
+       - Collects final system state
+       - Generates cleanup summary report
+
+    Outputs:
+    - ${ARTIFACT_DIR}/cleanup-logs/: Cleanup operation logs
+    - ${ARTIFACT_DIR}/cleanup-logs/archived-logs/: Archived test logs
+
+    ============================================================================
+    PREREQUISITES
+    ============================================================================
+
+    Infrastructure Requirements:
+    - Beaker bare metal machine pre-provisioned with Fedora
+    - SSH public key pre-configured in ~/.ssh/authorized_keys on Beaker
+    - Network connectivity between CI pod and Beaker machine (port 22, 6443)
+
+    Vault Configuration:
+    - Secret path: secrets/kv/selfservice/confidential-qe/beaker-bm
+    - Required fields:
+      * beaker-ssh-private-key: SSH private key (matching public key on Beaker)
+      * beaker-ip: IP address of Beaker machine
+    - Optional fields:
+      * beaker-user: SSH username (defaults to 'root')
+    - Secret must be synced to K8s secret 'beaker-bm' in 'test-credentials' namespace
+
+    ============================================================================
+    ENVIRONMENT VARIABLES
+    ============================================================================
+
+    Infrastructure:
+    - BEAKER_IP: Beaker machine IP (from Vault or env)
+    - BEAKER_USER: SSH username (default: root)
+    - KIND_CLUSTER_NAME: Cluster name (default: kind)
+    - CONTAINER_RUNTIME: docker or podman (default: docker)
+
+    Operator:
+    - COCL_OPERATOR_REPO: Repository URL (default: trusted-execution-clusters/operator)
+    - COCL_OPERATOR_BRANCH: Branch name (default: main)
+    - COCL_OPERATOR_PATCH_URL: Optional patch URL (default: empty)
+
+    Timeouts:
+    - CLUSTER_CREATE_TIMEOUT: Cluster creation timeout (default: 900s)
+    - POD_READY_TIMEOUT: Pod readiness timeout (default: 900s)
+    - E2E_TEST_TIMEOUT: Overall E2E test timeout (default: 1800s / 30 minutes)
+    - VM_BOOT_TIMEOUT: VM boot verification timeout (default: 600s / 10 minutes)
+    - DEPROVISION_TIMEOUT: Cleanup timeout (default: 600s)
+
+    E2E Test Configuration:
+    - FCOS_SOURCE_IMAGE: FCOS container image (default: quay.io/trusted-execution-clusters/fedora-coreos:42.20250705.3.0)
+    - FCOS_TARGET_IMAGE: Target FCOS tag (default: quay.io/trusted-execution-clusters/fcos)
+    - INVESTIGATIONS_REPO: VM build scripts repository (default: trusted-execution-clusters/investigations)
+    - INVESTIGATIONS_BRANCH: Repository branch (default: main)
+
+    Cleanup Options:
+    - CLEANUP_IMAGES: Clean container images (default: true)
+    - RESTART_SERVICES: Restart services (default: true)
+
+    ============================================================================
+    EXPECTED OUTCOMES
+    ============================================================================
+
+    Success Criteria:
+    ✅ Pre phase completes: Beaker machine prepared, Kind cluster running
+    ✅ Test phase completes: cocl-operator deployed, all pods healthy
+    ✅ Post phase completes: All resources cleaned up
+
+    Failure Scenarios:
+    ❌ SSH connection failure → Exit in pre phase
+    ❌ Dependency installation failure → Exit in pre phase
+    ❌ Kind cluster creation failure → Exit in pre phase
+    ❌ Operator installation failure → Exit in test phase
+    ❌ Pod health check timeout → Exit in test phase
+    ❌ E2E test failure → Exit in test phase:
+       - QEMU VM image build failure
+       - VM boot timeout (SSH port not accessible)
+       - Attestation verification failure (non-200 responses)
+       - Pod log collection failure
+    ⚠️  Cleanup failure → Logged but workflow succeeds (best-effort)
+
+    ============================================================================
+    USAGE EXAMPLES
+    ============================================================================
+
+    Basic Usage:
+    This workflow is typically referenced in CI operator config files:
+
+    ```yaml
+    tests:
+    - as: cocl-operator-e2e
+      cluster: build03
+      steps:
+        workflow: confidential-clusters-cocl-full-e2e
+    ```
+
+    With Custom Environment Variables:
+    ```yaml
+    tests:
+    - as: cocl-operator-e2e-custom
+      cluster: build03
+      steps:
+        workflow: confidential-clusters-cocl-full-e2e
+        env:
+        - name: COCL_OPERATOR_BRANCH
+          value: "feature-branch"
+        - name: POD_READY_TIMEOUT
+          value: "1200"
+    ```
+
+    ============================================================================
+    TROUBLESHOOTING
+    ============================================================================
+
+    If the workflow fails, check:
+    1. ${ARTIFACT_DIR}/beaker-logs/ - Infrastructure setup issues
+    2. ${ARTIFACT_DIR}/kind-cluster-logs/ - Cluster creation issues
+    3. ${ARTIFACT_DIR}/operator-install-logs/ - Operator deployment issues
+    4. ${ARTIFACT_DIR}/cleanup-logs/ - Cleanup operation issues
+
+    Common Issues:
+    - SSH connection failures: Check Vault secret and Beaker machine accessibility
+    - Pod timeout: Check ${ARTIFACT_DIR}/operator-install-logs/ for pod describe output
+    - Image pull errors: Check network connectivity and registry availability
+    - Cleanup failures: Usually non-critical, check cleanup-logs for details
+
+    ============================================================================
+    MAINTENANCE NOTES
+    ============================================================================
+
+    Future Enhancements:
+    - E2E test implementation (currently placeholder)
+    - Test parallelization support
+    - Multi-cluster testing support
+    - Performance benchmarking integration
+
+    Related Workflows:
+    - (Future) confidential-clusters-cocl-pr-verify: Lightweight PR validation
+    - (Future) confidential-clusters-cocl-operator-only: Skip infra, test operator changes
+
+    Last Updated: 2025-01-18
+    Architecture Version: 2.0 (separated infra/operator/cleanup chains)
