@@ -84,9 +84,16 @@ tests:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints
-- as: installer-rehearse-gcp-proxy
+      MINIMAL_PERMISSIONS_WITHOUT_FIREWALL_PROVISION: "yes"
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-byo-fw-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-byo-fw-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+- as: installer-rehearse-gcp-wif
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
@@ -96,8 +103,8 @@ tests:
       CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
       ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
-      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-workload-identity
+      MINIMAL_PERMISSIONS_CCO_MANUAL_WITHOUT_FIREWALL_PROVISION: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi-byo-fw-cco-manual-workload-identity
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
