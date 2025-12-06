@@ -15,10 +15,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.20
-  upi-installer:
-    name: "4.20"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -26,6 +22,7 @@ images:
     FROM src
     COPY oc /usr/bin/oc
     RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y skopeo git && dnf clean all
   from: src
   inputs:
     cli:
@@ -33,7 +30,12 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: src-with-oc-and-kubectl
-- dockerfile_path: Dockerfile.ci
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: arm64
+  dockerfile_path: Dockerfile.ci
   inputs:
     ocp_builder_rhel-9-base-openshift-4.19:
       as:
@@ -42,7 +44,12 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: kueue-operator
-- dockerfile_path: Dockerfile.kueue
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: arm64
+  dockerfile_path: Dockerfile.kueue
   inputs:
     ocp_builder_rhel-9-base-openshift-4.19:
       as:
@@ -51,7 +58,12 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: kueue-operand
-- dockerfile_path: must-gather/Dockerfile
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: arm64
+  dockerfile_path: must-gather/Dockerfile
   inputs:
     ocp_builder_rhel-9-base-openshift-4.19:
       as:
@@ -60,7 +72,12 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: kueue-must-gather
-- dockerfile_literal: |
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: arm64
+  dockerfile_literal: |
     FROM src
     RUN dnf install -y skopeo git && dnf clean all
     RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
@@ -79,24 +96,19 @@ operator:
   - pullspec: registry.redhat.io/kueue/kueue-must-gather-rhel9:latest
     with: kueue-must-gather
 releases:
-  latest:
+  arm64-latest-4-19:
     release:
-      architecture: multi
-      channel: stable
-      version: "4.20"
-  latest-4-18:
-    release:
-      architecture: multi
-      channel: stable
-      version: "4.18"
-  latest-4-19:
-    release:
-      architecture: multi
+      architecture: arm64
       channel: stable
       version: "4.19"
-  latest-4-20:
+  arm64-latest-4-20:
     release:
-      architecture: multi
+      architecture: arm64
+      channel: stable
+      version: "4.20"
+  latest:
+    release:
+      architecture: arm64
       channel: stable
       version: "4.20"
 resources:
@@ -105,159 +117,79 @@ resources:
       cpu: "4"
       memory: 4Gi
 tests:
-- as: unit
-  commands: make test
-  container:
-    from: src
-- as: test-generate
-  commands: make generate manifests regen-crd
-  container:
-    from: src
-- as: lint
-  commands: |
-    export GOCACHE=/tmp/
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    export GOPROXY=https://proxy.golang.org
-    make lint
-  container:
-    clone: true
-    from: kueue-operator-src
-- as: fips-image-scan-kueue-operator
-  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
-  steps:
-    dependencies:
-      SCAN_IMAGE: kueue-operator
-    test:
-    - ref: fips-check-image-scan
-- as: security
-  optional: true
-  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
-  steps:
-    workflow: openshift-ci-security
-- as: operator-test-e2e-4-18
+- as: test-e2e-operator-4-19
   minimum_interval: 96h
   steps:
     cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-18
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest-4-19
+    env:
+      CONTAINER_IMAGE: quay.io/curl/curl:latest
+      OCP_ARCH: arm64
     post:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
     workflow: ipi-aws
-- as: operator-test-e2e-4-19
+- as: test-e2e-operator-4-20
   minimum_interval: 96h
   steps:
     cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-19
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest-4-20
+    env:
+      CONTAINER_IMAGE: quay.io/curl/curl:latest
+      OCP_ARCH: arm64
     post:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e
     workflow: ipi-aws
-- as: operator-test-e2e-4-20
-  minimum_interval: 96h
-  presubmit: true
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-20
-    post:
-    - chain: kueue-operator-post
-    test:
-    - chain: kueue-operator-test-e2e
-    workflow: ipi-aws
-- as: operator-test-e2e-4-19-fips
-  minimum_interval: 96h
-  steps:
-    cluster_profile: aws
-    env:
-      FIPS_ENABLED: "true"
-    post:
-    - chain: kueue-operator-post
-    test:
-    - ref: fips-check
-    - chain: kueue-operator-test-e2e
-    workflow: ipi-aws
-- as: operator-test-e2e-4-19-hypershift
-  minimum_interval: 96h
-  steps:
-    cluster_profile: aws-2
-    env:
-      HYPERSHIFT_NODE_COUNT: "2"
-    post:
-    - chain: kueue-operator-post
-    test:
-    - chain: kueue-operator-test-e2e-dev-bundle
-    workflow: hypershift-hostedcluster-workflow
-- as: operator-test-e2e-4-20-hypershift
-  minimum_interval: 96h
-  steps:
-    cluster_profile: aws-2
-    env:
-      HYPERSHIFT_NODE_COUNT: "2"
-    post:
-    - chain: kueue-operator-post
-    test:
-    - chain: kueue-operator-test-e2e-dev-bundle
-    workflow: hypershift-hostedcluster-workflow
-- always_run: false
-  as: perfscale-payload-kueue-operator-9nodes
-  optional: true
-  steps:
-    cluster_profile: aws-perfscale-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "9"
-      COMPUTE_NODE_TYPE: m6a.2xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
-      ZONES_COUNT: "3"
-    test:
-    - chain: kueue-operator-test-perfscale
-    workflow: openshift-qe-installer-aws
-- as: upstream-test-e2e-4-19
+- as: test-e2e-upstream-4-19
   minimum_interval: 96h
   steps:
     cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-19
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest-4-19
+    env:
+      OCP_ARCH: arm64
     post:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e-upstream
     workflow: ipi-aws
-- as: upstream-test-e2e-4-20
+- as: test-e2e-upstream-4-20
   minimum_interval: 96h
-  presubmit: true
   steps:
     cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-20
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest-4-20
+    env:
+      OCP_ARCH: arm64
     post:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e-upstream
     workflow: ipi-aws
 - as: konflux-images-4-20
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.20"
   cron: '@daily'
   steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest-4-20
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
+      CONTAINER_IMAGE: quay.io/curl/curl:latest
+      OCP_ARCH: arm64
       OPERAND_COMPONENT: kueue-operand-main
       OPERATOR_COMPONENT: kueue-operator-main
     post:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e-legacy
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: kueue-operator
+  variant: arm64
