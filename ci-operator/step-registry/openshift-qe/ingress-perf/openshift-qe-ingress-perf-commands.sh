@@ -37,5 +37,8 @@ pushd e2e-benchmarking/workloads/ingress-perf
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 export ES_INDEX="ingress-performance"
 
+# Export SERVICE_MESH so run.sh can access it
+export SERVICE_MESH="${SERVICE_MESH:-}"
+
 # Start the Workload
 ./run.sh
