@@ -220,16 +220,34 @@ tests:
     test:
     - chain: kueue-operator-test-e2e-upstream
 - always_run: false
-  as: perfscale-payload-kueue-operator-9nodes
+  as: perfscale-pr-kueue-operator-9nodes
   optional: true
   steps:
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: aws-perfscale
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
       BUNDLE_COMPONENT: kueue-bundle-main
       COMPUTE_NODE_REPLICAS: "9"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      KUBE_BURNER_VERSION: 1.8.2
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+      ZONES_COUNT: "3"
+    test:
+    - chain: kueue-operator-test-perfscale
+    workflow: openshift-qe-installer-aws
+- as: perfscale-kueue-operator-9nodes
+  cron: 0 1 1,15 * *
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      BUNDLE_COMPONENT: kueue-bundle-main
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      KUBE_BURNER_VERSION: 1.8.2
       OPERAND_COMPONENT: kueue-operand-main
       OPERATOR_COMPONENT: kueue-operator-main
       ZONES_COUNT: "3"
