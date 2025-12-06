@@ -39,6 +39,15 @@ case "$ES_TYPE" in
     ES_HOST=$(<"/secret/quay-qe/hostname")
     ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
     ;;
+  stackrox)
+    ES_SECRETS_PATH='/secret_stackrox'
+    ES_PASSWORD=$(<"${ES_SECRETS_PATH}/password")
+    ES_USERNAME=$(<"${ES_SECRETS_PATH}/username")
+    if [ -e "${ES_SECRETS_PATH}/host" ]; then
+        ES_HOST=$(<"${ES_SECRETS_PATH}/host")
+    fi
+    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+    ;;
   *)
     ES_PASSWORD=$(<"/secret/internal/password")
     ES_USERNAME=$(<"/secret/internal/username")
@@ -50,6 +59,10 @@ export ES_SERVER
 
 pip install .
 EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
+
+if [[ ! -z "${ORION_ARGS:-}" ]]; then
+    EXTRA_FLAGS+=" ${ORION_ARGS}"
+fi
 
 if [[ ! -z "$UUID" ]]; then
     EXTRA_FLAGS+=" --uuid ${UUID}"
