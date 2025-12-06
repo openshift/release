@@ -141,12 +141,7 @@ run_test_case_1() {
     sleep 60
 
     # Verify e2e-opp namespace was created
-    if ! oc get namespace e2e-opp >/dev/null 2>&1; then
-        echo "ERROR: Namespace e2e-opp not found"
-        echo "deploy.sh may have failed due to token expiration or other issues"
-        oc get namespace | grep opp || true
-        return 1
-    fi
+    oc get namespace e2e-opp >/dev/null 2>&1 || { echo "ERROR: Namespace e2e-opp not found, deploy.sh may have failed"; return 1; }
 
     oc label managedcluster local-cluster oppapps=httpd-example --overwrite
 
