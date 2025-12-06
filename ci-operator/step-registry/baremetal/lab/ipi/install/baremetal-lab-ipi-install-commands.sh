@@ -32,13 +32,41 @@ function oinst() {
    --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 }
 
+function get_ready_nodes_count() {
+  oc get nodes \
+    -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | \
+    grep -c -E ",True$"
+}
+
+# wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
+function wait_for_nodes_readiness()
+{
+  local expected_nodes=${1}
+  local max_retries=${2:-10}
+  local period=${3:-5}
+  for i in $(seq 1 "${max_retries}") max; do
+    if [ "${i}" == "max" ]; then
+      echo "[ERROR] Timeout reached. ${expected_nodes} ready nodes expected, found ${ready_nodes}... Failing."
+      return 1
+    fi
+    sleep "${period}m"
+    ready_nodes=$(get_ready_nodes_count)
+    if [ "${ready_nodes}" == "${expected_nodes}" ]; then
+        echo "[INFO] Found ${ready_nodes}/${expected_nodes} ready nodes, continuing..."
+        return 0
+    fi
+    echo "[INFO] - ${expected_nodes} ready nodes expected, found ${ready_nodes}..." \
+      "Waiting ${period}min before retrying (timeout in $(( (max_retries - i) * (period) ))min)..."
+  done
+}
+
 function update_image_registry() {
   # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
-  knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  knownCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}")
   if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
       echo "knownCapabilities contains ImageRegistry"
       # check if ImageRegistry capability enabled
-      enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+      enabledCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}")
         if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
             echo "ImageRegistry capability is not enabled, skip image registry configuration..."
             return 0
@@ -123,9 +151,17 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "{INFO} Additional worker ${name} will be added as day2 operation"
     continue
   fi
+  if [[ "${name}" == *-a-* ]] && [[ "${arch}" == "aarch64" ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "false" ]; then
+    echo "{INFO} Setting additional arm64 worker ${name} architecture in install-config.yaml"
+    ADD_WKR_ARCH=$( printf '\n  %s' 'architecture: aarch64')
+  else
+    echo "{INFO} Adding ${name} - ${arch}"
+    ADD_WKR_ARCH=''
+  fi
+
   ADAPTED_YAML="
   name: ${name}
-  role: ${name%%-[0-9]*}
+  role: ${name%%-[0-9]*}${ADD_WKR_ARCH}
   bootMACAddress: ${provisioning_mac}
   rootDeviceHints:
     ${root_device:+deviceName: ${root_device}}
@@ -249,6 +285,15 @@ if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
 fi
+
+EXPECTED_NODES=$(( masters + workers ))
+if [ "${ADDITIONAL_WORKERS_DAY2}" == "false" ]; then
+  EXPECTED_NODES=$(( EXPECTED_NODES + ADDITIONAL_WORKERS ))
+fi
+# Additional check to wait for all the nodes to be ready. Especially important for multi-arch compute nodes clusters with
+# mixed arch nodes.
+echo -e "\nWaiting for all the nodes to be ready..."
+wait_for_nodes_readiness ${EXPECTED_NODES}
 update_image_registry
 
 touch  "${SHARED_DIR}/success"
