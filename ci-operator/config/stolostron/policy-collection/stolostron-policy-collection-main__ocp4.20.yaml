@@ -82,6 +82,7 @@ tests:
         ]
       TEST_IMPORTANCE: LEVEL0
       TEST_SCENARIOS: Cluster_Observability
+      WAIT_DURATION: "259200"
       ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
@@ -108,6 +109,60 @@ tests:
     - ref: acm-fetch-managed-clusters
     - ref: quay-tests-quay-interop-test
     - ref: acm-opp-app
+    - ref: acm-opp-wait-for-debug
+    - ref: interop-tests-ocs-tests
+    - ref: acm-tests-observability
+    - ref: acm-tests-grc
+    - ref: acm-tests-alc
+    - ref: openshift-extended-test
+- as: interop-opp-aws-single-cluster
+  capabilities:
+  - intranet
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp","opp-aws-lp","opp-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_EPIC: LPINTEROP-5702
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_VERSION_MAJOR_MINOR: "4.19"
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.14", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+      TEST_IMPORTANCE: LEVEL0
+      TEST_SCENARIOS: Cluster_Observability
+      WAIT_DURATION: "259200"
+      ZONES_COUNT: "3"
+    post:
+    - ref: acm-fetch-operator-versions
+    - ref: acm-must-gather
+    - ref: acm-inspector
+    - ref: gather-aws-console
+    - chain: ipi-deprovision
+    - ref: firewatch-report-issues
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    test:
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-policies-openshift-plus-setup
+    - ref: acm-policies-openshift-plus
+    - chain: cucushift-installer-check-cluster-health
+    - ref: quay-tests-quay-interop-test
+    - ref: acm-opp-app
+    - ref: acm-opp-wait-for-debug
     - ref: interop-tests-ocs-tests
     - ref: acm-tests-observability
     - ref: acm-tests-grc
@@ -136,7 +191,7 @@ tests:
       SIZE_VARIANT: large
       TEST_IMPORTANCE: LEVEL0
       TEST_SCENARIOS: Cluster_Observability
-      WAIT_DURATION: "172800"
+      WAIT_DURATION: "259200"
     test:
     - ref: install-operators
     - ref: acm-mch
