@@ -128,10 +128,10 @@ EOF
 
 sleep 60
 
-git clone https://github.com/stolostron/policy-collection.git
+git clone https://github.com/tanfengshuang/policy-collection.git
 
 cd policy-collection/deploy/ 
-echo 'y' | ./deploy.sh -p policygenerator/policy-sets/community/openshift-plus-setup -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus-setup
+echo 'y' | ./deploy.sh -p policygenerator/policy-sets/community/openshift-plus-setup -n policies -u https://github.com/tanfengshuang/policy-collection.git -a openshift-plus-setup
 
 echo "$(oc get policies -A)"
 
