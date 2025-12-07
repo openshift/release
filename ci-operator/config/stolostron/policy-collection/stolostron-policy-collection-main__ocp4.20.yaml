@@ -83,7 +83,6 @@ tests:
         ]
       TEST_IMPORTANCE: LEVEL0
       TEST_SCENARIOS: Cluster_Observability
-      WAIT_DURATION: "259200"
       ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
@@ -110,7 +109,6 @@ tests:
     - ref: acm-fetch-managed-clusters
     - ref: quay-tests-quay-interop-test
     - ref: acm-opp-app
-    - ref: acm-opp-wait-for-debug
     - ref: interop-tests-ocs-tests
     - ref: acm-tests-observability
     - ref: acm-tests-grc
@@ -140,7 +138,6 @@ tests:
         ]
       TEST_IMPORTANCE: LEVEL0
       TEST_SCENARIOS: Cluster_Observability
-      WAIT_DURATION: "259200"
       ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
@@ -164,7 +161,6 @@ tests:
     - chain: cucushift-installer-check-cluster-health
     - ref: quay-tests-quay-interop-test
     - ref: acm-opp-app
-    - ref: acm-opp-wait-for-debug
     - ref: interop-tests-ocs-tests
     - ref: acm-tests-observability
     - ref: acm-tests-grc
@@ -190,19 +186,47 @@ tests:
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.14", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
-      SIZE_VARIANT: large
       TEST_IMPORTANCE: LEVEL0
       TEST_SCENARIOS: Cluster_Observability
-      WAIT_DURATION: "259200"
     test:
     - ref: install-operators
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
-    - ref: acm-opp-app
-    - ref: acm-opp-wait-for-debug
     - chain: cucushift-installer-check-cluster-health
     - ref: interop-tests-ocs-tests
+    - ref: acm-opp-app
+    - ref: acm-tests-observability
+    - ref: openshift-extended-test
+    workflow: acm-ipi-vsphere
+- as: interop-opp-vsphere-large
+  capabilities:
+  - intranet
+  cron: 0 0 1,15 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-vsphere.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp","opp-vsphere-lp","opp-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_EPIC: LPINTEROP-5702
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.14", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+      SIZE_VARIANT: large
+      TEST_IMPORTANCE: LEVEL0
+      TEST_SCENARIOS: Cluster_Observability
+    test:
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-policies-openshift-plus-setup
+    - ref: acm-policies-openshift-plus
+    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-ocs-tests
+    - ref: acm-opp-app
     - ref: acm-tests-observability
     - ref: openshift-extended-test
     workflow: acm-ipi-vsphere
