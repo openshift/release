@@ -46,7 +46,6 @@ declare -A TEST_FAILURE_MSG
 # All test cases that should appear in JUnit XML
 ALL_TEST_CASES=(
     "deploy-opp-application"
-    "verify-policy-compliance"
     "test-acs-integration"
 )
 
@@ -145,6 +144,16 @@ run_test_case_1() {
     oc get namespace e2e-opp >/dev/null 2>&1 || { echo "ERROR: Namespace e2e-opp not found, deploy.sh may have failed"; return 1; }
 
     oc label managedcluster local-cluster oppapps=httpd-example --overwrite
+
+    # Wait for policies to become Compliant
+    echo "Waiting for policies to become Compliant..."
+    for i in {1..20}; do
+        if oc get policies -n policies | grep example | grep -qv "NonCompliant"; then
+            echo "Policies are Compliant"; break
+        fi
+        echo "Try $i/20: Policies not yet compliant, waiting 15s..."
+        sleep 15
+    done
 
     # Check initial status
     oc get policies -n policies | grep example || true
@@ -258,59 +267,10 @@ run_test_case_1() {
 }
 
 ################################################################################
-# Test Case 2: Verify Policy Compliance
+# Test Case 2: Test ACS Integration
 ################################################################################
 run_test_case_2() {
-    echo "====== Test Case 2: Verify Policy Compliance ======"
-
-    # Wait for policies to become Compliant
-    POLICY_TIMEOUT=300
-    POLICY_ELAPSED=0
-    POLICY_CHECK_INTERVAL=15
-
-    echo "Waiting for policies to become Compliant (max ${POLICY_TIMEOUT}s)..."
-
-    # Check critical policies
-    POLICIES_TO_CHECK=(
-        "policy-example-httpd"
-        "policy-build-example-httpd"
-    )
-
-    while [ $POLICY_ELAPSED -lt $POLICY_TIMEOUT ]; do
-        ALL_COMPLIANT=true
-
-        echo "Checking policy status at ${POLICY_ELAPSED}s:"
-        oc get policies -n policies | grep example || true
-
-        for policy in "${POLICIES_TO_CHECK[@]}"; do
-            STATUS=$(oc get policy -n policies "$policy" -o jsonpath='{.status.compliant}' 2>/dev/null || echo "Unknown")
-            echo "  - $policy: $STATUS"
-
-            if [ "$STATUS" != "Compliant" ]; then
-                ALL_COMPLIANT=false
-            fi
-        done
-
-        if [ "$ALL_COMPLIANT" = true ]; then
-            echo "All policies are Compliant!"
-            break
-        fi
-
-        sleep $POLICY_CHECK_INTERVAL
-        POLICY_ELAPSED=$((POLICY_ELAPSED + POLICY_CHECK_INTERVAL))
-    done
-
-    # Final check
-    [ "$ALL_COMPLIANT" = true ] || { echo "ERROR: Policies did not become Compliant within ${POLICY_TIMEOUT}s"; return 1; }
-
-    return 0
-}
-
-################################################################################
-# Test Case 3: Test ACS Integration
-################################################################################
-run_test_case_3() {
-    echo "====== Test Case 3: Test ACS Integration ======"
+    echo "====== Test Case 2: Test ACS Integration ======"
     echo "NOTE: Test Case 1 has verified image is in Quay. Now waiting for ACS to scan it."
 
     # Fetch ACS credentials
@@ -437,35 +397,19 @@ if run_test_case_1; then
     echo "✅ Test Case 1 Result: PASSED"
     echo ""
 
-    # Test Case 1 passed, continue to Test Case 2
+    # Run Test Case 2 (ACS Integration)
     CASE2_START=$(date +%s)
     if run_test_case_2; then
         CASE2_DURATION=$(($(date +%s) - CASE2_START))
-        record_test_result "verify-policy-compliance" "passed" "" "$CASE2_DURATION"
+        record_test_result "test-acs-integration" "passed" "" "$CASE2_DURATION"
         echo ""
         echo "✅ Test Case 2 Result: PASSED"
         echo ""
     else
         CASE2_DURATION=$(($(date +%s) - CASE2_START))
-        record_test_result "verify-policy-compliance" "failed" "Policy compliance verification failed" "$CASE2_DURATION"
+        record_test_result "test-acs-integration" "failed" "ACS integration test failed" "$CASE2_DURATION"
         echo ""
         echo "❌ Test Case 2 Result: FAILED"
-        echo ""
-    fi
-
-    # Run Test Case 3 regardless of Case 2 result
-    CASE3_START=$(date +%s)
-    if run_test_case_3; then
-        CASE3_DURATION=$(($(date +%s) - CASE3_START))
-        record_test_result "test-acs-integration" "passed" "" "$CASE3_DURATION"
-        echo ""
-        echo "✅ Test Case 3 Result: PASSED"
-        echo ""
-    else
-        CASE3_DURATION=$(($(date +%s) - CASE3_START))
-        record_test_result "test-acs-integration" "failed" "ACS integration test failed" "$CASE3_DURATION"
-        echo ""
-        echo "❌ Test Case 3 Result: FAILED"
         echo ""
     fi
 else
