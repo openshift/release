@@ -120,10 +120,14 @@ INTERVAL=10
 for ((i=0; i<=TIMEOUT; i+=INTERVAL)); do
 
     # Count pods NOT in Running or Completed
-    NOT_READY=$(oc get pods -n openshift-cnv --no-headers 2>/dev/null \
-        | awk '{print $3}' \
-        | grep -vE "Running" || true \
-        | wc -l)
+    NOT_READY=$(
+    (
+    oc get pods -n openshift-cnv --no-headers 2>/dev/null \
+    | awk '{print $3}' \
+    | grep -v "Running" ) || true \
+    | wc -l
+               )
+
 
     # Count total pods
     TOTAL=$(oc get pods -n openshift-cnv --no-headers 2>/dev/null | wc -l)
