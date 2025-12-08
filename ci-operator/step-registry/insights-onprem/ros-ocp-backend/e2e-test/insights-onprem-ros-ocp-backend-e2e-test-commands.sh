@@ -45,10 +45,14 @@ echo "========== MinIO Configuration =========="
 
 # Read MinIO configuration from SHARED_DIR (set by insights-onprem-minio-deploy step)
 if [ -f "${SHARED_DIR}/minio-endpoint" ]; then
-    export MINIO_ENDPOINT=$(cat "${SHARED_DIR}/minio-endpoint")
-    export MINIO_ACCESS_KEY=$(cat "${SHARED_DIR}/minio-access-key")
-    export MINIO_SECRET_KEY=$(cat "${SHARED_DIR}/minio-secret-key")
-    export MINIO_NAMESPACE=$(cat "${SHARED_DIR}/minio-namespace")
+    MINIO_ENDPOINT=$(cat "${SHARED_DIR}/minio-endpoint")
+    export MINIO_ENDPOINT
+    MINIO_ACCESS_KEY=$(cat "${SHARED_DIR}/minio-access-key")
+    export MINIO_ACCESS_KEY
+    MINIO_SECRET_KEY=$(cat "${SHARED_DIR}/minio-secret-key")
+    export MINIO_SECRET_KEY
+    MINIO_NAMESPACE=$(cat "${SHARED_DIR}/minio-namespace")
+    export MINIO_NAMESPACE
     echo "MinIO endpoint: ${MINIO_ENDPOINT}"
     echo "MinIO namespace: ${MINIO_NAMESPACE}"
 else
