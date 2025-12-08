@@ -162,24 +162,24 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-16
     source: registry.redhat.io/quay/clair-rhel9
   - mirrors:
-     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-10
-     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-11
-     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-12
-     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-13
-     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-14
-     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-15
-     source: registry.redhat.io/quay/quay-builder-rhel8
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-10
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-11
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-12
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-13
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-14
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-15
+    source: registry.redhat.io/quay/quay-builder-rhel8
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-rhel9-v3-16
     source: registry.redhat.io/quay/quay-builder-rhel9
   - mirrors:
-     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-10
-     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-11
-     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-12
-     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-13
-     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-14
-     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-15
-     source: registry.redhat.io/quay/quay-builder-qemu-rhel8
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-10
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-11
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-12
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-13
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-14
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-v3-15
+    source: registry.redhat.io/quay/quay-builder-qemu-rhel8
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-qemu-rhel9-v3-16
     source: registry.redhat.io/quay/quay-builder-qemu-rhel9
