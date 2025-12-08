@@ -134,9 +134,11 @@ run_test_case_1() {
     chmod +x /tmp/jq
 
     # Clone and deploy
-    git clone https://github.com/stolostron/policy-collection.git || { echo "ERROR: Failed to clone repository"; return 1; }
-    cd policy-collection/deploy/ || { echo "ERROR: Failed to cd to deploy directory"; return 1; }
-    echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || { echo "ERROR: deploy.sh failed"; return 1; }
+    git clone https://github.com/tanfengshuang/policy-collection.git || { echo "ERROR: Failed to clone repository"; return 1; }
+    cd policy-collection || { echo "ERROR: Failed to cd to policy-collection"; return 1; }
+    git checkout opp-deployment-vsphere || { echo "ERROR: Failed to checkout branch"; return 1; }
+    cd deploy/ || { echo "ERROR: Failed to cd to deploy directory"; return 1; }
+    echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -b opp-deployment-vsphere -a e2e-opp || { echo "ERROR: deploy.sh failed"; return 1; }
 
     sleep 60
 
