@@ -41,6 +41,21 @@ else
     echo "helm is already installed"
 fi
 
+echo "========== MinIO Configuration =========="
+
+# Read MinIO configuration from SHARED_DIR (set by insights-onprem-minio-deploy step)
+if [ -f "${SHARED_DIR}/minio-endpoint" ]; then
+    export MINIO_ENDPOINT=$(cat "${SHARED_DIR}/minio-endpoint")
+    export MINIO_ACCESS_KEY=$(cat "${SHARED_DIR}/minio-access-key")
+    export MINIO_SECRET_KEY=$(cat "${SHARED_DIR}/minio-secret-key")
+    export MINIO_NAMESPACE=$(cat "${SHARED_DIR}/minio-namespace")
+    echo "MinIO endpoint: ${MINIO_ENDPOINT}"
+    echo "MinIO namespace: ${MINIO_NAMESPACE}"
+else
+    echo "WARNING: MinIO configuration not found in SHARED_DIR"
+    echo "Make sure insights-onprem-minio-deploy step ran before this step"
+fi
+
 echo "========== Image Tag Resolution =========="
 
 export IMAGE_TAG
