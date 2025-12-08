@@ -31,21 +31,16 @@ save_status_data_router_failed() {
   cp "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt" "$ARTIFACT_DIR/STATUS_DATA_ROUTER_FAILED.txt"
 }
 
-# Download and source the reporting.sh file from RHDH repository
-REPORTING_SCRIPT_URL="https://raw.githubusercontent.com/redhat-developer/rhdh/${RELEASE_BRANCH_NAME}/.ibm/pipelines/reporting.sh"
-REPORTING_SCRIPT_TMP="/tmp/reporting.sh"
-
-echo "💾 Downloading reporting.sh from ${REPORTING_SCRIPT_URL}"
-if curl -f -s -o "${REPORTING_SCRIPT_TMP}" "${REPORTING_SCRIPT_URL}"; then
-  echo "🟢 Successfully downloaded reporting.sh, sourcing it..."
-  # shellcheck source=/dev/null
-  source "${REPORTING_SCRIPT_TMP}"
-  rm -f "${REPORTING_SCRIPT_TMP}"
-  echo "✅ Successfully sourced reporting.sh from redhat-developer/rhdh/${RELEASE_BRANCH_NAME}"
-else
-  echo "🔴 Error: Failed to download reporting.sh from ${REPORTING_SCRIPT_URL}"
-  save_status_data_router_failed true
-fi
+get_job_url() {
+  local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results"
+  local job_complete_url
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    job_complete_url="${job_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+  else
+    job_complete_url="${job_base_url}/logs/${JOB_NAME}/${BUILD_ID}"
+  fi
+  echo "${job_complete_url}"
+}
 
 # Validate required variables
 validate_required_vars() {
