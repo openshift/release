@@ -24,13 +24,13 @@ fi
 cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
 hypershift_pods=$(! oc -n hypershift get pods| grep operator >/dev/null ||oc -n hypershift get pods| grep operator |wc -l)
 if [[ $cluster_infra == "BareMetal" && $hypershift_pods -ge 1 ]];then
-        echo "Executing cluster-density-v2 in hypershift cluster"
-        if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
-                echo "Set http proxy for hypershift cluster"
-                . $SHARED_DIR/proxy-conf.sh
-        fi
-        echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
-        export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
+  echo "Executing cluster-density-v2 in hypershift cluster"
+  if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
+    echo "Set http proxy for hypershift cluster"
+    . $SHARED_DIR/proxy-conf.sh
+  fi
+  echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
+  export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
 fi
 
 # Managment Kubeconfig for ROSA-HCP
@@ -55,9 +55,6 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=node-density
 
-RANDOM_WORKER_NODE=$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | shuf -n1)
-oc adm must-gather --timeout=3h --dest-dir "${ARTIFACT_DIR}/" -- PROFILING_NODE_SECONDS=60 gather_profiling_node $RANDOM_WORKER_NODE &
-
 EXTRA_FLAGS="--gc-metrics=true --pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
@@ -69,33 +66,8 @@ fi
 export EXTRA_FLAGS
 
 
-RANDOM_WORKER_NODE=$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | shuf -n1)
-
-gather_loop() {
-  local count=1
-  while true; do
-    echo "Starting background must-gather iteration #$count..."
-    timestamp=$(date -u +"%Y-%m-%dT%H-%M-%SZ")
-    gather_dir="${ARTIFACT_DIR}/node-profile-${timestamp}"
-    # Start must-gather in background and let it run independently
-    oc adm must-gather --dest-dir "$gather_dir" -- gather_profiling_node "$RANDOM_WORKER_NODE" &
-    count=$((count + 1))
-    sleep 60
-  done
-}
-
-# Run the gather loop in background
-gather_loop &
-GATHER_LOOP_PID=$!
-
 # Run workload immediately
 ./run.sh
-
-# After workload finishes, kill background gather loop
-echo "Workload finished. Stopping gather loop (PID $GATHER_LOOP_PID)..."
-kill "$GATHER_LOOP_PID" 2>/dev/null || true
-wait "$GATHER_LOOP_PID" 2>/dev/null || true
-echo "Gather loop stopped."
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
