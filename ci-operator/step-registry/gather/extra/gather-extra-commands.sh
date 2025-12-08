@@ -129,6 +129,8 @@ queue ${ARTIFACT_DIR}/clusterserviceversions.json oc --insecure-skip-tls-verify 
 queue ${ARTIFACT_DIR}/oc_cmds/clusterserviceversions oc --insecure-skip-tls-verify --request-timeout=5s get clusterserviceversions --all-namespaces
 queue ${ARTIFACT_DIR}/releaseinfo.json oc --insecure-skip-tls-verify --request-timeout=5s adm release info -o json
 queue ${ARTIFACT_DIR}/clusterrolebindings.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterrolebindings --all-namespaces -o json
+queue ${ARTIFACT_DIR}/networkpolicies.json oc --insecure-skip-tls-verify --request-timeout=5s get networkpolicies --all-namespaces -o json
+queue ${ARTIFACT_DIR}/oc_cmds/networkpolicies oc --insecure-skip-tls-verify --request-timeout=5s get networkpolicies --all-namespaces
 
 FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
@@ -735,6 +737,10 @@ mkdir -p ${ARTIFACT_DIR}/junit/
 
 if openshift-tests e2e-analysis --help &>/dev/null; then
     echo "Post e2e-analysis check for the cluster"
+    if [[ -f "${SHARED_DIR}/install-duration.log" ]]; then
+      echo "Found install-duration.log, it will be used for collecting install durations"
+      cat "${SHARED_DIR}/install-duration.log"
+    fi
     openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
 else
     # C2S/SC2S proxy can not access internet
@@ -791,6 +797,18 @@ while IFS= read -r line; do
       echo "<testcase name=\"$( xmlescape "${prefix}" )\"></testcase>" >> "${tests}"
       continue
     fi
+    
+    # sometimes infrastrue issue got recovered during cluster reconciling, does not result in a cricital issue, then skip it.
+    if [[ "$prefix" == "Infrastructure - quota exceeded or hit rate limit" ]]; then
+      INSTALL_EXIT_CODE=0
+      INSTALL_STATUS_FILE="${SHARED_DIR}/install-status.txt"
+      [[ -f "${INSTALL_STATUS_FILE}" ]] && INSTALL_EXIT_CODE=$(tail -n1 "${INSTALL_STATUS_FILE}" | awk '{print $1}') || true
+      if [[ "$INSTALL_EXIT_CODE" ==  0 ]]; then
+        echo "<testcase name=\"$( xmlescape "${prefix}" )\"><system-out>install succeed, skipping: $( xmlescape "${out}" )</system-out></testcase>" >> "${tests}"
+        continue
+      fi
+    fi
+
     echo Detected: "${prefix}" 1>&2
 
     failures=$((failures+1))

@@ -45,7 +45,7 @@ images:
     RUN export GOFLAGS='-mod=readonly' && \
         make install-tools && \
         make -C tooling/templatize templatize && \
-        make -C test/ aro-hcp-tests
+        make -C test/ aro-hcp-tests prow-job-executor
     ENV PATH="/usr/local/bin:$PATH"
   from: src
   inputs:
@@ -66,6 +66,12 @@ resources:
     requests:
       cpu: "8"
       memory: 4Gi
+  aro-hcp-e2e-tools:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: "8"
+      memory: 8Gi
 test_binary_build_commands: make test-compile
 tests:
 - always_run: true
@@ -106,6 +112,7 @@ tests:
 - always_run: true
   as: e2e-parallel
   optional: true
+  skip_if_only_changed: ^(?:action\.yml|AGENTS\.md|CLAUDE\.md|CODEOWNERS|CONTRIBUTING\.md|\.bingo/|\.cursor/|demo/|\.devcontainer/|docs/|\.editorconfig|GEMINI\.md|generate-repo\.sh|generate-tag\.sh|get-digest\.sh|get-tag-sha\.sh|\.gitattributes|\.gitguardian\.yaml|\.github/|\.gitignore|\.gitleaks\.toml|\.golangci\.yml|hack/|LICENSE|\.mega-linter\.yml|README\.md|SECURITY\.md|svc-deploy\.sh|\.vscode/|\.yamlfmt\.yaml|\.yamllint\.yml)$|\.md$
   steps:
     cluster_profile: aro-hcp-dev
     env:

@@ -50,11 +50,11 @@ done
 
 JOB="$(echo "${JOB_SPEC}" | jq '.job')"
 IPI_BOOTSTRAP_IP=""
+CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 
 if [[ "${JOB}" =~ "baremetal-ipi" ]]; then
   echo "This is a IPI job. Saving bootstrap ip for post steps."
   cp "${SHARED_DIR}"/ipi_bootstrap_ip_address "${SHARED_DIR}"/ipi_bootstrap_ip_address_fw
-  CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
   IPI_BOOTSTRAP_IP="$(<"${SHARED_DIR}/ipi_bootstrap_ip_address_fw")"
 
   # copy bootstrap ip to bastion host for use in cleanup
@@ -88,4 +88,7 @@ EOF
 
 # mirror-images-by-oc-adm will run only if a specific file is found, see step code
 cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"
+# Save mirror_registry_url file for post step use
+scp "${SSHOPTS[@]}" "${SHARED_DIR}/mirror_registry_url" "root@${AUX_HOST}:/var/builds/$CLUSTER_NAME/mirror_registry_url"
+
 
