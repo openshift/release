@@ -109,7 +109,7 @@ if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 file /tmp/openshift-baremetal-install
-
+worker_arch=$(echo "${ADDITIONAL_WORKER_ARCHITECTURE}" | sed 's/aarch64/arm64/;s/x86_64/amd64/')
 echo "[INFO] Processing the install-config.yaml..."
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
@@ -124,10 +124,10 @@ controlPlane:
    name: master
    replicas: ${masters}
 compute:
-- architecture: ${architecture}
+- architecture: ${worker_arch}
   hyperthreading: Enabled
   name: worker
-  replicas: ${workers}
+  replicas: ${ADDITIONAL_WORKERS}
 platform:
   baremetal:
     libvirtURI: >-
@@ -152,16 +152,20 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     continue
   fi
   if [[ "${name}" == *-a-* ]] && [[ "${arch}" == "aarch64" ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "false" ]; then
-    echo "{INFO} Setting additional arm64 worker ${name} architecture in install-config.yaml"
-    ADD_WKR_ARCH=$( printf '\n  %s' 'architecture: aarch64')
+#    echo "{INFO} Setting additional arm64 worker ${name} architecture in install-config.yaml"
+    echo "Adding additional worker ROLE"
+    node_role="worker"
+#    ADD_WKR_ARCH=$( printf '\n  %s' 'architecture: aarch64')
   else
-    echo "{INFO} Adding ${name} - ${arch}"
-    ADD_WKR_ARCH=''
+    echo "Setting ROLE"
+    node_role="${name%%-[0-9]*}"
+#    echo "{INFO} Adding ${name} - ${arch}"
+#    ADD_WKR_ARCH=''
   fi
 
   ADAPTED_YAML="
   name: ${name}
-  role: ${name%%-[0-9]*}${ADD_WKR_ARCH}
+  role: ${node_role}
   bootMACAddress: ${provisioning_mac}
   rootDeviceHints:
     ${root_device:+deviceName: ${root_device}}

@@ -23,15 +23,15 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "$SHARED_DIR/hosts.yaml"); do
     continue
   fi
   if [[ "${name}" == *-a-* ]] && [[ "${arch}" == "aarch64" ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "false" ]; then
-    echo "{INFO} Setting additional arm64 worker ${name} architecture in install-config.yaml"
-    ADD_WKR_ARCH=$( printf '\n      %s' 'architecture: aarch64')
+    echo "Adding additional worker ROLE"
+    node_role="worker"
   else
-    echo "{INFO} Adding ${name} - ${arch}"
-    ADD_WKR_ARCH=''
+    echo "Setting ROLE"
+    node_role="${name%%-[0-9]*}"
   fi
   cat >> "$SHARED_DIR/redfish_patch_install_config.yaml" <<EOF
     - name: ${name}
-      role: ${name%%-[0-9]*}${ADD_WKR_ARCH}
+      role: ${node_role}
       bootMACAddress: ${mac}
       rootDeviceHints:
         ${root_device:+deviceName: ${root_device}}
