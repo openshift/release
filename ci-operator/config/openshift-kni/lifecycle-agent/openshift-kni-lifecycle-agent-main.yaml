@@ -59,8 +59,14 @@ tests:
     export XDG_CONFIG_HOME=/tmp/.config
     export XDG_DATA_HOME=/tmp/.local/share
     make ci-job
+    make coveralls-download
+    export COVERALLS_REPO_TOKEN=$(cat /etc/coveralls/TOKEN)
+    ./bin/coveralls report --job-flag "unit-tests" --build-number=$(git rev-parse HEAD) coverage.out
   container:
     from: src
+  secrets:
+  - mount_path: /etc/coveralls
+    name: lifecycle-agent-coverall
 - always_run: false
   as: integration
   skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
