@@ -86,18 +86,20 @@ tests:
     env:
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints
-- as: installer-rehearse-gcp-proxy
+- as: installer-rehearse-gcp-private
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
-      ENABLE_MIN_PERMISSION_FOR_STS: "true"
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-workload-identity
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build07.ci.openshift.org/ci-ln-641n8qt/release:latest
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      SLEEP_DURATION: 4h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-custom-dns-private-behind-proxy-provision
 - as: installer-rehearse-ibmcloud-dis
   cron: '@yearly'
   steps:
