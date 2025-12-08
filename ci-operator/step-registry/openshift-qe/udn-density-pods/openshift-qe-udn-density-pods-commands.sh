@@ -68,4 +68,4 @@ fi
 if [[ ${PPROF} == "true" ]]; then
   cp -r pprof-data "${ARTIFACT_DIR}/"
 fi
-sleep 3600
+sleep 28800
