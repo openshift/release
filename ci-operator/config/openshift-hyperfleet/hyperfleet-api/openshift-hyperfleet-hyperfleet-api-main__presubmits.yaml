@@ -34,9 +34,11 @@ tests:
   - nested-podman
   commands: |
     export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
-    podman system service --time=20 &
+    podman system service --time=120 $(DOCKER_HOST) &
     systemctl --user start podman.socket || true
     export TESTCONTAINERS_RYUK_DISABLED=true
+    export TESTCONTAINERS_CHECKS_DISABLE=true
+
     export PATH=$PATH:$(go env GOPATH)/bin
     make generate
     make test-integration
