@@ -230,19 +230,19 @@ echo "MinIO configuration saved to SHARED_DIR"
 
 echo "========== Creating ODF Credentials Secret for Helm Chart =========="
 
-# Create the credentials secret in the helm chart namespace
-# The install-helm-chart.sh script looks for cost-onprem-odf-credentials in the 
-# namespace where the helm chart is deployed (default: cost-onprem)
-HELM_NAMESPACE="${HELM_NAMESPACE:-cost-onprem}"
+# Create the credentials secret in the namespace where the helm chart will be deployed
+# The NAMESPACE env var is set by CI to the job's namespace (e.g., ci-op-xxxxx)
+# The install-helm-chart.sh script looks for cost-onprem-odf-credentials in this namespace
 SECRET_NAME="${ODF_CREDENTIALS_SECRET_NAME:-cost-onprem-odf-credentials}"
 
-# Create the helm chart namespace if it doesn't exist
-echo "Creating namespace ${HELM_NAMESPACE} if it doesn't exist..."
-oc create namespace "${HELM_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+# Use the CI job namespace (NAMESPACE) as the target for the secret
+# This is where install-helm-chart.sh will deploy and look for the secret
+TARGET_NAMESPACE="${NAMESPACE:-cost-onprem}"
+echo "Target namespace for ODF credentials: ${TARGET_NAMESPACE}"
 
-echo "Creating ${SECRET_NAME} secret in namespace: ${HELM_NAMESPACE}"
+echo "Creating ${SECRET_NAME} secret in namespace: ${TARGET_NAMESPACE}"
 oc create secret generic "${SECRET_NAME}" \
-    --namespace="${HELM_NAMESPACE}" \
+    --namespace="${TARGET_NAMESPACE}" \
     --from-literal=access-key="${MINIO_ACCESS_KEY}" \
     --from-literal=secret-key="${MINIO_SECRET_KEY}" \
     --dry-run=client -o yaml | oc apply -f -
@@ -250,7 +250,7 @@ oc create secret generic "${SECRET_NAME}" \
 # Also save the MinIO endpoint and namespace info for the tests
 echo "MINIO_ENDPOINT=http://minio.${MINIO_NAMESPACE}.svc:9000" >> "${SHARED_DIR}/minio-env"
 echo "S3_ENDPOINT=http://minio.${MINIO_NAMESPACE}.svc:9000" >> "${SHARED_DIR}/minio-env"
-echo "HELM_NAMESPACE=${HELM_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
+echo "TARGET_NAMESPACE=${TARGET_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
 
-echo "ODF credentials secret created successfully in ${HELM_NAMESPACE} namespace"
+echo "ODF credentials secret created successfully in ${TARGET_NAMESPACE} namespace"
 
