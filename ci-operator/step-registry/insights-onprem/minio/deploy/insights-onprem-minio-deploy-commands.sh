@@ -4,6 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "========== Installing Dependencies =========="
+
+# Install oc if not available
+if ! command -v oc &> /dev/null; then
+    echo "oc not found, installing..."
+    curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz -o /tmp/oc.tar.gz
+    tar -xzf /tmp/oc.tar.gz -C /tmp oc
+    chmod +x /tmp/oc
+    export PATH="/tmp:${PATH}"
+    echo "oc installed successfully"
+else
+    echo "oc is already installed"
+fi
+
 echo "========== Deploying MinIO for S3-compatible Object Storage =========="
 
 MINIO_NAMESPACE="${MINIO_NAMESPACE:-minio}"
