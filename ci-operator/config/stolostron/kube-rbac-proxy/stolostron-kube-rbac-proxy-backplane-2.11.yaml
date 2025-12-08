@@ -3,33 +3,26 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.21-linux:
+  stolostron_builder_go1.23-linux:
     name: builder
     namespace: stolostron
-    tag: go1.21-linux
-  stolostron_builder_go1.24-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.24-linux
+    tag: go1.23-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.24-linux
+    tag: go1.23-linux
 images:
 - dockerfile_path: Dockerfile.prow
   from: base
   inputs:
-    stolostron_builder_go1.21-linux:
+    stolostron_builder_go1.23-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.21-linux
-    stolostron_builder_go1.24-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.23-linux
   to: kube-rbac-proxy-mce
 promotion:
   to:
-  - name: "2.8"
+  - name: "2.11"
     namespace: stolostron
 resources:
   '*':
@@ -82,7 +75,7 @@ tests:
       SOURCE_IMAGE_REF: kube-rbac-proxy-mce
     env:
       IMAGE_REPO: kube-rbac-proxy-mce
-      IMAGE_TAG: latest-2.8
+      IMAGE_TAG: latest-2.11
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: publish
@@ -97,7 +90,7 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME=kube-rbac-proxy-mce
-        export OSCI_COMPONENT_VERSION=2.8.0
+        export OSCI_COMPONENT_VERSION=2.11.0
         export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
         export OSCI_PIPELINE_REPO=backplane-pipeline
         export OSCI_PUBLISH_DELAY="0"
@@ -115,6 +108,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: backplane-2.8
+  branch: backplane-2.11
   org: stolostron
   repo: kube-rbac-proxy
