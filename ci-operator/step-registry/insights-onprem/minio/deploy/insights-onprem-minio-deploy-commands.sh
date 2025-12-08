@@ -20,6 +20,7 @@ fi
 
 echo "========== Deploying MinIO for S3-compatible Object Storage =========="
 
+# MinIO goes in its own namespace (like ODF uses openshift-storage)
 MINIO_NAMESPACE="${MINIO_NAMESPACE:-minio}"
 MINIO_ACCESS_KEY="${MINIO_ACCESS_KEY:-minioadmin}"
 MINIO_SECRET_KEY="${MINIO_SECRET_KEY:-minioadmin}"
@@ -28,7 +29,7 @@ MINIO_STORAGE_SIZE="${MINIO_STORAGE_SIZE:-10Gi}"
 echo "MinIO Namespace: ${MINIO_NAMESPACE}"
 echo "Storage Size: ${MINIO_STORAGE_SIZE}"
 
-# Create namespace
+# Create MinIO namespace
 echo "Creating namespace ${MINIO_NAMESPACE}..."
 oc create namespace "${MINIO_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
@@ -228,29 +229,34 @@ echo "${MINIO_SECRET_KEY}" > "${SHARED_DIR}/minio-secret-key"
 
 echo "MinIO configuration saved to SHARED_DIR"
 
-echo "========== Creating ODF Credentials Secret for Helm Chart =========="
+echo "========== Creating ODF Credentials Secret in Application Namespace =========="
 
-# Create the credentials secret in the namespace where the helm chart will be deployed
-# The NAMESPACE env var is set by CI to the job's namespace (e.g., ci-op-xxxxx)
-# The install-helm-chart.sh script looks for cost-onprem-odf-credentials in this namespace
+# The ODF credentials secret goes in the APPLICATION namespace (where helm chart deploys)
+# This is separate from the MinIO namespace (storage layer)
+APP_NAMESPACE="${APP_NAMESPACE:-cost-onprem}"
 SECRET_NAME="${ODF_CREDENTIALS_SECRET_NAME:-cost-onprem-odf-credentials}"
 
-# Use the CI job namespace (NAMESPACE) as the target for the secret
-# This is where install-helm-chart.sh will deploy and look for the secret
-TARGET_NAMESPACE="${NAMESPACE:-cost-onprem}"
-echo "Target namespace for ODF credentials: ${TARGET_NAMESPACE}"
+# Create application namespace if it doesn't exist
+echo "Creating application namespace ${APP_NAMESPACE}..."
+oc create namespace "${APP_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
 
-echo "Creating ${SECRET_NAME} secret in namespace: ${TARGET_NAMESPACE}"
+# Apply cost management optimization label (required by the operator)
+echo "Applying cost management optimization label to namespace..."
+oc label namespace "${APP_NAMESPACE}" cost_management_optimizations=true --overwrite
+
+echo "Creating ${SECRET_NAME} secret in namespace: ${APP_NAMESPACE}"
 oc create secret generic "${SECRET_NAME}" \
-    --namespace="${TARGET_NAMESPACE}" \
+    --namespace="${APP_NAMESPACE}" \
     --from-literal=access-key="${MINIO_ACCESS_KEY}" \
     --from-literal=secret-key="${MINIO_SECRET_KEY}" \
     --dry-run=client -o yaml | oc apply -f -
 
-# Also save the MinIO endpoint and namespace info for the tests
+# Save namespace info for the e2e tests
+echo "MINIO_NAMESPACE=${MINIO_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
+echo "APP_NAMESPACE=${APP_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
 echo "MINIO_ENDPOINT=http://minio.${MINIO_NAMESPACE}.svc:9000" >> "${SHARED_DIR}/minio-env"
 echo "S3_ENDPOINT=http://minio.${MINIO_NAMESPACE}.svc:9000" >> "${SHARED_DIR}/minio-env"
-echo "TARGET_NAMESPACE=${TARGET_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
 
-echo "ODF credentials secret created successfully in ${TARGET_NAMESPACE} namespace"
+echo "ODF credentials secret created successfully in ${APP_NAMESPACE} namespace"
+echo "MinIO is accessible from ${APP_NAMESPACE} at: http://minio.${MINIO_NAMESPACE}.svc:9000"
 
