@@ -13,15 +13,15 @@ az account set --subscription "${SUBSCRIPTION_ID}"
 oc version
 kubelogin --version
 
-echo "source registry set to ${BACKEND_SOURCE_REGISTRY} and repo ${BACKEND_REPOSITORY} for Backend Image"
 BACKEND_DIGEST=$(echo ${BACKEND_IMAGE} | cut -d'@' -f2)
 BACKEND_REPOSITORY=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
 BACKEND_SOURCE_REGISTRY=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+echo "source registry set to ${BACKEND_SOURCE_REGISTRY} and repo ${BACKEND_REPOSITORY} for Backend Image"
 
-echo "source registry set to ${FRONTEND_SOURCE_REGISTRY} and repo ${FRONTEND_REPOSITORY} for Frontend Image"
 FRONTEND_DIGEST=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f2)
 FRONTEND_REPOSITORY=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
 FRONTEND_SOURCE_REGISTRY=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+echo "source registry set to ${FRONTEND_SOURCE_REGISTRY} and repo ${FRONTEND_REPOSITORY} for Frontend Image"
 
 # Set up registries that require oc login - append backend and frontend registries
 if [[ -n "${USE_OC_LOGIN_REGISTRIES}" ]]; then
