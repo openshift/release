@@ -96,6 +96,11 @@ releases:
       product: ocp
       stream: nightly
       version: "4.20"
+  n2minor:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
   target:
     candidate:
       architecture: multi
@@ -820,6 +825,22 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
+      PUBLIC_ONLY: "true"
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: aws-ipi-ovn-hypershift-mgmt-global-ps-f7
+  cron: 30 19 1,8,17,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      ADDITIONAL_CA_BUNDLE_FILE: additional-ca.crt
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      DYNAMIC_ADDITIONAL_TRUST_BUNDLE_ENABLED: "true"
+      DYNAMIC_GLOBAL_PULL_SECRET_ENABLED: "true"
+      DYNAMIC_IMAGE_REGISTRY_ENABLED: "true"
       HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
       PUBLIC_ONLY: "true"
       TEST_IMPORTANCE: Critical
@@ -2459,6 +2480,94 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-disasterrecovery-sanity
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
+- as: aws-ipi-ovn-hypershift-mce-n2minor-mgmt-f28
+  cron: 35 1 17 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_VERSION: "2.10"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce
+- as: aws-ipi-ovn-hypershift-mce-n2minor-guest-f28
+  cron: 14 21 22 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      MCE_VERSION: "2.10"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-guest
+- as: baremetalds-hypershift-agent-mce-n2minor-guest-f28
+  capabilities:
+  - intranet
+  cron: 28 2 2 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
+      MCE_VERSION: "2.10"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+- as: baremetalds-hypershift-agent-mce-n2minor-mgmt-f28
+  capabilities:
+  - intranet
+  cron: 39 10 12 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
+      MCE_VERSION: "2.10"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce
+- as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-n2minor-mgmt-f28
+  capabilities:
+  - intranet
+  cron: 43 4 27 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
+      MCE_VERSION: "2.10"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.19
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce
+- as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-n2minor-guest-f28
+  capabilities:
+  - intranet
+  cron: 26 18 2 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
+      MCE_VERSION: "2.10"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.19
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
 - as: gcp-ipi-confidential-fips-mini-perm-f28-destructive
   cron: 27 4 23 * *
   steps:
@@ -2628,9 +2737,9 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       MINIMAL_PERMISSIONS_WITHOUT_ACT_AS: "yes"
     test:
@@ -2642,9 +2751,9 @@ tests:
     cluster_profile: gcp-qe
     env:
       COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
       CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       MINIMAL_PERMISSIONS_WITHOUT_ACT_AS: "yes"
     test:

@@ -78,6 +78,7 @@ if [[ "${ENALBE_DNSMASQ_METHOD}" == "NetworkManager" ]]; then
     run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo chown root:root /etc/NetworkManager/dnsmasq.d/custom-dns.conf && sudo restorecon -v /etc/NetworkManager/dnsmasq.d/custom-dns.conf"
     run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo touch /etc/NetworkManager/conf.d/use-dnsmasq.conf && echo -e '[main]\ndns=dnsmasq' | sudo tee -a /etc/NetworkManager/conf.d/use-dnsmasq.conf"
     run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo systemctl restart NetworkManager.service"
+    run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "sudo systemctl restart squid.service"
 
 elif [[ "${ENALBE_DNSMASQ_METHOD}" == "systemd-service" ]]; then
     run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "rpm -q dnsmasq >/dev/null 2>&1 || { echo 'Error: dnsmasq is not installed.' >&2; exit 1; }"

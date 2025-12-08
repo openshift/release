@@ -284,7 +284,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-agent-4control-ipv4
     decorate: true
     labels:
@@ -359,7 +359,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-agent-5control-ipv4
     decorate: true
     labels:
@@ -434,7 +434,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-agent-compact-ipv4
     decorate: true
     labels:
@@ -508,7 +508,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-agent-compact-ipv4-appliance-diskimage
     decorate: true
     labels:
@@ -583,7 +583,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-agent-compact-ipv4-iso-no-registry
     decorate: true
     labels:
@@ -658,7 +658,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-agent-compact-ipv4-none-platform
     decorate: true
     labels:
@@ -733,7 +733,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-agent-compact-ipv6-minimaliso
     decorate: true
     labels:
@@ -808,7 +808,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-agent-ha-dualstack
     decorate: true
     labels:
@@ -883,7 +883,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-agent-sno-ipv4-pxe
     decorate: true
     labels:
@@ -958,7 +958,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-agent-sno-ipv6
     decorate: true
     labels:
@@ -1033,7 +1033,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-agent-two-node-fencing-ipv4
     decorate: true
     labels:
@@ -4783,7 +4783,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-metal-assisted
     decorate: true
     labels:
@@ -4858,7 +4858,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn
     decorate: true
     labels:
@@ -4933,7 +4933,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     labels:
@@ -5008,7 +5008,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     labels:
@@ -5082,7 +5082,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-swapped-hosts
     decorate: true
     labels:
@@ -5157,7 +5157,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-metal-ipi-ovn-virtualmedia
     decorate: true
     labels:
@@ -5232,7 +5232,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-metal-ovn-two-node-arbiter
     decorate: true
     labels:
@@ -5307,7 +5307,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build10
     context: ci/prow/e2e-metal-ovn-two-node-fencing
     decorate: true
     labels:
@@ -7304,6 +7304,82 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere-static-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
+    context: ci/prow/gcp-custom-endpoints-proxy-wif
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-main-gcp-custom-endpoints-proxy-wif
+    optional: true
+    rerun_command: /test gcp-custom-endpoints-proxy-wif
+    run_if_changed: (gcp|google)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=gcp-custom-endpoints-proxy-wif
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )gcp-custom-endpoints-proxy-wif,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
