@@ -62,6 +62,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.21"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.21"
   ppc64le-latest:
     candidate:
       architecture: ppc64le
@@ -702,6 +708,52 @@ tests:
       TEST_ARGS: --monitor=watch-namespaces
       TEST_SUITE: olmv1/extended/candidate/fast
     workflow: baremetalds-two-node-fencing-techpreview
+- as: e2e-ibmcloud-ovn-extended-f4
+  cron: 23 16 1-31/4 * *
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/fast
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-ibmcloud-ovn
+- as: e2e-ibmcloud-ovn-slow-extended-f5
+  cron: 23 12 1-31/5 * *
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv1/extended/candidate/slow
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-ibmcloud-ovn
+- as: e2e-aws-ovn-heterogeneous-extended-f4
+  cron: 23 14 1-31/4 * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SKIPS: ""
+      TEST_SUITE: olmv1/extended/candidate/fast
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-heterogeneous
+- as: e2e-aws-ovn-heterogeneous-slow-extended-f5
+  cron: 51 18 1-31/5 * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SKIPS: ""
+      TEST_SUITE: olmv1/extended/candidate/slow
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-heterogeneous
 zz_generated_metadata:
   branch: release-4.21
   org: openshift

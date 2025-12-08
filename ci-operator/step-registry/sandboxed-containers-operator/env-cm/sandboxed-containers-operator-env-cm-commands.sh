@@ -70,9 +70,8 @@ if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   fi
 
   create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
-  create_catsrc "${TRUSTEE_CATALOG_SOURCE_NAME}" "${TRUSTEE_CATALOG_SOURCE_IMAGE}"
 else
-  if [[ -n "$CATALOG_SOURCE_IMAGE" || -n "$TRUSTEE_CATALOG_SOURCE_IMAGE" ]]; then
+  if [[ -n "$CATALOG_SOURCE_IMAGE" ]]; then
     echo "CATALOG_SOURCE_IMAGE can only be used when TEST_RELEASE_TYPE==Pre-GA ($CATALOG_SOURCE_IMAGE)"
     exit 1
   fi
@@ -96,7 +95,6 @@ data:
   enableGPU: "${ENABLEGPU}"
   podvmImageUrl: "${PODVM_IMAGE_URL}"
   runtimeClassName: "${RUNTIMECLASS}"
-  trusteeCatalogSourcename: "${TRUSTEE_CATALOG_SOURCE_NAME}"
   trusteeUrl: "${TRUSTEE_URL}"
   INITDATA: "${INITDATA}"
   enablePeerPods: "${ENABLEPEERPODS}"
