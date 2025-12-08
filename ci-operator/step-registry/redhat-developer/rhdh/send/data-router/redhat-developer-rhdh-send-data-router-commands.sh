@@ -90,12 +90,15 @@ process_junit_files() {
     local namespace
     namespace=$(echo "$filename" | sed 's/^junit-results-//' | sed 's/\.xml$//')
 
+    # Create namespace directory in ARTIFACT_DIR if it doesn't exist
+    mkdir -p "${ARTIFACT_DIR}/${namespace}"
+
     # Construct artifacts URL for this namespace
     local artifacts_url
     artifacts_url=$(get_artifacts_url "${namespace}")
 
-    # Create backup of original file
-    cp "$junit_file" "${ARTIFACT_DIR}/${namespace}/${junit_file}.original.xml"
+    # Create backup of original file in ARTIFACT_DIR
+    cp "$junit_file" "${ARTIFACT_DIR}/${namespace}/${filename}.original.xml"
 
     # Replace attachment placeholders with full URLs to OpenShift CI storage
     sed -i "s#\[\[ATTACHMENT|\(.*\)\]\]#${artifacts_url}/\1#g" "$junit_file"
@@ -107,7 +110,7 @@ process_junit_files() {
     sed -i 's#<property name="\([^"]*\)" value="\([^"]*\)">#<property name="\1" value="\2"/>#g' "$junit_file"
 
     # Save the processed file to the artifact directory
-    cp "$junit_file" "${ARTIFACT_DIR}/${namespace}/${junit_file}.processed.xml"
+    cp "$junit_file" "${ARTIFACT_DIR}/${namespace}/${filename}.processed.xml"
 
     echo "✅ Processed: ${filename} (namespace: ${namespace})"
   done
