@@ -130,6 +130,7 @@ NEW_PATH="$PATH:${YARN_PATH}"
 export PATH=${NEW_PATH}
 
 #yarn run cypress run --browser firefox --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags=newui+-nopipeline || true
+#NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='p1 p2 p3 --noprowci' ||true
 NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --noprowci' || true
 
 yarn run jrm  ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_testing_report-* || true
