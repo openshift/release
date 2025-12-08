@@ -12,7 +12,6 @@ RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev
 SLACK_NIGHTLY_WEBHOOK_URL=$(cat /tmp/secrets/SLACK_NIGHTLY_WEBHOOK_URL)
 export RELEASE_BRANCH_NAME SLACK_NIGHTLY_WEBHOOK_URL
 
-# Source: https://github.com/redhat-developer/rhdh/blob/main/.ibm/pipelines/reporting.sh
 get_artifacts_url() {
   local namespace=$1
 
