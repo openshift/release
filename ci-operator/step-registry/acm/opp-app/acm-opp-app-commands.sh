@@ -14,10 +14,12 @@ cd /tmp/
 curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /tmp/jq
 chmod +x /tmp/jq
 
-git clone https://github.com/stolostron/policy-collection.git
-cd policy-collection/deploy/
+git clone https://github.com/tanfengshuang/policy-collection.git
+cd policy-collection
+git checkout opp-deployment-vsphere
+cd deploy/
 
-echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp
+echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -b opp-deployment-vsphere -a e2e-opp
 
 # Wait for the Quay resources to be created
 # How do I check this?

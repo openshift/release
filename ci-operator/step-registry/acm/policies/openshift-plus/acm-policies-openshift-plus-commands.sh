@@ -9,12 +9,14 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 # cd to writeable directory
 cd /tmp/
 
-git clone https://github.com/stolostron/policy-collection.git
+git clone https://github.com/tanfengshuang/policy-collection.git
+cd policy-collection
+git checkout opp-deployment-vsphere
 
 sleep 60
 
-cd policy-collection/deploy/ 
-echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
+cd deploy/
+echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/tanfengshuang/policy-collection.git -b opp-deployment-vsphere -a openshift-plus
 
 sleep 120
 
