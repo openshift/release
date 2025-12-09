@@ -115,6 +115,10 @@ CONFIG = {
         'us-east-1': 5,
         'ap-northeast-1': 5,
     },
+    'aws-confidential-computing-qe-quota-slice': {
+        'us-east-2': 3,
+        'eu-west-1': 1,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
