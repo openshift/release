@@ -72,6 +72,91 @@ else
     echo "Make sure insights-onprem-minio-deploy step ran before this step"
 fi
 
+# Read application namespace from SHARED_DIR and export as NAMESPACE
+# This overrides the CI's NAMESPACE var so the helm chart deploys to the right place
+if [ -f "${SHARED_DIR}/minio-env" ]; then
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/minio-env"
+    if [ -n "${APP_NAMESPACE:-}" ]; then
+        export NAMESPACE="${APP_NAMESPACE}"
+        echo "Application namespace: ${NAMESPACE}"
+    fi
+fi
+
+echo "========== Installing Cost Management Operator =========="
+# Pre-install the Cost Management Operator without startingCSV
+# This ensures the operator is installed with whatever version is available in the catalog
+# The upstream setup-cost-mgmt-tls.sh will skip installation if it's already present
+
+# Use the application namespace (defaults to cost-onprem)
+COST_MGMT_NAMESPACE="${NAMESPACE:-cost-onprem}"
+echo "Installing Cost Management Operator in namespace: ${COST_MGMT_NAMESPACE}"
+
+# List available versions of the Cost Management Operator
+echo "Checking available versions of costmanagement-metrics-operator in catalog..."
+if oc get packagemanifest costmanagement-metrics-operator -n openshift-marketplace &> /dev/null; then
+    echo "Package manifest found. Available channels and versions:"
+    oc get packagemanifest costmanagement-metrics-operator -n openshift-marketplace -o jsonpath='{range .status.channels[*]}Channel: {.name}, Current CSV: {.currentCSV}{"\n"}{end}' || true
+    echo ""
+    echo "Default channel: $(oc get packagemanifest costmanagement-metrics-operator -n openshift-marketplace -o jsonpath='{.status.defaultChannel}')" || true
+else
+    echo "WARNING: costmanagement-metrics-operator package manifest not found in catalog"
+fi
+
+# Check if operator is already installed
+if oc get subscription costmanagement-metrics-operator -n "${COST_MGMT_NAMESPACE}" &> /dev/null; then
+    echo "Cost Management Operator already installed, skipping..."
+else
+    echo "Ensuring namespace ${COST_MGMT_NAMESPACE} exists..."
+    oc create namespace "${COST_MGMT_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+
+    echo "Creating OperatorGroup..."
+    cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: costmanagement-metrics-operator
+  namespace: ${COST_MGMT_NAMESPACE}
+spec:
+  targetNamespaces:
+  - ${COST_MGMT_NAMESPACE}
+EOF
+
+    echo "Creating Subscription (without startingCSV to use latest available version)..."
+    cat <<EOF | oc apply -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: costmanagement-metrics-operator
+  namespace: ${COST_MGMT_NAMESPACE}
+spec:
+  channel: stable
+  name: costmanagement-metrics-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+EOF
+
+    echo "Waiting for Cost Management Operator to be ready..."
+    # Wait for the CSV to be installed (up to 5 minutes)
+    TIMEOUT=300
+    ELAPSED=0
+    while [ $ELAPSED -lt $TIMEOUT ]; do
+        if oc get csv -n "${COST_MGMT_NAMESPACE}" 2>/dev/null | grep -q "costmanagement-metrics-operator.*Succeeded"; then
+            echo "Cost Management Operator installed successfully"
+            break
+        fi
+        echo "Waiting for operator CSV to succeed... (${ELAPSED}s elapsed)"
+        sleep 10
+        ELAPSED=$((ELAPSED + 10))
+    done
+
+    if [ $ELAPSED -ge $TIMEOUT ]; then
+        echo "WARNING: Timeout waiting for Cost Management Operator, continuing anyway..."
+        oc get csv -n "${COST_MGMT_NAMESPACE}" || true
+        oc get subscription -n "${COST_MGMT_NAMESPACE}" -o yaml || true
+    fi
+fi
+
 echo "========== Image Tag Resolution =========="
 
 export IMAGE_TAG
