@@ -60,4 +60,69 @@ spec:
       interval: 45m
 EOF
 
+echo "7. Verifying CatalogSource status..."
+# Wait for the CatalogSource to be created and have a state
+TIMEOUT=300
+INTERVAL=10
+ELAPSED=0
+
+while [ $ELAPSED -lt $TIMEOUT ]; do
+    CATALOG_STATE=$(oc get catalogsource redhat-operators -n openshift-marketplace -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+
+    if [[ "$CATALOG_STATE" == "READY" ]]; then
+        echo "CatalogSource is READY"
+        break
+    elif [[ "$CATALOG_STATE" == "" ]]; then
+        echo "Waiting for CatalogSource status to be populated... (${ELAPSED}s/${TIMEOUT}s)"
+    else
+        echo "CatalogSource state: ${CATALOG_STATE} (${ELAPSED}s/${TIMEOUT}s)"
+    fi
+
+    sleep $INTERVAL
+    ELAPSED=$((ELAPSED + INTERVAL))
+done
+
+if [ $ELAPSED -ge $TIMEOUT ]; then
+    echo "ERROR: CatalogSource did not become READY within ${TIMEOUT} seconds"
+    oc get catalogsource redhat-operators -n openshift-marketplace -o yaml 
+    exit 1
+fi
+
+echo "8. Verifying catalog pod is running and ready..."
+# Wait for the catalog pod to be created and become ready
+TIMEOUT=300
+ELAPSED=0
+
+while [ $ELAPSED -lt $TIMEOUT ]; do
+    POD_NAME=$(oc get pods -n openshift-marketplace -l olm.catalogSource=redhat-operators -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+
+    if [[ -z "$POD_NAME" ]]; then
+        echo "Waiting for catalog pod to be created... (${ELAPSED}s/${TIMEOUT}s)"
+        sleep $INTERVAL
+        ELAPSED=$((ELAPSED + INTERVAL))
+        continue
+    fi
+
+    POD_PHASE=$(oc get pod "$POD_NAME" -n openshift-marketplace -o jsonpath='{.status.phase}' 2>/dev/null || true)
+    POD_READY=$(oc get pod "$POD_NAME" -n openshift-marketplace -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | true)
+
+    echo "Catalog pod: ${POD_NAME}, Phase: ${POD_PHASE}, Ready: ${POD_READY} (${ELAPSED}s/${TIMEOUT}s)"
+
+    if [[ "$POD_PHASE" == "Running" ]] && [[ "$POD_READY" == "True" ]]; then
+        echo "Catalog pod is running and ready"
+        break
+    fi
+
+    # Check if pod is in a failed state
+    if [[ "$POD_PHASE" == "Failed" ]] || [[ "$POD_PHASE" == "CrashLoopBackOff" ]]; then
+        echo "ERROR: Catalog pod is in a failed state: ${POD_PHASE}"
+        oc get pod "$POD_NAME" -n openshift-marketplace -o yaml
+        oc logs "$POD_NAME" -n openshift-marketplace --tail=50 || true
+        exit 1
+    fi
+
+    sleep $INTERVAL
+    ELAPSED=$((ELAPSED + INTERVAL))
+done
+
 echo "Catalog source setup complete for cluster version ${OCP_MAJOR_MINOR}."
