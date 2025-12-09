@@ -54,12 +54,13 @@ ALLOWED_JOBS=(
 )
 
 # Check if current job matches allowlist
+set +x
 echo "******** Checking job allowlist..."
 echo "******** Current job: ${JOB_NAME}"
 
 JOB_MATCHED=0
 for allowed_job in "${ALLOWED_JOBS[@]}"; do
-    if [[ "${JOB_NAME}" == "${allowed_job}" ]]; then
+    if [[ "${JOB_NAME}" == *"${allowed_job}"* ]]; then
         echo "******** Job matched allowlist: ${allowed_job}"
         JOB_MATCHED=1
         break
@@ -72,6 +73,7 @@ if [[ ${JOB_MATCHED} -eq 0 ]]; then
 fi
 
 echo "******** Job is in allowlist. Proceeding with analysis..."
+set -x
 
 # Create GCS artifact tool with list and get commands
 echo "******** Creating GCS artifact tool..."
