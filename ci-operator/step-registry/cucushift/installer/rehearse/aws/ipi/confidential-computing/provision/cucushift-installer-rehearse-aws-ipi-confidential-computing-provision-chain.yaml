@@ -1,0 +1,40 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-confidential-computing-provision
+  steps:
+  - chain: ipi-conf-aws
+  - ref: ipi-conf-aws-usage-info
+  - ref: ipi-conf-aws-confidential
+  - chain: aws-provision-iam-user-minimal-permission
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-aws-confidential-computing
+  - ref: cucushift-installer-check-aws-custom-ami
+  env:
+  - name: OCP_ARCH
+    default: "amd64"
+  - name: COMPUTE_NODE_TYPE
+    default: "m6a.2xlarge"
+  - name: CONTROL_PLANE_INSTANCE_TYPE
+    default: "m6a.2xlarge"
+  - name: CONFIDENTIAL_COMPUTE
+    default: "AMDEncryptedVirtualizationNestedPaging"
+    documentation: |-
+      Define platform.aws.defaultMachinePlatform.cpuOptions.confidentialCompute
+      Allowed values are  "Disabled", "AMDEncryptedVirtualizationNestedPaging".
+  - name: COMPUTE_CONFIDENTIAL_COMPUTE
+    default: ""
+    documentation: |-
+      Define compute.platform.aws.cpuOptions.confidentialCompute
+      Allowed values are  "Disabled", "AMDEncryptedVirtualizationNestedPaging".
+  - name: CONTROL_PLANE_CONFIDENTIAL_COMPUTE
+    default: ""
+    documentation: |-
+      Define controlPlane.platform.aws.cpuOptions.confidentialCompute
+      Allowed values are  "Disabled", "AMDEncryptedVirtualizationNestedPaging".
+  - name: CONFIDENTIAL_COMPUTE_AMI
+    default: "ami-0620723a637bda50d"
+    documentation: |-
+      Define custom AMI for confidential compute.
+  documentation: |-
+    Create an IPI cluster on AWS for QE e2e tests.
