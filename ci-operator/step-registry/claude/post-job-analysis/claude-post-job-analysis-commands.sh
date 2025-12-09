@@ -101,7 +101,17 @@ from urllib.parse import quote
 BUCKET = "test-platform-results"
 JOB_NAME = os.environ.get('JOB_NAME', '')
 BUILD_ID = os.environ.get('BUILD_ID', '')
-PREFIX = f"logs/{JOB_NAME}/{BUILD_ID}/artifacts"
+PULL_NUMBER = os.environ.get('PULL_NUMBER', '')
+REPO_OWNER = os.environ.get('REPO_OWNER', '')
+REPO_NAME = os.environ.get('REPO_NAME', '')
+
+# Construct the correct GCS path based on whether this is a PR build
+if PULL_NUMBER:
+    # PR builds: pr-logs/pull/{org}_{repo}/{pr_number}/{job_name}/{build_id}/artifacts
+    PREFIX = f"pr-logs/pull/{REPO_OWNER}_{REPO_NAME}/{PULL_NUMBER}/{JOB_NAME}/{BUILD_ID}/artifacts"
+else:
+    # Regular builds: logs/{job_name}/{build_id}/artifacts
+    PREFIX = f"logs/{JOB_NAME}/{BUILD_ID}/artifacts"
 BASE_URL = f"https://storage.googleapis.com/storage/v1/b/{BUCKET}/o"
 DOWNLOAD_URL = "https://storage.googleapis.com"
 OUTPUT_DIR = "."
@@ -214,9 +224,6 @@ echo "******** GCS tool created. Available commands:"
 echo "  ./gcs_tool.py list              # List all artifacts"
 echo "  ./gcs_tool.py get <files...>    # Download specific files"
 
-# Define the output HTML file
-OUTPUT_HTML="${ARTIFACT_DIR}/claude-analysis-summary.html"
-
 # Create temporary settings file with required permissions
 SETTINGS_FILE=$(mktemp)
 trap 'rm -f "${SETTINGS_FILE}"' EXIT
@@ -319,7 +326,7 @@ Before beginning your analysis, you MUST determine if the job failed.
 - Downloaded files will be in the current working directory
 
 **HTML OUTPUT REQUIREMENTS**:
-You MUST create an HTML file at ${OUTPUT_HTML} with the following structure:
+You MUST create an HTML file at ./claude-analysis-summary.html with the following structure:
 
 \`\`\`html
 <!DOCTYPE html>
@@ -373,5 +380,12 @@ Use the Write tool to create this HTML file with your actual analysis content. K
 
 Please begin your analysis now and create the HTML report."
 
-echo "******** CI Job Failure Analysis Complete"
-echo "******** HTML report generated at: ${OUTPUT_HTML}"
+# Copy the HTML report from working directory to artifacts directory
+if [[ -f "./claude-analysis-summary.html" ]]; then
+    cp "./claude-analysis-summary.html" "${ARTIFACT_DIR}/"
+    echo "******** CI Job Failure Analysis Complete"
+    echo "******** HTML report generated at: ${ARTIFACT_DIR}/claude-analysis-summary.html"
+else
+    echo "******** WARNING: Claude did not generate the expected HTML report at ./claude-analysis-summary.html"
+    echo "******** CI Job Failure Analysis may have encountered an error"
+fi
