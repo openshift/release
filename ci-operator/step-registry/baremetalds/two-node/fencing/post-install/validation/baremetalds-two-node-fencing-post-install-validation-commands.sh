@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "[INFO] Starting baremetalds-two-node-fencing-post-install-node-fencing-validation step"
+echo "[INFO] Starting baremetalds-two-node-fencing-post-install-validation step"
 
 if [[ "${FENCING_VALIDATION:-false}" != "true" ]]; then
   echo "[INFO] FENCING_VALIDATION != true; skipping fencing_validator execution."
