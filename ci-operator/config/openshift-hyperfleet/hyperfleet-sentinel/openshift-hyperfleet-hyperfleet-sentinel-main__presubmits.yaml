@@ -40,8 +40,9 @@ tests:
     # Start podman API service in background for testcontainers-go
     # The nested-podman image provides podman but doesn't start the API service
     podman system service --time=0 &
-    PODMAN_PID=$!
     sleep 2
+    systemctl --user start podman.socket || true
+
     # Configure testcontainers-go to work with podman
     # See: https://github.com/testcontainers/testcontainers-go/issues/2952
     SOCKET_PATH=$(podman info --format '{{.Host.RemoteSocket.Path}}')
@@ -51,11 +52,6 @@ tests:
     # Run integration tests
     make generate
     make test-integration
-    # Cleanup: stop podman service to allow job to complete
-    TEST_EXIT_CODE=$?
-    kill $PODMAN_PID 2>/dev/null || true
-    wait $PODMAN_PID 2>/dev/null || true
-    exit $TEST_EXIT_CODE
   container:
     from: podman-test
   nested_podman: true

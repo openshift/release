@@ -35,13 +35,19 @@ tests:
   commands: |
     export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
     podman system service --time=0 &
+    PODMAN_PID=$!
     sleep 2
     systemctl --user start podman.socket || true
     export TESTCONTAINERS_RYUK_DISABLED=true
-    export TESTCONTAINERS_CHECKS_DISABLE=true
     export PATH=$PATH:$(go env GOPATH)/bin
     make generate
     make test-integration
+
+    # Cleanup: stop podman service to allow job to complete
+    TEST_EXIT_CODE=$?
+    kill $PODMAN_PID 2>/dev/null || true
+    wait $PODMAN_PID 2>/dev/null || true
+    exit $TEST_EXIT_CODE
   container:
     from: podman-test
   nested_podman: true
