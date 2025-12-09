@@ -26,7 +26,7 @@ def add_art_publish(gendoc):
     }, comment='Long lived API token for art-publish')
 
     gendoc.append_all([{
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'art-manage-art-equivalent-buildconfigs',
@@ -97,7 +97,7 @@ in 3.11).''')
     }, comment='Allow ART to mirror images to the ocp-private namespace so 4.x:base images can be pushed')
 
     gendoc.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'art-publish-modify-release',
@@ -137,7 +137,7 @@ in 3.11).''')
     })
 
     gendoc.append_all([{
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'art-prowjob',
@@ -168,7 +168,7 @@ in 3.11).''')
     }], comment='Allow ART to create prowjobs in the ci namespace for running upgrade tests')
 
     gendoc.append_all([{
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'ClusterRole',
         'metadata': {
             'name': 'art-publish-release-admin',
@@ -243,7 +243,7 @@ in 3.11).''')
                 })
 
             gendoc.append({
-                'apiVersion': 'authorization.openshift.io/v1',
+                'apiVersion': 'rbac.authorization.k8s.io/v1',
                 'kind': 'Role',
                 'metadata': {
                     'name': 'art-publish-modify-release',
@@ -264,7 +264,7 @@ in 3.11).''')
             })
 
             gendoc.append({
-                'apiVersion': 'authorization.openshift.io/v1',
+                'apiVersion': 'rbac.authorization.k8s.io/v1',
                 'kind': 'Role',
                 'metadata': {
                     'name': 'art-backup-upgrade-graph',
