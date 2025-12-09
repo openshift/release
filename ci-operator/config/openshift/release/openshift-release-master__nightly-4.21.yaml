@@ -474,6 +474,26 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV4V6"
     workflow: agent-e2e-two-node-arbiter-ipv4
+- as: e2e-aws-ovn-single-node-4vcpu-32gb-compute-upgrade
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-3
+    env:
+      SINGLE_NODE_AWS_INSTANCE_TYPE: r6i.xlarge
+      TEST_ARGS: --max-parallel-tests 10 --timeout 30m
+      TEST_SKIPS: \[FeatureGate:PodLevelResources\]\|\[FeatureGate:InPlacePodVerticalScaling\]\|
+        \[Feature:Builds\]\|\[OCPFeatureGate:GatewayAPIController\]\[Feature:Router\]\|\[apigroup:build.openshift.io\]
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws-single-node
+  timeout: 5h0m0s
+- as: e2e-aws-ovn-single-node-4vcpu-32gb-compute-serial
+  cron: '@daily'
+  steps:
+    cluster_profile: aws
+    env:
+      SINGLE_NODE_AWS_INSTANCE_TYPE: r6i.xlarge
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws-single-node
 - as: e2e-metal-ovn-two-node-arbiter-upgrade
   capabilities:
   - intranet
