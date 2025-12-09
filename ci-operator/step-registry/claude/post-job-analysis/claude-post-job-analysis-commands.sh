@@ -342,6 +342,7 @@ You MUST create an HTML file at ./claude-analysis-summary.html with the followin
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
+            background-color: white;
         }
         h1 { border-bottom: 2px solid #333; padding-bottom: 10px; }
         h2 { color: #0066cc; margin-top: 30px; }
