@@ -12,6 +12,7 @@ az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}"
 az account set --subscription "${SUBSCRIPTION_ID}"
 oc version
 kubelogin --version
+export DEPLOY_ENV="prow"
 
 BACKEND_DIGEST=$(echo ${BACKEND_IMAGE} | cut -d'@' -f2)
 BACKEND_REPOSITORY=$(echo ${BACKEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
