@@ -232,7 +232,7 @@ if [ -n "${TEST_NAME:-}" ]; then
       rm /tmp/jobs.config
   fi
 
-  echo "Updating jobs.config for mode: $MODE"
+  echo "Updating jobs.config for mode: $TEST_NAME"
 
   # 2. Define the Job lists based on the mode
   if [ "$TEST_NAME" == "MACVLAN" ]; then
