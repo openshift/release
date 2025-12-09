@@ -112,14 +112,14 @@ EOF
         exit 1
     fi
 
-    echo "Waiting for cert-manager webhook to be ready..."
-    if wait_for_state "deployment/cert-manager-webhook" "condition=Available" "5m" "cert-manager"; then
-        echo "cert-manager webhook is ready"
+    if wait_for_state "deployment/cert-manager" "condition=Available" "5m" "cert-manager" && \
+        wait_for_state "deployment/cert-manager-webhook" "condition=Available" "5m" "cert-manager" && \
+        wait_for_state "deployment/cert-manager-cainjector" "condition=Available" "5m" "cert-manager"; then
+        echo "Operands are all ready"
     else
         echo "Timed out after 5m. Dumping resources for debugging..."
         run_command "oc get pod -n cert-manager"
-        run_command "oc get deployment -n cert-manager"
-        run_command "oc get event -n cert-manager"
+        run_command "oc get event -n cert-manager" 
         exit 1
     fi
 

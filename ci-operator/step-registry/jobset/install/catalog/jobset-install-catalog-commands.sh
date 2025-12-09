@@ -123,10 +123,10 @@ EOF
 
     echo "[$(timestamp)] Mirroring the images to the mirror registry..."
     run_command "./oc-mirror --v2 --config=${TMP_DIR}/imageset.yaml --workspace=file://${TMP_DIR} docker://${MIRROR_REGISTRY_HOST} --log-level=info --retry-times=5 --src-tls-verify=false --dest-tls-verify=false"
-
-    echo "[$(timestamp)] Replacing the generated catalog source name with the ENV var '$CATSRC_NAME'..."
+    echo "[$(timestamp)] Replacing the generated catalog source name with the ENV var '$CUSTOM_CATSRC_NAME'..."
     run_command "curl -k -L -o yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/') && chmod +x ./yq"
-    run_command "./yq eval '.metadata.name = \"$CATSRC_NAME\"' -i ${OC_MIRROR_OUTPUT_DIR}/cs-*.yaml"
+    run_command "./yq eval '.metadata.name = \"$CUSTOM_CATSRC_NAME\"' -i ${OC_MIRROR_OUTPUT_DIR}/cs-*.yaml"
+    run_command "./yq eval '.metadata.name = \"$CUSTOM_CATSRC_NAME\"' -i ${OC_MIRROR_OUTPUT_DIR}/idms-*.yaml"
 
     echo "[$(timestamp)] Checking and applying the generated resource files..."
     run_command "find ${OC_MIRROR_OUTPUT_DIR} -type f | xargs -I{} bash -c 'cat {}; echo \"---\"'"
@@ -155,18 +155,19 @@ function tmp_prune_distruptive_resource() {
 }
 
 function check_catalog_readiness () {
+    local catsrc="$1"
     echo "Waiting the applied catalog source to become READY..."
-    if wait_for_state "catalogsource/${CATSRC_NAME}" "jsonpath={.status.connectionState.lastObservedState}=READY" "5m" "openshift-marketplace"; then
+    if wait_for_state "catalogsource/${catsrc}" "jsonpath={.status.connectionState.lastObservedState}=READY" "5m" "openshift-marketplace"; then
         echo "CatalogSource is ready"
     else
         echo "Timed out after 5m. Dumping resources for debugging..."
         run_command "oc get pod -n openshift-marketplace"
-        run_command "oc get event -n openshift-marketplace | grep ${CATSRC_NAME}"
+        run_command "oc get event -n openshift-marketplace | grep ${catsrc}"
         exit 1
     fi
 
     echo "Storing the catalog source name to '${SHARED_DIR}/catsrc_name'..."
-    echo "${CATSRC_NAME}" > "${SHARED_DIR}"/catsrc_name
+    echo "${catsrc}" > "${SHARED_DIR}"/catsrc_name
 }
 
 if [ -z "${CATSRC_IMG}" ]; then
@@ -194,5 +195,9 @@ else
     create_catalog
 fi
 
-check_catalog_readiness
+if [ "${MIRROR_OPERATORS}" == "true" ]; then
+    check_catalog_readiness "$CUSTOM_CATSRC_NAME"
+else
+    check_catalog_readiness "$CATSRC_NAME"
+fi
 echo "[$(timestamp)] Succeeded in creating the catalog source!"
