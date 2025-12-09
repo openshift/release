@@ -137,6 +137,7 @@ When maintaining upgrade test jobs, follow these strategic guidelines to ensure 
    - Chain upgrade paths must cover all platforms: AWS, Azure, Baremetal, GCP, IBMCloud, Nutanix, vSphere
    - Chain upgrade jobs must cover all key features: sdn (4.15 and earlier; 4.14 default is OVN), sno, ovn, ipsec, ipv4, ipv6, dual-stack, fips, proxy, capability, sts, mixarch
    - Chain upgrade jobs must cover all CPU architectures: amd64, arm64, multiarch
+   - Each selected profile should have at least one key feature
 
 3. **EOL (End of Life) version handling**
    - Only keep one more release for EOL versions
@@ -148,6 +149,19 @@ When maintaining upgrade test jobs, follow these strategic guidelines to ensure 
 
 5. **Customer usage-driven coverage**
    - No need to cover versions not actively used by customers
+
+6. **Not Applicable Features**
+   Do not choose profiles containing below features for Chain upgrade jobs:
+   - agent
+   - disc
+   - gpu
+   - hypershift
+   - longduration
+   - longrun
+   - rosa
+   - to-multiarch
+   - tp
+   - winc
 
 ### Images in base_images
 We run jobs in containers, to set up a container we can put images in base_images in a configuration file.
