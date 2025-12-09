@@ -4,9 +4,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-# Fix UID issue (from Telco QE Team)
-~/fix_uid.sh
-
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 MICROSHIFT_PR=${MICROSHIFT_PR:-}
@@ -25,16 +22,28 @@ fi
 export LAB_CLOUD
 QUADS_INSTANCE=$(cat ${CLUSTER_PROFILE_DIR}/quads_instance_${LAB})
 export QUADS_INSTANCE
+LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
+export LOGIN
 
 # Get allocated nodes from QUADS
 echo "Getting allocated nodes from QUADS..."
 OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
-NODES=$(curl -sSk $OCPINV | jq -r ".nodes[1:$((NUM_NODES+1))][].name")
+NODES=$(curl -sSk $OCPINV | jq -r ".nodes[0:${NUM_NODES}][].name")
 if [[ -z "${NODES}" ]]; then
   echo "ERROR: No nodes returned from QUADS for lab cloud ${LAB_CLOUD}"
   exit 1
 fi
 echo "Nodes to deploy MicroShift on: $NODES"
+
+# Copy SSH keys from bastion to provisioned nodes
+echo "Copying SSH keys to provisioned nodes..."
+for node in $NODES; do
+  echo "Copying SSH key to ${node}..."
+  ssh ${SSH_ARGS} root@${bastion} "
+    ssh-keygen -R ${node} 2>/dev/null || true
+    sshpass -p '${LOGIN}' ssh-copy-id -o StrictHostKeyChecking=no root@${node}
+  "
+done
 
 # Create ansible inventory following the MicroShift ansible format
 cat <<EOF >/tmp/microshift-inventory
