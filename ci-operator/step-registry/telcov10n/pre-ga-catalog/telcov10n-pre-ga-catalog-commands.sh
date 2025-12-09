@@ -74,59 +74,59 @@ EOF
   jq '.data.".dockerconfigjson" = "'${new_dot_dockerconfig_data}'"' /tmp/dot-dockerconfig.json | oc replace -f -
 }
 
-function append_production_path_icsp_entries {
+function append_production_path_idms_entries {
   # This function addresses the PreGA catalog mirror path mismatch issue.
-  # PreGA oc-mirror generates ICSP with development registry paths (e.g., acm-d, redhat-user-workloads),
+  # PreGA oc-mirror generates IDMS with development registry paths (e.g., acm-d, redhat-user-workloads),
   # but operator CSVs reference production paths (e.g., rhacm2, multicluster-engine, openshift-gitops-1).
   # Without these additional entries, ACM/MCE/GitOps operators will fail with ImagePullBackOff.
   #
-  # This fix ensures only ONE node reboot is needed by appending entries to the ICSP
+  # This fix ensures only ONE node reboot is needed by appending entries to the IDMS
   # before it's applied to the cluster.
   #
   # Reference: .cursor/docs/troubleshooting/prega-catalog-mirror-issue.md
 
-  local icsp_file="${1}"
+  local idms_file="${1}"
 
-  echo "************ telcov10n Append production path ICSP entries ************"
+  echo "************ telcov10n Append production path IDMS entries ************"
   echo ""
-  echo "Checking if production path entries need to be added to ICSP..."
-  echo "This is required because PreGA oc-mirror generates ICSP with development paths (acm-d, redhat-user-workloads)"
+  echo "Checking if production path entries need to be added to IDMS..."
+  echo "This is required because PreGA oc-mirror generates IDMS with development paths (acm-d, redhat-user-workloads)"
   echo "but operator CSVs reference production paths (rhacm2, multicluster-engine, openshift-gitops-1)"
   echo ""
 
-  # Check if the production path entries are already in the ICSP file
+  # Check if the production path entries are already in the IDMS file
   local needs_rhacm2=false
   local needs_mce=false
   local needs_gitops=false
 
-  if ! grep -q "registry.redhat.io/rhacm2" "${icsp_file}"; then
+  if ! grep -q "registry.redhat.io/rhacm2" "${idms_file}"; then
     echo "- Missing: registry.redhat.io/rhacm2 (ACM production path)"
     needs_rhacm2=true
   else
     echo "✓ Found: registry.redhat.io/rhacm2"
   fi
 
-  if ! grep -q "registry.redhat.io/multicluster-engine" "${icsp_file}"; then
+  if ! grep -q "registry.redhat.io/multicluster-engine" "${idms_file}"; then
     echo "- Missing: registry.redhat.io/multicluster-engine (MCE production path)"
     needs_mce=true
   else
     echo "✓ Found: registry.redhat.io/multicluster-engine"
   fi
 
-  if ! grep -q "registry.redhat.io/openshift-gitops-1" "${icsp_file}"; then
+  if ! grep -q "registry.redhat.io/openshift-gitops-1" "${idms_file}"; then
     echo "- Missing: registry.redhat.io/openshift-gitops-1 (GitOps production path)"
     needs_gitops=true
   else
     echo "✓ Found: registry.redhat.io/openshift-gitops-1"
   fi
 
-  # If any entries are missing, append them to the ICSP file
+  # If any entries are missing, append them to the IDMS file
   if [ "${needs_rhacm2}" = true ] || [ "${needs_mce}" = true ] || [ "${needs_gitops}" = true ]; then
     echo ""
-    echo "Appending missing production path entries to ${icsp_file}..."
+    echo "Appending missing production path entries to ${idms_file}..."
 
     if [ "${needs_rhacm2}" = true ]; then
-      cat <<'EOF' >> "${icsp_file}"
+      cat <<'EOF' >> "${idms_file}"
   - mirrors:
     - quay.io/prega/test/acm-d
     source: registry.redhat.io/rhacm2
@@ -135,7 +135,7 @@ EOF
     fi
 
     if [ "${needs_mce}" = true ]; then
-      cat <<'EOF' >> "${icsp_file}"
+      cat <<'EOF' >> "${idms_file}"
   - mirrors:
     - quay.io/prega/test/acm-d
     source: registry.redhat.io/multicluster-engine
@@ -144,7 +144,7 @@ EOF
     fi
 
     if [ "${needs_gitops}" = true ]; then
-      cat <<'EOF' >> "${icsp_file}"
+      cat <<'EOF' >> "${idms_file}"
   - mirrors:
     - quay.io/prega/test/redhat-user-workloads/rh-openshift-gitops-tenant
     source: registry.redhat.io/openshift-gitops-1
@@ -158,12 +158,12 @@ EOF
     echo ""
   else
     echo ""
-    echo "✓ All required production path ICSP entries already exist in the file. No changes needed."
+    echo "✓ All required production path IDMS entries already exist in the file. No changes needed."
     echo ""
   fi
 }
 
-function apply_catalog_source_and_image_content_source_policy {
+function apply_catalog_source_and_image_digest_mirror_set {
 
   SSHOPTS=(-o 'ConnectTimeout=5'
     -o 'StrictHostKeyChecking=no'
@@ -175,7 +175,7 @@ function apply_catalog_source_and_image_content_source_policy {
   catalog_info_dir=$(mktemp -d)
 
   timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-    "${PREGA_CATSRC_AND_ICSP_CRS_URL}" "${PREGA_OPERATOR_INDEX_TAGS_URL}" \
+    "${PREGA_CATSRC_AND_IDMS_CRS_URL}" "${PREGA_OPERATOR_INDEX_TAGS_URL}" \
     "${catalog_info_dir}" "${IMAGE_INDEX_OCP_VERSION}" << 'EOF'
 set -o nounset
 set -o errexit
@@ -344,20 +344,20 @@ EOF
   set +x
   echo "--------------------- ${ARTIFACT_DIR}/pre-ga-info/catalogSource.yaml -------------------------"
   cat ${prega_info_dir}/catalogSource.yaml
-  echo "------------- ${ARTIFACT_DIR}/pre-ga-info/imageContentSourcePolicy.yaml (BEFORE) -------------"
-  cat ${prega_info_dir}/imageContentSourcePolicy.yaml
+  echo "------------- ${ARTIFACT_DIR}/pre-ga-info/imageDigestMirrorSet.yaml (BEFORE) -----------------"
+  cat ${prega_info_dir}/imageDigestMirrorSet.yaml
   echo "----------------------------------------------------------------------------------------------"
 
-  # Append production path entries to ICSP if needed (ACM/MCE/GitOps)
-  append_production_path_icsp_entries "${prega_info_dir}/imageContentSourcePolicy.yaml"
+  # Append production path entries to IDMS if needed (ACM/MCE/GitOps)
+  append_production_path_idms_entries "${prega_info_dir}/imageDigestMirrorSet.yaml"
 
-  echo "------------- ${ARTIFACT_DIR}/pre-ga-info/imageContentSourcePolicy.yaml (AFTER) --------------"
-  cat ${prega_info_dir}/imageContentSourcePolicy.yaml
+  echo "------------- ${ARTIFACT_DIR}/pre-ga-info/imageDigestMirrorSet.yaml (AFTER) ------------------"
+  cat ${prega_info_dir}/imageDigestMirrorSet.yaml
   echo "----------------------------------------------------------------------------------------------"
   set -x
   oc apply -f ${prega_info_dir}/catalogSource.yaml
-  oc apply -f ${prega_info_dir}/imageContentSourcePolicy.yaml
-  cat ${prega_info_dir}/imageContentSourcePolicy.yaml >| ${SHARED_DIR}/imageContentSourcePolicy.yaml
+  oc apply -f ${prega_info_dir}/imageDigestMirrorSet.yaml
+  cat ${prega_info_dir}/imageDigestMirrorSet.yaml >| ${SHARED_DIR}/imageDigestMirrorSet.yaml
   set +x
 }
 
@@ -365,7 +365,7 @@ function create_pre_ga_calatog {
 
   echo "************ telcov10n Create Pre GA catalog ************"
 
-  apply_catalog_source_and_image_content_source_policy
+  apply_catalog_source_and_image_digest_mirror_set
 
   wait_until_command_is_ok \
     "oc -n openshift-marketplace get catalogsource ${CATALOGSOURCE_NAME} -o=jsonpath='{.status.connectionState.lastObservedState}' | grep -w READY" \
