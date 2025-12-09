@@ -232,6 +232,57 @@ fi
 echo "========== Final Image Configuration =========="
 echo "Using Image: ${QUAY_REPO}:${IMAGE_TAG}"
 
+echo "========== Configuring Helm for MinIO Storage =========="
+# Tell the Helm chart to use MinIO instead of ODF (NooBaa)
+# This prevents the chart from trying to lookup NooBaa CRDs which don't exist
+# when using MinIO for object storage
+
+# The deploy-test-ros.sh script sets HELM_EXTRA_ARGS for image overrides.
+# We need to add our MinIO configuration to HELM_EXTRA_ARGS as well.
+# This ensures global.storageType=minio is passed regardless of what the upstream
+# scripts do with HELM_EXTRA_ARGS or VALUES_FILE.
+
+HELM_WRAPPER="/tmp/helm-wrapper"
+ORIGINAL_HELM=$(command -v helm)
+
+cat > "${HELM_WRAPPER}" << 'WRAPPER_EOF'
+#!/bin/bash
+# Helm wrapper that injects MinIO storage configuration
+# This intercepts helm calls and adds --set global.storageType=minio
+
+ORIGINAL_HELM="__ORIGINAL_HELM__"
+MINIO_ACCESS_KEY="__MINIO_ACCESS_KEY__"
+MINIO_SECRET_KEY="__MINIO_SECRET_KEY__"
+
+# Check if this is an install/upgrade command that needs our overrides
+if [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"install"* ]]; then
+    echo "[helm-wrapper] Injecting MinIO storage configuration..."
+    exec "$ORIGINAL_HELM" "$@" \
+        --set "global.storageType=minio" \
+        --set "minio.rootUser=${MINIO_ACCESS_KEY}" \
+        --set "minio.rootPassword=${MINIO_SECRET_KEY}"
+else
+    # For other helm commands, pass through unchanged
+    exec "$ORIGINAL_HELM" "$@"
+fi
+WRAPPER_EOF
+
+# Replace placeholders with actual values
+sed -i "s|__ORIGINAL_HELM__|${ORIGINAL_HELM}|g" "${HELM_WRAPPER}"
+sed -i "s|__MINIO_ACCESS_KEY__|${MINIO_ACCESS_KEY:-minioadmin}|g" "${HELM_WRAPPER}"
+sed -i "s|__MINIO_SECRET_KEY__|${MINIO_SECRET_KEY:-minioadmin}|g" "${HELM_WRAPPER}"
+
+chmod +x "${HELM_WRAPPER}"
+
+# Prepend /tmp to PATH so our wrapper is found first
+export PATH="/tmp:${PATH}"
+# Also create a symlink so 'helm' resolves to our wrapper
+ln -sf "${HELM_WRAPPER}" /tmp/helm
+
+echo "Helm wrapper installed at /tmp/helm"
+echo "Original helm: ${ORIGINAL_HELM}"
+echo "MinIO storage type will be injected into helm upgrade/install commands"
+
 echo "========== Running E2E Tests =========="
 export IMAGE_TAG
 make oc-deploy-test
