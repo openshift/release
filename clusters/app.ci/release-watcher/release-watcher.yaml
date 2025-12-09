@@ -1,0 +1,73 @@
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: release-watcher
+  namespace: ci
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  labels:
+    app: release-watcher
+  name: release-watcher
+  namespace: ci
+spec:
+  selector:
+    matchLabels:
+      component: release-watcher
+  template:
+    metadata:
+      labels:
+        component: release-watcher
+    spec:
+      serviceAccountName: release-watcher
+      containers:
+      - env:
+        - name: TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: TOKEN
+              name: release-watcher-bot-token
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-watcher_latest
+        imagePullPolicy: Always
+        name: release-watcher
+        command:
+        - release-watcher
+        args:
+        - bot
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    component: release-watcher
+  name: release-watcher
+  namespace: ci
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: release-watcher
+  sessionAffinity: None
+  type: ClusterIP
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: release-watcher
+  namespace: ci
+spec:
+  tls:
+    termination: Edge
+    insecureEdgeTerminationPolicy: Redirect
+  to:
+    kind: Service
+    name: release-watcher

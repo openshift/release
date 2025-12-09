@@ -122,6 +122,35 @@ tests:
       TEST_ARGS: --monitor=watch-namespaces
       TEST_SUITE: olmv0/extended/candidate/slow
     workflow: openshift-e2e-aws-ovn
+- as: e2e-gcp-ovn-ipi-disconnected-techpreview-extended-f2
+  cron: 14 10 1-31/2 * *
+  steps:
+    cluster_profile: gcp
+    env:
+      ENABLE_IDMS: "yes"
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv0/extended/candidate/function
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-provision
+    test:
+    - ref: openshift-extended-olm-test-disconnected
+- as: e2e-gcp-ovn-ipi-disconnected-extended-f1
+  cron: 34 8 * * *
+  steps:
+    cluster_profile: gcp
+    env:
+      ENABLE_IDMS: "yes"
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv0/extended/candidate/function
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-provision
+    test:
+    - ref: openshift-extended-olm-test-disconnected
 - as: e2e-azure-ovn-techpreview-extended-f1
   cron: 22 7 * * *
   steps:
