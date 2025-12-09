@@ -194,6 +194,7 @@ if [[ "${SIZE_VARIANT}" == "large" ]]; then
   platform:
     vsphere:
       cpus: 8
+      coresPerSocket: 8
       memoryMB: 32768
       osDisk:
         diskSizeGB: 120
@@ -203,6 +204,7 @@ compute:
   platform:
     vsphere:
       cpus: 8
+      coresPerSocket: 8
       memoryMB: 32768
       osDisk:
         diskSizeGB: 120"
