@@ -108,11 +108,34 @@ ENV_DATA:
 __APPENDED_ENV_DATA__
 fi
 
+# Ensure pytest-xdist is installed.
+# Since we are non-root, we cannot write to the system venv (/opt/ocs-ci/venv).
+# We must install to a temporary directory and add it to PYTHONPATH.
+if ! python3 -c "import xdist" &> /dev/null; then
+    echo "pytest-xdist not found. Installing to temporary local dir..."
+    
+    # Create a writable directory for python packages
+    mkdir -p /tmp/python_packages
+    
+    # Install xdist (pinned <3.0.0) into that directory
+    # --target forces pip to install here instead of the read-only venv
+    pip install --target=/tmp/python_packages "pytest-xdist<3.0.0"
+    
+    # Add this directory to the Python Path so 'run-ci' can find the plugin
+    export PYTHONPATH="/tmp/python_packages:${PYTHONPATH:-}"
+    
+    echo "pytest-xdist installed successfully to /tmp/python_packages"
+fi
 
 set -x
 START_TIME=$(date "+%s")
 
+# Define parallel workers (default to 4)
+PARALLEL_WORKERS="${PARALLEL_WORKERS:-4}"
+
 run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
+  -n "${PARALLEL_WORKERS}" \
+  --dist loadscope \
   --ocsci-conf "${LOGS_CONFIG}" \
   --collect-logs \
   --ocs-version  "${OCS_VERSION}"                    \
