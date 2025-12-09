@@ -249,37 +249,29 @@ function get_related_catalogs_and_icsp_manifests {
 selected_manifest_digest=$(findout_manifest_digest)
 version_tag=$(get_related_catalogs_and_icsp_manifests)
 
-echo "Checking if the selected tag exists..."
+echo "Checking if the selected tag exists and has required files..."
 status_code=$(curl -sSL -o /dev/null -w "%{http_code}" "${catalog_soruces_url}/${version_tag}")
+
 if [ "$status_code" -ne 200 ]; then
-  echo "Resource not found (HTTP status: $status_code). Getting previous version..."
+  echo "WARNING: Tag ${version_tag} not found (HTTP status: $status_code)"
+  echo "Falling back to latest available ${tag_version/.0/} mirror..."
 
-  # Get all tags from the base URL, filter for tag version, sort, and get the previous one
-  next_version=$(curl -sSL "${catalog_soruces_url}" \
+  # Get the latest valid version from the mirror server for this OCP version
+  latest_version=$(curl -sSL "${catalog_soruces_url}" \
     | grep -oP '(?<=href=")[^"]+' \
-    | sort -t '-' -k2,2 -k3,3 \
-    | grep "${tag_version/.0/}" \
-    | awk -F '[-/]' -v tag_ver="$version_tag" '
-BEGIN {
-    split(tag_ver, a, "[-/]");
-    reference_ts = a[2];
-    gsub(/T|ci/, "", reference_ts);
-}
-{
-    current_ts = $2
-    gsub(/T|ci/, "", current_ts)
-    if (current_ts >= reference_ts) {
-        # printf("%s > %s = ", current_ts, reference_ts)
-        print $0
-        exit
-    }
-}')
+    | grep "^${tag_version/.0/}" \
+    | grep -v ".yaml$" \
+    | sort -t '-' -k2,2r -k3,3r \
+    | head -1)
 
-  if [ -n "$next_version" ]; then
-    echo "Next available version is: $next_version"
-    version_tag=${next_version}
+  if [ -n "$latest_version" ]; then
+    echo "Using latest available version: $latest_version"
+    version_tag=${latest_version%/}  # Remove trailing slash if present
   else
-    echo "Could not find a previous version."
+    echo "ERROR: Could not find any ${tag_version/.0/} versions at ${catalog_soruces_url}"
+    echo "Available versions:"
+    curl -sSL "${catalog_soruces_url}" | grep -oP '(?<=href=")[^"]+' | grep -v ".yaml$" | sort -r | head -10
+    exit 1
   fi
 fi
 
@@ -288,11 +280,65 @@ mkdir -pv ${info_dir}
 pushd .
 cd ${info_dir}
 
-for f in $(curl -sSL ${catalog_soruces_url}/${version_tag}|grep -oP '(?<=href=")[^"]+'|grep 'yaml$'); do
+echo "Downloading YAML files from ${catalog_soruces_url}/${version_tag}..."
+yaml_files=$(curl -sSL ${catalog_soruces_url}/${version_tag} | grep -oP '(?<=href=")[^"]+' | grep 'yaml$')
+
+if [ -z "$yaml_files" ]; then
+  echo "WARNING: No YAML files found in ${version_tag}"
+  echo "Falling back to latest available ${tag_version/.0/} mirror with files..."
+
+  # Find the latest version that actually has YAML files
+  for candidate in $(curl -sSL "${catalog_soruces_url}" \
+    | grep -oP '(?<=href=")[^"]+' \
+    | grep "^${tag_version/.0/}" \
+    | grep -v ".yaml$" \
+    | sort -t '-' -k2,2r -k3,3r); do
+
+    candidate=${candidate%/}  # Remove trailing slash
+    test_files=$(curl -sSL "${catalog_soruces_url}/${candidate}" | grep -oP '(?<=href=")[^"]+' | grep 'yaml$' | wc -l)
+
+    if [ "$test_files" -gt 0 ]; then
+      echo "Found valid mirror: $candidate (contains $test_files YAML files)"
+      version_tag=$candidate
+      cd ..
+      rm -rf ${info_dir}
+      info_dir=${3}/${version_tag}
+      mkdir -pv ${info_dir}
+      cd ${info_dir}
+      yaml_files=$(curl -sSL ${catalog_soruces_url}/${version_tag} | grep -oP '(?<=href=")[^"]+' | grep 'yaml$')
+      break
+    fi
+  done
+
+  if [ -z "$yaml_files" ]; then
+    echo "ERROR: Could not find any ${tag_version/.0/} mirror with YAML files"
+    exit 1
+  fi
+fi
+
+echo "Downloading files..."
+for f in $yaml_files; do
   set -x
   curl -sSLO ${catalog_soruces_url}/${version_tag}/${f}
   set +x
 done
+
+# Verify required files were downloaded
+if [ ! -f "catalogSource.yaml" ]; then
+  echo "ERROR: catalogSource.yaml not found in ${catalog_soruces_url}/${version_tag}"
+  echo "Available files in directory:"
+  ls -la
+  echo "Aborting - PreGA mirror may be incomplete or still building"
+  exit 1
+fi
+
+if [ ! -f "imageDigestMirrorSet.yaml" ]; then
+  echo "ERROR: imageDigestMirrorSet.yaml not found in ${catalog_soruces_url}/${version_tag}"
+  echo "Available files in directory:"
+  ls -la
+  echo "Aborting - PreGA mirror may be incomplete or still building"
+  exit 1
+fi
 
 set -x
 if [ -n "${next_version:-}" ]; then
