@@ -50,23 +50,35 @@ storage:
       inline: |
         #!/bin/bash
         set -e -o pipefail
-        NODECONF=/etc/systemd/system/kubelet.service.d/20-providerid.conf
-        if [ -e "\${NODECONF}" ]; then
-            echo "Not replacing existing \${NODECONF}"
+
+        # Use kubelet-env file which is already read by kubelet.service in UPI
+        NODEENV=/etc/kubernetes/kubelet-env
+
+        # Check if provider ID already set in the environment file
+        if [ -e "\${NODEENV}" ] && grep -q "^KUBELET_PROVIDERID=" "\${NODEENV}"; then
+            echo "KUBELET_PROVIDERID already set in \${NODEENV}"
             exit 0
         fi
 
+        # Fetch provider ID from cloud metadata service
         PROVIDER_ID=${PROVIDER_ID_COMMAND}
 
         if [[ -z "\${PROVIDER_ID}" ]]; then
-            echo "Can not obtain provider-id from the metadata service."
+            echo "ERROR: Cannot obtain provider-id from the metadata service."
             exit 1
-        fi 
+        fi
 
-        cat > "\${NODECONF}" <<EOF
-        [Service]
-        Environment="KUBELET_PROVIDERID=\${PROVIDER_ID}"
-        EOF
+        echo "Setting KUBELET_PROVIDERID=\${PROVIDER_ID}"
+
+        # Create kubelet-env if it doesn't exist
+        if [ ! -e "\${NODEENV}" ]; then
+            touch "\${NODEENV}"
+        fi
+
+        # Append provider ID to kubelet-env
+        echo "KUBELET_PROVIDERID=\${PROVIDER_ID}" >> "\${NODEENV}"
+
+        echo "Provider ID configured successfully"
 systemd:
   units:
   - name: kubelet-providerid.service
@@ -79,6 +91,8 @@ systemd:
       [Service]
       ExecStart=/usr/local/bin/kubelet-providerid
       Type=oneshot
+      StandardOutput=journal+console
+      StandardError=journal+console
       [Install]
       WantedBy=network-online.target
 EOF

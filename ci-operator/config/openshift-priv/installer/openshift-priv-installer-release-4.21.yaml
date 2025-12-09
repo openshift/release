@@ -1499,10 +1499,18 @@ tests:
   run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp
-    env:
-      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-gcp-custom-endpoints
+- always_run: false
+  as: gcp-custom-endpoints-proxy-wif
+  optional: true
+  run_if_changed: (gcp|google)
+  steps:
+    cluster_profile: gcp
+    env:
+      ADDITIONAL_WHITELIST_URLS: s3.us-east-1.amazonaws.com
+      RESTRICTED_NETWORK: "yes"
+    workflow: openshift-e2e-gcp-custom-endpoints-proxy-whitelist-cco-manual-workload-identity
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.21
   org: openshift-priv

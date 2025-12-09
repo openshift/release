@@ -1,0 +1,52 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/openshift/release:golang-1.23
+      RUN yum install -y jq && yum clean all
+images:
+- dockerfile_path: ci/Dockerfile.ci
+  to: ocp-virt-validation-checkup
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 600Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws-virtualization
+    env:
+      BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
+    test:
+    - ref: interop-tests-deploy-cnv
+    - as: run-validation-checkup
+      cli: latest
+      commands: make ci-validate
+      dependencies:
+      - env: OCP_VIRT_VALIDATION_IMAGE
+        name: ocp-virt-validation-checkup
+      env:
+      - default: gp3
+        name: STORAGE_CLASS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 600Mi
+    workflow: cnv-e2e-ipi-aws
+zz_generated_metadata:
+  branch: release-4.20
+  org: openshift-cnv
+  repo: ocp-virt-validation-checkup

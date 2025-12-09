@@ -10,28 +10,18 @@ declare CATALOG_SOURCE=${LVM_CATALOG_SOURCE}
 declare LVM_INDEX_IMAGE
 
 CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
-MINOR_VERSION=$(echo "$CLUSTER_VERSION" | cut -d. -f2)
 
 echo "Detected OpenShift version: ${CLUSTER_VERSION}"
 
-# For OpenShift 4.20+, use Konflux catalogsource index image by default
-if [[ ${MINOR_VERSION} -ge 20 ]]; then
-  LVM_INDEX_IMAGE="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"
-fi
+# lvms-operator exists in Konflux catalogsource index image by default in all versions
+LVM_INDEX_IMAGE="quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v${CLUSTER_VERSION}"
 
 # Allow overriding the LVM_INDEX_IMAGE with the Gangway API
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE:-}" ]]; then
   LVM_INDEX_IMAGE=${MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE}
 fi
 
-# Check if LVM_INDEX_IMAGE is not empty and skip the step if it is
-if [[ -z "${LVM_INDEX_IMAGE:-}" ]]; then
-    echo "WARNING: LVM_INDEX_IMAGE is empty or not set"
-    echo "Skipping LVM CatalogSource step"
-    exit 0
-else
-    echo "LVM_INDEX_IMAGE is set to: $LVM_INDEX_IMAGE"
-fi
+echo "LVM_INDEX_IMAGE is set to: $LVM_INDEX_IMAGE"
 
 function set_proxy {
 	if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then

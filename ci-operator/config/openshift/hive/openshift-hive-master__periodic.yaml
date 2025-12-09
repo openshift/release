@@ -1,8 +1,3 @@
-base_images:
-  ocp_4.20_base-rhel9:
-    name: "4.20"
-    namespace: ocp
-    tag: base-rhel9
 binary_build_commands: GO_COMPLIANCE_INFO=0 make build
 build_root:
   image_stream_tag:
@@ -10,8 +5,16 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.20
 images:
-- dockerfile_path: Dockerfile
-  from: ocp_4.20_base-rhel9
+- dockerfile_literal: |
+    FROM ubi9-minimal
+    RUN rm -rf /etc/yum.repos.d/*
+    RUN curl http://base-4-20-rhel9.ocp.svc > /etc/yum.repos.d/base-4-20-rhel9.repo
+  to: ubi9-minimal-entitled
+- build_args:
+  - name: DNF
+    value: microdnf
+  dockerfile_path: Dockerfile
+  from: ubi9-minimal-entitled
   to: hive
 releases:
   latest:

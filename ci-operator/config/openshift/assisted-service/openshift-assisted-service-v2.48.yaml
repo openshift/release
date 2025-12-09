@@ -1,0 +1,306 @@
+base_images:
+  assisted-image-service:
+    name: v2.48
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: v2.48
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: v2.48
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: v2.48
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-test-infra:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: ci-images/Dockerfile.base
+  to: assisted-service-base
+- dockerfile_path: ci-images/Dockerfile.unit-tests
+  from: assisted-service-base
+  to: assisted-service-unit-test
+- dockerfile_path: ci-images/Dockerfile.lint
+  from: assisted-service-base
+  to: assisted-service-lint
+- dockerfile_path: ci-images/Dockerfile.subsystem
+  from: assisted-service-base
+  to: assisted-service-subsystem
+- dockerfile_path: ci-images/Dockerfile.code-generation
+  from: assisted-service-base
+  to: assisted-service-generate
+- dockerfile_path: Dockerfile.assisted-service
+  to: assisted-service
+promotion:
+  to:
+  - name: v2.48
+    namespace: edge-infrastructure
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-service
+    env:
+      RELEASE_TAG_PREFIX: hotfix
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org
+    && make lint
+  container:
+    from: assisted-service-lint
+- as: unit-test
+  commands: |
+    export REPORTS=/tmp/reports
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    export GINKGO_REPORTFILE=/tmp/junit_unit_test.xml
+    make ci-unit-test
+  container:
+    from: assisted-service-unit-test
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-service-codecov-token
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+- as: verify-generated-code
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  steps:
+    test:
+    - ref: assisted-verify-generated-code
+- as: subsystem-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.15"
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+        export PERSISTENT_STORAGE="False"
+        export GENERATE_CRD='false'
+        unset GOFLAGS
+        make ci-deploy-for-subsystem
+        oc get pods
+        make test
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      from: assisted-service-subsystem
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: e2e-metal-assisted-single-node
+  capabilities:
+  - intranet
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        NUM_MASTERS=1
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-day2
+  capabilities:
+  - intranet
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- always_run: true
+  as: e2e-metal-assisted
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-static-ip-suite
+  capabilities:
+  - intranet
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        STATIC_IPS=true
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-ipv4v6
+  capabilities:
+  - intranet
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        IPv6=yes
+        IPv4=yes
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- always_run: true
+  as: e2e-metal-assisted-lvm
+  capabilities:
+  - intranet
+  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        OLM_OPERATORS=lvm
+        MASTER_MEMORY=25600
+        NUM_MASTERS=3
+        NUM_WORKERS=0
+        MASTER_CPU=9
+        MASTER_DISK_COUNT=2
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-osc
+  capabilities:
+  - intranet
+  run_if_changed: ^(internal/operators/[^/]+\.go|internal/operators/osc/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        OLM_OPERATORS=osc
+        NUM_MASTERS=3
+        NUM_WORKERS=2
+        MASTER_MEMORY=18432
+        MASTER_CPU=5
+        WORKER_MEMORY=10240
+        WORKER_CPU=3
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- as: e2e-vsphere-assisted
+  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/vsphere/.*|internal/provider/registry/.*)$
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.20
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-metal-assisted-none
+  capabilities:
+  - intranet
+  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/none/.*|internal/provider/registry/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        PLATFORM=none
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-external
+  capabilities:
+  - intranet
+  run_if_changed: ^(internal/provider/[^/]+\.go|internal/provider/external/.*|internal/provider/registry/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        PLATFORM=external
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-virtualization-4-18
+  capabilities:
+  - intranet
+  run_if_changed: ^(internal/operators/nodehealthcheck/.*|internal/operators/selfnoderemediation/.*|internal/operators/fenceagentsremediation/.*|internal/operators/nodemaintenance/.*|internal/operators/kubedescheduler/.*|internal/operators/cnv|internal/operators/mtv/.*|internal/operators/nmstate/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=node-healthcheck,self-node-remediation,fence-agents-remediation,node-maintenance,kube-descheduler,cnv,mtv,nmstate
+        OPENSHIFT_VERSION=4.18
+        MASTER_MEMORY=18700
+        MASTER_CPU=10
+        MASTER_DISK_COUNT=2
+        WORKER_CPU=20
+        WORKER_MEMORY=16384
+        WORKER_DISK_COUNT=2
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-ai-nvidia-4-18
+  capabilities:
+  - intranet
+  run_if_changed: ^(internal/operators/authorino/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/nvidiagpu/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=authorino,node-feature-discovery,nvidia-gpu,odf,openshift-ai,pipelines,serverless,servicemesh
+        OPENSHIFT_VERSION=4.18
+        NVIDIA_REQUIRE_GPU=false
+      CLUSTERTYPE: assisted_large_el9
+      REQUIRED_MEMORY_GIB: "400"
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-ai-amd-4-19
+  capabilities:
+  - intranet
+  run_if_changed: ^(internal/operators/andgpu/.*|internal/operators/authorino/.*|internal/operators/kmm/.*|internal/operators/nodefeaturediscovery/.*|internal/operators/odf/.*|internal/operators/openshiftai/.*|internal/operators/pipelines/.*|internal/operators/serverless/.*|internal/operators/servicemesh/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=amd-gpu,authorino,kmm,node-feature-discovery,odf,openshift-ai,pipelines,serverless,servicemesh
+        OPENSHIFT_VERSION=4.19
+        AMD_REQUIRE_GPU=false
+      CLUSTERTYPE: assisted_large_el9
+      REQUIRED_MEMORY_GIB: "400"
+    workflow: assisted-ofcir-baremetal
+zz_generated_metadata:
+  branch: v2.48
+  org: openshift
+  repo: assisted-service

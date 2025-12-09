@@ -16,4 +16,4 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
   export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
 fi
 
-./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" --junit-path="${ARTIFACT_DIR}/junit.xml"
+./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" --junit-path="${ARTIFACT_DIR}/junit.xml" --max-concurrency 100
