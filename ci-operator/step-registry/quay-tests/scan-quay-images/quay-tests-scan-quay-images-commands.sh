@@ -29,7 +29,7 @@ fi
 if [[ "${QUAY_VERSION}" == "3.15" ]]; then
   QUAY_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-v3-15-username)
   QUAY_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-v3-15-password)
-  QUAY_CLAIR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-clair-v3-15-password)
+  QUAY_CLAIR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-clair-v3-15-username)
   QUAY_CLAIR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-clair-v3-15-password)
   QUAY_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-operator-v3-15-username)
   QUAY_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-operator-v3-15-password)
