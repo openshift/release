@@ -74,6 +74,95 @@ EOF
   jq '.data.".dockerconfigjson" = "'${new_dot_dockerconfig_data}'"' /tmp/dot-dockerconfig.json | oc replace -f -
 }
 
+function append_production_path_icsp_entries {
+  # This function addresses the PreGA catalog mirror path mismatch issue.
+  # PreGA oc-mirror generates ICSP with development registry paths (e.g., acm-d, redhat-user-workloads),
+  # but operator CSVs reference production paths (e.g., rhacm2, multicluster-engine, openshift-gitops-1).
+  # Without these additional entries, ACM/MCE/GitOps operators will fail with ImagePullBackOff.
+  #
+  # This fix ensures only ONE node reboot is needed by appending entries to the ICSP
+  # before it's applied to the cluster.
+  #
+  # Reference: .cursor/docs/troubleshooting/prega-catalog-mirror-issue.md
+
+  local icsp_file="${1}"
+
+  echo "************ telcov10n Append production path ICSP entries ************"
+  echo ""
+  echo "Checking if production path entries need to be added to ICSP..."
+  echo "This is required because PreGA oc-mirror generates ICSP with development paths (acm-d, redhat-user-workloads)"
+  echo "but operator CSVs reference production paths (rhacm2, multicluster-engine, openshift-gitops-1)"
+  echo ""
+
+  # Check if the production path entries are already in the ICSP file
+  local needs_rhacm2=false
+  local needs_mce=false
+  local needs_gitops=false
+
+  if ! grep -q "registry.redhat.io/rhacm2" "${icsp_file}"; then
+    echo "- Missing: registry.redhat.io/rhacm2 (ACM production path)"
+    needs_rhacm2=true
+  else
+    echo "✓ Found: registry.redhat.io/rhacm2"
+  fi
+
+  if ! grep -q "registry.redhat.io/multicluster-engine" "${icsp_file}"; then
+    echo "- Missing: registry.redhat.io/multicluster-engine (MCE production path)"
+    needs_mce=true
+  else
+    echo "✓ Found: registry.redhat.io/multicluster-engine"
+  fi
+
+  if ! grep -q "registry.redhat.io/openshift-gitops-1" "${icsp_file}"; then
+    echo "- Missing: registry.redhat.io/openshift-gitops-1 (GitOps production path)"
+    needs_gitops=true
+  else
+    echo "✓ Found: registry.redhat.io/openshift-gitops-1"
+  fi
+
+  # If any entries are missing, append them to the ICSP file
+  if [ "${needs_rhacm2}" = true ] || [ "${needs_mce}" = true ] || [ "${needs_gitops}" = true ]; then
+    echo ""
+    echo "Appending missing production path entries to ${icsp_file}..."
+
+    if [ "${needs_rhacm2}" = true ]; then
+      cat <<'EOF' >> "${icsp_file}"
+  - mirrors:
+    - quay.io/prega/test/acm-d
+    source: registry.redhat.io/rhacm2
+EOF
+      echo "  ✓ Added registry.redhat.io/rhacm2 → quay.io/prega/test/acm-d"
+    fi
+
+    if [ "${needs_mce}" = true ]; then
+      cat <<'EOF' >> "${icsp_file}"
+  - mirrors:
+    - quay.io/prega/test/acm-d
+    source: registry.redhat.io/multicluster-engine
+EOF
+      echo "  ✓ Added registry.redhat.io/multicluster-engine → quay.io/prega/test/acm-d"
+    fi
+
+    if [ "${needs_gitops}" = true ]; then
+      cat <<'EOF' >> "${icsp_file}"
+  - mirrors:
+    - quay.io/prega/test/redhat-user-workloads/rh-openshift-gitops-tenant
+    source: registry.redhat.io/openshift-gitops-1
+EOF
+      echo "  ✓ Added registry.redhat.io/openshift-gitops-1 → quay.io/prega/test/redhat-user-workloads/rh-openshift-gitops-tenant"
+    fi
+
+    echo ""
+    echo "✓ Production path entries appended successfully"
+    echo "  This ensures ACM, MCE, and GitOps operators can pull images from PreGA mirror"
+    echo ""
+  else
+    echo ""
+    echo "✓ All required production path ICSP entries already exist in the file. No changes needed."
+    echo ""
+  fi
+}
+
 function apply_catalog_source_and_image_content_source_policy {
 
   SSHOPTS=(-o 'ConnectTimeout=5'
@@ -255,7 +344,14 @@ EOF
   set +x
   echo "--------------------- ${ARTIFACT_DIR}/pre-ga-info/catalogSource.yaml -------------------------"
   cat ${prega_info_dir}/catalogSource.yaml
-  echo "------------- ${ARTIFACT_DIR}/pre-ga-info/imageContentSourcePolicy.yaml ----------------------"
+  echo "------------- ${ARTIFACT_DIR}/pre-ga-info/imageContentSourcePolicy.yaml (BEFORE) -------------"
+  cat ${prega_info_dir}/imageContentSourcePolicy.yaml
+  echo "----------------------------------------------------------------------------------------------"
+
+  # Append production path entries to ICSP if needed (ACM/MCE/GitOps)
+  append_production_path_icsp_entries "${prega_info_dir}/imageContentSourcePolicy.yaml"
+
+  echo "------------- ${ARTIFACT_DIR}/pre-ga-info/imageContentSourcePolicy.yaml (AFTER) --------------"
   cat ${prega_info_dir}/imageContentSourcePolicy.yaml
   echo "----------------------------------------------------------------------------------------------"
   set -x
