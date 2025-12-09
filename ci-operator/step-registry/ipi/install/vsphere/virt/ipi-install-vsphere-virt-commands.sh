@@ -96,6 +96,17 @@ function wait_for_co_ready() {
   fi
 }
 
+# Wait for Storage cluster operator to have degraded status
+function wait_for_storage_co_degrade() {
+  echo "$(date -u --rfc-3339=seconds) - Waiting for Storage cluster operator to degrade"
+  oc wait --for=jsonpath='{.status.conditions[?(@.type=="Degraded")].status}'=True clusteroperator/storage --timeout=10m
+  if [[ $? -ne 0 ]]; then
+    echo "$(date -u --rfc-3339=seconds) - Storage cluster operator did not degrade"
+    exit 1
+  fi
+  echo "$(date -u --rfc-3339=seconds) - SUCCESS: Storage cluster operator is degraded"
+}
+
 
 # We are going to apply the 'node.openshift.io/platform-type=vsphere' label to all existing nodes as a workaround while waiting for upstream CCM changes
 # When upstream changes are merged downstream, the function will output that no nodes were updated.
@@ -139,12 +150,12 @@ for (( i=0; i<${BM_COUNT}; i++ )); do
   oc patch vm "${VM_NAME}-${i}" -n ${VM_NAMESPACE} --type=merge --patch-file ${VM_NETWORK_PATCH} --kubeconfig=${VIRT_KUBECONFIG}
 done
 
-# Update CSI driver to be removed.  Note, sometimes this can take a little while to start removing pods, but only on first attempt.
-# For now, we'll update and move on.  It should be resolved by the time the BM is ready to join.
-if [ "${CSI_MANAGEMENT_REMOVED}" == "true" ]; then
-  echo "$(date -u --rfc-3339=seconds) - Patching clustercsidriver managementState to be Removed"
-  oc patch clustercsidriver csi.vsphere.vmware.com --type=merge --patch 'spec: {managementState: "Removed"}'
-fi
+# # Update CSI driver to be removed.  Note, sometimes this can take a little while to start removing pods, but only on first attempt.
+# # For now, we'll update and move on.  It should be resolved by the time the BM is ready to join.
+# if [ "${CSI_MANAGEMENT_REMOVED}" == "true" ]; then
+#   echo "$(date -u --rfc-3339=seconds) - Patching clustercsidriver managementState to be Removed"
+#   oc patch clustercsidriver csi.vsphere.vmware.com --type=merge --patch 'spec: {managementState: "Removed"}'
+# fi
 
 # Start VM
 echo "$(date -u --rfc-3339=seconds) - Starting virtual machines"
@@ -162,6 +173,17 @@ done
 
 # Wait for node to be ready to prevent any interruption during the e2e tests
 wait_for_node_ready
+
+# Verifying Storage cluster operator is degraded for (OCP >=4.21) feature, STOR-2620: vSphere Bare Metal nodes support
+# Wait for Storage cluster operator to degrade
+wait_for_storage_co_degrade
+
+# Update CSI driver to be removed.  Note, sometimes this can take a little while to start removing pods, but only on first attempt.
+# For now, we'll update and move on.  It should be resolved by the time the BM is ready to join.
+if [ "${CSI_MANAGEMENT_REMOVED}" == "true" ]; then
+  echo "$(date -u --rfc-3339=seconds) - Patching clustercsidriver managementState to be Removed"
+  oc patch clustercsidriver csi.vsphere.vmware.com --type=merge --patch 'spec: {managementState: "Removed"}'
+fi
 
 # Wait for all CO to be stable
 wait_for_co_ready
