@@ -82,6 +82,9 @@ SSH_KEY="$HOME/$CLUSTER_NAME/.ssh/$CLUSTER_NAME-key"
 HAPROXY_REMOTE_CFG="/etc/haproxy/haproxy.cfg"
 
 # Install IBM Cloud CLI
+export PATH="$HOME/.tmp/bin:$PATH"
+mkdir -p "$HOME/.tmp/bin"
+
 if ! command -v ibmcloud &> /dev/null; then
     set -e
     echo "ibmcloud CLI is not installed. Installing it now..."
