@@ -222,7 +222,27 @@ oc wait --timeout=5m --for=condition=ManagedClusterConditionAvailable -n local-c
 oc wait --timeout=5m --for=condition=ManagedClusterJoined -n local-cluster ManagedCluster/local-cluster
 echo "MCE local-cluster is ready!"
 
-oc apply -f - <<EOF
+echo "Waiting for local-cluster namespace..."
+for ((i=1; i<=20; i++)); do
+  if oc get namespace local-cluster &>/dev/null; then
+    echo "Namespace local-cluster exists"
+    break
+  fi
+  echo "Waiting for local-cluster namespace... (attempt $i/20)"
+  sleep 5
+done
+
+if ! oc get namespace local-cluster &>/dev/null; then
+  echo "ERROR: local-cluster namespace was not created"
+  exit 1
+fi
+
+# Check if ManagedClusterAddOn already exists before creating
+if oc get managedclusteraddon hypershift-addon -n local-cluster &>/dev/null; then
+  echo "ManagedClusterAddOn hypershift-addon already exists"
+else
+  echo "Creating ManagedClusterAddOn for hypershift..."
+  oc apply -f - <<EOF
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ManagedClusterAddOn
 metadata:
@@ -231,23 +251,67 @@ metadata:
 spec:
   installNamespace: open-cluster-management-agent-addon
 EOF
+fi
 
 # wait for hypershift operator to come online
+echo "Waiting for hypershift operator pods to come online..."
 _hypershiftReady=0
-set +e
-for ((i=1; i<=20; i++)); do
-  oc get pods -n hypershift | grep "operator.*Running"
-  if [ $? -eq 0 ]; then
+for ((i=1; i<=30; i++)); do
+  # Check if hypershift namespace exists first
+  if ! oc get namespace hypershift &>/dev/null; then
+    echo "Waiting for hypershift namespace to be created... (attempt $i/30)"
+    sleep 15
+    continue
+  fi
+  running_pods=$(oc get pods -n hypershift --no-headers 2>/dev/null | grep -c "operator.*Running" || echo "0")
+
+  if [ "$running_pods" -gt 0 ]; then
+    echo "HyperShift operator pod(s) are running! ($running_pods pod(s) found)"
     _hypershiftReady=1
     break
   fi
-  echo "Waiting on hypershift operator to install"
-  sleep 30
+
+  echo "Waiting for hypershift operator to start... (attempt $i/30)"
+
+  # Show debug info every 5 attempts
+  if [ $((i % 5)) -eq 0 ]; then
+    echo "=== Debug: Current state ==="
+    echo "Hypershift namespace pods:"
+    oc get pods -n hypershift 2>/dev/null || echo "  No pods yet"
+    echo "ManagedClusterAddOn status:"
+    oc get managedclusteraddon hypershift-addon -n local-cluster -o jsonpath='{.status.conditions[?(@.type=="Available")]}' 2>/dev/null | jq '.' || echo "  Not available yet"
+    echo "ManifestWork:"
+    oc get manifestwork -n local-cluster 2>/dev/null | head -5 || echo "  No ManifestWork found"
+    echo "=========================="
+  fi
+
+  sleep 15
 done
-set -e
 
 if [ $_hypershiftReady -eq 0 ]; then
-  echo "hypershift operator did not come online in expected time"
+  echo "ERROR: hypershift operator did not come online in expected time"
+  echo ""
+  echo "=== Final Debugging Information ==="
+  echo "ManagedCluster status:"
+  oc get managedcluster local-cluster -o jsonpath='{.status}' | jq '.' || true
+  echo ""
+  echo "ManagedClusterAddOn status:"
+  oc get managedclusteraddon hypershift-addon -n local-cluster -o yaml 2>/dev/null || echo "ManagedClusterAddOn not found"
+  echo ""
+  echo "ManifestWork status:"
+  oc get manifestwork -n local-cluster 2>/dev/null || echo "No ManifestWork found"
+  echo ""
+  echo "HyperShift namespace:"
+  oc get ns hypershift -o yaml 2>/dev/null || echo "Namespace not found"
+  echo ""
+  echo "HyperShift namespace pods:"
+  oc get pods -n hypershift 2>/dev/null || echo "No pods or namespace doesn't exist"
+  echo ""
+  echo "MCE operator logs (last 100 lines):"
+  oc logs -n multicluster-engine deployment/multicluster-engine-operator --tail=100 || true
+  echo ""
+  echo "HyperShift addon manager logs (last 100 lines):"
+  oc logs -n multicluster-engine -l app=hypershift-addon-manager --tail=100 || true
   exit 1
 fi
 echo "hypershift is running! Waiting for the pods to become ready"
