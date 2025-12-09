@@ -3,23 +3,6 @@
 set -x
 set -e
 
-# Update the default storage class to ocs-storagecluster-ceph-rbd
-VIRT_SC="ocs-storagecluster-ceph-rbd-virtualization"
-CEPH_RBD_SC="ocs-storagecluster-ceph-rbd"
-
-echo "Removing default annotation from: $VIRT_SC"
-oc annotate --overwrite sc "$VIRT_SC" \
-  storageclass.kubernetes.io/is-default-class="false"
-
-echo "Setting default StorageClass to: $CEPH_RBD_SC"
-oc patch storageclass "$CEPH_RBD_SC" \
-  -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
-
-echo
-echo "✔ Updated StorageClasses:"
-oc get sc
-
-
 # Hosted Control Plane parameters
 HC_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
 export HC_NAME

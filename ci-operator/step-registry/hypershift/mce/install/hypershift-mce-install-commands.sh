@@ -269,7 +269,7 @@ echo "Configuring the hosting service cluster"
 oc create secret generic hypershift-operator-oidc-provider-s3-credentials --from-file=credentials=/etc/hypershift-pool-aws-credentials/credentials --from-literal=bucket=hypershift-ci-oidc --from-literal=region=us-east-1 -n local-cluster
 oc label secret hypershift-operator-oidc-provider-s3-credentials -n local-cluster cluster.open-cluster-management.io/backup=true
 
-sleep 1800
+sleep 180
 
 # wait for Configuring the hosting service cluster
 _configReady=0
