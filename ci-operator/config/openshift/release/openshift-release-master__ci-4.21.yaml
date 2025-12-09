@@ -383,6 +383,90 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-upgrade-vsphere-runc
+- as: claude-post-analysis-test
+  interval: 24h
+  steps:
+    post:
+    - ref: claude-post-job-analysis
+    test:
+    - as: generate-dummy-artifacts
+      commands: |
+        #!/bin/bash
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        echo "Generating dummy artifacts for testing claude-post-job-analysis..."
+
+        # Create a dummy test step directory structure
+        mkdir -p "${ARTIFACT_DIR}/e2e-test/artifacts"
+
+        # Create a failed finished.json
+        cat > "${ARTIFACT_DIR}/e2e-test/finished.json" << 'EOF'
+        {
+          "timestamp": 1733760000,
+          "passed": false,
+          "result": "FAILURE"
+        }
+        EOF
+
+        # Create a dummy JUnit XML with some failures
+        cat > "${ARTIFACT_DIR}/e2e-test/artifacts/junit_e2e.xml" << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <testsuites>
+          <testsuite name="e2e-tests" tests="10" failures="2" errors="0" skipped="1" time="300.5">
+            <testcase name="test-pod-creation" classname="cluster" time="5.2">
+              <system-out>Pod created successfully</system-out>
+            </testcase>
+            <testcase name="test-networking" classname="cluster" time="10.5">
+              <failure message="Connection timeout" type="NetworkError">
+                Expected connection to succeed but got timeout after 30s
+                Error: dial tcp 10.0.0.1:443: i/o timeout
+              </failure>
+            </testcase>
+            <testcase name="test-storage" classname="cluster" time="8.3">
+              <system-out>Storage provisioned correctly</system-out>
+            </testcase>
+            <testcase name="test-authentication" classname="cluster" time="15.7">
+              <failure message="Authentication failed" type="AuthError">
+                Expected OAuth authentication to succeed but got 401 Unauthorized
+                Error: unable to authenticate user
+              </failure>
+            </testcase>
+            <testcase name="test-upgrade" classname="cluster" time="0">
+              <skipped message="Skipped due to environment" />
+            </testcase>
+          </testsuite>
+        </testsuites>
+        EOF
+
+        # Create some dummy log files
+        mkdir -p "${ARTIFACT_DIR}/e2e-test/artifacts/pods"
+        cat > "${ARTIFACT_DIR}/e2e-test/artifacts/pods/test-pod-1.log" << 'EOF'
+        2025-12-09T10:00:00Z INFO Starting pod test-pod-1
+        2025-12-09T10:00:05Z ERROR Failed to connect to API server
+        2025-12-09T10:00:06Z ERROR Connection refused: dial tcp 10.0.0.1:6443: connection refused
+        2025-12-09T10:00:10Z FATAL Pod failed to start
+        EOF
+
+        cat > "${ARTIFACT_DIR}/e2e-test/artifacts/e2e-test.log" << 'EOF'
+        Running e2e tests...
+        [INFO] Test suite: cluster networking
+        [PASS] test-pod-creation
+        [FAIL] test-networking: Connection timeout
+        [PASS] test-storage
+        [FAIL] test-authentication: Authentication failed
+        [SKIP] test-upgrade
+        Summary: 10 tests, 7 passed, 2 failed, 1 skipped
+        EOF
+
+        echo "Dummy artifacts created successfully"
+        ls -laR "${ARTIFACT_DIR}"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: master
   org: openshift

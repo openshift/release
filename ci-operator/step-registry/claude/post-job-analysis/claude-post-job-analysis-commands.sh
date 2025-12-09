@@ -31,8 +31,7 @@ if [[ -z "${BUILD_ID:-}" ]]; then
     exit 1
 fi
 
-# Allowlist of blocking jobs for 4.21 payloads (non-optional jobs from release-controller)
-# Only run Claude analysis on these critical jobs to avoid noise and cost
+# Allowlist of jobs - only run Claude analysis on these critical jobs
 ALLOWED_JOBS=(
     "periodic-ci-openshift-hypershift-release-4.21-periodics-e2e-aws-ovn-conformance"
     "periodic-ci-openshift-microshift-release-4.21-periodics-e2e-aws-ovn-ocp-conformance"
@@ -51,9 +50,7 @@ ALLOWED_JOBS=(
     "periodic-ci-openshift-release-master-nightly-4.21-e2e-metal-ipi-ovn-bm"
     "periodic-ci-openshift-release-master-nightly-4.21-e2e-metal-ipi-ovn-ipv6"
     "periodic-ci-openshift-release-master-nightly-4.21-e2e-rosa-sts-ovn"
-    "periodic-ci-openshift-release-master-nightly-4.21-fips-payload-scan"
-    "periodic-ci-openshift-release-master-nightly-4.21-install-analysis-all"
-    "periodic-ci-openshift-release-master-nightly-4.21-overall-analysis-all"
+    "periodic-ci-openshift-release-master-ci-4.21-claude-post-analysis-test"
 )
 
 # Check if current job matches allowlist
@@ -71,7 +68,6 @@ done
 
 if [[ ${JOB_MATCHED} -eq 0 ]]; then
     echo "******** Job does not match allowlist filters. Skipping Claude analysis."
-    echo "******** This step only runs on blocking jobs for 4.21 payloads."
     exit 0
 fi
 
