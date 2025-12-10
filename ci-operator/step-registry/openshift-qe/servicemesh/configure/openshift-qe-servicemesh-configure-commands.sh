@@ -152,4 +152,4 @@ EOF
 oc get pods -n istio-system
 oc get services -n istio-system
 
-echo "Gateway deployed successfully"
+echo "Gateway deployed successfully. Mesh configuration completed"
