@@ -12,21 +12,57 @@ RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev
 SLACK_NIGHTLY_WEBHOOK_URL=$(cat /tmp/secrets/SLACK_NIGHTLY_WEBHOOK_URL)
 export RELEASE_BRANCH_NAME SLACK_NIGHTLY_WEBHOOK_URL
 
-# Download and source the reporting.sh file from RHDH repository
-REPORTING_SCRIPT_URL="https://raw.githubusercontent.com/redhat-developer/rhdh/${RELEASE_BRANCH_NAME}/.ibm/pipelines/reporting.sh"
-REPORTING_SCRIPT_TMP="/tmp/reporting.sh"
+get_artifacts_url() {
+  local namespace=$1
 
-echo "💾 Downloading reporting.sh from ${REPORTING_SCRIPT_URL}"
-if curl -f -s -o "${REPORTING_SCRIPT_TMP}" "${REPORTING_SCRIPT_URL}"; then
-  echo "🟢 Successfully downloaded reporting.sh, sourcing it..."
-  # shellcheck source=/dev/null
-  source "${REPORTING_SCRIPT_TMP}"
-  rm -f "${REPORTING_SCRIPT_TMP}"
-  echo "✅ Successfully sourced reporting.sh from redhat-developer/rhdh/${RELEASE_BRANCH_NAME}"
-else
-  echo "🔴 Error: Failed to download reporting.sh from ${REPORTING_SCRIPT_URL}"
-  exit 1
-fi
+  if [ -z "${namespace}" ]; then
+    echo "Warning: namespace parameter is empty (this is expected only for top level artifacts directory)" >&2
+  fi
+
+  local artifacts_base_url="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results"
+  local artifacts_complete_url
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    local part_1="${JOB_NAME##pull-ci-redhat-developer-rhdh-main-}"         # e.g. "e2e-ocp-operator-nightly"
+    local suite_name="${JOB_NAME##pull-ci-redhat-developer-rhdh-main-e2e-}" # e.g. "ocp-operator-nightly"
+    local part_2="redhat-developer-rhdh-${suite_name}"                      # e.g. "redhat-developer-rhdh-ocp-operator-nightly"
+    # Override part_2 based for specific cases that do not follow the standard naming convention.
+    case "$JOB_NAME" in
+      *osd-gcp*)
+        part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
+        ;;
+      *ocp-v*helm*-nightly*)
+        part_2="redhat-developer-rhdh-ocp-helm-nightly"
+        ;;
+    esac
+    artifacts_complete_url="${artifacts_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${namespace}"
+  else
+    local part_1="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-}"         # e.g. "e2e-aks-helm-nightly"
+    local suite_name="${JOB_NAME##periodic-ci-redhat-developer-rhdh-"${RELEASE_BRANCH_NAME}"-e2e-}" # e.g. "aks-helm-nightly"
+    local part_2="redhat-developer-rhdh-${suite_name}"                                              # e.g. "redhat-developer-rhdh-aks-helm-nightly"
+    # Override part_2 based for specific cases that do not follow the standard naming convention.
+    case "$JOB_NAME" in
+      *osd-gcp*)
+        part_2="redhat-developer-rhdh-osd-gcp-helm-nightly"
+        ;;
+      *ocp-v*helm*-nightly*)
+        part_2="redhat-developer-rhdh-ocp-helm-nightly"
+        ;;
+    esac
+    artifacts_complete_url="${artifacts_base_url}/logs/${JOB_NAME}/${BUILD_ID}/artifacts/${part_1}/${part_2}/artifacts/${namespace}"
+  fi
+  echo "${artifacts_complete_url}"
+}
+
+get_job_url() {
+  local job_base_url="https://prow.ci.openshift.org/view/gs/test-platform-results"
+  local job_complete_url
+  if [ -n "${PULL_NUMBER:-}" ]; then
+    job_complete_url="${job_base_url}/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+  else
+    job_complete_url="${job_base_url}/logs/${JOB_NAME}/${BUILD_ID}"
+  fi
+  echo "${job_complete_url}"
+}
 
 get_slack_alert_text() {
   URL_CI_RESULTS=$(get_job_url)

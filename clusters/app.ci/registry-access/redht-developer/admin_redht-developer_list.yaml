@@ -1,33 +1,34 @@
-kind: List
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Namespace
-  metadata:
-    name: redht-developer
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: RoleBinding
-  metadata:
-    name: image-puller
-    namespace: redht-developer
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: ClusterRole
-    name: system:image-puller
-  subjects:
-  - apiGroup: rbac.authorization.k8s.io
-    kind: Group
-    name: system:authenticated
-  - apiGroup: rbac.authorization.k8s.io
-    kind: Group
-    name: system:unauthenticated
-- apiVersion: authorization.openshift.io/v1
-  kind: RoleBinding
-  metadata:
-    name: admin
-    namespace: redht-developer
-  roleRef:
-    name: pull-secret-namespace-manager
-  subjects:
-  - kind: Group
-    name: redhat-developer-team
+kind: Namespace
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
+  name: redht-developer
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: image-puller
+  namespace: redht-developer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:image-puller
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:authenticated
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:unauthenticated
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: admin
+  namespace: redht-developer
+roleRef:
+  name: pull-secret-namespace-manager
+subjects:
+- kind: Group
+  name: redhat-developer-team

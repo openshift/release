@@ -1,0 +1,234 @@
+base_images:
+  assisted-image-service:
+    name: v2.48
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer-agent:
+    name: v2.48
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-service:
+    name: v2.48
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  assisted-test-infra-internal:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-test-infra-internal
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  upi-installer:
+    name: "4.2"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.assisted-installer
+  to: assisted-installer
+- dockerfile_path: Dockerfile.assisted-installer-controller
+  to: assisted-installer-controller
+- dockerfile_path: Dockerfile.assisted-installer-build
+  to: assisted-installer-build
+promotion:
+  to:
+  - name: v2.48
+    namespace: edge-infrastructure
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer
+    env:
+      IMAGE_REPO: assisted-installer
+      RELEASE_TAG_PREFIX: hotfix
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: mirror-vcsref-image-controller
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-installer-controller
+    env:
+      IMAGE_REPO: assisted-installer-controller
+      RELEASE_TAG_PREFIX: hotfix
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    clone: true
+    from: assisted-installer-build
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: format-check
+  commands: make format-check
+  container:
+    clone: true
+    from: assisted-installer-build
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: unit-test
+  commands: |
+    export GOCACHE=/tmp/gocache
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    make REPORTS=${ARTIFACT_DIR} unit-test
+  container:
+    clone: true
+    from: assisted-installer-build
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-installer-codecov-token
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: e2e-metal-assisted
+  capabilities:
+  - intranet
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-ipv6
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        IPv6=yes
+        IPv4=no
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-single-node
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        NUM_MASTERS=1
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-cnv
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        OLM_OPERATORS=cnv
+        OPENSHIFT_VERSION=4.20
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+        MASTER_MEMORY=18700
+        MASTER_CPU=9
+        WORKER_MEMORY=9216
+        MASTER_DISK_COUNT=2
+        WORKER_DISK_COUNT=2
+        WORKER_CPU=5
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-lvm
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        OLM_OPERATORS=lvm
+        NUM_MASTERS=3
+        NUM_WORKERS=0
+        MASTER_MEMORY=25600
+        MASTER_CPU=9
+        MASTER_DISK_COUNT=2
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-odf
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        OLM_OPERATORS=odf
+        OPENSHIFT_VERSION=4.20
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-oci-assisted
+  optional: true
+  steps:
+    cluster_profile: oci-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-oci
+- always_run: false
+  as: e2e-metal-assisted-external
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        PLATFORM=external
+        OPENSHIFT_VERSION=4.20
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-vsphere-assisted
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=v2.48
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.20
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+zz_generated_metadata:
+  branch: v2.48
+  org: openshift
+  repo: assisted-installer

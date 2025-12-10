@@ -34,7 +34,7 @@ In order to test effectively, they need to be able to test against nightlies
 provided to allow them to pull. Questions in forum-ibm-roks / https://redhat.enterprise.slack.com/archives/C015MKYUVSR''')
 
     gendoc.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'amd64-nightly-puller',

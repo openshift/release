@@ -43,7 +43,7 @@ tests:
 - as: e2e-metal-ipi-bm
   capabilities:
   - intranet
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -52,21 +52,21 @@ tests:
 - as: e2e-metal-ipi-serial-ipv4
   capabilities:
   - intranet
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv4
 - as: e2e-metal-ipi-virtualmedia
   capabilities:
   - intranet
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
@@ -82,8 +82,8 @@ tests:
   commands: |-
     #!/bin/bash
     set -euxo pipefail
-    # this could also come from the "CLONEREFS_OPTIONS" env variable
-    export CHECK_RELEASE="release-4.19"
+    # Automatically set based on the branch being tested
+    export CHECK_RELEASE=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref // .refs.base_ref')
     make check-reqs
   container:
     from: src

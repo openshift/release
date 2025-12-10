@@ -120,54 +120,120 @@ function create_icsp_connected () {
             - registry.stage.redhat.io
             source: registry.redhat.io
 EOF
-    else
-        image_version="${test_version//./-}"
-        cat <<EOF | oc apply -f -
-        apiVersion: operator.openshift.io/v1alpha1
-        kind: ImageContentSourcePolicy
-        metadata:
-          name: logging-registry
-        spec:
-          repositoryDigestMirrors:
-          - source: registry.redhat.io/openshift-logging/cluster-logging-rhel9-operator
-            mirrors:
-            - quay.io/redhat-user-workloads/obs-logging-tenant/cluster-logging-operator-v$image_version
-          - source: registry.redhat.io/openshift-logging/log-file-metric-exporter-rhel9
-            mirrors:
-            - quay.io/redhat-user-workloads/obs-logging-tenant/log-file-metric-exporter-v$image_version
-          - source: registry.redhat.io/openshift-logging/eventrouter-rhel9
-            mirrors:
-            - quay.io/redhat-user-workloads/obs-logging-tenant/logging-eventrouter-v$image_version
-          - source: registry.redhat.io/openshift-logging/vector-rhel9
-            mirrors:
-            - quay.io/redhat-user-workloads/obs-logging-tenant/logging-vector-v$image_version
-          - source: registry.redhat.io/openshift-logging/cluster-logging-operator-bundle
-            mirrors:
-            - quay.io/redhat-user-workloads/obs-logging-tenant/cluster-logging-operator-bundle-v$image_version
-          - source: registry.redhat.io/openshift-logging/loki-operator-bundle
-            mirrors:
-            - quay.io/redhat-user-workloads/obs-logging-tenant/loki-operator-bundle-v$image_version
-          - source: registry.redhat.io/openshift-logging/loki-rhel9-operator
-            mirrors:
-            - quay.io/redhat-user-workloads/obs-logging-tenant/loki-operator-v$image_version
-          - source: registry.redhat.io/openshift-logging/logging-loki-rhel9
-            mirrors:
-            - quay.io/redhat-user-workloads/obs-logging-tenant/logging-loki-v$image_version
-          - source: registry.redhat.io/openshift-logging/lokistack-gateway-rhel9
-            mirrors:
-            - quay.io/redhat-user-workloads/obs-logging-tenant/lokistack-gateway-v$image_version
-          - source: registry.redhat.io/openshift-logging/opa-openshift-rhel9
-            mirrors:
-            - quay.io/redhat-user-workloads/obs-logging-tenant/opa-openshift-v$image_version
+    elif [[ $test_version == "5.8" ]]; then
+          cat <<EOF | oc apply -f -
+          apiVersion: operator.openshift.io/v1alpha1
+          kind: ImageContentSourcePolicy
+          metadata:
+            name: logging-registry
+          spec:
+            repositoryDigestMirrors:
+            - source: registry.redhat.io/openshift-logging/cluster-logging-rhel9-operator
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/cluster-logging-operator-v5-8
+            - source: registry.redhat.io/openshift-logging/log-file-metric-exporter-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/log-file-metric-exporter-v5-8
+            - source: registry.redhat.io/openshift-logging/eventrouter-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/logging-eventrouter-v5-8
+            - source: registry.redhat.io/openshift-logging/vector-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/logging-vector-v5-8
+            - source: registry.redhat.io/openshift-logging/cluster-logging-operator-bundle
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/cluster-logging-operator-bundle-v5-8
+            - source: registry.redhat.io/openshift-logging/loki-operator-bundle
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/loki-operator-bundle-v5-8
+            - source: registry.redhat.io/openshift-logging/loki-rhel9-operator
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/loki-operator-v5-8
+            - source: registry.redhat.io/openshift-logging/logging-loki-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/logging-loki-v5-8
+            - source: registry.redhat.io/openshift-logging/lokistack-gateway-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/lokistack-gateway-v5-8
+            - source: registry.redhat.io/openshift-logging/opa-openshift-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/opa-openshift-v5-8
+            - source: registry.redhat.io/openshift-logging/elasticsearch-operator-bundle
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/elasticsearch-operator-bundle-v5-8
+            - source: registry.redhat.io/openshift-logging/elasticsearch-rhel9-operator
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/elasticsearch-operator-v5-8
+            - source: registry.redhat.io/openshift-logging/elasticsearch-proxy-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/elasticsearch-proxy-v5-8
+            - source: registry.redhat.io/openshift-logging/logging-curator5-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/logging-curator5-v5-8
+            - source: registry.redhat.io/openshift-logging/elasticsearch6-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/logging-elasticsearch6-v5-8
+            - source: registry.redhat.io/openshift-logging/fluentd-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/logging-fluentd-v5-8
+            - source: registry.redhat.io/openshift-logging/logging-view-plugin-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/logging-view-plugin-v5-8
+            - source: registry.redhat.io/openshift-logging/kibana6-rhel8
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/logging-kibana-v5-8
+EOF
+        else
+          image_version="${test_version//./-}"
+          cat <<EOF | oc apply -f -
+          apiVersion: operator.openshift.io/v1alpha1
+          kind: ImageContentSourcePolicy
+          metadata:
+            name: logging-registry
+          spec:
+            repositoryDigestMirrors:
+            - source: registry.redhat.io/openshift-logging/cluster-logging-rhel9-operator
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/cluster-logging-operator-v$image_version
+            - source: registry.redhat.io/openshift-logging/log-file-metric-exporter-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/log-file-metric-exporter-v$image_version
+            - source: registry.redhat.io/openshift-logging/eventrouter-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/logging-eventrouter-v$image_version
+            - source: registry.redhat.io/openshift-logging/vector-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/logging-vector-v$image_version
+            - source: registry.redhat.io/openshift-logging/cluster-logging-operator-bundle
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/cluster-logging-operator-bundle-v$image_version
+            - source: registry.redhat.io/openshift-logging/loki-operator-bundle
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/loki-operator-bundle-v$image_version
+            - source: registry.redhat.io/openshift-logging/loki-rhel9-operator
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/loki-operator-v$image_version
+            - source: registry.redhat.io/openshift-logging/logging-loki-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/logging-loki-v$image_version
+            - source: registry.redhat.io/openshift-logging/lokistack-gateway-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/lokistack-gateway-v$image_version
+            - source: registry.redhat.io/openshift-logging/opa-openshift-rhel9
+              mirrors:
+              - quay.io/redhat-user-workloads/obs-logging-tenant/opa-openshift-v$image_version
 EOF
     fi
+
     if [ $? == 0 ]; then
         echo "create the ICSP successfully"
+        sleep 60
+        echo "check mcp status"
+        check_mcp_status
     else
-        echo "!!! fail to create the ICSP"
+        echo "!!! failed to create the ICSP"
         return 1
     fi
-
 }
 
 function operator_sdk_install_operator() {
@@ -473,7 +539,15 @@ if [[ ! -z ${index_image} ]]; then
     check_marketplace
     create_catalog_sources
     subscribe_operator "cluster-logging" "openshift-logging"
-    subscribe_operator "loki-operator" "openshift-operators-redhat"
+    if [[ $test_version == "5.8" ]]; then
+      subscribe_operator "elasticsearch-operator" "openshift-operators-redhat"
+      cluster_minor_version=$(oc get clusterversion/version -ojsonpath='{.status.desired.version}' 2>/dev/null | cut -d '.' -f 2)
+      if (( cluster_minor_version < 16 )); then
+        subscribe_operator "loki-operator" "openshift-operators-redhat"
+      fi
+    else
+      subscribe_operator "loki-operator" "openshift-operators-redhat"
+    fi
 else
     echo "Install operator via operator-sdk"
     # install operator-sdk
@@ -503,6 +577,9 @@ else
             ;;
             *"cluster-logging-operator-bundle"*)
             operator_sdk_install_operator $bundle "openshift-logging"
+            ;;
+            *"elasticsearch-operator-bundle"*)
+            operator_sdk_install_operator $bundle "openshift-operators-redhat"
             ;;
             *)
             echo "unkonw bundle $bundle"

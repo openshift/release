@@ -1,0 +1,92 @@
+binary_build_commands: 'mkdir -p .workspace; echo {\"gitref\": \"$(git rev-parse \
+  --short HEAD)\"} > .workspace/metadata.json'
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+  use_build_cache: true
+images:
+- build_args:
+  - name: BASE_IMAGE
+    value: registry.access.redhat.com/ubi9/ubi:9.6
+  - name: RELEASE_BASE_IMAGE
+    value: registry.access.redhat.com/ubi9-minimal:9.6
+  - name: BASE_OS
+    value: redhat
+  - name: PROJECT_VERSION
+    value: 2025.4.0
+  - name: ov_source_branch
+    value: releases/2025/4
+  - name: ov_source_org
+    value: opendatahub-io
+  - name: ov_genai_branch
+    value: releases/2025/4
+  - name: ov_tokenizers_branch
+    value: releases/2025/4
+  - name: ov_use_binary
+    value: "0"
+  - name: INSTALL_DRIVER_VERSION
+    value: 25.05.32567
+  - name: OPTIMIZE_BUILDING_TESTS
+    value: "0"
+  - name: RUN_TESTS
+    value: "0"
+  - name: LTO_ENABLE
+    value: "ON"
+  - name: LTO_CXX_FLAGS
+    value: -flto=auto -ffat-lto-objects -march=haswell
+  - name: LTO_LD_FLAGS
+    value: -flto=auto -ffat-lto-objects
+  - name: debug_bazel_flags
+    value: --config=haswell --strip=always --define MEDIAPIPE_DISABLE=0 --define PYTHON_DISABLE=0
+      --config=mp_on_py_on --verbose_failures --//:distro=redhat --local_ram_resources=20480
+      --local_cpu_resources=12
+  - name: CAPI_FLAGS
+    value: --config=haswell --strip=always --config=mp_off_py_off --verbose_failures
+      --//:distro=redhat --local_ram_resources=20480 --local_cpu_resources=12
+  - name: CMAKE_BUILD_TYPE
+    value: Release
+  - name: GPU
+    value: "1"
+  - name: JOBS
+    value: "12"
+  dockerfile_path: Dockerfile.redhat
+  to: model-server-release-intel-gpu-2025.4-release
+promotion:
+  to:
+  - name: model-server-release-intel-gpu-2025.4-release
+    namespace: opendatahub-io
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+  model-server-release-intel-gpu-2025.4-release:
+    limits:
+      cpu: "12"
+      memory: 18Gi
+    requests:
+      cpu: "8"
+      memory: 10Gi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: model-server-release-intel-gpu-2025.4-release
+    env:
+      IMAGE_REPO: openvino_model_server
+    workflow: opendatahub-io-ci-image-mirror-serving-runtime
+- as: fast-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: model-server-release-intel-gpu-2025.4-release
+    env:
+      IMAGE_REPO: openvino_model_server
+      RELEASE_VERSION: 2025.4-release
+    workflow: opendatahub-io-ci-image-mirror-serving-runtime
+zz_generated_metadata:
+  branch: 2025.4-release
+  org: opendatahub-io
+  repo: openvino_model_server
