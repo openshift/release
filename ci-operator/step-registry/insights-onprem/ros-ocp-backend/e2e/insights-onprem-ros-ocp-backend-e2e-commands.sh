@@ -27,7 +27,7 @@ if ! command -v kubectl &> /dev/null; then
     export PATH="/tmp:${PATH}"
     echo "kubectl ${KUBECTL_VERSION} installed successfully"
 else
-    echo "kubectl is already installed
+    echo "kubectl is already installed"
 fi
 
 # Install helm if not available
