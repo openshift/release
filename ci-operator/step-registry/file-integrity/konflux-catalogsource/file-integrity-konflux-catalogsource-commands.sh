@@ -29,12 +29,6 @@ timestamp() {
 
 # create ICSP for connected env.
 create_icsp_connected() {
-  #Delete any existing ImageContentSourcePolicy
-  oc delete imagecontentsourcepolicies brew-registry --ignore-not-found=true || {
-    echo "failed to delete existing imagecontentsourcepolicies"
-    return 1
-  }
-
   cat <<EOF | oc apply -f - || {
 apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
@@ -429,6 +423,23 @@ function tmp_prune_disruptive_resource() {
 
 main() {
   echo "Enabling konflux catalogsource"
+
+  #Delete any existing ImageContentSourcePolicy
+  oc delete imagecontentsourcepolicies brew-registry --ignore-not-found=true || {
+    echo "failed to delete existing imagecontentsourcepolicies"
+    return 1
+  }
+
+  check_mcp_status || {
+	echo "failed to check mcp status. resolve the above errors"
+  }
+
+  # Exit early if MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE is not provided
+  if [[ -z "${MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE}" ]]; then
+    echo "'MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE' is empty. Skipping catalog source creation..."
+    exit 0
+  fi
+
   set_proxy
   if [ -f "${SHARED_DIR}/nested_kubeconfig" ]; then
     export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
@@ -507,11 +518,6 @@ main() {
       echo "failed to check marketplace. resolve the above errors"
       return 1
     }
-
-    if [[ -z "${MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE}" ]]; then
-      echo "'MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE' is empty. Skipping catalog source creation..."
-      exit 0
-    fi
   fi
 
 
