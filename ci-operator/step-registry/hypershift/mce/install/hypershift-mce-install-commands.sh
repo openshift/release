@@ -275,7 +275,7 @@ sleep 180
 _configReady=0
 trap - ERR
 set +e
-for ((i=1; i<=10; i++)); do
+for ((i=1; i<=30; i++)); do
   oc get configmap -n kube-public oidc-storage-provider-s3-config
   if [ $? -eq 0 ]; then
     _configReady=1
