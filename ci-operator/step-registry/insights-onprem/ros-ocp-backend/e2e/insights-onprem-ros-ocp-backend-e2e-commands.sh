@@ -239,30 +239,44 @@ echo "========== Configuring Helm for MinIO Storage =========="
 
 # The deploy-test-ros.sh script sets HELM_EXTRA_ARGS for image overrides.
 # We need to add our MinIO configuration to HELM_EXTRA_ARGS as well.
-# This ensures global.storageType=minio is passed regardless of what the upstream
-# scripts do with HELM_EXTRA_ARGS or VALUES_FILE.
+#
+# Strategy: Create a wrapper around the helm binary that injects our --set flags
+# ONLY for the cost-onprem chart installation. Other helm commands (repo add, 
+# strimzi install, etc.) pass through unchanged.
+
+# IMPORTANT: Find the REAL helm binary location BEFORE we create any wrappers
+# If helm was installed to /tmp/helm, we need to find the actual binary
+ORIGINAL_HELM=$(command -v helm)
+if [[ "${ORIGINAL_HELM}" == "/tmp/helm" ]]; then
+    # Helm was installed to /tmp, use the actual binary path
+    # Move it to a different location to avoid conflicts with the wrapper
+    mv /tmp/helm /tmp/helm-original
+    ORIGINAL_HELM="/tmp/helm-original"
+    echo "Moved original helm to ${ORIGINAL_HELM}"
+fi
 
 HELM_WRAPPER="/tmp/helm-wrapper"
-ORIGINAL_HELM=$(command -v helm)
 
 cat > "${HELM_WRAPPER}" << 'WRAPPER_EOF'
 #!/bin/bash
 # Helm wrapper that injects MinIO storage configuration
 # This intercepts helm calls and adds --set global.storageType=minio
+# ONLY for the cost-onprem chart - other charts pass through unchanged
 
 ORIGINAL_HELM="__ORIGINAL_HELM__"
 MINIO_ACCESS_KEY="__MINIO_ACCESS_KEY__"
 MINIO_SECRET_KEY="__MINIO_SECRET_KEY__"
 
-# Check if this is an install/upgrade command that needs our overrides
-if [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"install"* ]]; then
-    echo "[helm-wrapper] Injecting MinIO storage configuration..."
+# Only inject MinIO config for the cost-onprem chart installation
+# Check if this is an install/upgrade command for cost-onprem specifically
+if [[ "$*" == *"cost-onprem"* ]] && { [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"install"* ]]; }; then
+    echo "[helm-wrapper] Detected cost-onprem chart - injecting MinIO storage configuration..."
     exec "$ORIGINAL_HELM" "$@" \
         --set "global.storageType=minio" \
         --set "minio.rootUser=${MINIO_ACCESS_KEY}" \
         --set "minio.rootPassword=${MINIO_SECRET_KEY}"
 else
-    # For other helm commands, pass through unchanged
+    # For all other helm commands (repo add, strimzi install, etc.), pass through unchanged
     exec "$ORIGINAL_HELM" "$@"
 fi
 WRAPPER_EOF
@@ -274,14 +288,12 @@ sed -i "s|__MINIO_SECRET_KEY__|${MINIO_SECRET_KEY:-minioadmin}|g" "${HELM_WRAPPE
 
 chmod +x "${HELM_WRAPPER}"
 
-# Prepend /tmp to PATH so our wrapper is found first
-export PATH="/tmp:${PATH}"
-# Also create a symlink so 'helm' resolves to our wrapper
+# Create symlink so 'helm' resolves to our wrapper
 ln -sf "${HELM_WRAPPER}" /tmp/helm
 
 echo "Helm wrapper installed at /tmp/helm"
-echo "Original helm: ${ORIGINAL_HELM}"
-echo "MinIO storage type will be injected into helm upgrade/install commands"
+echo "Original helm binary: ${ORIGINAL_HELM}"
+echo "MinIO storage type will be injected for cost-onprem chart only"
 
 echo "========== Running E2E Tests =========="
 export IMAGE_TAG
