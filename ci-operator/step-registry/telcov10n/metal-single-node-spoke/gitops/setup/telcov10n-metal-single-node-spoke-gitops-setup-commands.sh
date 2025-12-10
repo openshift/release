@@ -105,7 +105,7 @@ function setup_hub_cluster_with_site_config_addon {
     echo "Check SiteConfig templates..."
     echo
     set -x
-    wait_until_command_is_ok "oc -n ${MCH_NAMESPACE} get cm | grep 'templates' | wc -l | grep -w '4'" 10s 30
+    wait_until_command_is_ok "oc -n ${MCH_NAMESPACE} get cm | grep 'templates' | wc -l | grep -w '6'" 10s 30
     set +x
   else
     echo
