@@ -8,11 +8,17 @@ export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
 export CUSTOMER_SUBSCRIPTION; CUSTOMER_SUBSCRIPTION=$(cat "${CLUSTER_PROFILE_DIR}/subscription-name")
 export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscription-id")
+export PROW_SVC_SUBSCRIPTION_ID; PROW_SVC_SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/prow-svc-subscription-id")
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
 az account set --subscription "${SUBSCRIPTION_ID}"
 
 unset GOFLAGS
+tmp_config=$(mktemp -d)
+cp -r $(dirname $(az config get --query 'cloud[0].source' -o  tsv 2>/dev/null))/* ${tmp_config}
+export AZURE_CONFIG_DIR=${tmp_config}
+az account set -s ${PROW_SVC_SUBSCRIPTION_ID}
 make -C dev-infrastructure/ svc.aks.kubeconfig SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
+unset ${AZURE_CONFIG_DIR}
 export KUBECONFIG=kubeconfig
 PIDFILE="/tmp/svc-tunnel.pid"
 MONITOR_PIDFILE="/tmp/svc-monitor.pid"
