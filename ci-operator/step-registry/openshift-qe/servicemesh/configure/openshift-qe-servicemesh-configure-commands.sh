@@ -4,7 +4,7 @@ set -o nounset
 set -o pipefail
 set -x
 
-MESH_MODE=${MESH_MODE}
+SERVICE_MESH=${SERVICE_MESH}
 WAYPOINT=${WAYPOINT:-false}
 
 # Ensure STRIC mTLS is enabled
@@ -24,10 +24,10 @@ oc delete ns netperf --wait=true --ignore-not-found=true
 
 # Create and configure the namespace for the workload
 oc create ns netperf
-if [[ ${MESH_MODE} == "sidecar" ]]; then
+if [[ ${SERVICE_MESH} == "sidecar" ]]; then
   echo "Adding istio-injection=enabled label to ns"
   oc label ns netperf istio-injection=enabled --overwrite
-elif [[ ${MESH_MODE} == "ambient" ]]; then
+elif [[ ${SERVICE_MESH} == "ambient" ]]; then
   echo "Adding istio.io/dataplane-mode=ambient label to ns"
   oc label ns netperf istio.io/dataplane-mode=ambient --overwrite
   if [[ ${WAYPOINT} == "true" ]]; then
@@ -51,7 +51,7 @@ EOF
   oc label ns netperf istio.io/use-waypoint=waypoint --overwrite
   fi
 else
-  echo "No known MESH_MODE defined (sidecar, ambient). Running with default CNI"
+  echo "No known SERVICE_MESH defined (sidecar, ambient). Running with default CNI"
 fi
 oc create sa netperf -n netperf
 oc adm policy add-scc-to-user hostnetwork -z netperf -n netperf
