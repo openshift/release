@@ -276,14 +276,15 @@ EOF
 echo "MinIO proxy service created: minio-proxy.${APP_NAMESPACE}.svc:9000 -> minio.${MINIO_NAMESPACE}.svc:9000"
 
 # Save namespace info for the e2e tests
-# MINIO_ENDPOINT points to the proxy service in the app namespace (no port, chart adds it via odf.port)
+# MINIO_ENDPOINT includes the port because the MinIO Go client expects host:port format
+# The proxy service forwards to the actual MinIO service
 echo "MINIO_NAMESPACE=${MINIO_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
 echo "APP_NAMESPACE=${APP_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
-echo "MINIO_ENDPOINT=minio-proxy.${APP_NAMESPACE}.svc" >> "${SHARED_DIR}/minio-env"
+echo "MINIO_ENDPOINT=minio-proxy.${APP_NAMESPACE}.svc:9000" >> "${SHARED_DIR}/minio-env"
 echo "S3_ENDPOINT=http://minio.${MINIO_NAMESPACE}.svc:9000" >> "${SHARED_DIR}/minio-env"
 
-# Also update the minio-endpoint file
-echo "minio-proxy.${APP_NAMESPACE}.svc" > "${SHARED_DIR}/minio-endpoint"
+# Also update the minio-endpoint file (with port for MinIO client compatibility)
+echo "minio-proxy.${APP_NAMESPACE}.svc:9000" > "${SHARED_DIR}/minio-endpoint"
 
 echo "ODF credentials secret created successfully in ${APP_NAMESPACE} namespace"
 echo "MinIO is accessible from ${APP_NAMESPACE} at: http://minio-proxy.${APP_NAMESPACE}.svc:9000"
