@@ -31,6 +31,26 @@ images:
       - destination_dir: src
         source_path: /go/src/github.com/Azure/ARO-HCP
   to: nested-podman-src
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: backend/Dockerfile
+  from: src
+  to: aro-hcp-backend
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: frontend/Dockerfile
+  from: src
+  to: aro-hcp-frontend
 - dockerfile_literal: |
     FROM src
     RUN cat /etc/dnf/dnf.conf || true
@@ -41,7 +61,11 @@ images:
     USER root
     RUN mkdir -p /usr/local/bin
     RUN az bicep install && mv /root/.azure/bin/bicep /usr/local/bin
-    RUN az aks install-cli --install-location /usr/local/bin/kubectl --kubelogin-install-location /usr/local/bin/kubelogin
+    RUN az aks install-cli --kubelogin-install-location /usr/local/bin/kubelogin
+    RUN curl -LO "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz" && \
+        tar -xzf openshift-client-linux.tar.gz -C /usr/local/bin oc && \
+        rm openshift-client-linux.tar.gz && \
+        chmod +x /usr/local/bin/oc
     RUN export GOFLAGS='-mod=readonly' && \
         make install-tools && \
         make -C tooling/templatize templatize && \

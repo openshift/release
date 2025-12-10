@@ -1,120 +1,120 @@
 #
 # Run a frontend mirror that aggregates all all repos.
 #
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: artifacts-rpms-openshift-origin
+  namespace: ci-rpms
+spec:
+  to:
+    kind: Service
+    name: artifacts-rpms-openshift-origin
+  tls:
+    termination: Edge
+    insecureEdgeTerminationPolicy: Redirect
+---
 apiVersion: v1
-kind: List
-items:
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
-    name: artifacts-rpms-openshift-origin
-    namespace: ci-rpms
-  spec:
-    to:
-      kind: Service
-      name: artifacts-rpms-openshift-origin
-    tls:
-      termination: Edge
-      insecureEdgeTerminationPolicy: Redirect
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: artifacts-rpms-openshift-origin
-    namespace: ci-rpms
-  spec:
-    selector:
+kind: Service
+metadata:
+  name: artifacts-rpms-openshift-origin
+  namespace: ci-rpms
+spec:
+  selector:
+    app: artifacts-rpms-openshift-origin
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: artifacts-rpms-openshift-origin
+  namespace: ci-rpms
+  labels:
+    app: artifacts-rpms-openshift-origin
+  annotations:
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
       app: artifacts-rpms-openshift-origin
-    ports:
-    - port: 80
-      targetPort: 8080
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: artifacts-rpms-openshift-origin
-    namespace: ci-rpms
-    labels:
-      app: artifacts-rpms-openshift-origin
-    annotations:
-      keel.sh/matchTag: 'true'
-      keel.sh/policy: force
-      keel.sh/pollSchedule: '@every 5m'
-      keel.sh/trigger: poll
-  spec:
-    replicas: 2
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: artifacts-rpms-openshift-origin
-    template:
-      metadata:
-        labels:
-          app: artifacts-rpms-openshift-origin
-      spec:
-        volumes:
+    spec:
+      volumes:
+      - name: sync
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      - name: run
+        emptyDir: {}
+      containers:
+      - name: mirror
+        ports:
+          - name: http
+            containerPort: 8080
+        volumeMounts:
         - name: sync
-          emptyDir: {}
+          mountPath: /tmp/sync
         - name: cache
-          emptyDir: {}
-        - name: run
-          emptyDir: {}
-        containers:
-        - name: mirror
-          ports:
-            - name: http
-              containerPort: 8080
-          volumeMounts:
-          - name: sync
-            mountPath: /tmp/sync
-          - name: cache
-            mountPath: /tmp/cache
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_content-mirror_latest
-          imagePullPolicy: Always
-          workingDir: /tmp/sync
-          command:
-          - content-mirror
-          - --path=/tmp/config
-          - --max-size=5g
-          - --timeout=30m
-          - /tmp/sync
-        - name: sync-openshift
-          volumeMounts:
-          - name: sync
-            mountPath: /tmp/sync
-          image: "quay.io/centos/centos:7"
-          workingDir: /tmp/sync
-          command:
-          - /bin/bash
-          - -c
-          - |
-            #!/bin/bash
-            set -euo pipefail
-            trap 'jobs -p | xargs -r kill || true; exit 0' TERM
+          mountPath: /tmp/cache
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_content-mirror_latest
+        imagePullPolicy: Always
+        workingDir: /tmp/sync
+        command:
+        - content-mirror
+        - --path=/tmp/config
+        - --max-size=5g
+        - --timeout=30m
+        - /tmp/sync
+      - name: sync-openshift
+        volumeMounts:
+        - name: sync
+          mountPath: /tmp/sync
+        image: "quay.io/centos/centos:7"
+        workingDir: /tmp/sync
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          set -euo pipefail
+          trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
-            while true; do
-              cat <<END >/tmp/openshift.repo
-            [openshift-origin-v3.11]
-            name = openshift-origin-v3.11
-            baseurl = http://artifacts-openshift-origin-release-3-11.ci-rpms:80/repo
-            gpgcheck = 0
-            [openshift-origin-v4.0]
-            name = openshift-origin-v4.0
-            baseurl = http://artifacts-openshift-origin-release-4-0.ci-rpms:80/repo
-            gpgcheck = 0
-            [openshift-origin-v4.1]
-            name = openshift-origin-v4.1
-            baseurl = http://artifacts-openshift-origin-release-4-1.ci-rpms:80/repo
-            gpgcheck = 0
-            [openshift-origin-v4.2]
-            name = openshift-origin-v4.2
-            baseurl = http://artifacts-openshift-origin-release-4-2.ci-rpms:80/repo
-            gpgcheck = 0
-            [openshift-4.0]
-            name = openshift-4.0
-            baseurl = http://artifacts-openshift-origin-release-4-0.ci-rpms:80/repo
-            gpgcheck = 0
-            END
-              if ! cmp -s /tmp/openshift.repo /tmp/sync/openshift.repo; then
-                cp -f /tmp/openshift.repo /tmp/sync/openshift.repo
-              fi
-              sleep 180 & wait
-            done
+          while true; do
+            cat <<END >/tmp/openshift.repo
+          [openshift-origin-v3.11]
+          name = openshift-origin-v3.11
+          baseurl = http://artifacts-openshift-origin-release-3-11.ci-rpms:80/repo
+          gpgcheck = 0
+          [openshift-origin-v4.0]
+          name = openshift-origin-v4.0
+          baseurl = http://artifacts-openshift-origin-release-4-0.ci-rpms:80/repo
+          gpgcheck = 0
+          [openshift-origin-v4.1]
+          name = openshift-origin-v4.1
+          baseurl = http://artifacts-openshift-origin-release-4-1.ci-rpms:80/repo
+          gpgcheck = 0
+          [openshift-origin-v4.2]
+          name = openshift-origin-v4.2
+          baseurl = http://artifacts-openshift-origin-release-4-2.ci-rpms:80/repo
+          gpgcheck = 0
+          [openshift-4.0]
+          name = openshift-4.0
+          baseurl = http://artifacts-openshift-origin-release-4-0.ci-rpms:80/repo
+          gpgcheck = 0
+          END
+            if ! cmp -s /tmp/openshift.repo /tmp/sync/openshift.repo; then
+              cp -f /tmp/openshift.repo /tmp/sync/openshift.repo
+            fi
+            sleep 180 & wait
+          done
