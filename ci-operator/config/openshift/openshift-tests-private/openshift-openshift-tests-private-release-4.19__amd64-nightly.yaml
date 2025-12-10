@@ -3035,8 +3035,8 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
-- as: vsphere-ipi-amd-f30-netobserv-techpreview
-  cron: 26 14 12 * *
+- as: vsphere-ipi-amd-f28-netobserv-techpreview
+  cron: 36 2 4 * *
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -3046,15 +3046,14 @@ tests:
       TEST_SCENARIOS: "77894"
       TEST_TIMEOUT: "55"
     test:
-    - ref: idp-htpasswd
     - ref: cucushift-pre
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-vsphere-ipi
-- as: baremetalds-ipi-ovn-dualstack-primaryv6-f30-netobserv
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-netobserv
   capabilities:
   - intranet
-  cron: 26 14 12 * *
+  cron: 43 12 12 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -3065,17 +3064,29 @@ tests:
         NETWORK_TYPE=OVNKubernetes
       TEST_FILTERS: Network_Observability
       TEST_IMPORTANCE: .*
-      TEST_SCENARIOS: 76537|82637|53844|85887
+      TEST_SCENARIOS: with VMs|53844
       TEST_TIMEOUT: "55"
     test:
     - ref: netobserv-apply-redhat-operators
-    - ref: netobserv-deploy-nfs-provisioner
-    - ref: netobserv-enable-full-ipsec
-    - ref: idp-htpasswd
+    - ref: baremetal-lab-nfs-provisioner
     - ref: cucushift-pre
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: vsphere-ipi-amd-f28-netobserv-ipsec
+  cron: 41 21 2 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: "82637"
+      TEST_TIMEOUT: "55"
+    test:
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
 - as: vsphere-ipi-longduration-mco-fips-proxy-g1-f14
   cron: 41 0 12,28 * *
   steps:

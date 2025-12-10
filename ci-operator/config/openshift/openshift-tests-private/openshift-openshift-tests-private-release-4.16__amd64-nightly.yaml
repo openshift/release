@@ -15,6 +15,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: cli
+  cli-jq:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
   cluster-api-actuator-pkg-test:
     name: cluster-api-actuator-pkg-test
     namespace: ci
@@ -3261,6 +3265,43 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-install-disconnected
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-netobserv
+  capabilities:
+  - intranet
+  cron: 4 14 4 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: with VMs|53844
+      TEST_TIMEOUT: "55"
+    test:
+    - ref: netobserv-apply-redhat-operators
+    - ref: baremetal-lab-nfs-provisioner
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: vsphere-ipi-amd-f28-netobserv-ipsec
+  cron: 24 15 13 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: "82637"
+      TEST_TIMEOUT: "55"
+    test:
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
 zz_generated_metadata:
   branch: release-4.16
   org: openshift
