@@ -114,43 +114,13 @@ oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=
 
 echo "⏳ Waiting for all pods in openshift-cnv to become Running..."
 
-TIMEOUT=900   # 15 minutes
-INTERVAL=10
+oc wait pod \
+  -n openshift-cnv \
+  --all \
+  --for=condition=Ready \
+  --timeout=15m
 
-echo "⏳ Waiting for all pods in openshift-cnv to become Running..."
-
-for ((i=0; i<=TIMEOUT; i+=INTERVAL)); do
-
-    # Count pods NOT in Running
-    NOT_READY=$(
-      oc get pods -n openshift-cnv --no-headers 2>/dev/null \
-      | awk '{print $3}' \
-      | grep -v 'Running' || true \
-      | wc -l
-    )
-
-    # Count total pods
-    TOTAL=$(oc get pods -n openshift-cnv --no-headers 2>/dev/null | wc -l)
-
-    # Success condition
-    if [[ $TOTAL -gt 0 && $NOT_READY -eq 0 ]]; then
-        echo "✅ All pods in openshift-cnv are Running."
-        break
-    fi
-
-    echo "Still waiting... $NOT_READY pods not ready yet (checked $i sec)"
-    sleep $INTERVAL
-done
-
-echo "CNV pod check finished successfully."
-
-# Final validation after timeout
-if [[ $NOT_READY -ne 0 ]]; then
-    echo "❌ virtualization operator installation failed — some pods are not running."
-    oc get pods -n openshift-cnv
-    exit 1
-fi
-
+echo "✅ All pods in openshift-cnv are Ready."
 
 echo "Installing VM console logger in order to aid debugging potential VM boot issues"
 oc apply -f https://raw.githubusercontent.com/davidvossel/kubevirt-console-debugger/main/kubevirt-console-logger.yaml
