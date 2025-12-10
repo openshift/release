@@ -1,52 +1,80 @@
-# Openshift CNV+ODF Interop Interoperability Tests<!-- omit from toc -->
+# OpenShift Virtualization Interop Testing<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
 - [General Information](#general-information)
 - [Purpose](#purpose)
+- [Test Scenarios](#test-scenarios)
+  - [CNV+ODF Interop Tests](#cnvodf-interop-tests)
+  - [Goldman Sachs Configured Bare-Metal Cluster OpenShift Virtualization Tests](#goldman-sachs-configured-bare-metal-cluster-openshift-virtualization-tests)
 - [Process](#process)
   - [Cluster Provisioning and Deprovisioning: `firewatch-ipi-aws`](#cluster-provisioning-and-deprovisioning-firewatch-ipi-aws)
-  - [Test Setup, Execution, and Reporting Results - Openshift GitOps-interop-aws](#test-setup-execution-and-reporting-results---openshift-gitops-interop-aws)
-- [Prerequisite(s)](#prerequisites)
+  - [Test Execution Workflows](#test-execution-workflows)
+    - [CNV+ODF Test Execution](#cnvodf-test-execution)
+- [Prerequisites](#prerequisites)
   - [Environment Variables](#environment-variables)
+    - [Common Variables](#common-variables)
 - [IBM Fusion Access Operator Interop Tests](#ibm-fusion-access-operator-interop-tests)
   - [Test Configurations](#test-configurations)
   - [Test Chains](#test-chains)
 
 ## General Information
 
-- **Repository**: [RedHatQE/interop-testing](https://github.com/RedHatQE/interop-testing)
+- **CNV+ODF Repository**: [RedHatQE/interop-testing](https://github.com/RedHatQE/interop-testing)
+  - **Repository Maintained by**: Red Hat QE Interop Team
+  - **Test Infrastructure**: AWS CSPI QE cluster profile
+- **Goldman Sachs Bare-Metal Test Repository**: [RedHatQE/openshift-virtualization-tests](https://github.com/RedHatQE/openshift-virtualization-tests) 
 
 ## Purpose
 
-To provision the necessary infrastructure and using that infrastructure to execute Openshift CNV_ODF interop tests.
-The results of these tests will be reported to the appropriate sources following execution.
+To provision the necessary infrastructure and execute OpenShift Virtualization interoperability tests for various operator combinations, configurations, and scenarios. The results of these tests are reported to appropriate sources following execution.
 
-## Process
+## Test Scenarios
 
-The Openshift CNV+ODF Interop scenario can be broken into the following basic steps:
+### CNV+ODF Interop Tests
 
+Tests the interoperability between Containerized Data Virtualization (CNV) and OpenShift Data Foundation (ODF) operators.
+
+**Supported Versions:**
+- OCP 4.18+
+- CNV 4.18+
+- ODF 4.18+
+
+**Test Flow:**
 1. Provision a test cluster on AWS
 2. Install the ODF and CNV Operators
-3. Setup ODF StorageSystem and used it a the default StorageClass for CNV
-3. Execute tests and archive results
-4. Deprovision a test cluster.
+3. Setup ODF StorageSystem and use it as the default StorageClass for CNV
+4. Execute CNV tests with ODF storage backend
+5. Execute OpenShift Virtualization tests
+6. Archive results and deprovision cluster
+
+### Goldman Sachs Configured Bare-Metal Cluster OpenShift Virtualization Tests 
+
+Refer to [`gs-baremetal-localnet-test`](../../../step-registry/gs-baremetal/localnet-test/gs-baremetal-localnet-test-ref.yaml) and [`README`](../../../step-registry/gs-baremetal/localnet-test/README.md) to execute OpenShift Virtualization Networking tests on bare-metal cluster configured for Goldman Sachs
+
+
+## Process
 
 ### Cluster Provisioning and Deprovisioning: `firewatch-ipi-aws`
 
 Please see the [`firewatch-ipi-aws`](https://steps.ci.openshift.org/workflow/firewatch-ipi-aws) documentation for more information on this workflow. This workflow is not maintained by the Interop QE team.
 
-### Test Setup, Execution, and Reporting Results - `Openshift GitOps-interop-aws`
+### Test Execution Workflows
 
-Following the test cluster being provisioned, the following steps are executed in this order:
+#### CNV+ODF Test Execution
 
-1. [`deploy-odf`](../../../step-registry/interop-tests/deploy-odf/README.md)
-1. [`ocs-tests`](../../../step-registry/interop-tests/ocs-tests/README.md)
-1. [`deploy-cnv`](../../../step-registry/interop-tests/deploy-cnv/README.md)
-1. [`cnv-tests-e2e-deploy`](../../../step-registry/interop-tests/cnv-tests-e2e-deploy/README.md)
+Following cluster provisioning, the following steps are executed in order:
 
-## Prerequisite(s)
+1. [`deploy-odf`](../../../step-registry/interop-tests/deploy-odf/interop-tests-deploy-odf-ref.yaml) - Deploy ODF operator and storage system
+2. [`ocs-tests`](../../../step-registry/interop-tests/ocs-tests/interop-tests-ocs-tests-ref.yaml) - Execute ODF storage tests
+3. [`deploy-cnv`](../../../step-registry/interop-tests/deploy-cnv/interop-tests-deploy-cnv-ref.yaml) - Deploy CNV operator
+4. [`cnv-tests-e2e-deploy`](../../../step-registry/interop-tests/cnv-tests-e2e-deploy/interop-tests-cnv-tests-e2e-deploy-ref.yaml) - Execute CNV e2e tests
+5. [`openshift-virtualization-tests`](../../../step-registry/interop-tests/openshift-virtualization-tests/interop-tests-openshift-virtualization-tests-ref.yaml) - Execute OpenShift Virtualization tests
+
+## Prerequisites
 
 ### Environment Variables
+
+#### Common Variables
 
 - `BASE_DOMAIN`
   - **Definition**: A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
