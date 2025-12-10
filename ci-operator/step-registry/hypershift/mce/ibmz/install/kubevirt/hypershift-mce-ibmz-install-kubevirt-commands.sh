@@ -117,19 +117,22 @@ echo "⏳ Waiting for all pods in openshift-cnv to become Running..."
 TIMEOUT=900   # 15 minutes
 INTERVAL=10
 
+echo "⏳ Waiting for all pods in openshift-cnv to become Running..."
+
 for ((i=0; i<=TIMEOUT; i+=INTERVAL)); do
 
-    # Count pods NOT in Running or Completed
-    NOT_READY=$(oc get pods -n openshift-cnv --no-headers 2>/dev/null \
-  | awk '{print $3}' \
-  | grep -v 'Running' \
-  | wc -l)
-
-
+    # Count pods NOT in Running
+    NOT_READY=$(
+      oc get pods -n openshift-cnv --no-headers 2>/dev/null \
+      | awk '{print $3}' \
+      | grep -v 'Running' || true \
+      | wc -l
+    )
 
     # Count total pods
     TOTAL=$(oc get pods -n openshift-cnv --no-headers 2>/dev/null | wc -l)
 
+    # Success condition
     if [[ $TOTAL -gt 0 && $NOT_READY -eq 0 ]]; then
         echo "✅ All pods in openshift-cnv are Running."
         break
@@ -138,6 +141,8 @@ for ((i=0; i<=TIMEOUT; i+=INTERVAL)); do
     echo "Still waiting... $NOT_READY pods not ready yet (checked $i sec)"
     sleep $INTERVAL
 done
+
+echo "CNV pod check finished successfully."
 
 # Final validation after timeout
 if [[ $NOT_READY -ne 0 ]]; then

@@ -157,6 +157,7 @@ while read -r VSI_NAME VSI_ID VSI_ZONE; do
   echo "Attaching volume to VSI..."
   ATTACH_JSON=$(ibmcloud is instance-volume-attachment-add "$VSI_NAME" "$VSI_ID" \
                   --volume "$VOLUME_ID" \
+                  --auto-delete true \
                   --json)
 
   ATTACH_ID=$(echo "$ATTACH_JSON" | jq -r '.id')
