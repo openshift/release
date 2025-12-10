@@ -252,39 +252,16 @@ oc create secret generic "${SECRET_NAME}" \
     --from-literal=secret-key="${MINIO_SECRET_KEY}" \
     --dry-run=client -o yaml | oc apply -f -
 
-echo "========== Creating MinIO Proxy Service in Application Namespace =========="
-# Create a Service in the app namespace that forwards to MinIO in the minio namespace
-# This allows the helm chart to use a local service name without cross-namespace complexity
-# The service uses ExternalName to reference the MinIO service in the minio namespace
-echo "Creating minio-proxy service in ${APP_NAMESPACE}..."
-cat <<EOF | oc apply -f -
-apiVersion: v1
-kind: Service
-metadata:
-  name: minio-proxy
-  namespace: ${APP_NAMESPACE}
-spec:
-  type: ExternalName
-  externalName: minio.${MINIO_NAMESPACE}.svc.cluster.local
-  ports:
-  - port: 9000
-    targetPort: 9000
-    protocol: TCP
-    name: api
-EOF
-
-echo "MinIO proxy service created: minio-proxy.${APP_NAMESPACE}.svc:9000 -> minio.${MINIO_NAMESPACE}.svc:9000"
-
 # Save namespace info for the e2e tests
-# MINIO_ENDPOINT includes the port because the MinIO Go client expects host:port format
-# The proxy service forwards to the actual MinIO service
+# MINIO_ENDPOINT is just the hostname - the chart will add the port via odf.port
+# We use the cross-namespace DNS name directly since ExternalName doesn't help with port mapping
 echo "MINIO_NAMESPACE=${MINIO_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
 echo "APP_NAMESPACE=${APP_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
-echo "MINIO_ENDPOINT=minio-proxy.${APP_NAMESPACE}.svc:9000" >> "${SHARED_DIR}/minio-env"
+echo "MINIO_ENDPOINT=minio.${MINIO_NAMESPACE}.svc" >> "${SHARED_DIR}/minio-env"
 echo "S3_ENDPOINT=http://minio.${MINIO_NAMESPACE}.svc:9000" >> "${SHARED_DIR}/minio-env"
 
-# Also update the minio-endpoint file (with port for MinIO client compatibility)
-echo "minio-proxy.${APP_NAMESPACE}.svc:9000" > "${SHARED_DIR}/minio-endpoint"
+# minio-endpoint file (just hostname, no port)
+echo "minio.${MINIO_NAMESPACE}.svc" > "${SHARED_DIR}/minio-endpoint"
 
 echo "ODF credentials secret created successfully in ${APP_NAMESPACE} namespace"
 echo "MinIO is accessible from ${APP_NAMESPACE} at: http://minio-proxy.${APP_NAMESPACE}.svc:9000"

@@ -27,7 +27,7 @@ if ! command -v kubectl &> /dev/null; then
     export PATH="/tmp:${PATH}"
     echo "kubectl ${KUBECTL_VERSION} installed successfully"
 else
-    echo "kubectl is already installed"
+    echo "kubectl is already installed
 fi
 
 # Install helm if not available
@@ -283,17 +283,21 @@ if [[ "$*" == *"cost-onprem"* ]] && { [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"
     echo "[helm-wrapper] Detected cost-onprem chart - injecting MinIO storage configuration..."
     # IMPORTANT: Do NOT set global.storageType=minio as that changes isOpenShift detection
     # which breaks security contexts (runAsUser: 1000 not allowed on OpenShift)
-    # Instead, set odf.endpoint to point to our MinIO proxy service, which bypasses the NooBaa lookup
     #
-    # The minio-deploy step creates a proxy service (minio-proxy) in the app namespace that
-    # forwards to the actual MinIO service. This allows us to use a simple hostname without port
-    # in odf.endpoint, while odf.port specifies the port separately.
+    # The chart uses odf.endpoint for BOTH:
+    # 1. STORAGE_ENDPOINT env var - MinIO client expects host:port format
+    # 2. wait-for-storage TCP check - uses /dev/tcp/<endpoint>/<port>
+    #
+    # To satisfy both, we set:
+    # - odf.endpoint = host:port (for MinIO client)
+    # - odf.port = "" (empty, so TCP check becomes /dev/tcp/host:port/ which works)
     #
     # Uses MINIO_ENDPOINT, MINIO_PORT, and MINIO_BUCKET env vars (configurable in ref.yaml)
-    echo "[helm-wrapper] Using MinIO endpoint: ${MINIO_ENDPOINT}:${MINIO_PORT}"
+    FULL_ENDPOINT="${MINIO_ENDPOINT}:${MINIO_PORT}"
+    echo "[helm-wrapper] Using MinIO endpoint: ${FULL_ENDPOINT}"
     exec "$ORIGINAL_HELM" "$@" \
-        --set "odf.endpoint=${MINIO_ENDPOINT}" \
-        --set "odf.port=${MINIO_PORT}" \
+        --set "odf.endpoint=${FULL_ENDPOINT}" \
+        --set "odf.port=" \
         --set "odf.useSSL=false" \
         --set "odf.bucket=${MINIO_BUCKET}"
 else
