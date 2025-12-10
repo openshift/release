@@ -12,20 +12,15 @@ set -o pipefail
 # Test Cases:
 #   1. Deploy OPP Application
 #      - Deploys httpd-example application via deploy.sh
+#      - Waits for ACM policies to become Compliant
 #      - Waits for build completion and deployment availability
 #      - Verifies image is pushed to Quay registry (OPP integration)
 #      - If ANY step fails, test fails and subsequent cases are skipped
 #
-#   2. Verify Policy Compliance
-#      - Waits for ACM policies to become Compliant
-#      - Checks policy-example-httpd and policy-build-example-httpd
-#      - Only runs if Case 1 passes
-#      - Failure does not block Case 3
-#
-#   3. Test ACS Integration
+#   2. Test ACS Integration
 #      - Queries ACS API for httpd-example image
 #      - Validates image appears in ACS with CVE scanning results
-#      - Only runs if Case 1 passes (runs regardless of Case 2 result)
+#      - Only runs if Case 1 passes
 #
 # Test Reporting:
 #   - Results are recorded in JUnit XML format
