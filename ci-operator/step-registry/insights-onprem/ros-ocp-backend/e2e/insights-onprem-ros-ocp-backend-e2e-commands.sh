@@ -276,11 +276,12 @@ if [[ "$*" == *"cost-onprem"* ]] && { [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"
     # IMPORTANT: Do NOT set global.storageType=minio as that changes isOpenShift detection
     # which breaks security contexts (runAsUser: 1000 not allowed on OpenShift)
     # Instead, set odf.endpoint to point to our MinIO service, which bypasses the NooBaa lookup
+    # Uses MINIO_ENDPOINT, MINIO_PORT, and MINIO_BUCKET env vars (configurable in ref.yaml)
     exec "$ORIGINAL_HELM" "$@" \
-        --set "odf.endpoint=minio-service.minio.svc.cluster.local" \
-        --set "odf.port=9000" \
+        --set "odf.endpoint=${MINIO_ENDPOINT}" \
+        --set "odf.port=${MINIO_PORT}" \
         --set "odf.useSSL=false" \
-        --set "odf.bucket=ros-data"
+        --set "odf.bucket=${MINIO_BUCKET}"
 else
     # For all other helm commands (repo add, strimzi install, etc.), pass through unchanged
     exec "$ORIGINAL_HELM" "$@"
