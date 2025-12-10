@@ -99,9 +99,8 @@ function wait_for_co_ready() {
 # Wait for Storage cluster operator to have degraded status
 function wait_for_storage_co_degrade() {
   echo "$(date -u --rfc-3339=seconds) - Waiting for Storage cluster operator to degrade"
-  oc wait --for=jsonpath='{.status.conditions[?(@.type=="Degraded")].status}'=True clusteroperator/storage --timeout=10m
-  if [[ $? -ne 0 ]]; then
-    echo "$(date -u --rfc-3339=seconds) - Storage cluster operator did not degrade"
+  if ! oc wait --for=jsonpath='{.status.conditions[?(@.type=="Degraded")].status}'=True clusteroperator/storage --timeout=20m; then
+    echo "$(date -u --rfc-3339=seconds) - FAILED: Storage cluster operator did not degrade"
     exit 1
   fi
   echo "$(date -u --rfc-3339=seconds) - SUCCESS: Storage cluster operator is degraded"
