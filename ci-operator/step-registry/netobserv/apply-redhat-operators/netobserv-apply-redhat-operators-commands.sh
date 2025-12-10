@@ -104,7 +104,7 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     fi
 
     POD_PHASE=$(oc get pod "$POD_NAME" -n openshift-marketplace -o jsonpath='{.status.phase}' 2>/dev/null || true)
-    POD_READY=$(oc get pod "$POD_NAME" -n openshift-marketplace -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | true)
+    POD_READY=$(oc get pod "$POD_NAME" -n openshift-marketplace -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
 
     echo "Catalog pod: ${POD_NAME}, Phase: ${POD_PHASE}, Ready: ${POD_READY} (${ELAPSED}s/${TIMEOUT}s)"
 
