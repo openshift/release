@@ -90,9 +90,15 @@ echo "========== Installing Cost Management Operator =========="
 # This ensures the operator is installed with whatever version is available in the catalog
 # The upstream setup-cost-mgmt-tls.sh will skip installation if it's already present
 
+# Check if we should skip operator installation
+if [ "${SKIP_COST_MGMT_INSTALL:-false}" == "true" ]; then
+    echo "SKIP_COST_MGMT_INSTALL=true, skipping Cost Management Operator installation"
+else
+
 # Use the application namespace (defaults to cost-onprem)
 COST_MGMT_NAMESPACE="${NAMESPACE:-cost-onprem}"
 echo "Installing Cost Management Operator in namespace: ${COST_MGMT_NAMESPACE}"
+echo "Channel: ${COST_MGMT_CHANNEL:-stable}, Source: ${COST_MGMT_SOURCE:-redhat-operators}"
 
 # List available versions of the Cost Management Operator
 echo "Checking available versions of costmanagement-metrics-operator in catalog..."
@@ -132,15 +138,15 @@ metadata:
   name: costmanagement-metrics-operator
   namespace: ${COST_MGMT_NAMESPACE}
 spec:
-  channel: stable
+  channel: ${COST_MGMT_CHANNEL:-stable}
   name: costmanagement-metrics-operator
-  source: redhat-operators
+  source: ${COST_MGMT_SOURCE:-redhat-operators}
   sourceNamespace: openshift-marketplace
 EOF
 
     echo "Waiting for Cost Management Operator to be ready..."
-    # Wait for the CSV to be installed (up to 5 minutes)
-    TIMEOUT=300
+    # Wait for the CSV to be installed
+    TIMEOUT="${OPERATOR_INSTALL_TIMEOUT:-300}"
     ELAPSED=0
     while [ $ELAPSED -lt $TIMEOUT ]; do
         if oc get csv -n "${COST_MGMT_NAMESPACE}" 2>/dev/null | grep -q "costmanagement-metrics-operator.*Succeeded"; then
@@ -158,6 +164,8 @@ EOF
         oc get subscription -n "${COST_MGMT_NAMESPACE}" -o yaml || true
     fi
 fi
+
+fi  # end SKIP_COST_MGMT_INSTALL check
 
 echo "========== Image Tag Resolution =========="
 
@@ -192,8 +200,8 @@ if [ "${JOB_TYPE}" == "presubmit" ] && [[ "${JOB_NAME}" != rehearse-* ]]; then
     REPO_PATH=$(echo "${QUAY_REPO}" | sed 's|^quay.io/||')
     
     # Timeout configuration for waiting for Docker image availability
-    MAX_WAIT_TIME_SECONDS=$((60*60))  # Maximum wait time: 60 minutes
-    POLL_INTERVAL_SECONDS=60          # Check every 60 seconds
+    MAX_WAIT_TIME_SECONDS="${IMAGE_WAIT_TIMEOUT:-3600}"
+    POLL_INTERVAL_SECONDS="${IMAGE_POLL_INTERVAL:-60}"
     ELAPSED_TIME=0
     
     echo "Waiting for image ${IMAGE_NAME} to be available..."

@@ -222,8 +222,9 @@ echo "MinIO Console endpoint: http://minio.${MINIO_NAMESPACE}.svc:9001"
 echo "Buckets created: ros-data, insights-upload-perma, koku-bucket"
 
 # Save MinIO configuration to SHARED_DIR for use by other steps
+# Note: minio-endpoint is just the hostname (no protocol or port)
 echo "${MINIO_NAMESPACE}" > "${SHARED_DIR}/minio-namespace"
-echo "minio.${MINIO_NAMESPACE}.svc:9000" > "${SHARED_DIR}/minio-endpoint"
+echo "minio.${MINIO_NAMESPACE}.svc" > "${SHARED_DIR}/minio-endpoint"
 echo "${MINIO_ACCESS_KEY}" > "${SHARED_DIR}/minio-access-key"
 echo "${MINIO_SECRET_KEY}" > "${SHARED_DIR}/minio-secret-key"
 
@@ -252,9 +253,11 @@ oc create secret generic "${SECRET_NAME}" \
     --dry-run=client -o yaml | oc apply -f -
 
 # Save namespace info for the e2e tests
+# Note: MINIO_ENDPOINT should be just the hostname (no protocol or port)
+# The helm chart will add the port separately via odf.port
 echo "MINIO_NAMESPACE=${MINIO_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
 echo "APP_NAMESPACE=${APP_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
-echo "MINIO_ENDPOINT=http://minio.${MINIO_NAMESPACE}.svc:9000" >> "${SHARED_DIR}/minio-env"
+echo "MINIO_ENDPOINT=minio.${MINIO_NAMESPACE}.svc" >> "${SHARED_DIR}/minio-env"
 echo "S3_ENDPOINT=http://minio.${MINIO_NAMESPACE}.svc:9000" >> "${SHARED_DIR}/minio-env"
 
 echo "ODF credentials secret created successfully in ${APP_NAMESPACE} namespace"
