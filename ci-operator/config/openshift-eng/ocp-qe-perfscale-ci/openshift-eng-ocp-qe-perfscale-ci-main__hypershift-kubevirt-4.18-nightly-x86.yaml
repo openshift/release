@@ -1,0 +1,47 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  upi-installer:
+    name: "4.18"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: hcp-kubevirt-ovn-pod-stress-ocpbugs-66075
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-hcp
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: registry.build07.ci.openshift.org/ci-ln-l477g5k/release:latest
+      HYPERSHIFT_NODE_COUNT: "1"
+      HYPERSHIFT_NODE_CPU_CORES: "16"
+      HYPERSHIFT_NODE_MEMORY: 64Gi
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.14
+    workflow: hypershift-kubevirt-baremetalds-conformance
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: hypershift-kubevirt-4.18-nightly-x86
