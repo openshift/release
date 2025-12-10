@@ -855,6 +855,8 @@ do
   wait "$!"
   ret="$?"
   echo "Installer exit with code $ret"
+  echo "Debug by Jinyun"
+  sleep 3600
 
   tries=$((tries+1))
 done
