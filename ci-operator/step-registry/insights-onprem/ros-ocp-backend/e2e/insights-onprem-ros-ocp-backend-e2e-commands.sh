@@ -283,8 +283,14 @@ if [[ "$*" == *"cost-onprem"* ]] && { [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"
     echo "[helm-wrapper] Detected cost-onprem chart - injecting MinIO storage configuration..."
     # IMPORTANT: Do NOT set global.storageType=minio as that changes isOpenShift detection
     # which breaks security contexts (runAsUser: 1000 not allowed on OpenShift)
-    # Instead, set odf.endpoint to point to our MinIO service, which bypasses the NooBaa lookup
+    # Instead, set odf.endpoint to point to our MinIO proxy service, which bypasses the NooBaa lookup
+    #
+    # The minio-deploy step creates a proxy service (minio-proxy) in the app namespace that
+    # forwards to the actual MinIO service. This allows us to use a simple hostname without port
+    # in odf.endpoint, while odf.port specifies the port separately.
+    #
     # Uses MINIO_ENDPOINT, MINIO_PORT, and MINIO_BUCKET env vars (configurable in ref.yaml)
+    echo "[helm-wrapper] Using MinIO endpoint: ${MINIO_ENDPOINT}:${MINIO_PORT}"
     exec "$ORIGINAL_HELM" "$@" \
         --set "odf.endpoint=${MINIO_ENDPOINT}" \
         --set "odf.port=${MINIO_PORT}" \
