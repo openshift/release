@@ -17,12 +17,7 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Currently the PinnedImageSet feature is only available through TechPreviewNoUpgrade featureset.
-# Remove this check once the PinnedImageSet feature becomes GA
-if [ "$(oc get featuregate cluster -ojsonpath='{.spec.featureSet}')" != "TechPreviewNoUpgrade" ]; then
-    echo "This step can only be executed in clusters with TechPreviewUpgrade featureset"
-    exit 255
-fi
+# PinnedImageSet feature is now GA - TechPreview check removed
 
 # If it's serial upgrades then override-upgrade file will store the release and overrides OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
 # upgrade-edge file expects a comma separated releases list like target_release1,target_release2,...
@@ -201,7 +196,10 @@ done
 if [ "${MCO_CONF_DAY2_PINTARGETRELEASE_REMOVE_PULLSECRET,,}" == "true" ]; then
     echo "Configure pull-secret to be empty!"
     if oc get secret pull-secret -n openshift-config; then
-        oc set data secret/pull-secret -n openshift-config .dockerconfigjson={}
+        # Create valid empty dockerconfig JSON and update the secret
+        # The pull-secret must be valid JSON with empty auths, not null or bare {}
+        EMPTY_DOCKERCONFIG=$(echo -n '{"auths":{}}' | base64 -w0)
+        oc patch secret/pull-secret -n openshift-config -p "{\"data\":{\".dockerconfigjson\":\"${EMPTY_DOCKERCONFIG}\"}}"
 
         # Wait for MCP to start updating
         oc wait mcp master --for='condition=UPDATING=True' --timeout=300s
@@ -215,6 +213,22 @@ if [ "${MCO_CONF_DAY2_PINTARGETRELEASE_REMOVE_PULLSECRET,,}" == "true" ]; then
         exit 255
     fi
 fi
+
+# Set ImageStreamTags to reference mode for debugging/validation purposes.
+# This forces these images to be pulled from external registry or use pinned cached versions
+# rather than the internal registry. This validates that pinned images are accessible,
+# especially after the pull-secret has been removed. Useful for debugging with tools like
+# oc debug, must-gather, and network-tools to ensure image pinning is working correctly.
+image_list=("cli" "cli-artifacts" "installer" "installer-artifacts" "tests" "tools" "must-gather" "oauth-proxy" "network-tools")
+
+for img in "${image_list[@]}"; do
+  if oc get imagestreamtags ${img}:latest -n openshift &>/dev/null; then
+    echo "Patching imagestreamtag ${img}:latest to reference mode"
+    oc patch imagestreamtags ${img}:latest -n openshift --type json -p '[{"op": "add", "path": "/tag/reference", "value": true}]'
+  else
+    echo "Skipping imagestreamtag ${img}:latest (not found)"
+  fi
+done
 
 create_passed_junit "$JUNIT_SUITE" "$JUNIT_TEST"
 

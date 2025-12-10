@@ -1,108 +1,108 @@
 # Run an RPM server for release artifacts
 #
-kind: List
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: artifacts-openshift-origin-release-4-1
+  namespace: ci-rpms
+spec:
+  to:
+    kind: Service
+    name: artifacts-openshift-origin-release-4-1
+  tls:
+    termination: Edge
+    insecureEdgeTerminationPolicy: Redirect
+---
 apiVersion: v1
-items:
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
-    name: artifacts-openshift-origin-release-4-1
-    namespace: ci-rpms
-  spec:
-    to:
-      kind: Service
-      name: artifacts-openshift-origin-release-4-1
-    tls:
-      termination: Edge
-      insecureEdgeTerminationPolicy: Redirect
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: artifacts-openshift-origin-release-4-1
-    namespace: ci-rpms
-  spec:
-    selector:
+kind: Service
+metadata:
+  name: artifacts-openshift-origin-release-4-1
+  namespace: ci-rpms
+spec:
+  selector:
+    app: artifacts-openshift-origin-release-4-1
+  ports:
+  - port: 80
+    targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: artifacts-openshift-origin-release-4-1
+  namespace: ci-rpms
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","namespace":"ocp","name":"4.1:artifacts"},"fieldPath":"spec.template.spec.containers[?(@.name==\"srv\")].image"}]'
+spec:
+  replicas: 0
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
       app: artifacts-openshift-origin-release-4-1
-    ports:
-    - port: 80
-      targetPort: 8080
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: artifacts-openshift-origin-release-4-1
-    namespace: ci-rpms
-    annotations:
-      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","namespace":"ocp","name":"4.1:artifacts"},"fieldPath":"spec.template.spec.containers[?(@.name==\"srv\")].image"}]'
-  spec:
-    replicas: 0
-    revisionHistoryLimit: 10
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: artifacts-openshift-origin-release-4-1
-    template:
-      metadata:
-        labels:
-          app: artifacts-openshift-origin-release-4-1
-      spec:
-        containers:
-        - name: srv
-          image: " "
-          command:
-          - /bin/bash
-          - -c
-          args:
-          - |
-            #!/bin/bash
-            cat <<END >>/tmp/serve.py
-            import time, threading, socket, SocketServer, BaseHTTPServer, SimpleHTTPServer
+    spec:
+      containers:
+      - name: srv
+        image: " "
+        command:
+        - /bin/bash
+        - -c
+        args:
+        - |
+          #!/bin/bash
+          cat <<END >>/tmp/serve.py
+          import time, threading, socket, SocketServer, BaseHTTPServer, SimpleHTTPServer
 
-            # Create socket
-            addr = ('', 8080)
-            sock = socket.socket (socket.AF_INET, socket.SOCK_STREAM)
-            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.bind(addr)
-            sock.listen(5)
+          # Create socket
+          addr = ('', 8080)
+          sock = socket.socket (socket.AF_INET, socket.SOCK_STREAM)
+          sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+          sock.bind(addr)
+          sock.listen(5)
 
-            # Launch multiple listeners as threads
-            class Thread(threading.Thread):
-            	def __init__(self, i):
-            		threading.Thread.__init__(self)
-            		self.i = i
-            		self.daemon = True
-            		self.start()
+          # Launch multiple listeners as threads
+          class Thread(threading.Thread):
+          	def __init__(self, i):
+          		threading.Thread.__init__(self)
+          		self.i = i
+          		self.daemon = True
+          		self.start()
 
-            	def run(self):
-            		httpd = BaseHTTPServer.HTTPServer(addr, SimpleHTTPServer.SimpleHTTPRequestHandler, False)
+          	def run(self):
+          		httpd = BaseHTTPServer.HTTPServer(addr, SimpleHTTPServer.SimpleHTTPRequestHandler, False)
 
-            		# Prevent the HTTP server from re-binding every handler.
-            		# https://stackoverflow.com/questions/46210672/
-            		httpd.socket = sock
-            		httpd.server_bind = self.server_close = lambda self: None
+          		# Prevent the HTTP server from re-binding every handler.
+          		# https://stackoverflow.com/questions/46210672/
+          		httpd.socket = sock
+          		httpd.server_bind = self.server_close = lambda self: None
 
-            		httpd.serve_forever()
+          		httpd.serve_forever()
 
-            [Thread(i) for i in range(100)]
-            time.sleep(9e9)
-            END
-            python /tmp/serve.py
-          ports:
-          - containerPort: 8080
-            protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /
-              port: 8080
-              scheme: HTTP
-          readinessProbe:
-            failureThreshold: 3
-            httpGet:
-              path: /
-              port: 8080
-              scheme: HTTP
-          resources:
-            requests:
-              cpu: 50m
-              memory: 50Mi
-          workingDir: /srv
-        restartPolicy: Always
-        terminationGracePeriodSeconds: 1
+          [Thread(i) for i in range(100)]
+          time.sleep(9e9)
+          END
+          python /tmp/serve.py
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+            scheme: HTTP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /
+            port: 8080
+            scheme: HTTP
+        resources:
+          requests:
+            cpu: 50m
+            memory: 50Mi
+        workingDir: /srv
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 1

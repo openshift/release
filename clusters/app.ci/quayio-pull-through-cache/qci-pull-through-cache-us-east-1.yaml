@@ -1,100 +1,100 @@
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: qci-pull-through-cache-us-east-1
+  namespace: ci
+spec:
+  to:
+    kind: Service
+    name: qci-pull-through-cache-us-east-1
+  tls:
+    termination: Edge
+    insecureEdgeTerminationPolicy: Redirect
+---
 apiVersion: v1
-kind: List
-items:
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
-    name: qci-pull-through-cache-us-east-1
-    namespace: ci
-  spec:
-    to:
-      kind: Service
-      name: qci-pull-through-cache-us-east-1
-    tls:
-      termination: Edge
-      insecureEdgeTerminationPolicy: Redirect
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: qci-pull-through-cache-us-east-1
-    namespace: ci
-  spec:
-    selector:
+kind: Service
+metadata:
+  name: qci-pull-through-cache-us-east-1
+  namespace: ci
+spec:
+  selector:
+    app: qci-pull-through-cache-us-east-1
+  ports:
+  - port: 5000
+    targetPort: 5000
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qci-pull-through-cache-us-east-1
+  namespace: ci
+  labels:
+    app: qci-pull-through-cache-us-east-1
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
       app: qci-pull-through-cache-us-east-1
-    ports:
-    - port: 5000
-      targetPort: 5000
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: qci-pull-through-cache-us-east-1
-    namespace: ci
-    labels:
-      app: qci-pull-through-cache-us-east-1
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-  spec:
-    replicas: 0
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: qci-pull-through-cache-us-east-1
-    template:
-      metadata:
-        labels:
-          app: qci-pull-through-cache-us-east-1
-      spec:
-        tolerations:
-        - key: node-role.kubernetes.io/infra
-          operator: Exists
-        nodeSelector:
-          node-role.kubernetes.io: infra
-        containers:
-        - command:
-          - /tp-entrypoint.sh
-          env:
-          - name: REGISTRY_STORAGE_S3_ACCESSKEY
-            valueFrom:
-              secretKeyRef:
-                name: qci-pull-through-cache-credentials
-                key: AWS_ACCESS_KEY_ID
-          - name: REGISTRY_STORAGE_S3_SECRETKEY
-            valueFrom:
-              secretKeyRef:
-                name: qci-pull-through-cache-credentials
-                key: AWS_SECRET_ACCESS_KEY
-          - name: REGISTRY_STORAGE_S3_REGIONENDPOINT
-            valueFrom:
-              secretKeyRef:
-                name: qci-pull-through-cache-credentials
-                key: AWS_ENDPOINT_URL
-          - name: REGISTRY_STORAGE_S3_BUCKET
-            value: quay-openshift-ci-test
-          - name: REGISTRY_STORAGE_S3_REGION
-            value: us-east-1
-          name: qci-cache
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_docker-registry_tp-2.8.1
-          imagePullPolicy: Always
-          ports:
-            - name: http
-              containerPort: 5000
-          volumeMounts:
-          - mountPath: /etc/quay-io-pull-credentials
-            name: qci-robot-credentials
-          - mountPath: /etc/docker-registry
-            name: config
-        volumes:
-        - name: config
-          configMap:
-            name: qci-pull-through-cache-aws
-        - name: qci-robot-credentials
-          secret:
-            secretName: qci-robot-credentials
-            items:
-            - key: username
-              path: quay_io_username
-            - key: password
-              path: quay_io_password
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/infra
+        operator: Exists
+      nodeSelector:
+        node-role.kubernetes.io: infra
+      containers:
+      - command:
+        - /tp-entrypoint.sh
+        env:
+        - name: REGISTRY_STORAGE_S3_ACCESSKEY
+          valueFrom:
+            secretKeyRef:
+              name: qci-pull-through-cache-credentials
+              key: AWS_ACCESS_KEY_ID
+        - name: REGISTRY_STORAGE_S3_SECRETKEY
+          valueFrom:
+            secretKeyRef:
+              name: qci-pull-through-cache-credentials
+              key: AWS_SECRET_ACCESS_KEY
+        - name: REGISTRY_STORAGE_S3_REGIONENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: qci-pull-through-cache-credentials
+              key: AWS_ENDPOINT_URL
+        - name: REGISTRY_STORAGE_S3_BUCKET
+          value: quay-openshift-ci-test
+        - name: REGISTRY_STORAGE_S3_REGION
+          value: us-east-1
+        name: qci-cache
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_docker-registry_tp-2.8.1
+        imagePullPolicy: Always
+        ports:
+          - name: http
+            containerPort: 5000
+        volumeMounts:
+        - mountPath: /etc/quay-io-pull-credentials
+          name: qci-robot-credentials
+        - mountPath: /etc/docker-registry
+          name: config
+      volumes:
+      - name: config
+        configMap:
+          name: qci-pull-through-cache-aws
+      - name: qci-robot-credentials
+        secret:
+          secretName: qci-robot-credentials
+          items:
+          - key: username
+            path: quay_io_username
+          - key: password
+            path: quay_io_password

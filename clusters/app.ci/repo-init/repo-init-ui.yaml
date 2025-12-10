@@ -1,107 +1,107 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    labels:
+kind: Service
+metadata:
+  namespace: ci
+  labels:
+    app: prow
+    component: repo-init-ui
+  name: repo-init-ui
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: main
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: metrics
+  selector:
+    app: prow
+    component: repo-init-ui
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  labels:
+    app: prow
+    component: repo-init-ui
+  name: repo-init-ui
+  namespace: ci
+spec:
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  port:
+    targetPort: main
+  to:
+    kind: Service
+    name: repo-init-ui
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: repo-init-ui
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
       app: prow
       component: repo-init-ui
-    name: repo-init-ui
-  spec:
-    ports:
-    - name: main
-      port: 80
-      protocol: TCP
-      targetPort: main
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: metrics
-    selector:
-      app: prow
-      component: repo-init-ui
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
-    labels:
-      app: prow
-      component: repo-init-ui
-    name: repo-init-ui
-    namespace: ci
-  spec:
-    tls:
-      insecureEdgeTerminationPolicy: Redirect
-      termination: edge
-    port:
-      targetPort: main
-    to:
-      kind: Service
-      name: repo-init-ui
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: repo-init-ui
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-  spec:
-    replicas: 2
-    strategy:
-      type: RollingUpdate
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: repo-init-ui
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: repo-init-ui
-      spec:
-        affinity:
-          podAntiAffinity:
-            preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                  - key: component
-                    operator: In
-                    values:
-                    - repo-init-ui
-                topologyKey: "kubernetes.io/hostname"
-        containers:
-        - name: repo-init-ui
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_repo-init_latest
-          imagePullPolicy: Always
-          args:
-          - --loglevel=info
-          - --mode=ui
-          - --port=8080
-          ports:
-          - name: main
-            containerPort: 8080
-          - name: metrics
-            containerPort: 9090
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 3
-            periodSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-            initialDelaySeconds: 10
-            periodSeconds: 3
-            timeoutSeconds: 600
-          resources:
-            requests:
-              memory: "3Gi"
-              cpu: "500m"
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - repo-init-ui
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: repo-init-ui
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_repo-init_latest
+        imagePullPolicy: Always
+        args:
+        - --loglevel=info
+        - --mode=ui
+        - --port=8080
+        ports:
+        - name: main
+          containerPort: 8080
+        - name: metrics
+          containerPort: 9090
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 600
+        resources:
+          requests:
+            memory: "3Gi"
+            cpu: "500m"

@@ -1,67 +1,69 @@
-kind: List
+---
+kind: ServiceAccount
 apiVersion: v1
-items:
+metadata:
+  name: sa-image-tagger
+  namespace: origin
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: image-tagger
+  namespace: origin
+rules:
+- apiGroups:
+  - ""
+  - image.openshift.io
+  resources:
+  - imagestreamtags
+  - imagestreams
+  verbs:
+  - update
+  - patch
+  - get
+  - create
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: okd-release
+  namespace: origin
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: okd-admins
 - kind: ServiceAccount
-  apiVersion: v1
-  metadata:
-    name: sa-image-tagger
-    namespace: origin
-- kind: Role
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: image-tagger
-    namespace: origin
-  rules:
-  - apiGroups:
-    - ""
-    - image.openshift.io
-    resources:
-    - imagestreamtags
-    - imagestreams
-    verbs:
-    - update
-    - patch
-    - get
-    - create
-- kind: RoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: okd-release
-    namespace: origin
-  subjects:
+  name: sa-image-tagger
+  namespace: origin
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: image-tagger
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: okd-release-controller-modify
+  namespace: origin
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: okd-admins
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: release-controller-modify
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: okd-admins-sa-pull-secret
+  namespace: origin
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
     name: okd-admins
-  - kind: ServiceAccount
-    name: sa-image-tagger
-    namespace: origin
-  roleRef:
-    kind: Role
-    apiGroup: rbac.authorization.k8s.io
-    name: image-tagger
-- kind: RoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: okd-release-controller-modify
-    namespace: origin
-  subjects:
-  - kind: Group
-    apiGroup: rbac.authorization.k8s.io
-    name: okd-admins
-  roleRef:
-    kind: Role
-    apiGroup: rbac.authorization.k8s.io
-    name: release-controller-modify
-- kind: RoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: okd-admins-sa-pull-secret
-    namespace: origin
-  roleRef:
-    kind: ClusterRole
-    apiGroup: rbac.authorization.k8s.io
-    name: pull-secret-namespace-manager
-  subjects:
-    - kind: Group
-      apiGroup: rbac.authorization.k8s.io
-      name: okd-admins

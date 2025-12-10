@@ -1,157 +1,158 @@
-kind: List
+---
+kind: ServiceAccount
 apiVersion: v1
-items:
-- kind: ServiceAccount
-  apiVersion: v1
-  metadata:
+metadata:
+  name: slack-bot
+  namespace: ci
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  namespace: ci
+  name: slack-bot
+spec:
+  port:
+    targetPort: 8888
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
     name: slack-bot
-    namespace: ci
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
-    namespace: ci
-    name: slack-bot
-  spec:
-    port:
-      targetPort: 8888
-    tls:
-      insecureEdgeTerminationPolicy: Redirect
-      termination: edge
-    to:
-      kind: Service
-      name: slack-bot
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    name: slack-bot
-    labels:
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  name: slack-bot
+  labels:
+    app: slack-bot
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8888"
+spec:
+  selector:
+    app: slack-bot
+  ports:
+  - name: main
+    port: 8888
+    targetPort: 8888
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: slack-bot
+  labels:
+    app: slack-bot
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
       app: slack-bot
-    annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "8888"
-  spec:
-    selector:
-      app: slack-bot
-    ports:
-    - name: main
-      port: 8888
-      targetPort: 8888
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: slack-bot
-    labels:
-      app: slack-bot
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-  spec:
-    replicas: 2
-    revisionHistoryLimit: 2
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: slack-bot
-    template:
-      metadata:
-        labels:
-          app: slack-bot
-      spec:
-        serviceAccountName: slack-bot
-        initContainers:
-        - name: git-sync-init
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --root=/tmp/git-sync
-          - --one-time=true
-          - --depth=1
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          imagePullPolicy: Always
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-        containers:
-        - name: git-sync
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --period=30s
-          - --root=/tmp/git-sync
-          - --max-failures=3
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          imagePullPolicy: Always
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-          resources:
-            requests:
-              memory: "4Gi"
-              cpu: "0.5"
-        - name: slack-bot
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_slack-bot_latest
-          imagePullPolicy: Always
-          args:
-          - --slack-token-path=/etc/slack/oauth_token
-          - --slack-signing-secret-path=/etc/slack/signing_secret
-          - --log-level=debug
-          - --jira-bearer-token-file=/etc/jira/token
-          - --jira-endpoint=https://issues.redhat.com
-          - --prow-config-path=/etc/prow-config/config.yaml
-          - --supplemental-prow-config-dir=/etc/prow-config
-          - --prow-job-config-path=/var/repo/release/ci-operator/jobs
-          - --keywords-config-path=/etc/slack-bot-config/config.yaml
-          - --helpdesk-alias=subteam^STSR51Q76
-          ports:
-          - name: main
-            containerPort: 8888
-          - name: metrics
-            containerPort: 9090
-          volumeMounts:
-          - name: slack
-            mountPath: /etc/slack
-            readOnly: true
-          - name: jira
-            mountPath: /etc/jira
-            readOnly: true
-          - name: prow-config
-            mountPath: /etc/prow-config
-            readOnly: true
-          - name: release
-            mountPath: /var/repo
-          - name: slack-bot-config
-            mountPath: /etc/slack-bot-config
-            readOnly: true
-          resources:
-            requests:
-              memory: "1Gi"
-              cpu: "100m"
-        volumes:
-        - name: slack
-          secret:
-            secretName: slack-credentials-dptp-bot
-        - name: jira
-          secret:
-            secretName: jira-token-dptp-bot
-        - name: prow-config
-          configMap:
-            name: config
+    spec:
+      serviceAccountName: slack-bot
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        volumeMounts:
         - name: release
-          emptyDir: {}
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "0.5"
+      - name: slack-bot
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_slack-bot_latest
+        imagePullPolicy: Always
+        args:
+        - --slack-token-path=/etc/slack/oauth_token
+        - --slack-signing-secret-path=/etc/slack/signing_secret
+        - --log-level=debug
+        - --jira-bearer-token-file=/etc/jira/token
+        - --jira-endpoint=https://issues.redhat.com
+        - --prow-config-path=/etc/prow-config/config.yaml
+        - --supplemental-prow-config-dir=/etc/prow-config
+        - --prow-job-config-path=/var/repo/release/ci-operator/jobs
+        - --keywords-config-path=/etc/slack-bot-config/config.yaml
+        - --helpdesk-alias=subteam^STSR51Q76
+        ports:
+        - name: main
+          containerPort: 8888
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
+        - name: slack
+          mountPath: /etc/slack
+          readOnly: true
+        - name: jira
+          mountPath: /etc/jira
+          readOnly: true
+        - name: prow-config
+          mountPath: /etc/prow-config
+          readOnly: true
+        - name: release
+          mountPath: /var/repo
         - name: slack-bot-config
-          configMap:
-            name: slack-bot-keyword-list
+          mountPath: /etc/slack-bot-config
+          readOnly: true
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "100m"
+      volumes:
+      - name: slack
+        secret:
+          secretName: slack-credentials-dptp-bot
+      - name: jira
+        secret:
+          secretName: jira-token-dptp-bot
+      - name: prow-config
+        configMap:
+          name: config
+      - name: release
+        emptyDir: {}
+      - name: slack-bot-config
+        configMap:
+          name: slack-bot-keyword-list

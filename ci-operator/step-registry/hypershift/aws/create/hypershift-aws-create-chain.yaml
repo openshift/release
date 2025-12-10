@@ -90,6 +90,15 @@ chain:
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
+
+      support_np_skew() {
+        curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+        local extra_flags=""
+        extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
+        extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
+        extra_flags+="&& oc apply -f /tmp/hc.yaml"
+        echo "$extra_flags"
+      }
       
       HC_REGION=${HYPERSHIFT_AWS_REGION:-$LEASED_RESOURCE}
       HC_ZONES="${HYPERSHIFT_HC_ZONES}"
@@ -192,7 +201,13 @@ chain:
         cp ${hosted_cluster_info_file} ${ARTIFACT_DIR}/aws-hosted-cluster-info-user-tag
       fi
 
-      "${COMMAND[@]}"
+      # Execute the command
+      # When using np_skew (different release images), we need eval to properly handle shell operators
+      if [[ -n "$RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && "$RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
+        eval "${COMMAND[*]} $(support_np_skew)"
+      else
+        "${COMMAND[@]}"
+      fi
 
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
@@ -229,7 +244,7 @@ chain:
         export CLUSTER_NAME
         timeout 25m bash -c '
           until [[ "$(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='"'"'{.status.version.history[?(@.state!="")].state}'"'"')" = "Completed" ]]; do
-              sleep 15
+            sleep 15
           done
         '
       fi
@@ -281,5 +296,7 @@ chain:
     dependencies:
     - name: "release:latest"
       env: RELEASE_IMAGE_LATEST
+    - name: "release:latest"
+      env: NODEPOOL_RELEASE_IMAGE_LATEST
     - name: hypershift-operator
       env: HYPERSHIFT_RELEASE_LATEST

@@ -1,75 +1,75 @@
-kind: List
-apiVersion: v1
-items:
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    labels:
-      app: gcsweb
-    name: gcsweb
-    namespace: ci-staging
-  spec:
-    replicas: 1
-    selector:
-      matchLabels:
-        component: gcsweb
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: gcsweb
-      spec:
-        containers:
-        - image: quay.io/openshift/ci:ci_gcsweb_latest
-          name: gcsweb
-          args:
-          - "-b"
-          - "gs://test-platform-results=gs://origin-ci-test"
-          - "-b"
-          - "origin-federated-results"
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 10
-            periodSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-- kind: Service
-  apiVersion: v1
-  metadata:
-    annotations:
-      haproxy.router.openshift.io/timeout: 1h
-    name: gcsweb
-    namespace: ci-staging
-    labels:
-      app: gcsweb
-  spec:
-    ports:
-    - name: web
-      protocol: TCP
-      port: 80
-      targetPort: 8080
-      nodePort: 0
-    selector:
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gcsweb
+  name: gcsweb
+  namespace: ci-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
       component: gcsweb
-    type: ClusterIP
-    sessionAffinity: None
-- kind: Route
-  apiVersion: route.openshift.io/v1
-  metadata:
-    annotations:
-      haproxy.router.openshift.io/timeout: 1h
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: gcsweb
+    spec:
+      containers:
+      - image: quay.io/openshift/ci:ci_gcsweb_latest
+        name: gcsweb
+        args:
+        - "-b"
+        - "gs://test-platform-results=gs://origin-ci-test"
+        - "-b"
+        - "origin-federated-results"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+---
+kind: Service
+apiVersion: v1
+metadata:
+  annotations:
+    haproxy.router.openshift.io/timeout: 1h
+  name: gcsweb
+  namespace: ci-staging
+  labels:
+    app: gcsweb
+spec:
+  ports:
+  - name: web
+    protocol: TCP
+    port: 80
+    targetPort: 8080
+    nodePort: 0
+  selector:
+    component: gcsweb
+  type: ClusterIP
+  sessionAffinity: None
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  annotations:
+    haproxy.router.openshift.io/timeout: 1h
+  name: gcsweb
+  namespace: ci-staging
+  labels:
+    app: gcsweb
+spec:
+  to:
+    kind: Service
     name: gcsweb
-    namespace: ci-staging
-    labels:
-      app: gcsweb
-  spec:
-    to:
-      kind: Service
-      name: gcsweb
-    tls:
-      termination: edge
-      insecureEdgeTerminationPolicy: Redirect
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

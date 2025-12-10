@@ -1,133 +1,133 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    labels:
-      app: prow
-      component: repo-init-apiserver
+kind: Service
+metadata:
+  namespace: ci
+  labels:
+    app: prow
+    component: repo-init-apiserver
+  name: repo-init-apiserver
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: main
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: metrics
+  selector:
+    app: prow
+    component: repo-init-apiserver
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  labels:
+    app: prow
+    component: repo-init-apiserver
+  name: repo-init-apiserver
+  namespace: ci
+spec:
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  port:
+    targetPort: main
+  to:
+    kind: Service
     name: repo-init-apiserver
-  spec:
-    ports:
-    - name: main
-      port: 80
-      protocol: TCP
-      targetPort: main
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: metrics
-    selector:
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: repo-init-apiserver
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  labels:
+    app: prow
+    component: repo-init-apiserver
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
       app: prow
       component: repo-init-apiserver
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
-    labels:
-      app: prow
-      component: repo-init-apiserver
-    name: repo-init-apiserver
-    namespace: ci
-  spec:
-    tls:
-      insecureEdgeTerminationPolicy: Redirect
-      termination: edge
-    port:
-      targetPort: main
-    to:
-      kind: Service
-      name: repo-init-apiserver
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: repo-init-apiserver
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-    labels:
-      app: prow
-      component: repo-init-apiserver
-  spec:
-    replicas: 2
-    strategy:
-      type: RollingUpdate
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: repo-init-apiserver
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: repo-init-apiserver
-      spec:
-        affinity:
-          podAntiAffinity:
-            preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                  - key: component
-                    operator: In
-                    values:
-                    - repo-init-apiserver
-                topologyKey: "kubernetes.io/hostname"
-        containers:
-        - name: repo-init-apiserver
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_repo-init_latest
-          imagePullPolicy: Always
-          args:
-          - --loglevel=info
-          - --mode=api
-          - --port=8080
-          - --github-token-path=/etc/github/oauth
-          - --github-endpoint=http://ghproxy
-          - --num-repos=4
-          - --disable-cors=true
-          - --server-config-path=/etc/repo-init-config
-          ports:
-          - name: main
-            containerPort: 8080
-          - name: metrics
-            containerPort: 9090
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 120 # We need a long delay to allow for cloning multiple copies of the openshift/release repo
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-            initialDelaySeconds: 150
-            periodSeconds: 10
-            timeoutSeconds: 600
-          resources:
-            requests:
-              memory: "3Gi"
-              cpu: "500m"
-          volumeMounts:
-          - mountPath: /tmp
-            name: release-repos
-          - mountPath: /etc/github
-            name: token
-            readOnly: true
-          - mountPath: /etc/repo-init-config
-            name: repo-init-config
-            readOnly: true
-        volumes:
-        - name: release-repos
-          emptyDir: {}
-        - name: token
-          secret:
-            secretName: github-credentials-openshift-bot
-        - name: repo-init-config
-          secret:
-            secretName: repo-init-client
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - repo-init-apiserver
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+      - name: repo-init-apiserver
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_repo-init_latest
+        imagePullPolicy: Always
+        args:
+        - --loglevel=info
+        - --mode=api
+        - --port=8080
+        - --github-token-path=/etc/github/oauth
+        - --github-endpoint=http://ghproxy
+        - --num-repos=4
+        - --disable-cors=true
+        - --server-config-path=/etc/repo-init-config
+        ports:
+        - name: main
+          containerPort: 8080
+        - name: metrics
+          containerPort: 9090
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 120 # We need a long delay to allow for cloning multiple copies of the openshift/release repo
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 150
+          periodSeconds: 10
+          timeoutSeconds: 600
+        resources:
+          requests:
+            memory: "3Gi"
+            cpu: "500m"
+        volumeMounts:
+        - mountPath: /tmp
+          name: release-repos
+        - mountPath: /etc/github
+          name: token
+          readOnly: true
+        - mountPath: /etc/repo-init-config
+          name: repo-init-config
+          readOnly: true
+      volumes:
+      - name: release-repos
+        emptyDir: {}
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-bot
+      - name: repo-init-config
+        secret:
+          secretName: repo-init-client

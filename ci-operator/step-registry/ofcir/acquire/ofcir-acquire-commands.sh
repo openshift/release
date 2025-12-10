@@ -126,10 +126,10 @@ CIRTYPE=host_el9
 [ "$CLUSTERTYPE" == "baremetal-moc" ] && CIRTYPE=cluster_moc
 [ "$CLUSTERTYPE" == "virt-arm64" ] && CIRTYPE=host_arm
 [ "$CLUSTERTYPE" == "lab-small" ] && CIRTYPE=host_lab_small
+[ "$CLUSTERTYPE" == "host_384gb_el9" ] && CIRTYPE=host_384gb_el9
 [ "$CLUSTERTYPE" == "assisted_large_el9" ] && CIRTYPE=assisted_large_el9
 [ "$CLUSTERTYPE" == "assisted_medium_el9" ] && CIRTYPE=assisted_medium_el9
 [ "$CLUSTERTYPE" == "assisted_small_el9" ] && CIRTYPE=assisted_small_el9
-[ "$CLUSTERTYPE" == "assisted_amd64_el9" ] && CIRTYPE=assisted_amd64_el9
 
 getCIR && exit_with_success
 exit_with_failure "Failed to create ci resource: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"

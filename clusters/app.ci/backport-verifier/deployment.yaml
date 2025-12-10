@@ -1,96 +1,95 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: backport-verifier
-    namespace: ci
-  spec:
-    selector:
+kind: Service
+metadata:
+  name: backport-verifier
+  namespace: ci
+spec:
+  selector:
+    app: prow
+    component: backport-verifier
+  ports:
+  - port: 80
+    targetPort: 8888
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backport-verifier
+  labels:
+    app: prow
+    component: backport-verifier
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  namespace: ci
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
       app: prow
       component: backport-verifier
-    ports:
-    - port: 80
-      targetPort: 8888
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: backport-verifier
-    labels:
-      app: prow
-      component: backport-verifier
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-    namespace: ci
-  spec:
-    replicas: 1
-    revisionHistoryLimit: 2
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: backport-verifier
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: backport-verifier
-      spec:
-        containers:
-        - name: backport-verifier
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_backport-verifier_latest
-          imagePullPolicy: Always
-          args:
-          - --endpoint=/
-          - --port=8888
-          - --config-path=/etc/config/config.yaml
-          - --github-endpoint=http://ghproxy
-          - --github-endpoint=https://api.github.com
-          - --github-graphql-endpoint=http://ghproxy/graphql
-          - --github-token-path=/etc/github/oauth
-          - --hmac-secret-file=/etc/webhook/hmac.yaml
-          ports:
-            - name: http
-              containerPort: 8888
-          volumeMounts:
-          - name: config
-            mountPath: /etc/config
-            readOnly: true
-          - name: hmac
-            mountPath: /etc/webhook
-            readOnly: true
-          - name: oauth
-            mountPath: /etc/github
-            readOnly: true
-          - name: tmp
-            mountPath: /tmp
-          resources:
-            requests:
-              memory: "300Mi"
-              cpu: "50m"
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 20
-            periodSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-        volumes:
+    spec:
+      containers:
+      - name: backport-verifier
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_backport-verifier_latest
+        imagePullPolicy: Always
+        args:
+        - --endpoint=/
+        - --port=8888
+        - --config-path=/etc/config/config.yaml
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-token-path=/etc/github/oauth
+        - --hmac-secret-file=/etc/webhook/hmac.yaml
+        ports:
+          - name: http
+            containerPort: 8888
+        volumeMounts:
         - name: config
-          configMap:
-            name: backport-verifier-config
+          mountPath: /etc/config
+          readOnly: true
         - name: hmac
-          secret:
-            secretName: github-webhook-credentials
+          mountPath: /etc/webhook
+          readOnly: true
         - name: oauth
-          secret:
-            secretName: github-credentials-openshift-ci-robot
+          mountPath: /etc/github
+          readOnly: true
         - name: tmp
-          emptyDir: {}
+          mountPath: /tmp
+        resources:
+          requests:
+            memory: "300Mi"
+            cpu: "50m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 20
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+      volumes:
+      - name: config
+        configMap:
+          name: backport-verifier-config
+      - name: hmac
+        secret:
+          secretName: github-webhook-credentials
+      - name: oauth
+        secret:
+          secretName: github-credentials-openshift-ci-robot
+      - name: tmp
+        emptyDir: {}

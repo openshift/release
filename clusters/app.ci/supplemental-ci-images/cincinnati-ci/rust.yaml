@@ -1,73 +1,72 @@
-apiVersion: v1
-kind: List
-items:
-- kind: BuildConfig
-  apiVersion: build.openshift.io/v1
-  metadata:
-    namespace: cincinnati-ci-public
-    name: rust-boot-root-1.84.1
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      pushSecret:
-        name: quayio-openshift-ota-cincinnati-ci-push-credentials
-      to:
-        kind: DockerImage
-        name: quay.io/openshift-ota/cincinnati-ci-public:rust_boot-root-1.84.1
-    source:
-      dockerfile: |
-        FROM registry.access.redhat.com/ubi9/ubi:9.6
-        RUN dnf update -y \
-            && dnf install -y git jq rust rustfmt cargo openssl-devel python3-pip \
-            && dnf clean all
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: cincinnati-ci-public
+  name: rust-boot-root-1.84.1
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: quayio-openshift-ota-cincinnati-ci-push-credentials
+    to:
+      kind: DockerImage
+      name: quay.io/openshift-ota/cincinnati-ci-public:rust_boot-root-1.84.1
+  source:
+    dockerfile: |
+      FROM registry.access.redhat.com/ubi9/ubi:9.6
+      RUN dnf update -y \
+          && dnf install -y git jq rust rustfmt cargo openssl-devel python3-pip \
+          && dnf clean all
 
-        WORKDIR /go
-        ENV HOME="/go" PATH="/go/.local/bin:/go/.cargo/bin:$PATH"
-        ### UBI has no dnf repo providing those tools
-        RUN pip3 install --user yamllint \
-            && mkdir -p /go/.cargo/bin && curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C /go/.cargo/bin \
-            && curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /go/.cargo/bin \
-            && chmod -R a+rwX,o-w /go
-      type: Dockerfile
-    strategy:
-      dockerStrategy:
-        from:
-          kind: ImageStreamTag
-          name: ubi:9
-          namespace: ocp
-        imageOptimizationPolicy: SkipLayers
-      type: Docker
-    triggers:
-      - type: ConfigChange
-- kind: BuildConfig
-  apiVersion: build.openshift.io/v1
-  metadata:
-    namespace: cincinnati-ci-public
-    name: rust-e2e-test-ubi9
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      pushSecret:
-        name: quayio-openshift-ota-cincinnati-ci-push-credentials
-      to:
-        kind: DockerImage
-        name: quay.io/openshift-ota/cincinnati-ci-public:rust_e2e-test-ubi9
-    source:
-      dockerfile: |
-        FROM registry.access.redhat.com/ubi9/ubi:latest
-        RUN curl -sL https://github.com/tsenart/vegeta/releases/download/v12.8.4/vegeta_12.8.4_linux_amd64.tar.gz | tar xzf - -C /usr/bin vegeta && \
-            curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xzf - -C /usr/bin oc && \
-            curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/bin
-      type: Dockerfile
-    strategy:
-      dockerStrategy:
-        from:
-          kind: ImageStreamTag
-          name: ubi:9
-          namespace: ocp
-        imageOptimizationPolicy: SkipLayers
-      type: Docker
-    triggers:
-      - type: ConfigChange
+      WORKDIR /go
+      ENV HOME="/go" PATH="/go/.local/bin:/go/.cargo/bin:$PATH"
+      ### UBI has no dnf repo providing those tools
+      RUN pip3 install --user yamllint \
+          && mkdir -p /go/.cargo/bin && curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C /go/.cargo/bin \
+          && curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /go/.cargo/bin \
+          && chmod -R a+rwX,o-w /go
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: ubi:9
+        namespace: ocp
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+    - type: ConfigChange
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: cincinnati-ci-public
+  name: rust-e2e-test-ubi9
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    pushSecret:
+      name: quayio-openshift-ota-cincinnati-ci-push-credentials
+    to:
+      kind: DockerImage
+      name: quay.io/openshift-ota/cincinnati-ci-public:rust_e2e-test-ubi9
+  source:
+    dockerfile: |
+      FROM registry.access.redhat.com/ubi9/ubi:latest
+      RUN curl -sL https://github.com/tsenart/vegeta/releases/download/v12.8.4/vegeta_12.8.4_linux_amd64.tar.gz | tar xzf - -C /usr/bin vegeta && \
+          curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xzf - -C /usr/bin oc && \
+          curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/bin
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: ubi:9
+        namespace: ocp
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+    - type: ConfigChange
