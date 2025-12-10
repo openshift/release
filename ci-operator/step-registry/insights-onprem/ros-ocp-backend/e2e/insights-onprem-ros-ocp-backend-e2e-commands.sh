@@ -20,10 +20,12 @@ fi
 # Install kubectl if not available
 if ! command -v kubectl &> /dev/null; then
     echo "kubectl not found, installing..."
-    curl -sL "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" -o /tmp/kubectl
+    # Use a fixed stable version to avoid issues with version lookup
+    KUBECTL_VERSION="v1.31.0"
+    curl -sL "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" -o /tmp/kubectl
     chmod +x /tmp/kubectl
     export PATH="/tmp:${PATH}"
-    echo "kubectl installed successfully"
+    echo "kubectl ${KUBECTL_VERSION} installed successfully"
 else
     echo "kubectl is already installed"
 fi
