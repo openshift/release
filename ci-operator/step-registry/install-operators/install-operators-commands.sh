@@ -180,11 +180,24 @@ EOF
         fi
 
         if [[ -z "${CSV}" ]]; then
+            # Check for dependency resolution failures early
+            resolution_failed=$(oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o jsonpath='{.status.conditions[?(@.type=="ResolutionFailed")].status}' 2>/dev/null || echo "")
+            if [[ "${resolution_failed}" == "True" ]]; then
+                echo "Try ${i}/${RETRIES}: Dependency resolution failed for ${operator_name}"
+                resolution_message=$(oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o jsonpath='{.status.conditions[?(@.type=="ResolutionFailed")].message}' 2>/dev/null || echo "")
+                if [[ -n "${resolution_message}" ]]; then
+                    echo "Resolution error: ${resolution_message}"
+                fi
+                # Break early if it's a dependency issue - no point retrying
+                break
+            fi
             echo "Try ${i}/${RETRIES}: can't get the ${operator_name} yet. Checking again in 30 seconds"
             sleep 30
+            continue
         fi
 
-        if [[ $(oc get csv -n ${operator_install_namespace} ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
+        csv_phase=$(oc get csv -n "${operator_install_namespace}" "${CSV}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        if [[ "${csv_phase}" == "Succeeded" ]]; then
             echo "${operator_name} is deployed"
             break
         else
@@ -193,17 +206,57 @@ EOF
         fi
     done
 
-    if [[ $(oc get csv -n "${operator_install_namespace}" "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
+    if [[ -z "${CSV}" ]]; then
+        echo "Error: Failed to deploy ${operator_name} - CSV was never created"
+        echo
+        echo "Assert that the '${operator_name}' packagemanifest belongs to '${operator_source}' catalog"
+        echo
+        oc get packagemanifest | grep ${operator_name} || echo
+        echo "Subscription details:"
+        oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o yaml || echo
+        
+        # Check for dependency resolution failures
+        resolution_failed=$(oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o jsonpath='{.status.conditions[?(@.type=="ResolutionFailed")].status}' 2>/dev/null || echo "")
+        if [[ "${resolution_failed}" == "True" ]]; then
+            echo
+            echo "⚠️  DEPENDENCY RESOLUTION FAILURE DETECTED ⚠️"
+            echo "The operator subscription failed due to missing or incompatible dependencies."
+            resolution_message=$(oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o jsonpath='{.status.conditions[?(@.type=="ResolutionFailed")].message}' 2>/dev/null || echo "")
+            if [[ -n "${resolution_message}" ]]; then
+                echo "Resolution error message:"
+                echo "${resolution_message}"
+                echo
+                echo "This usually means:"
+                echo "  1. A required dependency operator is not installed"
+                echo "  2. A required dependency operator version is not available"
+                echo "  3. The dependency operator version does not meet the required version constraints"
+                echo
+                echo "Please check the error message above to identify which dependency is missing."
+            fi
+        fi
+        
+        if [[ "${operator_skip_checking}" == "true" ]]; then
+            echo "'${operator_name}' installation failed, but maybe not all needed CRDs are available yet... continue"
+        else
+            exit 1
+        fi
+    elif [[ -n "${CSV}" ]] && [[ $(oc get csv -n "${operator_install_namespace}" "${CSV}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "") != "Succeeded" ]]; then
         echo "Error: Failed to deploy ${operator_name}"
         echo
         echo "Assert that the '${operator_name}' packagemanifest belongs to '${operator_source}' catalog"
         echo
         oc get packagemanifest | grep ${operator_name} || echo
-        echo "CSV ${CSV} YAML"
-        oc get csv "${CSV}" -n "${operator_install_namespace}" -o yaml
-        echo
-        echo "CSV ${CSV} Describe"
-        oc describe csv "${CSV}" -n "${operator_install_namespace}"
+        if [[ -n "${CSV}" ]]; then
+            echo "CSV ${CSV} YAML"
+            oc get csv "${CSV}" -n "${operator_install_namespace}" -o yaml || echo "Failed to get CSV ${CSV}"
+            echo
+            echo "CSV ${CSV} Describe"
+            oc describe csv "${CSV}" -n "${operator_install_namespace}" || echo "Failed to describe CSV ${CSV}"
+        else
+            echo "CSV was not found in subscription"
+            echo "Subscription details:"
+            oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o yaml || echo
+        fi
         if [[ "${operator_skip_checking}" == "true" ]]; then
             echo "'${operator_name}' installation failed, but maybe not all needed CRDs are available yet... continue"
         else
