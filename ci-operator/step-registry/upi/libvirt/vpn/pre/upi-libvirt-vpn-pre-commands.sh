@@ -29,6 +29,8 @@ if [[ -z "${LEASE_PORT}" ]]; then
   exit 1
 fi
 
+curl "$EXTERNAL_IP:$LEASE_PORT"
+
 echo "Test the libvirt connection..."
 REMOTE_LIBVIRT_URI_1="qemu+tcp://10.0.1.2/system"
 REMOTE_LIBVIRT_URI_2="qemu+tcp://10.0.1.2:16509/system"
@@ -36,5 +38,7 @@ echo "No port specified..."
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI_1} list
 echo "Include the port..."
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI_2} list
+
+sleep 1200
 
 echo "Ending test of the Z Network environment..."
