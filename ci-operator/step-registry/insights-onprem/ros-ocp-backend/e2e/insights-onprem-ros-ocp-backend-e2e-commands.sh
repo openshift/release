@@ -273,10 +273,14 @@ MINIO_SECRET_KEY="__MINIO_SECRET_KEY__"
 # Check if this is an install/upgrade command for cost-onprem specifically
 if [[ "$*" == *"cost-onprem"* ]] && { [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"install"* ]]; }; then
     echo "[helm-wrapper] Detected cost-onprem chart - injecting MinIO storage configuration..."
+    # IMPORTANT: Do NOT set global.storageType=minio as that changes isOpenShift detection
+    # which breaks security contexts (runAsUser: 1000 not allowed on OpenShift)
+    # Instead, set odf.endpoint to point to our MinIO service, which bypasses the NooBaa lookup
     exec "$ORIGINAL_HELM" "$@" \
-        --set "global.storageType=minio" \
-        --set "minio.rootUser=${MINIO_ACCESS_KEY}" \
-        --set "minio.rootPassword=${MINIO_SECRET_KEY}"
+        --set "odf.endpoint=minio-service.minio.svc.cluster.local" \
+        --set "odf.port=9000" \
+        --set "odf.useSSL=false" \
+        --set "odf.bucket=ros-data"
 else
     # For all other helm commands (repo add, strimzi install, etc.), pass through unchanged
     exec "$ORIGINAL_HELM" "$@"
