@@ -13,6 +13,107 @@ else
     echo "no proxy setting."
 fi
 
+# Debug wait timeout - can be set via environment variable (in seconds)
+# Default: 0 (no wait). Set to a positive number to wait for debugging.
+DEBUG_WAIT_TIMEOUT="${DEBUG_WAIT_TIMEOUT:-0}"
+
+# Function to gather comprehensive debugging information
+gather_debug_info() {
+    local operator_name=$1
+    local operator_install_namespace=$2
+    local operator_source=$3
+    
+    echo "=========================================="
+    echo "DEBUG: Gathering diagnostic information for ${operator_name}"
+    echo "=========================================="
+    
+    # Cluster version
+    echo "--- OpenShift Cluster Version ---"
+    oc version -o yaml || echo "Failed to get cluster version"
+    echo ""
+    
+    # Operator namespace
+    echo "--- Namespace ${operator_install_namespace} ---"
+    oc get namespace "${operator_install_namespace}" -o yaml || echo "Namespace not found"
+    echo ""
+    
+    # OperatorGroup
+    echo "--- OperatorGroups in ${operator_install_namespace} ---"
+    oc get operatorgroup -n "${operator_install_namespace}" -o yaml || echo "No OperatorGroups found"
+    echo ""
+    
+    # Subscription
+    echo "--- Subscription ${operator_name} ---"
+    oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o yaml || echo "Subscription not found"
+    echo ""
+    
+    # Subscription conditions
+    echo "--- Subscription Conditions ---"
+    oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o jsonpath='{.status.conditions[*]}' | jq -r '.' 2>/dev/null || \
+        oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o jsonpath='{.status.conditions[*]}' || echo "No conditions found"
+    echo ""
+    
+    # InstallPlans
+    echo "--- InstallPlans in ${operator_install_namespace} ---"
+    oc get installplan -n "${operator_install_namespace}" -o yaml || echo "No InstallPlans found"
+    echo ""
+    
+    # CSVs
+    echo "--- ClusterServiceVersions in ${operator_install_namespace} ---"
+    oc get csv -n "${operator_install_namespace}" -o yaml || echo "No CSVs found"
+    echo ""
+    
+    # CSV status if exists
+    local csv_name=$(oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || echo "")
+    if [[ -n "${csv_name}" ]]; then
+        echo "--- CSV ${csv_name} Details ---"
+        oc get csv "${csv_name}" -n "${operator_install_namespace}" -o yaml || echo "CSV not found"
+        echo ""
+        echo "--- CSV ${csv_name} Status ---"
+        oc describe csv "${csv_name}" -n "${operator_install_namespace}" || echo "Failed to describe CSV"
+        echo ""
+    fi
+    
+    # CatalogSource
+    echo "--- CatalogSource ${operator_source} ---"
+    oc get catalogsource "${operator_source}" -n openshift-marketplace -o yaml || echo "CatalogSource not found"
+    echo ""
+    
+    # All CatalogSources
+    echo "--- All CatalogSources in openshift-marketplace ---"
+    oc get catalogsource -n openshift-marketplace -o yaml || echo "No CatalogSources found"
+    echo ""
+    
+    # PackageManifest
+    echo "--- PackageManifest ${operator_name} ---"
+    oc get packagemanifest "${operator_name}" -o yaml || echo "PackageManifest not found"
+    echo ""
+    
+    # All PackageManifests for this operator
+    echo "--- All PackageManifests matching ${operator_name} ---"
+    oc get packagemanifest | grep "${operator_name}" || echo "No PackageManifests found"
+    echo ""
+    
+    # Pods in namespace
+    echo "--- Pods in ${operator_install_namespace} ---"
+    oc get pods -n "${operator_install_namespace}" -o yaml || echo "No pods found"
+    echo ""
+    
+    # Events in namespace
+    echo "--- Events in ${operator_install_namespace} ---"
+    oc get events -n "${operator_install_namespace}" --sort-by='.lastTimestamp' || echo "No events found"
+    echo ""
+    
+    # OLM operator logs (if available)
+    echo "--- OLM Operator Logs (last 50 lines) ---"
+    oc logs -n openshift-operator-lifecycle-manager -l app=olm-operator --tail=50 || echo "Could not retrieve OLM logs"
+    echo ""
+    
+    echo "=========================================="
+    echo "DEBUG: Diagnostic information gathering complete"
+    echo "=========================================="
+}
+
 # If not provided in the JSON, will use the following defaults.
 DEFAULT_OPERATOR_SOURCE="redhat-operators"
 DEFAULT_OPERATOR_SOURCE_DISPLAY="Red Hat Operators"
@@ -235,9 +336,21 @@ EOF
             fi
         fi
         
+        # Gather comprehensive debug information
+        gather_debug_info "${operator_name}" "${operator_install_namespace}" "${operator_source}"
+        
         if [[ "${operator_skip_checking}" == "true" ]]; then
             echo "'${operator_name}' installation failed, but maybe not all needed CRDs are available yet... continue"
         else
+            # Wait for debugging if DEBUG_WAIT_TIMEOUT is set
+            if [[ "${DEBUG_WAIT_TIMEOUT}" -gt 0 ]]; then
+                echo ""
+                echo "⚠️  DEBUG WAIT: Waiting ${DEBUG_WAIT_TIMEOUT} seconds for debugging..."
+                echo "   You can now access the cluster to investigate the issue."
+                echo "   Cluster will remain available for ${DEBUG_WAIT_TIMEOUT} seconds."
+                sleep "${DEBUG_WAIT_TIMEOUT}"
+                echo "DEBUG WAIT: Timeout reached, proceeding with exit."
+            fi
             exit 1
         fi
     elif [[ -n "${CSV}" ]] && [[ $(oc get csv -n "${operator_install_namespace}" "${CSV}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "") != "Succeeded" ]]; then
@@ -257,9 +370,22 @@ EOF
             echo "Subscription details:"
             oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o yaml || echo
         fi
+        
+        # Gather comprehensive debug information
+        gather_debug_info "${operator_name}" "${operator_install_namespace}" "${operator_source}"
+        
         if [[ "${operator_skip_checking}" == "true" ]]; then
             echo "'${operator_name}' installation failed, but maybe not all needed CRDs are available yet... continue"
         else
+            # Wait for debugging if DEBUG_WAIT_TIMEOUT is set
+            if [[ "${DEBUG_WAIT_TIMEOUT}" -gt 0 ]]; then
+                echo ""
+                echo "⚠️  DEBUG WAIT: Waiting ${DEBUG_WAIT_TIMEOUT} seconds for debugging..."
+                echo "   You can now access the cluster to investigate the issue."
+                echo "   Cluster will remain available for ${DEBUG_WAIT_TIMEOUT} seconds."
+                sleep "${DEBUG_WAIT_TIMEOUT}"
+                echo "DEBUG WAIT: Timeout reached, proceeding with exit."
+            fi
             exit 1
         fi
     else
