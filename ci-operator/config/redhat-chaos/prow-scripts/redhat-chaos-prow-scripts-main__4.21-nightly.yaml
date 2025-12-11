@@ -626,42 +626,56 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: krkn-hub-tests-nutanix
+  capabilities:
+  - sshd-bastion
   steps:
+    allow_skip_on_success: true
     cluster_profile: nutanix-qe-zone
     env:
-      BASE_DOMAIN: nutanix-ci.devcluster.openshift.com
       CHURN: "true"
+      COMPUTE_REPLICAS: "11"
       EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "11"
-      SIZE_VARIANT: large
-      SPOT_INSTANCES: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_MEMORYSIZE: 64Gi
+      OPENSHIFT_INFRA_NODE_INSTANCE_VCPU: "16"
+      PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
       TELEMETRY_GROUP: prow-ocp-4.21
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
+    - chain: create-infra-move-ingress-monitoring-registry
     - chain: redhat-chaos-krkn-hub-tests
-    workflow: openshift-qe-installer-nutanix
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
 - always_run: false
   as: krkn-hub-node-tests-nutanix
+  capabilities:
+  - sshd-bastion
   steps:
+    allow_skip_on_success: true
     cluster_profile: nutanix-qe-zone
     env:
-      BASE_DOMAIN: nutanix-ci.devcluster.openshift.com
       CHURN: "true"
+      COMPUTE_REPLICAS: "11"
       EXTRA_FLAGS: --churn-duration=90m --timeout=5h --churn-percent 25
       GC: "false"
       ITERATION_MULTIPLIER_ENV: "11"
-      SIZE_VARIANT: large
-      SPOT_INSTANCES: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_MEMORYSIZE: 64Gi
+      OPENSHIFT_INFRA_NODE_INSTANCE_VCPU: "16"
+      PROFILE_TYPE: reporting
+      SET_ENV_BY_PLATFORM: custom
       TELEMETRY_GROUP: prow-ocp-4.21
     observers:
       enable:
       - redhat-chaos-cerberus
+      - openshift-qe-cluster-density-v2-observer
     test:
+    - chain: create-infra-move-ingress-monitoring-registry
     - chain: redhat-chaos-krkn-hub-node-tests
-    workflow: openshift-qe-installer-nutanix
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
