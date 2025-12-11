@@ -58,31 +58,38 @@ fi
 echo "========== MinIO Configuration =========="
 
 # Read MinIO configuration from SHARED_DIR (set by insights-onprem-minio-deploy step)
-if [ -f "${SHARED_DIR}/minio-endpoint" ]; then
-    MINIO_ENDPOINT=$(cat "${SHARED_DIR}/minio-endpoint")
+if [ -f "${SHARED_DIR}/minio-env" ]; then
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/minio-env"
+    
+    # Export the variables we need
+    export MINIO_HOST
+    export MINIO_PORT
     export MINIO_ENDPOINT
-    MINIO_ACCESS_KEY=$(cat "${SHARED_DIR}/minio-access-key")
-    export MINIO_ACCESS_KEY
-    MINIO_SECRET_KEY=$(cat "${SHARED_DIR}/minio-secret-key")
-    export MINIO_SECRET_KEY
-    MINIO_NAMESPACE=$(cat "${SHARED_DIR}/minio-namespace")
     export MINIO_NAMESPACE
-    echo "MinIO endpoint: ${MINIO_ENDPOINT}"
+    export APP_NAMESPACE
+    
+    echo "MinIO host: ${MINIO_HOST}"
+    echo "MinIO port: ${MINIO_PORT}"
+    echo "MinIO endpoint (host:port): ${MINIO_ENDPOINT}"
     echo "MinIO namespace: ${MINIO_NAMESPACE}"
+    echo "Application namespace: ${APP_NAMESPACE}"
+    
+    # Set NAMESPACE for the helm chart deployment
+    if [ -n "${APP_NAMESPACE:-}" ]; then
+        export NAMESPACE="${APP_NAMESPACE}"
+    fi
 else
     echo "WARNING: MinIO configuration not found in SHARED_DIR"
     echo "Make sure insights-onprem-minio-deploy step ran before this step"
 fi
 
-# Read application namespace from SHARED_DIR and export as NAMESPACE
-# This overrides the CI's NAMESPACE var so the helm chart deploys to the right place
-if [ -f "${SHARED_DIR}/minio-env" ]; then
-    # shellcheck source=/dev/null
-    source "${SHARED_DIR}/minio-env"
-    if [ -n "${APP_NAMESPACE:-}" ]; then
-        export NAMESPACE="${APP_NAMESPACE}"
-        echo "Application namespace: ${NAMESPACE}"
-    fi
+# Read credentials from separate files
+if [ -f "${SHARED_DIR}/minio-access-key" ]; then
+    MINIO_ACCESS_KEY=$(cat "${SHARED_DIR}/minio-access-key")
+    export MINIO_ACCESS_KEY
+    MINIO_SECRET_KEY=$(cat "${SHARED_DIR}/minio-secret-key")
+    export MINIO_SECRET_KEY
 fi
 
 echo "========== Installing Cost Management Operator =========="
@@ -148,7 +155,7 @@ EOF
     # Wait for the CSV to be installed
     TIMEOUT="${OPERATOR_INSTALL_TIMEOUT:-300}"
     ELAPSED=0
-    while [ $ELAPSED -lt $TIMEOUT ]; do
+    while [ $ELAPSED -lt "$TIMEOUT" ]; do
         if oc get csv -n "${COST_MGMT_NAMESPACE}" 2>/dev/null | grep -q "costmanagement-metrics-operator.*Succeeded"; then
             echo "Cost Management Operator installed successfully"
             break
@@ -158,7 +165,7 @@ EOF
         ELAPSED=$((ELAPSED + 10))
     done
 
-    if [ $ELAPSED -ge $TIMEOUT ]; then
+    if [ $ELAPSED -ge "$TIMEOUT" ]; then
         echo "WARNING: Timeout waiting for Cost Management Operator, continuing anyway..."
         oc get csv -n "${COST_MGMT_NAMESPACE}" || true
         oc get subscription -n "${COST_MGMT_NAMESPACE}" -o yaml || true
@@ -197,7 +204,7 @@ if [ "${JOB_TYPE}" == "presubmit" ] && [[ "${JOB_NAME}" != rehearse-* ]]; then
     
     echo "========== Waiting for Docker Image Availability =========="
     # Extract repository path from full quay URL
-    REPO_PATH=$(echo "${QUAY_REPO}" | sed 's|^quay.io/||')
+    REPO_PATH="${QUAY_REPO#quay.io/}"
     
     # Timeout configuration for waiting for Docker image availability
     MAX_WAIT_TIME_SECONDS="${IMAGE_WAIT_TIMEOUT:-3600}"
@@ -221,13 +228,13 @@ if [ "${JOB_TYPE}" == "presubmit" ] && [[ "${JOB_NAME}" != rehearse-* ]]; then
         echo "Image not yet available. Waiting ${POLL_INTERVAL_SECONDS}s... (elapsed: $((ELAPSED_TIME / 60))m)"
         
         # Wait for the interval duration
-        sleep ${POLL_INTERVAL_SECONDS}
+        sleep "${POLL_INTERVAL_SECONDS}"
         
         # Increment the elapsed time
         ELAPSED_TIME=$((ELAPSED_TIME + POLL_INTERVAL_SECONDS))
         
         # If the elapsed time exceeds the timeout, exit with an error
-        if [ ${ELAPSED_TIME} -ge ${MAX_WAIT_TIME_SECONDS} ]; then
+        if [ "${ELAPSED_TIME}" -ge "${MAX_WAIT_TIME_SECONDS}" ]; then
             echo "Timed out waiting for Docker image ${IMAGE_NAME}. Time elapsed: $((ELAPSED_TIME / 60)) minute(s)."
             echo "Please verify that the image build job completed successfully."
             exit 1
@@ -284,20 +291,20 @@ if [[ "$*" == *"cost-onprem"* ]] && { [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"
     # IMPORTANT: Do NOT set global.storageType=minio as that changes isOpenShift detection
     # which breaks security contexts (runAsUser: 1000 not allowed on OpenShift)
     #
-    # The chart uses odf.endpoint for BOTH:
-    # 1. STORAGE_ENDPOINT env var - MinIO client expects host:port format
-    # 2. wait-for-storage TCP check - uses /dev/tcp/<endpoint>/<port>
+    # We use a proxy service (minio-storage) in the app namespace that routes to MinIO.
+    # - odf.endpoint = minio-storage (just hostname)
+    # - odf.port = 9000
     #
-    # To satisfy both, we set:
-    # - odf.endpoint = host:port (for MinIO client)
-    # - odf.port = "" (empty, so TCP check becomes /dev/tcp/host:port/ which works)
+    # The TCP check will work: /dev/tcp/minio-storage/9000
+    # The MinIO client will receive STORAGE_ENDPOINT=minio-storage (without port)
+    # which would normally fail, BUT the chart should be fixed to append the port.
     #
-    # Uses MINIO_ENDPOINT, MINIO_PORT, and MINIO_BUCKET env vars (configurable in ref.yaml)
-    FULL_ENDPOINT="${MINIO_ENDPOINT}:${MINIO_PORT}"
-    echo "[helm-wrapper] Using MinIO endpoint: ${FULL_ENDPOINT}"
+    # TODO: This requires chart fix - STORAGE_ENDPOINT should be endpoint:port
+    # See MINIO_STORAGE_PROPOSAL.md for the upstream fix proposal.
+    echo "[helm-wrapper] Using MinIO host: ${MINIO_HOST}, port: ${MINIO_PORT}"
     exec "$ORIGINAL_HELM" "$@" \
-        --set "odf.endpoint=${FULL_ENDPOINT}" \
-        --set "odf.port=" \
+        --set "odf.endpoint=${MINIO_HOST}" \
+        --set "odf.port=${MINIO_PORT}" \
         --set "odf.useSSL=false" \
         --set "odf.bucket=${MINIO_BUCKET}"
 else

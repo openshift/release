@@ -252,16 +252,69 @@ oc create secret generic "${SECRET_NAME}" \
     --from-literal=secret-key="${MINIO_SECRET_KEY}" \
     --dry-run=client -o yaml | oc apply -f -
 
+echo "========== Creating MinIO Proxy Service in Application Namespace =========="
+# Create a service that listens on port 9000 and forwards to MinIO's ClusterIP:9000
+# This allows the chart to use just the hostname for odf.endpoint while the
+# MinIO client connects on port 9000 (which we'll set via odf.port)
+#
+# WORKAROUND: The chart has a bug where STORAGE_ENDPOINT doesn't include the port.
+# The MinIO client defaults to port 80 for HTTP. To work around this, we create
+# a service that listens on BOTH port 80 and 9000, forwarding to MinIO on 9000.
+# This way:
+# - TCP check uses /dev/tcp/minio-storage/9000 (works)
+# - MinIO client uses minio-storage:80 (which forwards to MinIO:9000)
+
+MINIO_CLUSTER_IP=$(oc get svc minio -n "${MINIO_NAMESPACE}" -o jsonpath='{.spec.clusterIP}')
+echo "MinIO ClusterIP: ${MINIO_CLUSTER_IP}"
+
+cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-storage
+  namespace: ${APP_NAMESPACE}
+spec:
+  ports:
+  - port: 80
+    targetPort: 9000
+    protocol: TCP
+    name: http
+  - port: 9000
+    targetPort: 9000
+    protocol: TCP
+    name: api
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: minio-storage
+  namespace: ${APP_NAMESPACE}
+subsets:
+- addresses:
+  - ip: ${MINIO_CLUSTER_IP}
+  ports:
+  - port: 9000
+    name: http
+  - port: 9000
+    name: api
+EOF
+
+echo "MinIO proxy service created:"
+echo "  minio-storage:80 -> ${MINIO_CLUSTER_IP}:9000 (for MinIO client default port)"
+echo "  minio-storage:9000 -> ${MINIO_CLUSTER_IP}:9000 (for TCP check)"
+
 # Save namespace info for the e2e tests
-# MINIO_ENDPOINT is just the hostname - the chart will add the port via odf.port
-# We use the cross-namespace DNS name directly since ExternalName doesn't help with port mapping
+# MINIO_HOST is just the hostname (for odf.endpoint - chart uses this for STORAGE_ENDPOINT)
+# MINIO_PORT is 9000 (for odf.port - chart uses this for TCP check)
 echo "MINIO_NAMESPACE=${MINIO_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
 echo "APP_NAMESPACE=${APP_NAMESPACE}" >> "${SHARED_DIR}/minio-env"
-echo "MINIO_ENDPOINT=minio.${MINIO_NAMESPACE}.svc" >> "${SHARED_DIR}/minio-env"
+echo "MINIO_HOST=minio-storage" >> "${SHARED_DIR}/minio-env"
+echo "MINIO_PORT=9000" >> "${SHARED_DIR}/minio-env"
+echo "MINIO_ENDPOINT=minio-storage:9000" >> "${SHARED_DIR}/minio-env"
 echo "S3_ENDPOINT=http://minio.${MINIO_NAMESPACE}.svc:9000" >> "${SHARED_DIR}/minio-env"
 
-# minio-endpoint file (just hostname, no port)
-echo "minio.${MINIO_NAMESPACE}.svc" > "${SHARED_DIR}/minio-endpoint"
+# minio-endpoint file - just the hostname for chart compatibility
+echo "minio-storage" > "${SHARED_DIR}/minio-endpoint"
 
 echo "ODF credentials secret created successfully in ${APP_NAMESPACE} namespace"
 echo "MinIO is accessible from ${APP_NAMESPACE} at: http://minio-proxy.${APP_NAMESPACE}.svc:9000"
