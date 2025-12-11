@@ -56,7 +56,7 @@ fi
 oc create sa netperf -n netperf
 oc adm policy add-scc-to-user hostnetwork -z netperf -n netperf
 
-# Install the Istio Ingress Gateway
+# Install the Istio Ingress Gateway on an Infra node, isolated from openshift-ingress (haproxy pods)
 oc apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -64,7 +64,7 @@ metadata:
   name: istio-ingressgateway
   namespace: istio-system
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       istio: ingressgateway
@@ -117,7 +117,15 @@ spec:
             - matchExpressions:
               - key: node-role.kubernetes.io/infra
                 operator: Exists
-
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                ingresscontroller.operator.openshift.io/deployment-ingresscontroller: default
+            topologyKey: kubernetes.io/hostname
+            namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: openshift-ingress
 EOF
 
 oc wait deployment istio-ingressgateway -n istio-system --for=condition=Available=True --timeout=300s
