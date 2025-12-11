@@ -176,10 +176,24 @@ if [[ -n "${LOOKBACK_SIZE}" ]]; then
     export EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
 fi
 
+INPUT_VARS_LIST=()
+if [[ -n "${REPO_OWNER}" ]]; then
+    INPUT_VARS_LIST+=("\"organization\": \"${REPO_OWNER}\"")
+fi
+if [[ -n "${REPO_NAME}" ]]; then
+    INPUT_VARS_LIST+=("\"repository\": \"${REPO_NAME}\"")
+fi
+if [[ -n "${PULL_NUMBER}" ]]; then
+    INPUT_VARS_LIST+=("\"pull_number\": \"${PULL_NUMBER}\"")
+fi
+INPUT_VARS='--input-vars={'
+INPUT_VARS+=$(IFS=','; echo "${INPUT_VARS_LIST[*]}")
+INPUT_VARS+='}'
+
 set +e
 set -o pipefail
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
+es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion --config ${CONFIG} ${EXTRA_FLAGS} ${INPUT_VARS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 
