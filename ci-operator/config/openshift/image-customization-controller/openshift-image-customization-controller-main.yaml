@@ -1,8 +1,4 @@
 base_images:
-  dev-scripts:
-    name: dev-scripts-honza-aarch64
-    namespace: ocp-kni
-    tag: dev-scripts
   ocp_4.21_base-rhel9:
     name: "4.21"
     namespace: ocp
@@ -14,6 +10,23 @@ base_images:
 build_root:
   from_repository: true
 images:
+- build_args:
+  - name: SOURCE_GIT_URL
+    value: https://github.com/honza/dev-scripts.git
+  - name: SOURCE_GIT_REF
+    value: aarch64-workers
+  dockerfile_literal: |
+    FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.21
+    ARG SOURCE_GIT_URL
+    ARG SOURCE_GIT_REF
+    RUN yum install -y git && \
+        git clone ${SOURCE_GIT_URL} /tmp/dev-scripts-src && \
+        cd /tmp/dev-scripts-src && \
+        git checkout ${SOURCE_GIT_REF}
+    # TEMPORARY: Build dev-scripts from honza/dev-scripts:aarch64-workers for multi-arch testing
+    # TODO: Remove when multi-arch PR merges to openshift-metal3/dev-scripts
+    WORKDIR /tmp/dev-scripts-src
+  to: dev-scripts
 - inputs:
     ocp_4.21_base-rhel9:
       as:
