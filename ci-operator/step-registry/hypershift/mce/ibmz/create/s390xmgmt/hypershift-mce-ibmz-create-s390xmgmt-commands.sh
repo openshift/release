@@ -77,3 +77,6 @@ cat "$SHARED_DIR/mgmt_cluster_name"
 echo "Copying kubeconfig into SHARED_DIR"
 cp "$HOME/$CLUSTER_NAME/auth/kubeconfig" "$SHARED_DIR/kubeconfig"
 echo "Kubeconfig copied into SHARED_DIR"
+
+#Saving node keys to SHARED_DIR
+cp "$HOME/$CLUSTER_NAME/.ssh/$CLUSTER_NAME-key" "$SHARED_DIR/$CLUSTER_NAME-key"
