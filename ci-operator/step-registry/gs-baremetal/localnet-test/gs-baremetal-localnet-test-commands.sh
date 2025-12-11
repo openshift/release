@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euxo pipefail; shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit extglob
 
 start_time=$SECONDS
 
