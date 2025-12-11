@@ -47,14 +47,3 @@ for try in $(seq "${RETRIES}"); do
   fi
 done
 
-
- # 1. 检查 QuayRegistry 的 Clair 配置
-  oc get quayregistry registry -n local-quay -o yaml | grep -A 10 "kind: clair"
-
-  # 2. 检查实际 Clair pods 的资源规格
-  POD=$(oc get pods -n local-quay -l quay-component=clair-app -o jsonpath='{.items[0].metadata.name}')
-  oc get pod $POD -n local-quay -o json | \
-    jq '.spec.containers[] | select(.name=="clair-app") | .resources'
-
-  # 3. 如果发现 pods 还是 2Gi/2CPU，强制重建：
-  #oc delete pods -n local-quay -l quay-component=clair-app
