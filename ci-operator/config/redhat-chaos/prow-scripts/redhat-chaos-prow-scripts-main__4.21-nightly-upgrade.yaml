@@ -1,0 +1,362 @@
+base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+  prow-scripts.prow:
+    name: prow-scripts
+    namespace: chaos
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-main-prow-421-up
+- dockerfile_literal: |-
+    FROM prow-scripts.prow
+    RUN ls
+  from: prow-scripts.prow
+  to: prow-scripts-420-up
+- dockerfile_literal: |-
+    FROM ocp-qe-perfscale-ci
+    RUN ls
+    RUN cp oc /bin
+  from: ocp-qe-perfscale-ci
+  to: perfscale-observer
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.20"
+  multi-initial:
+    release:
+      architecture: multi
+      channel: fast
+      version: "4.20"
+  multi-target:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: chaos-aws-loaded-upgrade-420to421-pod-scenarios
+  cron: 0 12 11 * *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-chaos
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      MAX_UNAVAILABLE: "3"
+      USER_TAGS: |
+        TicketId 421
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    workflow: openshift-qe-upgrade
+- as: chaos-aws-loaded-upgrade-420to421-node-scenarios
+  cron: 0 1 11 * *
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-chaos
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      MAX_UNAVAILABLE: "3"
+      USER_TAGS: |
+        TicketId 421
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-3-quota-slice
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-node-disruptions-worker-outage-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    workflow: openshift-qe-upgrade
+- as: chaos-aws-ipsec-loaded-upgrade-420to421-pod-scenarios
+  cron: 0 12 11 * *
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: aws-chaos
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      MAX_UNAVAILABLE: "3"
+      USER_TAGS: |
+        TicketId 421
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ovn-conf-ipsec-manifest
+    - chain: ipi-install-stableinitial
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    workflow: openshift-qe-upgrade
+- as: chaos-aws-ipsec-loaded-upgrade-420to421-node-scenarios
+  cron: 0 1 11 * *
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: aws-chaos
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      BASE_DOMAIN: aws.rhperfscale.org
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      MAX_UNAVAILABLE: "3"
+      USER_TAGS: |
+        TicketId 421
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-3-quota-slice
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-node-disruptions-worker-outage-observer
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ovn-conf-ipsec-manifest
+    - chain: ipi-install-stableinitial
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    workflow: openshift-qe-upgrade
+- as: chaos-gcp-loaded-upgrade-420to421-node-scenarios
+  cron: 0 12 5 * *
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: gcp-chaos
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      MAX_UNAVAILABLE: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-node-disruptions-worker-outage-observer
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-gcp
+- as: chaos-gcp-loaded-upgrade-420to421-pod-scenarios
+  cron: 0 12 5 * *
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: gcp-chaos
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      CHURN: "false"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      MAX_UNAVAILABLE: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-gcp
+- as: chaos-gcp-fipsetcd-loaded-upgrade-420to421-node-scenarios
+  cron: 0 12 5 * *
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: gcp-chaos
+    dependencies:
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      CHURN: "false"
+      COMPUTE_NODE_REPLICAS: "24"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "3"
+      PROFILE_TYPE: reporting
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-node-disruptions-worker-outage-observer
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+- as: chaos-gcp-fipsetcd-loaded-upgrade-420to421-pod-scenarios
+  cron: 0 12 5 * *
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: gcp-chaos
+    dependencies:
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      CHURN: "false"
+      COMPUTE_NODE_REPLICAS: "24"
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "3"
+      PROFILE_TYPE: reporting
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+- always_run: false
+  as: chaos-azure-multi-upgrade-420to421-3nodes-pod-scenarios
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-target
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKERS: "3"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
+      CUSTOM_AZURE_REGION: eastus
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "1"
+      OCP_ARCH: amd64
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E8s_v3
+      WORKER_REPLICA_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-pod-scenarios-random-system-pods-observer
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: workers-scale
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-azure
+- always_run: false
+  as: chaos-azure-multi-upgrade-420to421-3nodes-node-scenarios
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:multi-target
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKERS: "3"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CHURN: "false"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
+      CUSTOM_AZURE_REGION: eastus
+      ENABLE_FORCE: "true"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE: "1"
+      OCP_ARCH: amd64
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_E8s_v3
+      WORKER_REPLICA_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
+      - redhat-chaos-node-disruptions-worker-outage-observer
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: workers-scale
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-start-krkn
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-azure
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: prow-scripts
+  variant: 4.21-nightly-upgrade
