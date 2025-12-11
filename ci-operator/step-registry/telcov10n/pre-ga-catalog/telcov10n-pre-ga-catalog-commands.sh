@@ -21,37 +21,18 @@ function update_openshift_config_pull_secret {
 
   echo "Adding PreGA pull secret to pull the container image index from the Hub cluster..."
 
-  # optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
-  # optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
-  # qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
+  # Extract credentials from vault files for Konflux/dev build registries
+  optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
+  optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
+  qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
 
-  # openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
-  # openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
-  # openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
+  openshifttest_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.user')
+  openshifttest_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay_openshifttest.json" | jq -r '.password')
+  openshifttest_registry_auth=`echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0`
 
-  # reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
-  # reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
-  # brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
-
-#   cat <<EOF >| /tmp/pre-ga.json
-# {
-#   "auths": {
-#     "quay.io/prega": {
-#       "auth": "$(cat /var/run/telcov10n/ztp-left-shifting/prega-pull-secret)",
-#       "email": "prega@redhat.com"
-#     },
-#     "brew.registry.redhat.io": {
-#       "auth": "${brew_registry_auth}"
-#     },
-#     "quay.io/openshift-qe-optional-operators": {
-#       "auth": "${qe_registry_auth}"
-#     },
-#     "quay.io/openshifttest": {
-#       "auth": "${openshifttest_registry_auth}"
-#     }
-#   }
-# }
-# EOF
+  reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
+  reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
+  brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
 
   cat <<EOF >| /tmp/pre-ga.json
 {
@@ -59,6 +40,18 @@ function update_openshift_config_pull_secret {
     "quay.io/prega": {
       "auth": "$(cat /var/run/telcov10n/ztp-left-shifting/prega-pull-secret)",
       "email": "prega@redhat.com"
+    },
+    "quay.io/acm-d": {
+      "auth": "${qe_registry_auth}"
+    },
+    "brew.registry.redhat.io": {
+      "auth": "${brew_registry_auth}"
+    },
+    "quay.io/openshift-qe-optional-operators": {
+      "auth": "${qe_registry_auth}"
+    },
+    "quay.io/openshifttest": {
+      "auth": "${openshifttest_registry_auth}"
     }
   }
 }
