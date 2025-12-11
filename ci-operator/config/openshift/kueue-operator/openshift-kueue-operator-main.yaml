@@ -19,20 +19,10 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: upi-installer
+binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- additional_architectures:
-  - arm64
-  dockerfile_path: Dockerfile.ci
-  inputs:
-    ocp_builder_rhel-9-base-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.21
-    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
-  to: kueue-operator
 - additional_architectures:
   - arm64
   dockerfile_literal: |
@@ -94,7 +84,7 @@ tests:
   skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
   steps:
     dependencies:
-      SCAN_IMAGE: kueue-operator
+      SCAN_IMAGE: bin
     test:
     - ref: fips-check-image-scan
 - as: security
