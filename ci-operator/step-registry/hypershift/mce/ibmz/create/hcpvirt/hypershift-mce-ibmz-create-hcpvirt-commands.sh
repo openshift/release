@@ -79,6 +79,7 @@ job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
 export job_id
 export CLUSTER_NAME="hcp-s390x-mgmt-ci-$job_id"
 SSH_KEY="$SHARED_DIR/$CLUSTER_NAME-key"
+chmod 600 $SSH_KEY
 HAPROXY_REMOTE_CFG="/etc/haproxy/haproxy.cfg"
 
 # Install IBM Cloud CLI
