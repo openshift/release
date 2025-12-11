@@ -40,8 +40,21 @@ tests:
         /var/run/hcp-integration-credentials/client-id)\nexport AZURE_CLIENT_SECRET;
         AZURE_CLIENT_SECRET=$(cat /var/run/hcp-integration-credentials/client-secret)\nexport
         AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat /var/run/hcp-integration-credentials/tenant)\n\necho
-        \"===== Sync Go workspace vendor directory =====\"\ngo work vendor\n\n# Configure
-        git\ngit config user.name \"openshift-ci-robot\"\ngit config user.email \"openshift-ci-robot@users.noreply.github.com\"\n\necho
+        \"===== Generate GitHub App token =====\"\nb64url() { openssl base64 -e |
+        tr '/+' '_-' | tr -d '=' | tr -d '\\n'; }\nNOW=$(date +%s)\nEXP=$((NOW +
+        600))\nHEADER=$(printf '{\"alg\":\"RS256\",\"typ\":\"JWT\"}' | b64url)\nGITHUB_APP_ID=\"1460951\"\nPAYLOAD=$(printf
+        '{\"iat\":%d,\"exp\":%d,\"iss\":%d}' \"$NOW\" \"$EXP\" \"$GITHUB_APP_ID\"
+        | b64url)\nSIG_INPUT=\"$HEADER.$PAYLOAD\"\nSIGNATURE=$(printf '%s' \"$SIG_INPUT\"
+        | openssl dgst -sha256 -sign /secrets/openshift-ovnk-bot/openshift-pr-manager-app-private-key
+        | b64url)\nJWT=\"$HEADER.$PAYLOAD.$SIGNATURE\"\nINSTALLATION_ID=$(curl -sS
+        -H \"Authorization: Bearer $JWT\" -H \"Accept: application/vnd.github+json\"
+        \"https://api.github.com/repos/Azure/ARO-HCP/installation\" | jq -r .id)\nGITHUB_TOKEN=$(curl
+        -sS -H \"Authorization: Bearer $JWT\" -H \"Accept: application/vnd.github+json\"
+        -X POST \"https://api.github.com/app/installations/${INSTALLATION_ID}/access_tokens\"
+        | jq -r .token)\nmkdir -p /etc/github\necho -n \"$GITHUB_TOKEN\" > /etc/github/oauth\necho
+        \"GitHub App token generated successfully\"\n\necho \"===== Sync Go workspace
+        vendor directory =====\"\ngo work vendor\n\n# Configure git\ngit config user.name
+        \"aro-hcp-bot\"\ngit config user.email \"aro-hcp-bot@users.noreply.github.com\"\n\necho
         \"===== Building image-updater =====\"\ncd tooling/image-updater\nmake build\n\necho
         \"===== Running image-updater for all components =====\"\n./image-updater
         update --config config.yaml | tee /tmp/image-updater-output.txt\n\n# Check
@@ -62,11 +75,11 @@ tests:
         Image digest update PR created. Please review: https://github.com/Azure/ARO-HCP/pulls?q=is%3Apr+is%3Aopen+author%3Aopenshift-ci-robot\\\"}\"
         \"${WEBHOOK_URL}\"\n"
       credentials:
-      - collection: ""
-        mount_path: /etc/github
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        namespace: ci
-      - collection: ""
+      - collection: \"\"
+        mount_path: /secrets/openshift-ovnk-bot
+        name: openshift-pr-manager-app-private-key
+        namespace: test-credentials
+      - collection: \"\"
         mount_path: /var/run/hcp-integration-credentials
         name: hcp-integration-credentials
         namespace: test-credentials
