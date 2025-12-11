@@ -16,6 +16,13 @@ export CLUSTER_ARCH
 ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
 export ssh_key_file
 
+job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
+export job_id
+export CLUSTER_NAME="hcp-s390x-mgmt-ci-$job_id"
+SSH_KEY="$SHARED_DIR/$CLUSTER_NAME-key"
+chmod 600 $SSH_KEY
+HAPROXY_REMOTE_CFG="/etc/haproxy/haproxy.cfg"
+
 # Installing hypershift cli
 HYPERSHIFT_CLI_NAME=hcp
 echo "$(date) Installing hypershift cli"
@@ -75,12 +82,7 @@ oc apply -f /tmp/hc-manifests/cluster-agent.yaml
 oc wait --timeout=15m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
 echo "$(date) Kubevirt cluster is available"
 
-job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
-export job_id
-export CLUSTER_NAME="hcp-s390x-mgmt-ci-$job_id"
-SSH_KEY="$SHARED_DIR/$CLUSTER_NAME-key"
-chmod 600 $SSH_KEY
-HAPROXY_REMOTE_CFG="/etc/haproxy/haproxy.cfg"
+
 
 # Install IBM Cloud CLI
 export PATH="$HOME/.tmp/bin:$PATH"
@@ -200,29 +202,26 @@ echo "Generated HAProxy section:"
 cat "$haproxy_section"
 
 # Update HAProxy on bastion
-ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" bash << 'EOF'
-# Backup existing HAProxy config
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" bash << EOF
 cp "$HAPROXY_REMOTE_CFG" "${HAPROXY_REMOTE_CFG}.bak_$(date +%F_%H%M%S)"
-
-# Remove old cluster section if exists
-if grep -q 'hosted2-api-server' "$HAPROXY_REMOTE_CFG"; then
-    sed -i '/hosted2-api-server/,/^$/d' "$HAPROXY_REMOTE_CFG"
-fi
-
+sed -i '/hosted2-api-server/,/^$/d' "$HAPROXY_REMOTE_CFG"
 EOF
 
-# Now append the LOCAL haproxy section content remotely
+# -----------------------
+# 2. Append new section
+# -----------------------
 ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" \
-  "cat >> \"$HAPROXY_REMOTE_CFG\"" << 'HASECTION'
+  "cat >> \"$HAPROXY_REMOTE_CFG\"" << HASECTION
 $(cat "$haproxy_section")
 HASECTION
 
-ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" bash << 'EOF'
-# Restart HAProxy
+# -----------------------
+# 3. Restart HAProxy
+# -----------------------
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" bash << EOF
 systemctl restart haproxy
 systemctl status haproxy --no-pager
 EOF
-
 
 echo "✔ HAProxy updated successfully on bastion $BASTION_FIP"
 
