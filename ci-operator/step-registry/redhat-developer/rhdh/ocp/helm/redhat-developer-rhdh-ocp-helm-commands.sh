@@ -1,4 +1,15 @@
 #!/bin/bash
+
+# Check for [skip-build] commit comments in the PR title
+if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
+   PR_TITLE=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}" | jq -r '.title')
+    echo "PR_TITLE: $PR_TITLE"
+    if [[ "$PR_TITLE" == *"[skip-build]"* ]]; then
+        echo "PR_TITLE contains '[skip-build]', skipping all test execution with exit code 0"
+        exit 0
+    fi
+fi
+
 echo "========== Workdir Setup =========="
 export HOME WORKSPACE
 HOME=/tmp
