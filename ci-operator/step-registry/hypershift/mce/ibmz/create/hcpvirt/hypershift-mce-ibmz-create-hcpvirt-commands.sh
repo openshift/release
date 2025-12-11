@@ -221,29 +221,76 @@ EOF
 
 echo "✔ HAProxy updated successfully on bastion $BASTION_FIP"
 
-# Download hosted cluster kubeconfig
 echo "$(date) Create hosted cluster kubeconfig"
-${HYPERSHIFT_CLI_NAME} create kubeconfig kubevirt --namespace=${HC_NS} --name=${HC_NAME} >${SHARED_DIR}/nested_kubeconfig
+${HYPERSHIFT_CLI_NAME} create kubeconfig kubevirt \
+  --namespace="${HC_NS}" --name="${HC_NAME}" \
+  > "${SHARED_DIR}/nested_kubeconfig"
 echo "${HC_NAME}" > "${SHARED_DIR}/cluster-name"
 
-# Get NodePort
-NODEPORT=$(oc get svc kube-apiserver -n $HC_NS -o jsonpath='{.spec.ports[?(@.port==6443)].nodePort}')
+HOSTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+
+# --- Wait for kube-apiserver NodePort ---
+echo "Waiting for kube-apiserver service..."
+NODEPORT=""
+for i in {1..30}; do
+  NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
+    get svc kube-apiserver -n "$HC_NS" \
+    -o jsonpath='{.spec.ports[?(@.port==6443)].nodePort}' 2>/dev/null || true)
+  if [[ -n "$NODEPORT" ]]; then
+    break
+  fi
+  echo "kube-apiserver NodePort not ready yet, retrying... ($i/30)"
+  sleep 10
+done
+
+if [[ -z "$NODEPORT" ]]; then
+  echo "ERROR: kube-apiserver service not found"
+  exit 1
+fi
 echo "Kube-apiserver NodePort: $NODEPORT"
 
-# Update kubeconfig server URL
-sed -i "s#server: https://.*:6443#server: https://${BASTION_FIP}:${NODEPORT}#g" ${SHARED_DIR}/nested_kubeconfig
+# --- Update kubeconfig server URL safely ---
+CLSTR_NAME=$(oc --kubeconfig "$HOSTED_KUBECONFIG" config view -o jsonpath='{.clusters[0].name}')
+oc --kubeconfig "$HOSTED_KUBECONFIG" config set-cluster "$CLSTR_NAME" \
+  --server="https://${BASTION_FIP}:${NODEPORT}"
+echo "✅ Updated kubeconfig server URL to https://${BASTION_FIP}:${NODEPORT}"
 
-# Get the HTTP & HTTPS node port
-HOSTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-HTTP_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
-  get svc router-nodeport-default -n openshift-ingress \
-  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}')
+# --- Wait for ingress router service NodePorts ---
+echo "Waiting for router-nodeport-default service..."
+HTTP_NODEPORT=""
+HTTPS_NODEPORT=""
+for i in {1..30}; do
+  HTTP_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
+    get svc router-nodeport-default -n openshift-ingress \
+    -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)
+
+  HTTPS_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
+    get svc router-nodeport-default -n openshift-ingress \
+    -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || true)
+
+  if [[ -n "$HTTP_NODEPORT" && -n "$HTTPS_NODEPORT" ]]; then
+    break
+  fi
+  echo "Router NodePorts not ready yet, retrying... ($i/30)"
+  sleep 10
+done
+
+if [[ -z "$HTTP_NODEPORT" || -z "$HTTPS_NODEPORT" ]]; then
+  echo "ERROR: router-nodeport-default service not found or ports not assigned"
+  exit 1
+fi
+
 echo "HTTP NodePort: $HTTP_NODEPORT"
-
-HTTPS_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
-  get svc router-nodeport-default -n openshift-ingress \
-  -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}')
 echo "HTTPS NodePort: $HTTPS_NODEPORT"
+
+# --- Export for next Prow steps ---
+export HOSTED_KUBECONFIG
+export HTTP_NODEPORT
+export HTTPS_NODEPORT
+
+echo "✅ Hosted kubeconfig and NodePorts are ready."
+
+sleep 1800
 
 # Create loadbalancer service
 oc apply -f - <<EOF
