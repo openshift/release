@@ -3399,20 +3399,29 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
-- as: vsphere-ipi-ovn-dualstack-primaryv6-f28-netobserv
-  cron: 14 22 12 * *
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-netobserv
+  capabilities:
+  - intranet
+  cron: 44 1 6 * *
   steps:
-    cluster_profile: vsphere-elastic
+    cluster_profile: equinix-ocp-metal-qe
     env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
       TEST_FILTERS: Network_Observability
       TEST_IMPORTANCE: .*
-      TEST_SCENARIOS: "53844"
+      TEST_SCENARIOS: with VMs|53844
       TEST_TIMEOUT: "55"
     test:
+    - ref: netobserv-apply-redhat-operators
+    - chain: storage-conf-csi-optional-topolvm
     - ref: cucushift-pre
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
-    workflow: openshift-e2e-vsphere-ovn-dualstack
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: vsphere-ipi-longduration-mco-fips-proxy-g1-f14
   cron: 24 14 11,25 * *
   steps:
