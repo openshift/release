@@ -64,7 +64,8 @@ gather_debug_info() {
     echo ""
     
     # CSV status if exists
-    local csv_name=$(oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || echo "")
+    local csv_name
+    csv_name=$(oc get subscription "${operator_name}" -n "${operator_install_namespace}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || echo "")
     if [[ -n "${csv_name}" ]]; then
         echo "--- CSV ${csv_name} Details ---"
         oc get csv "${csv_name}" -n "${operator_install_namespace}" -o yaml || echo "CSV not found"
