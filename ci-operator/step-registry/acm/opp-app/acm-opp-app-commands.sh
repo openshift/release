@@ -221,9 +221,9 @@ run_test_case_1() {
 
     # Verify image pushed to Quay registry (OPP integration)
     echo "Verifying image pushed to Quay registry..."
-    QUAY_REGISTRY="registry-quay-local-quay.apps.ci-op-kp66d69k-4f127.cspilp.interop.ccitredhat.com"
-    QUAY_IMAGE_PATH="openshift_e2e-opp/httpd-example"
-    QUAY_MANIFEST_URL="https://$QUAY_REGISTRY/v2/$QUAY_IMAGE_PATH/manifests/latest"
+    QUAY_HOSTNAME=$(oc get quayintegration quay -o jsonpath='{.spec.quayHostname}') || { echo "ERROR: Failed to get Quay hostname"; oc get quayintegration quay -o yaml || true; return 1; }
+    QUAY_MANIFEST_URL="$QUAY_HOSTNAME/v2/openshift_e2e-opp/httpd-example/manifests/latest"
+    echo "Checking Quay manifest URL: $QUAY_MANIFEST_URL"
 
     QUAY_CHECK_RETRIES=20
     QUAY_CHECK_INTERVAL=15
