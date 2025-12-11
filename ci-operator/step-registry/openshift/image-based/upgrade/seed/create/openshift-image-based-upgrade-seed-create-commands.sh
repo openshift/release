@@ -90,6 +90,10 @@ if [[ ! -z "${OO_BUNDLE_OVERRIDE}" ]]; then
   OO_BUNDLE=$OO_BUNDLE_OVERRIDE
 fi
 
+if [[ ! -z "${RECERT_IMAGE_DEPENDENCY}" ]]; then
+  RECERT_IMAGE=$RECERT_IMAGE_DEPENDENCY
+fi
+
 echo "Creating seed script..."
 cat <<EOF > ${SHARED_DIR}/create_seed.sh
 #!/bin/bash
