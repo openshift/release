@@ -201,23 +201,19 @@ done <<< "$worker_ips"
 echo "Generated HAProxy section:"
 cat "$haproxy_section"
 
-# Update HAProxy on bastion
+# shellcheck disable=SC2087
 ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" bash << EOF
 cp "$HAPROXY_REMOTE_CFG" "${HAPROXY_REMOTE_CFG}.bak_$(date +%F_%H%M%S)"
 sed -i '/hosted2-api-server/,/^$/d' "$HAPROXY_REMOTE_CFG"
 EOF
 
-# -----------------------
-# 2. Append new section
-# -----------------------
+# shellcheck disable=SC2087
 ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" \
-  "cat >> \"$HAPROXY_REMOTE_CFG\"" << HASECTION
+  "cat >> \"$HAPROXY_REMOTE_CFG\"" << EOF2
 $(cat "$haproxy_section")
-HASECTION
+EOF2
 
-# -----------------------
-# 3. Restart HAProxy
-# -----------------------
+#Restart HAProxy
 ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no root@"$BASTION_FIP" bash << EOF
 systemctl restart haproxy
 systemctl status haproxy --no-pager
