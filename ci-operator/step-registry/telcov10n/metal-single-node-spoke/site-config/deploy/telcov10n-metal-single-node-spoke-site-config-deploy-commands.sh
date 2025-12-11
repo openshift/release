@@ -711,7 +711,7 @@ function setup-pre-ga-catalog-access {
 
   if [ -f ${SHARED_DIR}/pull-secret-with-pre-ga.json ];then
 
-      echo "************ telcov10n Setup ZTP to use PreGA catalog ************"
+      echo "************ telcov10n Setup ZTP to use PreGA catalog with Konflux build mirrors ************"
 
       cat <<EO-cm | oc apply -f -
 apiVersion: v1
@@ -725,6 +725,45 @@ data:
   registries.conf: |
     unqualified-search-registries = ["registry.access.redhat.com", "docker.io"]
 
+    # Mirror configuration for multicluster-engine images (Konflux builds)
+    [[registry]]
+       prefix = ""
+       location = "registry.redhat.io/multicluster-engine"
+       mirror-by-digest-only = true
+
+       [[registry.mirror]]
+       location = "quay.io/acm-d"
+       insecure = false
+
+       [[registry.mirror]]
+       location = "brew.registry.redhat.io/rh-osbs/multicluster-engine"
+       insecure = false
+
+    # Mirror configuration for rhacm2 images (Konflux builds)
+    [[registry]]
+       prefix = ""
+       location = "registry.redhat.io/rhacm2"
+       mirror-by-digest-only = true
+
+       [[registry.mirror]]
+       location = "quay.io/acm-d"
+       insecure = false
+
+       [[registry.mirror]]
+       location = "brew.registry.redhat.io/rh-osbs/rhacm2"
+       insecure = false
+
+    # Mirror configuration for openshift4 images (for dependencies)
+    [[registry]]
+       prefix = ""
+       location = "registry.redhat.io/openshift4"
+       mirror-by-digest-only = true
+
+       [[registry.mirror]]
+       location = "quay.io/acm-d"
+       insecure = false
+
+    # Legacy PreGA catalog mirror (for backward compatibility)
     [[registry]]
        prefix = ""
        location = "registry.redhat.io"
@@ -736,6 +775,11 @@ EO-cm
 
     mirror_registry_ref="mirrorRegistryRef:
       name: assisted-installer-mirror-config"
+
+      # Add annotation to allow unrestricted image pulls
+      oc annotate agentserviceconfig agent \
+        "unsupported.agent-install.openshift.io/assisted-service-allow-unrestricted-image-pulls=" \
+        --overwrite 2>/dev/null || true
 
       set -x
       oc -n multicluster-engine get cm assisted-installer-mirror-config -oyaml
