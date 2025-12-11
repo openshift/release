@@ -2,7 +2,7 @@
 
 set -exuo pipefail
 
-HCP_CLI="/usr/bin/hcp"
+HCP_CLI="bin/hypershift"
 
 MCE=${MCE_VERSION:-""}
 CLUSTER_NAME=$(echo -n "${PROW_JOB_ID}"|sha256sum|cut -c-20)
@@ -160,7 +160,7 @@ EOF
   if [[ "${ATTACH_DEFAULT_NETWORK}" == "true" ]]; then
     EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
   else
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:clusters-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
   fi
 fi
 
@@ -194,6 +194,7 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
     --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
     --infra-availability-policy "${INFRA_AVAILABILITY}" \
     --service-cidr 172.32.0.0/16 \
+    --control-plane-operator-image quay.io/zhouying7780/hypershift-control-plane:66205 \
     --cluster-cidr 10.136.0.0/14 ${RENDER_COMMAND} > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 
   oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
@@ -212,6 +213,7 @@ else
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
     --infra-availability-policy ${INFRA_AVAILABILITY} \
     --service-cidr 172.32.0.0/16 \
+    --control-plane-operator-image quay.io/zhouying7780/hypershift-control-plane:66205 \
     --cluster-cidr 10.136.0.0/14  $(support_np_skew)"
 fi
 

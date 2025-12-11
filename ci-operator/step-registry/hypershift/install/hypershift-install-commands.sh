@@ -4,9 +4,9 @@ set -eux
 
 EXTRA_ARGS=""
 HCP_CLI="bin/hypershift"
-OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
+OPERATOR_IMAGE="quay.io/zhouying7780/hypershift-operator:66205"
 if [[ $HO_MULTI == "true" ]]; then
-  OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
+  OPERATOR_IMAGE="quay.io/zhouying7780/hypershift-operator:66205"
   oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
   mkdir /tmp/hs-cli
   oc image extract quay.io/acm-d/rhtap-hypershift-operator:latest --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
