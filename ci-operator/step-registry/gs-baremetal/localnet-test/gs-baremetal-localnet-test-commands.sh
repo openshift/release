@@ -211,12 +211,17 @@ curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
 oc whoami --show-console
 HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
 
-# TODO: We might need to re-import all the images to utlize the new default storage class.
+if ! oc get storageclass "${DEFAULT_STORAGE_CLASS}" &>/dev/null; then
+    echo "ERROR: Storage class '${DEFAULT_STORAGE_CLASS}' not found!"
+    echo "Available storage classes:"
+    oc get storageclass
+    exit 1
+fi
+
 oc get sc
-setDefaultStorageClass 'ocs-storagecluster-ceph-rbd-virtualization'
+setDefaultStorageClass "${DEFAULT_STORAGE_CLASS}"
 oc get sc
 cnv::reimport_datavolumes
-
 rc=0
 uv run --verbose --cache-dir /tmp/uv-cache pytest \
     -s \
