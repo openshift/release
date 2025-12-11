@@ -164,7 +164,7 @@ done
 # Update CSI driver to be removed.  Note, sometimes this can take a little while to start removing pods, but only on first attempt.
 # For now, we'll update and move on.  It should be resolved by the time the BM is ready to join.
 # If STORAGE_CO_DEGRADE_CHECK is true, we will patch clustercsidriver managementState later to make sure the Storage cluster operator degrades.
-if [[ "${CSI_MANAGEMENT_REMOVED}" == "true"] && ["${STORAGE_CO_DEGRADE_CHECK}" == "false" ]]; then
+if [[ "${CSI_MANAGEMENT_REMOVED}" == "true" ] && [ "${STORAGE_CO_DEGRADE_CHECK}" == "false" ]]; then
   patch_csi_driver_management_state
 fi
 
@@ -191,7 +191,7 @@ wait_for_storage_co_degrade
 
 # Update CSI driver to be removed.  Note, sometimes this can take a little while to start removing pods, but only on first attempt.
 # We will patch clustercsidriver managementState now if skipped earlier to make sure the Storage cluster operator degrades.
-if [[ "${CSI_MANAGEMENT_REMOVED}" == "true"] && ["${STORAGE_CO_DEGRADE_CHECK}" == "true"] ]; then
+if [[ "${CSI_MANAGEMENT_REMOVED}" == "true" ] && [ "${STORAGE_CO_DEGRADE_CHECK}" == "true" ]]; then
   patch_csi_driver_management_state
 fi
 
