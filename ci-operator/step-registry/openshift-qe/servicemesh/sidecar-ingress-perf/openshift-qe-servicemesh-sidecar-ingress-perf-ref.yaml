@@ -1,11 +1,11 @@
 ref:
-  as: openshift-qe-ingress-perf
+  as: openshift-qe-servicemesh-sidecar-ingress-perf
   from_image:
     namespace: ci
     name: ocp-qe-perfscale-ci
     tag: latest
   cli: latest
-  commands: openshift-qe-ingress-perf-commands.sh
+  commands: openshift-qe-servicemesh-sidecar-ingress-perf-commands.sh
   credentials:
   - namespace: test-credentials # this entry injects the custom credential
     name: ocp-qe-perfscale-es
@@ -20,9 +20,9 @@ ref:
     documentation: |-
       Override the ingress-perf version
   - name: CONFIG
-    default: "config/standard.yml"
+    default: "config/standard-servicemesh.yml"
     documentation: |-
-      Defaults to "config/standard.yml"
+      Use the standard servicemesh configuration file.
   - name: LOG_LEVEL
     default: "info"
     documentation: |-
@@ -32,21 +32,22 @@ ref:
     documentation: |-
       Defaults to 5 Iterations
   - name: ADDITIONAL_PARAMS
-    default: '{}'
+    default: '{"service_mesh_mode": "sidecar"}'
     documentation: |-
-      JSON value to upload additonal metadata to the fingerprint
+      Additonal metadata fingerprint for the service mesh mode.
   - name: GATEWAY_API
     default: "false"
     documentation: |-
-      Ingress-perf is compatible with the OpenShift implementation of the Gateway API, provided by OpenShift Service Mesh. To enable this, set it to "true".
+      Ingress-perf is compatible with the OpenShift implementation of the Gateway API, provided by OpenShift Service Mesh.
+      For OSSM specific tests, it should be set to "false" to let the traffic flow through the istio-ingressgateway.
   - name: SERVICE_MESH
-    default: ""
+    default: "sidecar"
     documentation: |-
-      Define the service mesh mode to use: sidecar or ambient, no service mesh is used by default
+      Define the service mesh mode to use: sidecar
   timeout: 4h
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
   documentation: >-
-    This step runs the PerfScale's ingress-perf workload in the deployed cluster
+    This step runs the PerfScale's ingress-perf workload for the sidecar service mesh in the deployed cluster
