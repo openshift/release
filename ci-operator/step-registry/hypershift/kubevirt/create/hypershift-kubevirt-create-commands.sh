@@ -173,8 +173,13 @@ case "${IP_STACK}" in
    EXTRA_ARGS+=" --service-cidr 172.32.0.0/16 --cluster-cidr 10.136.0.0/14 "
    ;;
  "v4v6")
-   # --cluster-cidr 10.132.0.0/14 --cluster-cidr fd03::/48 --service-cidr 172.31.0.0/16 --service-cidr fd04::/112
-   EXTRA_ARGS+=" --default-dual "
+   # Use explicit CIDRs with IPv4 first (primary) since --default-dual doesn't work for KubeVirt
+   # Use non-conflicting IPv6 CIDRs (fd03::/48, fd04::/112) to avoid conflicts with management cluster
+   EXTRA_ARGS+=" --cluster-cidr 10.132.0.0/14 --cluster-cidr fd03::/48 --service-cidr 172.31.0.0/16 --service-cidr fd04::/112 "
+   ;;
+ "v6v4")
+   # Use explicit CIDRs with IPv6 first (primary) for v6v4 stack
+   EXTRA_ARGS+=" --cluster-cidr fd03::/48 --cluster-cidr 10.132.0.0/14 --service-cidr fd04::/112 --service-cidr 172.31.0.0/16 "
    ;;
  "v6")
    EXTRA_ARGS+=" --cluster-cidr fd03::/48 --service-cidr fd04::/112 "
