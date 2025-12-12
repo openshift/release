@@ -188,8 +188,9 @@ function verify_nodes() {
         FAILURE_SUMMARY+=("${node}: throughput ${volume_throughput}")
         ret=$((ret+1))
         continue
+      else
+        echo "PASS: ${node} volume ${volume_id} throughput=${volume_throughput}MiB/s (expected=${expected_throughput}MiB/s)"
       fi
-      echo "PASS: ${node} volume ${volume_id} throughput=${volume_throughput}MiB/s (expected=${expected_throughput}MiB/s)"
     else
       echo "INFO: ${node} volume ${volume_id} type=${volume_type} throughput=${volume_throughput}MiB/s (no throughput check required)"
     fi
