@@ -19,6 +19,38 @@ if ! oc get secret pull-secret -n "${AGENT_NAMESPACE}"; then
       --type=kubernetes.io/dockerconfigjson -n "${AGENT_NAMESPACE}"
 fi
 
+# Workaround for OCP 4.19+ signature verification issue (OCPBUGS-XXXXX)
+# The discovery ISO's /etc/containers/policy.json requires signatures, but the
+# assisted-installer-agent image fails signature verification in OCP 4.19+.
+# This ignition override configures a permissive policy to allow unsigned images.
+OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1,2)
+IGNITION_OVERRIDE=""
+# Extract major and minor version numbers for comparison
+OCP_MAJOR=$(echo "$OCP_VERSION" | cut -d. -f1)
+OCP_MINOR=$(echo "$OCP_VERSION" | cut -d. -f2)
+if [[ "$OCP_MAJOR" -eq 4 ]] && [[ "$OCP_MINOR" -ge 19 ]]; then
+  echo "[WARN] Applying signature policy workaround for OCP 4.19+ agent.service image pull issue"
+  POLICY_JSON_BASE64=$(echo '{"default":[{"type":"insecureAcceptAnything"}]}' | base64 -w0)
+  IGNITION_OVERRIDE="ignitionConfigOverride: |
+    {
+      \"ignition\": {
+        \"version\": \"3.2.0\"
+      },
+      \"storage\": {
+        \"files\": [
+          {
+            \"path\": \"/etc/containers/policy.json\",
+            \"mode\": 420,
+            \"overwrite\": true,
+            \"contents\": {
+              \"source\": \"data:text/plain;charset=utf-8;base64,${POLICY_JSON_BASE64}\"
+            }
+          }
+        ]
+      }
+    }"
+fi
+
 oc apply -f - <<EOF
 apiVersion: agent-install.openshift.io/v1beta1
 kind: InfraEnv
@@ -30,6 +62,7 @@ spec:
   pullSecretRef:
     name: pull-secret
   sshAuthorizedKey: $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
+  ${IGNITION_OVERRIDE}
 EOF
 
 # Wait until ISO is generated for InfraEnv
