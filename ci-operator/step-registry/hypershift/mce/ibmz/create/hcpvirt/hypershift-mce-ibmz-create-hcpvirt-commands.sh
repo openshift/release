@@ -233,9 +233,8 @@ HOSTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 echo "Waiting for kube-apiserver service..."
 NODEPORT=""
 for i in {1..30}; do
-  NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
-    get svc kube-apiserver -n "$HC_NS" \
-    -o jsonpath='{.spec.ports[?(@.port==6443)].nodePort}' 2>/dev/null || true)
+  NODEPORT=$(oc get svc kube-apiserver -n "${HC_NS}-${HC_NAME}" \
+    -o jsonpath="{.spec.ports[?(@.port==6443)].nodePort}" 2>/dev/null || true)
   if [[ -n "$NODEPORT" ]]; then
     break
   fi
@@ -261,10 +260,12 @@ HTTP_NODEPORT=""
 HTTPS_NODEPORT=""
 for i in {1..30}; do
   HTTP_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
+    --insecure-skip-tls-verify=true \
     get svc router-nodeport-default -n openshift-ingress \
     -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)
 
   HTTPS_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
+    --insecure-skip-tls-verify=true \
     get svc router-nodeport-default -n openshift-ingress \
     -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || true)
 
