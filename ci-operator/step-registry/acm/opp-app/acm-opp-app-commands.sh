@@ -223,6 +223,8 @@ run_test_case_1() {
     echo "Verifying image pushed to Quay registry..."
     QUAY_HOSTNAME=$(oc get quayintegration quay -o jsonpath='{.spec.quayHostname}') || { echo "ERROR: Failed to get Quay hostname"; oc get quayintegration quay -o yaml || true; return 1; }
     QUAY_MANIFEST_URL="$QUAY_HOSTNAME/v2/openshift_e2e-opp/httpd-example/manifests/latest"
+    QUAY_TOKEN=$(oc get secret -n policies quay-integration -o jsonpath='{.data.token}' 2>/dev/null | base64 -d | /tmp/jq -r '.token' 2>/dev/null || echo "")
+    [ -z "$QUAY_TOKEN" ] && { echo "ERROR: Failed to get Quay token from quay-integration secret"; oc get secret -n policies quay-integration -o yaml || true; return 1; }
     echo "Checking Quay manifest URL: $QUAY_MANIFEST_URL"
 
     QUAY_CHECK_RETRIES=20
@@ -231,7 +233,7 @@ run_test_case_1() {
     for attempt in $(seq 1 $QUAY_CHECK_RETRIES); do
         echo "Attempt $attempt/$QUAY_CHECK_RETRIES: Checking if image exists in Quay..."
 
-        HTTP_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" "$QUAY_MANIFEST_URL" 2>/dev/null || echo "000")
+        HTTP_STATUS=$(curl -k -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $QUAY_TOKEN" "$QUAY_MANIFEST_URL" 2>/dev/null || echo "000")
 
         if [ "$HTTP_STATUS" = "200" ]; then
             echo "✓ Image successfully pushed to Quay registry"
