@@ -162,7 +162,6 @@ handle_azure() {
     else
         # On normal cluster wait for it to be Available
         echo "Waiting for OpenShift infrastructure to be ready..."
-        oc wait --for=condition=Available --timeout=600s infrastructure/cluster
         MANAGEMENT_RESOURCE_GROUP="$AZURE_RESOURCE_GROUP"
     fi
     for I in {1..30}; do
