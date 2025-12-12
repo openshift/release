@@ -187,7 +187,9 @@ wait_for_node_ready
 
 # Verifying Storage cluster operator is degraded for (OCP >=4.21) feature, STOR-2620: vSphere Bare Metal nodes support
 # Wait for Storage cluster operator to degrade
-wait_for_storage_co_degrade
+if [ "${STORAGE_CO_DEGRADE_CHECK}" == "true" ]; then
+  wait_for_storage_co_degrade
+fi
 
 # Update CSI driver to be removed.  Note, sometimes this can take a little while to start removing pods, but only on first attempt.
 # We will patch clustercsidriver managementState now if skipped earlier to make sure the Storage cluster operator degrades.
