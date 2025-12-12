@@ -13,7 +13,6 @@ debug_on_exit() {
   local end_time=$SECONDS
   local execution_time=$((end_time - start_time))
   local debug_threshold=1800 # 30 minutes in seconds
-  local hco_namespace=openshift-cnv
 
   if [[ (${execution_time} -lt ${debug_threshold}) || ${exit_code} -ne 0 ]]; then
     echo
@@ -209,12 +208,12 @@ curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
 oc whoami --show-console
 HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
 
-if ! oc get storageclass "${DEFAULT_STORAGE_CLASS}" &>/dev/null; then
-    echo "ERROR: Storage class '${DEFAULT_STORAGE_CLASS}' not found!"
-    echo "Available storage classes:"
+# Assuming that `DEFAULT_STORAGE_CLASS` has been previously set (or set as env. var. by CI Operator).
+oc get storageclass "${DEFAULT_STORAGE_CLASS}" 1> /dev/null || {
+    : "Storage Class '${DEFAULT_STORAGE_CLASS}' does not exist. Available Storage Classes are:"
     oc get storageclass
-    exit 1
-fi
+    false
+}
 
 oc get sc
 setDefaultStorageClass "${DEFAULT_STORAGE_CLASS}"
