@@ -1,4 +1,8 @@
 base_images:
+  aro-hcp-e2e-base-image:
+    name: aro-hcp-e2e-base
+    namespace: rh_ee_ves
+    tag: v1.0
   nested-podman:
     name: nested-podman
     namespace: ci
@@ -52,26 +56,17 @@ images:
   from: src
   to: aro-hcp-frontend
 - dockerfile_literal: |
-    FROM src
-    RUN cat /etc/dnf/dnf.conf || true
-    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
-    RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
-    RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
-    RUN dnf install -y azure-cli libicu
+    FROM aro-hcp-e2e-base-image
     USER root
-    RUN mkdir -p /usr/local/bin
-    RUN az bicep install && mv /root/.azure/bin/bicep /usr/local/bin
-    RUN az aks install-cli --kubelogin-install-location /usr/local/bin/kubelogin
-    RUN curl -LO "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz" && \
-        tar -xzf openshift-client-linux.tar.gz -C /usr/local/bin oc && \
-        rm openshift-client-linux.tar.gz && \
-        chmod +x /usr/local/bin/oc
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    ENV GOBIN="$(go env GOPATH)/bin"
+    ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
     RUN export GOFLAGS='-mod=readonly' && \
         make install-tools && \
         make -C tooling/templatize templatize && \
         make -C test/ aro-hcp-tests prow-job-executor
-    ENV PATH="/usr/local/bin:$PATH"
-  from: src
+  from: aro-hcp-e2e-base-image
   inputs:
     src:
       paths:
