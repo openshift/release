@@ -13,7 +13,6 @@ debug_on_exit() {
   local end_time=$SECONDS
   local execution_time=$((end_time - start_time))
   local debug_threshold=1800 # 30 minutes in seconds
-  local hco_namespace=openshift-cnv
 
   if [[ (${execution_time} -lt ${debug_threshold}) || ${exit_code} -ne 0 ]]; then
     echo
