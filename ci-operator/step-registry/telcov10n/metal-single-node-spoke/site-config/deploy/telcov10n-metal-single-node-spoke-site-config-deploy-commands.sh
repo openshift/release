@@ -366,7 +366,7 @@ resources:
 
 configMapGenerator:
   - files:
-    $(add_icsp_cr_if_exists)
+    $(add_idms_cr_if_exists)
 $(generate_extracted_list_of_extra_manifest_paths "sno-extra-manifest")
     name: extra-manifests-cm
     namespace: ${SPOKE_CLUSTER_NAME}
@@ -376,9 +376,9 @@ generatorOptions:
 EOK
 }
 
-function add_icsp_cr_if_exists {
-  [ -f "${SHARED_DIR}/imageContentSourcePolicy.yaml" ] && \
-    echo "- sno-extra-manifest/imageContentSourcePolicy.yaml"
+function add_idms_cr_if_exists {
+  [ -f "${SHARED_DIR}/imageDigestMirrorSet.yaml" ] && \
+    echo "- sno-extra-manifest/imageDigestMirrorSet.yaml"
 }
 
 function generate_ztp_cluster_manifests {
@@ -516,9 +516,9 @@ EOK
 ts="$(date -u +%s%N)"
 extra_manifest_path=\${ztp_repo_dir}/clusters/${SPOKE_CLUSTER_NAME}/sno-extra-manifest/
 echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${extra_manifest_path}/.cluster-image-set-used.\${ts}
-cat <<EO-ICSP >| \${extra_manifest_path}/imageContentSourcePolicy.yaml
-$(cat ${SHARED_DIR}/imageContentSourcePolicy.yaml || echo "---")
-EO-ICSP
+cat <<EO-IDMS >| \${extra_manifest_path}/imageDigestMirrorSet.yaml
+$(cat ${SHARED_DIR}/imageDigestMirrorSet.yaml || echo "---")
+EO-IDMS
 echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${ztp_repo_dir}/site-policies/.cluster-image-set-used.\${ts}
 
 ############## BEGIN of ArgoCD extra manifest extration #####################################################
