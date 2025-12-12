@@ -1,33 +1,17 @@
 base_images:
   ansible:
-    name: "4.16"
+    name: "4.20"
     namespace: ocp
     tag: ansible
-  aws-efs-csi-operator-create-efs:
-    name: "4.16"
-    namespace: ocp
-    tag: aws-efs-csi-operator-create-efs
   cli:
-    name: "4.16"
+    name: "4.20"
     namespace: ocp
     tag: cli
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocm-cli:
-    name: ocm-cli
-    namespace: ci
-    tag: latest
   tests-private:
-    name: tests-private
-    namespace: ci
-    tag: "4.18"
-  tests-private-postupg:
-    name: tests-private
-    namespace: ci
-    tag: "4.18"
-  tests-private-preupg:
     name: tests-private
     namespace: ci
     tag: "4.18"
@@ -36,19 +20,19 @@ base_images:
     namespace: ci
     tag: "4.18"
   tools:
-    name: "4.16"
+    name: "4.20"
     namespace: ocp
     tag: tools
   upi-installer:
-    name: "4.16"
+    name: "4.20"
     namespace: ocp
     tag: upi-installer
 releases:
   latest:
     release:
-      architecture: amd64
+      architecture: multi
       channel: candidate
-      version: "4.16"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -57,13 +41,12 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: aws-usgov-ipi-private-sts-f999-logging
-  cron: 30 2 29 2 *
+- as: aws-ipi-proxy-sts-f999-logging
+  cron: 20 2 29 2 *
   steps:
-    cluster_profile: aws-usgov-qe
+    cluster_profile: aws-observability
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "true"
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
       FORCE_SUCCESS_EXIT: "true"
       LOGGING_TEST_VERSION: "6.2"
       OPERATORS: |
@@ -72,7 +55,7 @@ tests:
             {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
       TEST_FILTERS: ~Disruptive&;~Longduration&;~AZWIF&;~AZMonitor&;~GCL&
-      TEST_IMPORTANCE: Critical|High
+      TEST_IMPORTANCE: Critical|High|Medium
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "15"
@@ -80,9 +63,9 @@ tests:
     - chain: openshift-logging-deploy-operators
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
-    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 zz_generated_metadata:
-  branch: release-4.16
+  branch: release-4.20
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-stable-openshift-logging-6.2
+  variant: multi-stable-openshift-logging-6.2
