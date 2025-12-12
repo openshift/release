@@ -80,6 +80,11 @@ if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_
     fi
 fi
 
+export bin_url="https://raw.githubusercontent.com/kuiwang02/operator-framework-olm/microhypermgmt/tests-extension/cmd/olmv0-tests-ext.tar.gz"
+curl --fail --retry 8 -sS -L "${bin_url}" -o /tmp/olmv0-tests-ext.tar.gz
+tar xzf /tmp/olmv0-tests-ext.tar.gz -C /tmp
+export EXTENSION_BINARY_OVERRIDE_OPERATOR_LIFECYCLE_MANAGER=/tmp/olmv0-tests-ext
+
 openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-}  \
   -f "${CONFORMANCE_TEST_LIST}" \
   --max-parallel-tests 15 \
