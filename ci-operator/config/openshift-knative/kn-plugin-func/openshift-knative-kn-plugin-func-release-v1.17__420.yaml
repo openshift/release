@@ -27,13 +27,12 @@ promotion:
   to:
   - additional_images:
       kn-plugin-func-src: src
+    name: knative-v1.17
     namespace: openshift
-    tag: knative-v1.17
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: fast
       version: "4.20"
 resources:
   '*':
@@ -43,13 +42,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: unit
+- as: unit
   commands: GOPATH=/tmp/go GOFLAGS="" make test
   container:
     from: src
-- always_run: false
-  as: e2e-oncluster-test
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
+- as: e2e-oncluster-test
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -57,6 +55,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.16"
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     test:
     - as: test
