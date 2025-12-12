@@ -96,8 +96,7 @@ echo "  size: ${EXPECTED_COMPUTE_SIZE} GiB"
 echo "  throughput: ${EXPECTED_COMPUTE_THROUGHPUT} MiB/s"
 if [[ -n "${COMPUTE_THROUGHPUT}" ]]; then
   echo "  (from compute[0].platform.aws.rootVolume)"
-fi
-if [[ -n "${DEFAULT_THROUGHPUT}" ]]; then
+elif [[ -n "${DEFAULT_THROUGHPUT}" ]]; then
   echo "  (from platform.aws.defaultMachinePlatform.rootVolume)"
 fi
 echo "Control-plane rootVolume:"
@@ -105,8 +104,7 @@ echo "  size: ${EXPECTED_CONTROL_PLANE_SIZE} GiB"
 echo "  throughput: ${EXPECTED_CONTROL_PLANE_THROUGHPUT} MiB/s"
 if [[ -n "${CONTROL_PLANE_THROUGHPUT}" ]]; then
   echo "  (from controlPlane.platform.aws.rootVolume)"
-fi
-if [[ -n "${DEFAULT_THROUGHPUT}" ]]; then
+elif [[ -n "${DEFAULT_THROUGHPUT}" ]]; then
   echo "  (from platform.aws.defaultMachinePlatform.rootVolume)"
 fi
 echo "Edge rootVolume:"
@@ -114,8 +112,7 @@ echo "  size: ${EXPECTED_EDGE_SIZE} GiB"
 echo "  throughput: ${EXPECTED_EDGE_THROUGHPUT} MiB/s"
 if [[ -n "${EDGE_THROUGHPUT}" ]]; then
   echo "  (from compute[1].platform.aws.rootVolume)"
-fi
-if [[ -n "${DEFAULT_THROUGHPUT}" ]]; then
+elif [[ -n "${DEFAULT_THROUGHPUT}" ]]; then
   echo "  (from platform.aws.defaultMachinePlatform.rootVolume)"
 fi
 
