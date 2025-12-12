@@ -8,7 +8,6 @@ declare -r PULL_SECRET=/var/run/vault/deploy-konflux-operator-art-image-share
 declare -r TOOLS_DIR=/tmp/bin
 declare -r MIRROR_REGISTRY_DIR="${MIRROR_REGISTRY_DIR:-"/var/run/vault/mirror-registry"}"
 declare -r MIRROR_REGISTRY_CREDS="${MIRROR_REGISTRY_DIR}/registry_creds"
-declare -r MIRROR_REGISTRY_CA="${MIRROR_REGISTRY_DIR}/client_ca.crt"
 declare -r DEPLOY_KONFLUX_OPERATOR_VERSION=v7.1
 
 if [[ -n "${KONFLUX_TARGET_OPERATORS:-}" && -n "${KONFLUX_TARGET_FBC_TAGS:-}" ]]; then
@@ -64,10 +63,14 @@ function deploy_operators() {
     fi
 
     if [[ "${DISCONNECTED:-false}" == "true" ]]; then
-        local mirror_registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
-        local mirror_registry_proxy_url=$(echo "${mirror_registry_url}" | sed 's/5000/6001/g')
-        local registry_creds=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
-        local registry_auth=$(mktemp)
+        local mirror_registry_url
+        mirror_registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+        local mirror_registry_proxy_url
+        mirror_registry_proxy_url="${mirror_registry_url//5000/6001}"
+        local registry_creds
+        registry_creds=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
+        local registry_auth
+        registry_auth=$(mktemp)
 
         # Generate auth file for the mirror registry
         cat <<EOF > "${registry_auth}"
