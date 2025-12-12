@@ -53,8 +53,5 @@ registry="${registryEndpoint#https://}"
 echo "The Quay hostname is $registryEndpoint"
 export CYPRESS_QUAY_ENDPOINT=$registry
 
-# Set Electron flags for container environment to avoid GPU/sandbox issues
-export ELECTRON_EXTRA_LAUNCH_ARGS="--disable-gpu --no-sandbox --disable-dev-shm-usage --disable-software-rasterizer"
-
 yarn run smoke || true
 

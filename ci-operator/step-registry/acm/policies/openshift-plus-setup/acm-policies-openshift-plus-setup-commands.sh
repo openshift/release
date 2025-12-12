@@ -128,10 +128,10 @@ EOF
 
 sleep 60
 
-git clone -b fix-quay-clair-hpa-with-stabilization https://github.com/tanfengshuang/policy-collection.git
+git clone https://github.com/stolostron/policy-collection.git
 
 cd policy-collection/deploy/
-echo 'y' | ./deploy.sh -p policygenerator/policy-sets/community/openshift-plus-setup -n policies -u https://github.com/tanfengshuang/policy-collection.git -b fix-quay-clair-hpa-with-stabilization -a openshift-plus-setup
+echo 'y' | ./deploy.sh -p policygenerator/policy-sets/community/openshift-plus-setup -n policies -a openshift-plus-setup
 
 echo "$(oc get policies -A)"
 
