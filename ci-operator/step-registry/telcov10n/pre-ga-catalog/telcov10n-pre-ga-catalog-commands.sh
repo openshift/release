@@ -181,92 +181,134 @@ image_index_ocp_version="${4}"
 tag_version="v${4}.0"
 
 function findout_manifest_digest {
-  # Try Release Canditates
-  res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version}-rc." | jq -r '
-    [ .tags[] ]
+  # Query Quay API for stable tag to get manifest digest
+  # This approach uses Quay's maintained stable tags (v4.21, v4.22)
+  # which always point to validated, production-ready catalog indices
+
+  local stable_tag="${tag_version%.0}"  # v4.21.0 -> v4.21
+
+  echo "==============================================================================" >&2
+  echo "Querying Quay for stable PreGA catalog tag: ${stable_tag}" >&2
+  echo "==============================================================================" >&2
+
+  # Try stable tag first (v4.21) - most reliable
+  local res=$(curl -sSL "${prega_operator_index_tags_url}?specificTag=${stable_tag}" 2>/dev/null | jq -r '
+    [.tags[] | select(.name == "'"${stable_tag}"'")]
     | sort_by(.start_ts)
-    | last.manifest_digest')
+    | last.manifest_digest' 2>/dev/null || echo "null")
 
-  # Try Engineer Canditates
-  if [ "${res}" == "null" ]; then
-    res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version}-ec." | jq -r '
-      [ .tags[] ]
-      | sort_by(.start_ts)
-      | last.manifest_digest')
+  if [ "${res}" != "null" ] && [ -n "${res}" ]; then
+    echo "✓ Found stable tag ${stable_tag} with manifest digest: ${res:0:20}..." >&2
+    echo "${res}"
+    return 0
+  fi
 
-    if [ "${res}" == "null" ]; then
-      res=$(curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" | jq -r '
-        [ .tags[] ]
-        | sort_by(.start_ts)
-        | last.manifest_digest')
+  echo "WARNING: Stable tag ${stable_tag} not found, trying fallback with ${tag_version}" >&2
 
-      if [ "${res}" == "null" ]; then
-        res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version/.0/-}" | jq -r '
-          [ .tags[]
-          | select(has("end_ts") | not)]
-          | sort_by(.start_ts)
-          | .[-2].manifest_digest')
-      fi
-    fi
+  # Fallback 1: Try with .0 suffix (v4.21.0)
+  res=$(curl -sSL "${prega_operator_index_tags_url}?specificTag=${tag_version}" 2>/dev/null | jq -r '
+    [.tags[]]
+    | sort_by(.start_ts)
+    | last.manifest_digest' 2>/dev/null || echo "null")
+
+  if [ "${res}" != "null" ] && [ -n "${res}" ]; then
+    echo "✓ Found tag ${tag_version} with manifest digest: ${res:0:20}..." >&2
+    echo "${res}"
+    return 0
+  fi
+
+  echo "WARNING: ${tag_version} not found, querying latest timestamped versions" >&2
+
+  # Fallback 2: Get second-newest timestamped version (avoids race conditions)
+  # This selects .[-2] to avoid the newest which might not be on mirror yet
+  res=$(curl -sSL "${prega_operator_index_tags_url}?filter_tag_name=like:${tag_version/.0/-}" 2>/dev/null | jq -r '
+    [.tags[]
+    | select(has("end_ts") | not)]
+    | sort_by(.start_ts)
+    | .[-2].manifest_digest' 2>/dev/null || echo "null")
+
+  if [ "${res}" != "null" ] && [ -n "${res}" ]; then
+    echo "✓ Found timestamped version with manifest digest: ${res:0:20}..." >&2
+  else
+    echo "ERROR: Could not determine manifest digest from Quay API" >&2
   fi
 
   echo "${res}"
 }
 
-function get_related_catalogs_and_icsp_manifests {
+function get_related_catalogs_and_idms_manifests {
+  # Find the timestamped version on mirror site that matches the manifest digest
+  # from the stable tag query
 
-  query_tag="${tag_version%.*}-"
+  local query_tag="${tag_version%.*}-"  # v4.21.0 -> v4.21-
 
-  for ((page = 1 ; page < ${max_pages:=50}; page++)); do
+  echo "" >&2
+  echo "==============================================================================" >&2
+  echo "Finding timestamped version matching manifest digest on mirror" >&2
+  echo "==============================================================================" >&2
+  echo "Query pattern: ${query_tag}*" >&2
+  echo "Target digest: ${selected_manifest_digest:0:20}..." >&2
 
-    index_list=$(curl -sSL "${prega_operator_index_tags_url}/?filter_tag_name=like:${query_tag}&page=${page}" | jq)
+  # Search through Quay API pages to find matching timestamped tag
+  for ((page = 1; page < ${max_pages:=10}; page++)); do
+    local index_list=$(curl -sSL "${prega_operator_index_tags_url}/?filter_tag_name=like:${query_tag}&page=${page}" 2>/dev/null | jq 2>/dev/null || echo '{"tags":[]}')
 
-    tag=$(echo "${index_list}" | jq -r '
+    local tag=$(echo "${index_list}" | jq -r '
       [.tags[]
-      | select(.manifest_digest == "'${selected_manifest_digest}'")]
-      | first.name')
-    [ "${tag}" != "null" ] && break
-    tag="${selected_manifest_digest}-not-found"
+      | select(.manifest_digest == "'"${selected_manifest_digest}"'")]
+      | first.name' 2>/dev/null || echo "null")
 
-    has_additional=$(echo "${index_list}" | jq -r '.has_additional')
+    if [ "${tag}" != "null" ] && [ -n "${tag}" ]; then
+      echo "✓ Found matching timestamped tag: ${tag} (page ${page})" >&2
+      echo "${tag}"
+      return 0
+    fi
+
+    local has_additional=$(echo "${index_list}" | jq -r '.has_additional' 2>/dev/null || echo "false")
     [ "${has_additional}" == "false" ] && break
   done
 
-  if [ "${image_index_ocp_version/./}" -gt 419 ]; then
-    echo ${tag}
-  else
-    echo ${tag/-/.0-}
-  fi
+  # If not found, return error indication
+  echo "ERROR: Could not find timestamped tag matching manifest digest" >&2
+  echo "${selected_manifest_digest}-not-found"
 }
 
+# Step 1: Get manifest digest from Quay stable tag
 selected_manifest_digest=$(findout_manifest_digest)
-version_tag=$(get_related_catalogs_and_icsp_manifests)
 
-echo "Checking if the selected tag exists and has required files..."
-status_code=$(curl -sSL -o /dev/null -w "%{http_code}" "${catalog_soruces_url}/${version_tag}")
+if [ "${selected_manifest_digest}" == "null" ] || [ -z "${selected_manifest_digest}" ]; then
+  echo "ERROR: Failed to determine manifest digest"
+  exit 1
+fi
+
+# Step 2: Find timestamped version with matching digest
+version_tag=$(get_related_catalogs_and_idms_manifests)
+
+if [ -z "$version_tag" ] || [[ "$version_tag" == *"-not-found" ]]; then
+  echo "ERROR: Failed to find matching timestamped version on mirror"
+  echo "This likely indicates a race condition - stable tag updated before mirror published"
+  exit 1
+fi
+
+echo ""
+echo "=============================================================================="
+echo "Checking if selected catalog exists on mirror site"
+echo "=============================================================================="
+
+# Check if version exists on mirror
+status_code=$(curl -sSL -o /dev/null -w "%{http_code}" "${catalog_soruces_url}/${version_tag}/")
 
 if [ "$status_code" -ne 200 ]; then
-  echo "WARNING: Tag ${version_tag} not found (HTTP status: $status_code)"
-  echo "Falling back to latest available ${tag_version/.0/} mirror..."
-
-  # Get the latest valid version from the mirror server for this OCP version
-  latest_version=$(curl -sSL "${catalog_soruces_url}" \
-    | grep -oP '(?<=href=")[^"]+' \
-    | grep "^${tag_version/.0/}" \
-    | grep -v ".yaml$" \
-    | sort -t '-' -k2,2r -k3,3r \
-    | head -1)
-
-  if [ -n "$latest_version" ]; then
-    echo "Using latest available version: $latest_version"
-    version_tag=${latest_version%/}  # Remove trailing slash if present
-  else
-    echo "ERROR: Could not find any ${tag_version/.0/} versions at ${catalog_soruces_url}"
-    echo "Available versions:"
-    curl -sSL "${catalog_soruces_url}" | grep -oP '(?<=href=")[^"]+' | grep -v ".yaml$" | sort -r | head -10
-    exit 1
-  fi
+  echo "ERROR: Selected version ${version_tag} not found on mirror (HTTP ${status_code})"
+  echo "Mirror may not be ready yet"
+  echo ""
+  echo "Available versions on mirror site:"
+  curl -sSL "${catalog_soruces_url}" | grep -oP '(?<=href=")[^"]+' | grep "^${tag_version/.0/}" | sort -r | head -10
+  exit 1
 fi
+
+echo "✓ Version ${version_tag} is available on mirror site (HTTP ${status_code})"
+echo ""
 
 info_dir=${3}/${version_tag}
 mkdir -pv ${info_dir}
@@ -277,36 +319,11 @@ echo "Downloading YAML files from ${catalog_soruces_url}/${version_tag}..."
 yaml_files=$(curl -sSL ${catalog_soruces_url}/${version_tag} | grep -oP '(?<=href=")[^"]+' | grep 'yaml$')
 
 if [ -z "$yaml_files" ]; then
-  echo "WARNING: No YAML files found in ${version_tag}"
-  echo "Falling back to latest available ${tag_version/.0/} mirror with files..."
-
-  # Find the latest version that actually has YAML files
-  for candidate in $(curl -sSL "${catalog_soruces_url}" \
-    | grep -oP '(?<=href=")[^"]+' \
-    | grep "^${tag_version/.0/}" \
-    | grep -v ".yaml$" \
-    | sort -t '-' -k2,2r -k3,3r); do
-
-    candidate=${candidate%/}  # Remove trailing slash
-    test_files=$(curl -sSL "${catalog_soruces_url}/${candidate}" | grep -oP '(?<=href=")[^"]+' | grep 'yaml$' | wc -l)
-
-    if [ "$test_files" -gt 0 ]; then
-      echo "Found valid mirror: $candidate (contains $test_files YAML files)"
-      version_tag=$candidate
-      cd ..
-      rm -rf ${info_dir}
-      info_dir=${3}/${version_tag}
-      mkdir -pv ${info_dir}
-      cd ${info_dir}
-      yaml_files=$(curl -sSL ${catalog_soruces_url}/${version_tag} | grep -oP '(?<=href=")[^"]+' | grep 'yaml$')
-      break
-    fi
-  done
-
-  if [ -z "$yaml_files" ]; then
-    echo "ERROR: Could not find any ${tag_version/.0/} mirror with YAML files"
-    exit 1
-  fi
+  echo "ERROR: No YAML files found in ${version_tag}"
+  echo "This should not happen as version was pre-verified"
+  echo "Contents of ${catalog_soruces_url}/${version_tag}:"
+  curl -sSL "${catalog_soruces_url}/${version_tag}"
+  exit 1
 fi
 
 echo "Downloading files..."
@@ -334,12 +351,6 @@ if [ ! -f "imageDigestMirrorSet.yaml" ]; then
 fi
 
 set -x
-if [ -n "${next_version:-}" ]; then
-  stable_img_index="quay.io/prega/prega-operator-index:${tag_version}"
-  sed -i "s#^  image:.*#  image: ${stable_img_index}#" catalogSource.yaml
-fi
-set +x
-
 popd
 EOF
 
@@ -393,6 +404,7 @@ EOF
   echo "------------- ${ARTIFACT_DIR}/pre-ga-info/imageDigestMirrorSet.yaml (AFTER) ------------------"
   cat ${prega_info_dir}/imageDigestMirrorSet.yaml
   echo "----------------------------------------------------------------------------------------------"
+
   set -x
   oc apply -f ${prega_info_dir}/catalogSource.yaml
   oc apply -f ${prega_info_dir}/imageDigestMirrorSet.yaml
