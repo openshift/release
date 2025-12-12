@@ -4,9 +4,12 @@ set -e
 set -u
 set -o pipefail
 
-PULL_SECRET=/var/run/vault/deploy-konflux-operator-art-image-share
-TOOLS_DIR=/tmp/bin
-DEPLOY_KONFLUX_OPERATOR_VERSION=v7.1
+declare -r PULL_SECRET=/var/run/vault/deploy-konflux-operator-art-image-share
+declare -r TOOLS_DIR=/tmp/bin
+declare -r MIRROR_REGISTRY_DIR="${MIRROR_REGISTRY_DIR:-"/var/run/vault/mirror-registry"}"
+declare -r MIRROR_REGISTRY_CREDS="${MIRROR_REGISTRY_DIR}/registry_creds"
+declare -r MIRROR_REGISTRY_CA="${MIRROR_REGISTRY_DIR}/client_ca.crt"
+declare -r DEPLOY_KONFLUX_OPERATOR_VERSION=v7.1
 
 if [[ -n "${KONFLUX_TARGET_OPERATORS:-}" && -n "${KONFLUX_TARGET_FBC_TAGS:-}" ]]; then
     echo "ERROR: KONFLUX_TARGET_OPERATORS and KONFLUX_TARGET_FBC_TAGS cannot be set at the same time"
@@ -47,21 +50,9 @@ function install_deps() {
     install_oc # we need a modern client
 }
 
-function install_secret() {
-    local current_pull_secret_dir current_pull_secret add_pull_secret new_pull_secret
-    current_pull_secret_dir=$(mktemp -d)
-    current_pull_secret=${current_pull_secret_dir}/.dockerconfigjson
-    add_pull_secret=${PULL_SECRET}/.dockerconfigjson
-    new_pull_secret=$(mktemp)
-    run_command "oc extract secret/pull-secret -n openshift-config --confirm --to ${current_pull_secret_dir}"
-    run_command "jq -s '{\"auths\": (.[0].auths + .[1].auths)}' ${current_pull_secret} ${add_pull_secret} > ${new_pull_secret}"
-    run_command "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_pull_secret}"
-    run_command "shred ${current_pull_secret} ${new_pull_secret}"
-}
-
 function deploy_operators() {
     run_command "cd $(mktemp -d)"
-    run_command "git clone --depth 1 --branch ${DEPLOY_KONFLUX_OPERATOR_VERSION} https://github.com/ajaggapa/deploy-konflux-operator.git"
+    run_command "git clone --depth 1 --branch registry_proxy https://github.com/mgencur/deploy-konflux-operator.git"
     run_command "chmod -R a+x deploy-konflux-operator"
 
     declare args=()
@@ -71,6 +62,34 @@ function deploy_operators() {
     if [[ -n "${KONFLUX_TARGET_FBC_TAGS:-}" ]]; then
         args+=(--fbc-tag "${KONFLUX_TARGET_FBC_TAGS}")
     fi
+
+    if [[ "${DISCONNECTED:-false}" == "true" ]]; then
+        local mirror_registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+        local mirror_registry_proxy_url=$(echo "${mirror_registry_url}" | sed 's/5000/6001/g')
+        local registry_creds=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
+        local registry_auth=$(mktemp)
+
+        # Generate auth file for the mirror registry
+        cat <<EOF > "${registry_auth}"
+{
+    "auths": {
+        "${mirror_registry_url}": {
+            "auth": "${registry_creds}"
+        },
+        "${mirror_registry_proxy_url}": {
+            "auth": "${registry_creds}"
+        }
+    }
+}
+EOF
+        if [[ "${USE_REGISTRY_PROXY:-false}" == "true" ]]; then
+            args+=(--internal-registry-proxy "${mirror_registry_proxy_url}" --internal-registry-proxy-auth "${registry_auth}")
+        else
+            args+=(--internal-registry "${mirror_registry_url}" --internal-registry-auth "${registry_auth}" --quay-auth "${PULL_SECRET}/.dockerconfigjson")
+        fi
+    else
+        args+=(--quay-auth "${PULL_SECRET}/.dockerconfigjson")
+    fi
     run_command "deploy-konflux-operator/deploy-operator.sh ${args[*]}"
 }
 
@@ -78,5 +97,4 @@ set_proxy
 install_deps
 run_command "oc whoami"
 run_command "which oc && oc version -o yaml"
-install_secret
 deploy_operators
