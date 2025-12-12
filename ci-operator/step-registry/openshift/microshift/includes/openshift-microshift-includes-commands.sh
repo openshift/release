@@ -328,6 +328,9 @@ function ci_custom_link_report() {
     tr:nth-child(even) {
       background-color: rgba(255, 255, 255, 0.04);
     }
+    tr:hover {
+      background-color: #000000;
+    }
     a:link {
       color: #ffffff;
       text-decoration: unset;
