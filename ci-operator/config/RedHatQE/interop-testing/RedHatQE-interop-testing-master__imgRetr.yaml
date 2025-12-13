@@ -1,0 +1,38 @@
+base_images:
+  openshift-virtualization-tests:
+    name: openshift-virtualization-tests
+    namespace: ci
+    tag: cnv-4.19
+resources:
+  '*':
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+  - as: img-retr
+    steps:
+      test:
+        - as: img-retr--0
+          commands: |-
+            shopt -op; shopt -p; set -x
+            set +eu -o pipefail; shopt -s inherit_errexit
+            true
+          credentials:
+            - mount_path: /secrets
+              name: cluster-secrets-aws-interop-qe
+              namespace: test-credentials
+            - mount_path: /var/run/cnv-ci-brew-pull-secret
+              name: cnv-ci-brew-pull-secret
+              namespace: test-credentials
+            - mount_path: /bw
+              name: openshift-virtualization-tests-credentials
+              namespace: test-credentials
+          from: openshift-virtualization-tests
+          resources:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 200Mi
