@@ -222,7 +222,27 @@ oc wait --timeout=5m --for=condition=ManagedClusterConditionAvailable -n local-c
 oc wait --timeout=5m --for=condition=ManagedClusterJoined -n local-cluster ManagedCluster/local-cluster
 echo "MCE local-cluster is ready!"
 
-oc apply -f - <<EOF
+echo "Waiting for local-cluster namespace..."
+for ((i=1; i<=20; i++)); do
+  if oc get namespace local-cluster &>/dev/null; then
+    echo "Namespace local-cluster exists"
+    break
+  fi
+  echo "Waiting for local-cluster namespace... (attempt $i/20)"
+  sleep 5
+done
+
+if ! oc get namespace local-cluster &>/dev/null; then
+  echo "ERROR: local-cluster namespace was not created"
+  exit 1
+fi
+
+# Check if ManagedClusterAddOn already exists before creating
+if oc get managedclusteraddon hypershift-addon -n local-cluster &>/dev/null; then
+  echo "ManagedClusterAddOn hypershift-addon already exists"
+else
+  echo "Creating ManagedClusterAddOn for hypershift..."
+  oc apply -f - <<EOF
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ManagedClusterAddOn
 metadata:
@@ -231,23 +251,67 @@ metadata:
 spec:
   installNamespace: open-cluster-management-agent-addon
 EOF
+fi
 
 # wait for hypershift operator to come online
+echo "Waiting for hypershift operator pods to come online..."
 _hypershiftReady=0
-set +e
-for ((i=1; i<=20; i++)); do
-  oc get pods -n hypershift | grep "operator.*Running"
-  if [ $? -eq 0 ]; then
+for ((i=1; i<=30; i++)); do
+  # Check if hypershift namespace exists first
+  if ! oc get namespace hypershift &>/dev/null; then
+    echo "Waiting for hypershift namespace to be created... (attempt $i/30)"
+    sleep 15
+    continue
+  fi
+  running_pods=$(oc get pods -n hypershift --no-headers 2>/dev/null | grep -c "operator.*Running" || echo "0")
+
+  if [ "$running_pods" -gt 0 ]; then
+    echo "HyperShift operator pod(s) are running! ($running_pods pod(s) found)"
     _hypershiftReady=1
     break
   fi
-  echo "Waiting on hypershift operator to install"
-  sleep 30
+
+  echo "Waiting for hypershift operator to start... (attempt $i/30)"
+
+  # Show debug info every 5 attempts
+  if [ $((i % 5)) -eq 0 ]; then
+    echo "=== Debug: Current state ==="
+    echo "Hypershift namespace pods:"
+    oc get pods -n hypershift 2>/dev/null || echo "  No pods yet"
+    echo "ManagedClusterAddOn status:"
+    oc get managedclusteraddon hypershift-addon -n local-cluster -o jsonpath='{.status.conditions[?(@.type=="Available")]}' 2>/dev/null | jq '.' || echo "  Not available yet"
+    echo "ManifestWork:"
+    oc get manifestwork -n local-cluster 2>/dev/null | head -5 || echo "  No ManifestWork found"
+    echo "=========================="
+  fi
+
+  sleep 15
 done
-set -e
 
 if [ $_hypershiftReady -eq 0 ]; then
-  echo "hypershift operator did not come online in expected time"
+  echo "ERROR: hypershift operator did not come online in expected time"
+  echo ""
+  echo "=== Final Debugging Information ==="
+  echo "ManagedCluster status:"
+  oc get managedcluster local-cluster -o jsonpath='{.status}' | jq '.' || true
+  echo ""
+  echo "ManagedClusterAddOn status:"
+  oc get managedclusteraddon hypershift-addon -n local-cluster -o yaml 2>/dev/null || echo "ManagedClusterAddOn not found"
+  echo ""
+  echo "ManifestWork status:"
+  oc get manifestwork -n local-cluster 2>/dev/null || echo "No ManifestWork found"
+  echo ""
+  echo "HyperShift namespace:"
+  oc get ns hypershift -o yaml 2>/dev/null || echo "Namespace not found"
+  echo ""
+  echo "HyperShift namespace pods:"
+  oc get pods -n hypershift 2>/dev/null || echo "No pods or namespace doesn't exist"
+  echo ""
+  echo "MCE operator logs (last 100 lines):"
+  oc logs -n multicluster-engine deployment/multicluster-engine-operator --tail=100 || true
+  echo ""
+  echo "HyperShift addon manager logs (last 100 lines):"
+  oc logs -n multicluster-engine -l app=hypershift-addon-manager --tail=100 || true
   exit 1
 fi
 echo "hypershift is running! Waiting for the pods to become ready"
@@ -292,6 +356,7 @@ if [[ "$USE_KONFLUX_CATALOG" == "true" ]]; then
     [2.8]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-release-mce-28:latest"
     [2.9]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-release-mce-29:latest"
     [2.10]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-release-mce-210:latest"
+    [2.11]="quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-release-mce-211:latest"
   )
   OVERRIDE_HO_IMAGE="${konflux_mce_image_list[$MCE_VERSION]}"
 fi
@@ -316,12 +381,62 @@ fi
 HYPERSHIFT_NAME=hcp
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
-  downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
-  cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
-  chmod +x /tmp/${HYPERSHIFT_NAME}
-  cd -
+  # Wait for ConsoleCLIDownload to be created by hypershift-addon-manager
+  # The resource might not exist immediately due to transient errors during initial setup
+  _cliDownloadReady=0
+  trap - ERR
+  set +e
+  for ((i=1; i<=20; i++)); do
+    echo "Checking if ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download exists (attempt $i/20)..."
+    oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download &>/dev/null
+    if [ $? -eq 0 ]; then
+      _cliDownloadReady=1
+      echo "ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download found"
+      break
+    fi
+
+    # On first retry attempt, check if hypershift-addon-manager had errors and restart it
+    if [ $i -eq 5 ]; then
+      echo "ConsoleCLIDownload not found after 5 attempts, checking hypershift-addon-manager logs..."
+      if oc logs -n multicluster-engine -l app=hypershift-addon-manager --tail=100 | grep -q "failed to create or update hcp-cli-download"; then
+        echo "Detected failure in hypershift-addon-manager, restarting pod to retry..."
+        oc delete pod -n multicluster-engine -l app=hypershift-addon-manager
+        echo "Waiting for hypershift-addon-manager to restart and create ConsoleCLIDownload..."
+        sleep 30
+      fi
+    fi
+
+    echo "Waiting for ConsoleCLIDownload to be created..."
+    sleep 15
+  done
+  set -e
+  trap 'exit_with_failure' ERR
+
+  if [ $_cliDownloadReady -eq 0 ]; then
+    echo "WARNING: ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download was not created in expected time"
+    echo "Attempting to diagnose the issue..."
+    oc get ConsoleCLIDownload -A || true
+    oc get deployment -n multicluster-engine hcp-cli-download -o yaml || true
+    oc get route -n multicluster-engine hcp-cli-download -o yaml || true
+    oc logs -n multicluster-engine -l app=hypershift-addon-manager --tail=200 || true
+    echo "ConsoleCLIDownload creation failed, but continuing with installation..."
+    echo "You may need to manually restart hypershift-addon-manager pod if HCP CLI is needed"
+  else
+    # Download the HCP CLI
+    downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
+    if [ -n "$downURL" ]; then
+      curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
+      cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
+      chmod +x /tmp/${HYPERSHIFT_NAME}
+      cd -
+      /tmp/${HYPERSHIFT_NAME} version
+    else
+      echo "WARNING: Could not extract download URL from ConsoleCLIDownload"
+    fi
+  fi
+else
+  echo "Skipping HCP CLI download for non-x86_64 architecture: $arch"
 fi
-/tmp/${HYPERSHIFT_NAME} version
 
 # display HyperShift Operator Version and MCE version
 oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" > "$ARTIFACT_DIR/mce-version"
