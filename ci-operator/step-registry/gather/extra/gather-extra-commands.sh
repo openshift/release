@@ -89,16 +89,19 @@ queue ${ARTIFACT_DIR}/oc_cmds/controlplanemachinesets oc --insecure-skip-tls-ver
 queue ${ARTIFACT_DIR}/machinesets.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.machine.openshift.io -A -o json
 queue ${ARTIFACT_DIR}/oc_cmds/machinesets oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.machine.openshift.io -A
 queue ${ARTIFACT_DIR}/machinesets.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.cluster.x-k8s.io -A -o json
-
+queue ${ARTIFACT_DIR}/oc_cmds/machinesets.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get machinesets.cluster.x-k8s.io -A
 queue ${ARTIFACT_DIR}/machines.json oc --insecure-skip-tls-verify --request-timeout=5s get machines.machine.openshift.io -A -o json
 queue ${ARTIFACT_DIR}/oc_cmds/machines oc --insecure-skip-tls-verify --request-timeout=5s get machines.machine.openshift.io -A -o wide
-
 queue ${ARTIFACT_DIR}/machines.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get machines.cluster.x-k8s.io -A -o json
-
+queue ${ARTIFACT_DIR}/oc_cmds/machines.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get machines.cluster.x-k8s.io -A -o wide
+queue ${ARTIFACT_DIR}/clusters.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get clusters.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/clusters.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get clusters.cluster.x-k8s.io -A
 queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}clusters.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}clusters.infrastructure.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/${CAPI_PLATFORM}clusters.infrastructure.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}clusters.infrastructure.cluster.x-k8s.io -A
 queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io -A -o json
+queue ${ARTIFACT_DIR}/oc_cmds/${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machines.infrastructure.cluster.x-k8s.io -A
 queue ${ARTIFACT_DIR}/${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io.json oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io -A -o json
-
+queue ${ARTIFACT_DIR}/oc_cmds/${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io oc --insecure-skip-tls-verify --request-timeout=5s get ${CAPI_PLATFORM}machinetemplates.infrastructure.cluster.x-k8s.io -A
 queue ${ARTIFACT_DIR}/namespaces.json oc --insecure-skip-tls-verify --request-timeout=5s get namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/namespaces oc --insecure-skip-tls-verify --request-timeout=5s get namespaces
 queue ${ARTIFACT_DIR}/nodes.json oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o json
