@@ -302,12 +302,12 @@ if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
   echo "Version is less than 4.19"
   # release-4.18 consumer image supports event API v1
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:release-4.18"
-  TEST_MODES=("dualnicbc" "bc" "oc")
+  TEST_MODES=("dualnicbc" "dualnicbcha" "bc" "oc")
 else
   echo "Version is 4.19 or greater"
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"
   # Only run tgm and dualfollower tests from 4.19 onwards
-  TEST_MODES=("tgm" "dualfollower" "dualnicbc" "bc" "oc")
+  TEST_MODES=("tgm" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
 fi
 
 # wait for the linuxptp-daemon to be deployed
