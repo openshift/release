@@ -7,22 +7,7 @@ set -o pipefail
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 if [ -f "${SHARED_DIR}/customer_vnet_subnets.yaml" ]; then
-  VNET_FILE="${SHARED_DIR}/customer_vnet_subnets.yaml"
-  RESOURCE_GROUP=$(cat ${SHARED_DIR}/resourcegroup)
-  vnet_name=$(yq-go r ${VNET_FILE} 'platform.azure.virtualNetwork')
-  controlPlaneSubnet=$(yq-go r ${VNET_FILE} 'platform.azure.controlPlaneSubnet')
-  computeSubnet=$(yq-go r ${VNET_FILE} 'platform.azure.computeSubnet')
-
-  PATCH="${SHARED_DIR}/install-config-provisioned-sharednetwork.yaml.patch"
-
-  cat >> "${PATCH}" << EOF
-platform:
-  azure:
-    networkResourceGroupName: ${RESOURCE_GROUP}
-    virtualNetwork: ${vnet_name}
-    controlPlaneSubnet: ${controlPlaneSubnet}
-    computeSubnet: ${computeSubnet}
-EOF
+  PATCH="${SHARED_DIR}/customer_vnet_subnets.yaml"
 else
   PATCH=/tmp/install-config-sharednetwork.yaml.patch
 
