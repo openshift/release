@@ -26,6 +26,11 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.20
 images:
+- dockerfile_literal: |-
+    FROM golangci-lint
+    RUN apt update && apt install -y libgpgme-dev
+  from: golangci-lint
+  to: golangci-lint-with-build-dependencies
 - dockerfile_path: Dockerfile
   to: lightspeed-operator
 - dockerfile_path: bundle.Dockerfile
@@ -108,7 +113,7 @@ tests:
     make lint
   container:
     clone: true
-    from: golangci-lint
+    from: golangci-lint-with-build-dependencies
   skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
 - as: bundle-e2e-4-16
   cluster_claim:
