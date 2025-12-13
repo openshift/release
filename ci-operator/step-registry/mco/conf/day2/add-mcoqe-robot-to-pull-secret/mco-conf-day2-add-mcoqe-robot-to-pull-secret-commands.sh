@@ -4,6 +4,12 @@ set -e
 set -u
 set -o pipefail
 
+# Source proxy configuration for disconnected-private clusters
+if [ -s "${SHARED_DIR}/proxy-conf.sh" ]; then
+    echo "Setting the proxy ${SHARED_DIR}/proxy-conf.sh"
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 TMP_DIR="/tmp/"
 cluster_pull_secret_file="$TMP_DIR/cluster-pull-secret.json"
 mcoqe_pull_secret_file="$TMP_DIR/mcoqe-pull-secret.json"
