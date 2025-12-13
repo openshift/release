@@ -207,11 +207,16 @@ images:
   to: knative-eventing-kafka-broker-dispatcher
 - dockerfile_path: openshift/ci-operator/static-images/receiver/Dockerfile
   to: knative-eventing-kafka-broker-receiver
+promotion:
+  to:
+  - additional_images:
+      eventing-kafka-broker-src: src
+    namespace: openshift
+    tag: knative-v1.17
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: fast
       version: "4.20"
 resources:
   '*':
@@ -219,16 +224,18 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
-- always_run: false
-  as: test-conformance
+- as: test-conformance
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
     post:
     - as: testlog-gather
       best_effort: true
@@ -275,7 +282,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -335,17 +341,137 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- always_run: false
-  as: test-e2e
+    workflow: generic-claim
+- as: test-conformance-c
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  cron: 55 2 * * 2,6
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
+    post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-kafka-broker-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-conformance
+      dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_EVENT_DISPLAY
+        name: knative-eventing-kafka-broker-event-display
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_SOURCE_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-source-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
+        name: knative-eventing-kafka-broker-post-install
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
+        name: knative-eventing-kafka-broker-webhook-kafka
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
+        name: knative-eventing-kafka-broker-test-committed-offset
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_CONSUMER_GROUP_LAG_PROVIDER_TEST
+        name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
+        name: knative-eventing-kafka-broker-test-event-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENTSHUB
+        name: knative-eventing-kafka-broker-test-eventshub
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
+        name: knative-eventing-kafka-broker-test-kafka-consumer
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_LOGS_EXPORTER
+        name: knative-eventing-kafka-broker-test-logs-exporter
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
+        name: knative-eventing-kafka-broker-test-print
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_RECORDEVENTS
+        name: knative-eventing-kafka-broker-test-recordevents
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
+        name: knative-eventing-kafka-broker-test-request-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATCH_CM
+        name: knative-eventing-kafka-broker-test-watch-cm
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FETCHER
+        name: knative-eventing-kafka-broker-test-wathola-fetcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FORWARDER
+        name: knative-eventing-kafka-broker-test-wathola-forwarder
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_RECEIVER
+        name: knative-eventing-kafka-broker-test-wathola-receiver
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
+        name: knative-eventing-kafka-broker-test-wathola-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_SOURCE_IMAGE
+        name: knative-eventing-kafka-broker-source-image
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
+      from: knative-eventing-kafka-broker-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
+- as: test-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: testlog-gather
       best_effort: true
@@ -392,7 +518,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -452,17 +577,137 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- always_run: false
-  as: test-reconciler
+    workflow: generic-claim
+- as: test-e2e-c
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  cron: 30 3 * * 2,6
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
+    post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-kafka-broker-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-e2e
+      dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_EVENT_DISPLAY
+        name: knative-eventing-kafka-broker-event-display
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_SOURCE_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-source-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
+        name: knative-eventing-kafka-broker-post-install
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
+        name: knative-eventing-kafka-broker-webhook-kafka
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
+        name: knative-eventing-kafka-broker-test-committed-offset
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_CONSUMER_GROUP_LAG_PROVIDER_TEST
+        name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
+        name: knative-eventing-kafka-broker-test-event-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENTSHUB
+        name: knative-eventing-kafka-broker-test-eventshub
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
+        name: knative-eventing-kafka-broker-test-kafka-consumer
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_LOGS_EXPORTER
+        name: knative-eventing-kafka-broker-test-logs-exporter
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
+        name: knative-eventing-kafka-broker-test-print
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_RECORDEVENTS
+        name: knative-eventing-kafka-broker-test-recordevents
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
+        name: knative-eventing-kafka-broker-test-request-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATCH_CM
+        name: knative-eventing-kafka-broker-test-watch-cm
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FETCHER
+        name: knative-eventing-kafka-broker-test-wathola-fetcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FORWARDER
+        name: knative-eventing-kafka-broker-test-wathola-forwarder
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_RECEIVER
+        name: knative-eventing-kafka-broker-test-wathola-receiver
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
+        name: knative-eventing-kafka-broker-test-wathola-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_SOURCE_IMAGE
+        name: knative-eventing-kafka-broker-source-image
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
+      from: knative-eventing-kafka-broker-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
+- as: test-reconciler
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: testlog-gather
       best_effort: true
@@ -509,7 +754,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -569,17 +813,137 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- always_run: false
-  as: test-reconciler-encryption-auth
+    workflow: generic-claim
+- as: test-reconciler-c
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  cron: 37 4 * * 2,6
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
+    post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-kafka-broker-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-reconciler
+      dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_EVENT_DISPLAY
+        name: knative-eventing-kafka-broker-event-display
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_SOURCE_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-source-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
+        name: knative-eventing-kafka-broker-post-install
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
+        name: knative-eventing-kafka-broker-webhook-kafka
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
+        name: knative-eventing-kafka-broker-test-committed-offset
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_CONSUMER_GROUP_LAG_PROVIDER_TEST
+        name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
+        name: knative-eventing-kafka-broker-test-event-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENTSHUB
+        name: knative-eventing-kafka-broker-test-eventshub
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
+        name: knative-eventing-kafka-broker-test-kafka-consumer
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_LOGS_EXPORTER
+        name: knative-eventing-kafka-broker-test-logs-exporter
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
+        name: knative-eventing-kafka-broker-test-print
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_RECORDEVENTS
+        name: knative-eventing-kafka-broker-test-recordevents
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
+        name: knative-eventing-kafka-broker-test-request-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATCH_CM
+        name: knative-eventing-kafka-broker-test-watch-cm
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FETCHER
+        name: knative-eventing-kafka-broker-test-wathola-fetcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FORWARDER
+        name: knative-eventing-kafka-broker-test-wathola-forwarder
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_RECEIVER
+        name: knative-eventing-kafka-broker-test-wathola-receiver
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
+        name: knative-eventing-kafka-broker-test-wathola-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_SOURCE_IMAGE
+        name: knative-eventing-kafka-broker-source-image
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
+      from: knative-eventing-kafka-broker-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
+- as: test-reconciler-encryption-auth
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: testlog-gather
       best_effort: true
@@ -626,7 +990,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -686,17 +1049,137 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
-- always_run: false
-  as: test-reconciler-keda
+    workflow: generic-claim
+- as: test-reconciler-encryption-auth-c
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  cron: 14 0 * * 2,6
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: aws-serverless
-    env:
-      BASE_DOMAIN: serverless.devcluster.openshift.com
-      SPOT_INSTANCES: "true"
-      ZONES_COUNT: "1"
+    post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-kafka-broker-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-reconciler-encryption-auth
+      dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_EVENT_DISPLAY
+        name: knative-eventing-kafka-broker-event-display
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_SOURCE_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-source-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
+        name: knative-eventing-kafka-broker-post-install
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
+        name: knative-eventing-kafka-broker-webhook-kafka
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
+        name: knative-eventing-kafka-broker-test-committed-offset
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_CONSUMER_GROUP_LAG_PROVIDER_TEST
+        name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
+        name: knative-eventing-kafka-broker-test-event-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENTSHUB
+        name: knative-eventing-kafka-broker-test-eventshub
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
+        name: knative-eventing-kafka-broker-test-kafka-consumer
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_LOGS_EXPORTER
+        name: knative-eventing-kafka-broker-test-logs-exporter
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
+        name: knative-eventing-kafka-broker-test-print
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_RECORDEVENTS
+        name: knative-eventing-kafka-broker-test-recordevents
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
+        name: knative-eventing-kafka-broker-test-request-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATCH_CM
+        name: knative-eventing-kafka-broker-test-watch-cm
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FETCHER
+        name: knative-eventing-kafka-broker-test-wathola-fetcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FORWARDER
+        name: knative-eventing-kafka-broker-test-wathola-forwarder
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_RECEIVER
+        name: knative-eventing-kafka-broker-test-wathola-receiver
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
+        name: knative-eventing-kafka-broker-test-wathola-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_SOURCE_IMAGE
+        name: knative-eventing-kafka-broker-source-image
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
+      from: knative-eventing-kafka-broker-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
+- as: test-reconciler-keda
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  skip_if_only_changed: ^.tekton/.*|^.konflux.*|^.github/.*|^rpms.lock.yaml$|^hack/(lib$|[^l].*|l[^i].*|li[^b].*|lib[^/].*)|^OWNERS.*|.*\.md
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     post:
     - as: testlog-gather
       best_effort: true
@@ -743,7 +1226,6 @@ tests:
           cpu: 300m
           memory: 300Mi
       timeout: 20m0s
-    - ref: ipi-deprovision-deprovision
     test:
     - as: test
       cli: latest
@@ -803,7 +1285,125 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
+- as: test-reconciler-keda-c
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: serverless-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  cron: 27 0 * * 2,6
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: knative-eventing-kafka-broker-source-image
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-eventing-kafka-broker-source-image
+      grace_period: 1m0s
+      optional_on_success: false
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    test:
+    - as: test
+      cli: latest
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-reconciler-keda
+      dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_EVENT_DISPLAY
+        name: knative-eventing-kafka-broker-event-display
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_SOURCE_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-source-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
+        name: knative-eventing-kafka-broker-post-install
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
+        name: knative-eventing-kafka-broker-webhook-kafka
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
+        name: knative-eventing-kafka-broker-test-committed-offset
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_CONSUMER_GROUP_LAG_PROVIDER_TEST
+        name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
+        name: knative-eventing-kafka-broker-test-event-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENTSHUB
+        name: knative-eventing-kafka-broker-test-eventshub
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
+        name: knative-eventing-kafka-broker-test-kafka-consumer
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_LOGS_EXPORTER
+        name: knative-eventing-kafka-broker-test-logs-exporter
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
+        name: knative-eventing-kafka-broker-test-print
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_RECORDEVENTS
+        name: knative-eventing-kafka-broker-test-recordevents
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
+        name: knative-eventing-kafka-broker-test-request-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATCH_CM
+        name: knative-eventing-kafka-broker-test-watch-cm
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FETCHER
+        name: knative-eventing-kafka-broker-test-wathola-fetcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FORWARDER
+        name: knative-eventing-kafka-broker-test-wathola-forwarder
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_RECEIVER
+        name: knative-eventing-kafka-broker-test-wathola-receiver
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
+        name: knative-eventing-kafka-broker-test-wathola-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_SOURCE_IMAGE
+        name: knative-eventing-kafka-broker-source-image
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
+      from: knative-eventing-kafka-broker-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: generic-claim
 zz_generated_metadata:
   branch: release-v1.17
   org: openshift-knative
