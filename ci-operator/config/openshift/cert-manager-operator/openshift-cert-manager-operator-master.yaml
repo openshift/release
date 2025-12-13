@@ -114,13 +114,13 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && !TechPreview"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-generic-claim
-- as: e2e-operator-tech-preview
+- as: e2e-operator-hypershift
   optional: true
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -135,12 +135,35 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"!/Platform:/"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Manual}"' make test-e2e
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-hypershift
+- as: e2e-operator-aws-proxy
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+      TEST_ARGS: "--dry-run"
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: wait
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-proxy
 zz_generated_metadata:
   branch: master
   org: openshift
