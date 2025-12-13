@@ -203,14 +203,17 @@ EOF
   echo "Generating manifests..."
   ${OCPINSTALL} --dir "${INSTALL_DIR}" agent create cluster-manifests
 
+
 else
   RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
   QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
   VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
+  EXPECTED_CHECKSUM=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.uncompressed-sha256")
   DOWNLOAD_NEW_IMAGE=true
 
   # Check if we need to update the source volume
   for CURRENT_SOURCE_VOLUME in $(${VIRSH} vol-list --pool ${POOL_NAME} | grep "ocp-${BRANCH}-rhcos" | awk '{ print $1 }' || true); do
+    echo "CURRENT_SOURCE_VOLUME is ${CURRENT_SOURCE_VOLUME}"
     if [[ "${CURRENT_SOURCE_VOLUME}" == "${VOLUME_NAME}" ]]; then
       DOWNLOAD_NEW_IMAGE=false
     # Delete the old source volume
@@ -224,7 +227,21 @@ else
     # Download the new rhcos image
     echo "Downloading new rhcos image..."
     curl -L "${QCOW_URL}" | gunzip -c > ${INSTALL_DIR}/${VOLUME_NAME} || true
+    actual_checksum=$(sha256sum ${INSTALL_DIR}/${VOLUME_NAME} | awk '{print $1}')
+    if [[ "${actual_checksum}" == "${EXPECTED_CHECKSUM}" ]]; then
+        echo "Checksum verified for ${VOLUME_NAME}"
+    else
+        echo "Checksum mismatch, retrying (attempt 2/2)..."
+        curl -L "${QCOW_URL}" | gunzip -c > ${INSTALL_DIR}/${VOLUME_NAME}
+        actual_checksum=$(sha256sum ${INSTALL_DIR}/${VOLUME_NAME} | awk '{print $1}')
 
+        if [[ "${actual_checksum}" == "${EXPECTED_CHECKSUM}" ]]; then
+            echo "Checksum verified for ${VOLUME_NAME}"
+        else
+            echo "Failed to download the image, download incomplete."
+            exit 1
+        fi
+    fi
     # Resize the rhcos image to match the volume capacity
     echo "Resizing rhcos image to match volume capacity..."
     qemu-img resize ${INSTALL_DIR}/${VOLUME_NAME} ${VOLUME_CAPACITY}
@@ -249,6 +266,49 @@ else
   echo "Generating manifests..."
   ${OCPINSTALL} --dir "${INSTALL_DIR}" create manifests
 fi
+
+# sleep 15m
+# if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
+#   echo "Step 2: Configuring etcd for slow storage..."
+  
+#   ETCD_MANIFEST="${INSTALL_DIR}/manifests/cluster-etcd-02-config.yaml"
+  
+
+#   if [[ -f "${ETCD_MANIFEST}" ]]; then
+#     echo "Updating existing etcd manifest: ${ETCD_MANIFEST}"
+    
+#     cp "${ETCD_MANIFEST}" "${ETCD_MANIFEST}.backup"
+    
+
+#     if grep -q "controlPlaneHardwareSpeed" "${ETCD_MANIFEST}"; then
+#       sed -i 's/controlPlaneHardwareSpeed:.*/controlPlaneHardwareSpeed: Slower/' "${ETCD_MANIFEST}"
+#     else
+#       sed -i '/^spec:/a\  controlPlaneHardwareSpeed: Slower' "${ETCD_MANIFEST}"
+#     fi
+    
+#     echo "Updated controlPlaneHardwareSpeed to Slower"
+#   else
+#     echo "Creating new etcd manifest: ${ETCD_MANIFEST}"
+
+#     cat > "${ETCD_MANIFEST}" <<'EOF'
+# apiVersion: operator.openshift.io/v1
+# kind: Etcd
+# metadata:
+#   name: cluster
+#   namespace: openshift-etcd
+# spec:
+#   controlPlaneHardwareSpeed: Slower
+#   logLevel: Normal
+#   managementState: Managed
+# EOF
+    
+#     echo "Created new etcd manifest"
+#   fi
+
+#   echo ""
+#   echo "Verifying etcd configuration:"
+#   grep -A5 "^spec:" "${ETCD_MANIFEST}"
+# fi
 
 # Check for the node tuning yaml config, and save it in the installation directory
 NODE_TUNING_YAML="${SHARED_DIR}/99-sysctl-worker.yaml"
@@ -478,17 +538,50 @@ if [ "$INSTALLER_TYPE" == "default" ]; then
   approve_csrs &
 fi
 
+
+
 # Add a small buffer before waiting for install completion
 sleep 5m
 
 set +x
 echo "Completing UPI setup..."
+${OCPINSTALL} version
+
+# # Patch etcd for allowing slower disks
+# if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
+#   echo "Patching etcd cluster operator..."
+#   oc patch etcd cluster --type=merge --patch '{"spec":{"controlPlaneHardwareSpeed":"Slower"}}'
+#   for i in {1..30}; do
+#     ETCD_CO_AVAILABLE=$(oc get co etcd | grep etcd | awk '{print $3}')
+#     if [[ "${ETCD_CO_AVAILABLE}" == "True" ]]; then
+#       echo "Patched successfully!"
+#       break
+#     fi
+#     sleep 15
+#   done
+#   if [[ "${ETCD_CO_AVAILABLE}" != "True" ]]; then
+#     echo "Etcd patch failed..."
+#     exit 1
+#   fi
+# fi
+
+
 if [ "$INSTALLER_TYPE" == "agent" ]; then
   ${OCPINSTALL} --dir="${INSTALL_DIR}" agent wait-for install-complete --log-level=debug 2>&1 | grep --line-buffered -v password &
 else
-  ${OCPINSTALL} --dir="${INSTALL_DIR}" wait-for install-complete 2>&1 | grep --line-buffered -v password &
+  (
+  ${OCPINSTALL} --dir="${INSTALL_DIR}" wait-for install-complete --log-level=debug 2>&1 | grep --line-buffered -v password
+) &
 fi
-wait "$!"
+PID=$!
+echo "Background command PID is $PID"
+echo "Failed OUTPUT waiting......"
+wait "$PID"
+echo "Failed OUTPUT after waiting...."
+
+# echo "Failed OUTPUT waiting......"
+# wait "$!"
+# echo "Failed OUTPUT after waiting...."
 save_credentials
 
 # Check for image registry availability
@@ -515,23 +608,23 @@ for i in {1..30}; do
   sleep 15
 done
 
-# Patch etcd for allowing slower disks
-if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
-  echo "Patching etcd cluster operator..."
-  oc patch etcd cluster --type=merge --patch '{"spec":{"controlPlaneHardwareSpeed":"Slower"}}'
-  for i in {1..30}; do
-    ETCD_CO_AVAILABLE=$(oc get co etcd | grep etcd | awk '{print $3}')
-    if [[ "${ETCD_CO_AVAILABLE}" == "True" ]]; then
-      echo "Patched successfully!"
-      break
-    fi
-    sleep 15
-  done
-  if [[ "${ETCD_CO_AVAILABLE}" != "True" ]]; then
-    echo "Etcd patch failed..."
-    exit 1
-  fi
-fi
+# # Patch etcd for allowing slower disks
+# if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
+#   echo "Patching etcd cluster operator..."
+#   oc patch etcd cluster --type=merge --patch '{"spec":{"controlPlaneHardwareSpeed":"Slower"}}'
+#   for i in {1..30}; do
+#     ETCD_CO_AVAILABLE=$(oc get co etcd | grep etcd | awk '{print $3}')
+#     if [[ "${ETCD_CO_AVAILABLE}" == "True" ]]; then
+#       echo "Patched successfully!"
+#       break
+#     fi
+#     sleep 15
+#   done
+#   if [[ "${ETCD_CO_AVAILABLE}" != "True" ]]; then
+#     echo "Etcd patch failed..."
+#     exit 1
+#   fi
+# fi
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
