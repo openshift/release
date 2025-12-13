@@ -33,7 +33,19 @@ fi
 HYPERSHIFT_NAME=hcp
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
-  downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
+  downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
+  # Retry curl up to 5 times to handle transient SSL errors
+  retry_count=0
+  max_retries=5
+  until curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}; do
+    retry_count=$((retry_count + 1))
+    if [ $retry_count -ge $max_retries ]; then
+      echo "Failed to download ${downURL} after ${max_retries} attempts"
+      exit 1
+    fi
+    echo "Download failed, retrying... (attempt $((retry_count + 1))/${max_retries})"
+    sleep 5
+  done
   cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
   chmod +x /tmp/${HYPERSHIFT_NAME}
   cd -
