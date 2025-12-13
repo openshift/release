@@ -5,6 +5,13 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+# Determine certificate verification setting based on BMC_VERIFY_CA
+if [ "${BMC_VERIFY_CA:-false}" == "true" ]; then
+  DISABLE_CERT_VERIFICATION="false"
+else
+  DISABLE_CERT_VERIFICATION="true"
+fi
+
 echo "Creating patch file to configure redfish virtual media"
 cat > "$SHARED_DIR/redfish_patch_install_config.yaml" <<EOF
 platform:
@@ -31,7 +38,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "$SHARED_DIR/hosts.yaml"); do
         ${root_dev_hctl:+hctl: ${root_dev_hctl}}
       bmc:
         address: ${redfish_scheme}://${bmc_address}${redfish_base_uri}
-        disableCertificateVerification: true
+        disableCertificateVerification: ${DISABLE_CERT_VERIFICATION}
         username: ${redfish_user}
         password: ${redfish_password}
       networkConfig:
