@@ -38,6 +38,9 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
 }
 
+
+echo "rosa version"
+rosa version
 get_channel_versions() {
   local channel="$1"
   local cmd="rosa list versions --channel-group ${channel} -o json"
