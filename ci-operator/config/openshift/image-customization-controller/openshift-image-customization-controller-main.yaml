@@ -49,6 +49,10 @@ releases:
       include_built_images: true
       name: "4.21"
       namespace: ocp
+  multi-latest:
+    integration:
+      name: "4.21-multi"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -100,6 +104,8 @@ tests:
   skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
@@ -107,15 +113,6 @@ tests:
         NUM_ARM_WORKERS=1
         APPLY_ARM_WORKERS=true
         BMC_DRIVER=redfish-virtualmedia
-    releases:
-      initial:
-        integration:
-          name: "4.21-multi-2"
-          namespace: ocp
-      latest:
-        integration:
-          name: "4.21-multi-2"
-          namespace: ocp
     workflow: baremetalds-e2e-ovn-ipv4-multi-arch
 - as: e2e-metal-ipi-virtualmedia
   capabilities:
