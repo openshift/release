@@ -63,7 +63,50 @@ EOF
 if [[ $PUBLIC_VLAN == "false" ]]; then
   echo "Private network deployment"
   echo -e "enable_bond: $BOND" >> /tmp/all.yml
-  echo -e "controlplane_network: 192.168.216.1/21\ncontrolplane_network_prefix: 21" >> /tmp/all.yml
+
+  case "$IP_STACK" in
+    dual)
+      cat <<EOF >> /tmp/all.yml
+controlplane_network:
+- 198.18.10.0/24
+- fd00:198:18:10::/64
+controlplane_network_prefix:
+- 24
+- 64
+cluster_network_cidr:
+- 10.128.0.0/14
+- fd01::/48
+cluster_network_host_prefix:
+- 23
+- 64
+service_network_cidr:
+- 172.30.0.0/16
+- fd02::/112
+EOF
+      ;;
+    ipv6)
+      cat <<EOF >> /tmp/all.yml
+controlplane_network:
+- fd00:198:18:10::/64
+controlplane_network_prefix:
+- 64
+cluster_network_cidr:
+- fd01::/48
+cluster_network_host_prefix:
+- 64
+service_network_cidr:
+- fd02::/112
+sync_ocp_release: true
+setup_bastion_registry: true
+use_bastion_registry: true
+sync_operator_index: true
+EOF
+      ;;
+    *)
+      # Default ipv4
+      echo -e "controlplane_network: ['192.168.216.0/21']\ncontrolplane_network_prefix: [21]" >> /tmp/all.yml
+      ;;
+  esac
 
   # Create proxy configuration for private VLAN deployments
   cat > ${SHARED_DIR}/proxy-conf.sh << 'PROXY_EOF'
