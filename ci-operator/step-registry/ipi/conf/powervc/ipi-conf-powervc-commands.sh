@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.4.6"
+	TAG="v0.5.2"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
 	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
@@ -122,6 +122,7 @@ FLAVOR: ${FLAVOR}
 LEASED_RESOURCE: ${LEASED_RESOURCE}
 NETWORK_NAME: ${NETWORK_NAME}
 RHCOS_IMAGE_NAME: ${RHCOS_IMAGE_NAME}
+SERVER_IP: ${SERVER_IP}
 EOF
 
 #POWERVC_USER_ID=$(cat "/var/run/powervc-ipi-cicd-secrets/powervc-creds/POWERVC_USER_ID")
@@ -166,6 +167,7 @@ PowerVC-Tool \
 	--sshKeyName "${CLUSTER_NAME}-key" \
 	--domainName "${BASE_DOMAIN}" \
 	--enableHAProxy false \
+	--serverIP "${SERVER_IP}" \
 	--shouldDebug true
 RC=$?
 if [ ${RC} -gt 0 ]
