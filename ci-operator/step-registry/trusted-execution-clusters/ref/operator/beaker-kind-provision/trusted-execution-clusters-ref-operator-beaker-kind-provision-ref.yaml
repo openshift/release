@@ -1,0 +1,102 @@
+ref:
+  as: trusted-execution-clusters-ref-operator-beaker-kind-provision
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  commands: trusted-execution-clusters-ref-operator-beaker-kind-provision-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: beaker-bm
+    mount_path: /var/run/beaker-bm
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      memory: 1Gi
+  env:
+  - name: BEAKER_IP
+    default: ""
+    documentation: |-
+      IP address of the Beaker provisioned bare metal machine.
+      If not set, the script will try to read from:
+      1. Vault-mounted secret: /var/run/beaker-bm/beaker-ip (if exists)
+      2. ${SHARED_DIR}/beaker_ip (fallback)
+      Can be provided as environment variable to override Vault value.
+  - name: BEAKER_USER
+    default: "root"
+    documentation: |-
+      Username for SSH access to the Beaker machine.
+      If not set, the script will try to read from:
+      1. Vault-mounted secret: /var/run/beaker-bm/beaker-user (if exists)
+      2. Default: root
+  - name: KIND_CLUSTER_NAME
+    default: "kind"
+    documentation: |-
+      Name of the Kind cluster to create.
+      Defaults to 'kind' if not specified.
+  - name: CONTAINER_RUNTIME
+    default: "docker"
+    documentation: |-
+      Container runtime to use for Kind cluster.
+      Currently only 'docker' is supported.
+      Defaults to 'docker' if not specified.
+  - name: OPERATOR_REPO
+    default: "https://github.com/trusted-execution-clusters/operator.git"
+    documentation: |-
+      Git repository URL for the trusted-execution-clusters operator project.
+      The kind cluster configuration will be downloaded from this repository.
+  - name: OPERATOR_BRANCH
+    default: "main"
+    documentation: |-
+      Branch of the operator repository to use.
+      Defaults to 'main' if not specified.
+  - name: KIND_CREATE_TIMEOUT
+    default: "900"
+    documentation: |-
+      Timeout in seconds for the entire Kind cluster creation process.
+      Defaults to 900 seconds (15 minutes).
+  - name: CLUSTER_READY_TIMEOUT
+    default: "300"
+    documentation: |-
+      Timeout in seconds for waiting for cluster to be ready.
+      Defaults to 300 seconds (5 minutes).
+  documentation: |-
+    This step prepares the environment on a pre-provisioned Beaker bare metal
+    machine running Fedora for deploying Kind clusters with the trusted-execution-clusters operator.
+
+    The step performs the following operations:
+    1. Connects to the Beaker machine via SSH using the provided credentials
+    2. Installs necessary dependencies (Docker CE, kubectl, kind, git, Rust, Go)
+    3. Downloads the operator repository with kind cluster configuration
+    4. Adapts the kind configuration for external access (apiServerAddress)
+    5. Verifies all tools are installed correctly
+
+    Prerequisites:
+    - A Beaker machine must be pre-provisioned with Fedora
+    - SSH public key must be pre-configured in ~/.ssh/authorized_keys on the Beaker machine
+    - SSH credentials stored in Vault at: secrets/kv/selfservice/confidential-qe/beaker-bm
+      Required fields:
+        - beaker-ssh-private-key: SSH private key (corresponding public key must be on Beaker machine)
+        - beaker-ip: IP address of the Beaker machine
+      Optional fields:
+        - beaker-user: SSH username (defaults to 'root' if not provided)
+    - The Vault secret must be manually synced to K8s secret 'beaker-bm' in 'test-credentials' namespace
+    - The BEAKER_IP can also be provided via environment variable or ${SHARED_DIR}/beaker_ip
+
+    Outputs:
+    - ${SHARED_DIR}/beaker_info: Information about the Beaker machine and installed tools
+    - ${ARTIFACT_DIR}/beaker-logs/: Installation logs and diagnostics
+
+    After this step completes, the Beaker machine will have:
+    - Docker CE installed and running
+    - kubectl CLI tool installed (v1.29.0)
+    - kind installed (v0.30.0)
+    - Rust and Go development tools
+    - Operator repository downloaded to ~/operator-kind-setup
+    - kind configuration prepared at ~/operator-kind-setup/kind/config.yaml
+
+    Note: This step only prepares the environment. To create a Kind cluster,
+    SSH to the Beaker machine and run:
+      kind create cluster --name kind --config ~/operator-kind-setup/kind/config.yaml
