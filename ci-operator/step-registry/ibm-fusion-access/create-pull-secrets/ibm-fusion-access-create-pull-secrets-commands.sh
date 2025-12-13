@@ -12,7 +12,7 @@ STORAGE_SCALE_OPERATOR_NAMESPACE="${STORAGE_SCALE_OPERATOR_NAMESPACE:-ibm-spectr
 IBM_ENTITLEMENT_KEY_PATH="/var/run/secrets/ibm-entitlement-key"
 FA__PULL_SECRET_EXTRA_PATH="/var/run/secrets/fusion-pullsecret-extra"
 
-echo "🚀 Creating Fusion Access pull secrets..."
+echo "🚀 Creating IBM Fusion Access pull secrets..."
 echo "Primary Namespace: $FUSION_ACCESS_NAMESPACE"
 echo "IBM Registry: $FA__IBM_REGISTRY"
 echo ""
@@ -428,4 +428,4 @@ if oc get secret fusion-pullsecret-extra -n "${FUSION_ACCESS_NAMESPACE}" >/dev/n
 fi
 
 echo ""
-echo "✅ All Fusion Access pull secrets creation completed!"
+echo "✅ All IBM Fusion Access pull secrets creation completed!"

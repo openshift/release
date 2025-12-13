@@ -1,11 +1,11 @@
-# Fusion Access Shared Library
+# IBM Fusion Access Shared Library
 
-This step generates a shared library of bash functions for JUnit XML test result reporting, used across all Fusion Access test steps.
+This step generates a shared library of bash functions for JUnit XML test result reporting, used across all IBM Fusion Access test steps.
 
 ## Purpose
 
 - **Centralize JUnit XML reporting functions**: Provides common functions for test result reporting
-- **Ensure consistency**: All Fusion Access tests use the same reporting format
+- **Ensure consistency**: All IBM Fusion Access tests use the same reporting format
 - **Reduce duplication**: Eliminates the need to duplicate JUnit XML code in each test step
 - **Follow best practices**: Implements OCP CI standard patterns for test result reporting
 - **Enable integration**: Supports Prow/Spyglass visualization and component readiness dashboards
@@ -68,7 +68,7 @@ Generates the final JUnit XML test results report. Should be called at the end o
 - `TEST_CASES`: Accumulated test case XML (string)
 
 **Optional Global Variables:**
-- `JUNIT_SUITE_NAME`: Name of the test suite (default: `"Fusion Access Tests"`)
+- `JUNIT_SUITE_NAME`: Name of the test suite (default: `"IBM Fusion Access Tests"`)
 - `JUNIT_EXIT_ON_FAILURE`: Exit with error if tests failed (default: `"true"`, set to `"false"` to suppress)
 - `SHARED_DIR`: Directory for sharing artifacts between steps (results copied here if exists)
 
@@ -111,7 +111,7 @@ Before using the functions, initialize all required variables:
 # JUnit XML test results configuration
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_<descriptive_test_name>_tests.xml"
-JUNIT_SUITE_NAME="Fusion Access <Test Category> Tests"
+JUNIT_SUITE_NAME="IBM Fusion Access <Test Category> Tests"
 TEST_START_TIME=$(date +%s)
 TESTS_TOTAL=0
 TESTS_FAILED=0
@@ -159,7 +159,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "************ Example Fusion Access Test ************"
+echo "************ Example IBM Fusion Access Test ************"
 
 # Source shared library
 source "${SHARED_DIR}/common-fusion-access-bash-functions.sh"
@@ -167,7 +167,7 @@ source "${SHARED_DIR}/common-fusion-access-bash-functions.sh"
 # Initialize JUnit XML variables
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_example_tests.xml"
-JUNIT_SUITE_NAME="Fusion Access Example Tests"
+JUNIT_SUITE_NAME="IBM Fusion Access Example Tests"
 TEST_START_TIME=$(date +%s)
 TESTS_TOTAL=0
 TESTS_FAILED=0
@@ -189,7 +189,7 @@ if oc get deployment -n ibm-fusion-access fusion-access-operator >/dev/null 2>&1
   TEST1_STATUS="passed"
 else
   echo "  ❌ Operator deployment not found"
-  TEST1_MESSAGE="Fusion Access operator deployment not found in namespace ibm-fusion-access"
+  TEST1_MESSAGE="IBM Fusion Access operator deployment not found in namespace ibm-fusion-access"
 fi
 
 TEST1_DURATION=$(($(date +%s) - TEST1_START))
@@ -268,7 +268,7 @@ fi
 ## Related Steps
 
 - `interop-tests-deploy-fusion-access` - Uses this library for deployment tests
-- `interop-tests-fusion-access-tests` - Uses this library for functional tests
+- `interop-tests-ibm-fusion-access-tests` - Uses this library for functional tests
 - `interop-tests-verify-shared-storage` - Uses this library for storage verification tests
 
 ## Maintenance
@@ -277,7 +277,7 @@ When updating this shared library:
 
 1. **Test changes locally**: Validate bash syntax with `bash -n`
 2. **Update documentation**: Keep this README and ref.yaml documentation in sync
-3. **Consider backward compatibility**: Changes affect all Fusion Access test steps
+3. **Consider backward compatibility**: Changes affect all IBM Fusion Access test steps
 4. **Test with existing steps**: Verify existing test steps still work
 5. **Document breaking changes**: Clearly communicate any API changes
 
