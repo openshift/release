@@ -29,6 +29,51 @@ tests:
     env:
       BASE_DOMAIN: edge-sro.rhecoeng.com
       NVIDIAGPU_DEPLOY_FROM_BUNDLE: "true"
+    test:
+    - as: pre-notifier
+      commands: curl -d "cluster is ready for https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PULL_NUMBER}" ntfy.sh/swghosh-openshift-ci
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi 
+    - as: sleeper-one
+      commands: |
+        #!/bin/bash
+        total_duration=6900 # 1h55m, timeout is 2h
+        elapsed_time=0
+        while [ $elapsed_time -lt $total_duration ]; do
+            sleep 30
+            elapsed_time=$((elapsed_time + 30))
+            echo "Elapsed time: $((elapsed_time / 3600)) hours $(( (elapsed_time % 3600) / 60 )) minutes $((elapsed_time % 60)) seconds"
+        done
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi
+    - as: sleeper-two
+      commands: |
+        #!/bin/bash
+        total_duration=6900 # 1h55m, timeout is 2h
+        elapsed_time=0
+        while [ $elapsed_time -lt $total_duration ]; do
+            sleep 30
+            elapsed_time=$((elapsed_time + 30))
+            echo "Elapsed time: $((elapsed_time / 3600)) hours $(( (elapsed_time % 3600) / 60 )) minutes $((elapsed_time % 60)) seconds"
+        done
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi
+    - as: post-notifier
+      commands: curl -d "cluster about to be destroyed for https://github.com/${REPO_OWNER}/${REPO_NAME}/pull/${PULL_NUMBER}" ntfy.sh/swghosh-openshift-ci
+      from: src
+      resources:
+        limits:
+          cpu: 100m
+          memory: 50Mi
     workflow: nvidia-gpu-operator-e2e-aws
 - always_run: false
   as: nvidia-gpu-operator-e2e-25-10-x
