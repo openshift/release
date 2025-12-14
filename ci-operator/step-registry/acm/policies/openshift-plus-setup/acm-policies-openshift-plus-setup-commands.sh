@@ -128,10 +128,10 @@ EOF
 
 sleep 60
 
-git clone -b fix-quay-clair-hpa-overscaling https://github.com/tanfengshuang/policy-collection.git
+git clone -b fix-ami-dynamic-lookup https://github.com/tanfengshuang/policy-collection.git
 
 cd policy-collection/deploy/
-echo 'y' | ./deploy.sh -p policygenerator/policy-sets/community/openshift-plus-setup -n policies -u https://github.com/tanfengshuang/policy-collection.git -b fix-quay-clair-hpa-overscaling -a openshift-plus-setup
+echo 'y' | ./deploy.sh -p policygenerator/policy-sets/community/openshift-plus-setup -n policies -u https://github.com/tanfengshuang/policy-collection.git -b fix-ami-dynamic-lookup -a openshift-plus-setup
 
 echo "$(oc get policies -A)"
 
