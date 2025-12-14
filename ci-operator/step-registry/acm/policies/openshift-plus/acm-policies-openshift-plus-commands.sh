@@ -9,12 +9,12 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 # cd to writeable directory
 cd /tmp/
 
-git clone https://github.com/stolostron/policy-collection.git
+git clone -b fix-ami-dynamic-lookup https://github.com/tanfengshuang/policy-collection.git
 
 sleep 60
 
-cd policy-collection/deploy/ 
-echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
+cd policy-collection/deploy/
+echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/tanfengshuang/policy-collection.git -b fix-ami-dynamic-lookup -a openshift-plus
 
 sleep 120
 
@@ -46,3 +46,4 @@ for try in $(seq "${RETRIES}"); do
     sleep 30
   fi
 done
+
