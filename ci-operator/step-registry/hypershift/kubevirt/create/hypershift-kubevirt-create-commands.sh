@@ -168,7 +168,25 @@ if [[ -f "${SHARED_DIR}/GPU_DEVICE_NAME" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --host-device-name $(cat "${SHARED_DIR}/GPU_DEVICE_NAME"),count:2"
 fi
 
-EXTRA_ARGS="${EXTRA_ARGS} --network-type=${HYPERSHIFT_NETWORK_TYPE}"
+EXTRA_ARGS="${EXTRA_ARGS} --network-type=${HYPERSHIFT_NETWORK_TYPE} "
+
+case "${IP_STACK}" in
+ "v4")
+   EXTRA_ARGS+=" --service-cidr 172.32.0.0/16 --cluster-cidr 10.136.0.0/14 "
+   ;;
+ "v4v6")
+   # Use explicit CIDRs with IPv4 first (primary) since --default-dual doesn't work for KubeVirt
+   # Use non-conflicting IPv6 CIDRs (fd03::/48, fd04::/112) to avoid conflicts with management cluster
+   EXTRA_ARGS+=" --cluster-cidr 10.132.0.0/14 --cluster-cidr fd03::/48 --service-cidr 172.31.0.0/16 --service-cidr fd04::/112 "
+   ;;
+ "v6v4")
+   # Use explicit CIDRs with IPv6 first (primary) for v6v4 stack
+   EXTRA_ARGS+=" --cluster-cidr fd03::/48 --cluster-cidr 10.132.0.0/14 --service-cidr fd04::/112 --service-cidr 172.31.0.0/16 "
+   ;;
+ "v6")
+   EXTRA_ARGS+=" --cluster-cidr fd03::/48 --service-cidr fd04::/112 "
+   ;;
+esac
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
 # Workaround for: https://issues.redhat.com/browse/OCPBUGS-42867
@@ -210,12 +228,8 @@ else
     --pull-secret ${PULL_SECRET_PATH} \
     --generate-ssh \
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
-    --infra-availability-policy ${INFRA_AVAILABILITY} \
-    --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14  $(support_np_skew)"
+    --infra-availability-policy ${INFRA_AVAILABILITY} $(support_np_skew)"
 fi
-
-
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
