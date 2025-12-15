@@ -138,13 +138,13 @@ spec:
 EOF
 
     echo "Generated MachineConfigs in ${output_dir}:"
-    echo "  - 00-nmstate-brex-bond-master.yaml"
-    echo "  - 00-nmstate-brex-bond-worker.yaml"
+    echo "  - 00-generated-nmstate-brex-bond-master.yaml"
+    echo "  - 00-generated-nmstate-brex-bond-worker.yaml"
+    echo "ASSETS_EXTRA_FOLDER=${output_dir}" >> "${SHARED_DIR}/dev-scripts-additional-config"
 }
 
 echo "NETWORK_TYPE=\"OVNKubernetes\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
 echo "NETWORK_CONFIG_FOLDER=/root/dev-scripts/network-configs/bond" >> "${SHARED_DIR}/dev-scripts-additional-config"
-echo "ASSETS_EXTRA_FOLDER=${output_dir}" >> "${SHARED_DIR}/dev-scripts-additional-config"
 echo "BOND_PRIMARY_INTERFACE=true" >> "${SHARED_DIR}/dev-scripts-additional-config"
 echo "EXTRA_NETWORK_NAMES=\"nmstate1 nmstate2\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
 echo "NMSTATE1_NETWORK_SUBNET_V4=\"192.168.221.0/24\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
