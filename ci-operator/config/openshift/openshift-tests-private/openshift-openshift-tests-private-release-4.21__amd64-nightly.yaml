@@ -318,6 +318,28 @@ tests:
     test:
     - chain: openshift-e2e-test-olm-qe-stress
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: gcp-ipi-byo-fw-mini-perm-f28-destructive
+  cron: 56 20 4 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      MINIMAL_PERMISSIONS_WITHOUT_FIREWALL_PROVISION: "yes"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-gcp-ipi-byo-fw
+- as: gcp-ipi-byo-fw-oidc-mini-perm-f28-destructive
+  cron: 11 1 7 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      MINIMAL_PERMISSIONS_CCO_MANUAL_WITHOUT_FIREWALL_PROVISION: "yes"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-gcp-ipi-byo-fw-cco-manual-workload-identity
 - as: gcp-ipi-f14-stress-olm
   cron: 15 11 5,19 * *
   steps:
@@ -2040,6 +2062,54 @@ tests:
     - ref: openshift-extended-test-longduration
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-install
+- as: azure-ipi-ovn-hypershift-guest-n1minor-cli-f28
+  cron: 17 13 3 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n1minor
+    env:
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: aro4
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: aro_419
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 419.6.20250523
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-hypershift-guest-advanced
+- as: azure-ipi-ovn-hypershift-guest-n2minor-cli-f28
+  cron: 2 12 12 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+    env:
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: aro4
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: aro_419
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 419.6.20250523
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-hypershift-guest-advanced
+- as: azure-ipi-ovn-hypershift-guest-n3minor-cli-f28
+  cron: 29 2 14 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n3minor
+    env:
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: aro4
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: aro_419
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 419.6.20250523
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-hypershift-guest-advanced
 - as: azure-ipi-ovn-hypershift-guest-f7
   cron: 5 23 1,8,15,24 * *
   steps:
@@ -2316,7 +2386,6 @@ tests:
       FILTERS_ADDITIONAL: ""
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-21@sha256:e8f3cb664058f30a87c5301d861766cdd02f0abcd7782f626f23e1701352cbe8
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
@@ -2339,7 +2408,6 @@ tests:
       FILTERS_ADDITIONAL: ""
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-21@sha256:e8f3cb664058f30a87c5301d861766cdd02f0abcd7782f626f23e1701352cbe8
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
@@ -2362,7 +2430,6 @@ tests:
       FILTERS_ADDITIONAL: ""
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-fbc-4-21@sha256:23898d7bc4b41db420c05b5084d286ac3fffb16480cf3d886726e8dc7d23f494
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: File_Integrity_Operator
@@ -2383,7 +2450,6 @@ tests:
       FILTERS_ADDITIONAL: ""
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/security-profiles-operator-fbc-4-21@sha256:130ed125d818fec0738302fdb5deb72722db0afbefc3ba67a29a89ab6706a4e6
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Security_Profiles_Operator

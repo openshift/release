@@ -13,6 +13,12 @@ get_job_url() {
   echo "${job_complete_url}"
 }
 
+# run the upload only if explicitly configured
+if [ "${REPORT_TO_REPORT_PORTAL}" != "true" ]
+then
+  echo "REPORT_TO_REPORT_PORTAL is disabled. Results will not be uploaded."
+  exit 0
+fi
 
 # get ocp info and product version from JOB_NAME
 # TODO: improve this to still get the info dynamically but without relying on JOB_NAME

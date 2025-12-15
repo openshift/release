@@ -1,0 +1,38 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_path: Containerfile
+  to: amd-ci
+- dockerfile_literal: |
+    FROM quay.io/ocp-edge-qe/eco-gotests:latest
+    USER 0
+    RUN chgrp -R 0 /home/testuser && chmod -R g=u /home/testuser
+    RUN ln -s /home/testuser/go/bin/ginkgo /usr/local/bin/ginkgo
+    RUN dnf install -y openssh-clients && dnf clean all
+  to: eco-gotests
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-amd-ci
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    env:
+      OCP_CLUSTER_VERSION: "4.19"
+      REMOTE_HOST: 10.1.178.14
+    workflow: amd-gpu-operator-e2e
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: amd-ci
+  variant: 4.19-stable

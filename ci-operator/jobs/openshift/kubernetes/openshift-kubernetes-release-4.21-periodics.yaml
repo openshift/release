@@ -1,19 +1,19 @@
 periodics:
 - agent: kubernetes
-  cluster: build11
+  cluster: build01
+  cron: 0 5 * * 1
   decorate: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
     path_alias: k8s.io/kubernetes
     repo: kubernetes
-  interval: 48h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kubernetes-release-4.21-k8s-conformance
+  name: periodic-ci-openshift-kubernetes-release-4.21-e2e-aws-hpa
   spec:
     containers:
     - args:
@@ -22,7 +22,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=k8s-conformance
+      - --target=e2e-aws-hpa
       command:
       - ci-operator
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -71,20 +71,20 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
-  cron: 0 5 * * 1
+  cluster: build01
   decorate: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
     path_alias: k8s.io/kubernetes
     repo: kubernetes
+  interval: 48h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kubernetes-release-4.21-k8s-e2e-aws-hpa
+  name: periodic-ci-openshift-kubernetes-release-4.21-k8s-conformance
   spec:
     containers:
     - args:
@@ -93,7 +93,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=k8s-e2e-aws-hpa
+      - --target=k8s-conformance
       command:
       - ci-operator
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest

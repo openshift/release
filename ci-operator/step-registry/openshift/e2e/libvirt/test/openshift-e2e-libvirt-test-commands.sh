@@ -329,8 +329,11 @@ export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
 	# Disabling the test until https://issues.redhat.com/browse/OCPBUGS-55458 is fixed.
 	case "${CLUSTER_TYPE}" in
 	powervs*)
-		TEST_ARGS="${TEST_ARGS:-} --disable-monitor=service-type-load-balancer-availability"
+	    TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability,service-type-load-balancer-availability"
 		;;
+	libvirt-ppc64le*)
+        TEST_ARGS="${TEST_ARGS:-} --disable-monitor=external-aws-cloud-service-availability,external-azure-cloud-service-availability,external-gcp-cloud-service-availability"
+        ;;
 	esac
 
     VERBOSITY="" # "--v 9"

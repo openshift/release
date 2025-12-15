@@ -4,6 +4,10 @@ base_images:
     namespace: ci
     tag: latest
   ocp_4.21_base-rhel9:
+    name: "4.21"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.22_base-rhel9:
     name: "4.22"
     namespace: ocp
     tag: base-rhel9
@@ -11,6 +15,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.21
+  ocp_builder_rhel-9-golang-1.25-openshift-4.22:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.22
 build_root:
   from_repository: true
 images:
@@ -19,31 +27,50 @@ images:
     ocp_4.21_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_4.22_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.25-openshift-4.22:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
   to: olm-catalogd
 - dockerfile_path: openshift/operator-controller.Dockerfile
   inputs:
     ocp_4.21_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_4.22_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.25-openshift-4.22:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
   to: olm-operator-controller
 - dockerfile_path: openshift/registry.Dockerfile
   inputs:
     ocp_4.21_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_4.22_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.25-openshift-4.22:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
   to: e2e-test-registry
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - e2e-test-registry
     name: "4.22"
     namespace: ocp

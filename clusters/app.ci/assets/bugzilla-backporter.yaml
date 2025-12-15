@@ -1,112 +1,112 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    labels:
+kind: Service
+metadata:
+  namespace: ci
+  labels:
+    app: prow
+    component: bugzilla-backporter
+  name: bugzilla-backporter
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: main
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: metrics
+  selector:
+    app: prow
+    component: bugzilla-backporter
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  labels:
+    app: prow
+    component: bugzilla-backporter
+  name: bugzilla-backporter
+  namespace: ci
+spec:
+  host: bugzilla-backporter.apps.ci.l2s4.p1.openshiftapps.com
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  port:
+    targetPort: main
+  to:
+    kind: Service
+    name: bugzilla-backporter
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: bugzilla-backporter
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
       app: prow
       component: bugzilla-backporter
-    name: bugzilla-backporter
-  spec:
-    ports:
-    - name: main
-      port: 80
-      protocol: TCP
-      targetPort: main
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: metrics
-    selector:
-      app: prow
-      component: bugzilla-backporter
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
-    labels:
-      app: prow
-      component: bugzilla-backporter
-    name: bugzilla-backporter
-    namespace: ci
-  spec:
-    host: bugzilla-backporter.apps.ci.l2s4.p1.openshiftapps.com
-    tls:
-      termination: edge
-      insecureEdgeTerminationPolicy: Redirect
-    port:
-      targetPort: main
-    to:
-      kind: Service
-      name: bugzilla-backporter
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: bugzilla-backporter
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-  spec:
-    replicas: 2
-    strategy:
-      type: RollingUpdate
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: bugzilla-backporter
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: bugzilla-backporter
-      spec:
-        containers:
-        - name: bugzilla-backporter
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_bugzilla-backporter_latest
-          imagePullPolicy: Always
-          args:
-          - -bugzilla-endpoint=https://bugzilla.redhat.com/
-          - -bugzilla-api-key-path=/etc/bugzilla/api
-          - -bugzilla-auth-method=bearer
-          - -log-level=debug
-          - -plugin-config=/etc/plugins/plugins.yaml
-          ports:
-          - name: main
-            containerPort: 8080
-          - name: metrics
-            containerPort: 9090
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 3
-            periodSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-            initialDelaySeconds: 10
-            periodSeconds: 3
-            timeoutSeconds: 600
-          volumeMounts:
-          - name: bugzilla
-            mountPath: /etc/bugzilla
-            readOnly: true
-          - name: plugins
-            mountPath: /etc/plugins
-            readOnly: true
-          resources:
-            requests:
-              memory: "2Gi"
-              cpu: "200m"
-        volumes:
+    spec:
+      containers:
+      - name: bugzilla-backporter
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_bugzilla-backporter_latest
+        imagePullPolicy: Always
+        args:
+        - -bugzilla-endpoint=https://bugzilla.redhat.com/
+        - -bugzilla-api-key-path=/etc/bugzilla/api
+        - -bugzilla-auth-method=bearer
+        - -log-level=debug
+        - -plugin-config=/etc/plugins/plugins.yaml
+        ports:
+        - name: main
+          containerPort: 8080
+        - name: metrics
+          containerPort: 9090
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 600
+        volumeMounts:
         - name: bugzilla
-          secret:
-            secretName: bugzilla-credentials-openshift-bugzilla-robot
+          mountPath: /etc/bugzilla
+          readOnly: true
         - name: plugins
-          configMap:
-            name: plugins
+          mountPath: /etc/plugins
+          readOnly: true
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "200m"
+      volumes:
+      - name: bugzilla
+        secret:
+          secretName: bugzilla-credentials-openshift-bugzilla-robot
+      - name: plugins
+        configMap:
+          name: plugins

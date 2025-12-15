@@ -1,129 +1,129 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    name: tot
-  spec:
-    selector:
+kind: Service
+metadata:
+  namespace: ci
+  name: tot
+spec:
+  selector:
+    app: prow
+    component: tot
+  ports:
+  - port: 80
+    targetPort: 8888
+  type: ClusterIP
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  namespace: ci
+  labels:
+    app: prow
+    component: tot
+  name: tot-storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: tot
+  labels:
+    app: prow
+    component: tot
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
       app: prow
       component: tot
-    ports:
-    - port: 80
-      targetPort: 8888
-    type: ClusterIP
-- kind: PersistentVolumeClaim
-  apiVersion: v1
-  metadata:
-    namespace: ci
-    labels:
-      app: prow
-      component: tot
-    name: tot-storage
-  spec:
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: 1Gi
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: tot
-    labels:
-      app: prow
-      component: tot
-  spec:
-    replicas: 1
-    revisionHistoryLimit: 2
-    selector:
-      matchLabels:
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
         app: prow
         component: tot
-    strategy:
-      type: Recreate
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: tot
-      spec:
-        initContainers:
-        - name: git-sync-init
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --root=/tmp/git-sync
-          - --one-time=true
-          - --depth=1
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-        containers:
-        - name: git-sync
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --period=30s
-          - --root=/tmp/git-sync
-          - --max-failures=3
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-          resources:
-            requests:
-              memory: "1Gi"
-              cpu: "0.5"
-        - name: tot
-          image: us-docker.pkg.dev/k8s-infra-prow/images/tot:v20251203-dc898f4c5
-          args:
-          - --config-path=/etc/config/config.yaml
-          - --supplemental-prow-config-dir=/etc/config
-          - --fallback=true
-          - --fallback-bucket=http://gcsweb/gcs/test-platform-results
-          - --storage=/storage/tot.json
-          - --job-config-path=/var/repo/release/ci-operator/jobs
-          ports:
-            - name: http
-              containerPort: 8888
-          volumeMounts:
-          - name: tot-volume
-            mountPath: /storage
-          - name: config
-            mountPath: /etc/config
-          - name: release
-            mountPath: /var/repo
-          resources:
-            requests:
-              memory: "6Gi"
-              cpu: "20m"
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 20
-            periodSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-        volumes:
-        - name: tot-volume
-          persistentVolumeClaim:
-            claimName: tot-storage
-        - name: config
-          configMap:
-            name: config
+    spec:
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
         - name: release
-          emptyDir: {}
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      - name: tot
+        image: us-docker.pkg.dev/k8s-infra-prow/images/tot:v20251205-476eedbb0
+        args:
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --fallback=true
+        - --fallback-bucket=http://gcsweb/gcs/test-platform-results
+        - --storage=/storage/tot.json
+        - --job-config-path=/var/repo/release/ci-operator/jobs
+        ports:
+          - name: http
+            containerPort: 8888
+        volumeMounts:
+        - name: tot-volume
+          mountPath: /storage
+        - name: config
+          mountPath: /etc/config
+        - name: release
+          mountPath: /var/repo
+        resources:
+          requests:
+            memory: "6Gi"
+            cpu: "20m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 20
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+      volumes:
+      - name: tot-volume
+        persistentVolumeClaim:
+          claimName: tot-storage
+      - name: config
+        configMap:
+          name: config
+      - name: release
+        emptyDir: {}

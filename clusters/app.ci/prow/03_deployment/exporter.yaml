@@ -1,73 +1,72 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    labels:
+kind: Service
+metadata:
+  namespace: ci
+  labels:
+    app: prow
+    component: exporter
+  name: exporter
+spec:
+  ports:
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  selector:
+    app: prow
+    component: exporter
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: exporter
+  labels:
+    app: prow
+    component: exporter
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
       app: prow
       component: exporter
-    name: exporter
-  spec:
-    ports:
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    selector:
-      app: prow
-      component: exporter
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: exporter
-    labels:
-      app: prow
-      component: exporter
-  spec:
-    replicas: 1
-    revisionHistoryLimit: 2
-    strategy:
-      type: Recreate
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: exporter
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: exporter
-      spec:
-        serviceAccountName: exporter
-        containers:
-        - name: exporter
-          image: us-docker.pkg.dev/k8s-infra-prow/images/exporter:v20251203-dc898f4c5
-          args:
-          - --config-path=/etc/config/config.yaml
-          - --supplemental-prow-config-dir=/etc/config
-          - --projected-token-file=/var/sa-token/token
-          ports:
-          - name: metrics
-            containerPort: 9090
-          volumeMounts:
-          - name: config
-            mountPath: /etc/config
-            readOnly: true
-          - name: service-account-token
-            mountPath: /var/sa-token
-          resources:
-            requests:
-              memory: "4Gi"
-              cpu: "600m"
-        volumes:
+    spec:
+      serviceAccountName: exporter
+      containers:
+      - name: exporter
+        image: us-docker.pkg.dev/k8s-infra-prow/images/exporter:v20251205-476eedbb0
+        args:
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --projected-token-file=/var/sa-token/token
+        ports:
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
         - name: config
-          configMap:
-            name: config
+          mountPath: /etc/config
+          readOnly: true
         - name: service-account-token
-          projected:
-            sources:
-            - serviceAccountToken:
-                path: token
+          mountPath: /var/sa-token
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "600m"
+      volumes:
+      - name: config
+        configMap:
+          name: config
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token

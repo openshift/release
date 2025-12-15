@@ -23,6 +23,7 @@ vars=(
   CYPRESS_LIGHTSPEED_CONSOLE_IMAGE
   CYPRESS_LIGHTSPEED_PROVIDER_URL
   CYPRESS_LIGHTSPEED_PROVIDER_TOKEN
+  CYPRESS_SKIP_TESTS
 )
 
 # Loop through each variable.
@@ -53,7 +54,7 @@ echo "Successfully read kubeadmin password from ${KUBEADMIN_PASSWORD_FILE}"
 LIGHTSPEED_PROVIDER_TOKEN_FILE="/var/run/vault/dt-secrets/lightspeed-provider-token"
 LIGHTSPEED_PROVIDER_URL_FILE="/var/run/vault/dt-secrets/lightspeed-provider-url"
 
-if [[ -z "${CYPRESS_LIGHTSPEED_PROVIDER_TOKEN}" ]]; then
+if [[ -z "${CYPRESS_LIGHTSPEED_PROVIDER_TOKEN:-}" ]]; then
   if [[ -f "${LIGHTSPEED_PROVIDER_TOKEN_FILE}" ]]; then
     CYPRESS_LIGHTSPEED_PROVIDER_TOKEN=$(cat "${LIGHTSPEED_PROVIDER_TOKEN_FILE}")
     export CYPRESS_LIGHTSPEED_PROVIDER_TOKEN
@@ -63,7 +64,7 @@ if [[ -z "${CYPRESS_LIGHTSPEED_PROVIDER_TOKEN}" ]]; then
   fi
 fi
 
-if [[ -z "${CYPRESS_LIGHTSPEED_PROVIDER_URL}" ]]; then
+if [[ -z "${CYPRESS_LIGHTSPEED_PROVIDER_URL:-}" ]]; then
   if [[ -f "${LIGHTSPEED_PROVIDER_URL_FILE}" ]]; then
     CYPRESS_LIGHTSPEED_PROVIDER_URL=$(cat "${LIGHTSPEED_PROVIDER_URL_FILE}")
     export CYPRESS_LIGHTSPEED_PROVIDER_URL
@@ -208,5 +209,11 @@ fi
 # Install npm modules
 npm install || true
 
-# Run the Cypress tests.
-npm run test-cypress-console-headless || true
+# Run the Cypress tests with grep filter if CYPRESS_SKIP_TESTS is set
+if [[ -n "${CYPRESS_SKIP_TESTS:-}" ]]; then
+  echo "Running Cypress tests with grep pattern: ${CYPRESS_SKIP_TESTS}"
+  npx cypress run --browser chrome --headless --env grep="${CYPRESS_SKIP_TESTS}",grepOmitFiltered=true || true
+else
+  echo "Running all Cypress tests"
+  npm run test-cypress-console-headless || true
+fi

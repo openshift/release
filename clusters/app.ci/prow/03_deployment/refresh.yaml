@@ -1,94 +1,93 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    name: refresh
-  spec:
-    selector:
+kind: Service
+metadata:
+  namespace: ci
+  name: refresh
+spec:
+  selector:
+    app: prow
+    component: refresh
+  ports:
+  - port: 80
+    targetPort: 8888
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: refresh
+  labels:
+    app: prow
+    component: refresh
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
       app: prow
       component: refresh
-    ports:
-    - port: 80
-      targetPort: 8888
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: refresh
-    labels:
-      app: prow
-      component: refresh
-  spec:
-    replicas: 1
-    revisionHistoryLimit: 2
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: refresh
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: refresh
-      spec:
-        containers:
-        - name: refresh
-          image: us-docker.pkg.dev/k8s-infra-prow/images/refresh:v20251203-dc898f4c5
-          args:
-          - --github-app-id=$(GITHUB_APP_ID)
-          - --github-app-private-key-path=/etc/github/cert
-          - --github-endpoint=http://ghproxy
-          - --github-endpoint=https://api.github.com
-          - --github-graphql-endpoint=http://ghproxy/graphql
-          - --config-path=/etc/config/config.yaml
-          - --supplemental-prow-config-dir=/etc/config
-          - --hmac-secret-file=/etc/webhook/hmac.yaml
-          - --dry-run=false
-          - --prow-url=https://prow.ci.openshift.org
-          env:
-            - name: GITHUB_APP_ID
-              valueFrom:
-                secretKeyRef:
-                  name: openshift-prow-github-app
-                  key: appid
-          ports:
-            - name: http
-              containerPort: 8888
-          volumeMounts:
-          - name: hmac
-            mountPath: /etc/webhook
-            readOnly: true
-          - name: github-app-credentials
-            mountPath: /etc/github
-            readOnly: true
-          - name: config
-            mountPath: /etc/config
-            readOnly: true
-          resources:
-            requests:
-              memory: "250Mi"
-              cpu: "50m"
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 20
-            periodSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-        volumes:
+    spec:
+      containers:
+      - name: refresh
+        image: us-docker.pkg.dev/k8s-infra-prow/images/refresh:v20251205-476eedbb0
+        args:
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --hmac-secret-file=/etc/webhook/hmac.yaml
+        - --dry-run=false
+        - --prow-url=https://prow.ci.openshift.org
+        env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-prow-github-app
+                key: appid
+        ports:
+          - name: http
+            containerPort: 8888
+        volumeMounts:
         - name: hmac
-          secret:
-            secretName: github-webhook-credentials
+          mountPath: /etc/webhook
+          readOnly: true
         - name: github-app-credentials
-          secret:
-            secretName: openshift-prow-github-app
+          mountPath: /etc/github
+          readOnly: true
         - name: config
-          configMap:
-            name: config
+          mountPath: /etc/config
+          readOnly: true
+        resources:
+          requests:
+            memory: "250Mi"
+            cpu: "50m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 20
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+      volumes:
+      - name: hmac
+        secret:
+          secretName: github-webhook-credentials
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
+      - name: config
+        configMap:
+          name: config

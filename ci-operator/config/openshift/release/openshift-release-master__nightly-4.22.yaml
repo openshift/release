@@ -481,6 +481,13 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-upgrade
+- as: e2e-metal-ovn-two-node-arbiter-upgrade-workers
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-arbiter-upgrade-workers
 - as: e2e-metal-ovn-two-node-arbiter-techpreview
   capabilities:
   - intranet
@@ -536,6 +543,25 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing
+- as: e2e-metal-ovn-two-node-fencing-validation-techpreview
+  capabilities:
+  - intranet
+  cron: 30 23 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BMC_DRIVER=redfish
+        FEATURE_SET="TechPreviewNoUpgrade"
+        IP_STACK=v4
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        MASTER_VCPU=8
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+      DISRUPTIVE_FENCING: "true"
+      FENCING_VALIDATION: "true"
+    workflow: baremetalds-two-node-fencing-post-install-validation
 - as: e2e-metal-ovn-two-node-fencing-degraded-techpreview
   capabilities:
   - intranet
@@ -760,6 +786,16 @@ tests:
   cron: 45 22 * * 6
   steps:
     cluster_profile: vsphere-elastic
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-staticip
+- as: e2e-vsphere-static-ovn-techpreview
+  cron: 45 22 * * 6
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch

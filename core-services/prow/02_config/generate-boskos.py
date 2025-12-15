@@ -40,8 +40,8 @@ CONFIG = {
         'us-west-2': 35,
     },
     'aws-cspi-qe-quota-slice': {
-        'us-east-1': 30,
         'us-east-2': 30,
+        'us-west-2': 30,
     },
     'aws-managed-cspi-qe-quota-slice': {
         'us-east-1': 10,
@@ -170,16 +170,16 @@ CONFIG = {
         'us-west-2': 10,
     },
     'azure4-quota-slice': {
-        'centralus': 33,
-        'eastus': 8,
-        'eastus2': 8,
-        'westus': 8
+        'centralus': 14,
+        'eastus': 14,
+        'eastus2': 14,
+        'westus': 14
     },
     'azure-2-quota-slice': {
         'centralus': 33,
-        'eastus': 8,
-        'eastus2': 8,
-        'westus': 8
+        'eastus': 33,
+        'eastus2': 33,
+        'westus': 33
     },
     'azure-arm64-quota-slice': {
         'centralus': 33,

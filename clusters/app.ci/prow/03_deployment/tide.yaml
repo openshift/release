@@ -1,150 +1,149 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    name: tide
-    labels:
+kind: Service
+metadata:
+  namespace: ci
+  name: tide
+  labels:
+    app: prow
+    component: tide
+spec:
+  selector:
+    app: prow
+    component: tide
+  ports:
+  - port: 80
+    name: main
+    targetPort: 8888
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: tide
+  labels:
+    app: prow
+    component: tide
+spec:
+  # Do not scale up.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
       app: prow
       component: tide
-  spec:
-    selector:
-      app: prow
-      component: tide
-    ports:
-    - port: 80
-      name: main
-      targetPort: 8888
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: tide
-    labels:
-      app: prow
-      component: tide
-  spec:
-    # Do not scale up.
-    replicas: 1
-    strategy:
-      type: Recreate
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: tide
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: tide
-      spec:
-        serviceAccountName: tide
-        initContainers:
-        - name: git-sync-init
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --root=/tmp/git-sync
-          - --one-time=true
-          - --depth=1
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-        containers:
-        - name: git-sync
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --period=30s
-          - --root=/tmp/git-sync
-          - --max-failures=3
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-          resources:
-            requests:
-              memory: "1Gi"
-              cpu: "0.5"
-        - name: tide
-          image: us-docker.pkg.dev/k8s-infra-prow/images/tide:v20251203-dc898f4c5
-          args:
-          - --config-path=/etc/config/config.yaml
-          - --supplemental-prow-config-dir=/etc/config
-          - --dry-run=false
-          - --github-app-id=$(GITHUB_APP_ID)
-          - --github-app-private-key-path=/etc/github/cert
-          - --job-config-path=/var/repo/release/ci-operator/jobs
-          - --github-endpoint=http://ghproxy
-          - --github-endpoint=https://api.github.com
-          - --github-graphql-endpoint=http://ghproxy/graphql
-          - --gcs-credentials-file=/etc/service-account/service-account.json
-          - --history-uri=gs://openshift-prow/tide-history.json
-          - --status-path=gs://openshift-prow/tide-status-checkpoint.yaml
-          - --projected-token-file=/var/sa-token/token
-          - --sync-hourly-tokens=-1
-          - --status-hourly-tokens=-1
-          env:
-          - name: GITHUB_APP_ID
-            valueFrom:
-              secretKeyRef:
-                name: openshift-merge-bot
-                key: appid
-          ports:
-          - name: main
-            containerPort: 8888
-          - name: metrics
-            containerPort: 9090
-          volumeMounts:
-          - name: service-account-token
-            mountPath: /var/sa-token
-          - name: github-app-credentials
-            mountPath: /etc/github
-            readOnly: true
-          - name: config
-            mountPath: /etc/config
-            readOnly: true
-          - name: release
-            mountPath: /var/repo
-          - name: tmp
-            mountPath: /tmp
-          - name: service-account
-            mountPath: /etc/service-account
-            readOnly: true
-          resources:
-            requests:
-              memory: "10Gi"
-              cpu: "750m"
-        volumes:
-        - name: service-account-token
-          projected:
-            sources:
-            - serviceAccountToken:
-                path: token
-        - name: github-app-credentials
-          secret:
-            secretName: openshift-merge-bot
-        - name: config
-          configMap:
-            name: config
+    spec:
+      serviceAccountName: tide
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
         - name: release
-          emptyDir: {}
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      - name: tide
+        image: us-docker.pkg.dev/k8s-infra-prow/images/tide:v20251203-dc898f4c5
+        args:
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --dry-run=false
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --gcs-credentials-file=/etc/service-account/service-account.json
+        - --history-uri=gs://openshift-prow/tide-history.json
+        - --status-path=gs://openshift-prow/tide-status-checkpoint.yaml
+        - --projected-token-file=/var/sa-token/token
+        - --sync-hourly-tokens=-1
+        - --status-hourly-tokens=-1
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-merge-bot
+              key: appid
+        ports:
+        - name: main
+          containerPort: 8888
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
+        - name: service-account-token
+          mountPath: /var/sa-token
+        - name: github-app-credentials
+          mountPath: /etc/github
+          readOnly: true
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: release
+          mountPath: /var/repo
         - name: tmp
-          emptyDir: {}
+          mountPath: /tmp
         - name: service-account
-          secret:
-            secretName: gce-sa-credentials-gcs-tide-publisher
+          mountPath: /etc/service-account
+          readOnly: true
+        resources:
+          requests:
+            memory: "10Gi"
+            cpu: "750m"
+      volumes:
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-merge-bot
+      - name: config
+        configMap:
+          name: config
+      - name: release
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+      - name: service-account
+        secret:
+          secretName: gce-sa-credentials-gcs-tide-publisher
