@@ -12,7 +12,7 @@ az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}"
 az account set --subscription "${SUBSCRIPTION_ID}"
 
 unset GOFLAGS
-make -C dev-infrastructure/ svc.aks.kubeconfig SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
+make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
 export KUBECONFIG=kubeconfig
 PIDFILE="/tmp/svc-tunnel.pid"
 MONITOR_PIDFILE="/tmp/svc-monitor.pid"
@@ -23,7 +23,7 @@ REMOTE_PORT=8443
 
 wait_for_service() {
     for i in {1..5}; do
-        if kubectl get svc -n "$NAMESPACE" "$SERVICE" >/dev/null 2>&1; then
+        if oc get svc -n "$NAMESPACE" "$SERVICE" >/dev/null 2>&1; then
             echo "Service $SERVICE found"
             return 0
         else
@@ -37,9 +37,9 @@ wait_for_service() {
 
 start_port_forward() {
     echo "Starting port-forward..."
-    pkill -f "kubectl.*port-forward.*$LOCAL_PORT" || true
+    pkill -f "oc.*port-forward.*$LOCAL_PORT" || true
     sleep 1
-    kubectl port-forward -n "$NAMESPACE" "svc/$SERVICE" \
+    oc port-forward -n "$NAMESPACE" "svc/$SERVICE" \
         "$LOCAL_PORT:$REMOTE_PORT" >/dev/null 2>&1 &
     echo $! > "$PIDFILE"
     sleep 3
@@ -105,7 +105,7 @@ stop_tunnel() {
         kill "$(cat "$PIDFILE")" 2>/dev/null || true
     fi
     # Clean up any remaining port-forwards
-    pkill -f "kubectl.*port-forward.*$LOCAL_PORT" || true
+    pkill -f "oc.*port-forward.*$LOCAL_PORT" || true
     rm -f "$PIDFILE" "$MONITOR_PIDFILE" 2>/dev/null || true
     echo "Port forward stopped"
 }

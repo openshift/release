@@ -4,10 +4,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.19
+  from_repository: true
 canonical_go_repository: github.com/openshift/ofcir
 images:
 - dockerfile_path: Dockerfile
@@ -66,32 +63,7 @@ tests:
     test:
     - as: test
       commands: |
-        SERVER_IP="$(cat ${SHARED_DIR}/server-ip)"
-        SSH_KEY="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
-        SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "$SSH_KEY")
-        echo "Setup test environment"
-        # Copy current ofcir sources to the remote server
-        tar -czf ofcir.tar.gz ofcir
-        scp "${SSHOPTS[@]}" ofcir.tar.gz "cloud-user@${SERVER_IP}:/tmp/ofcir.tar.gz"
-        timeout -s 9 60m ssh "${SSHOPTS[@]}" "cloud-user@${SERVER_IP}" bash - << EOF
-          set -euo pipefail
-          sudo su
-          ### Unpack ofcir sources
-          tar -xzvf /tmp/ofcir.tar.gz
-          ### Install golang
-          curl -OL https://go.dev/dl/go1.23.9.linux-amd64.tar.gz
-          tar -C /usr/local -xzf go1.23.9.linux-amd64.tar.gz
-          export GOPATH=/usr/local/go
-          export PATH=\$PATH:\$GOPATH/bin
-          ### Install dependencies
-          dnf install -y make podman
-          curl -LO "https://dl.k8s.io/release/\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-          install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-          export PATH=\$PATH:/usr/local/bin
-          echo "Running e2e tests..."
-          cd ofcir
-          make e2e-tests
-        EOF
+        ./ofcir/hack/ci-e2e-test.sh
       from: ofcir-tests-base
       resources:
         requests:

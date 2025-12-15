@@ -1,65 +1,67 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: ServiceAccount
-  metadata:
-    name: gangway
-    namespace: ci
-- kind: Role
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: gangway
-    namespace: ci
-  rules:
-    - apiGroups:
-        - prow.k8s.io
-      resources:
-        - prowjobs
-      verbs:
-        - create
-        - list
-        - get
-        - update
-- kind: RoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: gangway
-    namespace: ci
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: Role
-    name: gangway
-  subjects:
-  - kind: ServiceAccount
-    name: gangway
-    namespace: ci
-- kind: ClusterRole
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: gangway-oauth
-  rules:
+kind: ServiceAccount
+metadata:
+  name: gangway
+  namespace: ci
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gangway
+  namespace: ci
+rules:
   - apiGroups:
-    - authentication.k8s.io
+      - prow.k8s.io
     resources:
-    - tokenreviews
+      - prowjobs
     verbs:
-    - create
-  - apiGroups:
-    - authorization.k8s.io
-    resources:
-    - subjectaccessreviews
-    verbs:
-    - create
-- kind: ClusterRoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: gangway-oauth
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: ClusterRole
-    name: gangway-oauth
-  subjects:
-  - kind: ServiceAccount
-    name: gangway
-    namespace: ci
+      - create
+      - list
+      - get
+      - update
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gangway
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gangway
+subjects:
+- kind: ServiceAccount
+  name: gangway
+  namespace: ci
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gangway-oauth
+rules:
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gangway-oauth
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gangway-oauth
+subjects:
+- kind: ServiceAccount
+  name: gangway
+  namespace: ci

@@ -22,6 +22,8 @@ else #login for ROSA & Hypershift platforms
   eval "$(cat "${SHARED_DIR}/api.login")"
 fi
 
+oc version
+
 # cleaning leftovers if exists
 oc delete istio default ${ISTIO_NAMESPACE} || true
 oc delete istiocni default ${ISTIO_CNI_NAMESPACE} || true
@@ -184,8 +186,32 @@ oc -n ${TEMPO_NAMESPACE} wait --for condition=Ready TempoStack/sample --timeout 
 oc -n ${TEMPO_NAMESPACE} wait --for condition=Available deployment/tempo-sample-compactor --timeout 150s || (oc describe -n ${TEMPO_NAMESPACE} deployment/tempo-sample-compactor; exit 1)
 
 echo "Exposing Jaeger UI route (will be used in kiali ui)"
-oc expose svc tempo-sample-query-frontend --port=jaeger-ui --name=tracing-ui -n ${TEMPO_NAMESPACE}
-oc -n ${TEMPO_NAMESPACE} label route tracing-ui app.kubernetes.io/managed-by-
+oc apply -n ${TEMPO_NAMESPACE} -f - <<EOF
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: tracing-ui
+  namespace: tracing-system
+spec:
+  to:
+    kind: Service
+    name: tempo-sample-query-frontend
+    weight: 100
+  port:
+    targetPort: jaeger-ui
+  wildcardPolicy: None
+EOF
+sleep 2s
+
+if timeout 300 bash -c 'until oc -n '"${TEMPO_NAMESPACE}"' get route/tracing-ui &>/dev/null; do echo "Route tracing-ui does not exist"; sleep 2; done'; then
+  echo "Route tracing-ui exists"
+  oc -n ${TEMPO_NAMESPACE} get routes
+else
+  echo "Timeout: Route tracing-ui was not created within 5 minutes"
+  oc -n ${TEMPO_NAMESPACE} get routes
+  oc -n ${TEMPO_NAMESPACE} get services
+  oc -n ${TEMPO_NAMESPACE} get service tempo-sample-query-frontend -o yaml
+fi
 
 echo "===== Installing OpenTelemetryCollector ====="
 oc apply -n ${OTEL_NAMESPACE} -f - <<EOF

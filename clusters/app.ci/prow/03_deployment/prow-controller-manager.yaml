@@ -1,130 +1,129 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    labels:
+kind: Service
+metadata:
+  namespace: ci
+  labels:
+    app: prow
+    component: prow-controller-manager
+  name: prow-controller-manager
+spec:
+  ports:
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  selector:
+    app: prow
+    component: prow-controller-manager
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: prow-controller-manager
+  labels:
+    app: prow
+    component: prow-controller-manager
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
       app: prow
       component: prow-controller-manager
-    name: prow-controller-manager
-  spec:
-    ports:
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    selector:
-      app: prow
-      component: prow-controller-manager
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: prow-controller-manager
-    labels:
-      app: prow
-      component: prow-controller-manager
-  spec:
-    replicas: 1
-    revisionHistoryLimit: 2
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: prow-controller-manager
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: prow-controller-manager
-      spec:
-        serviceAccountName: prow-controller-manager
-        initContainers:
-        - name: git-sync-init
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --root=/tmp/git-sync
-          - --one-time=true
-          - --depth=1
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-        containers:
-        - name: git-sync
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --period=30s
-          - --root=/tmp/git-sync
-          - --max-failures=3
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-          resources:
-            requests:
-              memory: "1Gi"
-              cpu: "0.5"
-        - name: prow-controller-manager
-          image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20251203-dc898f4c5
-          args:
-          - --config-path=/etc/config/config.yaml
-          - --supplemental-prow-config-dir=/etc/config
-          - --dry-run=false
-          - --job-config-path=/var/repo/release/ci-operator/jobs
-          - --github-token-path=/etc/github/oauth
-          - --github-endpoint=http://ghproxy
-          - --github-endpoint=https://api.github.com
-          - --github-graphql-endpoint=http://ghproxy/graphql
-          - --projected-token-file=/var/sa-token/token
-          - --kubeconfig-dir=/etc/build-farm-credentials
-          - --kubeconfig-suffix=config
-          - --enable-controller=plank
-          - --enable-controller=scheduler
-          ports:
-          - name: metrics
-            containerPort: 9090
-          volumeMounts:
-          - name: service-account-token
-            mountPath: /var/sa-token
-          - name: oauth
-            mountPath: /etc/github
-            readOnly: true
-          - name: config
-            mountPath: /etc/config
-            readOnly: true
-          - name: release
-            mountPath: /var/repo
-          - mountPath: /etc/build-farm-credentials
-            name: build-farm-credentials
-            readOnly: true
-          resources:
-            requests:
-              memory: "8Gi"
-              cpu: "600m"
-        volumes:
-        - name: service-account-token
-          projected:
-            sources:
-            - serviceAccountToken:
-                path: token
-        - name: oauth
-          secret:
-            secretName: github-credentials-openshift-ci-robot
-        - name: config
-          configMap:
-            name: config
+    spec:
+      serviceAccountName: prow-controller-manager
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
         - name: release
-          emptyDir: {}
-        - name: build-farm-credentials
-          secret:
-            secretName: prow-controller-manager
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      - name: prow-controller-manager
+        image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20251205-476eedbb0
+        args:
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --dry-run=false
+        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --github-token-path=/etc/github/oauth
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --projected-token-file=/var/sa-token/token
+        - --kubeconfig-dir=/etc/build-farm-credentials
+        - --kubeconfig-suffix=config
+        - --enable-controller=plank
+        - --enable-controller=scheduler
+        ports:
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
+        - name: service-account-token
+          mountPath: /var/sa-token
+        - name: oauth
+          mountPath: /etc/github
+          readOnly: true
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: release
+          mountPath: /var/repo
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "600m"
+      volumes:
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+      - name: oauth
+        secret:
+          secretName: github-credentials-openshift-ci-robot
+      - name: config
+        configMap:
+          name: config
+      - name: release
+        emptyDir: {}
+      - name: build-farm-credentials
+        secret:
+          secretName: prow-controller-manager

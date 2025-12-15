@@ -38,7 +38,8 @@ images:
   to: cluster-network-operator
 promotion:
   to:
-  - name: "4.22"
+  - disabled: true
+    name: "4.22"
     namespace: ocp
 releases:
   initial:
@@ -266,6 +267,20 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-aws-ovn-clusternetwork-cidr-expansion
+  cron: 0 3 * * 0,2,4,6
+  steps:
+    cluster_profile: aws-3
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-cidr-expansion
+- as: e2e-aws-ovn-subnet-configs
+  cron: 0 3 * * 0,2,4,6
+  steps:
+    cluster_profile: aws-3
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: ovn-subnet-configs
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true

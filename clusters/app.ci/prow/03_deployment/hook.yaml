@@ -1,252 +1,254 @@
-kind: List
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  namespace: ci
+  name: hook
+spec:
+  port:
+    targetPort: 8888
+  path: /hook
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: hook
+---
 apiVersion: v1
-items:
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
-    namespace: ci
-    name: hook
-  spec:
-    port:
-      targetPort: 8888
-    path: /hook
-    tls:
-      insecureEdgeTerminationPolicy: Redirect
-      termination: edge
-    to:
-      kind: Service
-      name: hook
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    name: hook
-    labels:
-      app: prow
-      component: hook
-    annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "8888"
-  spec:
-    selector:
-      app: prow
-      component: hook
-    ports:
-    - name: main
-      port: 8888
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    type: ClusterIP
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
-    namespace: ci
+kind: Service
+metadata:
+  namespace: ci
+  name: hook
+  labels:
+    app: prow
+    component: hook
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8888"
+spec:
+  selector:
+    app: prow
+    component: hook
+  ports:
+  - name: main
+    port: 8888
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  type: ClusterIP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  namespace: ci
+  name: hook-apps
+spec:
+  port:
+    targetPort: 8888
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
     name: hook-apps
-  spec:
-    port:
-      targetPort: 8888
-    tls:
-      insecureEdgeTerminationPolicy: Redirect
-      termination: edge
-    to:
-      kind: Service
-      name: hook-apps
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    name: hook-apps
-    labels:
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  name: hook-apps
+  labels:
+    app: prow
+    component: hook-apps
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8888"
+spec:
+  selector:
+    app: prow
+    component: hook-apps
+  ports:
+  - name: main
+    port: 8888
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: hook-apps
+  labels:
+    app: prow
+    component: hook-apps
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
       app: prow
       component: hook-apps
-    annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "8888"
-  spec:
-    selector:
-      app: prow
-      component: hook-apps
-    ports:
-    - name: main
-      port: 8888
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: hook-apps
-    labels:
-      app: prow
-      component: hook-apps
-  spec:
-    replicas: 2
-    revisionHistoryLimit: 2
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: hook-apps
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: hook-apps
-      spec:
-        affinity:
-          podAntiAffinity:
-            preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                  - key: component
-                    operator: In
-                    values:
-                    - hook-apps
-                topologyKey: "kubernetes.io/hostname"
-        serviceAccountName: hook
-        initContainers:
-        - name: git-sync-init
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --root=/tmp/git-sync
-          - --one-time=true
-          - --depth=1
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-        containers:
-        - name: git-sync
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --period=30s
-          - --root=/tmp/git-sync
-          - --max-failures=3
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-          resources:
-            requests:
-              memory: "1Gi"
-              cpu: "0.5"
-        - name: hook
-          image: us-docker.pkg.dev/k8s-infra-prow/images/hook:v20251203-dc898f4c5
-          args:
-          - --config-path=/etc/config/config.yaml
-          - --supplemental-prow-config-dir=/etc/config
-          - --hmac-secret-file=/etc/github/hmac
-          - --dry-run=false
-          - --job-config-path=/var/repo/release/ci-operator/jobs
-          - --github-app-id=$(GITHUB_APP_ID)
-          - --github-app-private-key-path=/etc/github/cert
-          - --github-endpoint=http://ghproxy
-          - --github-endpoint=https://api.github.com
-          - --github-graphql-endpoint=http://ghproxy/graphql
-          - --bugzilla-endpoint=https://bugzilla.redhat.com
-          - --bugzilla-api-key-path=/etc/bugzilla/api
-          - --bugzilla-auth-method=bearer
-          - --jira-endpoint=https://issues.redhat.com
-          - --jira-bearer-token-file=/etc/jira/token
-          - --projected-token-file=/var/sa-token/token
-          - --supplemental-plugin-config-dir=/etc/plugins
-          - --kubeconfig-dir=/etc/build-farm-credentials
-          - --kubeconfig-suffix=config
-          env:
-          - name: GITHUB_APP_ID
-            valueFrom:
-              secretKeyRef:
-                name: openshift-prow-github-app
-                key: appid
-          ports:
-            - name: main
-              containerPort: 8888
-            - name: metrics
-              containerPort: 9090
-          volumeMounts:
-          - name: service-account-token
-            mountPath: /var/sa-token
-          - name: github-app-credentials
-            mountPath: /etc/github
-            readOnly: true
-          - name: config
-            mountPath: /etc/config
-            readOnly: true
-          - name: bugzilla
-            mountPath: /etc/bugzilla
-            readOnly: true
-          - name: jira
-            mountPath: /etc/jira
-            readOnly: true
-          - name: unsplash-api
-            mountPath: /etc/unsplash-api
-            readOnly: true
-          - name: plugins
-            mountPath: /etc/plugins
-            readOnly: true
-          - name: tmp
-            mountPath: /tmp
-          - name: release
-            mountPath: /var/repo
-          - mountPath: /etc/build-farm-credentials
-            name: build-farm-credentials
-            readOnly: true
-          resources:
-            requests:
-              memory: "17Gi"
-              cpu: "200m"
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 45
-            periodSeconds: 15
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-        volumes:
-        - name: service-account-token
-          projected:
-            sources:
-            - serviceAccountToken:
-                path: token
-        - name: github-app-credentials
-          secret:
-            secretName: openshift-prow-github-app
-        - name: bugzilla
-          secret:
-            secretName: bugzilla-credentials-openshift-bugzilla-robot
-        - name: jira
-          secret:
-            secretName: jira-token-dptp-bot
-        - name: unsplash-api
-          secret:
-            secretName: unsplash-api-key
-        - name: config
-          configMap:
-            name: config
-        - name: plugins
-          configMap:
-            name: plugins
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - hook-apps
+              topologyKey: "kubernetes.io/hostname"
+      serviceAccountName: hook
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
         - name: release
-          emptyDir: {}
-        - name: build-farm-credentials
-          secret:
-            secretName: hook
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      - name: hook
+        image: us-docker.pkg.dev/k8s-infra-prow/images/hook:v20251205-476eedbb0
+        args:
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --hmac-secret-file=/etc/github/hmac
+        - --dry-run=false
+        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --bugzilla-endpoint=https://bugzilla.redhat.com
+        - --bugzilla-api-key-path=/etc/bugzilla/api
+        - --bugzilla-auth-method=bearer
+        - --jira-endpoint=https://issues.redhat.com
+        - --jira-bearer-token-file=/etc/jira/token
+        - --projected-token-file=/var/sa-token/token
+        - --supplemental-plugin-config-dir=/etc/plugins
+        - --kubeconfig-dir=/etc/build-farm-credentials
+        - --kubeconfig-suffix=config
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
+        ports:
+          - name: main
+            containerPort: 8888
+          - name: metrics
+            containerPort: 9090
+        volumeMounts:
+        - name: service-account-token
+          mountPath: /var/sa-token
+        - name: github-app-credentials
+          mountPath: /etc/github
+          readOnly: true
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: bugzilla
+          mountPath: /etc/bugzilla
+          readOnly: true
+        - name: jira
+          mountPath: /etc/jira
+          readOnly: true
+        - name: unsplash-api
+          mountPath: /etc/unsplash-api
+          readOnly: true
+        - name: plugins
+          mountPath: /etc/plugins
+          readOnly: true
         - name: tmp
-          emptyDir: {}
+          mountPath: /tmp
+        - name: release
+          mountPath: /var/repo
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        resources:
+          requests:
+            memory: "17Gi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 45
+          periodSeconds: 15
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+      volumes:
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
+      - name: bugzilla
+        secret:
+          secretName: bugzilla-credentials-openshift-bugzilla-robot
+      - name: jira
+        secret:
+          secretName: jira-token-dptp-bot
+      - name: unsplash-api
+        secret:
+          secretName: unsplash-api-key
+      - name: config
+        configMap:
+          name: config
+      - name: plugins
+        configMap:
+          name: plugins
+      - name: release
+        emptyDir: {}
+      - name: build-farm-credentials
+        secret:
+          secretName: hook
+      - name: tmp
+        emptyDir: {}
