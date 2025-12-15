@@ -1,0 +1,25 @@
+workflow:
+  as: assisted-ofcir-ip-config
+  steps:
+    cluster_profile: packet-assisted
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    pre:
+      - ref: ofcir-acquire
+      - ref: assisted-ofcir-setup
+      - chain: assisted-common-pre
+      - ref: assisted-ofcir-ip-config-setup
+      - ref: assisted-ofcir-ip-config-deploy-lca
+    test:
+      - ref: assisted-ofcir-ip-config-test
+    post:
+      - ref: assisted-common-gather
+      - ref: assisted-ofcir-ip-config-gather
+      - ref: ofcir-gather
+      - ref: ofcir-release
+    env:
+      CLUSTERTYPE: "assisted_medium_el9"
+  documentation: |-
+    This workflow installs a Single Node OpenShift (SNO) cluster on an OFCIR host,
+    deploys the lifecycle-agent (LCA) operator onto that cluster, and then configures
+    the cluster with new ip addresses.
