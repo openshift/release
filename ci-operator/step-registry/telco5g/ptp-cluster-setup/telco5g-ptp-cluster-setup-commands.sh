@@ -57,18 +57,13 @@ cat << EOF > ~/ocp-install.yml
       delay: 10
       timeout: 300
 
-EOF
-if [[ "$JOB_TYPE" == "periodic" ]]; then
-cat << EOF >> ~/ocp-install.yml
   - name: Check if abort file exists
     stat:
       path: /home/kni/abort
     register: file_info
     failed_when: file_info.stat.exists
+    when: job_type == "periodic"
 
-EOF
-fi
-cat << EOF >> ~/ocp-install.yml
   - name: Remove last run
     shell: kcli delete plan --yes ${PLAN_NAME}
     ignore_errors: yes
@@ -133,6 +128,13 @@ cat << EOF > ~/fetch-kubeconfig.yml
   hosts: hypervisor
   gather_facts: false
   tasks:
+
+  - name: Check if abort file exists
+    stat:
+      path: /home/kni/abort
+    register: file_info
+    failed_when: file_info.stat.exists
+    when: job_type == "periodic"
 
   - name: Copy kubeconfig from installer VM
     shell: kcli scp root@${CLUSTER_NAME}-installer:/root/ocp/auth/kubeconfig /home/kni/.kube/config_${CLUSTER_NAME}
@@ -301,11 +303,11 @@ log_chronyd_status() {
 status=0
 
 if [[ "$SKIP_OCP_INSTALL" != "true" ]]; then
-  ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+  ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -e job_type=$JOB_TYPE -vv || status=$?
 fi
 
 # Fetch kubeconfig and cluster information
-ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
+ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -e job_type=$JOB_TYPE -vv || true
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
 
 if [[ "$SKIP_OCP_INSTALL" != "true" && "$status" -eq 0 ]]; then

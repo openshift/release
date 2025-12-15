@@ -345,10 +345,10 @@ plank:
             memory: 250Mi
       timeout: 8h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20251203-dc898f4c5
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20251203-dc898f4c5
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20251203-dc898f4c5
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20251203-dc898f4c5
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20251205-476eedbb0
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20251205-476eedbb0
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20251205-476eedbb0
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20251205-476eedbb0
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -488,6 +488,9 @@ plank:
   - config:
       timeout: 24h0m0s
     repo: openshift/hypershift
+  - config:
+      timeout: 24h0m0s
+    repo: openshift/machine-config-operator
   job_url_prefix_config:
     '*': https://prow.ci.openshift.org/view/
     openshift-eng/agent-qe-infra: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
@@ -642,41 +645,30 @@ tide:
     optional-regex-contexts:
     - multi-pr-.*
     orgs:
+      Azure:
+        repos:
+          ARO-HCP:
+            branches:
+              main:
+                from-branch-protection: true
+                required-if-present-contexts:
+                - change-detection
+                - lint
+                - mega-linter
+                - test
+                - validate_bicep
+                - test-grafana-script
+                - test-prometheus-rules
+                skip-unknown-contexts: true
       ViaQ:
         repos:
           vector:
             skip-unknown-contexts: true
       containers:
         repos:
-          buildah:
-            required-contexts:
-            - Total Success
-            skip-unknown-contexts: true
-          common:
-            required-contexts:
-            - Total Success
-            skip-unknown-contexts: true
-          container-selinux:
-            skip-unknown-contexts: true
           dnsname:
             skip-unknown-contexts: true
           gvisor-tap-vsock:
-            skip-unknown-contexts: true
-          libhvee:
-            skip-unknown-contexts: true
-          luksy:
-            skip-unknown-contexts: true
-          podman:
-            required-contexts:
-            - Total Success
-            skip-unknown-contexts: true
-          podman-machine-os:
-            skip-unknown-contexts: true
-          podman-py:
-            skip-unknown-contexts: true
-          storage:
-            required-contexts:
-            - Total Success
             skip-unknown-contexts: true
       cri-o:
         repos:

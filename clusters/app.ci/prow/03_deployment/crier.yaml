@@ -1,152 +1,151 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    labels:
+kind: Service
+metadata:
+  namespace: ci
+  labels:
+    app: prow
+    component: crier
+  name: crier
+spec:
+  ports:
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  selector:
+    app: prow
+    component: crier
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: crier
+  labels:
+    app: prow
+    component: crier
+spec:
+  # Do not scale up.
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
       app: prow
       component: crier
-    name: crier
-  spec:
-    ports:
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    selector:
-      app: prow
-      component: crier
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: crier
-    labels:
-      app: prow
-      component: crier
-  spec:
-    # Do not scale up.
-    replicas: 1
-    revisionHistoryLimit: 2
-    strategy:
-      type: Recreate
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: crier
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: crier
-      spec:
-        serviceAccountName: crier
-        initContainers:
-        - name: git-sync-init
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --root=/tmp/git-sync
-          - --one-time=true
-          - --depth=1
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-        containers:
-        - name: git-sync
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --period=30s
-          - --root=/tmp/git-sync
-          - --max-failures=3
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-          resources:
-            requests:
-              memory: "1Gi"
-              cpu: "0.5"
-        - name: crier
-          image: us-docker.pkg.dev/k8s-infra-prow/images/crier:v20251203-dc898f4c5
-          args:
-          - --github-workers=30
-          - --config-path=/etc/config/config.yaml
-          - --supplemental-prow-config-dir=/etc/config
-          - --job-config-path=/var/repo/release/ci-operator/jobs
-          - --github-app-id=$(GITHUB_APP_ID)
-          - --github-app-private-key-path=/etc/github/cert
-          - --github-endpoint=http://ghproxy
-          - --github-endpoint=https://api.github.com
-          - --github-graphql-endpoint=http://ghproxy/graphql
-          - --blob-storage-workers=20
-          - --gcs-credentials-file=/etc/service-account/service-account.json
-          - --kubernetes-blob-storage-workers=20
-          - --slack-workers=5
-          - --slack-token-file=/etc/slack/oauth
-          - --projected-token-file=/var/sa-token/token
-          - --kubeconfig-dir=/etc/build-farm-credentials
-          - --kubeconfig-suffix=config
-          env:
-          - name: GITHUB_APP_ID
-            valueFrom:
-              secretKeyRef:
-                name: openshift-prow-github-app
-                key: appid
-          volumeMounts:
-          - name: service-account-token
-            mountPath: /var/sa-token
-          - name: github-app-credentials
-            mountPath: /etc/github
-            readOnly: true
-          - name: slack
-            mountPath: /etc/slack
-            readOnly: true
-          - name: config
-            mountPath: /etc/config
-            readOnly: true
-          - name: release
-            mountPath: /var/repo
-          - mountPath: /etc/build-farm-credentials
-            name: build-farm-credentials
-            readOnly: true
-          - name: service-account
-            mountPath: /etc/service-account
-            readOnly: true
-          resources:
-            requests:
-              memory: "10Gi"
-              cpu: "600m"
-        volumes:
-        - name: service-account-token
-          projected:
-            sources:
-            - serviceAccountToken:
-                path: token
-        - name: github-app-credentials
-          secret:
-            secretName: openshift-prow-github-app
-        - name: slack
-          secret:
-            secretName: slack-credentials-prow
-        - name: config
-          configMap:
-            name: config
+    spec:
+      serviceAccountName: crier
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
         - name: release
-          emptyDir: {}
-        - name: build-farm-credentials
-          secret:
-            secretName: crier
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      - name: crier
+        image: us-docker.pkg.dev/k8s-infra-prow/images/crier:v20251205-476eedbb0
+        args:
+        - --github-workers=30
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --blob-storage-workers=20
+        - --gcs-credentials-file=/etc/service-account/service-account.json
+        - --kubernetes-blob-storage-workers=20
+        - --slack-workers=5
+        - --slack-token-file=/etc/slack/oauth
+        - --projected-token-file=/var/sa-token/token
+        - --kubeconfig-dir=/etc/build-farm-credentials
+        - --kubeconfig-suffix=config
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
+        volumeMounts:
+        - name: service-account-token
+          mountPath: /var/sa-token
+        - name: github-app-credentials
+          mountPath: /etc/github
+          readOnly: true
+        - name: slack
+          mountPath: /etc/slack
+          readOnly: true
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: release
+          mountPath: /var/repo
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
         - name: service-account
-          secret:
-            secretName: gce-sa-credentials-gcs-crier-publisher
+          mountPath: /etc/service-account
+          readOnly: true
+        resources:
+          requests:
+            memory: "10Gi"
+            cpu: "600m"
+      volumes:
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
+      - name: slack
+        secret:
+          secretName: slack-credentials-prow
+      - name: config
+        configMap:
+          name: config
+      - name: release
+        emptyDir: {}
+      - name: build-farm-credentials
+        secret:
+          secretName: crier
+      - name: service-account
+        secret:
+          secretName: gce-sa-credentials-gcs-crier-publisher

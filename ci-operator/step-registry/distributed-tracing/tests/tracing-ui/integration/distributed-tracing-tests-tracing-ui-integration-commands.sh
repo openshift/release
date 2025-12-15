@@ -23,6 +23,7 @@ vars=(
   CYPRESS_LIGHTSPEED_CONSOLE_IMAGE
   CYPRESS_LIGHTSPEED_PROVIDER_URL
   CYPRESS_LIGHTSPEED_PROVIDER_TOKEN
+  CYPRESS_SKIP_TESTS
 )
 
 # Loop through each variable.
@@ -208,5 +209,11 @@ fi
 # Install npm modules
 npm install || true
 
-# Run the Cypress tests.
-npm run test-cypress-console-headless || true
+# Run the Cypress tests with grep filter if CYPRESS_SKIP_TESTS is set
+if [[ -n "${CYPRESS_SKIP_TESTS:-}" ]]; then
+  echo "Running Cypress tests with grep pattern: ${CYPRESS_SKIP_TESTS}"
+  npx cypress run --browser chrome --headless --env grep="${CYPRESS_SKIP_TESTS}",grepOmitFiltered=true || true
+else
+  echo "Running all Cypress tests"
+  npm run test-cypress-console-headless || true
+fi

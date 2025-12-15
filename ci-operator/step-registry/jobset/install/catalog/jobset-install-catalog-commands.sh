@@ -60,7 +60,7 @@ function create_catalog () {
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-  name: $CATSRC_NAME
+  name: $CS_CATSRC_NAME
   namespace: openshift-marketplace
 spec:
   sourceType: grpc
@@ -124,9 +124,24 @@ EOF
     echo "[$(timestamp)] Mirroring the images to the mirror registry..."
     run_command "./oc-mirror --v2 --config=${TMP_DIR}/imageset.yaml --workspace=file://${TMP_DIR} docker://${MIRROR_REGISTRY_HOST} --log-level=info --retry-times=5 --src-tls-verify=false --dest-tls-verify=false"
 
-    echo "[$(timestamp)] Replacing the generated catalog source name with the ENV var '$CATSRC_NAME'..."
+    echo "[$(timestamp)] Replacing the generated catalog source name with the ENV var '$CS_CATSRC_NAME'..."
     run_command "curl -k -L -o yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/') && chmod +x ./yq"
-    run_command "./yq eval '.metadata.name = \"$CATSRC_NAME\"' -i ${OC_MIRROR_OUTPUT_DIR}/cs-*.yaml"
+    run_command "./yq eval '.metadata.name = \"$CS_CATSRC_NAME\"' -i ${OC_MIRROR_OUTPUT_DIR}/cs-*.yaml"
+    if [ -f "${OC_MIRROR_OUTPUT_DIR}/idms-oc-mirror.yaml" ] ; then
+        echo "[$(timestamp)] Replacing the generated idms name with the ENV var '$IDMS_NAME'..."
+        run_command "./yq eval '.metadata.name = \"$IDMS_NAME\"' -i ${OC_MIRROR_OUTPUT_DIR}/idms-*.yaml"
+    else
+        echo "No idms file found. Skipping replase ..."
+    fi
+
+
+    if [ -f "${OC_MIRROR_OUTPUT_DIR}/itms-oc-mirror.yaml" ] ; then
+        echo "[$(timestamp)] Replacing the generated itms name with the ENV var '$ITMS_NAME'..."
+        run_command "./yq eval '.metadata.name = \"$ITMS_NAME\"' -i ${OC_MIRROR_OUTPUT_DIR}/itms-*.yaml"
+    else 
+        echo "No itms file found. Skipping replase ..."
+    fi
+
 
     echo "[$(timestamp)] Checking and applying the generated resource files..."
     run_command "find ${OC_MIRROR_OUTPUT_DIR} -type f | xargs -I{} bash -c 'cat {}; echo \"---\"'"
@@ -156,17 +171,17 @@ function tmp_prune_distruptive_resource() {
 
 function check_catalog_readiness () {
     echo "Waiting the applied catalog source to become READY..."
-    if wait_for_state "catalogsource/${CATSRC_NAME}" "jsonpath={.status.connectionState.lastObservedState}=READY" "5m" "openshift-marketplace"; then
+    if wait_for_state "catalogsource/${CS_CATSRC_NAME}" "jsonpath={.status.connectionState.lastObservedState}=READY" "5m" "openshift-marketplace"; then
         echo "CatalogSource is ready"
     else
         echo "Timed out after 5m. Dumping resources for debugging..."
         run_command "oc get pod -n openshift-marketplace"
-        run_command "oc get event -n openshift-marketplace | grep ${CATSRC_NAME}"
+        run_command "oc get event -n openshift-marketplace | grep ${CS_CATSRC_NAME}"
         exit 1
     fi
 
-    echo "Storing the catalog source name to '${SHARED_DIR}/catsrc_name'..."
-    echo "${CATSRC_NAME}" > "${SHARED_DIR}"/catsrc_name
+    echo "Storing the catalog source name to '${SHARED_DIR}/jobset_catsrc_name'..."
+    echo "${CS_CATSRC_NAME}" > "${SHARED_DIR}"/jobset_catsrc_name
 }
 
 if [ -z "${CATSRC_IMG}" ]; then
@@ -178,7 +193,7 @@ timestamp
 set_proxy
 
 if [ "${MIRROR_OPERATORS}" == "true" ]; then
-    export TMP_DIR=/tmp/mirror-operators
+    export TMP_DIR=/tmp/mirror-jobset
     export OC_MIRROR_OUTPUT_DIR="${TMP_DIR}/working-dir/cluster-resources"
     export XDG_RUNTIME_DIR="${TMP_DIR}/run"
     mkdir -p "${XDG_RUNTIME_DIR}/containers"

@@ -1,102 +1,102 @@
-kind: List
+---
+kind: PersistentVolumeClaim
 apiVersion: v1
-items:
-- kind: PersistentVolumeClaim
-  apiVersion: v1
-  metadata:
-    labels:
+metadata:
+  labels:
+    app: prow
+    component: ghproxy
+  name: ghproxy
+  namespace: ci
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 30Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: prow
+    component: ghproxy
+  name: ghproxy
+  namespace: ci
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: 8888
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  selector:
+    app: prow
+    component: ghproxy
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ghproxy
+  labels:
+    app: prow
+    component: ghproxy
+  namespace: ci
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
       app: prow
       component: ghproxy
-    name: ghproxy
-    namespace: ci
-  spec:
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: 30Gi
-- apiVersion: v1
-  kind: Service
-  metadata:
-    labels:
-      app: prow
-      component: ghproxy
-    name: ghproxy
-    namespace: ci
-  spec:
-    ports:
-    - name: main
-      port: 80
-      protocol: TCP
-      targetPort: 8888
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    selector:
-      app: prow
-      component: ghproxy
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: ghproxy
-    labels:
-      app: prow
-      component: ghproxy
-    namespace: ci
-  spec:
-    replicas: 1
-    strategy:
-      type: Recreate
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: ghproxy
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: ghproxy
-      spec:
-        containers:
-        - name: ghproxy
-          image: us-docker.pkg.dev/k8s-infra-prow/images/ghproxy:v20251203-dc898f4c5
-          imagePullPolicy: IfNotPresent
-          args:
-          - --cache-dir=/cache
-          - --cache-sizeGB=19
-          - --legacy-disable-disk-cache-partitions-by-auth-header=false
-          - --get-throttling-time-ms=200
-          - --throttling-time-ms=450
-          - --throttling-time-v4-ms=600
-          - --throttling-max-delay-duration-seconds=51
-          - --throttling-max-delay-duration-v4-seconds=150
-          - --request-timeout=151
-          - --concurrency=1000
-          ports:
-          - name: main
-            containerPort: 8888
-          - name: metrics
-            containerPort: 9090
-          volumeMounts:
-          - name: cache
-            mountPath: /cache
-          resources:
-            requests:
-              memory: "250Mi"
-              cpu: "100m"
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 20
-            periodSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-        volumes:
+    spec:
+      containers:
+      - name: ghproxy
+        image: us-docker.pkg.dev/k8s-infra-prow/images/ghproxy:v20251205-476eedbb0
+        imagePullPolicy: IfNotPresent
+        args:
+        - --cache-dir=/cache
+        - --cache-sizeGB=19
+        - --legacy-disable-disk-cache-partitions-by-auth-header=false
+        - --get-throttling-time-ms=200
+        - --throttling-time-ms=450
+        - --throttling-time-v4-ms=600
+        - --throttling-max-delay-duration-seconds=51
+        - --throttling-max-delay-duration-v4-seconds=150
+        - --request-timeout=151
+        - --concurrency=1000
+        ports:
+        - name: main
+          containerPort: 8888
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
         - name: cache
-          persistentVolumeClaim:
-            claimName: ghproxy
+          mountPath: /cache
+        resources:
+          requests:
+            memory: "250Mi"
+            cpu: "100m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 20
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+      volumes:
+      - name: cache
+        persistentVolumeClaim:
+          claimName: ghproxy
