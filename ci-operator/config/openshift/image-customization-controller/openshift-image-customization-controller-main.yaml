@@ -1,8 +1,4 @@
 base_images:
-  dev-scripts:
-    name: test
-    namespace: ocp-kni
-    tag: dev-scripts
   ocp_4.21_base-rhel9:
     name: "4.22"
     namespace: ocp
@@ -14,6 +10,23 @@ base_images:
 build_root:
   from_repository: true
 images:
+- build_args:
+  - name: SOURCE_GIT_URL
+    value: https://github.com/honza/dev-scripts.git
+  - name: SOURCE_GIT_REF
+    value: aarch64-workers
+  dockerfile_literal: |
+    FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.21
+    ARG SOURCE_GIT_URL
+    ARG SOURCE_GIT_REF
+    RUN yum install -y git && \
+        git clone ${SOURCE_GIT_URL} /tmp/dev-scripts-src && \
+        cd /tmp/dev-scripts-src && \
+        git checkout ${SOURCE_GIT_REF}
+    # TEMPORARY: Build dev-scripts from honza/dev-scripts:aarch64-workers for multi-arch testing
+    # TODO: Remove when multi-arch PR merges to openshift-metal3/dev-scripts
+    WORKDIR /tmp/dev-scripts-src
+  to: dev-scripts
 - inputs:
     ocp_4.21_base-rhel9:
       as:
@@ -36,6 +49,12 @@ releases:
       include_built_images: true
       name: "4.22"
       namespace: ocp
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -81,6 +100,22 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-ovn-ipv4-multi-arch
+  capabilities:
+  - intranet
+  skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        NUM_ARM_WORKERS=1
+        APPLY_ARM_WORKERS=true
+        BMC_DRIVER=redfish-virtualmedia
+    workflow: baremetalds-e2e-ovn-ipv4-multi-arch
 - as: e2e-metal-ipi-virtualmedia
   capabilities:
   - intranet
