@@ -99,6 +99,9 @@ EOF
     else
         args+=(--quay-auth "${PULL_SECRET}/.dockerconfigjson")
     fi
+
+    run_command "oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d > ${SHARED_DIR}/old_dockerconfigjson"
+
     run_command "deploy-konflux-operator/deploy-operator.sh ${args[*]}"
 }
 
