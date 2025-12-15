@@ -329,9 +329,18 @@ sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh
 chmod 700 $HOME/setup_proxy.sh
 
 echo "Transferring the setup script to Bastion"
-scp "${ssh_options[@]}" $HOME/setup_proxy.sh root@$BASTION_FIP:/root/setup_proxy.sh
+scp -i "$SSH_KEY" \
+  -o StrictHostKeyChecking=no \
+  -o UserKnownHostsFile=/dev/null \
+  "$HOME/setup_proxy.sh" \
+  root@"$BASTION_FIP":/root/setup_proxy.sh
+
 echo "Triggering the proxy server setup on Bastion"
-ssh "${ssh_options[@]}" root@$BASTION_FIP "/root/setup_proxy.sh"
+ssh -i "$SSH_KEY" \
+  -o StrictHostKeyChecking=no \
+  -o UserKnownHostsFile=/dev/null \
+  root@"$BASTION_FIP" \
+  bash /root/setup_proxy.sh
 
 cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${BASTION_FIP}:3128/
