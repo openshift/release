@@ -2366,23 +2366,36 @@ tests:
   - intranet
   cron: 16 22 1,17 * *
   steps:
-    cluster_profile: equinix-ocp-metal-qe
+    cluster_profile: equinix-ocp-hcp
     env:
-      EXTRA_ARGS: ' --annotations=hypershift.openshift.io/pod-security-admission-label-override=baseline
-        --enable-cluster-capabilities baremetal '
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_EXTRA_WORKERS=1
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=81920
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=250G
       HYPERSHIFT_NODE_COUNT: "1"
       HYPERSHIFT_NODE_MEMORY: "8"
+      IP_STACK: v4
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       MCE_VERSION: "2.11"
+      METALLB_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
       REDHAT_OPERATORS_INDEX_TAG: v4.20
+      TIMEOUT: +24 hours
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
 - as: baremetalds-ipi-ovn-v4v6-kubevirt-hypershift-mce-guest-f14
   capabilities:
   - intranet
   cron: 23 22 7,23 * *
   steps:
-    cluster_profile: equinix-ocp-metal-qe
+    cluster_profile: equinix-ocp-hcp
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
@@ -2396,7 +2409,7 @@ tests:
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST="vda vdb"
         VM_EXTRADISKS_SIZE=250G
-      HYPERSHIFT_HC_RELEASE_IMAGE: registry.build07.ci.openshift.org/ci-ln-j3276wt/release:latest
+      HYPERSHIFT_HC_RELEASE_IMAGE: registry.build07.ci.openshift.org/ci-ln-3jdkq8t/release:latest
       HYPERSHIFT_NODE_COUNT: "1"
       HYPERSHIFT_NODE_MEMORY: "8"
       IP_STACK: v4v6
@@ -2405,6 +2418,7 @@ tests:
       MCE_VERSION: "2.11"
       METALLB_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
       REDHAT_OPERATORS_INDEX_TAG: v4.20
+      TIMEOUT: +24 hours
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
 - as: baremetalds-ipi-ovn-lvms-f14
   capabilities:
