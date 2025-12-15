@@ -71,14 +71,20 @@ function deploy_operators() {
         registry_creds=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
         local registry_auth
         registry_auth=$(mktemp)
-
-        # Generate auth file for the mirror registry
         cat <<EOF > "${registry_auth}"
 {
     "auths": {
         "${mirror_registry_url}": {
             "auth": "${registry_creds}"
-        },
+        }
+    }
+}
+EOF
+        local registry_proxy_auth
+        registry_proxy_auth=$(mktemp)
+        cat <<EOF > "${registry_proxy_auth}"
+{
+    "auths": {
         "${mirror_registry_proxy_url}": {
             "auth": "${registry_creds}"
         }
@@ -86,7 +92,7 @@ function deploy_operators() {
 }
 EOF
         if [[ "${USE_REGISTRY_PROXY:-false}" == "true" ]]; then
-            args+=(--internal-registry-proxy "${mirror_registry_proxy_url}" --internal-registry-proxy-auth "${registry_auth}")
+            args+=(--internal-registry-proxy "${mirror_registry_proxy_url}" --internal-registry-proxy-auth "${registry_proxy_auth}")
         else
             args+=(--internal-registry "${mirror_registry_url}" --internal-registry-auth "${registry_auth}" --quay-auth "${PULL_SECRET}/.dockerconfigjson")
         fi
