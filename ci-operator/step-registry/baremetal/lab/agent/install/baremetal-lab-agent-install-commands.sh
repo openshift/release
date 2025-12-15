@@ -141,7 +141,7 @@ gnu_arch=$(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/;')
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
-
+sleep 600
 case "${BOOT_MODE}" in
 "iso")
   ### Create ISO image
