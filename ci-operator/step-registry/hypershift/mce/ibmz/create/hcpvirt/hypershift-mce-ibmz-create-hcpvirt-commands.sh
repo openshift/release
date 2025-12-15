@@ -308,11 +308,20 @@ oc --kubeconfig "$HOSTED_KUBECONFIG" config set-cluster "$CLSTR_NAME" \
   --server="https://${BASTION_FIP}:${NODEPORT}"
 echo "Updated kubeconfig server URL to https://${BASTION_FIP}:${NODEPORT}"
 
+# Wait for all hosted control plane pods to come up
+oc wait pod \
+  -n $hcp_ns \
+  --all \
+  --for=condition=Ready \
+  --timeout=15m
+
+echo "All pods in Hosted ccontrol plane namespace are Ready."
+
 # Downloading the script to set proxy server
 echo "Downloading the setup script for proxy"
 
 GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
-git clone git@github.ibm.com:OpenShift-on-Z/hosted-control-plane.git &&
+git clone -b proxy-tst git@github.ibm.com:OpenShift-on-Z/hosted-control-plane.git &&
 
 echo "Getting the proxy setup script"
 cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
@@ -355,6 +364,8 @@ EOF
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
+
+sleep 1800
 
 # --- Wait for ingress router service NodePorts ---
 echo "Waiting for router-nodeport-default service..."

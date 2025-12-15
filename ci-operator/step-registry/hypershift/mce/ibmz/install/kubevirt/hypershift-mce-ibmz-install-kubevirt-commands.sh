@@ -120,7 +120,7 @@ oc wait pod \
   --for=condition=Ready \
   --timeout=15m
 
-echo "✅ All pods in openshift-cnv are Ready."
+echo "All pods in openshift-cnv are Ready."
 
 echo "Installing VM console logger in order to aid debugging potential VM boot issues"
 oc apply -f https://raw.githubusercontent.com/davidvossel/kubevirt-console-debugger/main/kubevirt-console-logger.yaml
