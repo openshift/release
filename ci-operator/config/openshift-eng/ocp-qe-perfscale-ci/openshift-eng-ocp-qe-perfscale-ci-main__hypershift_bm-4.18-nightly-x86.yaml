@@ -80,15 +80,8 @@ tests:
         NUM_EXTRA_WORKERS=6
         EXTRA_WORKER_VCPU=4
         EXTRA_WORKER_MEMORY=16384
-      ES_SECRETS_PATH: /prod-secret
       LVM_OPERATOR_SUB_CHANNEL: stable-4.18
       MCE_VERSION: "2.8"
-      PPROF: "false"
-      # OVS timeout test specific configuration
-      OVS_TIMEOUT_TEST_PODS: "1000"
-      OVS_TIMEOUT_MAX_WAIT: "2400"
-      HYPERSHIFT_HC_RELEASE_IMAGE: "registry.build07.ci.openshift.org/ci-ln-l477g5k/release:latest"
-      TEST_PURPOSE: "OCPBUGS-66075-ovs-timeout-validation"
     test:
     - as: ovs-timeout-validation
       cli: latest
@@ -101,15 +94,15 @@ tests:
         
         echo "Starting OVS Timeout Fix Validation for OCPBUGS-66075"
         echo "Testing OVS timeout increase from 30s to 90s in HyperShift HCP environment"
-        echo "Using custom release: ${HYPERSHIFT_HC_RELEASE_IMAGE}"
-        echo "Target pods: ${OVS_TIMEOUT_TEST_PODS}"
+        echo "Using custom release: registry.build07.ci.openshift.org/ci-ln-l477g5k/release:latest"
+        echo "Target pods: 1000"
         
         # Function to log with timestamp
         log() {
           echo "[$(date '+%Y-%m-%d %H:%M:%S')] [OCPBUGS-66075] $*"
         }
         
-        log "Creating test deployment with ${OVS_TIMEOUT_TEST_PODS} pods..."
+        log "Creating test deployment with 1000 pods..."
         
         # Create the stress test deployment
         cat <<EOF | oc apply -f -
@@ -125,9 +118,9 @@ tests:
           annotations:
             test.openshift.io/description: "OVS timeout fix validation for OCPBUGS-66075"
             test.openshift.io/expected-timeout: "90s"
-            test.openshift.io/custom-release: "${HYPERSHIFT_HC_RELEASE_IMAGE}"
+            test.openshift.io/custom-release: "registry.build07.ci.openshift.org/ci-ln-l477g5k/release:latest"
         spec:
-          replicas: ${OVS_TIMEOUT_TEST_PODS}
+          replicas: 1000
           strategy:
             type: RollingUpdate
             rollingUpdate:
@@ -187,8 +180,8 @@ tests:
           current_time=$(date +%s)
           elapsed=$((current_time - start_time))
           
-          if [ $elapsed -gt ${OVS_TIMEOUT_MAX_WAIT} ]; then
-            log "ERROR: Test timed out after ${OVS_TIMEOUT_MAX_WAIT} seconds"
+          if [ $elapsed -gt 2400 ]; then
+            log "ERROR: Test timed out after 2400 seconds"
             break
           fi
           
@@ -207,16 +200,16 @@ tests:
             jq -r '[.items[] | select(.message | test("timeout.*ovs|ovs.*timeout|timeout.*30|timeout.*90", "i"))] | length' 2>/dev/null || echo 0)
           timeout_errors=$new_timeout_errors
           
-          log "Progress: ${running_pods}/${OVS_TIMEOUT_TEST_PODS} Running, ${pending_pods} Pending, ${failed_pods} Failed | Time: ${elapsed}s | Timeout Errors: ${timeout_errors}"
+          log "Progress: ${running_pods}/1000 Running, ${pending_pods} Pending, ${failed_pods} Failed | Time: ${elapsed}s | Timeout Errors: ${timeout_errors}"
           
           # Success condition
-          if [ $running_pods -eq ${OVS_TIMEOUT_TEST_PODS} ]; then
-            log "SUCCESS: All ${OVS_TIMEOUT_TEST_PODS} pods are running!"
+          if [ $running_pods -eq 1000 ]; then
+            log "SUCCESS: All 1000 pods are running!"
             break
           fi
           
           # Check for high failure rate
-          if [ $failed_pods -gt $((OVS_TIMEOUT_TEST_PODS / 4)) ]; then
+          if [ $failed_pods -gt $((1000 / 4)) ]; then
             log "ERROR: High failure rate detected: ${failed_pods} failed pods"
             break
           fi
@@ -229,8 +222,8 @@ tests:
         total_elapsed=$((end_time - start_time))
         
         log "=== FINAL TEST RESULTS ==="
-        log "Custom Release: ${HYPERSHIFT_HC_RELEASE_IMAGE}"
-        log "Target pods: ${OVS_TIMEOUT_TEST_PODS}"
+        log "Custom Release: registry.build07.ci.openshift.org/ci-ln-l477g5k/release:latest"
+        log "Target pods: 1000"
         log "Maximum pods running: ${max_pods_ready}"
         log "Final running pods: ${running_pods}"
         log "Failed pods: ${failed_pods}"
@@ -249,7 +242,7 @@ tests:
         oc delete deployment ovs-timeout-test-deployment --ignore-not-found=true --timeout=120s
         
         # Determine test result
-        success_threshold=$((OVS_TIMEOUT_TEST_PODS * 85 / 100))  # 85% success rate
+        success_threshold=$((1000 * 85 / 100))  # 85% success rate
         
         if [ $timeout_errors -eq 0 ] && [ $max_pods_ready -ge $success_threshold ]; then
           log "🎉 TEST RESULT: PASSED ✅"
