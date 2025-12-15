@@ -23,6 +23,16 @@ SSH_KEY="$SHARED_DIR/$CLUSTER_NAME-key"
 chmod 600 $SSH_KEY
 HAPROXY_REMOTE_CFG="/etc/haproxy/haproxy.cfg"
 
+ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
+export ssh_key_string
+tmp_ssh_key="/tmp/ssh-private-key"
+envsubst <<"EOF" >${tmp_ssh_key}
+-----BEGIN OPENSSH PRIVATE KEY-----
+${ssh_key_string}
+-----END OPENSSH PRIVATE KEY-----
+EOF
+chmod 0600 ${tmp_ssh_key}
+
 # Installing hypershift cli
 HYPERSHIFT_CLI_NAME=hcp
 echo "$(date) Installing hypershift cli"
@@ -219,7 +229,51 @@ systemctl restart haproxy
 systemctl status haproxy --no-pager
 EOF
 
-echo "✔ HAProxy updated successfully on bastion $BASTION_FIP"
+echo "HAProxy updated successfully on bastion $BASTION_FIP"
+
+create_sg_rule() {
+    local sg_name=$1
+    local direction=$2
+    local protocol=$3
+    local port_min=$4
+    local port_max=$5
+
+    # Check if the rule exists
+    if [ "$protocol" == "tcp" ]; then
+        rule_exists=$(ibmcloud is sg-rules $sg_name --output JSON | jq -r --arg port_min "$port_min" --arg port_max "$port_max" --arg direction "$direction" --arg protocol "$protocol" \
+             '.[] | select(.port_min == ($port_min|tonumber) and .port_max == ($port_max|tonumber) and .direction == $direction and .protocol == $protocol)')
+    else
+        rule_exists=$(ibmcloud is sg-rules $sg_name --output JSON | jq -r --arg direction "$direction" --arg protocol "$protocol" \
+                        '.[] | select(.direction == $direction and .protocol == $protocol)')
+    fi
+
+    if [ -n "$rule_exists" ]; then
+        echo -e "\n$direction rule for port $port_min with protocol $protocol already exists. Skipping creation..."
+    else
+        echo -e "\n$direction rule does not exist for $port_min with protocol $protocol. Creating it..."
+        extra_args=""
+        case "$protocol" in
+            "tcp")
+                extra_args="--port-min $port_min --port-max $port_max"
+                ;;
+            "icmp")
+                extra_args="--icmp-type $port_min --icmp-code $port_max"
+                ;;
+            "all")
+                if [ "$direction" == "inbound" ]; then
+                    extra_args="--remote $sg_name"
+                fi
+                ;;
+        esac
+        ibmcloud is sg-rulec $sg_name $direction $protocol $extra_args
+    fi
+}
+
+# Create security group rules to open the port range 30000-33000 for TCP traffic
+sg_name="$CLUSTER_NAME-sg"
+create_sg_rule $sg_name inbound tcp 30000 33000
+create_sg_rule $sg_name inbound tcp 3128 3128
+
 
 echo "$(date) Create hosted cluster kubeconfig"
 ${HYPERSHIFT_CLI_NAME} create kubeconfig kubevirt \
@@ -252,7 +306,46 @@ echo "Kube-apiserver NodePort: $NODEPORT"
 CLSTR_NAME=$(oc --kubeconfig "$HOSTED_KUBECONFIG" config view -o jsonpath='{.clusters[0].name}')
 oc --kubeconfig "$HOSTED_KUBECONFIG" config set-cluster "$CLSTR_NAME" \
   --server="https://${BASTION_FIP}:${NODEPORT}"
-echo "✅ Updated kubeconfig server URL to https://${BASTION_FIP}:${NODEPORT}"
+echo "Updated kubeconfig server URL to https://${BASTION_FIP}:${NODEPORT}"
+
+# Downloading the script to set proxy server
+echo "Downloading the setup script for proxy"
+
+GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
+git clone git@github.ibm.com:OpenShift-on-Z/hosted-control-plane.git &&
+
+echo "Getting the proxy setup script"
+cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
+
+# Configuring proxy server on bastion
+echo "Getting management cluster basedomain to allow traffic to proxy server"
+mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
+
+echo "Getting the proxy setup script"
+cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
+
+sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh 
+sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 
+chmod 700 $HOME/setup_proxy.sh
+
+echo "Transferring the setup script to Bastion"
+scp "${ssh_options[@]}" $HOME/setup_proxy.sh root@$BASTION_FIP:/root/setup_proxy.sh
+echo "Triggering the proxy server setup on Bastion"
+ssh "${ssh_options[@]}" root@$BASTION_FIP "/root/setup_proxy.sh"
+
+cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
+export HTTP_PROXY=http://${BASTION_FIP}:3128/
+export HTTPS_PROXY=http://${BASTION_FIP}:3128/
+export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export http_proxy=http://${BASTION_FIP}:3128/
+export https_proxy=http://${BASTION_FIP}:3128/
+export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+EOF
+
+# Sourcing the proxy settings for the next steps
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 # --- Wait for ingress router service NodePorts ---
 echo "Waiting for router-nodeport-default service..."
@@ -289,9 +382,7 @@ export HOSTED_KUBECONFIG
 export HTTP_NODEPORT
 export HTTPS_NODEPORT
 
-echo "✅ Hosted kubeconfig and NodePorts are ready."
-
-sleep 1800
+echo "Hosted kubeconfig and NodePorts are ready."
 
 # Create loadbalancer service
 oc apply -f - <<EOF
@@ -390,10 +481,10 @@ if oc wait node --all \
     --kubeconfig="${SHARED_DIR}/nested_kubeconfig" \
     --insecure-skip-tls-verify; then
 
-    echo "✅ All nodes are Ready"
+    echo "All nodes are Ready"
 
 else
-    echo "❌ Some nodes failed to become Ready"
+    echo "Some nodes failed to become Ready"
     oc get nodes --kubeconfig="${SHARED_DIR}/nested_kubeconfig" --insecure-skip-tls-verify -o wide
     exit 1
 fi
