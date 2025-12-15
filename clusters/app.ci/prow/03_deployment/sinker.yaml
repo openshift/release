@@ -1,107 +1,106 @@
-kind: List
-apiVersion: v1
-items:
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: sinker
-    namespace: ci
-    labels:
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sinker
+  namespace: ci
+  labels:
+    app: prow
+    component: sinker
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
       app: prow
       component: sinker
-  spec:
-    replicas: 1
-    revisionHistoryLimit: 2
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: sinker
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: sinker
-      spec:
-        serviceAccountName: sinker
-        initContainers:
-        - name: git-sync-init
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --root=/tmp/git-sync
-          - --one-time=true
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-        containers:
-        - name: git-sync
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --period=30s
-          - --root=/tmp/git-sync
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-        - name: sinker
-          image: us-docker.pkg.dev/k8s-infra-prow/images/sinker:v20251203-dc898f4c5
-          args:
-          - --config-path=/var/repo/release/core-services/prow/02_config/_config.yaml
-          - --supplemental-prow-config-dir=/var/repo/release/core-services/prow/02_config
-          - --job-config-path=/var/repo/release/ci-operator/jobs
-          - --projected-token-file=/var/sa-token/token
-          - --kubeconfig-dir=/etc/build-farm-credentials
-          - --kubeconfig-suffix=config
-          - --dry-run=false
-          ports:
-          - name: metrics
-            containerPort: 9090
-          volumeMounts:
-          - name: service-account-token
-            mountPath: /var/sa-token
-          - name: release
-            mountPath: /var/repo
-            readOnly: true
-          - mountPath: /etc/build-farm-credentials
-            name: build-farm-credentials
-            readOnly: true
-          resources:
-            requests:
-              memory: "10Gi"
-              cpu: "50m"
-        volumes:
+    spec:
+      serviceAccountName: sinker
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
         - name: release
-          emptyDir: {}
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+      - name: sinker
+        image: us-docker.pkg.dev/k8s-infra-prow/images/sinker:v20251205-476eedbb0
+        args:
+        - --config-path=/var/repo/release/core-services/prow/02_config/_config.yaml
+        - --supplemental-prow-config-dir=/var/repo/release/core-services/prow/02_config
+        - --job-config-path=/var/repo/release/ci-operator/jobs
+        - --projected-token-file=/var/sa-token/token
+        - --kubeconfig-dir=/etc/build-farm-credentials
+        - --kubeconfig-suffix=config
+        - --dry-run=false
+        ports:
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
         - name: service-account-token
-          projected:
-            sources:
-            - serviceAccountToken:
-                path: token
-        - name: build-farm-credentials
-          secret:
-            secretName: sinker
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    labels:
-      app: prow
-      component: sinker
-    name: sinker
-  spec:
-    ports:
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    selector:
-      app: prow
-      component: sinker
+          mountPath: /var/sa-token
+        - name: release
+          mountPath: /var/repo
+          readOnly: true
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        resources:
+          requests:
+            memory: "10Gi"
+            cpu: "50m"
+      volumes:
+      - name: release
+        emptyDir: {}
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token
+      - name: build-farm-credentials
+        secret:
+          secretName: sinker
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  labels:
+    app: prow
+    component: sinker
+  name: sinker
+spec:
+  ports:
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  selector:
+    app: prow
+    component: sinker

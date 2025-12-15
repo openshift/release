@@ -1,183 +1,185 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: ServiceAccount
-  metadata:
-    name: payload-testing-prow-plugin
-    namespace: ci
-- apiVersion: rbac.authorization.k8s.io/v1
+kind: ServiceAccount
+metadata:
+  name: payload-testing-prow-plugin
+  namespace: ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: payload-testing-prow-plugin
+  namespace: ci
+rules:
+- apiGroups:
+  - "ci.openshift.io"
+  resources:
+  - pullrequestpayloadqualificationruns
+  verbs:
+  - create
+  - list
+- apiGroups:
+  - prow.k8s.io
+  resources:
+  - prowjobs
+  verbs:
+  - update
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: payload-testing-prow-plugin
+  namespace: ci
+subjects:
+- kind: ServiceAccount
+  name: payload-testing-prow-plugin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
   kind: Role
-  metadata:
-    name: payload-testing-prow-plugin
-    namespace: ci
-  rules:
-  - apiGroups:
-    - "ci.openshift.io"
-    resources:
-    - pullrequestpayloadqualificationruns
-    verbs:
-    - create
-    - list
-  - apiGroups:
-    - prow.k8s.io
-    resources:
-    - prowjobs
-    verbs:
-    - update
-    - get
-- apiVersion: rbac.authorization.k8s.io/v1
-  kind: RoleBinding
-  metadata:
-    name: payload-testing-prow-plugin
-    namespace: ci
-  subjects:
-  - kind: ServiceAccount
-    name: payload-testing-prow-plugin
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: Role
-    name: payload-testing-prow-plugin
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: payload-testing-prow-plugin
-    namespace: ci
-  spec:
-    selector:
+  name: payload-testing-prow-plugin
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payload-testing-prow-plugin
+  namespace: ci
+spec:
+  selector:
+    app: prow
+    component: payload-testing-prow-plugin
+  ports:
+  - port: 80
+    targetPort: 8888
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payload-testing-prow-plugin
+  labels:
+    app: prow
+    component: payload-testing-prow-plugin
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  namespace: ci
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
       app: prow
       component: payload-testing-prow-plugin
-    ports:
-    - port: 80
-      targetPort: 8888
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: payload-testing-prow-plugin
-    labels:
-      app: prow
-      component: payload-testing-prow-plugin
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-    namespace: ci
-  spec:
-    replicas: 1
-    revisionHistoryLimit: 2
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: payload-testing-prow-plugin
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: payload-testing-prow-plugin
-      spec:
-        initContainers:
-        - name: git-sync-init
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --root=/tmp/git-sync
-          - --one-time=true
-          - --depth=1
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          imagePullPolicy: Always
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-        containers:
-        - name: git-sync
-          command:
-          - /git-sync
-          args:
-          - --repo=https://github.com/openshift/release.git
-          - --ref=master
-          - --period=30s
-          - --root=/tmp/git-sync
-          - --max-failures=3
-          - --link=release
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-          imagePullPolicy: Always
-          volumeMounts:
-          - name: release
-            mountPath: /tmp/git-sync
-          resources:
-            requests:
-              memory: "1Gi"
-              cpu: "0.5"
-        - name: payload-testing-prow-plugin
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_payload-testing-prow-plugin_latest
-          imagePullPolicy: Always
-          args:
-          - --endpoint=/
-          - --hmac-secret-file=/etc/webhook/hmac.yaml
-          - --github-endpoint=http://ghproxy
-          - --github-endpoint=https://api.github.com
-          - --github-graphql-endpoint=http://ghproxy/graphql
-          - --github-app-id=$(GITHUB_APP_ID)
-          - --github-app-private-key-path=/etc/github/cert
-          - --ci-op-config-dir=/var/repo/release/ci-operator/config
-          - --log-level=debug
-          - --trusted-app=openshift-pr-manager[bot]
-          env:
-          - name: GITHUB_APP_ID
-            valueFrom:
-              secretKeyRef:
-                name: openshift-prow-github-app
-                key: appid
-          - name: SKIP_JOB_REGEX_1
-            value: microshift
-          - name: SKIP_JOB_EXPIRE_1
-            value: "2026-05-27T00:00:00Z"
-          - name: SKIP_JOB_REGEX_2
-            value: rosa
-          - name: SKIP_JOB_EXPIRE_2
-            value: "2026-05-27T00:00:00Z"
-          - name: SKIP_JOB_REGEX_3
-            value: e2e-aws-driver-toolkit
-          - name: SKIP_JOB_REGEX_4
-            value: fips-payload-scan
-          ports:
-            - name: http
-              containerPort: 8888
-          volumeMounts:
-          - name: hmac
-            mountPath: /etc/webhook
-            readOnly: true
-          - name: github-app-credentials
-            mountPath: /etc/github
-            readOnly: true
-          - name: release
-            mountPath: /var/repo
-          resources:
-            requests:
-              memory: "300Mi"
-              cpu: "50m"
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 20
-            periodSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-        serviceAccountName: payload-testing-prow-plugin
-        volumes:
-        - name: hmac
-          secret:
-            secretName: github-webhook-credentials
-        - name: github-app-credentials
-          secret:
-            secretName: openshift-prow-github-app
+    spec:
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        volumeMounts:
         - name: release
-          emptyDir: {}
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      - name: payload-testing-prow-plugin
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_payload-testing-prow-plugin_latest
+        imagePullPolicy: Always
+        args:
+        - --endpoint=/
+        - --hmac-secret-file=/etc/webhook/hmac.yaml
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --ci-op-config-dir=/var/repo/release/ci-operator/config
+        - --log-level=debug
+        - --trusted-app=openshift-pr-manager[bot]
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
+        - name: SKIP_JOB_REGEX_1
+          value: microshift
+        - name: SKIP_JOB_EXPIRE_1
+          value: "2026-05-27T00:00:00Z"
+        - name: SKIP_JOB_REGEX_2
+          value: rosa
+        - name: SKIP_JOB_EXPIRE_2
+          value: "2026-05-27T00:00:00Z"
+        - name: SKIP_JOB_REGEX_3
+          value: e2e-aws-driver-toolkit
+        - name: SKIP_JOB_REGEX_4
+          value: fips-payload-scan
+        ports:
+          - name: http
+            containerPort: 8888
+        volumeMounts:
+        - name: hmac
+          mountPath: /etc/webhook
+          readOnly: true
+        - name: github-app-credentials
+          mountPath: /etc/github
+          readOnly: true
+        - name: release
+          mountPath: /var/repo
+        resources:
+          requests:
+            memory: "300Mi"
+            cpu: "50m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 20
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+      serviceAccountName: payload-testing-prow-plugin
+      volumes:
+      - name: hmac
+        secret:
+          secretName: github-webhook-credentials
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
+      - name: release
+        emptyDir: {}

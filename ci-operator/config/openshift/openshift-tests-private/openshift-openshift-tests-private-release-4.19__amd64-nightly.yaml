@@ -173,6 +173,25 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-longrun
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+- as: aws-c2s-ipi-disc-priv-fips-f999-file-integrity
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      MIRROR_OPERATORS: "true"
+      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&; ~ConnectedOnly&
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: File_Integrity_Operator
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: file-integrity-konflux-catalogsource
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disc-priv-localzone-fips-f14-nokubeadmin
   cron: 46 11 6,20 * *
   steps:
@@ -705,7 +724,6 @@ tests:
       EXTRA_ARGS: --fips
       FILTERS_ADDITIONAL: ""
       FIPS_ENABLED: "true"
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-19@sha256:6e1491be9919aec032cb8a8aaf2f91e5a5b53a4bb48554444118d0b2f639f056
       TEST_FILTERS: ~HyperShiftMGMT&;~NonHyperShiftHOST&;~DEPRECATED&;~ROSA&
       TEST_SCENARIOS: Compliance_Operator
       TEST_TIMEOUT: "20"
@@ -1972,6 +1990,20 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
+- as: baremetal-upi-ovn-ipv4-f14
+  capabilities:
+  - intranet
+  cron: 36 14 7,21 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi
 - as: baremetalds-ipi-ovn-lvms-f14-compliance
   capabilities:
   - intranet
@@ -1982,8 +2014,7 @@ tests:
       CATALOG_SOURCE_NAME: compliance-operator
       FILTERS_ADDITIONAL: ""
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
-      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-19@sha256:6e1491be9919aec032cb8a8aaf2f91e5a5b53a4bb48554444118d0b2f639f056
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
@@ -2005,8 +2036,7 @@ tests:
       E2E_RUN_TAGS: '@complianceoperator'
       FILTERS_ADDITIONAL: ""
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
-      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-19@sha256:6e1491be9919aec032cb8a8aaf2f91e5a5b53a4bb48554444118d0b2f639f056
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
       TEST_SCENARIOS: Compliance_Operator
       TEST_TIMEOUT: "60"
@@ -2027,10 +2057,8 @@ tests:
       E2E_RUN_TAGS: '@fio'
       FILTERS_ADDITIONAL: ""
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
-      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-fbc-4-19:latest
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
-      TEST_PARALLEL: "3"
       TEST_SCENARIOS: File_Integrity_Operator
       TEST_TIMEOUT: "30"
     test:
@@ -2039,39 +2067,16 @@ tests:
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
-- as: aws-ipi-disconnected-private-f999-file-integrity
-  cron: 8 8 29 2 *
-  steps:
-    cluster_profile: aws-quay-qe
-    env:
-      BASE_DOMAIN: quayqe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      FILTERS_ADDITIONAL: ""
-      FIPS_ENABLED: "true"
-      MIRROR_OPERATORS: "true"
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-fbc-4-19:latest
-      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&; ~ConnectedOnly&
-      TEST_PARALLEL: "3"
-      TEST_SCENARIOS: File_Integrity_Operator
-      TEST_TIMEOUT: "30"
-    test:
-    - ref: file-integrity-konflux-catalogsource
-    - ref: openshift-extended-test
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: baremetalds-ipi-ovn-lvms-f14-security-profiles
+- as: baremetal-ipi-ovn-ipv4-f28-security-profiles
   capabilities:
   - intranet
-  cron: 23 3 7,23 * *
+  cron: 8 15 22 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
       CATALOG_SOURCE_NAME: security-profiles-operator
       E2E_RUN_TAGS: '@spo'
       FILTERS_ADDITIONAL: ""
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
-      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/security-profiles-operator-fbc-4-19@sha256:b685ddd5eaf3c8e19942badaa5ec8da9622c5b954a70a9498b527e7655678294
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Security_Profiles_Operator
@@ -2080,21 +2085,7 @@ tests:
     - ref: openshift-extended-test
     - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
-- as: baremetal-upi-ovn-ipv4-f14
-  capabilities:
-  - intranet
-  cron: 36 14 7,21 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      architecture: amd64
-      masters: "3"
-      workers: "2"
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: baremetal-lab-upi
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-destructive
   capabilities:
   - intranet

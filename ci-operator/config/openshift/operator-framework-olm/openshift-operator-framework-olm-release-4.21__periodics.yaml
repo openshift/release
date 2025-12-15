@@ -23,6 +23,10 @@ base_images:
     name: ocm-cli
     namespace: ci
     tag: latest
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
   ocp_4.21_base-rhel9:
     name: "4.21"
     namespace: ocp
@@ -59,6 +63,12 @@ releases:
       version: "4.21"
   latest:
     candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  multi-latest:
+    candidate:
+      architecture: multi
       product: ocp
       stream: nightly
       version: "4.21"
@@ -116,6 +126,53 @@ tests:
       TEST_ARGS: --monitor=watch-namespaces
       TEST_SUITE: olmv0/extended/candidate/slow
     workflow: openshift-e2e-aws-ovn
+- as: e2e-gcp-ovn-ipi-disconnected-techpreview-extended-f2
+  cron: 14 10 1-31/2 * *
+  steps:
+    cluster_profile: gcp
+    env:
+      ENABLE_IDMS: "yes"
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv0/extended/candidate/function
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-provision
+    test:
+    - ref: openshift-extended-olm-test-disconnected
+- as: e2e-gcp-ovn-ipi-disconnected-extended-f1
+  cron: 34 8 * * *
+  steps:
+    cluster_profile: gcp
+    env:
+      ENABLE_IDMS: "yes"
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv0/extended/candidate/function
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-provision
+    test:
+    - ref: openshift-extended-olm-test-disconnected
+- as: e2e-aws-ovn-stress-extended-f4
+  cron: 52 19  1-31/4 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      STRESS_GITHUB_BRANCH: release-4.21
+    test:
+    - chain: openshift-e2e-test-olm-qe-stress-olmv0-ote
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-gcp-ovn-stress-extended-f4
+  cron: 11 6 1-31/4 * *
+  steps:
+    cluster_profile: gcp
+    env:
+      STRESS_GITHUB_BRANCH: release-4.21
+    test:
+    - chain: openshift-e2e-test-olm-qe-stress-olmv0-ote
+    workflow: openshift-e2e-gcp-ovn
 - as: e2e-azure-ovn-techpreview-extended-f1
   cron: 22 7 * * *
   steps:
@@ -620,6 +677,84 @@ tests:
       TEST_ARGS: --monitor=watch-namespaces
       TEST_SUITE: olmv0/extended/candidate/slow
     workflow: openshift-e2e-vsphere
+- as: e2e-ibmcloud-ovn-extended-f4
+  cron: 0 2 1-31/4 * *
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv0/extended/candidate/fast
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-ibmcloud-ovn
+- as: e2e-ibmcloud-ovn-slow-extended-f5
+  cron: 0 6 1-31/5 * *
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv0/extended/candidate/slow
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-ibmcloud-ovn
+- as: e2e-aws-ovn-heterogeneous-extended-f4
+  cron: 11 0 1-31/4 * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SKIPS: ""
+      TEST_SUITE: olmv0/extended/candidate/fast
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-heterogeneous
+- as: e2e-aws-ovn-heterogeneous-slow-extended-f4
+  cron: 11 19 1-31/4 * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SKIPS: ""
+      TEST_SUITE: olmv0/extended/candidate/slow
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-heterogeneous
+- as: e2e-aws-ovn-hypershift-mgmt-extended-f7
+  cron: 44 12 1-31/7 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      HYPERSHIFT_AWS_REGION: us-east-1
+      HYPERSHIFT_FEATURE_SET: TechPreviewNoUpgrade
+      HYPERSHIFT_HC_ZONES: us-east-1a,us-east-1b,us-east-1c
+      PUBLIC_ONLY: "true"
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv0/extended/candidate/fast
+    test:
+    - ref: openshift-extended-olm-test-hypershiftmgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: e2e-metal-ovn-two-node-fencing-dualstack-tp-extended-f5
+  capabilities:
+  - intranet
+  cron: 6 1 1-31/5 * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
+        BMC_DRIVER=redfish
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv0/extended/candidate/fast
+    workflow: baremetalds-two-node-fencing-techpreview
 zz_generated_metadata:
   branch: release-4.21
   org: openshift

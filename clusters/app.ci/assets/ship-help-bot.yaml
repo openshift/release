@@ -1,108 +1,109 @@
-kind: List
+---
+kind: ServiceAccount
 apiVersion: v1
-items:
-- kind: ServiceAccount
-  apiVersion: v1
-  metadata:
+metadata:
+  name: ship-help-bot
+  namespace: ci
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  namespace: ci
+  name: ship-help-bot
+spec:
+  port:
+    targetPort: 8888
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
     name: ship-help-bot
-    namespace: ci
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
-    namespace: ci
-    name: ship-help-bot
-  spec:
-    port:
-      targetPort: 8888
-    tls:
-      insecureEdgeTerminationPolicy: Redirect
-      termination: edge
-    to:
-      kind: Service
-      name: ship-help-bot
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    name: ship-help-bot
-    labels:
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  name: ship-help-bot
+  labels:
+    app: ship-help-bot
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8888"
+spec:
+  selector:
+    app: ship-help-bot
+  ports:
+  - name: main
+    port: 8888
+    targetPort: 8888
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: ship-help-bot
+  labels:
+    app: ship-help-bot
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
       app: ship-help-bot
-    annotations:
-      prometheus.io/scrape: "true"
-      prometheus.io/port: "8888"
-  spec:
-    selector:
-      app: ship-help-bot
-    ports:
-    - name: main
-      port: 8888
-      targetPort: 8888
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: ship-help-bot
-    labels:
-      app: ship-help-bot
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-  spec:
-    replicas: 1
-    revisionHistoryLimit: 2
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: ship-help-bot
-    template:
-      metadata:
-        labels:
-          app: ship-help-bot
-      spec:
-        serviceAccountName: ship-help-bot
-        containers:
-        - name: ship-help-bot
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_ship-help-bot_latest
-          imagePullPolicy: Always
-          env:
-          - name: GOOGLE_CLOUD_PROJECT
-            value: "openshift-crt"
-          - name: GOOGLE_CLOUD_LOCATION
-            value: "global"
-          - name: GOOGLE_APPLICATION_CREDENTIALS
-            value: "/etc/gcp/service-account.json"
-          - name: SLACK_BOT_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: ship-help-bot-slack
-                key: bot_token
-          - name: SLACK_APP_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: ship-help-bot-slack
-                key: app_token
-          - name: LOG_LEVEL
-            value: "INFO"
-          ports:
-          - name: main
-            containerPort: 8888
-          - name: metrics
-            containerPort: 9090
-          volumeMounts:
-          - name: gcp-credentials
-            mountPath: /etc/gcp
-            readOnly: true
-          resources:
-            requests:
-              memory: "1Gi"
-              cpu: "100m"
-        volumes:
+    spec:
+      serviceAccountName: ship-help-bot
+      containers:
+      - name: ship-help-bot
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ship-help-bot_latest
+        imagePullPolicy: Always
+        env:
+        - name: GOOGLE_CLOUD_PROJECT
+          value: "openshift-crt"
+        - name: GOOGLE_CLOUD_LOCATION
+          value: "global"
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: "/etc/gcp/service-account.json"
+        - name: SLACK_BOT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ship-help-bot-slack
+              key: bot_token
+        - name: SLACK_APP_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: ship-help-bot-slack
+              key: app_token
+        - name: LOG_LEVEL
+          value: "INFO"
+        ports:
+        - name: main
+          containerPort: 8888
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
         - name: gcp-credentials
-          secret:
-            secretName: ship-help-bot-gcp-service-account
+          mountPath: /etc/gcp
+          readOnly: true
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "100m"
+      volumes:
+      - name: gcp-credentials
+        secret:
+          secretName: ship-help-bot-gcp-service-account

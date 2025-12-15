@@ -1,124 +1,123 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: pj-rehearse-plugin
-    namespace: ci
-    labels:
+kind: Service
+metadata:
+  name: pj-rehearse-plugin
+  namespace: ci
+  labels:
+    app: prow
+    component: pj-rehearse-plugin
+spec:
+  selector:
+    app: prow
+    component: pj-rehearse-plugin
+  ports:
+  - name: main
+    port: 80
+    targetPort: 8888
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: 9090
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pj-rehearse-plugin
+  labels:
+    app: prow
+    component: pj-rehearse-plugin
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  namespace: ci
+spec:
+  replicas: 3
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
       app: prow
       component: pj-rehearse-plugin
-  spec:
-    selector:
-      app: prow
-      component: pj-rehearse-plugin
-    ports:
-    - name: main
-      port: 80
-      targetPort: 8888
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: pj-rehearse-plugin
-    labels:
-      app: prow
-      component: pj-rehearse-plugin
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-    namespace: ci
-  spec:
-    replicas: 3
-    revisionHistoryLimit: 2
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: pj-rehearse-plugin
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: pj-rehearse-plugin
-      spec:
-        containers:
-        - name: pj-rehearse-plugin
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_pj-rehearse_latest
-          imagePullPolicy: Always
-          args:
-          - --dry-run=false
-          - --log-level=debug
-          - --prowjob-kubeconfig=/var/kubeconfigs/sa.pj-rehearse.app.ci.config
-          - --kubeconfig-dir=/var/kubeconfigs
-          - --kubeconfig-suffix=config
-          - --normal-limit=5
-          - --more-limit=10
-          - --max-limit=25
-          - --sticky-label-author=openshift-bot
-          - --endpoint=/
-          - --hmac-secret-file=/etc/webhook/hmac.yaml
-          - --github-endpoint=http://ghproxy
-          - --github-endpoint=https://api.github.com
-          - --github-token-path=/etc/github/oauth
-          - --config-path=/etc/config/config.yaml
-          ports:
-            - name: http
-              containerPort: 8888
-            - name: metrics
-              containerPort: 9090
-          volumeMounts:
-          - mountPath: /etc/gcs
-            name: gcs-credentials
-            readOnly: true
-          - mountPath: /var/kubeconfigs
-            name: prowjob-kubeconfig
-          - name: prow-config
-            mountPath: /etc/config
-            readOnly: true
-          - name: hmac
-            mountPath: /etc/webhook
-            readOnly: true
-          - name: oauth
-            mountPath: /etc/github
-            readOnly: true
-          - name: cache
-            mountPath: /var/tmp
-          resources:
-            requests:
-              memory: "20Gi"
-              cpu: "4"
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 20
-            periodSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-        volumes:
-        - name: gcs-credentials
-          secret:
-            secretName: gce-sa-credentials-gcs-publisher
-        - name: prowjob-kubeconfig
-          secret:
-            secretName: pj-rehearse
+    spec:
+      containers:
+      - name: pj-rehearse-plugin
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_pj-rehearse_latest
+        imagePullPolicy: Always
+        args:
+        - --dry-run=false
+        - --log-level=debug
+        - --prowjob-kubeconfig=/var/kubeconfigs/sa.pj-rehearse.app.ci.config
+        - --kubeconfig-dir=/var/kubeconfigs
+        - --kubeconfig-suffix=config
+        - --normal-limit=5
+        - --more-limit=10
+        - --max-limit=25
+        - --sticky-label-author=openshift-bot
+        - --endpoint=/
+        - --hmac-secret-file=/etc/webhook/hmac.yaml
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-token-path=/etc/github/oauth
+        - --config-path=/etc/config/config.yaml
+        ports:
+          - name: http
+            containerPort: 8888
+          - name: metrics
+            containerPort: 9090
+        volumeMounts:
+        - mountPath: /etc/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /var/kubeconfigs
+          name: prowjob-kubeconfig
         - name: prow-config
-          configMap:
-            name: config
+          mountPath: /etc/config
+          readOnly: true
         - name: hmac
-          secret:
-            secretName: github-webhook-credentials
+          mountPath: /etc/webhook
+          readOnly: true
         - name: oauth
-          secret:
-            secretName: github-credentials-openshift-ci-robot
+          mountPath: /etc/github
+          readOnly: true
         - name: cache
-          emptyDir: {}
+          mountPath: /var/tmp
+        resources:
+          requests:
+            memory: "20Gi"
+            cpu: "4"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 20
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+      volumes:
+      - name: gcs-credentials
+        secret:
+          secretName: gce-sa-credentials-gcs-publisher
+      - name: prowjob-kubeconfig
+        secret:
+          secretName: pj-rehearse
+      - name: prow-config
+        configMap:
+          name: config
+      - name: hmac
+        secret:
+          secretName: github-webhook-credentials
+      - name: oauth
+        secret:
+          secretName: github-credentials-openshift-ci-robot
+      - name: cache
+        emptyDir: {}

@@ -8,28 +8,46 @@ base_images:
     namespace: ci
     tag: latest
 build_root:
-  from_repository: true
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
+
+      # Pre-install Python 3.12 and tools
+      RUN dnf install -y python3.12 python3.12-pip python3.12-devel && \
+          python3.12 -m pip install --no-cache-dir pytest ruff && \
+          dnf clean all
 resources:
   '*':
     requests:
       cpu: 100m
-      memory: 200Mi
+      memory: 1Gi
 tests:
 - as: lint
-  commands: HOME=/tmp golangci-lint run --timeout=20m
+  commands: cd go && HOME=/tmp golangci-lint run --timeout=20m
   container:
     from: golangci-lint
+- as: lint-python
+  commands: cd python && python3.12 -m ruff check .
+  container:
+    from: src
 - as: unit
-  commands: go test ./...
+  commands: |
+    # Set HOME to writable location for pip
+    export HOME=/tmp
+    # Install python package in editable mode so tests can import it
+    cd python && python3.12 -m pip install -e ".[dev]"
+    # Run all tests via root Makefile
+    cd .. && make test
   container:
     from: src
 - as: govulncheck
-  commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck ./...
+  commands: cd go && GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck ./...
   container:
     from: govulncheck
   optional: true
 - as: verify
   commands: |
+    cd go
     go mod verify
     go mod tidy
     git diff --exit-code go.mod go.sum
