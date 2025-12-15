@@ -174,92 +174,10 @@ fi
 
 fi  # end SKIP_COST_MGMT_INSTALL check
 
-echo "========== Image Tag Resolution =========="
-
-export IMAGE_TAG
-
-# Get job type and PR information from JOB_SPEC
-JOB_TYPE=$(echo "${JOB_SPEC}" | jq -r '.type // "presubmit"')
-echo "JOB_TYPE: ${JOB_TYPE}"
-
-if [ "${JOB_TYPE}" == "presubmit" ] && [[ "${JOB_NAME}" != rehearse-* ]]; then
-    echo "Running as presubmit job - resolving PR-based image tag"
-    
-    # Extract PR number and SHA from JOB_SPEC
-    GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
-    echo "GIT_PR_NUMBER: ${GIT_PR_NUMBER}"
-    
-    # Get the PR commit SHA
-    LONG_SHA=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].sha')
-    SHORT_SHA=$(echo "${LONG_SHA}" | cut -c1-8)
-    echo "SHORT_SHA: ${SHORT_SHA}"
-    
-    # Construct image tag: pr-<number>-<short-sha>
-    IMAGE_TAG="pr-${GIT_PR_NUMBER}-${SHORT_SHA}"
-    echo "Constructed IMAGE_TAG: ${IMAGE_TAG}"
-    
-    # Full image reference
-    IMAGE_NAME="${QUAY_REPO}:${IMAGE_TAG}"
-    echo "IMAGE_NAME: ${IMAGE_NAME}"
-    
-    echo "========== Waiting for Docker Image Availability =========="
-    # Extract repository path from full quay URL
-    REPO_PATH="${QUAY_REPO#quay.io/}"
-    
-    # Timeout configuration for waiting for Docker image availability
-    MAX_WAIT_TIME_SECONDS="${IMAGE_WAIT_TIMEOUT:-3600}"
-    POLL_INTERVAL_SECONDS="${IMAGE_POLL_INTERVAL:-60}"
-    ELAPSED_TIME=0
-    
-    echo "Waiting for image ${IMAGE_NAME} to be available..."
-    
-    while true; do
-        # Check image availability on Quay.io
-        response=$(curl -s "https://quay.io/api/v1/repository/${REPO_PATH}/tag/?specificTag=${IMAGE_TAG}")
-        
-        # Use jq to parse the JSON and see if the tag exists
-        tag_count=$(echo "${response}" | jq '.tags | length')
-        
-        if [ "${tag_count}" -gt "0" ]; then
-            echo "Docker image ${IMAGE_NAME} is now available. Time elapsed: $((ELAPSED_TIME / 60)) minute(s)."
-            break
-        fi
-        
-        echo "Image not yet available. Waiting ${POLL_INTERVAL_SECONDS}s... (elapsed: $((ELAPSED_TIME / 60))m)"
-        
-        # Wait for the interval duration
-        sleep "${POLL_INTERVAL_SECONDS}"
-        
-        # Increment the elapsed time
-        ELAPSED_TIME=$((ELAPSED_TIME + POLL_INTERVAL_SECONDS))
-        
-        # If the elapsed time exceeds the timeout, exit with an error
-        if [ "${ELAPSED_TIME}" -ge "${MAX_WAIT_TIME_SECONDS}" ]; then
-            echo "Timed out waiting for Docker image ${IMAGE_NAME}. Time elapsed: $((ELAPSED_TIME / 60)) minute(s)."
-            echo "Please verify that the image build job completed successfully."
-            exit 1
-        fi
-    done
-else
-    echo "Not a presubmit job or is a rehearsal - using default image tag"
-    IMAGE_TAG="${IMAGE_TAG_DEFAULT}"
-    echo "IMAGE_TAG: ${IMAGE_TAG}"
-fi
-
-echo "========== Final Image Configuration =========="
-echo "Using Image: ${QUAY_REPO}:${IMAGE_TAG}"
-
 echo "========== Configuring Helm for MinIO Storage =========="
 # Tell the Helm chart to use MinIO instead of ODF (NooBaa)
 # This prevents the chart from trying to lookup NooBaa CRDs which don't exist
 # when using MinIO for object storage
-
-# The deploy-test-ros.sh script sets HELM_EXTRA_ARGS for image overrides.
-# We need to add our MinIO configuration to HELM_EXTRA_ARGS as well.
-#
-# Strategy: Create a wrapper around the helm binary that injects our --set flags
-# ONLY for the cost-onprem chart installation. Other helm commands (repo add, 
-# strimzi install, etc.) pass through unchanged.
 
 # IMPORTANT: Find the REAL helm binary location BEFORE we create any wrappers
 # If helm was installed to /tmp/helm, we need to find the actual binary
@@ -277,12 +195,10 @@ HELM_WRAPPER="/tmp/helm-wrapper"
 cat > "${HELM_WRAPPER}" << 'WRAPPER_EOF'
 #!/bin/bash
 # Helm wrapper that injects MinIO storage configuration
-# This intercepts helm calls and adds --set global.storageType=minio
+# This intercepts helm calls and adds MinIO config
 # ONLY for the cost-onprem chart - other charts pass through unchanged
 
 ORIGINAL_HELM="__ORIGINAL_HELM__"
-MINIO_ACCESS_KEY="__MINIO_ACCESS_KEY__"
-MINIO_SECRET_KEY="__MINIO_SECRET_KEY__"
 
 # Only inject MinIO config for the cost-onprem chart installation
 # Check if this is an install/upgrade command for cost-onprem specifically
@@ -294,19 +210,12 @@ if [[ "$*" == *"cost-onprem"* ]] && { [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"
     # We use a proxy service (minio-storage) in the app namespace that routes to MinIO.
     # - odf.endpoint = minio-storage (just hostname)
     # - odf.port = 9000
-    #
-    # The TCP check will work: /dev/tcp/minio-storage/9000
-    # The MinIO client will receive STORAGE_ENDPOINT=minio-storage (without port)
-    # which would normally fail, BUT the chart should be fixed to append the port.
-    #
-    # TODO: This requires chart fix - STORAGE_ENDPOINT should be endpoint:port
-    # See MINIO_STORAGE_PROPOSAL.md for the upstream fix proposal.
-    echo "[helm-wrapper] Using MinIO host: ${MINIO_HOST}, port: ${MINIO_PORT}"
+    echo "[helm-wrapper] Using MinIO host: ${MINIO_HOST:-minio-storage}, port: ${MINIO_PORT:-9000}"
     exec "$ORIGINAL_HELM" "$@" \
-        --set "odf.endpoint=${MINIO_HOST}" \
-        --set "odf.port=${MINIO_PORT}" \
+        --set "odf.endpoint=${MINIO_HOST:-minio-storage}" \
+        --set "odf.port=${MINIO_PORT:-9000}" \
         --set "odf.useSSL=false" \
-        --set "odf.bucket=${MINIO_BUCKET}"
+        --set "odf.bucket=${MINIO_BUCKET:-ros-data}"
 else
     # For all other helm commands (repo add, strimzi install, etc.), pass through unchanged
     exec "$ORIGINAL_HELM" "$@"
@@ -315,8 +224,6 @@ WRAPPER_EOF
 
 # Replace placeholders with actual values
 sed -i "s|__ORIGINAL_HELM__|${ORIGINAL_HELM}|g" "${HELM_WRAPPER}"
-sed -i "s|__MINIO_ACCESS_KEY__|${MINIO_ACCESS_KEY:-minioadmin}|g" "${HELM_WRAPPER}"
-sed -i "s|__MINIO_SECRET_KEY__|${MINIO_SECRET_KEY:-minioadmin}|g" "${HELM_WRAPPER}"
 
 chmod +x "${HELM_WRAPPER}"
 
@@ -328,6 +235,13 @@ echo "Original helm binary: ${ORIGINAL_HELM}"
 echo "MinIO storage type will be injected for cost-onprem chart only"
 
 echo "========== Running E2E Tests =========="
-export IMAGE_TAG
-make oc-deploy-test
 
+# Export environment variables for the deployment script
+export NAMESPACE="${NAMESPACE:-cost-onprem}"
+export VERBOSE="${VERBOSE:-true}"
+
+# Run the deployment script from the chart repo source
+# The step runs with from: src, so we're already in the chart repo
+./scripts/deploy-test-cost-onprem.sh \
+    --namespace "${NAMESPACE}" \
+    --verbose
