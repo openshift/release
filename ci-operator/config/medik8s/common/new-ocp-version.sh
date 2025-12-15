@@ -24,9 +24,19 @@ for repo in */ ; do
   repo="${repo%/}"
   echo "updating $repo"
   cd $repo
-  # find latest release
-  release=$(ls | grep .yaml | grep release | sed -r 's#^medik8s-'"$repo"'-(.*)__.*$#\1#g' | uniq | sort | tail -1)
-  for branch in main $release; do
+  # find latest release (and previous one if present)
+  releases_sorted=$(ls | grep .yaml | grep release | sed -r 's#^medik8s-'"$repo"'-(.*)__.*$#\1#g' | sort -u -V)
+  release=$(echo "$releases_sorted" | tail -1)
+  prev_release=$(echo "$releases_sorted" | tail -2 | head -1)
+
+  branches="main $release"
+  # When targeting an even OCP version (e.g., 4.22), also update the previous
+  # release branch so jobs for both even/odd pairs stay in sync.
+  if [[ $(echo "$new_version" | awk -F. '{print $NF % 2}') -eq 0 ]] && [[ -n "$prev_release" ]] && [[ "$prev_release" != "$release" ]]; then
+    branches="$branches $prev_release"
+  fi
+
+  for branch in $branches; do
     echo "branch: $branch"
     # find newest OCP version
     version=$(ls | grep .yaml | grep "__" | grep medik8s-$repo-$branch | sed -r 's#^.*__(.*)\.yaml$#\1#g' | sort | tail -1)
