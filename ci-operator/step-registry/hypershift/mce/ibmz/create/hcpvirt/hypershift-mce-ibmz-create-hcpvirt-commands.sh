@@ -308,14 +308,39 @@ oc --kubeconfig "$HOSTED_KUBECONFIG" config set-cluster "$CLSTR_NAME" \
   --server="https://${BASTION_FIP}:${NODEPORT}"
 echo "Updated kubeconfig server URL to https://${BASTION_FIP}:${NODEPORT}"
 
-# Wait for all hosted control plane pods to come up
-oc wait pod \
-  -n $hcp_ns \
-  --all \
-  --for=condition=Ready \
-  --timeout=15m
+#Wait for Hosted control plane pods to come up
+RETRIES=30
+INTERVAL=30  # seconds
 
-echo "All pods in Hosted ccontrol plane namespace are Ready."
+for i in $(seq 1 "$RETRIES") max; do
+  [[ "$i" == "max" ]] && break
+
+  DESIRED_NODES=$(oc get np "$HC_NAME" -n "$HC_NS" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "")
+  CURRENT_NODES=$(oc get np "$HC_NAME" -n "$HC_NS" -o jsonpath='{.status.replicas}' 2>/dev/null || echo "")
+
+  if [[ -z "$DESIRED_NODES" || -z "$CURRENT_NODES" ]]; then
+    echo "[Retry $i/$RETRIES] NodePool $HC_NAME not found yet. Retrying in $INTERVAL seconds..."
+    sleep $INTERVAL
+    continue
+  fi
+
+  if [[ "$DESIRED_NODES" == "$CURRENT_NODES" ]]; then
+    echo "NodePool $HC_NAME is ready: $CURRENT_NODES/$DESIRED_NODES nodes"
+    break
+  fi
+
+  echo "[Retry $i/$RETRIES] NodePool not ready: desired=$DESIRED_NODES, current=$CURRENT_NODES. Retrying in $INTERVAL seconds..."
+  sleep $INTERVAL
+done
+
+# Final check after retries
+DESIRED_NODES=$(oc get np "$HC_NAME" -n "$HC_NS" -o jsonpath='{.spec.replicas}')
+CURRENT_NODES=$(oc get np "$HC_NAME" -n "$HC_NS" -o jsonpath='{.status.replicas}')
+
+if [[ "$DESIRED_NODES" != "$CURRENT_NODES" ]]; then
+  echo "Timeout waiting for NodePool $HC_NAME: desired=$DESIRED_NODES, current=$CURRENT_NODES"
+  exit 1
+fi
 
 # Downloading the script to set proxy server
 echo "Downloading the setup script for proxy"
@@ -365,29 +390,17 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-sleep 1800
-
 # --- Wait for ingress router service NodePorts ---
 echo "Waiting for router-nodeport-default service..."
-HTTP_NODEPORT=""
-HTTPS_NODEPORT=""
-for i in {1..30}; do
-  HTTP_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
-    --insecure-skip-tls-verify=true \
-    get svc router-nodeport-default -n openshift-ingress \
-    -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)
+HTTP_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
+  --insecure-skip-tls-verify=true \
+  get svc router-nodeport-default -n openshift-ingress \
+  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)
 
-  HTTPS_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
-    --insecure-skip-tls-verify=true \
-    get svc router-nodeport-default -n openshift-ingress \
-    -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || true)
-
-  if [[ -n "$HTTP_NODEPORT" && -n "$HTTPS_NODEPORT" ]]; then
-    break
-  fi
-  echo "Router NodePorts not ready yet, retrying... ($i/30)"
-  sleep 10
-done
+HTTPS_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
+  --insecure-skip-tls-verify=true \
+  get svc router-nodeport-default -n openshift-ingress \
+  -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || true)
 
 if [[ -z "$HTTP_NODEPORT" || -z "$HTTPS_NODEPORT" ]]; then
   echo "ERROR: router-nodeport-default service not found or ports not assigned"
