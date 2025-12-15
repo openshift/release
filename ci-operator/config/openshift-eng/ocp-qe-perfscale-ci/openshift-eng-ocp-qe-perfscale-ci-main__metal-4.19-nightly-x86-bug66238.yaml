@@ -1,0 +1,75 @@
+base_images:
+  cerberus:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.19.16
+        upper: 4.19.17
+  target:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.19.14
+        upper: 4.29.15
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: cdv2-6nodes-400pods-debug
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    env:
+      CHURN: "false"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "40"
+      PUBLIC_VLAN: "false"
+      TIMEOUT: 6h
+    test:
+    - ref: openshift-qe-installer-bm-day2-image-registry
+    - chain: openshift-qe-cluster-density-v2
+    - ref: wait
+    workflow: openshift-qe-installer-bm-deploy
+- always_run: false
+  as: upgrade-cdv2-6nodes-400pods
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    env:
+      CHURN: "false"
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "40"
+      PUBLIC_VLAN: "false"
+      TIMEOUT: 6h
+    test:
+    - chain: openshift-upgrade-qe-sanity
+    - chain: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-installer-bm-deploy
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: metal-4.19-nightly-x86-bug66238
