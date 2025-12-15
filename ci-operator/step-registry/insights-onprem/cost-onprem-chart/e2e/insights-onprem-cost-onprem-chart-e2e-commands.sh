@@ -242,7 +242,7 @@ export VERBOSE="${VERBOSE:-true}"
 
 # Run the deployment script from the chart repo source
 # The step runs with from: src, so we're already in the chart repo
-chmod +x ./scripts/deploy-test-cost-onprem.sh
-./scripts/deploy-test-cost-onprem.sh \
+# Use bash to execute since source may be read-only (can't chmod)
+bash ./scripts/deploy-test-cost-onprem.sh \
     --namespace "${NAMESPACE}" \
     --verbose
