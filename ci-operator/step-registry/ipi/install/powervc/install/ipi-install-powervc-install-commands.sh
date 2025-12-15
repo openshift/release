@@ -32,37 +32,27 @@ function install_required_tools() {
 			-o /tmp/bin/yq-v4 && chmod +x /tmp/bin/yq-v4
 	fi
 
-	TAG="2.39.0"
-	if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]
+	# @HACK: sudo not installed in this environment
+	cat << '__EOF__' | tee /tmp/sudo
+#!/bin/bash
+$@
+__EOF__
+	chmod u+x sudo
+	OLDPATH=${PATH}
+	export PATH=/tmp:${PATH}
+	curl --silent --location --output - https://clis.cloud.ibm.com/install/linux | bash
+	while [ ! -f /tmp/continue1 ]
+	do
+		sleep 15s
+	done
+	export PATH=${OLDPATH}
+
+	if ! ibmcloud --version
 	then
-		curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/${TAG}/IBM_Cloud_CLI_${TAG}_amd64.tar.gz
-		tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
-
-		if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]
-		then
-			echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud does not exist?"
-			exit 1
-		fi
-
-		curl --output /tmp/ibmcloud-cli.pub https://ibmcloud-cli-installer-public-keys.s3.us.cloud-object-storage.appdomain.cloud/ibmcloud-cli.pub
-		pushd /tmp/Bluemix_CLI/bin/
-		if ! openssl dgst -sha256 -verify /tmp/ibmcloud-cli.pub -signature ibmcloud.sig ibmcloud
-		then
-			echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud fails signature test!"
-			exit 1
-		fi
-		popd
-
-		PATH=${PATH}:/tmp/Bluemix_CLI/bin
-
-		hash file 2>/dev/null && file /tmp/Bluemix_CLI/bin/ibmcloud
-		echo "Checking ibmcloud version..."
-		if ! ibmcloud --version
-		then
-			echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud is not working?"
-			exit 1
-		fi
+		echo "Error: ibmcloud is not working?"
+		exit 1
 	fi
+	ibmcloud --version
 
 	for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns tg-cli
 	do
@@ -252,7 +242,7 @@ function dump_resources() {
 			--bastionUsername "cloud-user" \
 			--bastionRsa "${SSH_PRIV_KEY_PATH}" \
 			--kubeconfig "${DIR}/auth/kubeconfig" \
-			--shouldDebug true
+			--shouldDebug false
 	else
 		echo "Could not find ${DIR}/metadata.json for watch-create"
 	fi
