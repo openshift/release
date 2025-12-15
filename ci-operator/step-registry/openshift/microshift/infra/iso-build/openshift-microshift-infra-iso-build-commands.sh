@@ -72,8 +72,8 @@ download_brew_rpms() {
     y_version="$(cut -d'.' -f2 "${src_path}/Makefile.version.$(uname -m).var")"
     bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "${LATEST_RELEASE_TYPE}" || echo "WARNING: Failed to download ${LATEST_RELEASE_TYPE} RPMs for 4.${y_version}"
     bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "nightly" || echo "WARNING: Failed to download nightly RPMs for 4.${y_version}"
-    bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "zstream" "1" "0" || echo "WARNING: Failed to download zstream RPMs for 4.${y_version} Y-1"
-    bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "zstream" "2" "0" || ( echo "WARNING: Failed to download zstream RPMs for 4.${y_version} Y-2" && return 1 )
+    bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 1))" "${out_path}" "zstream" || echo "WARNING: Failed to download zstream RPMs for 4.$((${y_version} - 1))"
+    bash -x ./test/bin/manage_brew_rpms.sh download "4.$((${y_version} - 2))" "${out_path}" "zstream" || ( echo "WARNING: Failed to download zstream RPMs for 4.$((${y_version} - 2))" && return 1 )
     bash -x ./test/bin/manage_brew_rpms.sh download "4.${y_version}" "${out_path}" "zstream" "0" "1" || echo "WARNING: Failed to download zstream RPMs for 4.${y_version} Z-1"
 
     popd &>/dev/null
