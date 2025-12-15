@@ -164,7 +164,7 @@ validate_and_set_defaults() {
     MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest}"
 
     # Only collect must-gather on test failure
-    MUST_GATHER_ON_FAILURE_ONLY="${MUST_GATHER_ON_FAILURE_ONLY:-true}"
+    MUST_GATHER_ON_FAILURE_ONLY="${MUST_GATHER_ON_FAILURE_ONLY:-false}"
     # Validate MUST_GATHER_ON_FAILURE_ONLY
     if [[ "${MUST_GATHER_ON_FAILURE_ONLY}" != "true" && "${MUST_GATHER_ON_FAILURE_ONLY}" != "false" ]]; then
         echo "ERROR: MUST_GATHER_ON_FAILURE_ONLY should be 'true' or 'false', got: ${MUST_GATHER_ON_FAILURE_ONLY}"
