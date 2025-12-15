@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x
 
 if [[ -z "${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
   echo "ERROR: INSTALL_NAMESPACE is not defined"
@@ -55,6 +56,8 @@ spec:
   source: "${METALLB_OPERATOR_SUB_SOURCE}"
   sourceNamespace: openshift-marketplace
 EOF
+
+oc get subscription -n "${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}" "${METALLB_OPERATOR_SUB_PACKAGE}" -oyaml
 
 RETRIES=30
 CSV=
