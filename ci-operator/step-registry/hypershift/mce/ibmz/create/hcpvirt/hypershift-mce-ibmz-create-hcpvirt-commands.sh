@@ -390,21 +390,13 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-sleep 900
-
-# --- Wait for ingress router service NodePorts ---
+#Get for ingress router service NodePorts
 echo "Waiting for router-nodeport-default service..."
-HTTP_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
-  --insecure-skip-tls-verify=true \
-  get svc router-nodeport-default -n openshift-ingress \
-  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}')
+HTTP_NODEPORT=$(oc get svc router-nodeport-default -n openshift-ingress --kubeconfig $HOSTED_KUBECONFIG -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' --insecure-skip-tls-verify)
 
 echo "HTTP NodePort: $HTTP_NODEPORT"
 
-HTTPS_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
-  --insecure-skip-tls-verify=true \
-  get svc router-nodeport-default -n openshift-ingress \
-  -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}')
+HTTPS_NODEPORT=$(oc get svc router-nodeport-default -n openshift-ingress --kubeconfig $HOSTED_KUBECONFIG -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' --insecure-skip-tls-verify)
 
 echo "HTTPS NodePort: $HTTPS_NODEPORT"
 
