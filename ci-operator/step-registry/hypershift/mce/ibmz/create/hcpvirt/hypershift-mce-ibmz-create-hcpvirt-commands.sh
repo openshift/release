@@ -390,25 +390,28 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+sleep 900
+
 # --- Wait for ingress router service NodePorts ---
 echo "Waiting for router-nodeport-default service..."
 HTTP_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
   --insecure-skip-tls-verify=true \
   get svc router-nodeport-default -n openshift-ingress \
-  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || true)
+  -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}')
+
+echo "HTTP NodePort: $HTTP_NODEPORT"
 
 HTTPS_NODEPORT=$(oc --kubeconfig "$HOSTED_KUBECONFIG" \
   --insecure-skip-tls-verify=true \
   get svc router-nodeport-default -n openshift-ingress \
-  -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || true)
+  -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}')
+
+echo "HTTPS NodePort: $HTTPS_NODEPORT"
 
 if [[ -z "$HTTP_NODEPORT" || -z "$HTTPS_NODEPORT" ]]; then
   echo "ERROR: router-nodeport-default service not found or ports not assigned"
   exit 1
 fi
-
-echo "HTTP NodePort: $HTTP_NODEPORT"
-echo "HTTPS NodePort: $HTTPS_NODEPORT"
 
 # --- Export for next Prow steps ---
 export HOSTED_KUBECONFIG
