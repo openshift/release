@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Check for [skip-build] commit comments in the PR title
+# Check for [skip-e2e] commit comments in the PR title
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     PR_TITLE=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}" | jq -r '.title')
-    # only skip e2e tests for a [skip-build] PR that has been auto-approved by github-actions[bot]
-    if [[ "$PR_TITLE" == *"[skip-build]"* ]]; then
+    # only skip e2e tests for a [skip-e2e] PR that has been auto-approved by github-actions[bot]
+    if [[ "$PR_TITLE" == *"[skip-e2e]"* ]]; then
         echo "PR_TITLE: $PR_TITLE"
         APPROVALS=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}/reviews") # json array of approvals
         # iterate through the approvals and check if the approval is from the .user.login = "github-actions[bot]" and if the .state = "APPROVED" 
