@@ -287,7 +287,7 @@ while true; do
     echo "ERROR: Step2: Deploy nfs-provisioner failed, exit."
     echo "INFO: Print event in nfs-provisioner namespace"
     oc -n nfs-provisioner get event 
-    exit
+    exit 1
   fi
 done
 
