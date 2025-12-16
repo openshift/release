@@ -62,7 +62,8 @@ images:
   to: aws-karpenter-provider-aws
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - '*'
     name: "4.22"
     namespace: ocp
@@ -114,6 +115,24 @@ tests:
       HYPERSHIFT_NODE_COUNT: "1"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-external
+- as: e2e-kwok
+  cron: 0 5 * * 1
+  presubmit: true
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        # log in to the cluster in order for the script to log in to the internal registry
+        oc login -u kubeadmin "$(oc whoami --show-server)" < "${KUBEADMIN_PASSWORD_FILE}"
+        CLEANUP=false ./hack/openshift-kwok-e2e.sh
+      from: bin-oc-kubectl-helm
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

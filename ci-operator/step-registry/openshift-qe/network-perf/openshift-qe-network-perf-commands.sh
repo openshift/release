@@ -32,11 +32,13 @@ TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TA
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/network-perf-v2
 
+if [ ${CLEAN_UP} == "true" ]; then
 # Clean up resources from possible previous tests.
-oc delete ns netperf --wait=true --ignore-not-found=true
+  oc delete ns netperf --wait=true --ignore-not-found=true
+fi
 
 # Only store the results from the full run versus the smoke test.
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-export LOCAL=$LOCAL; export EXTERNAL_SERVER_ADDRESS=$EXTERNAL_SERVER_ADDRESS
-WORKLOAD=full-run.yaml ./run.sh
+export LOCAL=$LOCAL; export EXTERNAL_SERVER_ADDRESS=$EXTERNAL_SERVER_ADDRESS; export WORKLOAD=$WORKLOAD; export CLEAN_UP=$CLEAN_UP;
+./run.sh

@@ -47,7 +47,7 @@ function subscribe_operator () {
     local retry_count=0
 
     while [[ $retry_count -lt $max_retries ]]; do
-        output=$(oc get packagemanifest -n openshift-marketplace -l=catalog=$CATSRC_NAME --field-selector=metadata.name=leader-worker-set  2>&1)
+        output=$(oc get packagemanifest -n openshift-marketplace -l=catalog=$CS_CATSRC_NAME --field-selector=metadata.name=leader-worker-set  2>&1)
         if [[ $? -eq 0 ]] && ! echo "$output" | grep -q "No resources found"; then
             echo "PackageManifest found, proceeding with installation..."
             break
@@ -92,10 +92,10 @@ metadata:
   name: leader-worker-set
   namespace: openshift-lws-operator
 spec:
-  channel: stable-v1.0
+  channel: $CHANNEL
   name: leader-worker-set
   installPlanApproval: Automatic
-  source: $CATSRC_NAME
+  source: $CS_CATSRC_NAME
   sourceNamespace: openshift-marketplace
 EOF
 
@@ -138,9 +138,9 @@ EOF
     fi
 }
 
-if [ -s "${SHARED_DIR}/catsrc_name" ]; then
-    echo "Loading the catalog source name to use from the '${SHARED_DIR}/catsrc_name'..."
-    CATSRC_NAME=$(cat "${SHARED_DIR}"/catsrc_name)
+if [ -s "${SHARED_DIR}/lws_catsrc_name" ]; then
+    echo "Loading the catalog source name to use from the '${SHARED_DIR}/lws_catsrc_name'..."
+    CS_CATSRC_NAME=$(cat "${SHARED_DIR}"/lws_catsrc_name)
 fi
 
 timestamp

@@ -144,6 +144,7 @@ promotion:
   to:
   - additional_images:
       artifacts: artifacts
+    disabled: true
     excluded_images:
     - rhel-coreos
     name: "4.22"
@@ -426,6 +427,19 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: k8s-conformance
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: test
+      cli: latest
+      commands: openshift-hack/conformance-k8s.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
@@ -544,6 +558,13 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-external-aws
+- as: e2e-aws-hpa
+  cron: 0 5 * * 1
+  steps:
+    cluster_profile: aws-2
+    env:
+      TEST_SUITE: kubernetes/autoscaling/hpa
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

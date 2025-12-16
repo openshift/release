@@ -12,7 +12,7 @@ az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}"
 az account set --subscription "${SUBSCRIPTION_ID}"
 
 unset GOFLAGS
-make -C dev-infrastructure/ svc.aks.kubeconfig SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
+make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
 export KUBECONFIG=kubeconfig
 PIDFILE="/tmp/svc-tunnel.pid"
 MONITOR_PIDFILE="/tmp/svc-monitor.pid"

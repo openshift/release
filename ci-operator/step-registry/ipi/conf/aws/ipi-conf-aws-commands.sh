@@ -193,7 +193,17 @@ echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 existing_zones_setting=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.zones')
 
 if [[ ${existing_zones_setting} == "" ]] && [[ ${ADD_ZONES} == "yes" ]]; then
-  ZONES_COUNT=${ZONES_COUNT:-2}
+  ZONES_COUNT=${ZONES_COUNT:-auto}
+  if [[ "${ZONES_COUNT}" == "auto" ]]; then
+    if [[ "${JOB_NAME}" == pull-ci-*  || "${JOB_NAME}" == rehearse-*-pull-ci-* ]]; then
+      # For presubmits, limit cloud costs by using only one AZ when in "auto".
+      ZONES_COUNT="1"
+    else
+      # For periodics (which inform component readiness), ensure multiple AZ
+      # usage in "auto" mode.
+      ZONES_COUNT="2"
+    fi
+  fi
   ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
   ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
   echo "AWS region: ${REGION} (zones: ${ZONES_STR})"

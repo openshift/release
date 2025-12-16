@@ -1,0 +1,34 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM quay.io/fedora/fedora:42
+      RUN dnf install -y git findutils
+      RUN mkdir /go && chmod 777 /go
+images:
+- dockerfile_path: Dockerfile
+  from: root
+  to: bin
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  rhcos:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 1000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 3Gi
+tests:
+- as: rhcos
+  capabilities:
+  - kvm
+  commands: /usr/lib/coreos-assembler/ci/prow-rhcos.sh
+  container:
+    from: bin
+  skip_if_only_changed: ^\.tekton/|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+zz_generated_metadata:
+  branch: rhel-9.6
+  org: coreos
+  repo: coreos-assembler

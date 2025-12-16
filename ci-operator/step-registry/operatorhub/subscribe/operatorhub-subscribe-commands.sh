@@ -23,7 +23,7 @@ if [[ "${SUB_TARGET_NAMESPACES}" == "!install" ]]; then
   SUB_TARGET_NAMESPACES="${SUB_INSTALL_NAMESPACE}"
 fi
 
-echo "Installing ${SUB_PACKAGE} from ${SUB_CHANNEL} into ${SUB_INSTALL_NAMESPACE}, targeting ${SUB_TARGET_NAMESPACES}"
+echo "Installing ${SUB_PACKAGE} from channel: ${SUB_CHANNEL} in source: ${SUB_SOURCE} into ${SUB_INSTALL_NAMESPACE}, targeting ${SUB_TARGET_NAMESPACES}"
 
 # create the install namespace
 oc apply -f - <<EOF

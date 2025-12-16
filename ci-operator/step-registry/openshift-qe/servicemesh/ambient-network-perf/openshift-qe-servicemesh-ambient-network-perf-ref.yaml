@@ -1,0 +1,56 @@
+ref:
+  as: openshift-qe-servicemesh-ambient-network-perf
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "v2.6.4"
+    documentation: |-
+      Override the e2e version
+  - name: NETPERF_VERSION
+    default: "default"
+    documentation: |-
+      Override the k8s netperf
+  - name: VM
+    default: "false"
+    documentation:
+      To run netperf on VMs
+  - name: TOLERANCE
+    default: "90"
+    documentation: |-
+      Tolerance of delta from hostNetwork to podNetwork - single stream
+  - name: EXTERNAL_SERVER_ADDRESS
+    default: ""
+    documentation: |-
+      External netserver address hosted on bastion node
+  - name: LOCAL
+    default: "false"
+    documentation: |-
+      Run network performance tests with Server-Pods/Client-Pods on the same Node
+  - name: WORKLOAD
+    default: "ossm.yaml"
+    documentation: |-
+      The workload to run, defaults to ossm.yaml for Service Mesh tests
+  - name: ADDITIONAL_PARAMS
+    default: '{"service_mesh_mode": "ambient"}'
+    documentation: |-
+      Additonal metadata fingerprint for the service mesh mode.
+  - name: CLEAN_UP
+    default: "false"
+    documentation: |-
+      For Service Mesh tests, setting up and tearing down the test namespace is handled externally.
+  commands: openshift-qe-servicemesh-ambient-network-perf-commands.sh
+  timeout: 4h
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale network-perf workload for the ambient service mesh in the deployed cluster

@@ -30,13 +30,13 @@ node_lists=$(oc get nodes -ojson | jq -r '.items[].metadata.name' | xargs)
 for node in $node_lists; do
     result=""
     echo "**********Check fips on node ${node}**********"
-    result=$(oc debug node/${node} -n default -- chroot /host fips-mode-setup --check)
+    result=$(oc debug node/${node} -n openshift-infra -- chroot /host fips-mode-setup --check)
     if [[ "${result}" == "FIPS mode is enabled." ]]; then
         echo "Check passed on node ${node}"
     else
         echo "Check failed on node ${node}"
-        oc debug node/${node} -n default -- chroot /host fips-mode-setup --check
-        oc debug node/${node} -n default -- chroot /host grep -i fips /proc/cmdline
+        oc debug node/${node} -n openshift-infra -- chroot /host fips-mode-setup --check
+        oc debug node/${node} -n openshift-infra -- chroot /host grep -i fips /proc/cmdline
         check_result=1
     fi
 done

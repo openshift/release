@@ -6,6 +6,13 @@ build_root:
 images:
 - dockerfile_path: Containerfile
   to: amd-ci
+- dockerfile_literal: |
+    FROM quay.io/ocp-edge-qe/eco-gotests:latest
+    USER 0
+    RUN chgrp -R 0 /home/testuser && chmod -R g=u /home/testuser
+    RUN ln -s /home/testuser/go/bin/ginkgo /usr/local/bin/ginkgo
+    RUN dnf install -y openssh-clients && dnf clean all
+  to: eco-gotests
 resources:
   '*':
     limits:

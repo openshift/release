@@ -160,9 +160,6 @@ handle_azure() {
         AZURE_TENANT_ID="$(jq -r .data.azure_tenant_id azure_credentials.json|base64 -d)"
         rm -f azure_credentials.json
     else
-        # On normal cluster wait for it to be Available
-        echo "Waiting for OpenShift infrastructure to be ready..."
-        oc wait --for=condition=Available --timeout=600s infrastructure/cluster
         MANAGEMENT_RESOURCE_GROUP="$AZURE_RESOURCE_GROUP"
     fi
     for I in {1..30}; do
