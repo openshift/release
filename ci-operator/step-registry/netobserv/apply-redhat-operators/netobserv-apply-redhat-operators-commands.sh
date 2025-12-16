@@ -92,6 +92,7 @@ echo "8. Verifying catalog pod is running and ready..."
 # Wait for the catalog pod to be created and become ready
 TIMEOUT=300
 ELAPSED=0
+RUNNING=false
 
 while [ $ELAPSED -lt $TIMEOUT ]; do
     POD_NAME=$(oc get pods -n openshift-marketplace -l olm.catalogSource=redhat-operators -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
@@ -110,6 +111,7 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
 
     if [[ "$POD_PHASE" == "Running" ]] && [[ "$POD_READY" == "True" ]]; then
         echo "Catalog pod is running and ready"
+	RUNNING=true
         break
     fi
 
@@ -124,5 +126,10 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     sleep $INTERVAL
     ELAPSED=$((ELAPSED + INTERVAL))
 done
+
+
+if ! $RUNNING; then
+  exit 1
+fi
 
 echo "Catalog source setup complete for cluster version ${OCP_MAJOR_MINOR}."
