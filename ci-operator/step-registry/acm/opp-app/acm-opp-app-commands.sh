@@ -153,7 +153,7 @@ run_test_case_1() {
     # Wait for deployment (which implicitly waits for build to complete)
     echo "Waiting for deployment to be available (timeout: 10m)..."
     if ! oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=10m; then
-        echo "ERROR: Deployment did not become available"
+        echo "❌ ERROR: Deployment did not become available"
 
         # Collect diagnostics to understand why deployment failed
         echo "=== Build Status ==="
@@ -195,7 +195,7 @@ run_test_case_1() {
         return 1
     fi
 
-    echo "Deployment is available"
+    echo "✅ Deployment is available"
 
     # Collect final status
     oc get build,po,deployment -n e2e-opp || true
@@ -273,7 +273,7 @@ if ! oc get quayintegration quay >/dev/null 2>&1; then
     exit 0
 fi
 
-echo "✅ QuayIntegration 'quay' found"
+echo "✅ QuayIntegration quay found"
 oc get quayintegration quay -o yaml || true
 
 ################################################################################
@@ -284,22 +284,22 @@ CASE1_START=$(date +%s)
 if run_test_case_1; then
     CASE1_DURATION=$(($(date +%s) - CASE1_START))
     record_test_result "deploy-opp-application" "passed" "" "$CASE1_DURATION"
-    echo "✅ Test Case 1 Result: PASSED"
+    echo "✅ Test Case 1 (Deploy OPP Application) Result: PASSED"
 
     # Run Test Case 2 (ACS Integration)
     CASE2_START=$(date +%s)
     if run_test_case_2; then
         CASE2_DURATION=$(($(date +%s) - CASE2_START))
         record_test_result "test-acs-integration" "passed" "" "$CASE2_DURATION"
-        echo "✅ Test Case 2 Result: PASSED"
+        echo "✅ Test Case 2 (Test ACS Integration) Result: PASSED"
     else
         CASE2_DURATION=$(($(date +%s) - CASE2_START))
         record_test_result "test-acs-integration" "failed" "ACS integration test failed" "$CASE2_DURATION"
-        echo "❌ Test Case 2 Result: FAILED"
+        echo "❌ Test Case 2 (Test ACS Integration) Result: FAILED"
     fi
 else
     CASE1_DURATION=$(($(date +%s) - CASE1_START))
-    echo "❌ Test Case 1 Result: FAILED"
+    echo "❌ Test Case 1 (Deploy OPP Application) Result: FAILED"
     echo "Test Case 1 failed, skipping remaining test cases..."
     record_test_result "deploy-opp-application" "failed" "OPP application deployment failed" "$CASE1_DURATION"
 fi
