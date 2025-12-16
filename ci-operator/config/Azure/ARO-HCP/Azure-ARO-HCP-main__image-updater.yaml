@@ -18,12 +18,20 @@ images:
     COPY /src /opt/app-root/src/github.com/Azure
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
     USER root
+    # allow anyone to create content in GOPATH so we can go install stuff
     RUN chmod 777 /opt/app-root
+    RUN dnf install -y git go make
+    RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+    RUN dnf install -y pass || true
+    RUN dnf install -y qrencode || true
+    RUN dnf install -y net-tools || true
+    RUN dnf install -y https://rpmfind.net/linux/centos-stream/9-stream/BaseOS/x86_64/os/Packages/tree-1.8.0-10.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-libs-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/p/pass-1.7.4-16.el9.noarch.rpm || true
     RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
     RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
-    RUN dnf install -y azure-cli libicu git jq go make
+    RUN dnf install -y azure-cli libicu jq
     RUN curl -L -o /usr/local/bin/bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64 && chmod +x /usr/local/bin/bicep
     RUN curl -L -o /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+    RUN dnf clean all
     ADD prcreator /usr/bin/prcreator
   from: nested-podman
   inputs:
@@ -101,8 +109,8 @@ tests:
       from: image-updater-base
       resources:
         requests:
-          cpu: 3000m
-          memory: 4Gi
+          cpu: "2"
+          memory: 2Gi
 zz_generated_metadata:
   branch: main
   org: Azure
