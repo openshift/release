@@ -299,8 +299,8 @@ ExecStart=/usr/bin/podman run --name poc-registry-${port} \
 -v /opt/registry-${port}/data:/var/lib/registry:z \
 -v /opt/registry-${port}/auth:/auth \
 -v /opt/registry-${port}/certs:/certs:z \
--v /opt/registry-${port}/config.yaml:/etc/docker/registry/config.yml \
-quay.io/openshifttest/registry:2
+-v /opt/registry-${port}/config.yaml:/etc/distribution/config.yml \
+quay.io/openshifttest/registry:3
 
 ExecReload=-/usr/bin/podman stop "poc-registry-${port}"
 ExecReload=-/usr/bin/podman rm "poc-registry-${port}"
