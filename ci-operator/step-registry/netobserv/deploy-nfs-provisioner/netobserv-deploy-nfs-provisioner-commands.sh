@@ -304,7 +304,7 @@ mountOptions:
     - vers=4.1
 EOF
 
-echo "INFO: tep4: Set storageclass nutanix-volume as default storageclass if there is no default one......"
+echo "INFO: Step4: Set storageclass nutanix-volume as default storageclass if there is no default one......"
 sc_out="$(oc get storageclass --no-headers 2>/dev/null || true)"
 default_sc_count="$(grep -c 'default' <<<"$sc_out" || true)"
 if [ "${default_sc_count}" -eq 0 ]; then
