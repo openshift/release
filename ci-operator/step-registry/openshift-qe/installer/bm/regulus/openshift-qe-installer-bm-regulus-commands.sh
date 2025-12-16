@@ -273,7 +273,7 @@ fi
 # ───────────────────────────────────────────────────────────────────────────
 run-regulus() {
   # Pass jetlag's build-time private key and Regulus lab.config the to true bastion
-  if [ $DISCOVER_JETLAG == "true" ]; then
+  if [ "${DISCOVER_JETLAG:-}" == "true" ]; then
   	do_ssh root@$bastion "scp /root/.ssh/id_rsa root@$TRUE_BASTION_HOST:/tmp/private_key"
   fi
   do_jscp "root@${bastion}" "/tmp/lab.config" "${regulus_repo}/lab.config"
