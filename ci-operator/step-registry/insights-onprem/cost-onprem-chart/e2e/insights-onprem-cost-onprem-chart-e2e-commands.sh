@@ -239,6 +239,7 @@ echo "========== Running E2E Tests =========="
 # Export environment variables for the deployment script
 export NAMESPACE="${NAMESPACE:-cost-onprem}"
 export VERBOSE="${VERBOSE:-true}"
+export USE_LOCAL_CHART="true"
 
 # Run the deployment script from the chart repo source
 # The step runs with from: src, so we're already in the chart repo
