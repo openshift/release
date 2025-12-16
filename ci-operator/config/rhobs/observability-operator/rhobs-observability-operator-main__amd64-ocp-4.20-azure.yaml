@@ -1,0 +1,48 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  observability-operator-test-harness:
+    name: observability-operator-test-harness
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-release-golang-1.24-openshift-4.20
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4G
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: coo-stage
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: azure-observability
+    env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"}
+        ]
+    test:
+    - ref: rhobs-konflux-catalogsource
+    - ref: install-operators
+    - ref: rhobs-obo-test-harness
+    workflow: cucushift-installer-rehearse-azure-ipi
+zz_generated_metadata:
+  branch: main
+  org: rhobs
+  repo: observability-operator
+  variant: amd64-ocp-4.20-azure

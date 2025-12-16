@@ -120,6 +120,9 @@ function prepare_next_steps() {
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
 
+  # capture install duration for post e2e-analysis
+  awk '/Time elapsed per stage:/,/Time elapsed:/' "${dir}/.openshift_install.log" > "${SHARED_DIR}/install-duration.log"
+
   # Delete the ${REMOTE_SECRETS_DIR} as it may contain credential files
   run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "rm -rf ${REMOTE_SECRETS_DIR}"
 }

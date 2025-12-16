@@ -4,11 +4,11 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   ocp_4.20_base-rhel9:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: base-rhel9
   ocp_4.21_base-rhel9:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: base-rhel9
 build_root:
@@ -23,7 +23,7 @@ images:
   to: ironic
 promotion:
   to:
-  - name: "4.21"
+  - name: "4.22"
     namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
@@ -35,12 +35,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -51,7 +51,7 @@ tests:
 - as: e2e-metal-ipi-bm
   capabilities:
   - intranet
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -60,14 +60,14 @@ tests:
 - as: e2e-metal-ipi-virtualmedia
   capabilities:
   - intranet
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*|\.github/.*)$|\.(okd|scos|fcos|okd-x86_64)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
@@ -75,8 +75,8 @@ tests:
   commands: |-
     #!/bin/bash
     set -euxo pipefail
-    # this could also come from the "CLONEREFS_OPTIONS" env variable
-    export CHECK_RELEASE="main"
+    # Automatically set based on the branch being tested
+    export CHECK_RELEASE=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref // .refs.base_ref')
     make check-reqs
   container:
     from: src

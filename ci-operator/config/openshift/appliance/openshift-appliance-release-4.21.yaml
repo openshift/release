@@ -1,8 +1,4 @@
 base_images:
-  coreos-centos-stream9:
-    name: stream9
-    namespace: coreos
-    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -11,13 +7,17 @@ build_root:
   project_image:
     dockerfile_path: Dockerfile.openshift-appliance-build
 images:
+- dockerfile_literal: |
+    FROM ubi9-minimal
+    RUN rm -rf /etc/yum.repos.d/*
+    RUN curl http://base-4-20-rhel9.ocp.svc > /etc/yum.repos.d/base-4-20-rhel9.repo
+  to: ubi9-minimal-entitled
 - dockerfile_path: Dockerfile.openshift-appliance
-  from: coreos-centos-stream9
+  from: ubi9-minimal-entitled
   to: agent-preinstall-image-builder
 promotion:
   to:
-  - disabled: true
-    name: "4.21"
+  - name: "4.21"
     namespace: ocp
 releases:
   initial:

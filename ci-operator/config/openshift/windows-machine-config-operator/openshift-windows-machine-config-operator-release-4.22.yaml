@@ -46,6 +46,7 @@ promotion:
   to:
   - additional_images:
       windows-machine-config-operator-bundle: wmco-bundle
+    disabled: true
     name: "4.22"
     namespace: ocp
 releases:
@@ -102,6 +103,18 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
+  as: aws-e2e-operator-windows-server-2025
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      WINDOWS_SERVER_VERSION: "2025"
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-aws-ovn-hybrid
+- always_run: false
   as: vsphere-disconnected-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
@@ -148,6 +161,13 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- as: vsphere-e2e-ccm-install
+  cron: 0 9 * * 1
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: openshift-e2e-vsphere-ccm-ovn-hybrid-install
 - always_run: false
   as: azure-e2e-upgrade
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$

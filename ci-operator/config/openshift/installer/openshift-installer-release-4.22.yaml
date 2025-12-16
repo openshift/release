@@ -253,7 +253,8 @@ images:
   to: virtctl
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - src-oc
     name: "4.22"
     namespace: ocp
@@ -1351,6 +1352,27 @@ tests:
     - chain: ipi-install
     - ref: ipi-azure-rbac
     - ref: cucushift-installer-check-azure-osimage
+- always_run: false
+  as: e2e-azure-confidential-trustedlaunch
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_CONFIDENTIAL_COMPUTE: "true"
+      ENABLE_CONFIDENTIAL_CONTROL_PLANE: "true"
+    post:
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-confidential
+    - chain: azure-provision-service-principal-minimal-permission
+    - chain: ipi-install
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-check-azure-confidential
+    test:
+    - ref: openshift-e2e-test
 - as: gcp-private
   optional: true
   run_if_changed: (gcp|google)
@@ -1497,10 +1519,18 @@ tests:
   run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp
-    env:
-      FEATURE_GATES: '["GCPCustomAPIEndpointsInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-gcp-custom-endpoints
+- always_run: false
+  as: gcp-custom-endpoints-proxy-wif
+  optional: true
+  run_if_changed: (gcp|google)
+  steps:
+    cluster_profile: gcp
+    env:
+      ADDITIONAL_WHITELIST_URLS: s3.us-east-1.amazonaws.com
+      RESTRICTED_NETWORK: "yes"
+    workflow: openshift-e2e-gcp-custom-endpoints-proxy-whitelist-cco-manual-workload-identity
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.22
   org: openshift
