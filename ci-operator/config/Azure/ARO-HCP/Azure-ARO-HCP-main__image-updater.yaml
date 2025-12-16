@@ -15,7 +15,9 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM aro-hcp-e2e-base-image
-    RUN dnf install -y skopeo
+    RUN dnf install -y skopeo jq
+    RUN curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq &&\
+        chmod +x /usr/local/bin/yq
     ADD prcreator /usr/bin/prcreator
     COPY /src /opt/app-root/src/github.com/Azure
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
@@ -48,7 +50,7 @@ tests:
         set -o pipefail
 
         echo "===== Precheck: Ensure required tools are present ====="
-        for cmd in skopeo git az bicep; do
+        for cmd in skopeo git az bicep yq jq; do
           if ! command -v "$cmd" &> /dev/null; then
             echo "ERROR: Required tool '$cmd' is not installed or not in PATH."
             exit 1
