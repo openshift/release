@@ -309,7 +309,7 @@ oc --kubeconfig "$HOSTED_KUBECONFIG" config set-cluster "$CLSTR_NAME" \
 echo "Updated kubeconfig server URL to https://${BASTION_FIP}:${NODEPORT}"
 
 #Wait for Hosted control plane pods to come up
-RETRIES=30
+RETRIES=40
 INTERVAL=30  # seconds
 
 for i in $(seq 1 "$RETRIES") max; do
