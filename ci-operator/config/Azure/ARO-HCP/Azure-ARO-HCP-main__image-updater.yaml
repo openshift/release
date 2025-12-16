@@ -1,4 +1,8 @@
 base_images:
+  aro-hcp-e2e-base-image:
+    name: aro-hcp-e2e-base
+    namespace: rh_ee_ves
+    tag: v1.0
   prcreator:
     name: prcreator
     namespace: ci
@@ -10,16 +14,12 @@ build_root:
     tag: rhel-9-golang-1.24-openshift-4.20
 images:
 - dockerfile_literal: |
-    FROM src
-    RUN cat /etc/dnf/dnf.conf || true
-    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
-    RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
-    RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
-    RUN dnf install -y azure-cli libicu git skopeo
+    FROM aro-hcp-e2e-base-image
+    RUN dnf install -y skopeo
     ADD prcreator /usr/bin/prcreator
     COPY /src /opt/app-root/src/github.com/Azure
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-  from: src
+  from: aro-hcp-e2e-base-image
   inputs:
     prcreator:
       paths:
@@ -87,16 +87,19 @@ tests:
         cd ../..
 
         git add .
-        git commit -m "Ran image-updater for all components"
-
-        echo "===== Materializing configuration ====="
-        make -C config materialize
-
-        git add .
-        git commit -m "Render digests using materialize"
+        git commit -m "chore: execute image-updater for all components"
 
         echo "===== Rendering ACM helm-charts ====="
         make -C acm helm-charts
+        git add .
+        git commit -m "chore: render ACM helm-charts"
+
+        echo "===== Materializing configuration ====="
+        make -C config materialize
+        git add .
+        git commit -m "chore: render digests using materialize"
+
+        echo "===== Tidying and formatting code ====="
         make all-tidy
         make yamlfmt
 
@@ -112,7 +115,7 @@ tests:
           -organization=Azure \
           -repo=ARO-HCP \
           -branch=main \
-          -git-message="Render ACM helm-charts" \
+          -git-message="chore: tidy and format code" \
           -pr-title="Automated - Update component image digests" \
           -pr-message="This automated PR updates ARO-HCP container image digests to the latest versions from registries.
 
