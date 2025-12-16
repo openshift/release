@@ -66,7 +66,7 @@ function deploy_operators() {
         local mirror_registry_url
         mirror_registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
         local mirror_registry_proxy_url
-        mirror_registry_proxy_url="${mirror_registry_url//5000/6001}"
+        mirror_registry_proxy_url="${mirror_registry_url//5000/6003}"
         local registry_creds
         registry_creds=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
         local registry_auth
