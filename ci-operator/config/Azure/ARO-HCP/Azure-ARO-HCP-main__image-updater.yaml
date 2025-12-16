@@ -93,8 +93,12 @@ tests:
 
         echo "===== Rendering ACM helm-charts ====="
         make -C acm helm-charts
-        git add .
-        git commit -m "chore: render ACM helm-charts"
+        make yamlfmt && UPDATE=true go test ./tooling/helmtest/...
+        
+        if [[ $(git status --porcelain) != "" ]]; then
+          git add .
+          git commit -m "chore: render ACM helm-charts"
+        fi
 
         echo "===== Materializing configuration ====="
         make -C config materialize
