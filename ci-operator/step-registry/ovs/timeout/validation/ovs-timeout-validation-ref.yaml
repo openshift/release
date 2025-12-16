@@ -1,0 +1,30 @@
+ref:
+  as: ovs-timeout-validation
+  cli: latest
+  commands: ovs-timeout-validation-commands.sh
+  from: test-bin
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    This step validates the OVS timeout fix for OCPBUGS-66075 in HyperShift HCP environments.
+    
+    The step:
+    1. Creates 1000 concurrent pods to stress test OVS timeout handling
+    2. Monitors for OVS timeout errors (should be zero with 90s timeout fix)
+    3. Validates that ≥85% of pods successfully reach Running state
+    4. Uses custom release image containing the OVS timeout fix
+    
+    This validates that the OVS timeout increase from 30s to 90s prevents
+    pod creation failures during high concurrent workloads in HCP clusters.
+  env:
+  - name: OVS_TIMEOUT_TEST_PODS
+    default: "1000"
+    documentation: "Number of pods to create for OVS timeout stress testing"
+  - name: OVS_TIMEOUT_MAX_WAIT
+    default: "2400" 
+    documentation: "Maximum test time in seconds (40 minutes)"
+  - name: TEST_NAMESPACE
+    default: "default"
+    documentation: "Namespace for test pods"
