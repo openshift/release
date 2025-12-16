@@ -1,0 +1,53 @@
+ref:
+  as: openshift-qe-servicemesh-ambient-ingress-perf
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-servicemesh-ambient-ingress-perf-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  env:
+  - name: E2E_VERSION
+    default: "v2.6.4"
+    documentation: |-
+      Override the e2e version
+  - name: INGRESS_PERF_VERSION
+    default: "default"
+    documentation: |-
+      Override the ingress-perf version
+  - name: CONFIG
+    default: "config/standard-servicemesh.yml"
+    documentation: |-
+      Use the standard servicemesh configuration file.
+  - name: LOG_LEVEL
+    default: "info"
+    documentation: |-
+      Default LOG_LEVEL is set info
+  - name: ITERATIONS
+    default: "5"
+    documentation: |-
+      Defaults to 5 Iterations
+  - name: ADDITIONAL_PARAMS
+    default: '{"service_mesh_mode": "ambient"}'
+    documentation: |-
+      Additonal metadata fingerprint for the service mesh mode.
+  - name: GATEWAY_API
+    default: "false"
+    documentation: |-
+      Ingress-perf is compatible with the OpenShift implementation of the Gateway API, provided by OpenShift Service Mesh.
+      For OSSM specific tests, it should be set to "false" to let the traffic flow through the istio-ingressgateway.
+  - name: SERVICE_MESH
+    default: "ambient"
+    documentation: |-
+      Define the service mesh mode to use: ambient
+  timeout: 4h
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the PerfScale's ingress-perf workload for the ambient service mesh in the deployed cluster
