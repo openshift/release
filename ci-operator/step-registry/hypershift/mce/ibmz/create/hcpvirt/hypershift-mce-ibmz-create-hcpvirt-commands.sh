@@ -342,66 +342,25 @@ if [[ "$DESIRED_NODES" != "$CURRENT_NODES" ]]; then
   exit 1
 fi
 
-# Downloading the script to set proxy server
-echo "Downloading the setup script for proxy"
+echo "Fetching router-nodeport-default service NodePorts..."
 
-GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
-git clone -b proxy-tst git@github.ibm.com:OpenShift-on-Z/hosted-control-plane.git &&
+HTTP_NODEPORT=$(oc get svc router-nodeport-default \
+  -n openshift-ingress \
+  --kubeconfig "$HOSTED_KUBECONFIG" \
+  --insecure-skip-tls-verify \
+  -o jsonpath="{.spec.ports[?(@.name=='http')].nodePort}")
 
-echo "Getting the proxy setup script"
-cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
+HTTPS_NODEPORT=$(oc get svc router-nodeport-default \
+  -n openshift-ingress \
+  --kubeconfig "$HOSTED_KUBECONFIG" \
+  --insecure-skip-tls-verify \
+  -o jsonpath="{.spec.ports[?(@.name=='https')].nodePort}")
 
-# Configuring proxy server on bastion
-echo "Getting management cluster basedomain to allow traffic to proxy server"
-mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
-
-echo "Getting the proxy setup script"
-cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
-
-sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh 
-sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 
-chmod 700 $HOME/setup_proxy.sh
-
-echo "Transferring the setup script to Bastion"
-scp -i "$SSH_KEY" \
-  -o StrictHostKeyChecking=no \
-  -o UserKnownHostsFile=/dev/null \
-  "$HOME/setup_proxy.sh" \
-  root@"$BASTION_FIP":/root/setup_proxy.sh
-
-echo "Triggering the proxy server setup on Bastion"
-ssh -i "$SSH_KEY" \
-  -o StrictHostKeyChecking=no \
-  -o UserKnownHostsFile=/dev/null \
-  root@"$BASTION_FIP" \
-  bash /root/setup_proxy.sh
-
-cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
-export HTTP_PROXY=http://${BASTION_FIP}:3128/
-export HTTPS_PROXY=http://${BASTION_FIP}:3128/
-export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
-export http_proxy=http://${BASTION_FIP}:3128/
-export https_proxy=http://${BASTION_FIP}:3128/
-export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
-EOF
-
-# Sourcing the proxy settings for the next steps
-if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-  source "${SHARED_DIR}/proxy-conf.sh"
-fi
-
-#Get for ingress router service NodePorts
-echo "Waiting for router-nodeport-default service..."
-HTTP_NODEPORT=$(oc get svc router-nodeport-default -n openshift-ingress --kubeconfig $HOSTED_KUBECONFIG -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' --insecure-skip-tls-verify)
-
-echo "HTTP NodePort: $HTTP_NODEPORT"
-
-HTTPS_NODEPORT=$(oc get svc router-nodeport-default -n openshift-ingress --kubeconfig $HOSTED_KUBECONFIG -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' --insecure-skip-tls-verify)
-
+echo "HTTP NodePort:  $HTTP_NODEPORT"
 echo "HTTPS NodePort: $HTTPS_NODEPORT"
 
 if [[ -z "$HTTP_NODEPORT" || -z "$HTTPS_NODEPORT" ]]; then
-  echo "ERROR: router-nodeport-default service not found or ports not assigned"
+  echo "ERROR: NodePorts not assigned"
   exit 1
 fi
 
@@ -517,8 +476,57 @@ else
     exit 1
 fi
 
-
 echo "$(date) Successfully completed the Hosted cluster creation with type Kubevirt"
+
+# Downloading the script to set proxy server
+echo "Downloading the setup script for proxy"
+
+GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
+git clone -b proxy-tst git@github.ibm.com:OpenShift-on-Z/hosted-control-plane.git &&
+
+echo "Getting the proxy setup script"
+cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
+
+# Configuring proxy server on bastion
+echo "Getting management cluster basedomain to allow traffic to proxy server"
+mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
+
+echo "Getting the proxy setup script"
+cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
+
+sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh 
+sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 
+chmod 700 $HOME/setup_proxy.sh
+
+echo "Transferring the setup script to Bastion"
+scp -i "$SSH_KEY" \
+  -o StrictHostKeyChecking=no \
+  -o UserKnownHostsFile=/dev/null \
+  "$HOME/setup_proxy.sh" \
+  root@"$BASTION_FIP":/root/setup_proxy.sh
+
+echo "Triggering the proxy server setup on Bastion"
+ssh -i "$SSH_KEY" \
+  -o StrictHostKeyChecking=no \
+  -o UserKnownHostsFile=/dev/null \
+  root@"$BASTION_FIP" \
+  bash /root/setup_proxy.sh
+
+cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
+export HTTP_PROXY=http://${BASTION_FIP}:3128/
+export HTTPS_PROXY=http://${BASTION_FIP}:3128/
+export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export http_proxy=http://${BASTION_FIP}:3128/
+export https_proxy=http://${BASTION_FIP}:3128/
+export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+EOF
+
+# Sourcing the proxy settings for the next steps
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+
 
 
 
