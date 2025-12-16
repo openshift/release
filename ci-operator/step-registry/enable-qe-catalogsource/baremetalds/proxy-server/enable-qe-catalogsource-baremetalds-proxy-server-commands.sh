@@ -57,7 +57,7 @@ setup_proxy_registry 6002 "brew.registry.redhat.io" "https://brew.registry.redha
   "$(cat /home/registry_brew.json | jq '.user')" \
   "$(cat /home/registry_brew.json | jq -r '.password')"
 
-konflux_auth=$(jq -r '.auths["quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share"].auth' /home/registry_konflux_quay_auth.json)
+konflux_auth=$(jq -r '.auths["quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share"].auth' /home/registry_konflux_quay_auth.json | base64 -d)
 setup_proxy_registry 6003 "konflux quay.io" "https://quay.io" \
   "$(echo $konflux_auth | cut -d: -f1)" \
   "$(echo $konflux_auth | cut -d: -f2)"
