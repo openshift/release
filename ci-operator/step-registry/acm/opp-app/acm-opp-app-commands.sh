@@ -12,9 +12,8 @@ set -o pipefail
 # Test Cases:
 #   1. Deploy OPP Application
 #      - Deploys httpd-example application via deploy.sh
-#      - Waits for ACM policies to become Compliant
-#      - Waits for build completion and deployment availability
-#      - Verifies image is pushed to Quay registry (OPP integration)
+#      - Waits for deployment availability (implicitly waits for build)
+#      - Verifies deployment is running successfully
 #      - If ANY step fails, test fails and subsequent cases are skipped
 #
 #   2. Test ACS Integration
@@ -125,18 +124,18 @@ run_test_case_1() {
     echo "====== Test Case 1: Deploy OPP Application ======"
 
     # Download jq
-    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq || { echo "ERROR: Failed to download jq"; return 1; }
+    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq || return 1
     chmod +x /tmp/jq
 
     # Clone and deploy
-    git clone -b fix-ami-dynamic-lookup https://github.com/tanfengshuang/policy-collection.git || { echo "ERROR: Failed to clone repository"; return 1; }
-    cd policy-collection/deploy/ || { echo "ERROR: Failed to cd to deploy directory"; return 1; }
-    echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || { echo "ERROR: deploy.sh failed"; return 1; }
+    git clone -b fix-ami-dynamic-lookup https://github.com/tanfengshuang/policy-collection.git || return 1
+    cd policy-collection/deploy/ || return 1
+    echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || return 1
 
     sleep 60
 
     # Verify e2e-opp namespace was created
-    oc get namespace e2e-opp >/dev/null 2>&1 || { echo "ERROR: Namespace e2e-opp not found, deploy.sh may have failed"; return 1; }
+    oc get namespace e2e-opp >/dev/null 2>&1 || return 1
 
     oc label managedcluster local-cluster oppapps=httpd-example --overwrite
 
@@ -146,68 +145,60 @@ run_test_case_1() {
     oc get po -n e2e-opp || true
     oc get deployment -n e2e-opp || true
 
-    # Wait for build to complete
+    # Trigger build if needed
     LATEST_BUILD_NAME=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
-    [ -z "$LATEST_BUILD_NAME" ] && { LATEST_BUILD_NAME=$(oc start-build httpd-example -n e2e-opp -o name | cut -d'/' -f2) || { echo "ERROR: Failed to start build"; return 1; }; }
+    [ -z "$LATEST_BUILD_NAME" ] && { LATEST_BUILD_NAME=$(oc start-build httpd-example -n e2e-opp -o name | cut -d'/' -f2) || return 1; }
+    echo "Monitoring build: ${LATEST_BUILD_NAME}"
 
-    BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-    echo "Initial build status: ${LATEST_BUILD_NAME} is ${BUILD_STATUS}"
+    # Wait for deployment (which implicitly waits for build to complete)
+    echo "Waiting for deployment to be available (timeout: 10m)..."
+    if ! oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=10m; then
+        echo "ERROR: Deployment did not become available"
 
-    # Only wait if build is not already complete
-    if [ "$BUILD_STATUS" != "Complete" ]; then
-        BUILD_TIMEOUT=600
-        BUILD_ELAPSED=0
-        BUILD_CHECK_INTERVAL=15
+        # Collect diagnostics to understand why deployment failed
+        echo "=== Build Status ==="
+        LATEST_BUILD=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
+        if [ -n "$LATEST_BUILD" ]; then
+            BUILD_STATUS=$(oc get build "$LATEST_BUILD" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            echo "Latest build: $LATEST_BUILD"
+            echo "Build status: $BUILD_STATUS"
 
-        while [ $BUILD_ELAPSED -lt $BUILD_TIMEOUT ]; do
-            BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-            echo "Build status at ${BUILD_ELAPSED}s: ${BUILD_STATUS}"
-
-            if [ "$BUILD_STATUS" = "Complete" ]; then
-                echo "Build ${LATEST_BUILD_NAME} completed successfully"
-                break
-            elif [ "$BUILD_STATUS" = "Failed" ] || [ "$BUILD_STATUS" = "Error" ] || [ "$BUILD_STATUS" = "Cancelled" ]; then
-                echo "!!! Build ${LATEST_BUILD_NAME} failed with status: ${BUILD_STATUS}"
-
-                # Collect diagnostics
-                oc get event -n e2e-opp || true
+            if [ "$BUILD_STATUS" != "Complete" ]; then
+                echo "=== Build Details ==="
+                oc describe build "$LATEST_BUILD" -n e2e-opp || true
                 oc describe buildconfig httpd-example -n e2e-opp || true
-                oc describe build "$LATEST_BUILD_NAME" -n e2e-opp || true
-                oc get cm -n openshift-config opp-ingres-ca -o yaml || true
-                oc get quayintegration quay -o yaml || true
-                oc get secret -n policies quay-integration -o yaml || true
-
-                echo "=== Quay Bridge Operator Logs ==="
-                OPERATOR_POD_NAME=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-                if [ -n "$OPERATOR_POD_NAME" ]; then
-                    oc logs $OPERATOR_POD_NAME -n openshift-operators -c manager --tail=50 || true
-                fi
-
-                # Retry build
-                echo "Starting a new build..."
-                LATEST_BUILD_NAME=$(oc start-build httpd-example -n e2e-opp -o name | cut -d'/' -f2) || { echo "ERROR: Failed to start new build"; return 1; }
-                echo "New build started: ${LATEST_BUILD_NAME}"
-                BUILD_ELAPSED=0
-                continue
             fi
+        fi
 
-            sleep $BUILD_CHECK_INTERVAL
-            BUILD_ELAPSED=$((BUILD_ELAPSED + BUILD_CHECK_INTERVAL))
-        done
+        echo "=== Events ==="
+        oc get event -n e2e-opp || true
 
-        # Final build check
-        BUILD_STATUS=$(oc get build "$LATEST_BUILD_NAME" -n e2e-opp -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-        [ "$BUILD_STATUS" != "Complete" ] && { echo "ERROR: Build timeout. Final status: ${BUILD_STATUS}"; return 1; }
+        echo "=== Deployment Status ==="
+        oc get deployment -n e2e-opp || true
+        oc describe deployment httpd-example -n e2e-opp || true
+
+        echo "=== Pod Status ==="
+        oc get po -n e2e-opp || true
+
+        echo "=== ImageStream Status ==="
+        oc get is -n e2e-opp httpd-example -o yaml | grep -A 10 "status:" || true
+
+        echo "=== Quay Integration Status ==="
+        oc get quayintegration quay -o yaml || true
+        oc get cm -n openshift-config opp-ingres-ca -o yaml || true
+        oc get secret -n policies quay-integration -o yaml || true
+
+        echo "=== Quay Bridge Operator Logs ==="
+        OPERATOR_POD=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        [ -n "$OPERATOR_POD" ] && oc logs -n openshift-operators "$OPERATOR_POD" -c manager --tail=100 || true
+
+        return 1
     fi
 
-    # Wait for deployment
-    echo "Waiting for deployment to be available..."
-    oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=5m || { echo "ERROR: Deployment wait failed"; return 1; }
+    echo "Deployment is available"
 
-    # Collect deployment info
-    oc get build -n e2e-opp || true
-    oc get po -n e2e-opp || true
-    oc get deployment -n e2e-opp || true
+    # Collect final status
+    oc get build,po,deployment -n e2e-opp || true
     oc get is -n e2e-opp httpd-example -o yaml | grep -A 5 "status:" || true
 
     return 0
@@ -218,7 +209,7 @@ run_test_case_1() {
 ################################################################################
 run_test_case_2() {
     echo "====== Test Case 2: Test ACS Integration ======"
-    echo "NOTE: Test Case 1 has verified image is in Quay. Now waiting for ACS to scan it."
+    echo "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
 
     # Fetch ACS credentials
     echo "Fetching ACS credentials..."
@@ -236,68 +227,22 @@ run_test_case_2() {
     IMAGE_FOUND=false
 
     echo "Waiting for httpd-example image to appear in ACS (max $((RETRIES * RETRY_INTERVAL))s)..."
-
     for attempt in $(seq 1 $RETRIES); do
         echo "Attempt $attempt/$RETRIES: Querying ACS for httpd-example image..."
-	HTTPD_IMAGE_JSON=`$ACS_COMMAND | /tmp/jq "$JQ_FILTER"`
-	ID=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .id`
+        HTTPD_IMAGE_JSON=$($ACS_COMMAND | /tmp/jq "$JQ_FILTER")
+        ID=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq .id)
         if [ "$ID" != "" ]; then
-            CVES=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .cves`
-            image=`echo "$HTTPD_IMAGE_JSON" | /tmp/jq .name`
-            echo "✓ Success: Found $CVES CVEs for image $image"
+            CVES=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq .cves)
+            image=$(echo "$HTTPD_IMAGE_JSON" | /tmp/jq .name)
+            echo "✅ Success: Found $CVES CVEs for image $image"
             IMAGE_FOUND=true
             break
-	fi
+        fi
 
         [ $attempt -lt $RETRIES ] && sleep $RETRY_INTERVAL
     done
 
-    # Final check
-    if [ "$IMAGE_FOUND" = false ]; then
-        echo "ERROR: Image not found in ACS"
-
-        echo "=== Collecting diagnostic information ==="
-
-        echo "=== QuayIntegration Status ==="
-        oc get quayintegration quay -o yaml || true
-
-        echo "=== Quay Bridge Operator Logs ==="
-        QUAY_BRIDGE_POD=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-        if [ -n "$QUAY_BRIDGE_POD" ]; then
-            oc logs -n openshift-operators $QUAY_BRIDGE_POD -c manager --tail=100 || true
-        else
-            echo "Quay Bridge Operator pod not found"
-        fi
-
-        echo "=== ACS Central Logs ==="
-        ACS_CENTRAL_POD=$(oc get pod -n stackrox -l app=central -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-        if [ -n "$ACS_CENTRAL_POD" ]; then
-            oc logs -n stackrox $ACS_CENTRAL_POD --tail=100 || true
-        else
-            echo "ACS Central pod not found"
-        fi
-
-        echo "=== ACS Scanner Logs ==="
-        ACS_SCANNER_POD=$(oc get pod -n stackrox -l app=scanner -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-        if [ -n "$ACS_SCANNER_POD" ]; then
-            oc logs -n stackrox $ACS_SCANNER_POD --tail=100 || true
-        else
-            echo "ACS Scanner pod not found"
-        fi
-
-        echo "=== Build Information ==="
-        oc get build -n e2e-opp || true
-        oc get bc -n e2e-opp httpd-example -o yaml || true
-
-        echo "=== Image Stream Information ==="
-        oc get is -n e2e-opp || true
-        oc get is -n e2e-opp httpd-example -o yaml || true
-
-        echo "=== All ACS Images (first 10) ==="
-        curl -s -k -u admin:${ACS_PASSWORD} https://$ACS_HOST/v1/images | /tmp/jq '.images[:10] | .[] | {name: .name, id: .id}' || true
-
-        return 1
-    fi
+    [ "$IMAGE_FOUND" = true ] || return 1
 
     return 0
 }
@@ -330,7 +275,6 @@ fi
 
 echo "✅ QuayIntegration 'quay' found"
 oc get quayintegration quay -o yaml || true
-echo ""
 
 ################################################################################
 # Execute Test Cases
@@ -340,37 +284,28 @@ CASE1_START=$(date +%s)
 if run_test_case_1; then
     CASE1_DURATION=$(($(date +%s) - CASE1_START))
     record_test_result "deploy-opp-application" "passed" "" "$CASE1_DURATION"
-    echo ""
     echo "✅ Test Case 1 Result: PASSED"
-    echo ""
 
     # Run Test Case 2 (ACS Integration)
     CASE2_START=$(date +%s)
     if run_test_case_2; then
         CASE2_DURATION=$(($(date +%s) - CASE2_START))
         record_test_result "test-acs-integration" "passed" "" "$CASE2_DURATION"
-        echo ""
         echo "✅ Test Case 2 Result: PASSED"
-        echo ""
     else
         CASE2_DURATION=$(($(date +%s) - CASE2_START))
         record_test_result "test-acs-integration" "failed" "ACS integration test failed" "$CASE2_DURATION"
-        echo ""
         echo "❌ Test Case 2 Result: FAILED"
-        echo ""
     fi
 else
     CASE1_DURATION=$(($(date +%s) - CASE1_START))
-    echo ""
     echo "❌ Test Case 1 Result: FAILED"
-    echo ""
     echo "Test Case 1 failed, skipping remaining test cases..."
     record_test_result "deploy-opp-application" "failed" "OPP application deployment failed" "$CASE1_DURATION"
 fi
 
 echo "====== Test Summary ======"
 echo "All test results will be available in JUnit XML report"
-echo ""
 
 # Always exit 0 to allow subsequent test steps to run
 # Test results are reported via JUnit XML
