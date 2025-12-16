@@ -256,36 +256,14 @@ fi
 # wait for hypershift operator to come online
 echo "Waiting for hypershift operator pods to come online..."
 _hypershiftReady=0
+set +e
 for ((i=1; i<=30; i++)); do
-  # Check if hypershift namespace exists first
-  if ! oc get namespace hypershift &>/dev/null; then
-    echo "Waiting for hypershift namespace to be created... (attempt $i/30)"
-    sleep 15
-    continue
-  fi
-  running_pods=$(oc get pods -n hypershift --no-headers 2>/dev/null | grep -c "operator.*Running" || echo "0")
-
-  if [ "$running_pods" -gt 0 ]; then
-    echo "HyperShift operator pod(s) are running! ($running_pods pod(s) found)"
+  if oc get pods -n hypershift | grep -q "operator.*Running"; then
     _hypershiftReady=1
     break
   fi
-
-  echo "Waiting for hypershift operator to start... (attempt $i/30)"
-
-  # Show debug info every 5 attempts
-  if [ $((i % 5)) -eq 0 ]; then
-    echo "=== Debug: Current state ==="
-    echo "Hypershift namespace pods:"
-    oc get pods -n hypershift 2>/dev/null || echo "  No pods yet"
-    echo "ManagedClusterAddOn status:"
-    oc get managedclusteraddon hypershift-addon -n local-cluster -o jsonpath='{.status.conditions[?(@.type=="Available")]}' 2>/dev/null | jq '.' || echo "  Not available yet"
-    echo "ManifestWork:"
-    oc get manifestwork -n local-cluster 2>/dev/null | head -5 || echo "  No ManifestWork found"
-    echo "=========================="
-  fi
-
-  sleep 15
+  echo "Waiting on hypershift operator ($i/20)"
+  sleep 10
 done
 
 if [ $_hypershiftReady -eq 0 ]; then
