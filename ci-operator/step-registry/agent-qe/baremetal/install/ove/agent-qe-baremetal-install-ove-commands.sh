@@ -45,7 +45,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
      iso_path="${IP_ADDRESS}/isos/agent-ove.x86_64.iso"
    else
      # Assuming HTTP or HTTPS
-     iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/agent-ove.x86_64.iso"
+     iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/ove/agent-ove.x86_64.iso"
    fi
    mount_virtual_media "${host}" "${iso_path}"
 
@@ -63,3 +63,5 @@ if [ -f /tmp/virtual_media_mount_failed ]; then
   echo "Failed to mount the ISO image in one or more hosts"
   exit 1
 fi
+
+sleep 3600
