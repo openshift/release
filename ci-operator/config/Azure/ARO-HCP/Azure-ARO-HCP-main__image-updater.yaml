@@ -47,6 +47,15 @@ tests:
         set -o nounset
         set -o pipefail
 
+        echo "===== Precheck: Ensure required tools are present ====="
+        for cmd in skopeo git az bicep; do
+          if ! command -v "$cmd" &> /dev/null; then
+            echo "ERROR: Required tool '$cmd' is not installed or not in PATH."
+            exit 1
+          fi
+        done
+        echo "All required tools are present: skopeo, git, az, bicep."
+
         echo "===== Configure Azure Authentication ====="
         export AZURE_CLIENT_ID
         AZURE_CLIENT_ID=$(cat /var/run/hcp-integration-credentials/client-id)
