@@ -22,23 +22,21 @@ if [[ -z "${EXTERNAL_IP}" ]]; then
   exit 1
 fi
 
-echo "Gathering lease port..."
-LEASE_PORT="$(leaseLookup 'lease_port')"
-if [[ -z "${LEASE_PORT}" ]]; then
-  echo "Couldn't retrieve port from lease config"
+echo "Gathering hostname ..."
+HOSTNAME="$(leaseLookup 'hostname')"
+if [[ -z "${HOSTNAME}" ]]; then
+  echo "Couldn't retrieve hostname from lease config"
   exit 1
 fi
 
-curl "$EXTERNAL_IP:$LEASE_PORT"
+echo "Test the host connection..."
+curl -q "$EXTERNAL_IP:7001"
+curl -q "$HOSTNAME:7001"
 
 echo "Test the libvirt connection..."
-REMOTE_LIBVIRT_URI_1="qemu+tcp://10.0.1.2/system"
-REMOTE_LIBVIRT_URI_2="qemu+tcp://10.0.1.2:16509/system"
-echo "No port specified..."
-mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI_1} list
-echo "Include the port..."
-mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI_2} list
+REMOTE_LIBVIRT_URI="qemu+tcp://$HOSTNAME/system"
+mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list
 
 sleep 1200
 
-echo "Ending test of the Z Network environment..."
+echo "Ending test of the IBMZ Network environment..."
