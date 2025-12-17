@@ -1,0 +1,255 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  ocp_4.19_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-base-nodejs-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-nodejs-openshift-4.19
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-base-nodejs-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: monitoring-plugin
+- dockerfile_path: Dockerfile.test
+  to: monitoring-plugin-test
+- dockerfile_path: Dockerfile.mcp
+  inputs:
+    ocp_4.19_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.19:base-rhel9
+    ocp_builder_rhel-9-base-nodejs-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: monitoring-console-plugin
+- context_dir: .
+  dockerfile_path: web/cypress/Dockerfile
+  to: monitoring-ui-tests-runner
+promotion:
+  to:
+  - excluded_images:
+    - monitoring-plugin-test
+    - monitoring-console-plugin
+    - monitoring-ui-tests-runner
+    name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+tests:
+- as: lint
+  commands: |
+    make lint-frontend
+  container:
+    from: monitoring-plugin-test
+- as: translations
+  commands: |
+    make test-translations
+  container:
+    from: monitoring-plugin-test
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-hypershift-conformance
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+- always_run: true
+  as: e2e-monitoring
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.21"
+  optional: true
+  steps:
+    test:
+    - ref: monitoring-plugin-tests-monitoring-ui
+    workflow: generic-claim
+- always_run: false
+  as: e2e-coo
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.21"
+  optional: true
+  steps:
+    test:
+    - ref: monitoring-plugin-tests-coo-ui
+    workflow: generic-claim
+- always_run: false
+  as: e2e-incidents
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.21"
+  optional: true
+  steps:
+    test:
+    - ref: monitoring-plugin-tests-incidents-ui
+    workflow: generic-claim
+- always_run: false
+  as: e2e-alerts
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.21"
+  optional: true
+  steps:
+    test:
+    - ref: monitoring-plugin-tests-alerts-ui
+    workflow: generic-claim
+- always_run: false
+  as: e2e-dashboards
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.21"
+  optional: true
+  steps:
+    test:
+    - ref: monitoring-plugin-tests-dashboards-ui
+    workflow: generic-claim
+- always_run: false
+  as: e2e-metrics
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.21"
+  optional: true
+  steps:
+    test:
+    - ref: monitoring-plugin-tests-metrics-ui
+    workflow: generic-claim
+- always_run: false
+  as: e2e-monitoring-bvt
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.21"
+  optional: true
+  steps:
+    test:
+    - ref: monitoring-plugin-tests-monitoring-bvt-ui
+    workflow: generic-claim
+- always_run: false
+  as: e2e-monitoring-reg
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.21"
+  optional: true
+  steps:
+    test:
+    - ref: monitoring-plugin-tests-monitoring-reg-ui
+    workflow: generic-claim
+- always_run: false
+  as: e2e-virtualization
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.21"
+  optional: true
+  steps:
+    test:
+    - ref: monitoring-plugin-tests-virtualization-ui
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: monitoring-plugin

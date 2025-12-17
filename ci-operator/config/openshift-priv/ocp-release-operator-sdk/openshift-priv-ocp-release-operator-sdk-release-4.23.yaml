@@ -1,0 +1,103 @@
+base_images:
+  base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/ocp-release-operator-sdk
+images:
+- dockerfile_path: ci/dockerfiles/builder.Dockerfile
+  from: root
+  to: osdk-builder
+- dockerfile_path: release/helm/Dockerfile
+  from: base-rhel9
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: helm-operator
+- dockerfile_path: ci/dockerfiles/helm-e2e.Dockerfile
+  from: helm-operator
+  inputs:
+    osdk-builder:
+      as:
+      - osdk-builder
+  to: osdk-helm-e2e
+promotion:
+  to:
+  - excluded_images:
+    - osdk-builder
+    - osdk-helm-e2e
+    - memcached-operator
+    - nginx-operator
+    name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+test_binary_build_commands: make build/operator-sdk-dev-x86_64-linux-gnu
+tests:
+- as: unit
+  commands: |
+    echo "patch upstream"
+    make -f ci/prow.Makefile patch
+    echo "running unit tests"
+    make test-unit
+  container:
+    from: src
+- as: sanity
+  commands: |
+    echo "setting environment"
+    export GOCACHE=/tmp
+    export XDG_CACHE_HOME=/tmp
+    unset VERSION
+    echo "patch upstream"
+    make -f ci/prow.Makefile patch
+    echo "running make test-sanity"
+    make test-sanity
+  container:
+    from: src
+- as: e2e-helm
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make -f ci/prow.Makefile test-e2e-helm
+      dependencies:
+      - env: HELM_IMAGE
+        name: osdk-helm-e2e
+      - env: IMAGE_FORMAT
+        name: osdk-helm-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: ocp-release-operator-sdk

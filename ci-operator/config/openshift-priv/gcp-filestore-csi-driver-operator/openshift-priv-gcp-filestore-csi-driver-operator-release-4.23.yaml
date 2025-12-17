@@ -1,0 +1,169 @@
+base_images:
+  attacher-operand:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: csi-external-attacher
+  driver-operand:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: gcp-filestore-csi-driver
+  livenessprobe-operand:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: csi-livenessprobe
+  ocp_4.21_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
+  provisioner-operand:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: csi-external-provisioner
+  proxy-operand:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: kube-rbac-proxy
+  registrar-operand:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: csi-node-driver-registrar
+  resizer-operand:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: csi-external-resizer
+  snapshotter-operand:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: csi-external-snapshotter
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
+binary_build_commands: make
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/gcp-filestore-csi-driver-operator
+images:
+- dockerfile_path: Dockerfile.openshift
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: gcp-filestore-csi-driver-operator
+operator:
+  bundles:
+  - as: gcp-filestore-csi-driver-operator-bundle
+    base_index: operator-index
+    context_dir: config
+    dockerfile_path: bundle.Dockerfile
+    update_graph: replaces
+  substitutions:
+  - pullspec: quay.io/openshift/origin-gcp-filestore-csi-driver-operator:latest
+    with: pipeline:gcp-filestore-csi-driver-operator
+  - pullspec: quay.io/openshift/origin-gcp-filestore-csi-driver:latest
+    with: pipeline:driver-operand
+  - pullspec: quay.io/openshift/origin-csi-external-provisioner:latest
+    with: pipeline:provisioner-operand
+  - pullspec: quay.io/openshift/origin-csi-external-provisioner:latest
+    with: pipeline:attacher-operand
+  - pullspec: quay.io/openshift/origin-csi-external-snapshotter:latest
+    with: pipeline:snapshotter-operand
+  - pullspec: quay.io/openshift/origin-csi-external-resizer:latest
+    with: pipeline:resizer-operand
+  - pullspec: quay.io/openshift/origin-csi-node-driver-registrar:latest
+    with: pipeline:registrar-operand
+  - pullspec: quay.io/openshift/origin-csi-livenessprobe:latest
+    with: pipeline:livenessprobe-operand
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:latest
+    with: pipeline:proxy-operand
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make test
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: operator-e2e
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
+    env:
+      CLUSTERCSIDRIVER: filestore.csi.storage.gke.io
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: gcp-filestore-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+      TEST_CSI_DRIVER_MANIFEST: manifest-gcp-filestore.yaml
+      TEST_SUITE: openshift/csi
+      TRUECONDITIONS: GCPFilestoreDriverControllerServiceControllerAvailable GCPFilestoreDriverNodeServiceControllerAvailable
+    workflow: openshift-e2e-gcp-csi-filestore
+  timeout: 6h0m0s
+- always_run: false
+  as: operator-e2e-extended
+  optional: true
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;~LSO&;STORAGE&
+      TEST_SCENARIOS: \[CSI-Driver\]|\[GCP-Filestore-CSI-Driver\]|\[GCP-Filestore-CSI-Driver-Operator\]
+    workflow: openshift-e2e-gcp-csi-filestore-extended
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: gcp-filestore-csi-driver-operator
+    workflow: openshift-ci-security
+- always_run: false
+  as: e2e-gcp-manual-oidc-filestore
+  optional: true
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity-filestore
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: gcp-filestore-csi-driver-operator

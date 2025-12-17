@@ -1,0 +1,215 @@
+base_images:
+  base:
+    name: "4.23"
+    namespace: ocp
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  must-gather-base:
+    name: "4.23"
+    namespace: ocp
+    tag: must-gather
+  ocp_4.21_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.24-openshift-4.21
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  tests-base:
+    name: "4.23"
+    namespace: ocp
+    tag: tests
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: images/cli/Dockerfile.rhel
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: cli
+- dockerfile_path: images/tools/Dockerfile
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: tools
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: tests-base
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: tests
+- dockerfile_path: images/cli/Dockerfile.rhel
+  from: must-gather-base
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: must-gather
+- context_dir: images/deployer
+  dockerfile_path: Dockerfile.rhel
+  from: cli
+  to: deployer
+- dockerfile_path: images/cli-artifacts/Dockerfile.rhel
+  from: cli
+  inputs:
+    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: cli-artifacts
+- context_dir: images/recycler/
+  dockerfile_path: Dockerfile.rhel
+  from: cli
+  to: recycler
+promotion:
+  to:
+  - additional_images:
+      oc-rpms: rpms
+    excluded_images:
+    - tests
+    - must-gather
+    - oc-base-with-rpms
+    name: "4.23"
+    namespace: ocp
+raw_steps:
+- rpm_image_injection_step:
+    from: base
+    to: oc-base-with-rpms
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 6Gi
+  build-rpms-from-tar:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+rpm_build_commands: |-
+  TMPDIR=$( mktemp -d )
+  RPMBUILD_DIR=_rpmbuild/
+  mkdir -p ${RPMBUILD_DIR}/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+  tar -czf "${TMPDIR}/openshift-clients-0.0.1.tar.gz" --exclude='.git' --transform='s|^.|openshift-clients-0.0.1|' --exclude='openshift-clients-0.0.1.tar.gz' ./
+  cp ./oc.spec "${RPMBUILD_DIR}/SPECS/"
+  cp "${TMPDIR}/openshift-clients-0.0.1.tar.gz" "${RPMBUILD_DIR}/SOURCES/"
+  rpmbuild -ba --nodeps --define "_topdir $( pwd )/${RPMBUILD_DIR}" ${RPMBUILD_DIR}/SPECS/oc.spec --define "os_git_vars OS_GIT_VERSION='4.7.0' OS_GIT_COMMIT='${OPENSHIFT_BUILD_COMMIT::8}' OS_GIT_MAJOR='' OS_GIT_MINOR='' OS_GIT_TREE_STATE=''"
+rpm_build_location: _rpmbuild/RPMS/
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build-rpms-from-tar
+  commands: '# noop, just to force the building the `rpms` target'
+  container:
+    from: oc-base-with-rpms
+- as: rpm-build
+  commands: |
+    make rpm-build
+  container:
+    from: src
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws-5
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-serial
+  shard_count: 2
+  steps:
+    cluster_profile: aws-5
+    workflow: openshift-e2e-aws-serial
+- as: e2e-agnostic-ovn-cmd
+  steps:
+    cluster_profile: azure4
+    env:
+      TEST_SUITE: openshift/test-cmd
+    workflow: openshift-e2e-azure
+- as: e2e-aws-ovn-upgrade
+  steps:
+    cluster_profile: aws-5
+    workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-aws-certrotation
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    test:
+    - ref: openshift-oc-certrotation
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-ovn-builds
+  optional: true
+  run_if_changed: ^(pkg/.*build.*)|^(pkg/.*newapp.*)
+  steps:
+    cluster_profile: aws-5
+    workflow: openshift-e2e-aws-builds
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
+- always_run: false
+  as: e2e-agent-compact-ipv4
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: ^(pkg/cli/admin/nodeimage/|go.mod)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: oc
