@@ -16,14 +16,25 @@ images:
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: openshift/Dockerfile.openshift
+  dockerfile_path: Dockerfile.rhel
   from: origin_scos-4.22_base-stream9
   inputs:
     ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
       - builder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: ibmcloud-cluster-api-controllers
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: etcd
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.installer
+  from: origin_scos-4.22_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: installer-etcd-artifacts
 promotion:
   to:
   - name: scos-4.22
@@ -47,7 +58,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
-  branch: main
+  branch: openshift-4.22
   org: openshift
-  repo: cluster-api-provider-ibmcloud
+  repo: etcd
   variant: okd-scos
