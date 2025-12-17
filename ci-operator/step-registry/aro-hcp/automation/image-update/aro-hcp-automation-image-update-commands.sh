@@ -42,7 +42,7 @@ make build
 
 info "image: fetching the latest image digests for all components"
 if [[ ${DEBUG-0} -ge 1 ]]; then
-  ./image-updater update --verbosity 3 --config config.yaml | tee "${IMAGE_UPDATER_OUTPUT}"
+  ./image-updater update --verbosity 1 --config config.yaml | tee "${IMAGE_UPDATER_OUTPUT}"
 else
   ./image-updater update --config config.yaml > "${IMAGE_UPDATER_OUTPUT}"
 fi
