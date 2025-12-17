@@ -100,7 +100,8 @@ if [[ ! -f "${GITHUB_TOKEN_PATH}" ]]; then
 fi
 
 # Security: Load token without printing it
-readonly GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+readonly GITHUB_TOKEN
 debug "cfg: GitHub token loaded successfully (content redacted)"
 
 # Git: Configure git user and email for commits
@@ -119,9 +120,17 @@ for cred_file in "client-id" "client-secret" "tenant"; do
 done
 
 # Security: Load credentials without printing them
-readonly AZURE_CLIENT_ID="$(cat "${AZURE_CREDENTIALS_DIR}/client-id")"; export AZURE_CLIENT_ID
-readonly AZURE_CLIENT_SECRET="$(cat "${AZURE_CREDENTIALS_DIR}/client-secret")"; export AZURE_CLIENT_SECRET
-readonly AZURE_TENANT_ID="$(cat "${AZURE_CREDENTIALS_DIR}/tenant")"; export AZURE_TENANT_ID
+AZURE_CLIENT_ID="$(cat "${AZURE_CREDENTIALS_DIR}/client-id")"
+readonly AZURE_CLIENT_ID
+export AZURE_CLIENT_ID
+
+AZURE_CLIENT_SECRET="$(cat "${AZURE_CREDENTIALS_DIR}/client-secret")"
+readonly AZURE_CLIENT_SECRET
+export AZURE_CLIENT_SECRET
+
+AZURE_TENANT_ID="$(cat "${AZURE_CREDENTIALS_DIR}/tenant")"
+readonly AZURE_TENANT_ID
+export AZURE_TENANT_ID
 
 debug "azure: authentication configured successfully (credentials redacted)"
 
