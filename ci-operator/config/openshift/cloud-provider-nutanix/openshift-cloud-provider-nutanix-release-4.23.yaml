@@ -1,0 +1,108 @@
+base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: latest
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
+  ocp_4.21_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
+binary_build_commands: go build .
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/nutanix-cloud-native/cloud-provider-nutanix
+images:
+- dockerfile_path: openshift/Dockerfile.openshift
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: nutanix-cloud-controller-manager
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-nutanix
+  cluster: build01
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: nutanix-qe
+    workflow: openshift-e2e-nutanix
+- as: e2e-nutanix-windows
+  cluster: build01
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: nutanix-qe
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-nutanix-ovn-hybrid
+- as: regression-clusterinfra-nutanix-ipi-ccm
+  cluster: build01
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      E2E_RUN_TAGS: '@ccm'
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-nutanix-ipi
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+- as: fmt
+  commands: test -z $(gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/"))
+  container:
+    from: src
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
+  optional: true
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: cloud-provider-nutanix

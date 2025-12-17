@@ -1,0 +1,145 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  kube-rbac-proxy:
+    name: "4.23"
+    namespace: ocp
+    tag: kube-rbac-proxy
+  metallb:
+    name: "4.23"
+    namespace: ocp
+    tag: metallb
+  metallb-frr:
+    name: "4.23"
+    namespace: ocp
+    tag: metallb-frr
+  ocp_4.21_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.openshift
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: metallb-operator
+- dockerfile_path: bundleci.Dockerfile
+  to: metallb-operator-bundle
+operator:
+  bundles:
+  - as: operatorbundle
+    dockerfile_path: bundleci.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-metallb:.*
+    with: pipeline:metallb
+  - pullspec: quay.io/openshift/origin-metallb-operator:.*
+    with: pipeline:metallb-operator
+  - pullspec: quay.io/openshift/origin-metallb-frr:.*
+    with: pipeline:metallb-frr
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:.*
+    with: pipeline:kube-rbac-proxy
+promotion:
+  to:
+  - name: metallb-4.23
+    namespace: origin
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-metallb-operator
+        oc label --overwrite ns openshift-metallb-operator pod-security.kubernetes.io/enforce=privileged
+        make operator-sdk
+        ./_cache/operator-sdk version
+        ./_cache/operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE" # install my-operator
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server
+      dependencies:
+      - env: OO_BUNDLE
+        name: operatorbundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: run-test
+      cli: latest
+      commands: |
+        PATH=$PATH:$(pwd)/_cache hack/ocp_run_e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: metallb-e2e-metal
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+      E2E_TESTS_CONFIG: |
+        IP_STACK=v4
+        BGP_TYPE=frr-k8s-cno
+    workflow: baremetalds-metallb-e2e
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: metallb-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: metallb-operator
