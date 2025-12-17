@@ -3,6 +3,23 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# ============================================================================
+# SECURITY WARNING: This script handles sensitive credentials
+# ============================================================================
+# - GitHub tokens (GITHUB_TOKEN)
+# - Azure credentials (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)
+# - Slack webhook URLs
+#
+# NEVER enable 'set -x' or 'set -o xtrace' as it will expose credentials in logs
+# Use DEBUG environment variable (0-2) for controlled verbosity instead
+# ============================================================================
+
+# Security: Explicitly disable command tracing to prevent credential exposure
+set +o xtrace
+
+# Security: Trap to ensure xtrace is never accidentally enabled
+trap 'set +o xtrace' DEBUG
+
 # ShellCheck directives
 # shellcheck disable=SC2034  # Unused variables are exported for external tools
 
@@ -17,6 +34,7 @@ log() { echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] ${*}"; }
 info()  { if [[ ${DEBUG-0} -ge 1 ]]; then log "[info] ${*}"; fi }
 debug() { if [[ ${DEBUG-0} -ge 2 ]]; then log "[debug] ${*}"; fi }
 error() { log "[error] ${*}"; exit 1; }
+
 
 # Cleanup function to handle failures gracefully
 cleanup() {
@@ -41,8 +59,9 @@ notify() {
     error "slack: failed to read Slack webhook file"
   }
 
+  # Security: Use silent curl to prevent webhook URL exposure in logs
   if ! curl -f -s -X POST -H 'Content-type: application/json' \
-    --data "{\"text\":\"${*}\"}" "${webhook_url}"; then
+    --data "{\"text\":\"${*}\"}" "${webhook_url}" 2>/dev/null; then
     error "slack: failed to send Slack notification"
   fi
 
@@ -51,6 +70,8 @@ notify() {
 }
 
 # Helper function to run commands with conditional verbosity
+# Security Note: In DEBUG mode (>=2), command output is visible. Ensure no sensitive
+# data is passed through commands executed via this function.
 run() {
   if [[ ${DEBUG-0} -ge 2 ]]; then
     "$@"
@@ -78,7 +99,9 @@ if [[ ! -f "${GITHUB_TOKEN_PATH}" ]]; then
   error "github: token file not found at ${GITHUB_TOKEN_PATH}"
 fi
 
+# Security: Load token without printing it
 readonly GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+debug "cfg: GitHub token loaded successfully (content redacted)"
 
 # Git: Configure git user and email for commits
 debug "git: configure git user and email"
@@ -95,11 +118,12 @@ for cred_file in "client-id" "client-secret" "tenant"; do
   fi
 done
 
-export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${AZURE_CREDENTIALS_DIR}/client-id")
-export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${AZURE_CREDENTIALS_DIR}/client-secret")
-export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${AZURE_CREDENTIALS_DIR}/tenant")
+# Security: Load credentials without printing them
+readonly AZURE_CLIENT_ID="$(cat "${AZURE_CREDENTIALS_DIR}/client-id")"; export AZURE_CLIENT_ID
+readonly AZURE_CLIENT_SECRET="$(cat "${AZURE_CREDENTIALS_DIR}/client-secret")"; export AZURE_CLIENT_SECRET
+readonly AZURE_TENANT_ID="$(cat "${AZURE_CREDENTIALS_DIR}/tenant")"; export AZURE_TENANT_ID
 
-debug "azure: authentication configured successfully"
+debug "azure: authentication configured successfully (credentials redacted)"
 
 # Image Updater: Build and run the image-updater tool
 debug "image: change to tooling/image-updater directory"
@@ -150,6 +174,7 @@ info "image: materializing configuration"
 run make -C config materialize
 
 # Git: Display changes for debugging
+# Security Note: Only show diff in high debug mode; ensure no credential files are in the diff
 if [[ ${DEBUG-0} -ge 2 ]]; then
   debug "git: changes to be merged into main"
   git diff main
@@ -194,9 +219,9 @@ SLEEP_TIME=10  # Start with 10 seconds
 for ((i=1; i<=PR_CHECK_MAX_ATTEMPTS; i++)); do
   debug "github: attempting to find PR (attempt ${i} of ${PR_CHECK_MAX_ATTEMPTS})"
 
-  # Use authenticated API call to avoid rate limiting
+  # Security: Use authenticated API call with silent mode to prevent token exposure
   PR_URL=$(curl -f -s -H "Authorization: token ${GITHUB_TOKEN}" \
-    "https://api.github.com/repos/Azure/ARO-HCP/pulls?per_page=100" | \
+    "https://api.github.com/repos/Azure/ARO-HCP/pulls?per_page=100" 2>/dev/null | \
     jq -r ".[] | select(.user.login == \"${GITHUB_PR_USER}\" and .title == \"${GITHUB_PR_TITLE}\") | .html_url" | \
     head -1)
 
