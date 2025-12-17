@@ -66,9 +66,6 @@ tests:
         export AZURE_TENANT_ID
         AZURE_TENANT_ID=$(cat /var/run/hcp-integration-credentials/tenant)
 
-        echo "===== Sync Go workspace vendor directory ====="
-        go work vendor
-
         # Configure git
         git config user.name "openshift-ci-robot"
         git config user.email "openshift-ci-robot@users.noreply.github.com"
@@ -93,9 +90,10 @@ tests:
 
         echo "===== Rendering ACM helm-charts ====="
         make -C acm helm-charts
-        make yamlfmt && UPDATE=true go test ./tooling/helmtest/...
         
         if [[ $(git status --porcelain) != "" ]]; then
+          make yamlfmt 2> /dev/null \
+            && UPDATE=true go test ./tooling/helmtest/... 2> /dev/null
           git add .
           git commit -m "chore: render ACM helm-charts"
         fi
@@ -104,10 +102,6 @@ tests:
         make -C config materialize
         git add .
         git commit -m "chore: render digests using materialize"
-
-        echo "===== Tidying and formatting code ====="
-        make all-tidy
-        make yamlfmt
 
         echo "===== Changes detected ====="
         git status --short
@@ -121,7 +115,6 @@ tests:
           -organization=Azure \
           -repo=ARO-HCP \
           -branch=main \
-          -git-message="chore: tidy and format code" \
           -pr-title="Automated - Update component image digests" \
           -pr-message="This automated PR updates ARO-HCP container image digests to the latest versions from registries.
 
