@@ -42,6 +42,7 @@ then
 fi
 
 product_version="unknown"
+istio_version="unknown"
 if [[ "$JOB_NAME" =~ main|master ]]
 then
   product_version="main"
@@ -57,7 +58,7 @@ then
   version="${BASH_REMATCH[1]}"
   if [[ -n "$version" ]]
   then
-    product_version="$version"
+    istio_version="$version"
   fi
 fi
 
@@ -85,7 +86,7 @@ export TESTRUN_DESCRIPTION="Automated ${TEST_SUITE} test run ${JOB_URL}"
 export TEST_RESULTS_DIR="${SHARED_DIR}"
 export PRODUCT_VERSION="${product_version}"
 export PRODUCT_STAGE="midstream"
-export EXTRA_ATTRIBUTES="[{\"key\": \"ocp_cluster_arch\", \"value\": \"${ocp_arch}\"}, {\"key\": \"ocp_version\", \"value\": \"${ocp_version}\"}, {\"key\": \"trigger\", \"value\": \"ci\"}, {\"key\": \"build_type\", \"value\": \"pr_build\"}]"
+export EXTRA_ATTRIBUTES="[{\"key\": \"ocp_cluster_arch\", \"value\": \"${ocp_arch}\"}, {\"key\": \"ocp_version\", \"value\": \"${ocp_version}\"}, {\"key\": \"trigger\", \"value\": \"ci\"}, {\"key\": \"build_type\", \"value\": \"pr_build\"}, {\"key\": \"istio_version\", \"value\": \"${istio_version}\"}]"
 
 validate_environment
 set_defaults
