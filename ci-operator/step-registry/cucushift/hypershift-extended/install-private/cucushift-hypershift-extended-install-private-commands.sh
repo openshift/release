@@ -14,6 +14,8 @@ if [[ $HO_MULTI == "true" ]]; then
   HCP_CLI="/tmp/hs-cli/hypershift"
 fi
 
+OPERATOR_IMAGE="quay.io/duanwei33/hypershift:latest"
+
 # Build up the hypershift install command
 COMMAND=(
     "${HCP_CLI}" install
