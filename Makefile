@@ -22,7 +22,7 @@ help:
 
 all:  core services
 
-check: check-core check-services check-boskos check-labels
+check: check-core check-services check-boskos check-labels check-cluster-profiles
 	@echo "Service config check: PASS"
 
 check-boskos:
@@ -32,6 +32,10 @@ check-boskos:
 check-labels: python-help
 	python3 hack/validate-labels.py
 	@echo "Labels config check: PASS"
+
+check-cluster-profiles: python-help
+	python3 hack/validate-cluster-profiles-config.py ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+	@echo "Cluster profiles config check: PASS"
 
 check-core:
 	core-services/_hack/validate-core-services.sh core-services
