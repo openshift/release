@@ -2411,7 +2411,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/cloud-governance-ecoeng-02-policies
     decorate: true
     decoration_config:
@@ -2470,7 +2470,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/cloud-governance-ecoeng-02-tagging
     decorate: true
     decoration_config:
@@ -2540,7 +2540,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/cloud-governance-ecoeng-03-policies
     decorate: true
     decoration_config:
@@ -2599,7 +2599,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/cloud-governance-ecoeng-03-tagging
     decorate: true
     decoration_config:
@@ -2669,7 +2669,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/cloud-governance-perfscale-policies
     decorate: true
     decoration_config:
@@ -2728,7 +2728,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/cloud-governance-perfscale-tagging
     decorate: true
     decoration_config:
@@ -2793,6 +2793,82 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )cloud-governance-perfscale-tagging,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/gcp-4.20-nightly-x86-loaded-upgrade-from-4.19-loaded-upgrade-419to420-24node
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
+      ci-operator.openshift.io/variant: gcp-4.20-nightly-x86-loaded-upgrade-from-4.19
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-gcp-4.20-nightly-x86-loaded-upgrade-from-4.19-loaded-upgrade-419to420-24node
+    rerun_command: /test gcp-4.20-nightly-x86-loaded-upgrade-from-4.19-loaded-upgrade-419to420-24node
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=loaded-upgrade-419to420-24node
+        - --variant=gcp-4.20-nightly-x86-loaded-upgrade-from-4.19
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(gcp-4.20-nightly-x86-loaded-upgrade-from-4.19-loaded-upgrade-419to420-24node|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -3217,6 +3293,93 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
+    context: ci/prow/gcp-4.21-nightly-x86-loaded-upgrade-from-4.20-loaded-upgrade-420to421-24nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
+      ci-operator.openshift.io/variant: gcp-4.21-nightly-x86-loaded-upgrade-from-4.20
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-gcp-4.21-nightly-x86-loaded-upgrade-from-4.20-loaded-upgrade-420to421-24nodes
+    reporter_config:
+      slack:
+        channel: '#ocp-qe-scale-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
+    rerun_command: /test gcp-4.21-nightly-x86-loaded-upgrade-from-4.20-loaded-upgrade-420to421-24nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=loaded-upgrade-420to421-24nodes
+        - --variant=gcp-4.21-nightly-x86-loaded-upgrade-from-4.20
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(gcp-4.21-nightly-x86-loaded-upgrade-from-4.20-loaded-upgrade-420to421-24nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build08
     context: ci/prow/gcp-4.21-nightly-x86-node-density-cni-24nodes
     decorate: true
     decoration_config:
@@ -3293,7 +3456,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build08
     context: ci/prow/gcp-4.21-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
@@ -3381,7 +3544,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build08
     context: ci/prow/gcp-4.21-nightly-x86-node-density-heavy-etcd-fips-24nodes
     decorate: true
     decoration_config:
@@ -3469,7 +3632,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build08
     context: ci/prow/gcp-4.22-nightly-x86-control-plane-24nodes
     decorate: true
     decoration_config:
@@ -3964,7 +4127,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/gcp-4.22-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
@@ -4052,7 +4215,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build08
     context: ci/prow/gcp-4.22-nightly-x86-node-density-heavy-etcd-fips-24nodes
     decorate: true
     decoration_config:
@@ -4140,7 +4303,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/ibmcloud-4.21-nightly-x86-control-plane-24nodes
     decorate: true
     decoration_config:
@@ -4228,7 +4391,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/ibmcloud-4.21-nightly-x86-node-density-cni-24nodes
     decorate: true
     decoration_config:
@@ -4305,7 +4468,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/ibmcloud-4.21-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
@@ -4393,7 +4556,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -4537,7 +4700,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/metal-4.19-nightly-x86-deploy-6nodes
     decorate: true
     decoration_config:
@@ -4615,7 +4778,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/metal-4.19-nightly-x86-deploy-sno
     decorate: true
     decoration_config:
@@ -4693,7 +4856,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/metal-4.19-nightly-x86-netperf-external-sno
     decorate: true
     decoration_config:
@@ -4860,7 +5023,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build10
     context: ci/prow/metal-rhoso-x86-temp-test-cluster-health
     decorate: true
     decoration_config:
