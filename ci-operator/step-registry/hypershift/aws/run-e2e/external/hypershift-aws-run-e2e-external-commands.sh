@@ -106,6 +106,7 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.base-domain=ci.hypershift.devcluster.openshift.com \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" \
+  --e2e.control-plane-operator-image="quay.io/rhn_engineering_lgao/cpo_image:global-ps419" \
   ${PKI_RECONCILIATION_PARAMS:-} \
   ${N1_NP_VERSION_TEST_ARGS:-} \
   ${N2_NP_VERSION_TEST_ARGS:-} \
