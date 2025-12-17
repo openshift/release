@@ -716,6 +716,8 @@ ${INSTALLER_BINARY} version
 ${INSTALLER_BINARY} --dir="${dir}" create manifests &
 wait "$!"
 ret="$?"
+grep -H "id:" "${dir}"/openshift/99_openshift-cluster-api_*
+exit 1
 if test "${ret}" -ne 0 ; then
 	echo "Create manifests exit code: $ret"
 	exit "${ret}"
