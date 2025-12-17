@@ -1,0 +1,38 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: cert-issuer-aws
+spec:
+  acme:
+    email: openshift-ci-robot@redhat.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: cert-issuer-account-key
+    solvers:
+    - dns01:
+        route53:
+          region: us-east-1
+          hostedZoneID: Z1T10JYHIP2LL9
+          accessKeyID: AKIAUVEZ656HPXGU2IDG
+          secretAccessKeySecretRef:
+            name: cert-issuer
+            key: AWS_SECRET_ACCESS_KEY
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: cert-issuer
+spec:
+  acme:
+    email: openshift-ci-robot@redhat.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: cert-issuer-account-key
+    solvers:
+    - dns01:
+        cloudDNS:
+          project: openshift-ci-infra
+          hostedZoneName: origin-ci-ocp-public-dns
+          serviceAccountSecretRef:
+            name: cert-issuer
+            key: key.json

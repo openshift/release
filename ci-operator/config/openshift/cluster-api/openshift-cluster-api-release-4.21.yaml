@@ -43,8 +43,7 @@ images:
   to: cluster-capi-controllers
 promotion:
   to:
-  - disabled: true
-    name: "4.21"
+  - name: "4.21"
     namespace: ocp
 releases:
   initial:
@@ -75,6 +74,9 @@ tests:
     cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
     test:
     - as: test
       commands: openshift/e2e-tests.sh
@@ -82,6 +84,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: openshift-e2e-aws
 - as: e2e-gcp-capi-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -162,6 +165,11 @@ tests:
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
+- as: e2e-vsphere-staticip-ipam-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-staticip
 - as: regression-clusterinfra-aws-ipi-techpreview-capi
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

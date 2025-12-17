@@ -26,16 +26,52 @@ if [[ "${QUAY_VERSION}" == "3.16" ]]; then
   QUAY_BUILDER_QEMU_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-builder-qemu-v3-16-password)
 fi
 
+if [[ "${QUAY_VERSION}" == "3.15" ]]; then
+  QUAY_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-v3-15-username)
+  QUAY_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-v3-15-password)
+  QUAY_CLAIR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-clair-v3-15-username)
+  QUAY_CLAIR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-clair-v3-15-password)
+  QUAY_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-operator-v3-15-username)
+  QUAY_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-operator-v3-15-password)
+  QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/container-security-operator-v3-15-username)
+  QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/container-security-operator-v3-15-password)
+  QUAY_BRIDGE_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-bridge-operator-v3-15-username)
+  QUAY_BRIDGE_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-bridge-operator-v3-15-password)
+  QUAY_BUILDER_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-builder-v3-15-username)
+  QUAY_BUILDER_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-builder-v3-15-password)
+  QUAY_BUILDER_QEMU_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-builder-qemu-v3-15-username)
+  QUAY_BUILDER_QEMU_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-builder-qemu-v3-15-password)
+fi
+
+if [[ "${QUAY_VERSION}" == "3.14" ]]; then
+  QUAY_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-v3-14-username)
+  QUAY_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-v3-14-password)
+  QUAY_CLAIR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-clair-v3-14-username)
+  QUAY_CLAIR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-clair-v3-14-password)
+  QUAY_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-operator-v3-14-username)
+  QUAY_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-operator-v3-14-password)
+  QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/container-security-operator-v3-14-username)
+  QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/container-security-operator-v3-14-password)
+  QUAY_BRIDGE_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-bridge-operator-v3-14-username)
+  QUAY_BRIDGE_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-bridge-operator-v3-14-password)
+  QUAY_BUILDER_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-builder-v3-14-username)
+  QUAY_BUILDER_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-builder-v3-14-password)
+  QUAY_BUILDER_QEMU_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-builder-qemu-v3-14-username)
+  QUAY_BUILDER_QEMU_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-builder-qemu-v3-14-password)
+fi
+
 #Retrieve the private key of Quay Security Testing Hostname
 cp /var/run/quay-qe-omr-secret/quaybuilder /tmp && cd /tmp && chmod 600 quaybuilder && echo "" >>quaybuilder || true
 
-quay_operator_image_tag="quay.io/redhat-user-workloads/quay-eng-tenant/${QUAY_OPERATOR_IMAGE}"
-quay_app_image_tag="quay.io/redhat-user-workloads/quay-eng-tenant/${QUAY_IMAGE}"
-quay_clair_image_tag="quay.io/redhat-user-workloads/quay-eng-tenant/${QUAY_CLAIR_IMAGE}"
-quay_bridge_operator_image_tag="quay.io/redhat-user-workloads/quay-eng-tenant/${QUAY_BRIDGE_OPERATOR_IMAGE}"
-quay_container_security_operator_image_tag="quay.io/redhat-user-workloads/quay-eng-tenant/${QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE}"
-quay_builder_image_tag="quay.io/redhat-user-workloads/quay-eng-tenant/${QUAY_BUILDER_IMAGE}"
-quay_builder_qemu_image_tag="quay.io/redhat-user-workloads/quay-eng-tenant/${QUAY_BUILDER_QEMU_IMAGE}"
+QUAY_KONFLUX_BASE_PATH="quay.io/redhat-user-workloads/quay-eng-tenant"
+
+quay_operator_image_tag="${QUAY_KONFLUX_BASE_PATH}/${QUAY_OPERATOR_IMAGE}"
+quay_app_image_tag="${QUAY_KONFLUX_BASE_PATH}/${QUAY_IMAGE}"
+quay_clair_image_tag="${QUAY_KONFLUX_BASE_PATH}/${QUAY_CLAIR_IMAGE}"
+quay_bridge_operator_image_tag="${QUAY_KONFLUX_BASE_PATH}/${QUAY_BRIDGE_OPERATOR_IMAGE}"
+quay_container_security_operator_image_tag="${QUAY_KONFLUX_BASE_PATH}/${QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE}"
+quay_builder_image_tag="${QUAY_KONFLUX_BASE_PATH}/${QUAY_BUILDER_IMAGE}"
+quay_builder_qemu_image_tag="${QUAY_KONFLUX_BASE_PATH}/${QUAY_BUILDER_QEMU_IMAGE}"
 quay_redis_image_tag="${QUAY_REDIS_IMAGE}"
       
 function scan_quay_images(){

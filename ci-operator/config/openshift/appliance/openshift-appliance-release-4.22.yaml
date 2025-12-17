@@ -1,8 +1,4 @@
 base_images:
-  coreos-centos-stream9:
-    name: stream9
-    namespace: coreos
-    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -11,12 +7,18 @@ build_root:
   project_image:
     dockerfile_path: Dockerfile.openshift-appliance-build
 images:
+- dockerfile_literal: |
+    FROM ubi9-minimal
+    RUN rm -rf /etc/yum.repos.d/*
+    RUN curl http://base-4-20-rhel9.ocp.svc > /etc/yum.repos.d/base-4-20-rhel9.repo
+  to: ubi9-minimal-entitled
 - dockerfile_path: Dockerfile.openshift-appliance
-  from: coreos-centos-stream9
+  from: ubi9-minimal-entitled
   to: agent-preinstall-image-builder
 promotion:
   to:
-  - name: "4.22"
+  - disabled: true
+    name: "4.22"
     namespace: ocp
 releases:
   initial:
@@ -47,6 +49,16 @@ tests:
   container:
     from: test-bin
   run_if_changed: ^(cmd/.*|data/.*|hack/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
+- as: publish
+  cron: '@daily'
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: agent-preinstall-image-builder
+    env:
+      IMAGE_REPO: openshift-appliance
+      IMAGE_TAG: latest
+    test:
+    - ref: assisted-baremetal-images-publish
 - as: e2e-compact-ipv4-static
   capabilities:
   - intranet
@@ -66,6 +78,13 @@ tests:
     cluster_profile: packet-assisted
     dependencies:
       APPLIANCE_IMAGE: agent-preinstall-image-builder
+    workflow: agent-e2e-appliance-dualstack
+- as: e2e-sno-dualstack-dhcp-periodic
+  capabilities:
+  - intranet
+  cron: 00 00 */1 * 5
+  steps:
+    cluster_profile: packet-assisted
     workflow: agent-e2e-appliance-dualstack
 zz_generated_metadata:
   branch: release-4.22

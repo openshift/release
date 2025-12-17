@@ -1,82 +1,81 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: cherrypick
-    namespace: ci
-  spec:
-    selector:
+kind: Service
+metadata:
+  name: cherrypick
+  namespace: ci
+spec:
+  selector:
+    app: prow
+    component: cherrypick
+  ports:
+  - port: 80
+    targetPort: 8888
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cherrypick
+  labels:
+    app: prow
+    component: cherrypick
+  namespace: ci
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
       app: prow
       component: cherrypick
-    ports:
-    - port: 80
-      targetPort: 8888
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: cherrypick
-    labels:
-      app: prow
-      component: cherrypick
-    namespace: ci
-  spec:
-    replicas: 1
-    revisionHistoryLimit: 2
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: cherrypick
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: cherrypick
-      spec:
-        containers:
-        - name: cherrypick
-          image: us-docker.pkg.dev/k8s-infra-prow/images/cherrypicker:v20251203-dc898f4c5
-          args:
-          - --hmac-secret-file=/etc/webhook/hmac.yaml
-          - --github-token-path=/etc/github/oauth
-          - --github-endpoint=http://ghproxy
-          - --github-endpoint=https://api.github.com
-          - --github-graphql-endpoint=http://ghproxy/graphql
-          - --dry-run=false
-          ports:
-            - name: http
-              containerPort: 8888
-          volumeMounts:
-          - name: hmac
-            mountPath: /etc/webhook
-            readOnly: true
-          - name: oauth
-            mountPath: /etc/github
-            readOnly: true
-          - name: tmp
-            mountPath: /tmp
-          resources:
-            requests:
-              memory: "300Mi"
-              cpu: "50m"
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 20
-            periodSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-        volumes:
+    spec:
+      containers:
+      - name: cherrypick
+        image: us-docker.pkg.dev/k8s-infra-prow/images/cherrypicker:v20251205-476eedbb0
+        args:
+        - --hmac-secret-file=/etc/webhook/hmac.yaml
+        - --github-token-path=/etc/github/oauth
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --dry-run=false
+        ports:
+          - name: http
+            containerPort: 8888
+        volumeMounts:
         - name: hmac
-          secret:
-            secretName: github-webhook-credentials
+          mountPath: /etc/webhook
+          readOnly: true
         - name: oauth
-          secret:
-            secretName: github-credentials-openshift-cherrypick-robot
+          mountPath: /etc/github
+          readOnly: true
         - name: tmp
-          emptyDir: {}
+          mountPath: /tmp
+        resources:
+          requests:
+            memory: "300Mi"
+            cpu: "50m"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 20
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+      volumes:
+      - name: hmac
+        secret:
+          secretName: github-webhook-credentials
+      - name: oauth
+        secret:
+          secretName: github-credentials-openshift-cherrypick-robot
+      - name: tmp
+        emptyDir: {}

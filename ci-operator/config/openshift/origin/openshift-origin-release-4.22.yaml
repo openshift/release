@@ -1,6 +1,6 @@
 base_images:
   assisted-test-infra:
-    name: ocm-2.12
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -56,7 +56,8 @@ images:
   to: hello-openshift
 promotion:
   to:
-  - name: "4.22"
+  - disabled: true
+    name: "4.22"
     namespace: ocp
 releases:
   initial:
@@ -160,6 +161,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
+- always_run: false
+  as: e2e-gcp-ovn-kube-apiserver-rollout
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/kube-apiserver/rollout
+      TEST_TYPE: suite
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-ovn
 - always_run: false
   as: e2e-azure
   optional: true
@@ -556,7 +569,6 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     env:
-      PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
     workflow: baremetalds-sno
 - always_run: false
