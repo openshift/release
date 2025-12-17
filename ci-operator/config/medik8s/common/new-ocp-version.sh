@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 
-echo "Don't forget to update the OPERATOR_RELEASED_VERSION in the previous config files for 'main'"
+printf "%s\n" \
+"Don't forget to update the OPERATOR_RELEASED_VERSION in the previous config files for 'main' following the medik8s-REPO_NAME-BRANCH_NAME__NEW_VERSION.yaml format." \
+"For instance, after RHWA-25.9 release, medik8s-fence-agents-remediation-main__4.21 config file should have OPERATOR_RELEASED_VERSION with value of 0.6.0." \
+"and after RHWA-4.21-0 release (and FAR v0.7.0), medik8s-fence-agents-remediation-main__4.21 config file should have OPERATOR_RELEASED_VERSION with value of 0.7.0." \
+""
 
 # check we are in the correct directory
 if [ "${PWD##*/}" != "common" ]; then

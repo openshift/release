@@ -19,9 +19,9 @@ fi
 
 # directory name, e.g. node-healthcheck-operator
 REPO=../${1}
-# branch name, e.g. release-0.7
+# branch name, e.g. release-0.11
 BRANCH=${2}
-# old released operator version (without the leading v), e.g. 0.8.0
+# old released operator version (without the leading v), e.g. 0.10.0
 OPERATOR_RELEASED_VERSION=${3}
 
 # verify that the repo exists
@@ -56,4 +56,3 @@ if [ $# -eq 3 ]; then
 fi
 
 echo "Done, please run 'make update' for creating jobs"
-
