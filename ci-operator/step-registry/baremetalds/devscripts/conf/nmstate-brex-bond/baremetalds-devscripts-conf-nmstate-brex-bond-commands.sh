@@ -13,7 +13,8 @@ generate_nmstate_machineconfigs() {
     local master_mac_from="${4:-enp2s0}"
     local worker_mac_from="${5:-enp2s0}"
 
-    mkdir -p "${output_dir}"
+    mkdir -p "${output_dir}/assets"
+    mkdir -p "${output_dir}/network-config"
 
     # Master node nmstate config (plain text, will be base64 encoded)
     local master_nmstate_config="interfaces:
