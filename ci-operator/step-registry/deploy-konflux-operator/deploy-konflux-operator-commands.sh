@@ -8,10 +8,18 @@ declare -r PULL_SECRET=/var/run/vault/deploy-konflux-operator-art-image-share
 declare -r TOOLS_DIR=/tmp/bin
 declare -r MIRROR_REGISTRY_DIR="${MIRROR_REGISTRY_DIR:-"/var/run/vault/mirror-registry"}"
 declare -r MIRROR_REGISTRY_CREDS="${MIRROR_REGISTRY_DIR}/registry_creds"
+declare -r REGISTRY_PROXY_CREDENTIALS="${REGISTRY_PROXY_CREDENTIALS:-"${MIRROR_REGISTRY_CREDS}"}"
+declare -r REGISTRY_PROXY_HOST="${REGISTRY_PROXY_HOST:-""}"
+declare -r REGISTRY_PROXY_PORT="${REGISTRY_PROXY_PORT:-""}"
 declare -r DEPLOY_KONFLUX_OPERATOR_VERSION=v7.1
 
 if [[ -n "${KONFLUX_TARGET_OPERATORS:-}" && -n "${KONFLUX_TARGET_FBC_TAGS:-}" ]]; then
     echo "ERROR: KONFLUX_TARGET_OPERATORS and KONFLUX_TARGET_FBC_TAGS cannot be set at the same time"
+    exit 1
+fi
+
+if [[ -n "${REGISTRY_PROXY_HOST:-}" && -z "${REGISTRY_PROXY_PORT:-}" ]]; then
+    echo "ERROR: REGISTRY_PROXY_PORT is required when REGISTRY_PROXY_HOST is set"
     exit 1
 fi
 
@@ -65,13 +73,42 @@ function deploy_operators() {
     if [[ "${DISCONNECTED:-false}" == "true" ]]; then
         local mirror_registry_url
         mirror_registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
-        local mirror_registry_proxy_url
-        mirror_registry_proxy_url="${mirror_registry_url//5000/6003}"
-        local registry_creds
-        registry_creds=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
-        local registry_auth
-        registry_auth=$(mktemp)
-        cat <<EOF > "${registry_auth}"
+
+        # Configure registry proxy if enabled
+        if [[ "${USE_REGISTRY_PROXY:-false}" == "true" ]]; then
+            # Set proxy port (default: 6001)
+            local mirror_registry_proxy_port="${REGISTRY_PROXY_PORT:-6001}"
+            local mirror_registry_proxy_url
+
+            # Determine proxy URL: use explicit host if provided, otherwise derive from mirror registry
+            if [[ -n "${REGISTRY_PROXY_HOST:-}" ]]; then
+                # Use explicitly provided proxy host and port
+                mirror_registry_proxy_url="${REGISTRY_PROXY_HOST}:${REGISTRY_PROXY_PORT}"
+            else
+                # Derive proxy URL from mirror registry by replacing port 5000 with proxy port.
+                # This is for cases where registry proxy is derived from mirror registry url,
+                # but just running on a different port.
+                mirror_registry_proxy_url="${mirror_registry_url//5000/${mirror_registry_proxy_port}}"
+            fi
+
+            local registry_proxy_auth
+            registry_proxy_auth=$(mktemp)
+            cat <<EOF > "${registry_proxy_auth}"
+{
+    "auths": {
+        "${mirror_registry_proxy_url}": {
+            "auth": "${REGISTRY_PROXY_CREDENTIALS}"
+        }
+    }
+}
+EOF
+            args+=(--internal-registry-proxy "${mirror_registry_proxy_url}" --internal-registry-proxy-auth "${registry_proxy_auth}")
+        else
+            local registry_creds
+            registry_creds=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
+            local registry_auth
+            registry_auth=$(mktemp)
+            cat <<EOF > "${registry_auth}"
 {
     "auths": {
         "${mirror_registry_url}": {
@@ -80,20 +117,6 @@ function deploy_operators() {
     }
 }
 EOF
-        local registry_proxy_auth
-        registry_proxy_auth=$(mktemp)
-        cat <<EOF > "${registry_proxy_auth}"
-{
-    "auths": {
-        "${mirror_registry_proxy_url}": {
-            "auth": "${registry_creds}"
-        }
-    }
-}
-EOF
-        if [[ "${USE_REGISTRY_PROXY:-false}" == "true" ]]; then
-            args+=(--internal-registry-proxy "${mirror_registry_proxy_url}" --internal-registry-proxy-auth "${registry_proxy_auth}")
-        else
             args+=(--internal-registry "${mirror_registry_url}" --internal-registry-auth "${registry_auth}" --quay-auth "${PULL_SECRET}/.dockerconfigjson")
         fi
     else
