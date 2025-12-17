@@ -3,6 +3,14 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+# DEBUG OUTPUT - REMOVE BEFORE MERGING
+set -- ${LEASED_MSI_CONTAINERS:-}
+echo "MSI containers count: $#"
+for idx in $(seq 1 $#); do
+  rg_name="${!idx}"
+  echo "MSI container $idx: non-empty, len=${#rg_name}"
+done
+
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
