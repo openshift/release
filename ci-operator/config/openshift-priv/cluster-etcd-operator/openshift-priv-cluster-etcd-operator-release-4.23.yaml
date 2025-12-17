@@ -1,0 +1,286 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.21_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cluster-etcd-operator
+images:
+- dockerfile_path: Dockerfile.ocp
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: cluster-etcd-operator
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 1Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-agnostic-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-agnostic-ovn-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
+- always_run: false
+  as: e2e-aws-disruptive
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    workflow: openshift-e2e-aws-disruption
+- always_run: false
+  as: e2e-aws-disruptive-ovn
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    workflow: openshift-e2e-aws-disruption-ovn
+- always_run: false
+  as: e2e-gcp-disruptive
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-disruption
+- always_run: false
+  as: e2e-gcp-disruptive-ovn
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-disruption-ovn
+- as: e2e-operator
+  steps:
+    cluster_profile: aws-5
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-operator-fips
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-azure
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-gcp
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- always_run: false
+  as: e2e-metal-assisted
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-ofcir-baremetal
+- as: e2e-aws-ovn-single-node
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws-single-node
+- always_run: false
+  as: e2e-metal-single-node-live-iso
+  optional: true
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-sno
+- always_run: false
+  as: e2e-metal-ovn-two-node-fencing
+  optional: true
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-fencing
+- as: configmap-scale
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-perfscale-e2e-configmap-scale
+- as: e2e-aws-ovn-serial
+  shard_count: 2
+  steps:
+    cluster_profile: aws-5
+    workflow: openshift-e2e-aws-serial
+- always_run: false
+  as: e2e-aws-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    workflow: openshift-e2e-aws-etcd-scaling
+- always_run: false
+  as: e2e-gcp-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-etcd-scaling
+- always_run: false
+  as: e2e-azure-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: azure-2
+    workflow: openshift-e2e-azure-etcd-scaling
+- always_run: false
+  as: e2e-vsphere-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-etcd-scaling
+- always_run: false
+  as: e2e-aws-etcd-recovery
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    workflow: openshift-e2e-aws-etcd-recovery
+- always_run: false
+  as: e2e-aws-etcd-certrotation
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    workflow: openshift-e2e-aws-etcd-certrotation
+- always_run: false
+  as: e2e-metal-ovn-sno-cert-rotation-shutdown
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      CLUSTER_AGE_DAYS: "1825"
+      CLUSTER_AGE_STEP: "365"
+    workflow: openshift-e2e-cert-rotation-suspend-sno
+- always_run: false
+  as: e2e-metal-ovn-ha-cert-rotation-shutdown
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      CLUSTER_AGE_DAYS: "1825"
+      CLUSTER_AGE_STEP: "365"
+    workflow: openshift-e2e-cert-rotation-shutdown
+- always_run: false
+  as: e2e-aws-cpms
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    test:
+    - as: test
+      commands: make e2e-periodic
+      from: stable:cluster-control-plane-machine-set-tests
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: cluster-etcd-operator

@@ -1,0 +1,119 @@
+base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
+  ocp_4.21_azure-storage-azcopy-base:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: azure-storage-azcopy-base
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
+binary_build_commands: make azurefile
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/azure-file-csi-driver
+images:
+- dockerfile_path: Dockerfile.openshift
+  inputs:
+    ocp_4.21_azure-storage-azcopy-base:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:azure-storage-azcopy-base
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: azure-file-csi-driver
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  steps:
+    test:
+    - as: test
+      commands: |
+        unset KUBERNETES_SERVICE_HOST
+        GOFLAGS="-mod=readonly" make unit-test
+      from: src
+      resources:
+        requests:
+          cpu: 3500m
+          memory: 2Gi
+- as: e2e-azure-file-csi
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi-file
+- as: e2e-azure-ovn-upgrade
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- as: e2e-azure-file-nfs-csi
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi-file-nfs
+- always_run: false
+  as: e2e-azure-csi-file-cross-subscription
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_IDENTITY_TYPE_DEFAULT_MACHINE: None
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    workflow: openshift-e2e-azure-csi-file-cross-subscription
+- always_run: false
+  as: e2e-azure-file-csi-extended
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-File-CSI-Driver\]
+    workflow: openshift-e2e-azure-csi-extended
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: azure-file-csi-driver
+    workflow: openshift-ci-security
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
+  container:
+    from: commitchecker
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: azure-file-csi-driver
