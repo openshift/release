@@ -65,8 +65,30 @@ tests:
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
+      AZURE_COMPUTE_MULTIDISK_MOUNT_PATH: /var/lib/containers
+      AZURE_COMPUTE_MULTIDISK_TYPE: user-defined
+      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FEATURE_GATES: '["AzureMultiDisk=true", "MultiDiskSetup=true"]'
+      FEATURE_SET: CustomNoUpgrade
+      SLEEP_DURATION: 3h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-azure-ipi-multidisk-provision
+- as: installer-rehearse-azure-1
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build07.ci.openshift.org/ci-ln-xf1z5vt/release:latest
       FEATURE_GATES: '["AzureClusterHostedDNSInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
+      OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP: true
+    test:
+    - ref: openshift-e2e-test
     workflow: cucushift-installer-rehearse-azure-ipi-custom-dns
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
