@@ -1,5 +1,5 @@
 base_images:
-  operator-base:
+  base:
     name: ubi
     namespace: ocp
     tag: "9"
@@ -12,22 +12,23 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: operator-base
-  to: machine-deletion-remediation-operator
+  from: base
+  to: node-healthcheck-operator
 operator:
   bundles:
-  - as: machine-deletion-remediation-bundle
-    dockerfile_path: bundle.Dockerfile
+  - as: my-bundle
+    dockerfile_path: bundle.ci.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: quay.io/medik8s/machine-deletion-remediation-operator:latest
-    with: pipeline:machine-deletion-remediation-operator
+  - pullspec: quay.io/medik8s/node-healthcheck-operator:.*
+    with: pipeline:node-healthcheck-operator
 releases:
   latest:
     candidate:
+      architecture: amd64
       product: ocp
-      stream: ci
-      version: "4.16"
+      stream: nightly
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -47,7 +48,7 @@ tests:
     cluster_profile: medik8s-aws
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
-      INSTALL_NAMESPACE: mdr-install
+      INSTALL_NAMESPACE: nhc-install
     test:
     - as: e2e-install
       cli: latest
@@ -58,11 +59,12 @@ tests:
         oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
         oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" quay.io/medik8s/self-node-remediation-operator-bundle:latest
         operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
-        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment node-healthcheck-controller-manager
       dependencies:
       - env: OO_BUNDLE
-        name: machine-deletion-remediation-bundle
+        name: my-bundle
       env:
       - name: INSTALL_NAMESPACE
       from: operator-sdk
@@ -71,6 +73,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     - as: e2e-test
+      cli: latest
       commands: export OPERATOR_NS="$INSTALL_NAMESPACE" && make test-e2e
       env:
       - name: INSTALL_NAMESPACE
@@ -81,7 +84,7 @@ tests:
           memory: 200Mi
     workflow: ipi-aws
 zz_generated_metadata:
-  branch: main
+  branch: release-0.10
   org: medik8s
-  repo: machine-deletion-remediation
-  variant: "4.16"
+  repo: node-healthcheck-operator
+  variant: "4.21"

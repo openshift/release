@@ -1,34 +1,35 @@
 base_images:
-  os:
-    name: centos
-    namespace: openshift
-    tag: stream9
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
 binary_build_commands: make build
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: os
-  to: fence-agents-remediation
+  from: base
+  to: self-node-remediation-operator
 operator:
   bundles:
-  - as: my-bundle
+  - as: self-node-remediation-bundle
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
   substitutions:
-  - pullspec: quay.io/medik8s/fence-agents-remediation-operator:.*
-    with: pipeline:fence-agents-remediation
+  - pullspec: quay.io/medik8s/self-node-remediation-operator:.*
+    with: pipeline:self-node-remediation-operator
 releases:
   latest:
     candidate:
       product: ocp
-      stream: ci
-      version: "4.18"
+      stream: nightly
+      version: "4.21"
 resources:
   '*':
     requests:
       cpu: 500m
       memory: 1000Mi
+test_binary_build_commands: make test
 tests:
 - as: test
   commands: make test
@@ -41,20 +42,19 @@ tests:
     cluster_profile: medik8s-aws
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
-      OPERATOR_NAMESPACE: far-install
-      OPERATOR_RELEASED_VERSION: 0.4.0
+      OPERATOR_NAMESPACE: self-node-remediation
+      OPERATOR_RELEASED_VERSION: 0.11.0
     test:
-    - as: e2e-install-operator-last-version
+    - as: install-last-operator-version
       cli: latest
       commands: |
         make create-ns
-
         # workaround for OLM pod not running with restricted PSA
         oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
         oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
 
         # OPERATOR_NAMESPACE variable is used by bundle-run and bundle-run-update
-        BUNDLE_IMG=quay.io/medik8s/fence-agents-remediation-operator-bundle:v"$OPERATOR_RELEASED_VERSION" make bundle-run
+        BUNDLE_IMG=quay.io/medik8s/self-node-remediation-operator-bundle:v"$OPERATOR_RELEASED_VERSION" make bundle-run
       env:
       - name: OPERATOR_NAMESPACE
       - name: OPERATOR_RELEASED_VERSION
@@ -63,12 +63,12 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: e2e-upgrade-operator-latest
+    - as: upgrade-operator-latest
       cli: latest
       commands: BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
       dependencies:
       - env: OO_BUNDLE
-        name: my-bundle
+        name: self-node-remediation-bundle
       env:
       - name: OPERATOR_NAMESPACE
       from: src
@@ -76,10 +76,11 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: e2e-test
+    - as: test-command
       cli: latest
-      commands: export OPERATOR_NS="$OPERATOR_NAMESPACE" && make ocp-aws-credentials
-        test-e2e
+      commands: |
+        export SKIP_LOG_VERIFICATION="true" INSTALL_NAMESPACE="$OPERATOR_NAMESPACE"
+        make e2e-test
       env:
       - name: OPERATOR_NAMESPACE
       from: src
@@ -91,5 +92,5 @@ tests:
 zz_generated_metadata:
   branch: main
   org: medik8s
-  repo: fence-agents-remediation
-  variant: "4.18"
+  repo: self-node-remediation
+  variant: "4.21"
