@@ -1,0 +1,89 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.21_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.ocp
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: baremetal-cluster-api-controllers
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make unit
+tests:
+- as: unit
+  commands: make unit
+  container:
+    from: src
+  skip_if_only_changed: (^(docs|examples|config)/)|(\.md$)|((^|/)OWNERS$)
+- as: vendor
+  commands: make vendor && git diff --exit-code
+  container:
+    from: src
+  run_if_changed: (go\.(mod|sum)$)|(^(apis|pkg/hardwareutils)/)
+- as: lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache make
+  container:
+    from: src
+  skip_if_only_changed: (^(docs|examples)/)|(\.md$)|((^|/)OWNERS$)
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+- always_run: false
+  as: e2e-metal3-capi-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    test:
+    - as: test
+      commands: make capi_e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: baremetalds-e2e-ovn-ipv6
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: cluster-api-provider-metal3

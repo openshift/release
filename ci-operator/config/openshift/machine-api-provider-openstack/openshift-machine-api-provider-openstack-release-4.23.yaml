@@ -1,0 +1,105 @@
+base_images:
+  ocp_4.21_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+binary_build_commands: make build
+build_root:
+  from_repository: true
+canonical_go_repository: sigs.k8s.io/machine-api-provider-openstack
+images:
+- dockerfile_path: Dockerfile.rhel
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: openstack-machine-api-provider
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: GOMODCACHE=/tmp/mod-cache GOCACHE=/tmp XDG_CACHE_HOME=/tmp make test
+  container:
+    from: src
+- as: gofmt
+  commands: IS_CONTAINER=TRUE make fmt
+  container:
+    from: src
+- as: govet
+  commands: IS_CONTAINER=TRUE make vet
+  container:
+    from: src
+- as: golint
+  commands: IS_CONTAINER=TRUE make lint
+  container:
+    from: src
+- as: gomod
+  commands: if [ $(go mod tidy && go mod vendor && git diff | wc -l) -gt 0 ]; then
+    git diff && exit 1; fi
+  container:
+    from: src
+- as: e2e-openstack
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+    workflow: openshift-e2e-openstack-ipi
+- always_run: false
+  as: e2e-openstack-proxy
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-proxy
+- always_run: false
+  as: e2e-openstack-nfv-intel
+  optional: true
+  steps:
+    cluster_profile: openstack-nfv
+    workflow: openshift-e2e-openstack-nfv
+- always_run: false
+  as: e2e-openstack-dualstack
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    workflow: openshift-e2e-openstack-dualstack
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: machine-api-provider-openstack
