@@ -1,0 +1,69 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.20"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: ibmcloud-data-path-9nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-qe
+    env:
+      SET_ENV_BY_PLATFORM: custom
+      WORKERS: "9"
+    test:
+    - ref: openshift-qe-perfscale-ibm-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-ibmcloud-ipi-ovn
+- always_run: false
+  as: nutanix-data-path-9nodes
+  capabilities:
+  - sshd-bastion
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: nutanix-qe-zone
+    env:
+      COMPUTE_CPU: "8"
+      COMPUTE_MEMORY: "32000"
+      COMPUTE_REPLICAS: "9"
+      OPENSHIFT_INFRA_NODE_INSTANCE_MEMORYSIZE: 64Gi
+      OPENSHIFT_INFRA_NODE_INSTANCE_VCPU: "16"
+      SET_ENV_BY_PLATFORM: custom
+    test:
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: openshift-qe-data-path-tests
+    workflow: cucushift-installer-rehearse-nutanix-ipi-zones-customized-resource
+- always_run: false
+  as: gcp-data-path-9nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "9"
+    test:
+    - ref: openshift-qe-perfscale-gcp-data-path-fw
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-gcp
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: 4.20-nightly-datapath
