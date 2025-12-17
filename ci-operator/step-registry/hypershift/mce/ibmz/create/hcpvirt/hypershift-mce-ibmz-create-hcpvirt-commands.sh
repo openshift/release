@@ -512,6 +512,9 @@ ssh -i "$SSH_KEY" \
   root@"$BASTION_FIP" \
   bash /root/setup_proxy.sh
 
+echo "To debug the proxy issue"
+sleep 1800
+
 cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=http://${BASTION_FIP}:3128/
 export HTTPS_PROXY=http://${BASTION_FIP}:3128/
