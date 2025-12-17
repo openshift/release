@@ -1,0 +1,28 @@
+workflow:
+  as: cucushift-installer-rehearse-ibmcloud-ipi-hive-ibmcloud-clusterdeployment
+  steps:
+    pre:
+    - chain: ipi-conf-ibmcloud
+    - chain: ipi-install
+    - ref: cucushift-installer-rehearse-ibmcloud-ipi-hive-operator-install
+    test:
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-hive-ibmcloud-clusterdeployment
+    post:
+    - ref: cucushift-installer-rehearse-ibmcloud-ipi-hive-ibmcloud-clusterdeployment-deprovision
+    - chain: ipi-deprovision
+  documentation: |-
+    This workflow provisions an IBM Cloud management cluster, installs Hive on it,
+    then uses Hive to provision IBM Cloud spoke clusters via ClusterDeployment.
+
+    The workflow executes in three phases:
+    1. Pre: Provision IBM Cloud management cluster, install standalone Hive on it
+    2. Test: Create ClusterDeployment and validate IBM Cloud spoke cluster provisioning
+    3. Post: Clean up spoke cluster and management cluster
+
+    This tests Hive's native IBM Cloud platform integration by using a dedicated
+    IBM Cloud management cluster to provision spoke clusters through the ClusterDeployment API.
+
+    Architecture:
+    - Management cluster: IBM Cloud IPI cluster with standalone Hive installed
+    - Spoke cluster: IBM Cloud cluster provisioned by Hive via ClusterDeployment
+
