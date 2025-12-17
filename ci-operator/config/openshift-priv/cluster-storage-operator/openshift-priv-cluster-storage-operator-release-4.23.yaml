@@ -1,0 +1,228 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.21_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cluster-storage-operator
+images:
+- inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: cluster-storage-operator
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: verify-kustomize-assets
+  steps:
+    test:
+    - as: verify-kustomize
+      cli: latest
+      commands: ./hack/verify-manifest.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-upgrade
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-csi
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-e2e-aws-csi
+- always_run: false
+  as: e2e-gcp-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-gcp-ovn
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-csi
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-csi
+- always_run: false
+  as: e2e-ovn-vsphere
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-vsphere-upi
+- as: e2e-vsphere-csi
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    workflow: openshift-e2e-vsphere-csi
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure-2
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-azure-ovn
+  optional: true
+  steps:
+    cluster_profile: azure-2
+    workflow: openshift-e2e-azure
+- as: e2e-azure-csi
+  steps:
+    cluster_profile: azure-2
+    workflow: openshift-e2e-azure-csi
+- as: e2e-azure-file-csi
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-csi-file
+- always_run: false
+  as: e2e-ibmcloud-csi
+  optional: true
+  steps:
+    cluster_profile: ibmcloud
+    workflow: openshift-e2e-ibmcloud-csi
+- always_run: false
+  as: e2e-openstack
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+    workflow: openshift-e2e-openstack-ipi
+- always_run: false
+  as: e2e-openstack-parallel
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+- always_run: false
+  as: e2e-openstack-cinder-csi
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      TEST_SKIPS: should concurrently access the volume and restored snapshot from
+        pods on the same node
+    workflow: openshift-e2e-openstack-csi-cinder
+- always_run: false
+  as: e2e-openstack-manila-csi
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-csi-manila
+- always_run: false
+  as: hypershift-e2e-openstack-aws-csi-cinder
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-cinder.yaml
+      TEST_SUITE: openshift/csi
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vh-mecha-central-quota-slice
+    workflow: hypershift-openstack-aws-conformance
+- always_run: false
+  as: hypershift-e2e-openstack-aws-csi-manila
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_CSI_DRIVER_MANIFEST: manifest-openstack-manila.yaml
+      TEST_SUITE: openshift/csi
+    leases:
+    - env: OPENSTACK_CLOUD
+      resource_type: openstack-vh-mecha-central-quota-slice
+    workflow: hypershift-openstack-aws-conformance
+- as: hypershift-aws-e2e-external
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: cluster-storage-operator
+    workflow: openshift-ci-security
+- as: hypershift-e2e-aks
+  steps:
+    cluster_profile: hypershift
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: eastus
+    workflow: hypershift-azure-aks-e2e
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: cluster-storage-operator
