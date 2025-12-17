@@ -41,7 +41,7 @@ cleanup() {
   local exit_code=${?}
   if [[ ${exit_code} -ne 0 ]]; then
     error "Script failed with exit code ${exit_code}. Cleaning up..."
-    notify "❌ Image digest updater job failed with exit code ${exit_code}. Please check [prow](${PROW_JOB_URL:-https://prow.ci.openshift.org})."
+    notify "❌ Image digest updater job failed with exit code ${exit_code}. Please check prow at ${PROW_JOB_URL:-https://prow.ci.openshift.org}"
     exit "${exit_code}"
   fi
 }
@@ -145,7 +145,7 @@ cd ../..
 # Check if there are any changes from image updates
 if [[ $(git status --porcelain) == "" ]]; then
   info "image: no new digests found for any component images"
-  notify "⚠️ Image digest updater job completed but no new digests found for any component images. Please check [prow](${PROW_JOB_URL})."
+  notify "⚠️ Image digest updater job completed but no new digests found for any component images. Please check prow at ${PROW_JOB_URL}"
   exit 0
 fi
 
@@ -206,7 +206,7 @@ set -o errexit
 
 # Verify prcreator succeeded
 if [[ ${prcreator_exit_code} -ne 0 ]]; then
-  notify "❌ Image digest updater job failed to create PR. Please check [prow](${PROW_JOB_URL})."
+  notify "❌ Image digest updater job failed to create PR. Please check prow at ${PROW_JOB_URL}"
   error "github: prcreator command failed with exit code ${prcreator_exit_code}"
 fi
 
@@ -244,9 +244,9 @@ done
 # Slack: Send notification based on PR creation result
 info "slack: sending notification for PR creation"
 if [[ -z "${PR_URL}" ]]; then
-  notify "❌ Image digest updater job failed, no PR found after ${PR_CHECK_MAX_ATTEMPTS} attempts. Please check [prow](${PROW_JOB_URL})."
+  notify "❌ Image digest updater job failed, no PR found after ${PR_CHECK_MAX_ATTEMPTS} attempts. Please check prow$ at ${PROW_JOB_URL}"
   error "github: No PR found after ${PR_CHECK_MAX_ATTEMPTS} attempts"
 fi
 
-notify "✅ Image digest update PR created at ${PR_URL}. Please review and approve the changes."
+notify "✅ Image digest update PR ready to review: ${PR_URL}"
 exit 0
