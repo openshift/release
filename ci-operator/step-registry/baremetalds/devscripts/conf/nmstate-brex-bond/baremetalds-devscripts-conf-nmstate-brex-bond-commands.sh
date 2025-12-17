@@ -10,8 +10,8 @@ generate_nmstate_machineconfigs() {
     local output_dir="${1:-/tmp/nmstate-brex-bond}"
     local master_bond_port2="${2:-enp6s0}"
     local worker_bond_port2="${3:-enp6s0}"
-    local master_mac_from="${4:-enp2s0}"
-    local worker_mac_from="${5:-enp2s0}"
+    local master_mac_from="${4:-enp6s0}"
+    local worker_mac_from="${5:-enp6s0}"
 
     mkdir -p "${output_dir}/assets"
     mkdir -p "${output_dir}/network-config"
