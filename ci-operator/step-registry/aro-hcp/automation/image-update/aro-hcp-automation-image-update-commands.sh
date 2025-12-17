@@ -23,18 +23,22 @@ export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat /var/run/hcp-integration-credentia
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat /var/run/hcp-integration-credentials/client-secret)
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat /var/run/hcp-integration-credentials/tenant)
 
+debug "cfg: set environment variables"
+export PROW_JOB_URL="https://prow.ci.openshift.org/?job=periodic-ci-Azure-ARO-HCP-main-image-updater-image-updater-tooling"
+export IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.txt"
+export GIT_PR_TITLE="Automated - Update component image digests"
+export GIT_PR_USER="openshift-ci-robot"
+export GIT_PR_EMAIL="openshift-ci-robot@users.noreply.github.com"
+
 debug "git: configure git user and email"
-git config user.name "openshift-ci-robot"
-git config user.email "openshift-ci-robot@users.noreply.github.com"
+git config user.name "${GIT_PR_USER}"
+git config user.email "${GIT_PR_EMAIL}"
 
 debug "image: change to tooling/image-updater directory"
 cd tooling/image-updater
 
 debug "image: build image-updater binary"
 make build
-
-export PROW_JOB_URL="https://prow.ci.openshift.org/?job=periodic-ci-Azure-ARO-HCP-main-image-updater-image-updater-tooling"
-export IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.txt"
 
 info "image: fetching the latest image digests for all components"
 if [[ ${DEBUG-0} -ge 1 ]]; then
@@ -97,7 +101,7 @@ fi
   -repo=ARO-HCP \
   -branch=main \
   -git-message="chore: render digests using materialize" \
-  -pr-title="Automated - Update component image digests" \
+  -pr-title="${GIT_PR_TITLE}" \
   -pr-message="This automated PR updates ARO-HCP container image digests to the latest versions from registries.
 
 $(cat "${IMAGE_UPDATER_OUTPUT}")
@@ -112,7 +116,7 @@ info "github: checking for existing PR"
 PR_CHECK_MAX_ATTEMPTS=${PR_CHECK_MAX_ATTEMPTS:-5}
 for ((i=1; i<=PR_CHECK_MAX_ATTEMPTS; i++)); do
   debug "github: Waiting for the PR to be created..."
-  PR_URL=$(curl -s 'https://api.github.com/repos/Azure/ARO-HCP/pulls?per_page=100' | jq -r '.[] | select(.user.login == "openshift-ci-robot" and .title == "Automated - Update component image digests") | .html_url' | head -1)
+  PR_URL=$(curl -s "https://api.github.com/repos/Azure/ARO-HCP/pulls?per_page=100" | jq -r ".[] | select(.user.login == \"${GIT_PR_USER}\" and .title == \"${GIT_PR_TITLE}\") | .html_url" | head -1)
 
   if [ -n "$PR_URL" ]; then
     info "github: PR found at $PR_URL"
