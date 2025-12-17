@@ -93,9 +93,13 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.24
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: Istio Integration helm
       XDG_CACHE_HOME: /tmp/cache
     test:
     - as: copy-src
@@ -119,6 +123,9 @@ tests:
         cleanup() {
           echo "Copying artifacts..."
           oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+          # share artifacts with next job step which is uploading results to report portal
+          echo "Copying artifacts to SHARED_DIR..."
+          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
         }
         trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" <<EOF
@@ -151,9 +158,13 @@ tests:
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.24
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: Istio Integration security
       XDG_CACHE_HOME: /tmp/cache
     test:
     - as: copy-src
@@ -177,6 +188,9 @@ tests:
         cleanup() {
           echo "Copying artifacts..."
           oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+          # share artifacts with next job step which is uploading results to report portal
+          echo "Copying artifacts to SHARED_DIR..."
+          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
         }
         trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -207,9 +221,13 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.24
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: Istio Integration pilot
       XDG_CACHE_HOME: /tmp/cache
     test:
     - as: copy-src
@@ -233,6 +251,9 @@ tests:
         cleanup() {
           echo "Copying artifacts..."
           oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+          # share artifacts with next job step which is uploading results to report portal
+          echo "Copying artifacts to SHARED_DIR..."
+          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
         }
         trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -264,9 +285,13 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.24
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: Istio Integration telemetry
       XDG_CACHE_HOME: /tmp/cache
     test:
     - as: copy-src
@@ -290,6 +315,9 @@ tests:
         cleanup() {
           echo "Copying artifacts..."
           oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+          # share artifacts with next job step which is uploading results to report portal
+          echo "Copying artifacts to SHARED_DIR..."
+          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
         }
         trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \

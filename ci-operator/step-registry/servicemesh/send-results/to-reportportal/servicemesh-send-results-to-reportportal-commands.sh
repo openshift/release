@@ -45,7 +45,14 @@ product_version="unknown"
 if [[ "$JOB_NAME" =~ main|master ]]
 then
   product_version="main"
-elif [[ "$JOB_NAME" =~ release-(3[.][0-9]+)- ]]
+elif [[ "$JOB_NAME" =~ release-(3[.][0-9]+)- ]] # OSSM versioning
+then
+  version="${BASH_REMATCH[1]}"
+  if [[ -n "$version" ]]
+  then
+    product_version="$version"
+  fi
+elif [[ "$JOB_NAME" =~ release-(1[.][0-9]+)- ]] # Istio versioning
 then
   version="${BASH_REMATCH[1]}"
   if [[ -n "$version" ]]
