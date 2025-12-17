@@ -8,8 +8,8 @@ echo "************ baremetalds devscripts conf nmstate-brex-bond command *******
 
 generate_nmstate_machineconfigs() {
     local output_dir="${1:-/tmp/nmstate-brex-bond}"
-    local master_bond_port2="${2:-enp1s0}"
-    local worker_bond_port2="${3:-enp1s0}"
+    local master_bond_port2="${2:-enp6s0}"
+    local worker_bond_port2="${3:-enp6s0}"
     local master_mac_from="${4:-enp2s0}"
     local worker_mac_from="${5:-enp2s0}"
 
@@ -96,7 +96,7 @@ generate_nmstate_machineconfigs() {
     local worker_b64=$(echo -n "${worker_nmstate_config}" | base64 -w 0)
 
     # Generate master MachineConfig
-    cat > "${output_dir}/00-generated-nmstate-brex-bond-master.yaml" <<EOF
+    cat > "${output_dir}/assets/00-generated-nmstate-brex-bond-master.yaml" <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -116,8 +116,7 @@ spec:
           path: /etc/nmstate/openshift/cluster.yml
 EOF
 
-    # Generate worker MachineConfig
-    cat > "${output_dir}/00-generated-nmstate-brex-bond-worker.yaml" <<EOF
+    cat > "${output_dir}/assets/00-generated-nmstate-brex-bond-worker.yaml" <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -137,20 +136,56 @@ spec:
           path: /etc/nmstate/openshift/cluster.yml
 EOF
 
-    echo "Generated MachineConfigs in ${output_dir}:"
+    cat > "${output_dir}/network-config/ostest-master-0.yaml" <<EOF
+networkConfig: &BOND
+  interfaces:
+  - name: bond0
+    type: bond
+    state: up
+    ipv4:
+      dhcp: true
+      enabled: true
+      auto-dns: true
+      auto-gateway: true
+      auto-routes: true
+    link-aggregation:
+      mode: active-backup
+      options:
+        miimon: '100'
+      port:
+      - enp2s0
+      - ${master_bond_port2}
+EOF
+
+    for i in 1 2; do
+        cat > "${output_dir}/network-config/ostest-master-${i}.yaml" <<EOF
+networkConfig: *BOND
+EOF
+    done
+
+    for i in 0 1; do
+        cat > "${output_dir}/network-config/ostest-worker-${i}.yaml" <<EOF
+networkConfig: *BOND
+EOF
+    done
+
+    echo "Generated MachineConfigs in ${output_dir}/assets:"
     echo "  - 00-generated-nmstate-brex-bond-master.yaml"
     echo "  - 00-generated-nmstate-brex-bond-worker.yaml"
-    echo "ASSETS_EXTRA_FOLDER=${output_dir}" >> "${SHARED_DIR}/dev-scripts-additional-config"
+    echo "Generated network configs in ${output_dir}/network-config:"
+    echo "  - ostest-master-{0,1,2}.yaml"
+    echo "  - ostest-worker-{0,1}.yaml"
+    echo "ASSETS_EXTRA_FOLDER=${output_dir}/assets" >> "${SHARED_DIR}/dev-scripts-additional-config"
+    echo "NETWORK_CONFIG_FOLDER=${output_dir}/network-config" >> "${SHARED_DIR}/dev-scripts-additional-config"
 }
 
 echo "NETWORK_TYPE=\"OVNKubernetes\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
-echo "NETWORK_CONFIG_FOLDER=/root/dev-scripts/network-configs/bond" >> "${SHARED_DIR}/dev-scripts-additional-config"
 echo "BOND_PRIMARY_INTERFACE=true" >> "${SHARED_DIR}/dev-scripts-additional-config"
-echo "EXTRA_NETWORK_NAMES=\"nmstate1 nmstate2\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
-echo "NMSTATE1_NETWORK_SUBNET_V4=\"192.168.221.0/24\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
-echo "NMSTATE1_NETWORK_SUBNET_V6=\"fd2e:6f44:5dd8:ca56::/120\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
-echo "NMSTATE2_NETWORK_SUBNET_V4=\"192.168.222.0/24\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
-echo "NMSTATE2_NETWORK_SUBNET_V6=\"fd2e:6f44:5dd8:cc56::/120\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
+#echo "EXTRA_NETWORK_NAMES=\"nmstate1 nmstate2\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
+#echo "NMSTATE1_NETWORK_SUBNET_V4=\"192.168.221.0/24\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
+#echo "NMSTATE1_NETWORK_SUBNET_V6=\"fd2e:6f44:5dd8:ca56::/120\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
+#echo "NMSTATE2_NETWORK_SUBNET_V4=\"192.168.222.0/24\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
+#echo "NMSTATE2_NETWORK_SUBNET_V6=\"fd2e:6f44:5dd8:cc56::/120\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
 
 # Generate the MachineConfig YAMLs with default parameters
 generate_nmstate_machineconfigs
