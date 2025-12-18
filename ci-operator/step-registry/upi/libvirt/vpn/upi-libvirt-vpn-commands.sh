@@ -36,7 +36,7 @@ while [ $I -gt 0 ]; do
         curl "$EXTERNAL_IP:7001" >/dev/null &&
         curl "$HOSTNAME:7001" >/dev/null &&
         mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list >/dev/null
-        if [ $? -eq 0 ]; then echo $(date +%H:%M) ok; fi
+        if [ $? -eq 0 ]; then echo "$(date +%H:%M) ok"; fi
         sleep 600
 done
 
