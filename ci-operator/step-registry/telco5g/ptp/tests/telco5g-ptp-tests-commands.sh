@@ -318,7 +318,7 @@ cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
 # always run test from latest upstream
 
-git clone https://github.com/edcdavid/ptp-operator-upstream.git -b refactor-l2discovery ptp-operator-conformance-test
+git clone https://github.com/edcdavid/ptp-operator-upstream.git -b fix-wpc ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
