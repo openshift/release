@@ -119,3 +119,4 @@ stop_tunnel
 # the make target produces a junit.xml in ARTIFACT_DIR.  We want to copy to SHARED_DIR so we can create
 # direct debugging links for the individual tests that failed.
 cp "${ARTIFACT_DIR}/junit.xml" "${SHARED_DIR}/junit-e2e.xml"
+cp -r "${ARTIFACT_DIR}/test-timing" "${SHARED_DIR}/test-timing"
