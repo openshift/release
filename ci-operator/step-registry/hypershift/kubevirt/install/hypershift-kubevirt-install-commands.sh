@@ -143,10 +143,10 @@ done
 if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
   echo "Error: Failed to deploy CNV"
   echo "CSV ${CSV} YAML"
-  oc get CSV ${CSV} -n openshift-cnv -o yaml
+  oc get csv ${CSV} -n openshift-cnv -o yaml
   echo
   echo "CSV ${CSV} Describe"
-  oc describe CSV ${CSV} -n openshift-cnv
+  oc describe csv ${CSV} -n openshift-cnv
   exit 1
 fi
 
