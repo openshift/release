@@ -55,6 +55,10 @@ if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-cpo-overrides"
 fi
 
+if [ "${ENABLE_SCALE_FROM_ZERO}" == "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --scale-from-zero-aws-creds=/etc/hypershift-pool-aws-credentials/credentials"
+fi
+
 if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
   --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
