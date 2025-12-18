@@ -73,6 +73,27 @@ $( [ "${DISCONNECTED}" = "true" ] && echo \
 END
 }
 
+# See https://issues.redhat.com/browse/OCPQE-31328
+# Specific images need to be pulled from stage registry as they're no longer available in Brew.
+function deploy_image_digest_mirror_set() {
+  local mirror_registry_url mirror_registry_url_stage
+  mirror_registry_url=$(cat "${SHARED_DIR}/mirror_registry_url")
+  # Use the proxy registry port 6004 that redirects to registry.stage.redhat.io
+  mirror_registry_url_stage=${mirror_registry_url//5000/6004}
+  oc apply -f - <<END
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageDigestMirrorSet
+metadata:
+  name: mirror-config-agentserviceconfig
+  namespace: ${ASSISTED_NAMESPACE}
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - ${mirror_registry_url_stage}/rhel8/postgresql-12
+    source: registry.redhat.io/rhel8/postgresql-12
+END
+}
+
 function deploy_mirror_config_map() {
   if [ "${DISCONNECTED}" = "true" ]; then
     oc get configmap -n openshift-config user-ca-bundle -o json | \
@@ -164,6 +185,7 @@ EOF
   done
 fi
 
+deploy_image_digest_mirror_set
 deploy_mirror_config_map
 config_agentserviceconfig
 
