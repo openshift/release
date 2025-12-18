@@ -1,4 +1,8 @@
 base_images:
+  ocp_builder_rhel-9-base-nodejs-openshift-4.22:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-nodejs-openshift-4.22
   ocp_builder_rhel-9-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
@@ -12,19 +16,23 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.22
-canonical_go_repository: github.com/openshift/kubernetes-autoscaler
+canonical_go_repository: github.com/openshift-assisted/assisted-installer-ui
 images:
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
+  dockerfile_path: apps/assisted-disconnected-ui/Containerfile.ocp
   from: origin_scos-4.22_base-stream9
   inputs:
+    ocp_builder_rhel-9-base-nodejs-openshift-4.22:
+      as:
+      - ui-build
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.21
     ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
-      - builder
+      - proxy-build
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: cluster-autoscaler
+  to: agent-installer-ui
 promotion:
   to:
   - disabled: true
@@ -49,7 +57,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
-  branch: main
+  branch: master
   org: openshift-priv
-  repo: kubernetes-autoscaler
+  repo: assisted-installer-ui
   variant: okd-scos
