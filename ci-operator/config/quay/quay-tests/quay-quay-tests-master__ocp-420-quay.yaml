@@ -94,6 +94,29 @@ tests:
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
     workflow: firewatch-cucushift-installer-rehearse-aws-ipi
+- as: quay-acs-violations-check-quay316
+  cron: 0 20 24 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      ACS_OPERATOR_CHANNEL: stable
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.20
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-20@sha256:3e5c6a5a29702d77df8ba8d01dc87710187bb6d7e2d3729c73d0ef03de63bb18
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.16"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-noobaa
+    - ref: quay-tests-quay-acs
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay
