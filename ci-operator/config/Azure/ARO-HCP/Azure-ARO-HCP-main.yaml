@@ -1,4 +1,8 @@
 base_images:
+  aro-hcp-e2e-base-ci:
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: latest
   aro-hcp-e2e-base-image:
     name: aro-hcp-e2e-base
     namespace: rh_ee_ves
@@ -56,7 +60,7 @@ images:
   from: src
   to: aro-hcp-frontend
 - dockerfile_literal: |
-    FROM aro-hcp-e2e-base-image
+    FROM aro-hcp-e2e-base-ci
     USER root
     COPY /src /opt/app-root/src/github.com/Azure
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
@@ -66,7 +70,7 @@ images:
         make install-tools && \
         make -C tooling/templatize templatize && \
         make -C test/ aro-hcp-tests prow-job-executor
-  from: aro-hcp-e2e-base-image
+  from: aro-hcp-e2e-base-ci
   inputs:
     src:
       paths:
