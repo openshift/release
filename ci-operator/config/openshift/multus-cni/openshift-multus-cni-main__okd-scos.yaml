@@ -1,66 +1,57 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
+  ocp_builder_rhel-8-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.21
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    tag: rhel-8-golang-1.24-openshift-4.22
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
-  origin_scos-4.21_base-stream9:
-    name: scos-4.21
+    tag: rhel-9-golang-1.24-openshift-4.22
+  origin_scos-4.22_base-stream9:
+    name: scos-4.22
     namespace: origin
     tag: base-stream9
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.24-openshift-4.22
 images:
 - build_args:
   - name: TAGS
     value: scos
   dockerfile_path: Dockerfile.microshift
-  from: origin_scos-4.21_base-stream9
+  from: origin_scos-4.22_base-stream9
   inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
       - rhel9
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: multus-cni-microshift
 - build_args:
   - name: TAGS
     value: scos
   dockerfile_path: Dockerfile.openshift
-  from: origin_scos-4.21_base-stream9
+  from: origin_scos-4.22_base-stream9
   inputs:
-    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
+    ocp_builder_rhel-8-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
       - rhel8
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
       - rhel9
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: multus-cni
 promotion:
   to:
-  - name: scos-4.21
+  - name: scos-4.22
     namespace: origin
 releases:
   latest:
     integration:
       include_built_images: true
-      name: scos-4.21
+      name: scos-4.22
       namespace: origin
 resources:
   '*':

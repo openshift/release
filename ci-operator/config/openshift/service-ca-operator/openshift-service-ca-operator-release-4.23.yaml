@@ -1,0 +1,88 @@
+base_images:
+  ocp_4.21_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.rhel7
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: service-ca-operator
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: JUNIT_REPORT=1 make test-unit
+  container:
+    from: src
+- as: verify
+  commands: JUNIT_REPORT=1 make verify
+  container:
+    from: src
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-operator-serial-ote
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SUITE: openshift/service-ca-operator/operator/serial
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- as: e2e-aws-upgrade
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-upgrade-aws
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: service-ca-operator

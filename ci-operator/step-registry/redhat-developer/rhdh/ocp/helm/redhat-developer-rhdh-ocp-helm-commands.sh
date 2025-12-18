@@ -1,4 +1,25 @@
 #!/bin/bash
+
+# Check for [skip-e2e] commit comments in the PR title
+if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
+    PR_TITLE=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}" | jq -r '.title')
+    # only skip e2e tests for a [skip-e2e] PR that has been auto-approved by github-actions[bot]
+    if [[ "$PR_TITLE" == *"[skip-e2e]"* ]]; then
+        echo "PR_TITLE: $PR_TITLE"
+        APPROVALS=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}/reviews") # json array of approvals
+        # iterate through the approvals and check if the approval is from the .user.login = "github-actions[bot]" and if the .state = "APPROVED" 
+        approval_count=$(echo "$APPROVALS" | jq 'length')
+        for ((i=0; i<approval_count; i++)); do
+            user_login=$(echo "$APPROVALS" | jq -r ".[$i].user.login")
+            state=$(echo "$APPROVALS" | jq -r ".[$i].state")
+            if [[ "$user_login" == "github-actions[bot]" ]] && [[ "$state" == "APPROVED" ]]; then
+                echo "Auto-approved by github-actions[bot], so no need to run tests; skip all test execution with exit code 0"
+                exit 0
+            fi
+        done
+    fi
+fi
+
 echo "========== Workdir Setup =========="
 export HOME WORKSPACE
 HOME=/tmp
