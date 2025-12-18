@@ -6,6 +6,11 @@ set -o pipefail
 # 1. Setup environment variables for the deployment script
 export SCANNER_IMAGE="${PULL_SPEC_TLS_SCANNER_TOOL}"
 export NAMESPACE=tls-scanner-test
+# Set minimal resource requirements due to cluster pool memory saturation
+export SCANNER_MEMORY_REQUEST="${SCANNER_MEMORY_REQUEST:-50Mi}"
+export SCANNER_MEMORY_LIMIT="${SCANNER_MEMORY_LIMIT:-256Mi}"
+export SCANNER_CPU_REQUEST="${SCANNER_CPU_REQUEST:-50m}"
+export SCANNER_CPU_LIMIT="${SCANNER_CPU_LIMIT:-250m}"
 
 # Manually apply nftables rules to all nodes to allow traffic on scanner ports
 # This is necessary because we are using a pre-provisioned cluster (cluster_claim)
