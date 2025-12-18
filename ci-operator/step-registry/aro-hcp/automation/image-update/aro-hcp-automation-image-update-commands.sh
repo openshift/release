@@ -33,16 +33,15 @@ readonly IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.txt"
 log() { echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] ${*}"; }
 info()  { if [[ ${DEBUG-0} -ge 1 ]]; then log "[info] ${*}"; fi }
 debug() { if [[ ${DEBUG-0} -ge 2 ]]; then log "[debug] ${*}"; fi }
-error() { log "[error] ${*}"; exit 1; }
+error() { log "[error] ${*}"; exit ${ERR_EXIT_CODE:-1}; }
 
 
 # Cleanup function to handle failures gracefully
 cleanup() {
-  local exit_code=${?}
-  if [[ ${exit_code} -ne 0 ]]; then
-    error "Script failed with exit code ${exit_code}. Cleaning up..."
-    notify "❌ Image digest updater job failed with exit code ${exit_code}. Please check prow at ${PROW_JOB_URL:-https://prow.ci.openshift.org}"
-    exit "${exit_code}"
+  readonly EXIT_CODE=${?}
+  if [[ ${EXIT_CODE} -ne 0 ]]; then
+    notify "❌ Image digest updater job failed with exit code ${EXIT_CODE}. Please check prow at ${PROW_JOB_URL:-https://prow.ci.openshift.org}"
+    error "Script failed with exit code ${EXIT_CODE}. Cleaning up..."
   fi
 }
 trap cleanup EXIT
