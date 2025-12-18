@@ -1,0 +1,113 @@
+base_images:
+  base:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/kedacore-keda
+images:
+- build_args:
+  - name: GIT_COMMIT
+    value: dummy-ci-commit-value
+  from: base
+  to: custom-metrics-autoscaler
+- build_args:
+  - name: GIT_COMMIT
+    value: dummy-ci-commit-value
+  dockerfile_path: Dockerfile.webhooks
+  to: custom-metrics-autoscaler-webhooks
+- build_args:
+  - name: GIT_COMMIT
+    value: dummy-ci-commit-value
+  dockerfile_path: Dockerfile.adapter
+  to: custom-metrics-autoscaler-adapter
+- dockerfile_path: Dockerfile.tests
+  to: custom-metrics-autoscaler-tests
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: env && GOFLAGS="" make fmt
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: govet
+  commands: env && GOFLAGS="" make vet
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: cma-verify-history
+  commands: env && GOFLAGS="" hack/cma-verify-history.sh
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: clientset-verify
+  commands: mkdir /tmp/codecopy && cp -a . /tmp/codecopy && cd /tmp/codecopy && make
+    clientset-generate
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: kedacore-keda
+    workflow: openshift-ci-security
+- as: keda-e2e-aws-ovn
+  steps:
+    cluster_profile: aws-3
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - as: test-setup
+      cli: latest
+      commands: make e2e-test-openshift-setup
+      dependencies:
+      - env: IMAGE_CONTROLLER
+        name: custom-metrics-autoscaler
+      - env: IMAGE_ADAPTER
+        name: custom-metrics-autoscaler-adapter
+      - env: IMAGE_WEBHOOKS
+        name: custom-metrics-autoscaler-webhooks
+      from: custom-metrics-autoscaler-tests
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-run
+      cli: latest
+      commands: make e2e-test-openshift
+      from: custom-metrics-autoscaler-tests
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-clean
+      cli: latest
+      commands: make e2e-test-openshift-clean
+      from: custom-metrics-autoscaler-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: kedacore-keda

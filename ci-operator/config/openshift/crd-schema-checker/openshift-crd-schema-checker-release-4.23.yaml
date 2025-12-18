@@ -1,0 +1,56 @@
+base_images:
+  base:
+    name: "4.23"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.rhel7
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
+  to: crd-schema-checker-tools
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: test-bin
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: crd-schema-checker

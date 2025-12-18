@@ -36,51 +36,51 @@ base_images:
     namespace: ci
     tag: latest
   ocp_4.10_cli:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: cli
   ocp_4.17_base-rhel9:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_4.17_cli:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: cli
   ocp_4.17_etcd:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: etcd
   ocp_4.17_hyperkube:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: hyperkube
   ocp_4.17_installer-etcd-artifacts:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: installer-etcd-artifacts
   ocp_4.17_installer-kube-apiserver-artifacts:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: installer-kube-apiserver-artifacts
   ocp_4.21_base-rhel9:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_4.21_etcd:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: etcd
   ocp_4.21_hyperkube:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: hyperkube
   ocp_4.21_installer-etcd-artifacts:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: installer-etcd-artifacts
   ocp_4.21_installer-kube-apiserver-artifacts:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: installer-kube-apiserver-artifacts
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
@@ -256,30 +256,30 @@ promotion:
   to:
   - excluded_images:
     - src-oc
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.21-priv
+      name: 4.22-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.21-priv
+      name: 4.22-priv
       namespace: ocp-private
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "4.22"
   ppc64le-latest:
     candidate:
       architecture: ppc64le
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -1352,6 +1352,27 @@ tests:
     - chain: ipi-install
     - ref: ipi-azure-rbac
     - ref: cucushift-installer-check-azure-osimage
+- always_run: false
+  as: e2e-azure-confidential-trustedlaunch
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_CONFIDENTIAL_COMPUTE: "true"
+      ENABLE_CONFIDENTIAL_CONTROL_PLANE: "true"
+    post:
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-confidential
+    - chain: azure-provision-service-principal-minimal-permission
+    - chain: ipi-install
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-check-azure-confidential
+    test:
+    - ref: openshift-e2e-test
 - as: gcp-private
   optional: true
   run_if_changed: (gcp|google)

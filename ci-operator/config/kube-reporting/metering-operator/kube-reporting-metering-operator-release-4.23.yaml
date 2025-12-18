@@ -1,0 +1,152 @@
+base_images:
+  ansible-operator:
+    name: "4.23"
+    namespace: ocp
+    tag: ansible-operator
+  base:
+    name: "4.23"
+    namespace: ocp
+    tag: base
+  oauth_proxy:
+    name: "4.23"
+    namespace: ocp
+    tag: oauth-proxy
+  ocp_4.8_cli:
+    name: "4.23"
+    namespace: ocp
+    tag: cli
+  ocp_4.8_metering-helm:
+    name: "4.23"
+    namespace: ocp
+    tag: metering-helm
+  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.16-openshift-4.8
+build_root:
+  project_image:
+    context_dir: .
+    dockerfile_path: Dockerfile.src
+images:
+- dockerfile_path: Dockerfile.reporting-operator.rhel
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
+  to: metering-reporting-operator
+- dockerfile_path: Dockerfile.metering-ansible-operator.rhel8
+  from: ansible-operator
+  inputs:
+    ocp_4.8_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.8:cli
+    ocp_4.8_metering-helm:
+      as:
+      - registry.ci.openshift.org/ocp/4.8:metering-helm
+  to: metering-ansible-operator
+operator:
+  bundles:
+  - dockerfile_path: Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/openshift/origin-ghostunnel:4.8
+    with: stable:ghostunnel
+  - pullspec: quay.io/openshift/origin-metering-ansible-operator:4.8
+    with: pipeline:metering-ansible-operator
+  - pullspec: quay.io/openshift/origin-metering-hadoop:4.8
+    with: stable:metering-hadoop
+  - pullspec: quay.io/openshift/origin-metering-hive:4.8
+    with: stable:metering-hive
+  - pullspec: quay.io/openshift/origin-metering-presto:4.8
+    with: stable:metering-presto
+  - pullspec: quay.io/openshift/origin-metering-reporting-operator:4.8
+    with: pipeline:metering-reporting-operator
+  - pullspec: quay.io/openshift/origin-oauth-proxy:4.8
+    with: pipeline:oauth_proxy
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make unit TEST_OUTPUT_DIR=${ARTIFACT_DIR}
+  container:
+    from: src
+- as: verify
+  commands: |
+    set -x
+    set -e
+    # (chance): Hacks to allow us write access to our source files since
+    # they're 664 in the image and owned by root:root, and we get a random UID
+    # in Openshift pods which means we don't have write permissions.
+
+    # create a copy of the source so we can modify the files.
+    export GOPATH=/tmp/go
+    mkdir -p $GOPATH/src/github.com/kube-reporting/
+    cp -r /go/src/github.com/kube-reporting/metering-operator/ $GOPATH/src/github.com/kube-reporting/metering-operator
+    cd $GOPATH/src/github.com/kube-reporting/metering-operator
+
+    # Run the actual tests that nothing in the changes after re-generating
+    # files. This ensures generated files aren't modified directly.
+    make verify
+  container:
+    from: src
+- as: vendor
+  commands: make vendor && git diff --exit-code
+  container:
+    from: src
+- as: metering-e2e-aws
+  steps:
+    cluster_profile: aws-3
+    env:
+      COMPUTE_NODE_TYPE: m5.xlarge
+    test:
+    - as: e2e
+      commands: |
+        METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=${ARTIFACT_DIR}/e2e EXTRA_TEST_FLAGS="-run TestManualMeteringInstall" make e2e
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 500Mi
+    workflow: ipi-aws
+- as: metering-upgrade-aws
+  steps:
+    cluster_profile: aws-2
+    env:
+      COMPUTE_NODE_TYPE: m5.xlarge
+    test:
+    - as: e2e
+      commands: |
+        METERING_ANSIBLE_OPERATOR_INDEX_IMAGE=${OO_INDEX} TEST_ENABLE_MACHINE_AUTOSCALING="true" TEST_OUTPUT_PATH=${ARTIFACT_DIR}/upgrade make e2e-upgrade
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 500Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.23
+  org: kube-reporting
+  repo: metering-operator

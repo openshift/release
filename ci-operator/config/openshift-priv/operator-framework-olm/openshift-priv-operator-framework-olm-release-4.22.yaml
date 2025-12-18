@@ -1,5 +1,9 @@
 base_images:
   ocp_4.21_base-rhel9:
+    name: 4.21-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_4.22_base-rhel9:
     name: 4.22-priv
     namespace: ocp-private
     tag: base-rhel9
@@ -11,6 +15,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.21
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.22
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/operator-framework-olm
@@ -20,9 +28,15 @@ images:
     ocp_4.21_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_4.22_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: operator-lifecycle-manager
 - dockerfile_path: operator-registry.Dockerfile
   inputs:
@@ -50,7 +64,8 @@ images:
   to: ci-image
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - ci-image
     name: 4.22-priv
     namespace: ocp-private
