@@ -12,14 +12,15 @@ base_images:
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.21
   upi-installer:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: upi-installer
+binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
-canonical_go_repository: github.com/openshift/image-registry
+canonical_go_repository: github.com/openshift/cluster-authentication-operator
 images:
-- dockerfile_path: Dockerfile.ocp
+- dockerfile_path: Dockerfile.rhel7
   inputs:
     ocp_4.21_base-rhel9:
       as:
@@ -27,31 +28,29 @@ images:
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: docker-registry
+  to: cluster-authentication-operator
 promotion:
   to:
   - disabled: true
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
 releases:
   initial:
-    candidate:
-      product: ocp
-      relative: 1
-      stream: nightly
-      version: "4.21"
+    integration:
+      name: 4.22-priv
+      namespace: ocp-private
   latest:
     candidate:
       product: ocp
-      stream: nightly
-      version: "4.21"
+      stream: ci
+      version: "4.22"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 zz_generated_metadata:
-  branch: release-4.21
+  branch: release-4.22
   org: openshift-priv
-  repo: image-registry
+  repo: cluster-authentication-operator
   variant: periodics
