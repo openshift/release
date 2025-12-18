@@ -3,6 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   ocp_4.21_base-rhel9:
     name: "4.22"
     namespace: ocp
@@ -226,6 +230,23 @@ tests:
       TEST_SKIPS: ""
       TEST_SUITE: openshift/machine-config-operator/longduration
     workflow: openshift-e2e-aws-proxy
+- as: e2e-aws-ovn-day1-ocl
+  capabilities:
+  - nested-podman
+  interval: 24h
+  steps:
+    cluster_profile: aws-3
+    env:
+      MCO_CONF_DAY1_ENABLE_OCL_MCPS: master worker
+    pre:
+    - chain: ipi-conf-aws
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: mco-conf-day1-enable-ocl
+    - chain: ipi-install
+    test:
+    - ref: mco-check-day1-enable-ocl
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.22
   org: openshift
