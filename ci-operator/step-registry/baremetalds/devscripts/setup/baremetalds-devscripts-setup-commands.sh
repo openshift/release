@@ -13,6 +13,7 @@ source "${SHARED_DIR}/packet-conf.sh"
 # Get dev-scripts logs and other configuration
 finished()
 {
+  # Cleanup function to gather artifacts and configuration
   # Remember dev-scripts setup exit code
   retval=$?
 
@@ -35,12 +36,44 @@ finished()
   echo "dev-scripts setup completed, fetching logs"
   ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs | tar -C "${ARTIFACT_DIR}" -xzf -
   echo "Removing REDACTED info from log..."
-  sed -i '
-    s/.*auths.*/*** PULL_SECRET ***/g;
-    s/password: .*/password: REDACTED/;
-    s/X-Auth-Token.*/X-Auth-Token REDACTED/;
-    s/UserData:.*,/UserData: REDACTED,/;
-    ' "${ARTIFACT_DIR}"/root/dev-scripts/logs/*
+
+  # Process each log file individually with size logging
+  total_files=0
+  processed_files=0
+  for logfile in "${ARTIFACT_DIR}"/root/dev-scripts/logs/*; do
+    if [ -f "$logfile" ]; then
+      total_files=$((total_files + 1))
+      size=$(stat -c%s "$logfile" 2>/dev/null || echo 0)
+      size_kb=$((size / 1024))
+
+      # Show size in KB for better granularity (since most files are < 1MB)
+      if [ "$size" -lt 1024 ]; then
+        echo "Processing: $(basename "$logfile") (${size} bytes)"
+      elif [ "$size" -lt 1048576 ]; then
+        echo "Processing: $(basename "$logfile") (${size_kb}KB)"
+      else
+        size_mb=$((size / 1048576))
+        echo "Processing: $(basename "$logfile") (${size_mb}MB)"
+      fi
+
+      # Redact sensitive information from log files
+      # Note: Pattern 's/auths.*$/...' is used instead of 's/.*auths.*/.../' to avoid
+      # catastrophic backtracking on long lines. The greedy '.*' prefix can cause O(n²)
+      # regex performance when processing lines with or without "auths", especially
+      # problematic with long JSON dumps or base64-encoded data in logs.
+      if sed -i '
+        s/auths.*$/*** PULL_SECRET ***/;
+        s/password: .*/password: REDACTED/;
+        s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+        s/UserData:.*,/UserData: REDACTED,/;
+        ' "$logfile" 2>/dev/null; then
+        processed_files=$((processed_files + 1))
+      else
+        echo "  Warning: redaction failed for $(basename "$logfile"), continuing..."
+      fi
+    fi
+  done
+  echo "Log redaction completed: ${processed_files}/${total_files} files processed"
 
   # Save exit code for must-gather to generate junit. Make eats exit
   # codes, so we try to fetch it from the dev-scripts artifacts if we can.
@@ -185,9 +218,13 @@ EOF
 
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 
-
-
-timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+# Run dev-scripts installation with output redaction
+# The sed filter redacts sensitive data from streaming output during the 175-minute installation.
+# Using 's/auths.*$/.../' instead of 's/.*auths.*/.../' to prevent catastrophic backtracking.
+# The greedy '.*' prefix causes severe performance degradation when processing long lines
+# (JSON manifests, base64 data, etc.) in real-time, potentially adding minutes of delay
+# over the course of a 2+ hour installation.
+timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/auths.*$/*** PULL_SECRET ***/'
 
 set -xeuo pipefail
 
