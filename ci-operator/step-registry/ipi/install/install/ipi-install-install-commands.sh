@@ -234,6 +234,7 @@ function write_install_status() {
 
 function prepare_next_steps() {
   write_install_status
+  sleep 4h
   set +e
   echo "Tear down the backgroup process of copying kube config"
   if [[ -v copy_kubeconfig_pid ]]; then
