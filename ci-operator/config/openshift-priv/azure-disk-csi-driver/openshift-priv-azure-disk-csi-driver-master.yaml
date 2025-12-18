@@ -4,7 +4,7 @@ base_images:
     namespace: ci
     tag: latest
   ocp_4.21_base-rhel9:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.21:
@@ -30,17 +30,17 @@ images:
   to: azure-disk-csi-driver
 promotion:
   to:
-  - name: 4.21-priv
+  - name: 4.22-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.21-priv
+      name: 4.22-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.21-priv
+      name: 4.22-priv
       namespace: ocp-private
 resources:
   '*':
@@ -92,6 +92,16 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-azurestack-csi
+  cluster: build01
+  optional: true
+  run_if_changed: ^Makefile$
+  steps:
+    cluster_profile: azurestack-dev
+    env:
+      TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
+    workflow: openshift-e2e-azurestack-upi-csi
 - as: verify-commits
   commands: |
     commitchecker --start ${PULL_BASE_SHA:-master}

@@ -1,0 +1,37 @@
+ref:
+  as: release-qe-tests-image-consistency-check
+  from: oar
+  cli: latest
+  grace_period: 10m
+  commands: release-qe-tests-image-consistency-check-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+    - namespace: test-credentials
+      name: release-tests-token
+      mount_path: /var/run/vault/release-tests-token
+  documentation: |-
+    Run Image Consistency Check to check if the z-stream release images are consistent.
+  env:
+    - name: MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_URL
+      default: ""
+      documentation: |-
+        The URL of the payload to check. For example: quay.io/openshift-release-dev/ocp-release:4.16.54-x86_64
+        The var can be set when using the Gangway API, pass it as:
+        "pod_spec_options": {
+          "envs": {
+            "MULTISTAGE_PARAM_OVERRIDE_PAYLOAD_URL": "quay.io/openshift-release-dev/ocp-release:4.16.54-x86_64"
+          }
+        }
+    - name: MULTISTAGE_PARAM_OVERRIDE_MERGE_REQUEST_ID
+      default: ""
+      documentation: |-
+        The ID of the merge request to check. For example: 264 (To see the merge request: https://gitlab.cee.redhat.com/hybrid-platforms/art/ocp-shipment-data/-/merge_requests/264)
+        The var can be set when using the Gangway API, pass it as:
+        "pod_spec_options": {
+          "envs": {
+            "MULTISTAGE_PARAM_OVERRIDE_MERGE_REQUEST_ID": "264"
+          }
+        }

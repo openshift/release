@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.4.6"
+	TAG="v0.5.2"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
 	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
@@ -288,6 +288,7 @@ COMPUTE_NODE_TYPE=$(yq-v4 eval '.COMPUTE_NODE_TYPE' "${SHARED_DIR}/powervc-conf.
 FLAVOR=$(yq-v4 eval '.FLAVOR' "${SHARED_DIR}/powervc-conf.yaml")
 LEASED_RESOURCE=$(yq-v4 eval '.LEASED_RESOURCE' "${SHARED_DIR}/powervc-conf.yaml")
 NETWORK_NAME=$(yq-v4 eval '.NETWORK_NAME' "${SHARED_DIR}/powervc-conf.yaml")
+SERVER_IP=$(yq-v4 eval '.SERVER_IP' "${SHARED_DIR}/powervc-conf.yaml")
 
 export IBMCLOUD_API_KEY
 export ARCH
@@ -367,7 +368,7 @@ then
 	PowerVC-Tool \
 		send-metadata \
 		--createMetadata "${DIR}/metadata.json" \
-		--serverIP "10.130.41.245" \
+		--serverIP "${SERVER_IP}" \
 		--shouldDebug true
 
 	INFRAID=$(jq -r .infraID "${DIR}/metadata.json")

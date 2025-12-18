@@ -1,0 +1,89 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-9-base-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.14
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: ocp_builder_rhel-9-base-openshift-4.14
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: ironic-machine-os-downloader
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-ipi
+  capabilities:
+  - intranet
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-serial-ipv4
+  capabilities:
+  - intranet
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ovn-ipv4
+- as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-metal-ipi-virtualmedia
+  capabilities:
+  - intranet
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: ironic-rhcos-downloader
