@@ -11,14 +11,14 @@ base_images:
     name: insights-operator-tests
     namespace: ci
     tag: latest
-  ocp_4.21_base-rhel9:
-    name: "4.21"
+  ocp_4.22_base-rhel9:
+    name: "4.22"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.24-openshift-4.22
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -28,12 +28,12 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.21_base-rhel9:
+    ocp_4.22_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: insights-operator
 releases:
   arm64-latest:
@@ -54,7 +54,7 @@ resources:
       memory: 200Mi
 tests:
 - as: insights-operator-e2e-tests-periodic
-  cron: 40 4 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: gcp-3
     pre:
@@ -64,7 +64,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "not tp_only and not slow" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_periodic
+        pytest.sh -k "not tp_only and not slow" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_periodic_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -113,7 +113,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-techpreview
-  cron: 2 10 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: gcp-3
     env:
@@ -125,7 +125,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -174,7 +174,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
 - as: e2e-aws-techpreview
-  cron: 26 17 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: aws
     env:
@@ -186,7 +186,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -235,7 +235,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-aws
 - as: e2e-azure-techpreview
-  cron: 17 14 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: azure4
     env:
@@ -247,7 +247,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -296,7 +296,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-azure
 - as: e2e-vsphere-techpreview
-  cron: 56 3 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: vsphere-connected-2
     env:
@@ -308,7 +308,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -357,7 +357,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-vsphere
 - as: e2e-aws-single-node-techpreview
-  cron: 22 3 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: aws-3
     env:
@@ -367,7 +367,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -418,7 +418,7 @@ tests:
 - as: e2e-metal-techpreview-ipv4
   capabilities:
   - intranet
-  cron: 35 11 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -437,7 +437,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -488,7 +488,7 @@ tests:
 - as: e2e-metal-dualstack-techpreview
   capabilities:
   - intranet
-  cron: 4 12 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -509,7 +509,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -560,7 +560,7 @@ tests:
 - as: e2e-metal-ipv6-techpreview
   capabilities:
   - intranet
-  cron: 31 9 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -581,7 +581,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_data_gather or data_gather' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -630,7 +630,7 @@ tests:
       timeout: 3h0m0s
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
 - as: gcp-insights-runtime-extractor-tests
-  cron: 15 17 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: gcp-3
     pre:
@@ -640,7 +640,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.21
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -689,7 +689,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
 - as: aws-insights-runtime-extractor-tests
-  cron: 17 2 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: aws
     pre:
@@ -699,7 +699,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.21
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -748,7 +748,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-aws
 - as: azure-insights-runtime-extractor-tests
-  cron: 39 7 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: azure4
     pre:
@@ -758,7 +758,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.21
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -807,7 +807,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-azure
 - as: vsphere-insights-runtime-extractor-tests
-  cron: 58 5 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: vsphere-connected-2
     pre:
@@ -817,7 +817,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.21
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_tests_insights_runtime_extractor_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -868,7 +868,7 @@ tests:
 - as: metal-insights-runtime-extractor-tests-ipv4
   capabilities:
   - intranet
-  cron: 5 7 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -882,7 +882,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -931,7 +931,7 @@ tests:
       timeout: 3h0m0s
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-lvms
 - as: e2e-aws-single-node-insights-runtime-extractor-tests
-  cron: 54 18 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: aws-3
     test:
@@ -939,7 +939,7 @@ tests:
     - as: api-insights-tests
       cli: latest
       commands: |
-        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.21
+        pytest.sh -m 'insights_runtime_extractor' --junitxml=$(pwd)/junit_report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_techpreview_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -988,7 +988,7 @@ tests:
       timeout: 3h0m0s
     workflow: openshift-e2e-aws-single-node
 - as: insights-operator-e2e-tests-slow-tests
-  cron: 2 12 * * 6
+  cron: 0 0 * * 6
   steps:
     cluster_profile: gcp-3
     pre:
@@ -998,7 +998,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        pytest.sh -k "slow and not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_slow_tests
+        pytest.sh -k "slow and not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled --rp_name=Insights_operator_e2e_tests_slow_tests_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
@@ -1043,14 +1043,14 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
 - as: fips-image-scan-operator
-  cron: 37 7 * * 2
+  cron: 0 2 * * 2
   steps:
     dependencies:
       SCAN_IMAGE: insights-operator
     test:
     - ref: fips-check-image-scan
 - as: hosted-hypershift-insights-operator-e2e-tests
-  cron: 14 3 * * 6
+  cron: 0 0 * * 6
   steps:
     cluster_profile: aws-qe
     env:
@@ -1062,7 +1062,7 @@ tests:
     - as: test
       cli: latest
       commands: pytest.sh -k "not tp_only and not slow and not UI" --junitxml=$(pwd)/test-report.xml
-        --rp_enabled --rp_name=hosted-hypershift-insights-operator-e2e-tests
+        --rp_enabled --rp_name=hosted-hypershift-insights-operator-e2e-tests_4.22
       credentials:
       - collection: ""
         mount_path: /secrets
