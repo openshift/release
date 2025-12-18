@@ -1,0 +1,124 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.21_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/image-registry
+images:
+- dockerfile_path: Dockerfile.ocp
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: docker-registry
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: OS_GOFLAGS='-race' make build
+tests:
+- as: unit
+  commands: JUNIT_REPORT=1 hack/test-go.sh
+  container:
+    from: test-bin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e-aws-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-gcp
+  optional: true
+  run_if_changed: ^(.*gcs.*|vendor/(cloud\.google\.com|google\.golang\.org)/.*)\.go$
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-aws-image-registry
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-e2e-aws-image-registry
+- as: e2e-aws-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-upgrade-aws
+- as: e2e-agnostic-image-registry
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: e2e-test
+      commands: TEST_KUBECONFIG=${KUBECONFIG} JUNIT_REPORT=true make test-integration
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure
+- as: verify
+  commands: make verify
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e-hypershift
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
+- as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: image-registry

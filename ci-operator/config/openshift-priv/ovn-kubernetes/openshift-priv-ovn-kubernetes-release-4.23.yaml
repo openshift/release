@@ -1,0 +1,735 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  ocp_4.21_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.24-openshift-4.21
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+canonical_go_repository: github.com/openshift/ovn-kubernetes
+images:
+- dockerfile_path: Dockerfile.base
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+  to: ovn-kubernetes-base
+- dockerfile_path: Dockerfile
+  from: ovn-kubernetes-base
+  inputs:
+    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: ovn-kubernetes
+- dockerfile_path: Dockerfile.microshift
+  from: ovn-kubernetes-base
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: ovn-kubernetes-microshift
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-aws-ovn-clusternetwork-cidr-expansion
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-cidr-expansion
+- always_run: false
+  as: e2e-agent-compact-ipv4
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: agent-e2e-compact-ipv4
+- as: e2e-aws-ovn-edge-zones
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-edge-zones
+- as: e2e-aws-ovn-local-gateway
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      GATEWAY_MODE: local
+    workflow: openshift-e2e-aws-ovn
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv4
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-ovn-dualstack
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: baremetalds-e2e-ovn-dualstack
+- always_run: false
+  as: e2e-ovn-hybrid-step-registry
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-hybrid
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn-fdp-qe
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      PARALLEL: "1"
+      TEST_TIMEOUT: "60"
+    test:
+    - chain: openshift-e2e-test-network-qe
+    workflow: openshift-e2e-aws-ovn
+- always_run: false
+  as: e2e-metal-ovn-fdp-qe-ipv6
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+      EXTRA_MG_ARGS: --host-network
+      PARALLEL: "1"
+      TEST_TIMEOUT: "60"
+    test:
+    - chain: openshift-e2e-test-network-qe
+    workflow: baremetalds-e2e-ovn-ipv6
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-windows
+  steps:
+    cluster_profile: aws
+    env:
+      CUSTOM_VXLAN_PORT: "true"
+      EXTRA_MG_ARGS: --host-network
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-aws-ovn-hybrid-toggle
+- always_run: false
+  as: e2e-vsphere-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-vsphere-ovn
+- always_run: false
+  as: e2e-azure-ovn
+  optional: true
+  steps:
+    cluster_profile: azure-2
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-azure-ovn
+- as: e2e-aws-ovn-upgrade
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn-upgrade-ipsec
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-upgrade-ipsec
+- always_run: false
+  as: e2e-aws-ovn-serial-ipsec
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-serial-ipsec
+- as: e2e-aws-ovn-upgrade-local-gateway
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      GATEWAY_MODE: local
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws-ovn
+- as: e2e-azure-ovn-upgrade
+  steps:
+    cluster_profile: azure4
+    env:
+      EXTRA_MG_ARGS: --host-network
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-gcp-ovn
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-gcp-ovn
+- always_run: false
+  as: e2e-vsphere-windows
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      EXTRA_MG_ARGS: --host-network
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- always_run: false
+  as: e2e-openstack-ovn
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      EXTRA_MG_ARGS: --host-network
+      NETWORK_TYPE: OVNKubernetes
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
+- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
+  steps:
+    cluster_profile: aws
+    env:
+      EXTRA_MG_ARGS: --host-network
+      GATEWAY_MODE: local
+    workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-local-gateway
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        OVN_LOCAL_GATEWAY_MODE=true
+      EXTRA_MG_ARGS: --host-network
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-dualstack-bgp
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-bgp-dualstack
+- as: e2e-metal-ipi-ovn-dualstack-bgp-local-gw
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
+- as: e2e-aws-ovn-hypershift
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
+- as: unit
+  commands: |
+    cd go-controller
+    PKGS=$(go list -mod vendor -f '{{if len .TestGoFiles}} {{.ImportPath}} {{end}}' ${PKGS:-./cmd/... ./pkg/... ./hybrid-overlay/...} | xargs)
+    # these packages need running as a container for TestNewClientset
+    PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util/batching"/ }
+    PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util"/ }
+    PKGS=$PKGS make test NOROOT=TRUE
+  container:
+    from: src
+- as: lint
+  commands: |
+    cd go-controller
+    make lint
+  container:
+    from: src
+- as: gofmt
+  commands: |
+    cd go-controller
+    make gofmt
+  container:
+    from: src
+- as: e2e-aws-ovn-serial
+  steps:
+    cluster_profile: aws-3
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-serial
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: ovn-kubernetes
+    workflow: openshift-ci-security
+- always_run: true
+  as: qe-perfscale-payload-control-plane-6nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      ENABLE_LOCAL_INDEX: "true"
+      ES_TYPE: qe
+      EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
+      ITERATION_MULTIPLIER_ENV: "15"
+      OUTPUT_FORMAT: JUNIT
+      RUN_ORION: "true"
+      VERSION: "4.20"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    - chain: openshift-qe-orion-consolidated
+    workflow: openshift-qe-installer-aws
+- always_run: true
+  as: qe-perfscale-aws-ovn-small-udn-density-churn-l3
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHURN: "true"
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      EXTRA_FLAGS: --churn-duration=30m --churn-percent=25
+      ITERATION_MULTIPLIER_ENV: "3"
+      RUN_ORION: "true"
+      VERSION: "4.20"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-udn-density-pods
+- always_run: true
+  as: qe-perfscale-aws-ovn-small-udn-density-l3
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      ITERATION_MULTIPLIER_ENV: "3"
+      RUN_ORION: "true"
+      VERSION: "4.20"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-udn-density-pods
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-udn-density-l2
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      ENABLE_LAYER_3: "false"
+      ITERATION_MULTIPLIER_ENV: "3"
+      RUN_ORION: "true"
+      VERSION: "4.20"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-udn-density-pods
+- always_run: false
+  as: e2e-aws-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      EXTRA_MG_ARGS: --host-network
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-ovn-single-node-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      EXTRA_MG_ARGS: --host-network
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-single-node
+- always_run: false
+  as: e2e-azure-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: azure-2
+    env:
+      EXTRA_MG_ARGS: --host-network
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
+- always_run: true
+  as: e2e-gcp-ovn-techpreview
+  steps:
+    cluster_profile: gcp
+    env:
+      EXTRA_MG_ARGS: --host-network
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-gcp-ovn
+- always_run: false
+  as: openshift-e2e-gcp-ovn-techpreview-upgrade
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      EXTRA_MG_ARGS: --host-network
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-gcp-upgrade
+- always_run: false
+  as: e2e-metal-ipi-ovn-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        FEATURE_SET=TechPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+    workflow: baremetalds-e2e-ovn-ipv4
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        FEATURE_SET=TechPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+    workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        FEATURE_SET=TechPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+    workflow: baremetalds-e2e-ovn-dualstack
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        OVN_LOCAL_GATEWAY_MODE=true
+        FEATURE_SET=TechPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+    workflow: baremetalds-e2e
+- always_run: false
+  as: e2e-vsphere-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      EXTRA_MG_ARGS: --host-network
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-vsphere
+- always_run: false
+  as: e2e-metal-ipi-ovn-bgp-virt-dualstack
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CNV_PRERELEASE_LATEST_CHANNEL: "true"
+    workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
+- always_run: false
+  as: e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CNV_PRERELEASE_LATEST_CHANNEL: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
+- always_run: false
+  as: perfscale-aws-ovn-small-cluster-density-v2
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.xlarge
+      PROFILE_TYPE: both
+      SET_ENV_BY_PLATFORM: custom
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: perfscale-aws-ovn-small-node-density-cni
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.xlarge
+      PROFILE_TYPE: both
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: perfscale-aws-ovn-medium-cluster-density-v2
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
+      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      PROFILE_TYPE: both
+      WORKER_REPLICA_COUNT: "120"
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-cluster-density-v2
+- always_run: false
+  as: perfscale-aws-ovn-medium-node-density-cni
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
+      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      PROFILE_TYPE: both
+      WORKER_REPLICA_COUNT: "120"
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-node-density-cni
+- always_run: false
+  as: ovncore-perfscale-aws-ovn-large-cluster-density-v2
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-ovn-perfscale
+    env:
+      BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: r5.8xlarge
+      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false
+      ITERATION_MULTIPLIER_ENV: "6"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
+      PROFILE_TYPE: both
+      SET_ENV_BY_PLATFORM: custom
+      WORKER_REPLICA_COUNT: "501"
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: workers-scale
+    - ref: openshift-qe-cluster-density-v2
+- always_run: false
+  as: ovncore-perfscale-aws-ovn-large-node-density-cni
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-ovn-perfscale
+    env:
+      BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: r5.8xlarge
+      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
+      PROFILE_TYPE: both
+      SET_ENV_BY_PLATFORM: custom
+      WORKER_REPLICA_COUNT: "501"
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - chain: workers-scale
+    - chain: openshift-qe-node-density-cni
+- always_run: false
+  as: ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-ovn-perfscale
+    env:
+      BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      CLUSTER_NETWORK_CIDR: 20.0.0.0/8
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
+      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false --gc=false  --timeout=8h
+      ITERATION_MULTIPLIER_ENV: "6"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
+      PROFILE_TYPE: both
+      SET_ENV_BY_PLATFORM: custom
+      WORKER_REPLICA_COUNT: "750"
+      ZONES_COUNT: "6"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf-custom-cidr
+    - chain: ipi-install
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - chain: workers-scale
+    - ref: openshift-qe-cluster-density-v2
+- always_run: false
+  as: ovncore-perfscale-aws-ovn-xlarge-node-density-cni
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-ovn-perfscale
+    env:
+      BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      CLUSTER_NETWORK_CIDR: 20.0.0.0/8
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
+      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false --gc=false
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
+      PROFILE_TYPE: both
+      SET_ENV_BY_PLATFORM: custom
+      WORKER_REPLICA_COUNT: "750"
+      ZONES_COUNT: "6"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf-custom-cidr
+    - chain: ipi-install
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - chain: workers-scale
+    - ref: openshift-qe-node-density-cni
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: ovn-kubernetes
