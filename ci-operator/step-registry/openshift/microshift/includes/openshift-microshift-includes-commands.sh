@@ -256,11 +256,11 @@ function ci_custom_link_report() {
             scenario_status="fail"
           fi
         elif [ ! -d "${test}/vms/" ] && [ ! -f "${junit_file}" ]; then
-          for junit_file in "$(ls ${test}/phase_*/junit.xml)"; do
-            if grep -q -E 'message="FAILED"' "${junit_file}"; then
+          for temp_junit_file in "$(ls ${test}/phase_*/junit.xml)"; do
+            if grep -q -E 'message="FAILED"' "${temp_junit_file}"; then
               scenario_status="fail"
               break
-            elif grep -q -E 'message="SKIPPED"' "${junit_file}"; then
+            elif grep -q -E 'message="SKIPPED"' "${temp_junit_file}"; then
               scenario_status="skip"
             fi
           done
@@ -548,12 +548,12 @@ EOF
             status_emoji="❌"
           fi
         elif [ ! -d "${test}/vms/" ] && [ ! -f "${junit_file}" ]; then
-          for junit_file in "$(ls ${test}/phase_*/junit.xml)"; do
-            if grep -q -E 'message="FAILED"' "${junit_file}"; then
+          for temp_junit_file in "$(ls ${test}/phase_*/junit.xml)"; do
+            if grep -q -E 'message="FAILED"' "${temp_junit_file}"; then
               status_class="status-fail"
               status_emoji="❌"
               break
-            elif grep -q -E 'message="SKIPPED"' "${junit_file}"; then
+            elif grep -q -E 'message="SKIPPED"' "${temp_junit_file}"; then
               status_class="status-skip"
               status_emoji="⚠️"
             fi
