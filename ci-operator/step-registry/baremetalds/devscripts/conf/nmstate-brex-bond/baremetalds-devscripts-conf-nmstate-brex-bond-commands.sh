@@ -6,6 +6,15 @@ set -o pipefail
 
 echo "************ baremetalds devscripts conf nmstate-brex-bond command ************"
 
+if [ -f "${SHARED_DIR}/dev-scripts-additional-config" ]; then
+    echo "Loading existing dev-scripts configuration..."
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/dev-scripts-additional-config"
+fi
+
+NUM_MASTERS="${NUM_MASTERS:-3}"
+NUM_WORKERS="${NUM_WORKERS:-3}"
+
 generate_nmstate_machineconfigs() {
     local output_dir="${1:-/tmp/nmstate-brex-bond}"
     local master_bond_port2="${2:-enp6s0}"
@@ -158,13 +167,13 @@ networkConfig: &BOND
       - ${master_bond_port2}
 EOF
 
-    for i in 1 2; do
+    for ((i=1; i<NUM_MASTERS-1; i++)); do
         cat > "${output_dir}/network-config/ostest-master-${i}.yaml" <<EOF
 networkConfig: *BOND
 EOF
     done
 
-    for i in 0 1; do
+    for ((i=0; i<NUM_WORKERS-1; i++)); do
         cat > "${output_dir}/network-config/ostest-worker-${i}.yaml" <<EOF
 networkConfig: *BOND
 EOF
@@ -174,10 +183,33 @@ EOF
     echo "  - 00-generated-nmstate-brex-bond-master.yaml"
     echo "  - 00-generated-nmstate-brex-bond-worker.yaml"
     echo "Generated network configs in ${output_dir}/network-config:"
-    echo "  - ostest-master-{0,1,2}.yaml"
-    echo "  - ostest-worker-{0,1}.yaml"
+    echo "  - ostest-master-{0...${NUM_MASTERS-1}.yaml"
+    echo "  - ostest-worker-{0...${NUM_WORKERS-1}.yaml"
     echo "ASSETS_EXTRA_FOLDER=${output_dir}/assets" >> "${SHARED_DIR}/dev-scripts-additional-config"
     echo "NETWORK_CONFIG_FOLDER=${output_dir}/network-config" >> "${SHARED_DIR}/dev-scripts-additional-config"
+    echo "--- Generated config in: 00-generated-nmstate-brex-bond-master.yaml ---"
+    echo $master_nmstate_config
+    echo "--- Generated config in: 00-generated-nmstate-brex-bond-worker.yaml ---"
+    echo $worker_nmstate_config
+    echo "--- Generated assets config: ---"
+    echo "networkConfig: &BOND
+            interfaces:
+            - name: bond0
+              type: bond
+              state: up
+              ipv4:
+                dhcp: true
+                enabled: true
+                auto-dns: true
+                auto-gateway: true
+                auto-routes: true
+              link-aggregation:
+                mode: active-backup
+                options:
+                  miimon: '100'
+                port:
+                - enp2s0
+                - ${master_bond_port2}"
 }
 
 echo "NETWORK_TYPE=\"OVNKubernetes\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
