@@ -1,11 +1,6 @@
 # OpenShift Service Mesh CI Documentation
 
-Maintenance documentation for OpenShift Service Mesh CI jobs. Contains essential information not available in the configuration files themselves.
-
-## Table of Contents
-
-- [Performance Job Usage](#performance-job-usage)
-- [OpenShift CI Technical Notes](#openshift-ci-technical-notes)
+Maintenance documentation for OpenShift Service Mesh CI jobs. Contains essential information not available in the configuration files themselves. Please add here any information that may help future maintainers.
 
 ## Performance Job Usage
 
@@ -143,32 +138,3 @@ This job is primarily used for:
 **Getting Help**:
 - Performance-related questions: Contact the PerfScale team via internal Slack channels
 - Job configuration issues: Contact the OpenShift Service Mesh team
-
-## OpenShift CI Technical Notes
-
-As job definition YAML files are automatically regenerated and comments are removed, this section captures important maintenance notes for our OpenShift CI jobs.
-
-### OCP Installation
-
-#### HyperShift
-We use HyperShift for faster installation time and to save some $.
-- Uses `servicemesh-istio-e2e-hypershift` workflow
-- Does not support ARM64 yet (Platform team is working on that)
-- Does not support pre-GA versions
-- Contains credentials for `quay-proxy.ci.openshift.org/openshift` so it's possible to use:
-  ```yaml
-  MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.27
-  ```
-
-#### IPI Installation
-The `ipi-install` step always uses the installer from `release:latest` (even when you set `OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE` and `RELEASE_IMAGE_LATEST`) so you can't use multiple OCP versions in one job. We need to use one YAML file per OCP version because of that. Otherwise it would try to use e.g. 4.18 installer to install an older 4.14 version which fails.
-
-- Currently used for ARM64 clusters and pre-GA clusters
-- Does not contain credentials for `quay-proxy.ci.openshift.org/openshift` so using `MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.27` fails with authentication error
-- Necessary to use upstream image instead:
-  ```yaml
-  MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.27-56a42ed008b9070d88166dbec82e798d9eca43de
-  ```
-
-### Running Docker in OCP
-We can run Docker in the OCP as we are creating a privileged pod and passing our command to the `entrypoint` command available in the build-tools image.
