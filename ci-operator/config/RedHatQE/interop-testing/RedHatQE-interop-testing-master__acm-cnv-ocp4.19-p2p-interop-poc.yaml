@@ -1,0 +1,89 @@
+base_images:
+  acmqe-grc-test:
+    name: "2.14"
+    namespace: acm-qe
+    tag: acmqe-grc-test
+  application-ui-test:
+    name: "2.14"
+    namespace: acm-qe
+    tag: application-ui-test
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  fetch-managed-clusters:
+    name: autotest
+    namespace: acm-qe
+    tag: fetch-managed-clusters
+  multicluster-observability-operator-opp:
+    name: "2.14"
+    namespace: acm-qe
+    tag: multicluster-observability-operator-opp
+  virtctl:
+    name: "4.20"
+    namespace: ocp
+    tag: virtctl
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.20.0-rc.0
+        upper: 4.20.0-rc.20
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: acm-cnv-p2p-aws-419-poc
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.14", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+      USER_TAGS: |
+        scenario acm-cnv-p2p-poc
+    leases:
+    - count: 1
+      env: LEASED_RESOURCE
+      resource_type: aws-cspi-qe-quota-slice
+    post:
+    - ref: gather-aws-console
+    - chain: ipi-deprovision
+    pre:
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-az
+    - ref: ipi-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - chain: ipi-install
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-interop-p2p-cluster-install
+    - ref: acm-interop-p2p-cluster-upgrade
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: acm-cnv-ocp4.19-p2p-interop-poc
