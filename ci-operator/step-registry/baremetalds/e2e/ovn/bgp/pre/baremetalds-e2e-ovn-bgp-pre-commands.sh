@@ -3,9 +3,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "NMSBREX_MASTER_NIC1=enp2s0" >> "${SHARED_DIR}/nmstate-brex-bond-config"
-echo "NMSBREX_MASTER_NIC2=enp6s0" >> "${SHARED_DIR}/nmstate-brex-bond-config"
-
 # Fetch packet basic configuration
 source "${SHARED_DIR}/packet-conf.sh"
 ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << 'EOFTOP'

@@ -7,16 +7,7 @@ set -o pipefail
 echo "************ baremetalds devscripts conf nmstate-brex-bond command ************"
 
 generate_nmstate_machineconfigs() {
-  local nmstate_brex_bond_config_path="${SHARED_DIR}/nmstate-brex-bond-config"
   local devscripts_additional_config_path="${SHARED_DIR}/dev-scripts-additional-config"
-
-  if [ -f "$nmstate_brex_bond_config_path" ]; then
-    echo "Loading existing nmstate-brex-bond configuration (source: $nmstate_brex_bond_config_path)..."
-    cat "$nmstate_brex_bond_config_path"
-    # shellcheck disable=SC1090
-    source "$nmstate_brex_bond_config_path"
-    echo "*******************************************************************************"
-  fi
 
   if [ -f "$devscripts_additional_config_path" ]; then
     echo "Loading existing dev-scripts configuration (source: $devscripts_additional_config_path)..."
@@ -26,13 +17,13 @@ generate_nmstate_machineconfigs() {
     echo "*******************************************************************************"
   fi
 
-  local output_dir="${NMSBREX_OUT_DIR:-"/tmp/nmstate-brex-bond"}"
-  local master_bond_port1="${NMSBREX_MASTER_NIC1:-"enp2s0"}"
-  local worker_bond_port1="${NMSBREX_WORKER_NIC1:-$master_bond_port1}"
-  local master_bond_port2="${NMSBREX_MASTER_NIC2:-"enp3s0"}"
-  local worker_bond_port2="${NMSBREX_WORKER_NIC2:-$master_bond_port2}"
-  local master_mac_from="${NMSBREX_MASTER_COPY_MAC_FROM:-$master_bond_port1}"
-  local worker_mac_from="${NMSBREX_WORKER_COPY_MAC_FROM:-$worker_bond_port1}"
+  local output_dir="${NMS_BREX_OUT_DIR:-"/tmp/nmstate-brex-bond"}"
+  local master_bond_port1="${NMS_BREX_MASTER_NIC1:-"enp2s0"}"
+  local worker_bond_port1="${NMS_BREX_WORKER_NIC1:-$master_bond_port1}"
+  local master_bond_port2="${NMS_BREX_MASTER_NIC2:-"enp3s0"}"
+  local worker_bond_port2="${NMS_BREX_WORKER_NIC2:-$master_bond_port2}"
+  local master_mac_from="${NMS_BREX_MASTER_COPY_MAC_FROM:-$master_bond_port1}"
+  local worker_mac_from="${NMS_BREX_WORKER_COPY_MAC_FROM:-$worker_bond_port1}"
 
   local masters="${NUM_MASTERS:-3}"
   local workers="${NUM_WORKERS:-3}"
@@ -61,8 +52,17 @@ generate_nmstate_machineconfigs() {
   mkdir -p "${output_dir}/assets"
   mkdir -p "${output_dir}/network-config"
 
+  if [ -n "${NMS_BREX_ASSET_CONF_MASTER:-}" ]; then
+    echo "Using custom NMS_BREX_ASSET_CONF for asset configuration"
+    local master_nmstate_config="${NMS_BREX_ASSET_CONF_MASTER}"
+    local worker_nmstate_config="${NMS_BREX_ASSET_CONF_WORKER:-NMS_BREX_ASSET_CONF_MASTER}"
+  else
+    echo "Generating default asset configuration"
+  fi
+
   # Master node nmstate config (plain text, will be base64 encoded)
-  local master_nmstate_config="interfaces:
+  if [ -z "${NMS_BREX_ASSET_CONF_MASTER:-}" ]; then
+    local master_nmstate_config="interfaces:
 - name: bond0
   type: bond
   state: up
@@ -99,8 +99,8 @@ generate_nmstate_machineconfigs() {
     enabled: ${ipv6_enabled}
     dhcp: ${ipv6_enabled}"
 
-  # Worker node nmstate config (plain text, will be base64 encoded)
-  local worker_nmstate_config="interfaces:
+    # Worker node nmstate config (plain text, will be base64 encoded)
+    local worker_nmstate_config="interfaces:
 - name: bond0
   type: bond
   state: up
@@ -136,6 +136,7 @@ generate_nmstate_machineconfigs() {
   ipv6:
     enabled: ${ipv6_enabled}
     dhcp: ${ipv6_enabled}"
+  fi
 
   local master_b64
   local worker_b64
@@ -182,7 +183,15 @@ spec:
           path: /etc/nmstate/openshift/cluster.yml
 EOF
 
-  cat > "${output_dir}/network-config/ostest-master-0.yaml" <<EOF
+  # Check if custom network config is provided
+  if [ -n "${NMS_BREX_NETWORK_CONF_MASTER:-}" ]; then
+    echo "Using custom NMS_BREX_NETWORK_CONF_MASTER for network configuration"
+    cat > "${output_dir}/network-config/ostest-master-0.yaml" <<EOF
+${NMS_BREX_NETWORK_CONF_MASTER}
+EOF
+  else
+    echo "Generating default network configuration"
+    cat > "${output_dir}/network-config/ostest-master-0.yaml" <<EOF
 networkConfig: &BOND
   interfaces:
   - name: bond0
@@ -202,6 +211,7 @@ networkConfig: &BOND
       - ${master_bond_port1}
       - ${master_bond_port2}
 EOF
+  fi
 
   for ((i=1; i<masters; i++)); do
     cat > "${output_dir}/network-config/ostest-master-${i}.yaml" <<EOF
