@@ -1,6 +1,6 @@
 base_images:
   upi-installer:
-    name: "4.20"
+    name: "4.19"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -10,6 +10,11 @@ build_root:
     tag: latest
 releases:
   latest:
+    release:
+      architecture: multi
+      channel: fast
+      version: "4.19"
+  target:
     candidate:
       architecture: multi
       product: ocp
@@ -22,7 +27,7 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: node-density-heavy-24nodes
+  as: multi-loaded-upgrade-419to420-24nodes
   steps:
     allow_skip_on_success: true
     cluster_profile: azure-qe
@@ -31,22 +36,28 @@ tests:
       ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
       ADDITIONAL_WORKERS: "3"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CHURN: "false"
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D4s_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_D4s_v5
       CUSTOM_AZURE_REGION: westus2
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE_WORKER: "3"
       OCP_ARCH: amd64
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: Standard_D4s_v5
-      PPROF: "false"
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "24"
     test:
     - ref: ipi-install-heterogeneous
-    - ref: workers-scale
-    - chain: openshift-qe-node-density-heavy
+    - chain: openshift-qe-upgrade-max-unavailable
+    - chain: workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    - chain: openshift-upgrade-qe-sanity
     workflow: openshift-qe-installer-azure
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
   repo: ocp-qe-perfscale-ci
-  variant: azure-4.20-nightly-multi
+  variant: azure-4.20-nightly-multi-loaded-upgrade-from-4.19
