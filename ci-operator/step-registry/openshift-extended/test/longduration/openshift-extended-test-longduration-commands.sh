@@ -269,9 +269,8 @@ fi
 
 #if OVERWRITE_OC_MIRROR then overwrite the oc-mirror from the payload
 if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
-    echo "ocpversion: ${ocpVersion}"
+    echo "OCP Version: ${ocpVersion}"
     if [[ -n "${ocpVersion:-}" ]]; then
-        set +oex
         tmpDir=$(mktemp -d)
         cd ${tmpDir}
         tag=$(oc adm release info "${ocpVersion}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
@@ -281,15 +280,13 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
         ls -la ./oc-mirror
         chmod +x ./oc-mirror
         ./oc-mirror version --output yaml
-        cp ./oc-mirror /usr/local/bin/
+        cp /usr/bin/oc ./oc
+        PATH="$tmpDir:$PATH"
         cd /tmp/output
         echo "oc mirror version:"
-        oc mirror version --v2 --output yaml
+        oc mirror version --output yaml
         set +x
     fi
-    echo "debug...."
-    #sleep 2h
-    set -xeuo pipefail
 fi
 # execute the cases
 function run {
