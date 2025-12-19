@@ -11,7 +11,7 @@ set -o pipefail
 # - Slack webhook URLs
 #
 # NEVER enable 'set -x' or 'set -o xtrace' as it will expose credentials in logs
-# Use DEBUG environment variable (0-2) for controlled verbosity instead
+# Use VERBOSITY environment variable (0-2) for controlled verbosity instead
 # ============================================================================
 
 # Security: Explicitly disable command tracing to prevent credential exposure
@@ -24,15 +24,15 @@ trap 'set +o xtrace' DEBUG
 # shellcheck disable=SC2034  # Unused variables are exported for external tools
 
 # Environment variable defaults (overridable via ref.yaml)
-DEBUG=${DEBUG:-1}
+VERBOSITY=${VERBOSITY:-1}
 
 # Internal variables (not configurable via ref.yaml)
 readonly IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.txt"
 
 # Logging functions with timestamps and severity levels
 log() { echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] ${*}"; }
-info()  { if [[ ${DEBUG-0} -ge 1 ]]; then log "[info] ${*}"; fi }
-debug() { if [[ ${DEBUG-0} -ge 2 ]]; then log "[debug] ${*}"; fi }
+info()  { if [[ ${VERBOSITY-0} -ge 1 ]]; then log "[info] ${*}"; fi }
+debug() { if [[ ${VERBOSITY-0} -ge 2 ]]; then log "[debug] ${*}"; fi }
 error() { log "[error] ${*}"; exit ${ERR_EXIT_CODE:-1}; }
 
 
@@ -69,10 +69,10 @@ notify() {
 }
 
 # Helper function to run commands with conditional verbosity
-# Security Note: In DEBUG mode (>=2), command output is visible. Ensure no sensitive
+# Security Note: In VERBOSITY mode (>=2), command output is visible. Ensure no sensitive
 # data is passed through commands executed via this function.
 run() {
-  if [[ ${DEBUG-0} -ge 2 ]]; then
+  if [[ ${VERBOSITY-0} -ge 2 ]]; then
     "$@"
   else
     "$@" > /dev/null 2>&1
@@ -141,7 +141,7 @@ debug "image: build image-updater binary"
 run make build
 
 info "image: fetching the latest image digests for all components"
-if [[ ${DEBUG-0} -ge 2 ]]; then
+if [[ ${VERBOSITY-0} -ge 2 ]]; then
   ./image-updater update --verbosity 1 --config config.yaml | tee "${IMAGE_UPDATER_OUTPUT}"
 else
   ./image-updater update --config config.yaml > "${IMAGE_UPDATER_OUTPUT}"
@@ -183,7 +183,7 @@ run make -C config materialize
 
 # Git: Display changes for debugging
 # Security Note: Only show diff in high debug mode; ensure no credential files are in the diff
-if [[ ${DEBUG-0} -ge 2 ]]; then
+if [[ ${VERBOSITY-0} -ge 2 ]]; then
   debug "git: changes to be merged into main"
   git diff main
 fi
