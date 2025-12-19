@@ -230,13 +230,13 @@ function ci_custom_link_report() {
     local scenarios_passed=0
     local scenarios_failed=0
     local scenarios_skipped=0
-    
+
     for test in "${ARTIFACT_DIR}"/scenario-info/*; do
         # Skip if glob didn't match anything
         [ -d "${test}" ] || continue
-        
+
         total_scenarios=$((total_scenarios + 1))
-        
+
         # Find junit file
         local junit_file=""
         if [ -f "${test}/log.html" ]; then
@@ -249,12 +249,23 @@ function ci_custom_link_report() {
 
         # Determine scenario status
         local scenario_status="pass"
-        if [ ! -d "${test}/vms/" ] || [ ! -f "${junit_file}" ]; then
-            scenario_status="skip"
-        elif [ -f "${junit_file}" ] && grep -q -E 'failures="[1-9][0-9]?"' "${junit_file}"; then
+        if [ -d "${test}/vms/" ]; then
+          if [ ! -f "${junit_file}" ]; then
             scenario_status="fail"
+          elif [ -f "${junit_file}" ] && grep -q -E '(failures|errors)="[1-9][0-9]*"' "${junit_file}"; then
+            scenario_status="fail"
+          fi
+        elif [ ! -d "${test}/vms/" ] && [ ! -f "${junit_file}" ]; then
+          for temp_junit_file in "$(ls ${test}/phase_*/junit.xml)"; do
+            if grep -q -E 'message="FAILED"' "${temp_junit_file}"; then
+              scenario_status="fail"
+              break
+            elif grep -q -E 'message="SKIPPED"' "${temp_junit_file}"; then
+              scenario_status="skip"
+            fi
+          done
         fi
-        
+
         # Count by status
         case "${scenario_status}" in
             pass) scenarios_passed=$((scenarios_passed + 1)) ;;
@@ -316,6 +327,9 @@ function ci_custom_link_report() {
     }
     tr:nth-child(even) {
       background-color: rgba(255, 255, 255, 0.04);
+    }
+    tr:hover {
+      background-color: #000000;
     }
     a:link {
       color: #ffffff;
@@ -523,18 +537,31 @@ EOF
         fi
 
         # set scenario status
-        testname=$(basename "${test}")
         status_class="status-pass"
         status_emoji="✅"
-        if [ ! -d "${test}/vms/" ] || [ ! -f "${junit_file}" ]; then
-            status_class="status-skip"
-            status_emoji="⚠️"
-        elif [ -f "${junit_file}" ] && grep -q -E 'failures="[1-9][0-9]?"' "${junit_file}"; then
+        if [ -d "${test}/vms/" ]; then
+          if [ ! -f "${junit_file}" ]; then
             status_class="status-fail"
             status_emoji="❌"
+          elif [ -f "${junit_file}" ] && grep -q -E '(failures|errors)="[1-9][0-9]*"' "${junit_file}"; then
+            status_class="status-fail"
+            status_emoji="❌"
+          fi
+        elif [ ! -d "${test}/vms/" ] && [ ! -f "${junit_file}" ]; then
+          for temp_junit_file in "$(ls ${test}/phase_*/junit.xml)"; do
+            if grep -q -E 'message="FAILED"' "${temp_junit_file}"; then
+              status_class="status-fail"
+              status_emoji="❌"
+              break
+            elif grep -q -E 'message="SKIPPED"' "${temp_junit_file}"; then
+              status_class="status-skip"
+              status_emoji="⚠️"
+            fi
+          done
         fi
 
         # set scenario name
+        testname=$(basename "${test}")
         scenario_cell="<a class=\"scenario-link\" target=\"_blank\" href=\"${url_prefix}/${testname}\">${testname}</a>"
 
         # get microshift version from journal log

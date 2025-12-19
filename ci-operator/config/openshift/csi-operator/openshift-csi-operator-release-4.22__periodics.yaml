@@ -1,0 +1,197 @@
+base_images:
+  aws-ebs-csi-driver-operator:
+    name: "4.22"
+    namespace: ocp
+    tag: aws-ebs-csi-driver-operator
+  aws-ebs-csi-driver-operator-test:
+    name: "4.22"
+    namespace: ocp
+    tag: aws-ebs-csi-driver-operator-test
+  aws-efs-csi-driver-operator:
+    name: "4.22"
+    namespace: ocp
+    tag: aws-efs-csi-driver-operator
+  aws-efs-csi-operator-create-efs:
+    name: "4.22"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  aws-efs-driver-operand:
+    name: "4.22"
+    namespace: ocp
+    tag: aws-efs-csi-driver
+  azure-disk-csi-driver-operator:
+    name: "4.22"
+    namespace: ocp
+    tag: azure-disk-csi-driver-operator
+  azure-disk-csi-driver-operator-test:
+    name: "4.22"
+    namespace: ocp
+    tag: azure-disk-csi-driver-operator-test
+  azure-file-csi-driver-operator:
+    name: "4.22"
+    namespace: ocp
+    tag: azure-file-csi-driver-operator
+  azure-file-csi-driver-operator-test:
+    name: "4.22"
+    namespace: ocp
+    tag: azure-file-csi-driver-operator-test
+  csi-driver-manila-operator:
+    name: "4.22"
+    namespace: ocp
+    tag: csi-driver-manila-operator
+  csi-driver-smb-test:
+    name: "4.22"
+    namespace: ocp
+    tag: csi-driver-smb-test
+  csi-operator-test:
+    name: "4.22"
+    namespace: ocp
+    tag: csi-operator-test
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  livenessprobe-operand:
+    name: "4.22"
+    namespace: ocp
+    tag: csi-livenessprobe
+  ocp_4.19_base-rhel9:
+    name: "4.22"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.21_base-rhel9:
+    name: "4.22"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.23-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.21
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.22
+  openstack-cinder-csi-driver-operator:
+    name: "4.22"
+    namespace: ocp
+    tag: openstack-cinder-csi-driver-operator
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
+  provisioner-operand:
+    name: "4.22"
+    namespace: ocp
+    tag: csi-external-provisioner
+  proxy-operand:
+    name: "4.22"
+    namespace: ocp
+    tag: kube-rbac-proxy
+  registrar-operand:
+    name: "4.22"
+    namespace: ocp
+    tag: csi-node-driver-registrar
+  smb-csi-driver-operator:
+    name: "4.22"
+    namespace: ocp
+    tag: smb-csi-driver-operator
+  smb-csi-driver-operator-test:
+    name: "4.22"
+    namespace: ocp
+    tag: smb-csi-driver-operator-test
+  smb-driver-operand:
+    name: "4.22"
+    namespace: ocp
+    tag: csi-driver-smb
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
+build_root:
+  from_repository: true
+operator:
+  bundles:
+  - as: smb-csi-driver-operator-bundle
+    base_index: operator-index
+    context_dir: config/samba
+    dockerfile_path: bundle.Dockerfile
+    update_graph: replaces
+  - as: aws-efs-csi-driver-operator-bundle
+    base_index: operator-index
+    context_dir: config/aws-efs
+    dockerfile_path: bundle.Dockerfile
+    update_graph: replaces
+  substitutions:
+  - pullspec: quay.io/openshift/origin-aws-efs-csi-driver:latest
+    with: pipeline:aws-efs-driver-operand
+  - pullspec: quay.io/openshift/origin-aws-efs-csi-driver-operator:latest
+    with: pipeline:aws-efs-csi-driver-operator
+  - pullspec: quay.io/openshift/origin-smb-csi-driver-operator:latest
+    with: pipeline:smb-csi-driver-operator
+  - pullspec: quay.io/openshift/origin-csi-driver-smb:latest
+    with: pipeline:smb-driver-operand
+  - pullspec: quay.io/openshift/origin-csi-external-provisioner:latest
+    with: pipeline:provisioner-operand
+  - pullspec: quay.io/openshift/origin-csi-node-driver-registrar:latest
+    with: pipeline:registrar-operand
+  - pullspec: quay.io/openshift/origin-csi-livenessprobe:latest
+    with: pipeline:livenessprobe-operand
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:latest
+    with: pipeline:proxy-operand
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: periodic-e2e-aws-efs-csi
+  cron: 40 4 * * *
+  steps:
+    cluster_profile: aws-3
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      OO_CHANNEL: stable
+      TEST_SUITE: openshift/csi
+    workflow: openshift-e2e-aws-csi-efs
+- as: periodic-e2e-smb-csi
+  cron: 2 10 * * *
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index-smb-csi-driver-operator-bundle
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: smb-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+    workflow: openshift-e2e-azure-csi-smb
+- as: periodic-e2e-azure-file-csi
+  cron: 26 17 * * *
+  steps:
+    cluster_profile: azure4
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+    workflow: openshift-e2e-azure-csi-file
+zz_generated_metadata:
+  branch: release-4.22
+  org: openshift
+  repo: csi-operator
+  variant: periodics

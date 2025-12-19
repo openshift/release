@@ -1,0 +1,145 @@
+base_images:
+  ocp_4.14_cli:
+    name: "4.23"
+    namespace: ocp
+    tag: cli
+  ocp_4.21_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.22_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.22
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.rhel7
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_4.22_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
+  to: local-storage-operator
+- dockerfile_path: Dockerfile.diskmaker.rhel7
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: local-storage-diskmaker
+- dockerfile_path: Dockerfile.mustgather
+  from: ocp_4.14_cli
+  to: local-storage-mustgather
+operator:
+  bundles:
+  - as: local-storage-operator-bundle
+    context_dir: config
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/origin-local-storage-operator:latest
+    with: pipeline:local-storage-operator
+  - pullspec: quay.io/openshift/origin-local-storage-diskmaker:latest
+    with: pipeline:local-storage-diskmaker
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: e2e-operator
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OO_INDEX: ci-index-local-storage-operator-bundle
+    env:
+      OO_CHANNEL: preview
+      OO_INSTALL_NAMESPACE: openshift-local-storage
+      OO_PACKAGE: local-storage-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test
+      cli: latest
+      commands: make test_e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: e2e-operator-extended
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-local-storage-operator-bundle
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+      OO_CHANNEL: preview
+      OO_INSTALL_NAMESPACE: openshift-marketplace
+      OO_PACKAGE: local-storage-operator
+      OO_TARGET_NAMESPACES: '!install'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;STORAGE&
+      TEST_SCENARIOS: \[LSO\]
+    test:
+    - ref: openshift-extended-test
+    workflow: optional-operators-ci-aws
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: local-storage-operator
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: local-storage-operator

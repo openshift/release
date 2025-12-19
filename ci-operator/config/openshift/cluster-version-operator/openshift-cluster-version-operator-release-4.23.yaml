@@ -1,0 +1,208 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.64.8
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.21_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
+  yamllint:
+    name: rust
+    namespace: cincinnati-ci-public
+    tag: boot-root-1.84.1
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.rhel
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: cluster-version-operator
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: go fmt ./... && git diff --exit-code
+  container:
+    from: src
+  run_if_changed: \.go$
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --timeout=5m1s
+  container:
+    clone: true
+    from: golangci-lint
+- as: unit
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e-agnostic-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure-2
+    workflow: openshift-e2e-azure
+- as: e2e-agnostic-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: e2e-test
+      commands: make integration-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-extended-tests
+  optional: true
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      TEST_FILTERS: ~DisconnectedOnly&
+      TEST_SCENARIOS: OTA cvo
+    test:
+    - chain: openshift-e2e-test-ota-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: e2e-agnostic-ovn-upgrade-into-change
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure-2
+    workflow: openshift-upgrade-azure
+- as: e2e-agnostic-ovn-upgrade-out-of-change
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    workflow: openshift-upgrade-azure
+- as: e2e-hypershift-conformance
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
+- as: e2e-hypershift
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
+- as: e2e-aws-ovn-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-agnostic-operator-techpreview
+  steps:
+    cluster_profile: azure-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: e2e-test
+      commands: make integration-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-agnostic-ovn-upgrade-into-change-techpreview
+  steps:
+    cluster_profile: azure-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-upgrade-azure
+- always_run: false
+  as: e2e-agnostic-ovn-upgrade-out-of-change-techpreview
+  steps:
+    cluster_profile: azure-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-upgrade-azure
+- always_run: false
+  as: e2e-agnostic-operator-devpreview
+  optional: true
+  steps:
+    cluster_profile: azure-2
+    env:
+      FEATURE_SET: DevPreviewNoUpgrade
+    test:
+    - as: e2e-test
+      commands: make integration-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-azure
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+- as: verify-yaml
+  commands: make verify-yaml
+  container:
+    clone: true
+    from: yamllint
+  run_if_changed: (\.yaml|\.yml)$
+- as: verify-update
+  commands: make verify-update
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: cluster-version-operator
