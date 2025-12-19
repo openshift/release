@@ -7,13 +7,14 @@ set -o pipefail
 echo "************ baremetalds devscripts conf nmstate-brex-bond command ************"
 
 generate_nmstate_machineconfigs() {
-  local devscripts_additional_config_path="${SHARED_DIR}/dev-scripts-additional-config"
-
-  if [ -f "$devscripts_additional_config_path" ]; then
-    echo "Loading existing dev-scripts configuration (source: $devscripts_additional_config_path)..."
-    cat "$devscripts_additional_config_path"
-    # shellcheck disable=SC1090
-    source "$devscripts_additional_config_path"
+  if [ -n "${DEVSCRIPTS_CONFIG:-}" ]; then
+    echo "Applying DEVSCRIPTS_CONFIG environment variables..."
+    while IFS= read -r line; do
+      if [ -n "$line" ] && [[ ! "$line" =~ ^[[:space:]]*# ]]; then
+        echo "  Setting: $line"
+        export "$line"
+      fi
+    done <<< "$DEVSCRIPTS_CONFIG"
     echo "*******************************************************************************"
   fi
 
