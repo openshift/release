@@ -50,7 +50,9 @@ done
 #Trigget Quay E2E Testing
 registryEndpoint="$(oc -n "$quay_ns" get quayregistry "$quay_registry" -o jsonpath='{.status.registryEndpoint}')"
 registry="${registryEndpoint#https://}"
+
 echo "The Quay hostname is $registryEndpoint"
 export CYPRESS_QUAY_ENDPOINT=$registry
+
 yarn run smoke || true
 

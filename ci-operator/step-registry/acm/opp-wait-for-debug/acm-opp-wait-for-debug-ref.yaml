@@ -1,0 +1,36 @@
+ref:
+  as: acm-opp-wait-for-debug
+  from_image:
+    namespace: ocp
+    name: "4.20"
+    tag: cli
+  grace_period: 48h0m0s
+  commands: acm-opp-wait-for-debug-commands.sh
+  timeout: 48h0m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: WAIT_DURATION
+      default: "7200"
+      documentation: Time to wait in seconds (default 7200 = 2 hours, max 172800 = 48 hours)
+    - name: WAIT_MESSAGE
+      default: "Waiting for manual inspection and debugging"
+      documentation: Custom message to display during wait
+  documentation: |-
+    Pauses test execution after OPP configuration for debugging purposes.
+
+    This step allows operators to:
+    - Inspect the cluster state after OPP bundle installation
+    - Run oc commands interactively
+    - Debug OPP integration issues (Quay, ACS, ODF, ACM)
+    - Wait for manual verification before proceeding
+
+    The step will wait for a configurable time period (default: 2 hours)
+    or until a specific condition is met. During this time, the cluster
+    remains available for inspection via oc commands.
+
+    Environment Variables:
+    - WAIT_DURATION: Time to wait in seconds (default: 7200 = 2 hours)
+    - WAIT_MESSAGE: Custom message to display during wait
