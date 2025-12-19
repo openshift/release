@@ -1,18 +1,18 @@
 base_images:
   acmqe-grc-test:
-    name: "2.14"
+    name: "2.15"
     namespace: acm-qe
     tag: acmqe-grc-test
   application-ui-test:
-    name: "2.14"
+    name: "2.15"
     namespace: acm-qe
     tag: application-ui-test
   clc-ui-e2e:
-    name: "2.14"
+    name: "2.15"
     namespace: acm-qe
     tag: clc-ui-e2e
   cli:
-    name: "4.19"
+    name: "4.21"
     namespace: ocp
     tag: cli
   fetch-managed-clusters:
@@ -20,7 +20,7 @@ base_images:
     namespace: acm-qe
     tag: fetch-managed-clusters
   multicluster-observability-operator-opp:
-    name: "2.14"
+    name: "2.15"
     namespace: acm-qe
     tag: multicluster-observability-operator-opp
   ocs-ci-tests:
@@ -30,12 +30,16 @@ base_images:
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.19"
+    tag: "4.21"
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: rhel-9-release-golang-1.24-openshift-4.21
 images:
 - dockerfile_literal: |
     FROM this-is-ignored
@@ -48,7 +52,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -63,18 +67,19 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp","opp-aws-lp","opp-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.21-lp","opp-aws-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
-      FIREWATCH_DEFAULT_JIRA_EPIC: LPINTEROP-5704
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8640
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
-      ODF_VERSION_MAJOR_MINOR: "4.19"
+      ODF_VERSION_MAJOR_MINOR: "4.20"
       OPERATORS: |
         [
-          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.14", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.15", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
       TEST_IMPORTANCE: LEVEL0
       TEST_SCENARIOS: Cluster_Observability
@@ -103,14 +108,49 @@ tests:
     - ref: acm-tests-clc-create
     - ref: acm-fetch-managed-clusters
     - ref: interop-tests-ocs-tests
+    - ref: quay-tests-quay-interop-test
+    - ref: acm-opp-app
     - ref: acm-tests-observability
     - ref: acm-tests-grc
     - ref: acm-tests-alc
-    - ref: quay-tests-quay-interop-test
+    - ref: openshift-extended-test
+- as: interop-opp-vsphere
+  capabilities:
+  - intranet
+  cron: 0 0 1,15 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      COMPUTE_NODE_REPLICAS: "6"
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-vsphere.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp","opp-vsphere-lp","opp-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ftan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_EPIC: LPINTEROP-5702
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_VERSION_MAJOR_MINOR: "4.20"
+      OPENSHIFT_REQUIRED_CORES: "72"
+      OPENSHIFT_REQUIRED_MEMORY: "288"
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.15", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+      SIZE_VARIANT: large
+      TEST_IMPORTANCE: LEVEL0
+      TEST_SCENARIOS: Cluster_Observability
+    test:
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-policies-openshift-plus-setup
+    - ref: acm-policies-openshift-plus
+    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-ocs-tests
+    - ref: acm-tests-observability
     - ref: acm-opp-app
     - ref: openshift-extended-test
+    workflow: acm-ipi-vsphere
 zz_generated_metadata:
   branch: main
   org: stolostron
   repo: policy-collection
-  variant: ocp4.19
+  variant: ocp4.21
