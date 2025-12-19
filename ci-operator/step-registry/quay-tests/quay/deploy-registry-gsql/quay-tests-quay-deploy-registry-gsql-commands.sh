@@ -103,7 +103,7 @@ spec:
     managed: true
 EOF
 
-sleep 300  # wait for pods to be ready
+sleep 30000  # wait for pods to be ready
 
 for i in {1..60}; do
   if [[ "$(oc -n ${QUAYNAMESPACE} get quayregistry ${QUAYREGISTRY} -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
