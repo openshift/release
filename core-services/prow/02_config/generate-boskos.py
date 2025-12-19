@@ -237,9 +237,6 @@ CONFIG = {
         'usgovvirginia': 5,
         'usgovtexas': 5
     },
-    'aro-hcp-dev-quota-slice': {
-        'default': 10,
-    },    
     'azure-sustaining-autorelease-412-quota-slice': {
         'eastus': 60,
     },
@@ -261,8 +258,17 @@ CONFIG = {
     'aro-hcp-test-tenant-quota-slice': {
         'default': 10,
     },
-    'aro-hcp-test-tenant-msi-quota-slice': {
-        'default': 10,
+    'aro-hcp-test-msi-containers-dev': {
+        'rg': 120,
+    },
+    'aro-hcp-test-msi-containers-int': {
+        'rg': 120,
+    },
+    'aro-hcp-test-msi-containers-stg': {
+        'rg': 120,
+    },
+    'aro-hcp-test-msi-containers-prod': {
+        'rg': 120,
     },
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
