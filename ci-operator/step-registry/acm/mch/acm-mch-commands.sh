@@ -122,6 +122,7 @@ spec:
 EOF
 
 {
+  sleep 10 ;
   set -x ;
   oc -n ${MCH_NAMESPACE} wait --for=jsonpath='{.status.phase}'=Running mch/multiclusterhub --timeout 30m ;
 
