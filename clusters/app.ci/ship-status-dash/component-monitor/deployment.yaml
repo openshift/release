@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: component-monitor
+  namespace: ship-status
+  labels:
+    app: component-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: component-monitor
+  template:
+    metadata:
+      labels:
+        app: component-monitor
+    spec:
+      containers:
+        - name: component-monitor
+          image: quay-proxy.ci.openshift.org/openshift/ci:ship-status-dash_component-monitor_latest
+          command: ["./component-monitor"]
+          args:
+            - "--config-path=/etc/config/config.yaml"
+            - "--name=app-ci-component-monitor"
+            - "--dashboard-url=https://protected.ship-status.ci.openshift.org"
+            - "--kubeconfig-dir=/etc/kubeconfig"
+            - "--report-auth-token-file=/etc/kubeconfig/sa.component-monitor.app.ci.token.txt"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
+            - name: kubeconfig
+              mountPath: /etc/kubeconfig
+              readOnly: true
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
+      volumes:
+        - name: config
+          configMap:
+            name: component-monitor-config
+        - name: kubeconfig
+          secret:
+            secretName: component-monitor-kubeconfigs

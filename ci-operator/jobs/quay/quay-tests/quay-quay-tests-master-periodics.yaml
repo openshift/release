@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 3,15 * * *
   decorate: true
   decoration_config:
@@ -93,7 +93,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 3
   decorate: true
   decoration_config:
@@ -186,7 +186,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 1
   decorate: true
   decoration_config:
@@ -279,7 +279,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 6 25 10 *
   decorate: true
   decoration_config:
@@ -372,7 +372,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 2
   decorate: true
   decoration_config:
@@ -465,7 +465,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 6 25 10 *
   decorate: true
   decoration_config:
@@ -558,7 +558,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -651,7 +651,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -733,7 +733,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -815,7 +815,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -908,7 +908,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -990,7 +990,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 23 26 * *
   decorate: true
   decoration_config:
@@ -1083,7 +1083,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -1165,7 +1165,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 22 25 * *
   decorate: true
   decoration_config:
@@ -1258,7 +1258,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 23 25 * *
   decorate: true
   decoration_config:
@@ -1351,100 +1351,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
-  cron: 0 20 24 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: quay
-    repo: quay-tests
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
-    ci-operator.openshift.io/variant: ocp-418-quay
-    ci.openshift.io/generator: prowgen
-    job-release: "4.18"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-ocp-418-quay-quay-acs-violations-check-quay315
-  reporter_config:
-    slack:
-      channel: '#quay-qe'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-acs-violations-check-quay315
-      - --variant=ocp-418-quay
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 2
   decorate: true
   decoration_config:
@@ -1537,7 +1444,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 2
   decorate: true
   decoration_config:
@@ -1630,7 +1537,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 1
   decorate: true
   decoration_config:
@@ -1723,7 +1630,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 2
   decorate: true
   decoration_config:
@@ -1816,7 +1723,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 4
   decorate: true
   decoration_config:
@@ -1909,7 +1816,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 3
   decorate: true
   decoration_config:
@@ -2002,7 +1909,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
@@ -2095,7 +2002,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 6
   decorate: true
   decoration_config:
@@ -2188,7 +2095,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 3
   decorate: true
   decoration_config:
@@ -2281,7 +2188,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
@@ -2374,7 +2281,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
@@ -2467,7 +2374,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -2560,7 +2467,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -2653,7 +2560,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 10 * * 3
   decorate: true
   decoration_config:
@@ -2746,100 +2653,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
-  cron: 0 22 25 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: quay
-    repo: quay-tests
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
-    ci-operator.openshift.io/variant: ocp-418-quay
-    ci.openshift.io/generator: prowgen
-    job-release: "4.18"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-ocp-418-quay-quay-e2e-tests-quay314-ocp418-aws-sts
-  reporter_config:
-    slack:
-      channel: '#quay-qe'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay314-ocp418-aws-sts
-      - --variant=ocp-418-quay
-      command:
-      - ci-operator
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 22 26 * *
   decorate: true
   decoration_config:
@@ -2855,18 +2669,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-ocp-418-quay-quay-e2e-tests-quay314-ocp418-virtual-builder
-  reporter_config:
-    slack:
-      channel: '#quay-qe'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
+  name: periodic-ci-quay-quay-tests-master-ocp-418-quay-quay-e2e-tests-quay315-ocp418-virtual-builder
   spec:
     containers:
     - args:
@@ -2876,7 +2679,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay314-ocp418-virtual-builder
+      - --target=quay-e2e-tests-quay315-ocp418-virtual-builder
       - --variant=ocp-418-quay
       command:
       - ci-operator
@@ -2932,7 +2735,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 22 28 * *
   decorate: true
   decoration_config:
@@ -2948,18 +2751,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-ocp-418-quay-quay-e2e-tests-quay315-gcp-sql
-  reporter_config:
-    slack:
-      channel: '#quay-qe'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
+  name: periodic-ci-quay-quay-tests-master-ocp-418-quay-quay-e2e-tests-quay316-gcp-sql
   spec:
     containers:
     - args:
@@ -2969,7 +2761,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay315-gcp-sql
+      - --target=quay-e2e-tests-quay316-gcp-sql
       - --variant=ocp-418-quay
       command:
       - ci-operator
@@ -3025,7 +2817,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 22 23 * *
   decorate: true
   decoration_config:
@@ -3041,18 +2833,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-ocp-418-quay-quay-e2e-tests-quay315-ocp418-aws-s3-couldfront
-  reporter_config:
-    slack:
-      channel: '#quay-qe'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
+  name: periodic-ci-quay-quay-tests-master-ocp-418-quay-quay-e2e-tests-quay316-ocp418-aws-s3-couldfront
   spec:
     containers:
     - args:
@@ -3062,7 +2843,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay315-ocp418-aws-s3-couldfront
+      - --target=quay-e2e-tests-quay316-ocp418-aws-s3-couldfront
       - --variant=ocp-418-quay
       command:
       - ci-operator
@@ -3118,7 +2899,89 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
+  cron: 0 22 25 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: quay
+    repo: quay-tests
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
+    ci-operator.openshift.io/variant: ocp-418-quay
+    ci.openshift.io/generator: prowgen
+    job-release: "4.18"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-quay-quay-tests-master-ocp-418-quay-quay-e2e-tests-quay316-ocp418-aws-sts
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=quay-e2e-tests-quay316-ocp418-aws-sts
+      - --variant=ocp-418-quay
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
   cron: 0 23 27 * *
   decorate: true
   decoration_config:
@@ -3134,18 +2997,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-ocp-418-quay-quay-e2e-tests-quay315-ocp418-unmanaged-tls
-  reporter_config:
-    slack:
-      channel: '#quay-qe'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
+  name: periodic-ci-quay-quay-tests-master-ocp-418-quay-quay-e2e-tests-quay316-ocp418-unmanaged-tls
   spec:
     containers:
     - args:
@@ -3155,7 +3007,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay315-ocp418-unmanaged-tls
+      - --target=quay-e2e-tests-quay316-ocp418-unmanaged-tls
       - --variant=ocp-418-quay
       command:
       - ci-operator
@@ -3211,7 +3063,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -3304,7 +3156,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -3397,7 +3249,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 2
   decorate: true
   decoration_config:
@@ -3479,7 +3331,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -3572,7 +3424,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -3665,7 +3517,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 2
   decorate: true
   decoration_config:
@@ -3747,7 +3599,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 2
   decorate: true
   decoration_config:
@@ -3829,7 +3681,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
@@ -3911,7 +3763,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 3
   decorate: true
   decoration_config:
@@ -3993,7 +3845,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
@@ -4075,7 +3927,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 10 * * 3
   decorate: true
   decoration_config:
@@ -4157,7 +4009,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -4250,7 +4102,89 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
+  cron: 0 20 24 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: quay
+    repo: quay-tests
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
+    ci-operator.openshift.io/variant: ocp-420-quay
+    ci.openshift.io/generator: prowgen
+    job-release: "4.20"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-quay-quay-tests-master-ocp-420-quay-quay-acs-violations-check-quay316
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=quay-acs-violations-check-quay316
+      - --variant=ocp-420-quay
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -4343,7 +4277,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 23 31 2 *
   decorate: true
   decoration_config:
@@ -4436,12 +4370,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -4530,19 +4463,18 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 0 7 * *
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: omr-ocp412-unreleased
     ci.openshift.io/generator: prowgen
     job-release: "4.12"
@@ -4624,12 +4556,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 3
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -4718,19 +4649,18 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 0 3 * *
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: omr-ocp414-unreleased
     ci.openshift.io/generator: prowgen
     job-release: "4.14"
@@ -4812,12 +4742,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 1
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -4906,12 +4835,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 0 1 * *
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -5000,12 +4928,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 4h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -5094,19 +5021,18 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 0 9 * *
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: omr-ocp416-unreleased
     ci.openshift.io/generator: prowgen
     job-release: "4.16"
@@ -5188,12 +5114,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -5282,19 +5207,18 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 0 9 * *
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: omr-ocp417-unreleased
     ci.openshift.io/generator: prowgen
     job-release: "4.17"
@@ -5376,12 +5300,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -5470,19 +5393,18 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 0 9 * *
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
     repo: quay-tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: omr-ocp418-unreleased
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
@@ -5564,12 +5486,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 0 5 * *
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -5647,12 +5568,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 0 4 * *
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -5730,7 +5650,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 3
   decorate: true
   decoration_config:
@@ -5744,7 +5664,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-api
     ci.openshift.io/generator: prowgen
-    job-release: "4.19"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-api-quay-e2e-tests-quay-ocp419-stage-api-testing
   spec:
@@ -5812,7 +5732,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 6
   decorate: true
   decoration_config:
@@ -5826,7 +5746,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-qe
     ci-operator.openshift.io/variant: quay-api
     ci.openshift.io/generator: prowgen
-    job-release: "4.19"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-api-quay-e2e-tests-quay313-api-testing
   reporter_config:
@@ -5905,7 +5825,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 3
   decorate: true
   decoration_config:
@@ -5919,7 +5839,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-qe
     ci-operator.openshift.io/variant: quay-api
     ci.openshift.io/generator: prowgen
-    job-release: "4.19"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-api-quay-e2e-tests-quay314-api-testing
   spec:
@@ -5987,7 +5907,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 0 6 * *
   decorate: true
   decoration_config:
@@ -6001,7 +5921,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-api
     ci.openshift.io/generator: prowgen
-    job-release: "4.19"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-api-quay-e2e-tests-quay315-api-testing
   spec:
@@ -6069,7 +5989,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 0 6 * *
   decorate: true
   decoration_config:
@@ -6083,7 +6003,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-api
     ci.openshift.io/generator: prowgen
-    job-release: "4.19"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-api-quay-e2e-tests-quay316-api-testing
   spec:
@@ -6511,7 +6431,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
@@ -6685,7 +6605,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 0 15 * *
   decorate: true
   decoration_config:
@@ -6776,7 +6696,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 6
   decorate: true
   decoration_config:
@@ -6869,7 +6789,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 3
   decorate: true
   decoration_config:
@@ -6962,7 +6882,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
@@ -7055,12 +6975,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 1 * *
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -7138,12 +7057,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 1 * *
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -7232,7 +7150,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -7246,20 +7164,9 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-quay-qe
     ci-operator.openshift.io/variant: quay-oci-conformance
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.19"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-oci-conformance-quay-oci-conformance-test-quay315
-  reporter_config:
-    slack:
-      channel: '#quay-qe'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
+  name: periodic-ci-quay-quay-tests-master-quay-oci-conformance-quay-oci-conformance-test-quay316
   spec:
     containers:
     - args:
@@ -7269,7 +7176,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-oci-conformance-test-quay315
+      - --target=quay-oci-conformance-test-quay316
       - --variant=quay-oci-conformance
       command:
       - ci-operator
@@ -7325,7 +7232,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -7418,12 +7325,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -7512,7 +7418,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 2
   decorate: true
   decoration_config:
@@ -7605,7 +7511,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 4
   decorate: true
   decoration_config:
@@ -7698,7 +7604,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 3
   decorate: true
   decoration_config:
@@ -7791,7 +7697,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -7808,18 +7714,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.18"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-quay-performance-quay-e2e-tests-quay315-performance-test
-  reporter_config:
-    slack:
-      channel: '#quay-qe'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
-        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> {{end}}'
+  name: periodic-ci-quay-quay-tests-master-quay-performance-quay-e2e-tests-quay316-performance-test
   spec:
     containers:
     - args:
@@ -7829,7 +7724,7 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=quay-e2e-tests-quay315-performance-test
+      - --target=quay-e2e-tests-quay316-performance-test
       - --variant=quay-performance
       command:
       - ci-operator
@@ -7885,7 +7780,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 5 20 22 * *
   decorate: true
   decoration_config:
@@ -7983,7 +7878,6 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -8059,7 +7953,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 6
   decorate: true
   decoration_config:
@@ -8152,7 +8046,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 3
   decorate: true
   decoration_config:
@@ -8245,7 +8139,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
@@ -8350,7 +8244,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: quay-sdl
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-sdl-quay-sdl-check-images-vulnerabilities-quay310
   spec:
@@ -8420,7 +8314,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: quay-sdl
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-sdl-quay-sdl-check-images-vulnerabilities-quay311
   spec:
@@ -8490,7 +8384,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: quay-sdl
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-sdl-quay-sdl-check-images-vulnerabilities-quay312
   spec:
@@ -8560,7 +8454,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: quay-sdl
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-sdl-quay-sdl-check-images-vulnerabilities-quay313
   reporter_config:
@@ -8641,7 +8535,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: quay-sdl
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-sdl-quay-sdl-check-images-vulnerabilities-quay314
   reporter_config:
@@ -8722,7 +8616,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: quay-sdl
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-sdl-quay-sdl-check-images-vulnerabilities-quay315
   spec:
@@ -8781,6 +8675,76 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build09
+  cron: 0 0 6 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: quay
+    repo: quay-tests
+  labels:
+    ci-operator.openshift.io/variant: quay-sdl
+    ci.openshift.io/generator: prowgen
+    job-release: "4.20"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-quay-quay-tests-master-quay-sdl-quay-sdl-check-images-vulnerabilities-quay316
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=quay-sdl-check-images-vulnerabilities-quay316
+      - --variant=quay-sdl
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
   cron: 0 12 * * 5
   decorate: true
   decoration_config:
@@ -8792,7 +8756,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: quay-sdl
     ci.openshift.io/generator: prowgen
-    job-release: "4.18"
+    job-release: "4.20"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-quay-sdl-quay-sdl-check-images-vulnerabilities-quay39
   reporter_config:
@@ -8866,7 +8830,6 @@ periodics:
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -8942,7 +8905,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -9024,7 +8987,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -9106,7 +9069,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -9188,12 +9151,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -9271,7 +9233,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -9364,12 +9326,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay
@@ -9458,12 +9419,11 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
+  cluster: build05
   cron: 0 12 1 * *
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 8h0m0s
   extra_refs:
   - base_ref: master
     org: quay

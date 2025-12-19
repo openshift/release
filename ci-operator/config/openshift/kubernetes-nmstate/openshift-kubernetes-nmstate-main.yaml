@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -8,7 +8,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   ocp_4.21_base-rhel9:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.21:
@@ -51,23 +51,23 @@ promotion:
   to:
   - excluded_images:
     - src-with-oc-and-kubectl
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
   nightly:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "4.22"
   stable:
     release:
       channel: fast
@@ -96,7 +96,8 @@ tests:
   container:
     from: src
 - as: e2e-handler-ovn-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -106,7 +107,8 @@ tests:
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-operator-ovn-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -117,13 +119,15 @@ tests:
     workflow: kubernetes-nmstate-e2e-operator
 - always_run: false
   as: e2e-handler-azure
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: azure4
     workflow: kubernetes-nmstate-e2e-azure
 - as: e2e-handler-ovn-ipv4-nightly-periodic
-  cluster: build05
+  capabilities:
+  - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-ocp-metal

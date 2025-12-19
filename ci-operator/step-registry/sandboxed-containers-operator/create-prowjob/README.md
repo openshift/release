@@ -67,7 +67,6 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 | `OSC_CATALOG_TAG`          | derived latest           | Can be overridden.  Also sets EXPECTED_OSC_VERSION                          | repo tag                 |
 | `TRUSTEE_CATALOG_TAG`      | derived latest           | Can be overridden.  Also sets EXPECTED_TRUSTEE_VERSION                      | repo tag                 |
 | `EXPECTED_OSC_VERSION`     | `1.10.1`                 | Derived from X.Y.X-epoch_time catalog tag or OSC_CATALOG_TAG                | Semantic version format  |
-| `EXPECTED_TRUSTEE_VERSION` | `0.4.0`                  | Derived from X.Y.X-epoch_time catalog tag IFF exists or TRUSTEE_CATALOG_TAG | Semantic version format  |
 | `INSTALL_KATA_RPM`         | `true`                   | Whether to install Kata RPM                                                 | `true` or `false`        |
 | `KATA_RPM_VERSION`         | `3.17.0-3.rhaos4.19.el9` | Kata RPM version (when `INSTALL_KATA_RPM=true`)                             | RPM version format       |
 | `PROW_RUN_TYPE`            | `candidate`              | Prow job run type                                                           | `candidate` or `release` |
@@ -80,8 +79,7 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 #### Pre-GA (Development) Mode
 - Automatically queries Quay API for latest OSC catalog tags of development branch
   - OSC searches for X.Y.Z-epoch_time tag
-  - trustee uses an algorhythm
-- Creates `brew-catalog` and `trustee-catalog` sources with latest catalog tag
+- Creates `brew-catalog` source with latest catalog tag
   - if catalog tag is X.Y.Z-, the expected version of the operator is set
 
 #### GA (Production) Mode
@@ -136,12 +134,6 @@ ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed
 - **Source**: `quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc`
 - **Method**: Quay API with pagination (max 20 pages)
 - **Fallback**: `1.10.1-1755502791`
-
-### Trustee Catalog Tags
-- **Pattern**: `trustee-fbc-{OCP_VER}-on-push-.*-build-image-index`
-- **Source**: `quay.io/redhat-user-workloads/ose-osc-tenant/[trustee-fbc/]trustee-fbc-{OCP_VER}`
-- **Method**: Quay API with pagination (max 50 pages)
-- **Special Case**: OCP 4.16 uses `trustee-fbc/` subfolder
 
 ## Run Command
 

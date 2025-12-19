@@ -27,6 +27,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: base-rhel9
+  ocp_4.22_base-rhel9:
+    name: "4.22"
+    namespace: ocp
+    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
@@ -35,6 +39,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.24-openshift-4.21
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.22
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -86,12 +94,18 @@ images:
     ocp_4.21_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_4.22_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: aws-efs-csi-driver-operator
 - dockerfile_path: Dockerfile.create_efs
   inputs:
@@ -226,7 +240,8 @@ operator:
     with: pipeline:proxy-operand
 promotion:
   to:
-  - name: "4.22"
+  - disabled: true
+    name: "4.22"
     namespace: ocp
 releases:
   initial:
@@ -256,11 +271,11 @@ tests:
     from: src
 - as: e2e-aws-ovn-upgrade
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-csi
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-csi
 - as: hypershift-aws-e2e-external
   steps:
@@ -275,7 +290,7 @@ tests:
     workflow: openshift-e2e-aws-csi-extended
 - as: aws-efs-operator-e2e
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     dependencies:
       OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
     env:
@@ -285,7 +300,7 @@ tests:
 - as: aws-efs-single-zone-operator-e2e
   run_if_changed: ^(Dockerfile\.aws-efs|assets\/overlays\/aws-efs\/.*|pkg\/driver\/aws-efs\/.*|pkg\/operator\/.*)
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     dependencies:
       OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
     env:
@@ -371,7 +386,6 @@ tests:
   steps:
     cluster_profile: azure-2
     workflow: openshift-upgrade-azure
-  timeout: 5h30m0s
 - always_run: false
   as: e2e-azure-csi-extended
   optional: true

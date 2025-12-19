@@ -1,0 +1,125 @@
+base_images:
+  linuxptp-daemon:
+    name: "4.23"
+    namespace: ocp
+    tag: ptp
+  must_gather:
+    name: "4.23"
+    namespace: ocp
+    tag: must-gather
+  ocp_4.21_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.ocp
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: ptp-operator
+- dockerfile_path: Dockerfile.ocp
+  from: must_gather
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ptp-operator/must-gather/.
+  to: ptp-operator-must-gather
+operator:
+  bundles:
+  - dockerfile_path: bundleci.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/origin-ptp-operator:.*
+    with: pipeline:ptp-operator
+  - pullspec: quay.io/openshift/origin-ptp:.*
+    with: pipeline:linuxptp-daemon
+promotion:
+  to:
+  - name: ptp-4.23
+    namespace: origin
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: make fmt
+  container:
+    from: src
+- as: govet
+  commands: make vet
+  container:
+    from: src
+- as: bundle-check
+  commands: |
+    unset VERSION
+    make bundle-check
+  container:
+    from: src
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: operator-e2e
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-ptp
+      OO_PACKAGE: ptp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      commands: make test-validation-only
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: security
+  optional: true
+  skip_if_only_changed: ^test/|^hack/|^scripts/|^bin/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: ptp-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: ptp-operator

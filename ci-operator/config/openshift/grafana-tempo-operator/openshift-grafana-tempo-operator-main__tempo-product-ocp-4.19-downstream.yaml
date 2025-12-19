@@ -1,0 +1,55 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.23-openshift-4.19
+canonical_go_repository: github.com/grafana/tempo-operator
+images:
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: tempo-tests-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: tempo-downstream-tests
+  cron: 30 3 * * 1
+  steps:
+    cluster_profile: azure-observability
+    env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      OPERATORS: |
+        [
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespace": ""},
+            {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespace": "", "operator_group": "openshift-serverless"}
+        ]
+      SKIP_TESTS: tests/e2e-openshift-object-stores/*
+    test:
+    - ref: install-operators
+    - ref: distributed-tracing-tests-tempo-downstream
+    workflow: cucushift-installer-rehearse-azure-ipi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: grafana-tempo-operator
+  variant: tempo-product-ocp-4.19-downstream

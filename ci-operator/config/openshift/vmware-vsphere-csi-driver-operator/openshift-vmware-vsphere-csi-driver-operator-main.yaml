@@ -1,6 +1,6 @@
 base_images:
   ocp_4.21_base-rhel9:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.21:
@@ -12,7 +12,7 @@ base_images:
     namespace: ci
     tag: "4.21"
   virtctl:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: virtctl
 build_root:
@@ -32,17 +32,17 @@ images:
   to: vsphere-csi-driver-operator-test
 promotion:
   to:
-  - name: "4.21"
+  - name: "4.22"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -123,6 +123,15 @@ tests:
     env:
       TEST_SCENARIOS: \[CSI-Driver\]|\[vSphere CSI Driver\]|\[vSphere-CSI-Driver-Operator\]
     workflow: openshift-e2e-vsphere-csi-extended
+- as: e2e-vsphere-csi-vcf9
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
+    workflow: openshift-e2e-vsphere-csi
 - as: verify-deps
   steps:
     test:

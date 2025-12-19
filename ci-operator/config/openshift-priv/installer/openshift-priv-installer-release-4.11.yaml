@@ -353,7 +353,8 @@ tests:
     workflow: openshift-upgrade-gcp-latestinstaller
 - always_run: false
   as: e2e-metal-ipi
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -364,7 +365,8 @@ tests:
     workflow: baremetalds-e2e
 - always_run: false
   as: e2e-metal-ipi-swapped-hosts
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: (baremetal|metal3-io)
   steps:
@@ -376,7 +378,8 @@ tests:
         HOSTS_SWAP_DEFINITION=true
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: (baremetal|metal3-io)
   steps:
     cluster_profile: equinix-ocp-metal
@@ -387,7 +390,8 @@ tests:
     workflow: baremetalds-e2e
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: (baremetal|metal3-io)
   steps:
@@ -399,53 +403,13 @@ tests:
     workflow: baremetalds-e2e
 - always_run: false
   as: e2e-metal-ipi-virtualmedia
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: (baremetal|metal3-io)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
-- always_run: false
-  as: e2e-openstack
-  optional: true
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      TEST_SUITE: experimental/reliability/minimal
-    workflow: openshift-e2e-openstack-ipi
-- always_run: false
-  as: e2e-openstack-parallel
-  optional: true
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-e2e-openstack-ipi
-- always_run: false
-  as: e2e-openstack-nfv-intel
-  optional: true
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-nfv
-    workflow: openshift-e2e-openstack-nfv
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-openstack-proxy
-  optional: true
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-vh-mecha-central
-    workflow: openshift-e2e-openstack-proxy
-- as: openstack-manifests
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-vexxhost
-    workflow: openshift-manifests-openstack
 - always_run: false
   as: e2e-vsphere
   optional: true
@@ -473,7 +437,8 @@ tests:
     workflow: openshift-e2e-gcp-libvirt
 - always_run: false
   as: e2e-metal-assisted
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -513,19 +478,6 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-- always_run: false
-  as: e2e-openstack-kuryr
-  optional: true
-  run_if_changed: (openstack|gophercloud)
-  steps:
-    cluster_profile: openstack-vh-mecha-az0
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-    test:
-    - ref: openstack-noop
-    workflow: openshift-e2e-openstack-ipi
 - always_run: false
   as: e2e-azurestack
   optional: true

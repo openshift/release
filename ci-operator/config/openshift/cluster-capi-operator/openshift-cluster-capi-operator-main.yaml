@@ -8,7 +8,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   ocp_4.21_base-rhel9:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.21:
@@ -34,17 +34,17 @@ images:
   to: cluster-capi-operator
 promotion:
   to:
-  - name: "4.21"
+  - name: "4.22"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -86,20 +86,20 @@ tests:
   as: e2e-aws-ovn
   pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-serial
   pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   shard_count: 2
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-aws-ovn-techpreview
   pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
@@ -107,7 +107,7 @@ tests:
   as: e2e-aws-ovn-techpreview-upgrade
   pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-upgrade
@@ -115,7 +115,7 @@ tests:
   as: e2e-aws-capi-techpreview
   pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-5
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -128,6 +128,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-gcp-ovn-techpreview
@@ -171,7 +172,7 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: test
-      commands: hack/e2e-openstack.sh
+      commands: make e2e
       from: src
       resources:
         requests:
@@ -226,7 +227,8 @@ tests:
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-metal3-capi-techpreview
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
   steps:
@@ -260,7 +262,6 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi
-  timeout: 7h0m0s
 - as: verify-deps
   steps:
     env:

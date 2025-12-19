@@ -1,6 +1,6 @@
 #!/bin/bash
 # script to create prowjobs in ci-operator/config/openshift/sandboxed-containers-operator using environment variables.
-# Usage: 
+# Usage:
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh gen    # Generate prowjob configuration
 #   ./sandboxed-containers-operator-create-prowjob-commands.sh run    # Run prowjobs
 # should be run in a branch of a fork of https://github.com/openshift/release/
@@ -14,6 +14,7 @@ set -o pipefail
 # Endpoint for the Gangway API (https://docs.prow.k8s.io/docs/components/optional/gangway/)
 # used to interact with Prow via REST API
 GANGWAY_API_ENDPOINT="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions"
+ARO_CLUSTER_VERSION="${ARO_CLUSTER_VERSION:-4.17}"
 
 # Function to get latest OSC catalog tag
 get_latest_osc_catalog_tag() {
@@ -53,48 +54,6 @@ get_latest_osc_catalog_tag() {
     echo "${latest_tag}"
 }
 
-get_latest_trustee_catalog_tag() {
-    local page=1
-    local latest_tag=""
-    local test_pattern="^trustee-fbc-${OCP_VER}-on-push-.*-build-image-index$"
-
-    while true; do
-        local resp
-
-        # Query the Quay API for tags
-        if ! resp=$(curl -sf "${APIURL}/tag/?limit=100&page=${page}"); then
-            break
-        fi
-
-        # Check if page has tags
-        if ! jq -e '.tags | length > 0' <<< "${resp}" >/dev/null; then
-            break
-        fi
-
-        # Extract the latest matching tag from this page
-        latest_tag=$(echo "${resp}" | \
-            jq -r --arg test_string "${test_pattern}" \
-            '.tags[]? | select(.name | test($test_string)) | "\(.start_ts) \(.name)"' | \
-            sort -nr | head -n1 | awk '{print $2}')
-
-        if [[ -n "${latest_tag}" ]]; then
-            break
-        fi
-
-        ((page++))
-
-
-        # Safety limit to prevent infinite loops
-        if [[ ${page} -gt 50 ]]; then
-            echo "ERROR: Reached maximum page limit (50) while searching for trustee tags"
-            exit 1
-        fi
-    done
-
-    echo "${latest_tag}"
-}
-
-
 get_expected_version() {
     # Extract expected version from catalog tag
     # If catalog tag is in X.Y.Z-[0-9]+ format, returns X.Y.Z portion
@@ -116,9 +75,20 @@ validate_and_set_defaults() {
 
     # OCP version to test
     OCP_VERSION="${OCP_VERSION:-4.19}"
-    # Validate OCP version format
-    if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
-        echo "ERROR: Invalid OCP_VERSION format. Expected format: X.Y (e.g., 4.19)"
+    # Validate OCP version format (X.Y or X.Y.Z)
+    if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+        echo "ERROR: Invalid OCP_VERSION format. Expected format: X.Y or X.Y.Z (e.g., 4.19 or 4.20.6)"
+        exit 1
+    fi
+
+    # UPI installer version - always X.Y (major.minor only)
+    UPI_INSTALLER_VERSION=$(echo "${OCP_VERSION}" | cut -d'.' -f1,2)
+
+    # OCP release channel (stable, fast, candidate, eus)
+    OCP_CHANNEL="${OCP_CHANNEL:-fast}"
+    # Validate OCP_CHANNEL
+    if [[ ! "${OCP_CHANNEL}" =~ ^(stable|fast|candidate|eus)$ ]]; then
+        echo "ERROR: OCP_CHANNEL must be one of: stable, fast, candidate, eus. Got: ${OCP_CHANNEL}"
         exit 1
     fi
 
@@ -132,7 +102,7 @@ validate_and_set_defaults() {
     EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.1}"
 
     # Kata RPM Configuration
-    INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-true}"
+    INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-false}"
     if [[ "${INSTALL_KATA_RPM}" != "true" && "${INSTALL_KATA_RPM}" != "false" ]]; then
         echo "ERROR: INSTALL_KATA_RPM should be 'true' or 'false', got: ${INSTALL_KATA_RPM}"
         exit 1
@@ -160,7 +130,7 @@ validate_and_set_defaults() {
     else
         PROW_RUN_TYPE="release"
         CATALOG_SOURCE_NAME="redhat-operators"
-        TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
+        INSTALL_KATA_RPM="false"
     fi
 
     # After the tests finish, wait before killing the cluster
@@ -201,6 +171,12 @@ validate_and_set_defaults() {
         exit 1
     fi
 
+    # Trustee URL Configuration (defaults to empty string)
+    TRUSTEE_URL="${TRUSTEE_URL:-""}"
+
+    # Init Data Configuration (defaults to empty string)
+    INITDATA="${INITDATA:-""}"
+
     # Catalog Source Configuration
     echo "Configuring catalog sources..."
 
@@ -223,38 +199,9 @@ validate_and_set_defaults() {
 
       CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:${OSC_CATALOG_TAG}}"
       CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-brew-catalog}"
-
-      # Trustee Catalog Configuration
-      # Convert OCP version for Trustee catalog naming
-      OCP_VER=$(echo "${OCP_VERSION}" | tr '.' '-')
-      subfolder=""
-      if [[ "${OCP_VER}" == "4-16" ]]; then
-          subfolder="trustee-fbc/"
-      fi
-      # Get latest Trustee catalog tag with page limit safety
-      TRUSTEE_REPO_NAME="${subfolder}trustee-fbc-${OCP_VER}"
-      TRUSTEE_CATALOG_REPO="quay.io/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
-
-      APIURL="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
-      TRUSTEE_CATALOG_TAG=$(get_latest_trustee_catalog_tag)
-
-      # Extract expected Trustee version from catalog tag if it matches X.Y.Z-[0-9]+ format
-      extracted_trustee_version=$(get_expected_version "${TRUSTEE_CATALOG_TAG}")
-      if [[ -n "${extracted_trustee_version}" ]]; then
-          EXPECTED_TRUSTEE_VERSION="${extracted_trustee_version}"
-          echo "Extracted EXPECTED_TRUSTEE_VERSION from TRUSTEE_CATALOG_TAG: ${EXPECTED_TRUSTEE_VERSION}"
-      else
-          EXPECTED_TRUSTEE_VERSION="${EXPECTED_TRUSTEE_VERSION:-0.0.0}"
-          echo "Using default EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
-      fi
-
-      TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
-      TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
     else # GA
       CATALOG_SOURCE_NAME="redhat-operators"
-      TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
-      CATALOG_SOURCE_IMAGE="none"
-      TRUSTEE_CATALOG_SOURCE_IMAGE="none"
+      CATALOG_SOURCE_IMAGE=""
     fi
 }
 
@@ -263,8 +210,9 @@ show_usage() {
     echo "Usage: $0 <command>"
     echo ""
     echo "Commands:"
-    echo "  create  Create prowjob configuration files"
-    echo "  run     Run prowjobs from YAML configuration"
+    echo "  create            Create prowjob configuration files"
+    echo "  run               Run prowjobs from YAML configuration"
+	echo "  update_templates  Regenerate the ci-operator/config/openshift/sandboxed-containers-operator templates using default values (unless overridden)"
     echo ""
     echo "Examples:"
     echo "  $0 create"
@@ -272,7 +220,9 @@ show_usage() {
     echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata"
     echo ""
     echo "Environment variables for 'create' command:"
+    echo "  ARO_CLUSTER_VERSION            - ARO cluster version (default: ${ARO_CLUSTER_VERSION})"
     echo "  OCP_VERSION                    - OpenShift version (default: 4.19)"
+    echo "  OCP_CHANNEL                    - Release channel: stable, fast, candidate, eus (default: fast)"
     echo "  TEST_RELEASE_TYPE              - Test release type: Pre-GA or GA (default: Pre-GA)"
     echo "  EXPECTED_OSC_VERSION           - Expected OSC version (default: 1.10.1)"
     echo "  INSTALL_KATA_RPM               - Install Kata RPM: true or false (default: true)"
@@ -286,7 +236,8 @@ show_usage() {
     echo "  AWS_REGION_OVERRIDE            - AWS region (default: us-east-2)"
     echo "  CUSTOM_AZURE_REGION            - Azure region (default: eastus)"
     echo "  OSC_CATALOG_TAG                - OSC catalog tag (auto-detected if not provided)"
-    echo "  TRUSTEE_CATALOG_TAG            - Trustee catalog tag (auto-detected if not provided)"
+    echo "  TRUSTEE_URL                    - Trustee URL (default: empty)"
+    echo "  INITDATA                       - Initdata from Trustee(default: empty) The gzipped and base64 encoded initdata.toml file from Trustee"
 }
 
 # Main function
@@ -310,6 +261,9 @@ main() {
         run)
             command_run "$@"
             ;;
+		update_templates)
+			command_update_templates
+			;;
         *)
             echo "ERROR: Unknown command '${COMMAND}'"
             echo ""
@@ -317,6 +271,76 @@ main() {
             exit 1
             ;;
     esac
+}
+
+# Generate one variant of our workflow
+generate_workflow() {
+  local platform=$1       # e.g. azure or aws
+  local profile=$2        # e.g. azure-qe or aws-sandboxed-containers-operator
+  local workflow=$3       # e.g. sandboxed-containers-operator-e2e-azure
+  local workload=$4       # e.g. kata, peerpods, coco
+  local cron="0 0 31 2 1"
+
+  echo "- as: ${platform}-ipi-${workload}"
+  echo "  cron: ${cron}"
+  echo "  steps:"
+  echo "    cluster_profile: ${profile}"
+  echo "    env:"
+
+  # Collect environment variables into a temporary array
+  local env_vars=()
+  local kata_rpm_version
+  kata_rpm_version="${KATA_RPM_VERSION:-}"
+
+  # Platform-specific
+  if [[ $platform == "azure" ]]; then
+    env_vars+=("BASE_DOMAIN: qe.azure.devcluster.openshift.com")
+    env_vars+=("CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}")
+  elif [[ $platform == "aro" ]]; then
+    env_vars+=("ARO_CLUSTER_VERSION: \"${ARO_CLUSTER_VERSION}\"")
+    env_vars+=("LOCATION: ${CUSTOM_AZURE_REGION}")
+    env_vars+=("HYPERSHIFT_AZURE_LOCATION: ${CUSTOM_AZURE_REGION}")
+    kata_rpm_version="${kata_rpm_version//$OCP_VERSION/$ARO_CLUSTER_VERSION}"
+  elif [[ $platform == "aws" ]]; then
+    env_vars+=("AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}")
+  fi
+
+  # Common
+  env_vars+=(
+    "CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE:-\"\"}"
+    "CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}"
+    "ENABLE_MUST_GATHER: \"${ENABLE_MUST_GATHER}\""
+    "EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}"
+    "INITDATA: ${INITDATA:-\"\"}"
+    "INSTALL_KATA_RPM: \"${INSTALL_KATA_RPM}\""
+    "KATA_RPM_VERSION: ${kata_rpm_version:-\"\"}"
+    "MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}"
+    "MUST_GATHER_ON_FAILURE_ONLY: \"${MUST_GATHER_ON_FAILURE_ONLY}\""
+    "SLEEP_DURATION: ${SLEEP_DURATION}"
+    "TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&"
+    "TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}"
+    "TEST_SCENARIOS: ${TEST_SCENARIOS}"
+    "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
+    "TRUSTEE_URL: ${TRUSTEE_URL:-\"\"}"
+  )
+
+  # Workload-specific
+  case $workload in
+    kata)
+      # nothing extra for kata beyond defaults
+      ;;
+    peerpods|coco)
+      env_vars+=("ENABLEPEERPODS: \"true\"")
+      env_vars+=("RUNTIMECLASS: kata-remote")
+      env_vars+=("WORKLOAD_TO_TEST: ${workload/peerpods/peer-pods}")
+      ;;
+  esac
+
+  # Sort and print alphabetically
+  printf '%s\n' "${env_vars[@]}" | sort | sed 's/^/      /'
+
+  echo "    workflow: ${workflow}"
+  echo "  timeout: 24h0m0s"
 }
 
 # Function to create prowjob configuration
@@ -341,22 +365,20 @@ command_create() {
     # Create the prowjob configuration file
 
     cat > "${OUTPUT_FILE}" <<EOF
-#  DO NOT EDIT DIRECTLY.
-#  This is generated by the sandboxed-containers-operator-create-prowjob-commands.sh script.
 base_images:
   tests-private:
     name: tests-private
     namespace: ci
     tag: "4.21"
   upi-installer:
-    name: "${OCP_VERSION}"
+    name: "${UPI_INSTALLER_VERSION}"
     namespace: ocp
     tag: upi-installer
 releases:
   latest:
     release:
       architecture: amd64
-      channel: stable
+      channel: ${OCP_CHANNEL}
       version: "${OCP_VERSION}"
 resources:
   '*':
@@ -364,131 +386,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: azure-ipi-kata
-  cron: 0 0 31 2 1
-  steps:
-    cluster_profile: azure-qe
-    env:
-      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
-      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
-      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
-      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
-      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
-      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
-      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
-      SLEEP_DURATION: ${SLEEP_DURATION}
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: ${TEST_SCENARIOS}
-      TEST_TIMEOUT: "${TEST_TIMEOUT}"
-      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
-      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
-    workflow: sandboxed-containers-operator-e2e-azure
-- as: azure-ipi-peerpods
-  cron: 0 0 31 2 1
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
-      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
-      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
-      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
-      ENABLEPEERPODS: "true"
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
-      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
-      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
-      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
-      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
-      RUNTIMECLASS: kata-remote
-      SLEEP_DURATION: ${SLEEP_DURATION}
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: ${TEST_SCENARIOS}
-      TEST_TIMEOUT: "${TEST_TIMEOUT}"
-      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
-      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
-      WORKLOAD_TO_TEST: peer-pods
-    workflow: sandboxed-containers-operator-e2e-azure
-- as: azure-ipi-coco
-  cron: 0 0 31 2 1
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
-      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
-      CUSTOM_AZURE_REGION: ${CUSTOM_AZURE_REGION}
-      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
-      ENABLEPEERPODS: "true"
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
-      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
-      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
-      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
-      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
-      RUNTIMECLASS: kata-remote
-      SLEEP_DURATION: ${SLEEP_DURATION}
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: ${TEST_SCENARIOS}
-      TEST_TIMEOUT: "${TEST_TIMEOUT}"
-      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
-      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
-      WORKLOAD_TO_TEST: coco
-    workflow: sandboxed-containers-operator-e2e-azure
-- as: aws-ipi-peerpods
-  cron: 0 0 31 2 1
-  steps:
-    cluster_profile: aws-sandboxed-containers-operator
-    env:
-      AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}
-      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
-      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
-      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
-      ENABLEPEERPODS: "true"
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
-      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
-      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
-      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
-      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
-      RUNTIMECLASS: kata-remote
-      SLEEP_DURATION: ${SLEEP_DURATION}
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: ${TEST_SCENARIOS}
-      TEST_TIMEOUT: "${TEST_TIMEOUT}"
-      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
-      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
-      WORKLOAD_TO_TEST: peer-pods
-    workflow: sandboxed-containers-operator-e2e-aws
-- as: aws-ipi-coco
-  cron: 0 0 31 2 1
-  steps:
-    cluster_profile: aws-sandboxed-containers-operator
-    env:
-      AWS_REGION_OVERRIDE: ${AWS_REGION_OVERRIDE}
-      CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}
-      CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}
-      ENABLE_MUST_GATHER: ${ENABLE_MUST_GATHER}
-      ENABLEPEERPODS: "true"
-      EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}
-      INSTALL_KATA_RPM: ${INSTALL_KATA_RPM}
-      KATA_RPM_VERSION: ${KATA_RPM_VERSION}
-      MUST_GATHER_IMAGE: ${MUST_GATHER_IMAGE}
-      MUST_GATHER_ON_FAILURE_ONLY: ${MUST_GATHER_ON_FAILURE_ONLY}
-      RUNTIMECLASS: kata-remote
-      SLEEP_DURATION: ${SLEEP_DURATION}
-      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&
-      TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}
-      TEST_SCENARIOS: ${TEST_SCENARIOS}
-      TEST_TIMEOUT: "${TEST_TIMEOUT}"
-      TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE}
-      TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}
-      WORKLOAD_TO_TEST: coco
-    workflow: sandboxed-containers-operator-e2e-aws
+EOF
+generate_workflow azure azure-qe sandboxed-containers-operator-e2e-azure kata >> "${OUTPUT_FILE}"
+generate_workflow azure azure-qe sandboxed-containers-operator-e2e-azure peerpods >> "${OUTPUT_FILE}"
+generate_workflow azure azure-qe sandboxed-containers-operator-e2e-azure coco >> "${OUTPUT_FILE}"
+generate_workflow aro azure-qe sandboxed-containers-operator-e2e-aro peerpods >> "${OUTPUT_FILE}"
+generate_workflow aro azure-qe sandboxed-containers-operator-e2e-aro coco >> "${OUTPUT_FILE}"
+generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws peerpods >> "${OUTPUT_FILE}"
+generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws coco >> "${OUTPUT_FILE}"
+	cat >> "${OUTPUT_FILE}" <<EOF
 zz_generated_metadata:
   branch: devel
   org: openshift
@@ -527,6 +433,9 @@ EOF
     echo "=========================================="
     echo "Configuration details:"
     echo "  • OCP Version: ${OCP_VERSION}"
+    echo "  • OCP Channel: ${OCP_CHANNEL}"
+    echo "  • UPI Installer Version: ${UPI_INSTALLER_VERSION}"
+    echo "  • ARO Version: ${ARO_CLUSTER_VERSION}"
     echo "  • Prow Run Type: ${PROW_RUN_TYPE}"
     echo "  • Test Release Type: ${TEST_RELEASE_TYPE}"
     echo "  • Expected OSC Version: ${EXPECTED_OSC_VERSION}"
@@ -539,10 +448,8 @@ EOF
 
     if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
         echo "  • Catalog Source: ${CATALOG_SOURCE_NAME} (${CATALOG_SOURCE_IMAGE})"
-        echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME} (${TRUSTEE_CATALOG_SOURCE_IMAGE})"
     else
         echo "  • Catalog Source: ${CATALOG_SOURCE_NAME}"
-        echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME}"
     fi
 
     echo "=========================================="
@@ -723,6 +630,23 @@ command_run() {
     echo ""
     echo "Job triggering completed!"
     echo "Check the output_*.json and status_*.json files for details"
+}
+
+command_update_templates() {
+	local target_dir
+	local files
+	target_dir="$(realpath "$(dirname "${BASH_SOURCE[0]}")")/../../../config/openshift/sandboxed-containers-operator"
+	files="$(ls openshift-sandboxed-containers-operator-devel__downstream-{candidate,release}*.yaml 2>/dev/null)" ||:
+	if [ -n "$files" ]; then
+		echo "There are previously generated workflows, do you want to delete them? ${PWD}"
+		rm -i $files
+	fi
+	KATA_RPM_VERSION=3.21.0-3.rhaos4.19.el9 TEST_RELEASE_TYPE=Pre-GA "$(dirname "${BASH_SOURCE[0]}")"/sandboxed-containers-operator-create-prowjob-commands.sh create
+	INSTALL_KATA_RPM=false TEST_RELEASE_TYPE=GA "$(dirname "${BASH_SOURCE[0]}")"/sandboxed-containers-operator-create-prowjob-commands.sh create
+	mv openshift-sandboxed-containers-operator-devel__downstream-candidate*.yaml "${target_dir}/openshift-sandboxed-containers-operator-devel__downstream-candidate.yaml"
+	mv openshift-sandboxed-containers-operator-devel__downstream-release*.yaml "${target_dir}/openshift-sandboxed-containers-operator-devel__downstream-release.yaml"
+	echo
+	echo "Review the changes by 'git diff', then run 'make ci-operator-config && make jobs'"
 }
 
 # Call main function with all command line arguments

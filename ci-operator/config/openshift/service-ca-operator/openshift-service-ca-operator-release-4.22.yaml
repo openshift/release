@@ -1,28 +1,29 @@
 base_images:
-  ocp_4.21_base-rhel9:
+  ocp_4.22_base-rhel9:
     name: "4.22"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.24-openshift-4.22
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
-    ocp_4.21_base-rhel9:
+    ocp_4.22_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: service-ca-operator
 promotion:
   to:
-  - name: "4.22"
+  - disabled: true
+    name: "4.22"
     namespace: ocp
 releases:
   initial:
@@ -55,11 +56,11 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -69,37 +70,19 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-upgrade
-  steps:
-    cluster_profile: aws-2
-    workflow: openshift-upgrade-aws
-- as: e2e-aws-operator-tests-extension
+- as: e2e-aws-operator-serial-ote
   optional: true
   steps:
     cluster_profile: aws
-    post:
-    - chain: gather-core-dump
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
+    env:
+      TEST_SUITE: openshift/service-ca-operator/operator/serial
     test:
-    - as: tests-extension
-      cli: latest
-      commands: |
-        echo "Build binary service-ca-operator-tests-ext"
-        make tests-ext-build
-        echo "Set up cluster access"
-        export KUBECONFIG=${SHARED_DIR}/kubeconfig
-        echo "Verify cluster is accessible"
-        oc get clusterversion
-        echo "--------------"
-
-        echo "Running make run-suite SUITE=openshift/service-ca-operator/conformance/parallel ARTIFACT_DIR=/tmp/artifacts"
-        make run-suite SUITE=openshift/service-ca-operator/conformance/parallel ARTIFACT_DIR=${ARTIFACT_DIR}
-      from: src
-      resources:
-        requests:
-          cpu: 100m
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- as: e2e-aws-upgrade
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

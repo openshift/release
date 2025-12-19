@@ -3,14 +3,14 @@ base_images:
     name: cluster-api-actuator-pkg-test
     namespace: ci
     tag: latest
-  ocp_4.21_base-rhel9:
-    name: "4.21"
+  ocp_4.22_base-rhel9:
+    name: "4.22"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.24-openshift-4.22
   tests-private:
     name: tests-private
     namespace: ci
@@ -20,26 +20,26 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.rhel
   inputs:
-    ocp_4.21_base-rhel9:
+    ocp_4.22_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: azure-machine-controllers
 promotion:
   to:
-  - name: "4.21"
+  - name: "4.22"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -82,6 +82,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-azure
 - always_run: false
   as: e2e-azure-ovn-upgrade
@@ -96,7 +97,6 @@ tests:
   steps:
     cluster_profile: azurestack-dev
     workflow: openshift-e2e-azurestack
-  timeout: 6h0m0s
 - as: regression-clusterinfra-azure-ipi-mapi
   optional: true
   run_if_changed: ^(go\.mod|go\.sum)$
@@ -110,7 +110,6 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-azure-ipi
-  timeout: 7h0m0s
 - as: verify-deps
   steps:
     env:

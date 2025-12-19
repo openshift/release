@@ -161,12 +161,6 @@ tests:
     mount_path: /tmp/secret
     name: lvms-snyk-token
   skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
-- as: integration-tests
-  commands: |
-    ./integration-test
-  container:
-    from: lvm-operator-integration-test
-  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: e2e-aws-single-node
   cron: '@daily'
   presubmit: true
@@ -181,7 +175,10 @@ tests:
     test:
     - as: e2e-test
       cli: latest
-      commands: make e2e
+      commands: DISK_INSTALL=true make e2e
+      dependencies:
+      - env: OO_BUNDLE
+        name: lvm-operator-bundle
       from: test-bin
       resources:
         requests:
@@ -215,6 +212,9 @@ tests:
     - as: e2e-test
       cli: latest
       commands: DISK_INSTALL=true make e2e
+      dependencies:
+      - env: OO_BUNDLE
+        name: lvm-operator-bundle
       from: test-bin
       resources:
         requests:
@@ -281,7 +281,7 @@ tests:
     - as: lvms-sno-integration-test
       cli: latest
       commands: |
-        ./integration-test run-suite openshift/lvm-operator/test/integration
+        ./integration-test run-suite openshift/lvm-operator/test/integration/single-node
       from: lvm-operator-integration-test
       resources:
         requests:

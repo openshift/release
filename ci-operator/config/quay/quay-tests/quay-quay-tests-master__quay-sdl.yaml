@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.18"
+    name: "4.20"
     namespace: ocp
     tag: cli
 build_root:
@@ -14,7 +14,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -27,13 +27,14 @@ tests:
   cron: 0 0 6 * *
   steps:
     env:
-      QUAY_BRIDGE_OPERATOR_IMAGE: quay-quay-bridge-operator-rhel8:v3.15.1-4
-      QUAY_BUILDER_IMAGE: quay-quay-builder-rhel8:v3.15.1-5
-      QUAY_BUILDER_QEMU_IMAGE: quay-quay-builder-qemu-rhcos-rhel8:v3.15.1-4
-      QUAY_CLAIR_IMAGE: quay-clair-rhel8:v3.15.1-6
-      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: quay-quay-container-security-operator-rhel8:v3.15.1-4
-      QUAY_IMAGE: quay-quay-rhel8:v3.15.1-10
-      QUAY_OPERATOR_IMAGE: quay-quay-operator-rhel8:v3.15.1-6
+      QUAY_BRIDGE_OPERATOR_IMAGE: quay-bridge-operator-v3-15@sha256:16f4b1d7aa4b4c767b5450cb7c26ee8065aa040f8acab51f2014280fe29b70f4
+      QUAY_BUILDER_IMAGE: quay-builder-v3-15@sha256:458bbbea184bad16daa089f8413dd30c8ec4282d00f5edea82d1ef7292036eb4
+      QUAY_BUILDER_QEMU_IMAGE: quay-builder-qemu-v3-15@sha256:ead9f17c45e9ae72f98346e6ac55e95954ab4ba25741df8f195b8696cfcdd516
+      QUAY_CLAIR_IMAGE: quay-clair-v3-15@sha256:6bdfc3631f007cd848f04e3390efd5681e0f235e7fb9b1365d349a0cef47c7fb
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: container-security-operator-v3-15@sha256:181b8ead12a4addbe5c1d57339bbe6e3419bd91ef241c6c6f0f3319cfc88f1cf
+      QUAY_IMAGE: quay-quay-v3-15@sha256:22e4dcd8401f2382bdf38f8c2c7a7cf2efc675a77495f9b2e3ab9a400c6c7d89
+      QUAY_OPERATOR_IMAGE: quay-operator-v3-15@sha256:691ba0f368f44e7f3f9a642b5a8e33b8064b742790864f224833907ab5283ea5
+      QUAY_VERSION: "3.15"
     post:
     - ref: quay-tests-deprovisioning-quay-security-testing
     pre:
@@ -44,14 +45,15 @@ tests:
   cron: 0 12 * * 3
   steps:
     env:
-      QUAY_BRIDGE_OPERATOR_IMAGE: quay-quay-bridge-operator-rhel8:v3.14.3-3
-      QUAY_BUILDER_IMAGE: quay-quay-builder-rhel8:v3.14.3-2
-      QUAY_BUILDER_QEMU_IMAGE: quay-quay-builder-qemu-rhcos-rhel8:v3.14.3-4
-      QUAY_CLAIR_IMAGE: quay-clair-rhel8:v3.14.3-6
-      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: quay-quay-container-security-operator-rhel8:v3.14.3-2
-      QUAY_IMAGE: quay-quay-rhel8:v3.14.3-6
-      QUAY_OPERATOR_IMAGE: quay-quay-operator-rhel8:v3.14.3-8
-      QUAY_REDIS_IMAGE: registry.redhat.io/rhel8/redis-6:1-215.1749685126
+      QUAY_BRIDGE_OPERATOR_IMAGE: quay-bridge-operator-v3-14@sha256:ecc54a346d597e8fce700a59908811d6508b0dfc366de77a510e5155b55944f9
+      QUAY_BUILDER_IMAGE: quay-builder-v3-14@sha256:41cb5e625a145bdc9ff3cec703ea557dda4fa24b4bd4b6e5ad56c3e8923bd1a1
+      QUAY_BUILDER_QEMU_IMAGE: quay-builder-qemu-v3-14@sha256:06ec71b093ec90af268355bc739d6a2b8db9829e8a7fb3921c3dd0b24f3f8f99
+      QUAY_CLAIR_IMAGE: quay-clair-v3-14@sha256:ca0a4224ca2c669155e17d279cfb8bc9c46e4e85133b9eddabe5e823f5bb3254
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: container-security-operator-v3-14@sha256:101a5728fd9c8cc7799b2ce37bb6ed0898dcaa6c64e902796d7531dcc10d258d
+      QUAY_IMAGE: quay-quay-v3-14@sha256:9dd15e172450c4adb4f81660a7c7a36170405b6a7ee27c301dc1d7b89f99e12c
+      QUAY_OPERATOR_IMAGE: quay-operator-v3-14@sha256:1a1b03fd0ab98181f274fede0b88a27c31278e7f90e187933dff63444951193d
+      QUAY_REDIS_IMAGE: registry.redhat.io/rhel8/redis-6@sha256:cefc749916bb70a025acb560e3863e0593015832044b31d7e23e400e20b89bff
+      QUAY_VERSION: "3.14"
     post:
     - ref: quay-tests-deprovisioning-quay-security-testing
     pre:
@@ -137,6 +139,24 @@ tests:
       QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: quay-quay-container-security-operator-rhel8:v3.9.12-2
       QUAY_IMAGE: quay-quay-rhel8:v3.9.12-7
       QUAY_OPERATOR_IMAGE: quay-quay-operator-rhel8:v3.9.12-2
+    post:
+    - ref: quay-tests-deprovisioning-quay-security-testing
+    pre:
+    - ref: quay-tests-provisioning-quay-security-testing
+    test:
+    - ref: quay-tests-scan-quay-images
+- as: quay-sdl-check-images-vulnerabilities-quay316
+  cron: 0 0 6 * *
+  steps:
+    env:
+      QUAY_BRIDGE_OPERATOR_IMAGE: quay-bridge-operator-v3-16@sha256:f37b75957d97126f00126d1a51897b5a54bf063ba868e57d9cff241e732796ff
+      QUAY_BUILDER_IMAGE: quay-builder-v3-16@sha256:d3803200676de5a10f81539d3cb65e3d1cfad4fdfe7171284cab758bfc1bdd6a
+      QUAY_BUILDER_QEMU_IMAGE: quay-builder-qemu-v3-16@sha256:adc9eb1500491144a259fd95c14237be15fa92478523bf33769a708b301d66cb
+      QUAY_CLAIR_IMAGE: quay-clair-v3-16@sha256:b9a5096fef74999c34dfb721ca1b5e47623cfa21b48213f60a5b889894d4874e
+      QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE: container-security-operator-v3-16@sha256:7eb56ea92c1db547702ef9e540b3dd8dcf5bcbfc866540c09652d9eaaf07e52f
+      QUAY_IMAGE: quay-quay-v3-16@sha256:c855425208f7f33a550d216328965fdcb3abebc3ee28fc0854bf62c58ce07266
+      QUAY_OPERATOR_IMAGE: quay-operator-v3-16@sha256:16616e52f128f4a9b8511e7d9288bb1fcdd4e096a5a9b58400badbd0fad21476
+      QUAY_VERSION: "3.16"
     post:
     - ref: quay-tests-deprovisioning-quay-security-testing
     pre:

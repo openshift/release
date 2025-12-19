@@ -1,96 +1,96 @@
-kind: List
-apiVersion: v1
-items:
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-    labels:
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+  labels:
+    app: prow
+    component: pod-scaler-producer
+  name: pod-scaler-producer
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
       app: prow
       component: pod-scaler-producer
-    name: pod-scaler-producer
-    namespace: ci
-  spec:
-    replicas: 1
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: pod-scaler-producer
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: pod-scaler-producer
-      spec:
-        containers:
-        - image: quay-proxy.ci.openshift.org/openshift/ci:ci_pod-scaler_latest
-          name: pod-scaler
-          imagePullPolicy: Always
-          args:
-          - --loglevel=debug
-          - --cache-bucket=origin-ci-resource-usage-data-v2
-          - --gcs-credentials-file=/etc/gcs/service-account.json
-          - --mode=producer
-          - --kubeconfig-dir=/var/kubeconfigs
-          - --kubeconfig-suffix=config
-          ports:
-          - name: metrics
-            containerPort: 9090
-          volumeMounts:
-          - name: kubeconfigs
-            mountPath: /var/kubeconfigs
-          - name: gcs-credentials
-            mountPath: /etc/gcs
-            readOnly: true
-          resources:
-            requests:
-              memory: "5Gi"
-              cpu: "1500m"
-            limits:
-              memory: "10Gi"
-        volumes:
+    spec:
+      containers:
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_pod-scaler_latest
+        name: pod-scaler
+        imagePullPolicy: Always
+        args:
+        - --loglevel=debug
+        - --cache-bucket=origin-ci-resource-usage-data-v2
+        - --gcs-credentials-file=/etc/gcs/service-account.json
+        - --mode=producer
+        - --kubeconfig-dir=/var/kubeconfigs
+        - --kubeconfig-suffix=config
+        ports:
+        - name: metrics
+          containerPort: 9090
+        volumeMounts:
         - name: kubeconfigs
-          secret:
-            secretName: pod-scaler
+          mountPath: /var/kubeconfigs
         - name: gcs-credentials
-          secret:
-            secretName: gce-sa-credentials-resource-usage-data-publisher
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    labels:
+          mountPath: /etc/gcs
+          readOnly: true
+        resources:
+          requests:
+            memory: "5Gi"
+            cpu: "1500m"
+          limits:
+            memory: "10Gi"
+      volumes:
+      - name: kubeconfigs
+        secret:
+          secretName: pod-scaler
+      - name: gcs-credentials
+        secret:
+          secretName: gce-sa-credentials-resource-usage-data-publisher
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  labels:
+    app: prow
+    component: pod-scaler-producer
+  name: pod-scaler-producer
+spec:
+  ports:
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+  selector:
+    app: prow
+    component: pod-scaler-producer
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pod-scaler-producer
+  namespace: ci
+  labels:
+    app: prow
+    component: pod-scaler-producer
+    prow-app: pod-scaler-producer
+spec:
+  endpoints:
+    - interval: 30s
+      port: metrics
+      scheme: http
+  selector:
+    matchLabels:
       app: prow
       component: pod-scaler-producer
-    name: pod-scaler-producer
-  spec:
-    ports:
-      - name: metrics
-        port: 9090
-        protocol: TCP
-        targetPort: 9090
-    selector:
-      app: prow
-      component: pod-scaler-producer
-- apiVersion: monitoring.coreos.com/v1
-  kind: ServiceMonitor
-  metadata:
-    name: pod-scaler-producer
-    namespace: ci
-    labels:
-      app: prow
-      component: pod-scaler-producer
-      prow-app: pod-scaler-producer
-  spec:
-    endpoints:
-      - interval: 30s
-        port: metrics
-        scheme: http
-    selector:
-      matchLabels:
-        app: prow
-        component: pod-scaler-producer

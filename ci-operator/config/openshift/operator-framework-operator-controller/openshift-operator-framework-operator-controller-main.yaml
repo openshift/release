@@ -45,17 +45,17 @@ promotion:
   to:
   - excluded_images:
     - e2e-test-registry
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -103,7 +103,7 @@ tests:
 - as: openshift-e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-4
     test:
     - as: upstream-e2e
       cli: latest
@@ -121,7 +121,7 @@ tests:
   as: openshift-e2e-aws-techpreview
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -180,9 +180,16 @@ tests:
       resources:
         requests:
           cpu: 100m
+- as: e2e-gcp-ovn-upgrade
+  steps:
+    cluster_profile: gcp-3
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-gcp
 - as: e2e-aws-techpreview-olmv1-ext
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_ARGS: --monitor=watch-namespaces
@@ -192,7 +199,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-aws-olmv1-ext
   steps:
-    cluster_profile: aws-3
+    cluster_profile: aws-5
     env:
       TEST_ARGS: --monitor=watch-namespaces
       TEST_SUITE: olmv1/all
