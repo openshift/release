@@ -7,6 +7,12 @@ cd /go/src/github.com/openshift/gcp-pd-csi-driver-operator
 if [ "${COMPUTE_DISK_TYPE}" == "hyperdisk-balanced" ]; then
     # Using hyperdisk-balanced worker
     cp test/e2e/hyperdisk-manifest.yaml ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+    # VolumeAttributesClass tests should only run on cluster with hyperdisk-balanced worker
+    if [ -f "test/e2e/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST}" ]; then
+        echo "Copying ${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST} from openshift/gcp-pd-csi-driver-operator to ${SHARED_DIR}/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST}"
+        cp test/e2e/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST} ${SHARED_DIR}/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST}
+        cat ${SHARED_DIR}/${TEST_VOLUME_ATTRIBUTES_CLASS_MANIFEST}
+    fi
 else
     cp test/e2e/manifest.yaml ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
 fi
