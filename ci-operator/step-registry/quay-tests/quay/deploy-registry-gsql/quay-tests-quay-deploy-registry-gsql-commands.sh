@@ -61,7 +61,7 @@ FEATURE_SUPERUSER_CONFIGDUMP: true
 FEATURE_IMAGE_PULL_STATS: true
 REDIS_FLUSH_INTERVAL_SECONDS: 30
 PULL_METRICS_REDIS:
-  host: quayregistry-quay-redis
+  host: quay-quay-redis
   port: 6379
   db: 1
 EOF
@@ -103,7 +103,7 @@ spec:
     managed: true
 EOF
 
-sleep 30000  # wait for pods to be ready
+sleep 300 # wait for pods to be ready
 
 for i in {1..60}; do
   if [[ "$(oc -n ${QUAYNAMESPACE} get quayregistry ${QUAYREGISTRY} -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then

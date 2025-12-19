@@ -43,7 +43,7 @@ FEATURE_SUPERUSER_CONFIGDUMP: true
 FEATURE_IMAGE_PULL_STATS: true
 REDIS_FLUSH_INTERVAL_SECONDS: 30
 PULL_METRICS_REDIS:
-  host: quayregistry-quay-redis
+  host: quay-quay-redis
   port: 6379
   db: 1
 EOF
