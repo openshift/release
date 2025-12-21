@@ -760,6 +760,7 @@ while [ $retry_count -lt $max_retries ]; do
   # Execute command and capture both output and exit code
   set +o errexit # Avoid tripping errexit on failures so we can log and/or retry
   cmd_output=$(eval "${cmd}" 2>&1)
+  echo $cmd_output
   exit_code=$?
   set -o errexit
 
