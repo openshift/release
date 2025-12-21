@@ -243,10 +243,15 @@ function setup_test_result_for_component_readiness {
     fi
   done
 
-  # Create tar.gz archive of all artifacts (significantly smaller than individual files)
+  # Create tar.gz archive of all artifacts (gzip is the only compression available in CI image)
   echo "Creating tar.gz archive of PTP artifacts..."
   tar -czvf "${tar_archive}" -C "${tar_staging_dir}" .
   rm -rf "${tar_staging_dir}"
+
+  # Clean up raw artifacts from SHARED_DIR to stay under 3MB secret limit
+  # The archived version in ARTIFACT_DIR preserves all data
+  echo "Cleaning up raw PTP artifacts from SHARED_DIR (CI secret limit is 3MB)..."
+  rm -fv ${test_results_artifacts_append}*.ptplog 2>/dev/null || true
 
   # Process JUnit XML for CI integration (same as OSLAT/CPU-util)
   # These must remain uncompressed for CI to parse them
