@@ -87,7 +87,7 @@ export ANSIBLE_REMOTE_TEMP="/tmp"
 ansible-playbook ./playbooks/compute/config-cluster.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "${EXTRA_VARS}"
 
-
+echo "Set bastion ssh configuration"
 grep ansible_ssh_private_key -A 100 "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "/tmp/temp_ssh_key"
 
 chmod 600 "/tmp/temp_ssh_key"
