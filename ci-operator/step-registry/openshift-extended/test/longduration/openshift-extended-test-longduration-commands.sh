@@ -273,9 +273,11 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
         tmpDir=$(mktemp -d)
         cd ${tmpDir}
         tag=$(oc adm release info "${ocpVersion}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
-        echo "Extracting oc-mirror from ${ocpVersion}"
+        echo "Extracting oc-mirror from ${ocpVersion}, OCP_ARCH: ${OCP_ARCH}"
         set -x
-        oc image extract "${tag}" --path=/usr/bin/oc-mirror:. -a "${CLUSTER_PROFILE_DIR}/pull-secret"
+        which oc
+        uname -m
+        oc image extract "${tag}" --path=/usr/bin/oc-mirror:. -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os="linux/$(OCP_ARCH:-amd64)"
         ls -la ./oc-mirror
         md5sum ./oc-mirror
         chmod +x ./oc-mirror
