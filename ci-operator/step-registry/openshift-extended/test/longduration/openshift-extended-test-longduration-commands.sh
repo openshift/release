@@ -258,13 +258,11 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 
 # check if the cluster is ready
 oc version --client
-oc mirror version --output yaml
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
 if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
     oc get clusterversion version -o yaml || true
     ocpVersion=$(oc get clusterversion -o json | jq -r '.items[0].status.desired.version')
-    oc mirror version --v2 --output yaml
 fi
 
 #if OVERWRITE_OC_MIRROR then overwrite the oc-mirror from the payload
@@ -281,8 +279,8 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
         chmod +x ./oc-mirror
         ./oc-mirror version --output yaml
         cp /usr/bin/oc ./oc
-        PATH="$tmpDir:$PATH"
-        cd /tmp/output
+        export PATH="$tmpDir:$PATH"
+        echo "Using oc from: $(which oc)"
         echo "oc mirror version:"
         oc mirror version --output yaml
         set +x
