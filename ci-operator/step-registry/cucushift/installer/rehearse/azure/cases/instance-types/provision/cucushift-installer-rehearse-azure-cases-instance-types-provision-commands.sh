@@ -124,7 +124,6 @@ cat > ${INSTANCE_TYPE_LIST} <<EOF
 - master: Standard_NC4as_T4_v3
   worker: Standard_NV12ads_A10_v5
   region: southcentralus
-  worker_scaleup: Standard_HB120-16rs_v2
 - master: Standard_E4bs_v5
   worker: Standard_M32ms_v2
   region: centralus
@@ -164,6 +163,16 @@ cat > ${INSTANCE_TYPE_LIST} <<EOF
 - master: Standard_L8s_v4
   worker: Standard_L8as_v4
   region: eastus 
+- master: Standard_E8-4ds_v6
+  worker: Standard_E4s_v6
+  region: eastus
+- master: Standard_FX8-2mds_v2
+  worker: Standard_FX8-2ms_v2
+  region: eastus
+- master: Standard_L8aos_v4
+  worker: Standard_HB120-16rs_v2
+  region: southcentralus
+  worker_number: 1
 EOF
 
 INSTALL_BASE_DIR=/tmp/install_base_dir
@@ -278,6 +287,7 @@ function create_install_config()
   local region=$3
   local cluster_name=$4
   local install_dir=$5
+  local worker_number=${6:-$IC_COMPUTE_NODE_COUNT}
 
   local config
   config=${install_dir}/install-config.yaml
@@ -292,7 +302,7 @@ compute:
   platform:
     azure:
       type: ${worker_instance_type}
-  replicas: ${IC_COMPUTE_NODE_COUNT}
+  replicas: ${worker_number}
 controlPlane:
   architecture: amd64
   hyperthreading: Enabled
@@ -757,6 +767,7 @@ while IFS= read -r master_instance_type; do
     cluster_name=$(get_cluster_name "${master_instance_type}")
     install_dir=$(get_install_dir "${master_instance_type}")
     worker_instance_type="$(yq-go r ${INSTANCE_TYPE_LIST} "(master==${master_instance_type}).worker")"    
+    worker_number="$(yq-go r ${INSTANCE_TYPE_LIST} "(master==${master_instance_type}).worker_number")"
     region="$(yq-go r ${INSTANCE_TYPE_LIST} "(master==${master_instance_type}).region")"
     mkdir -p ${install_dir}
 
@@ -764,7 +775,7 @@ while IFS= read -r master_instance_type; do
     echo "Creating cluster [master:${master_instance_type}][worker:${worker_instance_type}][region:${region}][${cluster_name}], ${i}/${total}"
     echo "================================================================"
 
-    create_install_config $master_instance_type $worker_instance_type $region $cluster_name $install_dir
+    create_install_config $master_instance_type $worker_instance_type $region $cluster_name $install_dir $worker_number
 
     # create manifests
     openshift-install create manifests --dir ${install_dir} &
