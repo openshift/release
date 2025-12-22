@@ -131,7 +131,22 @@ if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
   esac
 fi
 
-hack/ci-test-e2e.sh -test.v \
+CI_TESTS_RUN="TestCiliumConnectivity"
+#AZURE_NETWORK_TYPE="OVNKubernetes"
+#if [[ "${CI_TESTS_RUN:-}" == "TestCiliumConnectivity" ]];then
+AZURE_NETWORK_TYPE="--network-type=Other"
+
+export CILIUM_VERSION="1.14.5"
+
+rm -rf /tmp/test-e2e
+oc image extract quay.io/wewang58/test-e2e:cilium --confirm --path /:/tmp/
+sleep 10m
+
+cp hack/ci-test-e2e.sh /tmp/
+sed -i 's|bin/test-e2e|/tmp/test-e2e|g' /tmp/ci-test-e2e.sh
+chmod +x /tmp/test-e2e
+
+/tmp/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-} \
   -test.parallel=20 \
   --e2e.platform=Azure \
@@ -150,10 +165,12 @@ hack/ci-test-e2e.sh -test.v \
     ${MI_ARGS:-} \
     ${DP_ARGS:-} \
     ${AZURE_MULTI_ARCH_PARAMS:-} \
+    ${AZURE_NETWORK_TYPE:-} \
   --e2e.azure-encryption-key-id=${AKS_KMS_KEY} \
   --e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET} \
   ${MARKETPLACE_IMAGE_PARAMS} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
-  --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
+  --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" \
+  --e2e.external-cni-provider="cilium" &
 wait $!
