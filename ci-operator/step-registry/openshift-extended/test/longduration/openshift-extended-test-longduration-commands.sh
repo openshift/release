@@ -282,7 +282,7 @@ if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
         md5sum ./oc-mirror
         chmod +x ./oc-mirror
         ./oc-mirror version --output yaml
-        cp /usr/bin/oc ./oc
+        cp $(which oc) ./oc
         export PATH="$tmpDir:$PATH"
         echo "Using oc from: $(which oc)"
         echo "oc mirror version:"
