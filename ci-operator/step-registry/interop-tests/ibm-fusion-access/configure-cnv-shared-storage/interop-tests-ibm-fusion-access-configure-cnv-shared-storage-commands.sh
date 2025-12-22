@@ -3,11 +3,11 @@ set -eux -o pipefail; shopt -s inherit_errexit
 
 echo "🔧 Configuring CNV for IBM Storage Scale shared storage..."
 
-# Set default values
-CNV_NAMESPACE="${CNV_NAMESPACE:-openshift-cnv}"
-SHARED_STORAGE_CLASS="${SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
-STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
-STORAGE_SCALE_CLUSTER_NAME="${STORAGE_SCALE_CLUSTER_NAME:-ibm-spectrum-scale}"
+# Set default values from FA__ prefixed environment variables
+CNV_NAMESPACE="${FA__CNV_NAMESPACE:-openshift-cnv}"
+SHARED_STORAGE_CLASS="${FA__SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
+STORAGE_SCALE_NAMESPACE="${FA__STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
+STORAGE_SCALE_CLUSTER_NAME="${FA__STORAGE_SCALE_CLUSTER_NAME:-ibm-spectrum-scale}"
 
 # JUnit XML test results
 JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_configure_cnv_shared_storage_tests.xml"
