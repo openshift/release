@@ -105,4 +105,4 @@ for i in {1..60}; do
   sleep 15
   echo "Wait for quay registry ready $((i*15))s"
 done
-echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
+echo "Timed out waiting for Quay to become ready afer 15 mins!" >&2
