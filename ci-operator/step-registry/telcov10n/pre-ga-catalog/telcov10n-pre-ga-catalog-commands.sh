@@ -438,13 +438,15 @@ function create_pre_ga_calatog {
 }
 
 function main {
+
   update_openshift_config_pull_secret
-  create_pre_ga_calatog
+
+  if [ -n "${CATALOGSOURCE_NAME:-}" ]; then
+    create_pre_ga_calatog
+  else
+    echo
+    echo "No preGA catalog name set. Skipping catalog creation..."
+  fi
 }
 
-if [ -n "${CATALOGSOURCE_NAME:-}" ]; then
-  main
-else
-  echo
-  echo "No preGA catalog name set. Skipping catalog creation..."
-fi
+main
