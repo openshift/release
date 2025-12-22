@@ -178,6 +178,38 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
+- as: aws-ipi-confidential-fips-mini-perm-f7
+  cron: 38 12 4,11,18,27 * *
+  steps:
+    cluster_profile: aws-confidential-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: confcluster.devcluster.openshift.com
+      COMPUTE_CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualizationNestedPaging
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONFIDENTIAL_COMPUTE: ""
+      CONTROL_PLANE_CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualizationNestedPaging
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-confidential-computing
+- as: aws-ipi-confidential-fips-mini-perm-f28-destructive
+  cron: 47 10 16 * *
+  steps:
+    cluster_profile: aws-confidential-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: confcluster.devcluster.openshift.com
+      COMPUTE_CONFIDENTIAL_COMPUTE: ""
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualizationNestedPaging
+      CONTROL_PLANE_CONFIDENTIAL_COMPUTE: ""
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-confidential-computing
 - as: aws-ipi-disc-priv-f28-longrun-ota
   cron: 52 7 7 * *
   steps:
