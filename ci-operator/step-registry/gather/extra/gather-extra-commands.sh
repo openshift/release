@@ -301,7 +301,7 @@ if [[ -n "${prometheus}" ]]; then
 	cat >> ${SHARED_DIR}/custom-links.txt <<-EOF
 	<script>
 	let prom = document.createElement('a');
-	prom.href="https://promecieus.dptools.openshift.org/?search="+encodeURIComponent(window.location.href);
+	prom.href="https://promecieus.dptools.openshift.org/?search="+encodeURIComponent(parent.window.location.href);
 	prom.title="Creates a new prometheus deployment with data from this job run.";
 	prom.innerHTML="PromeCIeus";
 	prom.target="_blank";

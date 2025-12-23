@@ -280,7 +280,7 @@ rm -rf "${ARTIFACT_DIR}"/must-gather
 cat >> ${SHARED_DIR}/custom-links.txt << EOF
 <script>
 let kaas = document.createElement('a');
-kaas.href="https://kaas.dptools.openshift.org/?search="+encodeURIComponent(window.location.href);
+kaas.href="https://kaas.dptools.openshift.org/?search="+encodeURIComponent(parent.window.location.href);
   kaas.title="KaaS is a service to spawn a fake API service that parses must-gather data. As a result, users can pass Prow CI URL to the service, fetch generated kubeconfig and use kubectl/oc/k9s/openshift-console to investigate the state of the cluster at the time must-gather was collected."
 kaas.innerHTML="KaaS";
 kaas.target="_blank";
