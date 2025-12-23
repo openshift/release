@@ -1374,6 +1374,31 @@ tests:
     - ref: cucushift-installer-check-azure-confidential
     test:
     - ref: openshift-e2e-test
+- as: gcp-custom-dns-private
+  optional: true
+  run_if_changed: (gcp|google)
+  steps:
+    cluster_profile: gcp
+    env:
+      BASE_DOMAIN: custom-dns.com
+      PUBLISH: Internal
+      USER_PROVISIONED_DNS: "yes"
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-private-deprovision
+    pre:
+    - ref: gcp-provision-minimal-permission
+    - ref: gcp-provision-vpc
+    - ref: ignition-bastionhost
+    - ref: gcp-provision-bastionhost
+    - ref: proxy-config-generate
+    - chain: ipi-conf-gcp
+    - ref: ipi-install-install
+    - ref: gcp-provision-private-custom-dns
+    - ref: bastion-dnsmasq
+    - ref: cucushift-installer-check-gcp-private
+    - ref: cucushift-installer-check-user-provisioned-dns
+    test:
+    - chain: cucushift-installer-check-cluster-health
 - as: gcp-private
   optional: true
   run_if_changed: (gcp|google)
