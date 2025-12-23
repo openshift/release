@@ -28,7 +28,7 @@ function save_oidc_tokens {
 
 function exit_trap {
     echo "Exit trap triggered"
-    sleep 1800s
+    #sleep 1800s
     date '+%s' > "${SHARED_DIR}/TEST_TIME_TEST_END" || :
     warn_0_case_executed
     if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
