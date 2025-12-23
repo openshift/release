@@ -1,0 +1,166 @@
+base_images:
+  ocp_4.21_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+images:
+- inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: cluster-openshift-apiserver-operator
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 3Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws-4
+    workflow: openshift-e2e-aws
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: aws-5
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-upgrade
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-gcp-operator-encryption-aescbc
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-aescbc JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-operator-encryption-aesgcm
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-aesgcm JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-operator-encryption-rotation-aescbc
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-rotation-aescbc JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-operator-encryption-rotation-aesgcm
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-rotation-aesgcm JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+- always_run: false
+  as: e2e-tests-extension
+  optional: true
+  steps:
+    test:
+    - as: tests-extension
+      commands: |
+        echo "Build binary cluster-openshift-apiserver-operator-tests-ext"
+        make tests-ext-build
+        echo "Running ./cluster-openshift-apiserver-operator-tests-ext with sanity test"
+        ./cluster-openshift-apiserver-operator-tests-ext run-test -n "[Jira:openshift-apiserver][sig-api-machinery] sanity test should always pass [Suite:openshift/cluster-openshift-apiserver-operator/conformance/parallel]"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: cluster-openshift-apiserver-operator

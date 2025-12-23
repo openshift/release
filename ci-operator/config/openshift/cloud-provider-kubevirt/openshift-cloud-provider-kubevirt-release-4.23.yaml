@@ -1,0 +1,83 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  ocp_4.21_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+binary_build_commands: make build
+build_root:
+  from_repository: true
+canonical_go_repository: kubevirt.io/cloud-provider-kubevirt-cloud
+images:
+- dockerfile_path: openshift-hack/images/Dockerfile.openshift
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: kubevirt-cloud-controller-manager
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make test
+tests:
+- as: security
+  optional: true
+  steps:
+    env:
+      ALL_PROJECTS: "true"
+      PROJECT_NAME: cloud-provider-kubevirt
+    workflow: openshift-ci-security
+- as: unit-tests
+  commands: GOFLAGS="-mod=readonly" make test
+  container:
+    from: src
+- as: hypershift-kubevirt-conformance-baremetalds
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.19
+    workflow: hypershift-kubevirt-baremetalds-conformance
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: cloud-provider-kubevirt

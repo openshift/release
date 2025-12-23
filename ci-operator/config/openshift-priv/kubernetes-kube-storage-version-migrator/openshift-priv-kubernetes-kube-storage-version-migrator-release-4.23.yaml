@@ -1,0 +1,77 @@
+base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
+  ocp_4.21_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/kubernetes-sigs/kube-storage-version-migrator
+images:
+- dockerfile_path: images/release/Dockerfile
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: kube-storage-version-migrator
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 1Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-aws
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+- as: verify-commits
+  commands: |
+    commitchecker --start "$(git merge-base ${PULL_BASE_SHA:-main} "${PULL_PULL_SHA:-HEAD}")" --end "${PULL_PULL_SHA:-HEAD}"
+  container:
+    from: commitchecker
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: kubernetes-kube-storage-version-migrator

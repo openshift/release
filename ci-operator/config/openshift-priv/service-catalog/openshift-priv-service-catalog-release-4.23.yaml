@@ -1,0 +1,64 @@
+base_images:
+  base:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base
+  openshift_release_golang-1.10:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: github.com/kubernetes-incubator/service-catalog
+images:
+- from: base
+  inputs:
+    openshift_release_golang-1.10:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.10
+  to: service-catalog
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: OS_GOFLAGS='-race' make build
+tests:
+- as: unit
+  commands: JUNIT_REPORT=1 hack/test-go.sh
+  container:
+    from: test-bin
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make build-e2e && hack/create-subscription.sh && hack/run-e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: service-catalog

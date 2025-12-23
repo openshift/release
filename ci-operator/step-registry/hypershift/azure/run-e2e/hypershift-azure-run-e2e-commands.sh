@@ -103,6 +103,34 @@ if [[ -n "${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER:-}" && -n "${HYPERSHIFT
   MARKETPLACE_IMAGE_PARAMS="--e2e.azure-marketplace-publisher ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER} --e2e.azure-marketplace-offer ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER} --e2e.azure-marketplace-sku ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU} --e2e.azure-marketplace-version ${HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION}"
 fi
 
+OAUTH_EXTERNAL_OIDC_PARAM=""
+if [ -f ${SHARED_DIR}/external-oidc-provider ] ; then
+    source ${SHARED_DIR}/external-oidc-provider
+fi
+if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
+  case "${OAUTH_EXTERNAL_OIDC_PROVIDER}" in
+    "keycloak")
+      source "${SHARED_DIR}/runtime_env"
+      OAUTH_EXTERNAL_OIDC_PARAM="--e2e.external-oidc-provider=${OAUTH_EXTERNAL_OIDC_PROVIDER} \
+      --e2e.external-oidc-cli-client-id=${KEYCLOAK_CLI_CLIENT_ID} \
+      --e2e.external-oidc-console-client-id=${CONSOLE_CLIENT_ID} \
+      --e2e.external-oidc-issuer-url=${KEYCLOAK_ISSUER} \
+      --e2e.external-oidc-console-secret=${CONSOLE_CLIENT_SECRET_VALUE} \
+      --e2e.external-oidc-ca-bundle-file=${KEYCLOAK_CA_BUNDLE_FILE}  \
+      --e2e.external-oidc-test-users=${KEYCLOAK_TEST_USERS}"
+      ;;
+    "azure")
+      #todo
+      echo "azure is not supported yet"
+      exit 1
+      ;;
+    *)
+      echo "unsupported OAUTH_EXTERNAL_OIDC_PROVIDER ${OAUTH_EXTERNAL_OIDC_PROVIDER}"
+      exit 1
+      ;;
+  esac
+fi
+
 hack/ci-test-e2e.sh -test.v \
   -test.run=${CI_TESTS_RUN:-} \
   -test.parallel=20 \
@@ -126,5 +154,6 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET} \
   ${MARKETPLACE_IMAGE_PARAMS} \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
+  ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}" &
 wait $!

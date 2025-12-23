@@ -99,6 +99,109 @@ See detailed documentation below.
 
 ---
 
+### `/effective-env` - Resolve Job Environment Variables
+
+**Purpose**: Resolve and display the effective environment variables for a specific CI job, showing how variables cascade through the job's workflow, chains, and steps with override tracking.
+
+**Usage**:
+```bash
+/effective-env <job_name> [component_name] [version] [filter]
+```
+
+**Parameters**:
+- `job_name` (required): The job name (value in the `as` field in ci-operator/config YAML files)
+- `component_name` (optional): Component name to narrow down job configs. Examples:
+  - `hypershift` → searches openshift/hypershift and openshift-priv/hypershift
+  - `jboss-eap` → searches jboss-eap-qe
+  - `openshift/hypershift` → searches only openshift/hypershift
+  - If not provided, searches all job configs
+- `version` (optional): Version(s) to filter job configs:
+  - Single version: `4.21`
+  - Multiple versions (comma or space-separated): `4.21,4.20` or `4.21 4.20`
+  - If not set, all versions included (may prompt for confirmation if >2 found)
+- `filter` (optional): Case-insensitive filter to show only matching environment variables
+  - Example: `lvm` shows LVM_OPERATOR_SUB_CHANNEL, LVM_CATALOG_SOURCE, etc.
+
+**Examples**:
+```bash
+# Basic usage - show all variables for a job
+/effective-env e2e-kubevirt-metal-ovn hypershift
+
+# Specific version
+/effective-env e2e-kubevirt-metal-ovn hypershift 4.21
+
+# Multiple versions
+/effective-env e2e-kubevirt-metal-ovn hypershift "4.20,4.21"
+
+# With filter - show only METALLB variables
+/effective-env e2e-kubevirt-metal-ovn hypershift 4.21 metallb
+
+# Multiple versions with filter
+/effective-env e2e-kubevirt-metal-ovn hypershift "4.20,4.21" hypershift
+
+```
+
+**What it does**:
+- Finds CI config files matching the job name and component
+- Filters by specified version(s)
+- Resolves environment variables through the entire dependency chain:
+  - Job config overrides (highest priority)
+  - Workflow-level variables
+  - Chain-level variables
+  - Step-level defaults (lowest priority)
+- Displays variables in a formatted table with:
+  - Total and filtered counts
+  - Override warnings (⚠️) for variables that override step defaults
+  - Summary of key overrides with source tracking
+  - Value truncation for readability (>80 chars)
+
+**Output Format**:
+```
+## Job: e2e-kubevirt-metal-ovn (4.21)
+- **Config**: ci-operator/config/openshift/hypershift/openshift-hypershift-release-4.21__periodics.yaml
+- **Workflow**: hypershift-kubevirt-baremetalds-conformance
+
+### Summary
+- Total environment variables: 75
+- Displayed: 4 (filtered by: 'metallb')
+- Overrides: 1
+
+| Variable | Value |
+|----------|-------|
+| ⚠️ METALLB_OPERATOR_SUB_SOURCE (workflow)     | qe-app-registry  |
+| METALLB_OPERATOR_SUB_CHANNEL (step)           | stable           |
+| ... | ... |
+
+### 🔑 Key Overrides
+
+These variables have been overridden from their step defaults:
+
+| Variable | Override Value | Source | Default Value |
+|----------|----------------|--------|---------------|
+| METALLB_OPERATOR_SUB_SOURCE | qe-app-registry | workflow | redhat-operators |
+```
+
+**Why Use It**:
+- **Debugging**: Understand which environment variables are actually used by a job
+- **Override Analysis**: See which variables are overridden from their defaults
+- **Configuration Validation**: Verify environment variable values before running jobs
+- **Impact Assessment**: Compare variables across multiple versions or configs
+- **Operator Configuration**: Quickly find operator subscription channels, catalog sources, etc.
+
+**Implementation**:
+- Uses `.claude/scripts/effective_env.py` to recursively resolve variables
+- Follows OpenShift CI priority rules: config > workflow > chain > step
+- Tracks override sources for transparency
+- Outputs structured JSON for reliable parsing
+
+**Tips**:
+1. **Filter for specific concerns**: Use filters like `catalog`, `channel`, `operator` to narrow results
+2. **Version comparison**: Specify multiple versions to see configuration drift
+3. **Override detection**: Pay attention to ⚠️ warnings - these indicate intentional overrides
+4. **Empty values**: Some variables may have empty defaults and get set at runtime
+
+---
+
 ## Step Finder Detailed Documentation
 
 ### `/step-finder` - Step Registry Component Discovery

@@ -223,11 +223,17 @@ else
   echo "zones already set in install-config.yaml, skipped"
 fi
 
-if [[ "${CI_NAT_REPLACE:-false}" == 'auto' ]]; then
-  # Target 100% of appropriate pull request jobs in master or main.
-  if [[ "${JOB_NAME}" == *pull-ci-openshift-*-ma*e2e*aws* && "${JOB_NAME}" != *'microshift'* && "${JOB_NAME}" != *'hypershift'* && "${JOB_NAME}" != *'vpc'* && "${JOB_NAME}" != *'single-node'* ]]; then
-    CI_NAT_REPLACE='true'
-    echo "IMPORTANT: this job has been selected to use NAT instance instead of NAT gateway. See jupierce if abnormalities are detected."
+# See if we can use NAT instances as a cost reduction method.
+# OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY is set to false by the release controller (i.e. do not use NAT instances
+# release controller jobs.
+if [[ "${CI_NAT_REPLACE:-false}" == 'auto' && "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-true}" != "false" ]]; then
+  # Enable the option for anything in the openshift org unless they use a different install topology.
+  # 4.21 is currently excluded as we approach GA.
+  if [[ "${JOB_NAME}" == *-ci-openshift-* && "${JOB_NAME}" != *-4.21-* ]]; then
+    if [[ "${JOB_NAME}" != *'microshift'* && "${JOB_NAME}" != *'hypershift'* && "${JOB_NAME}" != *'vpc'* && "${JOB_NAME}" != *'single-node'* ]]; then
+      CI_NAT_REPLACE='true'
+      echo "IMPORTANT: this job has been selected to use NAT instance instead of NAT gateway. See jupierce if abnormalities are detected."
+    fi
   fi
 fi
 

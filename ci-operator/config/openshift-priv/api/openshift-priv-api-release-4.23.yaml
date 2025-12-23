@@ -1,0 +1,187 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.21_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/api
+images:
+- dockerfile_path: Dockerfile.ocp
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: cluster-config-api
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: build
+  commands: |
+    true
+  container:
+    from: bin
+- as: verify
+  commands: |
+    make verify-scripts verify-codegen-crds -k --warn-undefined-variables
+  container:
+    from: src
+- as: verify-crd-schema
+  commands: |
+    make verify-crd-schema -k --warn-undefined-variables
+  container:
+    from: src
+- as: verify-crdify
+  commands: |
+    make verify-crdify -k --warn-undefined-variables
+  container:
+    from: src
+- as: verify-feature-promotion
+  commands: |
+    make verify-feature-promotion -k --warn-undefined-variables
+  container:
+    from: src
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: lint
+  commands: |
+    make -k lint verify-lint-fix
+  container:
+    from: src
+- as: integration
+  commands: |
+    make integration -k --warn-undefined-variables
+  container:
+    from: src
+- as: verify-client-go
+  commands: |
+    dir=$GOPATH/src/github.com/openshift/client-go
+    git clone https://github.com/openshift/client-go --branch ${PULL_BASE_REF:-master} --single-branch $dir
+    rm -rf $dir/vendor/github.com/openshift/api/*
+    cp -Rf ./ $dir/api/
+    rm -rf $dir/api/vendor
+    cd $dir
+    echo "replace github.com/openshift/api => ./api" >> go.mod
+    echo "# github.com/openshift/api => ./api" >> vendor/modules.txt
+    sed -i "/github.com\/openshift\/api v0.0.0/ s/$/ => \.\/api/" vendor/modules.txt
+    go mod vendor
+    make generate
+    go build ./...
+  container:
+    from: src
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-ovn-techpreview
+  pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-serial
+  pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  shard_count: 2
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- always_run: false
+  as: e2e-aws-serial-techpreview
+  pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  shard_count: 2
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws-serial
+- always_run: false
+  as: e2e-gcp
+  pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- always_run: false
+  as: e2e-azure
+  pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: azure-2
+    workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-upgrade
+  pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-upgrade-out-of-change
+  pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
+    workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-aws-ovn-hypershift
+  pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
+- always_run: false
+  as: e2e-aws-ovn-hypershift-conformance
+  pipeline_run_if_changed: ^Dockerfile\.ocp$|^Makefile$|^(manifests/.*|payload-command/.*|payload-manifests/.*)$
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: api

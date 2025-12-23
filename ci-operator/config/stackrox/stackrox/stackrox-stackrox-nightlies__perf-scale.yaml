@@ -1,0 +1,53 @@
+base_images:
+  ocp-4:
+    name: automation-flavors
+    namespace: stackrox
+    tag: openshift-4-stable
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-ui-test-0.4.9
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- as: 24nodes-scale-scannerv4-test
+  cron: 0 6 * * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-stackrox
+    env:
+      BASE_DOMAIN: perfscale.rox.systems
+      COMPUTE_NODE_REPLICAS: "24"
+      EXTRA_FLAGS: --churn-duration=20m --timeout=8h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
+      PODS_PER_NODE: "240"
+      ROX_SCANNER_V4_ENABLED: "true"
+      SCANNER_V4_MATCHER_READINESS: vulnerability
+      SCANNER_V4_MATCHER_READINESS_MAX_WAIT: "3600"
+      USER_TAGS: |
+        TicketId 382
+        RoxProject PerfScale
+      ZONES_COUNT: "3"
+    test:
+    - chain: stackrox-perfscale
+    workflow: stackrox-install-helm
+  timeout: 14h0m0s
+zz_generated_metadata:
+  branch: nightlies
+  org: stackrox
+  repo: stackrox
+  variant: perf-scale

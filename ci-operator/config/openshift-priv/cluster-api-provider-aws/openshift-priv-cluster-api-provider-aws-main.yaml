@@ -16,7 +16,7 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.21_base-rhel9:
-    name: 4.21-priv
+    name: 4.22-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.21:
@@ -43,17 +43,17 @@ images:
   to: aws-cluster-api-controllers
 promotion:
   to:
-  - name: 4.21-priv
+  - name: 4.22-priv
     namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.21-priv
+      name: 4.22-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.21-priv
+      name: 4.22-priv
       namespace: ocp-private
 resources:
   '*':
@@ -68,13 +68,15 @@ tests:
   commands: openshift/unit-tests.sh
   container:
     from: src
-- always_run: false
-  as: e2e-aws-capi-techpreview
-  optional: true
+- as: e2e-aws-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
     test:
     - as: test
       commands: openshift/e2e-tests.sh
@@ -82,6 +84,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

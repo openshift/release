@@ -1,0 +1,61 @@
+binary_build_commands: CGO_ENABLED=0 go build -o /go/bin/hypershift-oadp-plugin .
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.24
+canonical_go_repository: github.com/openshift/hypershift-oadp-plugin
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
+    make test
+  container:
+    from: src
+- as: security
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high -d
+      SNYK_ENABLE_DEPS_SCAN: "false"
+    workflow: openshift-ci-security
+- as: build
+  commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
+    make local
+  container:
+    from: src
+- as: verify
+  commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
+    make verify
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: hypershift-oadp-plugin

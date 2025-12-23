@@ -1,0 +1,70 @@
+ref:
+  as: aro-hcp-automation-image-update
+  from: aro-hcp-automation-image-update
+  commands: aro-hcp-automation-image-update-commands.sh
+  grace_period: 5m0s
+  timeout: 45m0s
+  env:
+  - name: AZURE_CREDENTIALS_DIR
+    default: /var/run/hcp-integration-credentials
+    documentation: |-
+      The directory where the Azure credentials are stored.
+  - name: GITHUB_REPO_ORG
+    default: Azure
+    documentation: |-
+      The organization of the GitHub repository.
+  - name: GITHUB_REPO_NAME
+    default: ARO-HCP
+    documentation: |-
+      The name of the GitHub repository.
+  - name: GITHUB_REPO_BRANCH
+    default: main
+    documentation: |-
+      The branch of the GitHub repository.
+  - name: GITHUB_TOKEN_PATH
+    default: /etc/github/oauth
+    documentation: |-
+      The path to the GitHub token file.
+  - name: GITHUB_PR_TITLE
+    default: Automated - Update component image digests
+    documentation: |-
+      The title of the GitHub pull request.
+  - name: GITHUB_PR_USER
+    default: openshift-ci-robot
+    documentation: |-
+      The user name of the GitHub pull request.
+  - name: GITHUB_PR_EMAIL
+    default: openshift-ci-robot@users.noreply.github.com
+    documentation: |-
+      The email of the GitHub pull request.
+  - name: SLACK_WEBHOOK_PATH
+    default: /var/run/slack-webhook/webhook
+    documentation: |-
+      The path to the Slack webhook file.
+  - name: PROW_JOB_URL
+    default: https://prow.ci.openshift.org/?job=periodic-ci-Azure-ARO-HCP-main-image-updater-image-updater-tooling
+    documentation: |-
+      The URL of the Prow job.
+  - name: VERBOSITY
+    default: "1"
+    documentation: |-
+      The debug level. 0 for no debug, 1 for debug, 2 for debug with verbose output.
+  credentials:
+  - collection: ""
+    mount_path: /etc/github
+    name: github-credentials-openshift-ci-robot-private-git-cloner
+    namespace: ci
+  - collection: ""
+    mount_path: /var/run/hcp-integration-credentials
+    name: hcp-integration-credentials
+    namespace: test-credentials
+  - collection: ""
+    mount_path: /var/run/slack-webhook
+    name: aro-hcp-image-bump-slack-webhook
+    namespace: test-credentials
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  documentation: |-
+    Fetches the latest image digests for all components and updates the image digests in the configuration.

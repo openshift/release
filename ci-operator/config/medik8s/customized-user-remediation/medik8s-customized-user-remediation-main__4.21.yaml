@@ -1,0 +1,61 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: os
+  to: customized-user-remediation
+operator:
+  bundles:
+  - as: my-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/medik8s/customized-user-remediation-operator:.*
+    with: pipeline:customized-user-remediation
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- as: openshift-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: medik8s-aws
+    dependencies:
+      OO_BUNDLE: my-bundle
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      OO_INSTALL_NAMESPACE: customized-user-remediation-e2e
+    test:
+    - as: e2e-test
+      commands: export OPERATOR_NS="$OO_INSTALL_NAMESPACE" && make e2e-test
+      env:
+      - name: OO_INSTALL_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: customized-user-remediation
+  variant: "4.21"
