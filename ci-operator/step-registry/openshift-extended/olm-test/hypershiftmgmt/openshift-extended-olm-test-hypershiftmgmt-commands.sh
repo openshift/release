@@ -216,6 +216,11 @@ oc get ImageDigestMirrorSet -o yaml || true
 oc get ImageTagMirrorSet -o yaml || true
 oc get ImageContentSourcePolicy -o yaml || true
 
+export bin_url="https://raw.githubusercontent.com/kuiwang02/operator-framework-olm/microhypermgmt/tests-extension/cmd/olmv0-tests-ext.tar.gz"
+curl --fail --retry 8 -sS -L "${bin_url}" -o /tmp/olmv0-tests-ext.tar.gz
+tar xzf /tmp/olmv0-tests-ext.tar.gz -C /tmp
+export EXTENSION_BINARY_OVERRIDE_OPERATOR_LIFECYCLE_MANAGER=/tmp/olmv0-tests-ext
+
 # wait longer if the new command is available
 echo "$(date) - waiting for oc adm wait-for-stable-cluster..."
 if oc adm wait-for-stable-cluster --minimum-stable-period 2m &>/dev/null; then
