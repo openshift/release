@@ -19,6 +19,10 @@ base_images:
     name: "2.15"
     namespace: acm-qe
     tag: multicluster-observability-operator-opp
+  ocs-ci-tests:
+    name: ocs-ci-container
+    namespace: ci
+    tag: stable
   virtctl:
     name: "4.21"
     namespace: ocp
@@ -28,20 +32,6 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.20
-images:
-- dockerfile_literal: |
-    FROM this-is-ignored
-    RUN dnf install -y git python39
-  from: cli
-  optional: true
-  to: cli-with-git
-- dockerfile_literal: |
-    FROM this-is-ignored
-    USER root
-    RUN dnf install -y sshpass openssh-clients
-    RUN dnf clean all
-  from: virtctl
-  to: virtctl-sshpass
 releases:
   initial:
     release:
@@ -59,18 +49,20 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: lp-interop-aws
+- as: aws-p2p-lp-interop
   cron: 0 23 31 2 *
   steps:
     cluster_profile: aws-cspi-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
+      ACM_SPOKE_CLUSTER_COUNT: "2"
       ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.20"
       ACM_SPOKE_CLUSTER_NAME_PREFIX: acm-spoke
+      ACM_SPOKE_CP_TYPE: m6a.2xlarge
+      ACM_SPOKE_WORKER_TYPE: c5n.metal
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
-      CLOUD_PROVIDER: ipi-aws
-      COMPUTE_NODE_TYPE: m6a.2xlarge
+      COMPUTE_NODE_TYPE: c5n.metal
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIREWATCH_CONFIG: |
         {
@@ -87,6 +79,7 @@ tests:
               {"step": "acm-tests-observability", "failure_type": "all", "classification": "ACM OBS testcase failure", "jira_project": "!default", "group": {"name": "opp-tests", "priority": 5}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "acm-tests-grc", "failure_type": "all", "classification": "ACM GRC testcase failure", "jira_project": "!default", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "acm-tests-alc", "failure_type": "all", "classification": "ACM ALC testcase failure", "jira_project": "!default", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "interop-tests-deploy-odf", "failure_type": "all", "classification": "ODF deploy failure", "jira_project": "!default", "group": {"name": "cluster", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]},
               {"step": "acm-interop-p2p-test-poc", "failure_type": "all", "classification": "ACM interop P2P POC test", "jira_project": "!default", "group": {"name": "interop-p2p-tests", "priority": 5}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
               {"step": "acm-mch", "failure_type": "all", "classification": "ACM MCH install", "jira_project": "!default", "group": {"name": "interop-p2p-tests", "priority": 2}, "jira_epic": "!default", "jira_assignee": "!default", "jira_additional_labels": ["!default"]}
             ]
@@ -98,24 +91,22 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8652
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      ODF_OPERATOR_CHANNEL: stable-4.20
+      ODF_VERSION_MAJOR_MINOR: "4.20"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.15", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
-      TARGET_CHANNEL: candidate-4.21
       USER_TAGS: |
         scenario acm-cnv-p2p
     leases:
     - count: 1
       env: LEASED_RESOURCE
       resource_type: aws-cspi-qe-quota-slice
-    - count: 1
+    - count: 2
       env: MANAGED_CLUSTER_LEASED_RESOURCE
       resource_type: aws-cspi-qe-quota-slice
     post:
-    - ref: acm-fetch-operator-versions
-    - ref: acm-must-gather
-    - ref: acm-inspector
     - ref: gather-aws-console
     - ref: acm-interop-p2p-cluster-uninstall
     - chain: ipi-deprovision
@@ -130,19 +121,16 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     - ref: install-operators
+    - ref: interop-tests-deploy-odf
     - ref: acm-mch
     - ref: acm-interop-p2p-cluster-install
     - ref: acm-fetch-managed-clusters
     - ref: p2p-acm-cnv-install-policy
-    - ref: p2p-cnv-pre-upgrade
-    - ref: acm-interop-p2p-cluster-upgrade
-    - ref: acm-tests-observability
-    - ref: acm-tests-grc
-    - ref: acm-tests-alc
-    - ref: p2p-cnv-post-upgrade
-  timeout: 8h0m0s
+    - ref: acm-interop-p2p-submariner-install
+    - ref: acm-interop-p2p-test-poc
+  timeout: 20h0m0s
 zz_generated_metadata:
   branch: master
   org: RedHatQE
   repo: interop-testing
-  variant: acm-cnv-ocp-4.21-p2p
+  variant: acm-virt-ocp4.21
