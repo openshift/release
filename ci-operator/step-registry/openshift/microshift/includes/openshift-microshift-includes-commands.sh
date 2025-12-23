@@ -527,7 +527,7 @@ function ci_custom_link_report() {
     </thead>
     <tbody>
 EOF
-
+    
     for test in "${ARTIFACT_DIR}"/scenario-info/*; do
         junit_file=""
         # RF, ginkgo or conformance
@@ -639,10 +639,7 @@ EOF
                 continue
             fi
             vmname=$(basename "${vm}")
-            if [ -n "${vm_links}" ]; then
-                vm_links="${vm_links}<br>"
-            fi
-            vm_links="${vm_links}<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/vms/${vmname}/sos\">🔎 SOS Reports</a></div>"
+            vm_links="${vm_links}<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/vms/${vmname}/sos\">🔎 SOS Report</a></div>"
         done
         if [ -z "${vm_links}" ]; then
             vm_links="<span class=\"empty-state\">No SOS report</span>"
