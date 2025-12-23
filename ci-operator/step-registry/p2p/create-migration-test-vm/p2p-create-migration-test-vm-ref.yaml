@@ -1,0 +1,75 @@
+ref:
+  as: p2p-create-migration-test-vm
+  from: cli
+  commands: p2p-create-migration-test-vm-commands.sh
+  timeout: 1h0m0s
+  grace_period: 10m0s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 400Mi
+  documentation: |-
+    Create a CNV test VirtualMachine on the source spoke for MTV cross-cluster live migration.
+
+    Supports cirros (HTTP import) or rhel (CNV DataSource clone). RHEL on ODF virt StorageClass
+    requires cloneStrategy=copy and usePopulator=false — both are applied automatically.
+
+    Requires p2p-acm-cnv-install-policy and p2p-install-odf-spokes on the source spoke.
+    Target kubeconfig: ${SHARED_DIR}/managed-cluster-kubeconfig-1 (default).
+
+    Writes ${ARTIFACT_DIR}/migration-test-vm-status.txt; diagnostics on failure under
+    ${ARTIFACT_DIR}/migration-test-vm-diagnostics/.
+  env:
+  - name: CNV_TEST_VM_NAME
+    default: "test-vm-1"
+    documentation: VirtualMachine metadata.name on the source spoke.
+  - name: CNV_TEST_VM_NAMESPACE
+    default: "vm-migration-test"
+    documentation: Namespace for the test VM and DataVolume.
+  - name: CNV_TEST_VM_IMAGE_TYPE
+    default: "rhel"
+    documentation: |-
+      OS image type: cirros (HTTP import, fast) or rhel (DataSource clone from CNV catalog).
+  - name: CNV_TEST_VM_STORAGE_CLASS
+    default: "ocs-storagecluster-ceph-rbd-virtualization"
+    documentation: ODF StorageClass for the root disk (must be ReadWriteMany).
+  - name: CNV_TEST_VM_DISK_SIZE
+    default: "32Gi"
+    documentation: Root disk size. Use 32Gi for rhel9 DataSource clone; 1Gi suffices for cirros.
+  - name: CNV_TEST_VM_MEMORY
+    default: "2Gi"
+    documentation: Guest memory for the VirtualMachine.
+  - name: CNV_TEST_VM_CPUS
+    default: "2"
+    documentation: Number of CPU cores for the VirtualMachine.
+  - name: CNV_TEST_VM_CIRROS_IMAGE_URL
+    default: "https://download.cirros-cloud.net/0.6.3/cirros-0.6.3-x86_64-disk.img"
+    documentation: HTTP URL for cirros image import (CNV_TEST_VM_IMAGE_TYPE=cirros).
+  - name: CNV_TEST_VM_DATA_SOURCE_NAME
+    default: "rhel9"
+    documentation: DataSource name when CNV_TEST_VM_IMAGE_TYPE=rhel.
+  - name: CNV_TEST_VM_DATA_SOURCE_NAMESPACE
+    default: "openshift-virtualization-os-images"
+    documentation: DataSource namespace when CNV_TEST_VM_IMAGE_TYPE=rhel.
+  - name: CNV_TEST_VM_SPOKE_KUBECONFIG
+    default: ""
+    documentation: |-
+      Optional path to source spoke kubeconfig. When empty, uses
+      SHARED_DIR/managed-cluster-kubeconfig-${CNV_TEST_VM_SPOKE_INDEX}.
+  - name: CNV_TEST_VM_SPOKE_INDEX
+    default: "1"
+    documentation: 1-based spoke index for SHARED_DIR kubeconfig discovery (source spoke).
+  - name: CNV_TEST_VM_DATAVOLUME_WAIT_TIMEOUT
+    default: "30m"
+    documentation: oc wait timeout for DataVolume Ready condition.
+  - name: CNV_TEST_VM_VMI_WAIT_TIMEOUT
+    default: "15m"
+    documentation: oc wait timeout for VMI Running phase.
+  - name: CNV_TEST_VM_CLEAN
+    default: "false"
+    documentation: Set to "true" to delete prior VM/DV/prime-* PVCs before create.
+  - name: P2P_CCLM_DEBUG_MODE
+    default: "false"
+    documentation: |-
+      When true, log failures and exit 0 so downstream debug steps (e.g. acm-interop-p2p-test-poc)
+      can run. Set P2P_CCLM_DEBUG_MODE=true in the job env during CCLM investigation.
