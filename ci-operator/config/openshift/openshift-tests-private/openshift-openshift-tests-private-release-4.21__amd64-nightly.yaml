@@ -2362,6 +2362,59 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-stack-upi
+- as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-guest-f28
+  capabilities:
+  - intranet
+  cron: 26 18 2 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
+      MCE_VERSION: "2.11"
+      METALLB_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.20
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      REDHAT_OPERATORS_INDEX_TAG: v4.20
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+      TIMEOUT: +24 hours
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
+- as: baremetalds-ipi-ovn-dualstack-kubevirt-hcp-mce-guest-f28
+  capabilities:
+  - intranet
+  cron: 26 18 2 * *
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=3
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=81920
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=250G
+      HYPERSHIFT_NODE_COUNT: "1"
+      HYPERSHIFT_HC_RELEASE_IMAGE: registry.build06.ci.openshift.org/ci-ln-jhlyrmb/release:latest
+      IP_STACK: v4v6
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.20
+      MCE_VERSION: "2.11"
+      METALLB_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.20
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      REDHAT_OPERATORS_INDEX_TAG: v4.20
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+      TIMEOUT: +24 hours
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce-guest
 - as: baremetalds-ipi-ovn-lvms-f14
   capabilities:
   - intranet
@@ -4320,8 +4373,10 @@ tests:
     cluster_profile: equinix-ocp-metal-qe
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@disconnected'
       FIPS_ENABLED: "true"
       IPSEC_OVN: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       architecture: amd64
       masters: "3"
       workers: "2"
@@ -4336,10 +4391,8 @@ tests:
     cluster_profile: equinix-ocp-metal-qe
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
-      E2E_RUN_TAGS: '@disconnected'
       FIPS_ENABLED: "true"
       IPSEC_OVN: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       architecture: amd64
       masters: "3"
       workers: "2"
