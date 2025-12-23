@@ -5,7 +5,6 @@ set -euxo pipefail; shopt -s inherit_errexit
 #=====================
 # Check if spoke clusters exist in ACM
 #=====================
-typeset managed_cluster_json
 managed_cluster_json="$(oc get managedcluster -o json 2>/dev/null || echo '{"items":[]}')"
 mapfile -t all_spokes < <(echo "${managed_cluster_json}" | jq -r '.items[]? | select(.metadata.name!="local-cluster") | .metadata.name')
 if [[ ${#all_spokes[@]} -eq 0 ]]; then
@@ -21,17 +20,29 @@ if [[ ! -f "${SHARED_DIR}/managed-cluster-name" ]]; then
     exit 1
 fi
 
-typeset cluster_name
 cluster_name="$(cat "${SHARED_DIR}/managed-cluster-name")"
-typeset namespace="${cluster_name}"
-typeset timeout_minutes="60"  # Default deprovisioning timeout
-typeset poll_seconds="10"     # Polling interval for checks
-typeset force_delete_mc="false"
+namespace="${cluster_name}"
+timeout_minutes="60"  # Default deprovisioning timeout
+poll_seconds="10"     # Polling interval for checks
+force_delete_mc="false"
+
+#=====================
+# Helper functions
+#=====================
+need() {
+    command -v "$1" >/dev/null 2>&1 || {
+        echo "[FATAL] '$1' not found" >&2
+        exit 1
+    }
+}
+
+need oc
+need jq
 
 #=====================
 # Setup and validation functions
 #=====================
-SetupTeardown() {
+setup_teardown() {
     # Check if namespace exists
     if ! oc get ns "${namespace}" >/dev/null 2>&1; then
         echo "[ERROR] Namespace '${namespace}' not found" >&2
@@ -46,11 +57,10 @@ SetupTeardown() {
 }
 
 # Function to pick the latest ClusterDeprovision resource for watching progress
-PickLatestDeprovName() {
-    typeset deprov_json
+pick_latest_deprov_name() {
+    local deprov_json
     deprov_json="$(oc -n "${namespace}" get clusterdeprovisions -o json 2>/dev/null || echo '{"items":[]}')"
     echo "${deprov_json}" | jq -r '.items | sort_by(.metadata.creationTimestamp) | last? | .metadata.name // ""'
-    true
 }
 
 echo "[INFO] Uninstalling cluster '${cluster_name}' in namespace '${namespace}'"
@@ -58,7 +68,7 @@ echo "[INFO] Uninstalling cluster '${cluster_name}' in namespace '${namespace}'"
 #=====================
 # Execution starts
 #=====================
-SetupTeardown
+setup_teardown
 
 #=====================
 # Detach from ACM (ManagedCluster) and clean up Klusterlet config
@@ -105,15 +115,14 @@ fi
 # Watch deprovision progress (ClusterDeprovision resource)
 #=====================
 echo "[INFO] Watching deprovision progress (ClusterDeprovision resource)"
-typeset start_time
 start_time="$(date +%s)"
-typeset deadline=$((start_time + timeout_minutes * 60))
-typeset deprov_name=""
+deadline=$((start_time + timeout_minutes * 60))
+deprov_name=""
 
 echo "[INFO] Waiting for ClusterDeprovision object to be created..."
 # Wait for the ClusterDeprovision object to be created by Hive
 while [[ -z "${deprov_name}" ]]; do
-    deprov_name="$(PickLatestDeprovName)"
+    deprov_name="$(pick_latest_deprov_name)"
     if [[ -n "${deprov_name}" ]]; then
         echo "[INFO] Found ClusterDeprovision: ${deprov_name}"
         break
