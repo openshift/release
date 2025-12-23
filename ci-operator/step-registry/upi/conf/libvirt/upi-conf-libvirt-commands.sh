@@ -129,7 +129,7 @@ spec:
         filesystem: root
         mode: 0644
         overwrite: true
-        path: /etc/sysctl.conf
+        path: /etc/chrony.conf
 EOF
 
   echo "Saving chrony master yaml config..."
