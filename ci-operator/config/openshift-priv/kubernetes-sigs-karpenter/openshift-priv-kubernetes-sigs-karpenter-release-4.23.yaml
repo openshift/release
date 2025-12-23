@@ -1,0 +1,121 @@
+base_images:
+  cli:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: cli
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.20_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+binary_build_commands: make openshift-toolchain
+build_root:
+  from_repository: true
+  use_build_cache: true
+canonical_go_repository: github.com/openshift/kubernetes-sigs-karpenter
+images:
+- dockerfile_literal: |
+    FROM replaced-by-from
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | sh
+  from: bin
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: bin-oc-kubectl-helm
+- dockerfile_literal: |-
+    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+    WORKDIR /go/src/github.com/openshift/kubernetes-sigs-karpenter
+    COPY . .
+
+    FROM registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ARG TARGETARCH
+    COPY --from=builder /go/src/github.com/openshift/kubernetes-sigs-karpenter/karpenter-provider-aws/karpenter-provider-aws-${TARGETARCH} /usr/bin/karpenter-provider-aws
+    LABEL io.k8s.display-name="Karpenter AWS provider for OpenShift" \
+          io.k8s.description="Karpenter is a Kubernetes Node Autoscaler built for flexibility, performance, and simplicity."
+    LABEL io.openshift.release.operator=true
+    ENTRYPOINT ["/usr/bin/karpenter-provider-aws"]
+  inputs:
+    ocp_4.20_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/kubernetes-sigs-karpenter/tmp/karpenter-provider-aws
+  to: aws-karpenter-provider-aws
+promotion:
+  to:
+  - excluded_images:
+    - '*'
+    name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  # build the aws-karpenter-provider-aws binary injected with the karpenter-core deps under test
+  karpenter_core_dir=$(pwd)
+  dir=./tmp/karpenter-provider-aws
+  git clone https://github.com/openshift/aws-karpenter-provider-aws.git --branch ${PULL_BASE_REF:-main} --depth=1 $dir --single-branch
+  cd $dir
+  go mod edit -replace=sigs.k8s.io/karpenter=$karpenter_core_dir
+  go mod tidy && go mod vendor
+  make binary
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: bin
+- as: verify
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    make openshift-verify
+  container:
+    from: bin
+- always_run: false
+  as: e2e-hypershift
+  optional: true
+  steps:
+    cluster_profile: hypershift
+    env:
+      CI_TESTS_RUN: ^TestKarpenter$
+      HYPERSHIFT_NODE_COUNT: "1"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-aws-e2e-external
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: kubernetes-sigs-karpenter

@@ -24,7 +24,7 @@ images:
       yum install -y ./google-chrome-stable_current_x86_64.rpm && \
       yum clean all && rm -rf /var/cache/yum/*
   from: src
-  to: quay-test-console
+  to: quay-newui-test
 releases:
   latest:
     candidate:
@@ -41,21 +41,113 @@ resources:
       memory: 200Mi
 tests:
 - as: quay-e2e-tests-quay314-ocp416-newui
-  cron: 0 12 1 * *
+  cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:1039732
+      NEW_UI_TESTING_COVERAGE: p1+-noprowci p2+-noprowci
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-16@sha256:28e130e04a4a63c40074d330311929a95d88aa7b9dbe5aed8ebad0c31de88c4f
       QUAY_OLD_UI_DISABLED: "false"
       QUAY_OPERATOR_CHANNEL: stable-3.14
-      QUAY_OPERATOR_SOURCE: brew-operator-catalog
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
     test:
     - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-test-quay-newui
     workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 8h0m0s
+- as: quay-e2e-tests-quay314-ocp416-newui-p3
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      NEW_UI_TESTING_COVERAGE: p3+-noprowci
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-16@sha256:28e130e04a4a63c40074d330311929a95d88aa7b9dbe5aed8ebad0c31de88c4f
+      QUAY_OLD_UI_DISABLED: "false"
+      QUAY_OPERATOR_CHANNEL: stable-3.14
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-newui
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 8h0m0s
+- as: quay-e2e-tests-quay315-ocp416-newui-p1-p2
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      NEW_UI_TESTING_COVERAGE: p1+-noprowci p2+-noprowci
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-15-v4-16@sha256:6cdfd670d291aa0d5f564ad9c9ddd28726e11fb9c9caccc8167030d263a586e5
+      QUAY_OLD_UI_DISABLED: "false"
+      QUAY_OPERATOR_CHANNEL: stable-3.15
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-newui
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 8h0m0s
+- as: quay-e2e-tests-quay315-ocp416-newui-p3
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      NEW_UI_TESTING_COVERAGE: p3+-noprowci
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-15-v4-16@sha256:6cdfd670d291aa0d5f564ad9c9ddd28726e11fb9c9caccc8167030d263a586e5
+      QUAY_OLD_UI_DISABLED: "false"
+      QUAY_OPERATOR_CHANNEL: stable-3.15
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-newui
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 8h0m0s
+- as: quay-e2e-tests-quay316-ocp416-newui-p1-p2
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      NEW_UI_TESTING_COVERAGE: p1+-noprowci p2+-noprowci
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-16@sha256:49d5870ca7956d61694d88caf9632d5d8a8c52ac6657606e5e2f16f3c2392de7
+      QUAY_OLD_UI_DISABLED: "true"
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-newui
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 8h0m0s
+- as: quay-e2e-tests-quay316-ocp416-newui-p3
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      NEW_UI_TESTING_COVERAGE: p3+-noprowci
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-16@sha256:49d5870ca7956d61694d88caf9632d5d8a8c52ac6657606e5e2f16f3c2392de7
+      QUAY_OLD_UI_DISABLED: "true"
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-newui
+    workflow: cucushift-installer-rehearse-aws-ipi
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: master
   org: quay

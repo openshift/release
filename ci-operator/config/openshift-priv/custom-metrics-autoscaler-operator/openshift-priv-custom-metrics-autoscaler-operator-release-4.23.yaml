@@ -1,0 +1,172 @@
+base_images:
+  cli:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: cli
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  operand:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: custom-metrics-autoscaler
+  operand-adapter:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: custom-metrics-autoscaler-adapter
+  operand-webhook:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: custom-metrics-autoscaler-webhooks
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/kedacore/keda-olm-operator
+images:
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    cli:
+      as:
+      - registry.redhat.io/openshift4/ose-cli:latest
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: custom-metrics-autoscaler-operator
+operator:
+  bundles:
+  - as: custom-metrics-autoscaler-operator-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile.ci
+    skip_building_index: true
+  substitutions:
+  - pullspec: ghcr.io/kedacore/keda-olm-operator:.*
+    with: pipeline:custom-metrics-autoscaler-operator
+  - pullspec: CMA_OPERAND_PLACEHOLDER_1
+    with: pipeline:operand
+  - pullspec: CMA_OPERAND_PLACEHOLDER_2
+    with: pipeline:operand-adapter
+  - pullspec: CMA_OPERAND_PLACEHOLDER_3
+    with: pipeline:operand-webhook
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: env && GOFLAGS="" make fmt
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: govet
+  commands: env && GOFLAGS="" make vet
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: cma-check-all-csv
+  commands: env && GOFLAGS="" make cma-check-all-csv
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: cma-verify-history
+  commands: env && GOFLAGS="" hack/cma-verify-history.sh
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: custom-metrics-autoscaler-operator
+    workflow: openshift-ci-security
+- as: cma-e2e-aws-ovn
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-3
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - as: test-install
+      cli: latest
+      commands: |
+        oc create ns keda
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n keda "$OO_BUNDLE"
+        oc wait --for condition=Available -n keda deployment custom-metrics-autoscaler-operator --timeout 10m
+      dependencies:
+      - env: OO_BUNDLE
+        name: custom-metrics-autoscaler-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-apply-kedacontroller
+      cli: latest
+      commands: |
+        oc apply -n keda -f config/samples/keda_v1alpha1_kedacontroller.yaml
+        # there is no 'wait --for=exists' yet, and we return if it's not there yet, so wait a bit
+        sleep 30
+        oc get deployment -n keda
+        oc wait --for condition=Available -n keda deployment keda-admission --timeout 10m
+        oc wait --for condition=Available -n keda deployment keda-metrics-apiserver --timeout 10m
+        oc wait --for condition=Available -n keda deployment keda-operator --timeout 10m
+        oc get deployment -n keda
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-setup
+      cli: latest
+      commands: E2E_INSTALL_KEDA=false make e2e-test-openshift-setup
+      from: custom-metrics-autoscaler-tests
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-run
+      cli: latest
+      commands: make e2e-test-openshift
+      from: custom-metrics-autoscaler-tests
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-clean
+      cli: latest
+      commands: E2E_INSTALL_KEDA=false make e2e-test-openshift-clean
+      from: custom-metrics-autoscaler-tests
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-teardown
+      cli: latest
+      commands: |
+        oc get deployment -n keda
+        operator-sdk cleanup -n keda keda
+        oc wait --for=delete -n keda deployment custom-metrics-autoscaler-operator --timeout 10m
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: custom-metrics-autoscaler-operator

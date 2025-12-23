@@ -185,6 +185,17 @@ By default, `podman` is used. Override with:
 export CONTAINER_ENGINE=docker
 ```
 
+## Claude Code Slash Commands
+
+Custom slash commands in `.claude/commands/` must include frontmatter:
+```markdown
+---
+description: Brief description of what the command does
+args: "[arg1] [arg2]"
+allowed-tools: Read, Edit, Bash(make release-controllers), AskUserQuestion
+---
+```
+
 ## Important Notes
 - Never manually edit files in `ci-operator/jobs/` - always edit `ci-operator/config/` and regenerate
 - New test workflows should use step-registry, not templates (templates are legacy)

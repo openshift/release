@@ -1811,6 +1811,7 @@ tests:
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_CUSTOM_AZURE_AZ: '[''2'']'
       COMPUTE_NODE_TYPE: Standard_EC4es_v5
       CONTROL_PLANE_INSTANCE_TYPE: Standard_DC8ads_v5
       ENABLE_CONFIDENTIAL_COMPUTE: "true"
@@ -2063,6 +2064,54 @@ tests:
     - ref: openshift-extended-test-longduration
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-azure-aks-hypershift-install
+- as: azure-ipi-ovn-hypershift-guest-n1minor-cli-f28
+  cron: 17 13 3 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n1minor
+    env:
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: aro4
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: aro_419
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 419.6.20250523
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-hypershift-guest-advanced
+- as: azure-ipi-ovn-hypershift-guest-n2minor-cli-f28
+  cron: 2 12 12 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n2minor
+    env:
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: aro4
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: aro_419
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 419.6.20250523
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-hypershift-guest-advanced
+- as: azure-ipi-ovn-hypershift-guest-n3minor-cli-f28
+  cron: 29 2 14 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:n3minor
+    env:
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER: aro4
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: aro_419
+      HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 419.6.20250523
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-azure-hypershift-guest-advanced
 - as: azure-ipi-ovn-hypershift-guest-f7
   cron: 5 23 1,8,15,24 * *
   steps:
@@ -2720,29 +2769,40 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-f7-longduration-mco-g1
-  cron: 38 23 2,9,16,23 * *
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: gcp-qe
-    env:
-      COMPUTE_NODE_REPLICAS: "2"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: High
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
-    test:
-    - chain: openshift-e2e-test-mco-qe-longrun
-    workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-f7-longduration-mco-g2
+- as: gcp-ipi-f7-longduration-mco-p1
   cron: 56 3 5,14,21,28 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_REPLICAS: "2"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: Critical|Medium|Low
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P1&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-f7-longduration-mco-p2
+  cron: 56 3 5,14,21,28 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P2&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-f7-longduration-mco-p3
+  cron: 56 3 5,14,21,28 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;~P1&;~P2&
       TEST_SCENARIOS: MCO
       TEST_TIMEOUT: "140"
     test:
@@ -3474,29 +3534,40 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
-- as: vsphere-ipi-longduration-mco-fips-proxy-g1-f14
+- as: vsphere-ipi-longduration-mco-fips-proxy-p1-f14
   cron: 2 16 11,27 * *
   steps:
     cluster_profile: vsphere-elastic
     env:
       COMPUTE_NODE_REPLICAS: "2"
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: High
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P1&
       TEST_SCENARIOS: MCO
       TEST_TIMEOUT: "140"
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
-- as: vsphere-ipi-longduration-mco-fips-proxy-g2-f14
+- as: vsphere-ipi-longduration-mco-fips-proxy-p2-f14
   cron: 5 12 6,22 * *
   steps:
     cluster_profile: vsphere-elastic
     env:
       COMPUTE_NODE_REPLICAS: "2"
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: Critical|Medium|Low
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P2&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: vsphere-ipi-longduration-mco-fips-proxy-p3-f14
+  cron: 5 12 6,22 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;~P1&;~P2&
       TEST_SCENARIOS: MCO
       TEST_TIMEOUT: "140"
     test:
@@ -4269,8 +4340,10 @@ tests:
     cluster_profile: equinix-ocp-metal-qe
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@disconnected'
       FIPS_ENABLED: "true"
       IPSEC_OVN: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       architecture: amd64
       masters: "3"
       workers: "2"

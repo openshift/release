@@ -170,16 +170,16 @@ CONFIG = {
         'us-west-2': 10,
     },
     'azure4-quota-slice': {
-        'centralus': 33,
-        'eastus': 8,
-        'eastus2': 8,
-        'westus': 8
+        'centralus': 14,
+        'eastus': 14,
+        'eastus2': 14,
+        'westus': 14
     },
     'azure-2-quota-slice': {
         'centralus': 33,
-        'eastus': 8,
-        'eastus2': 8,
-        'westus': 8
+        'eastus': 33,
+        'eastus2': 33,
+        'westus': 33
     },
     'azure-arm64-quota-slice': {
         'centralus': 33,
@@ -237,9 +237,6 @@ CONFIG = {
         'usgovvirginia': 5,
         'usgovtexas': 5
     },
-    'aro-hcp-dev-quota-slice': {
-        'default': 10,
-    },    
     'azure-sustaining-autorelease-412-quota-slice': {
         'eastus': 60,
     },
@@ -261,8 +258,17 @@ CONFIG = {
     'aro-hcp-test-tenant-quota-slice': {
         'default': 10,
     },
-    'aro-hcp-test-tenant-msi-quota-slice': {
-        'default': 10,
+    'aro-hcp-test-msi-containers-dev': {
+        'rg': 120,
+    },
+    'aro-hcp-test-msi-containers-int': {
+        'rg': 120,
+    },
+    'aro-hcp-test-msi-containers-stg': {
+        'rg': 120,
+    },
+    'aro-hcp-test-msi-containers-prod': {
+        'rg': 120,
     },
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
