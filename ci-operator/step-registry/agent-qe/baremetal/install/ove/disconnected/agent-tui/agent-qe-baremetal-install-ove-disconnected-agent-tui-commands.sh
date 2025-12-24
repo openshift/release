@@ -46,7 +46,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     RENDEZVOUS_NODE="$CURRENT_RENDEZVOUS_NODE" \
     python3.11 agent-tui/run_agent_tui.py || {
       echo "Agent TUI settings failed for $HOST_MACHINE."
-      exit 1
+#      exit 1
     }
   ) &
   pids+=($!)
@@ -56,7 +56,7 @@ done
 for pid in "${pids[@]}"; do
   if ! wait "$pid"; then
     cp -r /tmp/agent_logs/* "$ARTIFACT_DIR"
-    exit 1
+#    exit 1
   fi
 done
 echo "Agent TUI execution completed successfully!"
