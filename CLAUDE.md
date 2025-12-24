@@ -4,6 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repository holds OpenShift cluster manifests, component build manifests and CI workflow configuration for OpenShift component repositories for both OKD and OCP.
 
+## Documentation
+
+Additional documentation and references for working with this repository:
+
+- [OpenShift CI Documentation](https://docs.ci.openshift.org/) - Main documentation site for OpenShift CI infrastructure
+- [CI Operator Reference](https://steps.ci.openshift.org/ci-operator-reference) - Comprehensive reference for CI operator configuration specification and step registry
+
 ## Repository Structure
 
 - `ci-operator/config/` - CI configuration files defining builds and tests for component repositories
