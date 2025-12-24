@@ -3,14 +3,14 @@ set -eux -o pipefail; shopt -s inherit_errexit
 
 echo "🚀 Testing CNV VM live migration with IBM Storage Scale shared storage..."
 
-# Set default values
-CNV_NAMESPACE="${CNV_NAMESPACE:-openshift-cnv}"
-SHARED_STORAGE_CLASS="${SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
-TEST_NAMESPACE="${TEST_NAMESPACE:-cnv-migration-test}"
-VM_NAME="${VM_NAME:-test-migration-vm}"
-VM_CPU_REQUEST="${VM_CPU_REQUEST:-1}"
-VM_MEMORY_REQUEST="${VM_MEMORY_REQUEST:-1Gi}"
-VM_MIGRATION_TIMEOUT="${VM_MIGRATION_TIMEOUT:-15m}"
+# Set default values from FA__ prefixed environment variables
+CNV_NAMESPACE="${FA__CNV_NAMESPACE:-openshift-cnv}"
+SHARED_STORAGE_CLASS="${FA__SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
+TEST_NAMESPACE="${FA__TEST_NAMESPACE:-cnv-migration-test}"
+VM_NAME="${FA__VM_NAME:-test-migration-vm}"
+VM_CPU_REQUEST="${FA__VM_CPU_REQUEST:-1}"
+VM_MEMORY_REQUEST="${FA__VM_MEMORY_REQUEST:-1Gi}"
+VM_MIGRATION_TIMEOUT="${FA__VM_MIGRATION_TIMEOUT:-15m}"
 
 # JUnit XML test results
 JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_vm_migration_tests.xml"
@@ -246,23 +246,10 @@ EOF
 then
   echo "  ✅ VM created successfully"
   
-  # Wait for VMI to be created and running
+  # Wait for VMI to be running using oc wait
   echo "  ⏳ Waiting for VMI to be running (5m timeout)..."
-  TIMEOUT=300
-  ELAPSED=0
-  VMI_RUNNING=false
-  
-  while [[ $ELAPSED -lt $TIMEOUT ]]; do
-    VMI_PHASE=$(oc get vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
-    if [[ "$VMI_PHASE" == "Running" ]]; then
-      VMI_RUNNING=true
-      break
-    fi
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-  done
-  
-  if [[ "$VMI_RUNNING" == "true" ]]; then
+  if oc wait vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" \
+      --for=jsonpath='{.status.phase}'=Running --timeout=300s; then
     echo "  ✅ VMI is running"
     
     # Get the current node where VM is running
@@ -416,7 +403,8 @@ echo "🧹 Cleaning up test resources..."
 echo "  🗑️  Stopping VM..."
 if oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
   oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":false}}' || true
-  sleep 10
+  # Wait for VMI to be deleted before proceeding with cleanup
+  oc wait vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" --for=delete --timeout=60s 2>/dev/null || true
 fi
 
 echo "  🗑️  Deleting migration resource..."

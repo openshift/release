@@ -4,11 +4,11 @@ set -eux -o pipefail; shopt -s inherit_errexit
 echo "🔍 Verifying Shared Storage Between CNV and IBM Fusion Access"
 echo "======================================================="
 
-# Set default values
-CNV_NAMESPACE="${CNV_NAMESPACE:-openshift-cnv}"
-FUSION_ACCESS_NAMESPACE="${FUSION_ACCESS_NAMESPACE:-ibm-fusion-access}"
-SHARED_STORAGE_CLASS="${SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
-TEST_NAMESPACE="${TEST_NAMESPACE:-shared-storage-test}"
+# Set default values from FA__ prefixed environment variables
+CNV_NAMESPACE="${FA__CNV_NAMESPACE:-openshift-cnv}"
+FUSION_ACCESS_NAMESPACE="${FA__FUSION_ACCESS_NAMESPACE:-ibm-fusion-access}"
+SHARED_STORAGE_CLASS="${FA__SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
+TEST_NAMESPACE="${FA__TEST_NAMESPACE:-shared-storage-test}"
 
 # JUnit XML test results
 JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_verify_shared_storage_tests.xml"
@@ -190,18 +190,21 @@ then
   if oc wait pod cnv-data-writer -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=2m; then
     echo "  ✅ CNV data writer pod is running"
     
-    # Wait a bit for data to be written
-    echo "  ⏳ Waiting for data to be written..."
-    sleep 10
-    
-    # Check if data was written
-    echo "  📊 Checking data written by CNV pod..."
-    if oc exec cnv-data-writer -n "${TEST_NAMESPACE}" -- cat /shared-storage/cnv-data.txt 2>/dev/null; then
-      echo "  ✅ Data successfully written by CNV pod"
-      test_status="passed"
+    # Wait for data file to be written (pod writes immediately on start)
+    echo "  ⏳ Waiting for data file to be written..."
+    if oc wait --for=jsonpath='{.status.phase}'=Running pod/cnv-data-writer -n "${TEST_NAMESPACE}" --timeout=30s; then
+      # Check if data was written
+      echo "  📊 Checking data written by CNV pod..."
+      if oc exec cnv-data-writer -n "${TEST_NAMESPACE}" -- cat /shared-storage/cnv-data.txt 2>/dev/null; then
+        echo "  ✅ Data successfully written by CNV pod"
+        test_status="passed"
+      else
+        echo "  ❌ Failed to read data written by CNV pod"
+        test_message="Failed to read data from CNV PVC"
+      fi
     else
-      echo "  ❌ Failed to read data written by CNV pod"
-      test_message="Failed to read data from CNV PVC"
+      echo "  ❌ Pod not running within timeout"
+      test_message="Pod not running within timeout"
     fi
   else
     echo "  ⚠️  CNV data writer pod not ready within timeout"
@@ -293,14 +296,17 @@ then
   if oc wait pod fusion-data-reader -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=2m; then
     echo "  ✅ IBM Fusion Access data reader pod is running"
     
-    # Wait a bit for data processing
+    # Wait for pod to complete data processing (pod writes immediately on start)
     echo "  ⏳ Waiting for data processing..."
-    sleep 10
-    
-    # Check pod logs to see if it found the shared data
-    echo "  📊 Checking IBM Fusion Access pod logs..."
-    oc logs fusion-data-reader -n "${TEST_NAMESPACE}" --tail=20
-    test_status="passed"
+    if oc wait --for=jsonpath='{.status.phase}'=Running pod/fusion-data-reader -n "${TEST_NAMESPACE}" --timeout=30s; then
+      # Check pod logs to see if it found the shared data
+      echo "  📊 Checking IBM Fusion Access pod logs..."
+      oc logs fusion-data-reader -n "${TEST_NAMESPACE}" --tail=20
+      test_status="passed"
+    else
+      echo "  ⚠️  Pod not running within timeout"
+      test_message="Pod not running within timeout"
+    fi
   else
     echo "  ⚠️  IBM Fusion Access data reader pod not ready within timeout"
     test_message="IBM Fusion Access data reader pod not ready within 2m timeout"

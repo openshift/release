@@ -1,9 +1,10 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
-STORAGE_SCALE_CLUSTER_NAME="${STORAGE_SCALE_CLUSTER_NAME:-ibm-spectrum-scale}"
-FILESYSTEM_NAME="${FILESYSTEM_NAME:-shared-filesystem}"
+# Set default values from FA__ prefixed environment variables
+STORAGE_SCALE_NAMESPACE="${FA__STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
+STORAGE_SCALE_CLUSTER_NAME="${FA__STORAGE_SCALE_CLUSTER_NAME:-ibm-spectrum-scale}"
+FILESYSTEM_NAME="${FA__FILESYSTEM_NAME:-shared-filesystem}"
 
 echo "🗂️  Creating IBM Storage Scale shared filesystem for CNV integration..."
 echo "Note: Creating shared filesystem without EBS dependency"
@@ -78,7 +79,7 @@ EOF
     
     oc wait --for=jsonpath='{.metadata.name}'=${LOCALDISK_NAME} localdisk/${LOCALDISK_NAME} -n "${STORAGE_SCALE_NAMESPACE}" --timeout=300s
     echo "✅ LocalDisk ${LOCALDISK_NAME} created"
-    ((DISK_COUNT++))
+    DISK_COUNT=$((DISK_COUNT + 1))
   done
   
   echo "✅ Created ${#DEVICES[@]} LocalDisk resources"
@@ -126,23 +127,11 @@ EOF
 fi
 
 echo "⏳ Waiting for shared filesystem to be ready..."
-FILESYSTEM_ATTEMPTS=0
-MAX_FILESYSTEM_ATTEMPTS=20
-while [[ $FILESYSTEM_ATTEMPTS -lt $MAX_FILESYSTEM_ATTEMPTS ]]; do
-  FS_STATUS=$(oc get filesystem "${FILESYSTEM_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Success")].status}' 2>/dev/null || echo "Unknown")
-  echo "  📊 Filesystem Status: ${FS_STATUS} (attempt $((FILESYSTEM_ATTEMPTS + 1))/$MAX_FILESYSTEM_ATTEMPTS)"
-  
-  if [[ "${FS_STATUS}" == "True" ]]; then
-    echo "✅ Shared filesystem is ready"
-    break
-  else
-    echo "  ⏳ Waiting for filesystem to be ready..."
-    sleep 30
-    FILESYSTEM_ATTEMPTS=$((FILESYSTEM_ATTEMPTS + 1))
-  fi
-done
-
-if [[ $FILESYSTEM_ATTEMPTS -eq $MAX_FILESYSTEM_ATTEMPTS ]]; then
+if oc wait filesystem "${FILESYSTEM_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" \
+    --for=jsonpath='{.status.conditions[?(@.type=="Success")].status}'=True \
+    --timeout=600s; then
+  echo "✅ Shared filesystem is ready"
+else
   echo "⚠️  Shared filesystem not ready within timeout"
   echo "Filesystem details:"
   oc get filesystem "${FILESYSTEM_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" -o yaml
@@ -151,21 +140,11 @@ fi
 
 # Check for storage class creation
 echo "🔍 Checking for IBM Storage Scale StorageClass..."
-STORAGECLASS_ATTEMPTS=0
-MAX_STORAGECLASS_ATTEMPTS=12
-while [[ $STORAGECLASS_ATTEMPTS -lt $MAX_STORAGECLASS_ATTEMPTS ]]; do
-  if oc get storageclass | grep -i spectrum >/dev/null; then
-    echo "✅ IBM Storage Scale StorageClass found:"
-    oc get storageclass | grep -i spectrum
-    break
-  else
-    echo "⏳ Waiting for IBM Storage Scale StorageClass... (attempt $((STORAGECLASS_ATTEMPTS + 1))/$MAX_STORAGECLASS_ATTEMPTS)"
-    sleep 30
-    STORAGECLASS_ATTEMPTS=$((STORAGECLASS_ATTEMPTS + 1))
-  fi
-done
-
-if [[ $STORAGECLASS_ATTEMPTS -eq $MAX_STORAGECLASS_ATTEMPTS ]]; then
+# Wait for the storageclass to exist (checking for metadata.name)
+if oc wait storageclass --all --for=jsonpath='{.provisioner}'=spectrumscale.csi.ibm.com --timeout=360s 2>/dev/null; then
+  echo "✅ IBM Storage Scale StorageClass found:"
+  oc get storageclass | grep -i spectrum
+else
   echo "⚠️  IBM Storage Scale StorageClass not found after 6 minutes"
   echo "Available StorageClasses:"
   oc get storageclass

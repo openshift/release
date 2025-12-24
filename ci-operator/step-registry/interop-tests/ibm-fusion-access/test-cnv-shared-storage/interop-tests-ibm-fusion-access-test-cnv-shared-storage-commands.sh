@@ -3,12 +3,12 @@ set -eux -o pipefail; shopt -s inherit_errexit
 
 echo "🧪 Testing CNV VMs with IBM Storage Scale shared storage..."
 
-# Set default values
-CNV_NAMESPACE="${CNV_NAMESPACE:-openshift-cnv}"
-SHARED_STORAGE_CLASS="${SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
-TEST_NAMESPACE="${TEST_NAMESPACE:-cnv-shared-storage-test}"
-VM_CPU_REQUEST="${VM_CPU_REQUEST:-1}"
-VM_MEMORY_REQUEST="${VM_MEMORY_REQUEST:-1Gi}"
+# Set default values from FA__ prefixed environment variables
+CNV_NAMESPACE="${FA__CNV_NAMESPACE:-openshift-cnv}"
+SHARED_STORAGE_CLASS="${FA__SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
+TEST_NAMESPACE="${FA__TEST_NAMESPACE:-cnv-shared-storage-test}"
+VM_CPU_REQUEST="${FA__VM_CPU_REQUEST:-1}"
+VM_MEMORY_REQUEST="${FA__VM_MEMORY_REQUEST:-1Gi}"
 
 # JUnit XML test results
 JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_cnv_shared_storage_tests.xml"
@@ -221,9 +221,16 @@ then
   if oc patch vm test-shared-storage-vm -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}'; then
     echo "  ✅ VM start command sent"
     
-    # Wait for VM to be running
+    # Wait for VM to be running using oc wait
     echo "  ⏳ Waiting for VM to be running..."
-    sleep 30
+    if oc wait vmi test-shared-storage-vm -n "${TEST_NAMESPACE}" \
+        --for=jsonpath='{.status.phase}'=Running --timeout=300s 2>/dev/null; then
+      echo "  ✅ VM is running"
+      test_status="passed"
+    else
+      echo "  ⚠️ VM not running within timeout"
+      test_message="VM not running after 5 minutes"
+    fi
     
     # Check VM status
     echo "  📊 VM Status after start:"
@@ -231,12 +238,7 @@ then
     
     # Check VMI status
     echo "  📊 VMI Status:"
-    if oc get vmi test-shared-storage-vm -n "${TEST_NAMESPACE}" -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,AGE:.metadata.creationTimestamp" 2>/dev/null; then
-      test_status="passed"
-    else
-      echo "  ⚠️ VMI not found yet"
-      test_message="VMI not found after starting VM"
-    fi
+    oc get vmi test-shared-storage-vm -n "${TEST_NAMESPACE}" -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,AGE:.metadata.creationTimestamp" 2>/dev/null || echo "  ⚠️ VMI not found"
   else
     echo "  ❌ Failed to start VM"
     test_message="Failed to start VM"

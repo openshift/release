@@ -3,13 +3,13 @@ set -eux -o pipefail; shopt -s inherit_errexit
 
 echo "🔄 Testing CNV VM lifecycle operations with IBM Storage Scale shared storage..."
 
-# Set default values
-CNV_NAMESPACE="${CNV_NAMESPACE:-openshift-cnv}"
-SHARED_STORAGE_CLASS="${SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
-TEST_NAMESPACE="${TEST_NAMESPACE:-cnv-lifecycle-test}"
-VM_NAME="${VM_NAME:-test-lifecycle-vm}"
-VM_CPU_REQUEST="${VM_CPU_REQUEST:-1}"
-VM_MEMORY_REQUEST="${VM_MEMORY_REQUEST:-1Gi}"
+# Set default values from FA__ prefixed environment variables
+CNV_NAMESPACE="${FA__CNV_NAMESPACE:-openshift-cnv}"
+SHARED_STORAGE_CLASS="${FA__SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
+TEST_NAMESPACE="${FA__TEST_NAMESPACE:-cnv-lifecycle-test}"
+VM_NAME="${FA__VM_NAME:-test-lifecycle-vm}"
+VM_CPU_REQUEST="${FA__VM_CPU_REQUEST:-1}"
+VM_MEMORY_REQUEST="${FA__VM_MEMORY_REQUEST:-1Gi}"
 
 # JUnit XML test results
 JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_vm_lifecycle_tests.xml"
@@ -236,43 +236,21 @@ echo "  🚀 Starting VM by setting spec.running=true..."
 if oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}'; then
   echo "  ✅ VM start command sent"
   
-  # Wait for VMI to be created
-  echo "  ⏳ Waiting for VMI to be created (5m timeout)..."
-  TIMEOUT=300
-  ELAPSED=0
-  VMI_FOUND=false
-  
-  while [[ $ELAPSED -lt $TIMEOUT ]]; do
-    if oc get vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      VMI_FOUND=true
-      break
-    fi
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-  done
-  
-  if [[ "$VMI_FOUND" == "true" ]]; then
-    echo "  ✅ VMI created successfully"
+  # Wait for VMI to be running using oc wait
+  echo "  ⏳ Waiting for VMI to be running (5m timeout)..."
+  if oc wait vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" \
+      --for=jsonpath='{.status.phase}'=Running --timeout=300s; then
+    echo "  ✅ VMI is running"
     
-    # Wait for VMI to be running
-    echo "  ⏳ Waiting for VMI to be running (5m timeout)..."
-    if timeout 300 bash -c "until oc get vmi ${VM_NAME} -n ${TEST_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null | grep -q 'Running'; do sleep 5; done"; then
-      echo "  ✅ VMI is running"
-      
-      # Get VM status
-      VM_STATUS=$(oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "Unknown")
-      echo "  📊 VM Status: ${VM_STATUS}"
-      
-      test_status="passed"
-    else
-      echo "  ⚠️  VMI not running within timeout"
-      test_message="VMI not running within 5m timeout"
-      oc describe vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" || true
-    fi
+    # Get VM status
+    VM_STATUS=$(oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "Unknown")
+    echo "  📊 VM Status: ${VM_STATUS}"
+    
+    test_status="passed"
   else
-    echo "  ⚠️  VMI not created within timeout"
-    test_message="VMI not created within 5m timeout"
-    oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o yaml || true
+    echo "  ⚠️  VMI not running within timeout"
+    test_message="VMI not running within 5m timeout"
+    oc describe vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" || true
   fi
 else
   echo "  ❌ Failed to start VM"
@@ -297,22 +275,9 @@ echo "  🛑 Stopping VM by setting spec.running=false..."
 if oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":false}}'; then
   echo "  ✅ VM stop command sent"
   
-  # Wait for VMI to be deleted
+  # Wait for VMI to be deleted using oc wait --for=delete
   echo "  ⏳ Waiting for VMI to be deleted (5m timeout)..."
-  TIMEOUT=300
-  ELAPSED=0
-  VMI_DELETED=false
-  
-  while [[ $ELAPSED -lt $TIMEOUT ]]; do
-    if ! oc get vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      VMI_DELETED=true
-      break
-    fi
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-  done
-  
-  if [[ "$VMI_DELETED" == "true" ]]; then
+  if oc wait vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" --for=delete --timeout=300s 2>/dev/null; then
     echo "  ✅ VMI deleted successfully"
     
     # Verify VM status shows Stopped
@@ -347,53 +312,31 @@ echo "  🔄 Restarting VM by setting spec.running=true..."
 if oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}'; then
   echo "  ✅ VM restart command sent"
   
-  # Wait for new VMI to be created
-  echo "  ⏳ Waiting for new VMI to be created (5m timeout)..."
-  TIMEOUT=300
-  ELAPSED=0
-  VMI_FOUND=false
-  
-  while [[ $ELAPSED -lt $TIMEOUT ]]; do
-    if oc get vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      VMI_FOUND=true
-      break
-    fi
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-  done
-  
-  if [[ "$VMI_FOUND" == "true" ]]; then
-    echo "  ✅ New VMI created successfully"
+  # Wait for VMI to be running using oc wait
+  echo "  ⏳ Waiting for VMI to be running (5m timeout)..."
+  if oc wait vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" \
+      --for=jsonpath='{.status.phase}'=Running --timeout=300s; then
+    echo "  ✅ VMI is running after restart"
     
-    # Wait for VMI to be running
-    echo "  ⏳ Waiting for VMI to be running (5m timeout)..."
-    if timeout 300 bash -c "until oc get vmi ${VM_NAME} -n ${TEST_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null | grep -q 'Running'; do sleep 5; done"; then
-      echo "  ✅ VMI is running after restart"
-      
-      # Get VM status
-      VM_STATUS=$(oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "Unknown")
-      echo "  📊 VM Status after restart: ${VM_STATUS}"
-      
-      # Verify PVC is still bound (data persistence check)
-      PVC_STATUS=$(oc get pvc "${VM_NAME}-dv" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-      echo "  📊 PVC Status: ${PVC_STATUS}"
-      
-      if [[ "$PVC_STATUS" == "Bound" ]]; then
-        echo "  ✅ PVC still bound - data persistence verified"
-        test_status="passed"
-      else
-        echo "  ⚠️  PVC not bound (status: ${PVC_STATUS})"
-        test_message="PVC not bound after VM restart (status: ${PVC_STATUS})"
-      fi
+    # Get VM status
+    VM_STATUS=$(oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "Unknown")
+    echo "  📊 VM Status after restart: ${VM_STATUS}"
+    
+    # Verify PVC is still bound (data persistence check)
+    PVC_STATUS=$(oc get pvc "${VM_NAME}-dv" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+    echo "  📊 PVC Status: ${PVC_STATUS}"
+    
+    if [[ "$PVC_STATUS" == "Bound" ]]; then
+      echo "  ✅ PVC still bound - data persistence verified"
+      test_status="passed"
     else
-      echo "  ⚠️  VMI not running within timeout"
-      test_message="VMI not running within 5m timeout after restart"
-      oc describe vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" || true
+      echo "  ⚠️  PVC not bound (status: ${PVC_STATUS})"
+      test_message="PVC not bound after VM restart (status: ${PVC_STATUS})"
     fi
   else
-    echo "  ⚠️  VMI not created within timeout"
-    test_message="VMI not created within 5m timeout after restart"
-    oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o yaml || true
+    echo "  ⚠️  VMI not running within timeout"
+    test_message="VMI not running within 5m timeout after restart"
+    oc describe vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" || true
   fi
 else
   echo "  ❌ Failed to restart VM"
@@ -408,7 +351,8 @@ echo "🧹 Cleaning up test resources..."
 echo "  🗑️  Stopping VM..."
 if oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
   oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":false}}' || true
-  sleep 10
+  # Wait for VMI to be deleted before proceeding with cleanup
+  oc wait vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" --for=delete --timeout=60s 2>/dev/null || true
 fi
 
 echo "  🗑️  Deleting VM..."
