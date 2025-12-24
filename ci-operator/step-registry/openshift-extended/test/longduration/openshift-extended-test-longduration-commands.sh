@@ -269,6 +269,9 @@ fi
 #if OVERWRITE_OC_MIRROR then overwrite the oc-mirror from the payload
 if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
     echo "OCP Version: ${ocpVersion}"
+    if [[ "$ocpVersion" == *arm* ]] || [[ "${OCP_ARCH:-}" != "amd64" ]]; then
+        echo "OCP_ARCH is not amd64, or OCP is not amd64, currently do not support to overwrite the oc-mirror from the OCP release image"
+    fi
     if [[ -n "${ocpVersion:-}" ]]; then
         tmpDir=$(mktemp -d)
         cd ${tmpDir}
