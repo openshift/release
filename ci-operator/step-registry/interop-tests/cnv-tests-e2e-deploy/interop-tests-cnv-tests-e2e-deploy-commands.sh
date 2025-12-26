@@ -58,7 +58,8 @@ set -x
 
 # Get oc binary
 # curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
-curl -L "https://github.com/openshift-cnv/cnv-ci/tarball/release-${OCP_VERSION}" -o /tmp/cnv-ci.tgz
+# Get oharan2 cnv-ci repo to verify PR #126
+curl -L "https://github.com/oharan2/cnv-ci/archive/refs/heads/cnv_deploy.tar.gz" -o /tmp/cnv-ci.tgz
 mkdir -p /tmp/cnv-ci
 tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
 cd /tmp/cnv-ci || exit 1
@@ -71,6 +72,9 @@ if [[ -n "${KUBEVIRT_TESTING_CONFIGURATION:-}" ]]; then
     echo "🔄 KUBEVIRT_TESTING_CONFIGURATION_FILE set to ${KUBEVIRT_TESTING_CONFIGURATION_FILE}"
 fi
 
+# Install yq to generate the cnv deployment xml file
+install_yq_if_not_exists
+
 # Run the tests
 make deploy_test || exit_code=$?
 
@@ -79,8 +83,10 @@ set +x
  # Map tests if needed for related use cases
  mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
 
- # Send junit file to shared dir for Data Router Reporter step
+ # Send junit files to shared dir for Data Router Reporter step
 cp "${ARTIFACT_DIR}/junit.functest.xml" "${SHARED_DIR}"
+cp "${ARTIFACT_DIR}/junit_cnv_deploy.xml" "${SHARED_DIR}"
+
 
 if [ "${exit_code:-0}" -ne 0 ]; then
     echo "deploy_test failed with exit code $exit_code"
