@@ -8,11 +8,17 @@ export ACM_SPOKE_WORKER_TYPE
 export ACM_SPOKE_CP_TYPE
 export ACM_SPOKE_WORKER_REPLICAS
 export ACM_SPOKE_CP_REPLICAS
-export ACM_SPOKE_CLUSTER_NAME
 export ACM_SPOKE_CLUSTER_REGION=${MANAGED_CLUSTER_LEASED_RESOURCE}
 export ACM_SPOKE_NETWORK_TYPE
 export ACM_SPOKE_INSTALL_TIMEOUT_MINUTES
 export ACM_SPOKE_CLUSTER_VERSION
+
+
+HUB_CLUSTER_NAME="$(jq -r '.clusterName' ${SHARED_DIR}/metadata.json)"
+suffix=$(echo -n "${HUB_CLUSTER_NAME}" | sha1sum | cut -c1-5)
+
+export ACM_SPOKE_CLUSTER_NAME="spoke-${suffix}"
+
 
 #helpers
 need(){ command -v "$1" >/dev/null 2>&1 || { echo "FATAL: '$1' not found"; exit 1; }; }
@@ -206,6 +212,8 @@ spec:
 EOF
 
 oc apply -f "$MANAGED_CLUSTER_FILE"
+
+sleep 5400
 
 # create klusterlet addon config
 KLUSTERLET_ADD_ON_CONFIG_FILE=/tmp/klusterletaddonconfig.yaml
