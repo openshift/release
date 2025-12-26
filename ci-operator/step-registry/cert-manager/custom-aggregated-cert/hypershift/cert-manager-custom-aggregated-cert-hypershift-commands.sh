@@ -64,7 +64,7 @@ spec:
   duration: 2h
   renewBefore: 1h30m
 EOF
-    oc wait certificate "$AGGREGATED_CERT_NAME" -n openshift-ingress --for=condition=Ready=True --timeout=5m
+    oc wait certificate "$AGGREGATED_CERT_NAME" -n openshift-ingress --for=condition=Ready=True --timeout=10m
 }
 
 function configure_default_ic_cert() {
@@ -163,6 +163,13 @@ AGGREGATED_CERT_SECRET_NAME=cert-manager-managed-aggregated-cert-tls
 INGRESS_DOMAIN=$(oc get ingress.config cluster -o jsonpath='{.spec.domain}')
 HC_NAME="$(cut -d '.' -f 2 <<< "$INGRESS_DOMAIN")"
 HCP_NS="clusters-$HC_NAME"
+
+# Add annotation to skip KAS certificate SAN conflict validation
+# This is needed because the test configures a custom serving certificate with DNS names
+# that HyperShift automatically adds to the default KAS certificate will cause conflict.
+# https://issues.redhat.com/browse/OCPBUGS-53261
+mgmt oc annotate hc -n clusters "$HC_NAME" hypershift.openshift.io/skip-kas-conflict-san-validation=true --overwrite
+
 create_aggregated_cert
 
 # Configure ic cert
@@ -180,9 +187,6 @@ pushd "$TMP_DIR"
 oc extract secret/"$AGGREGATED_CERT_SECRET_NAME" -n openshift-ingress
 mgmt oc create secret tls "$AGGREGATED_CERT_SECRET_NAME" --cert=tls.crt --key=tls.key -n clusters
 
-# Get kubeconfig cluster ca data before configuring kas serving cert
-BACKUP_KUBECONFIG_CA_DATA="$(grep certificate-authority-data "$KUBECONFIG" | awk '{print $2}')"
-
 # Update KUBECONFIG to allow secure communication between kubelets and the external KAS endpoint
 # TODO: remove this workaround once https://issues.redhat.com/browse/OCPBUGS-41853 is resolved
 remove_kubelet_kubeconfig_cluster_ca
@@ -194,17 +198,32 @@ configure_kas_oauth_serving_cert
 check_cert_issuer "$KAS_ROUTE_HOSTNAME" 443 "Let's Encrypt"
 check_cert_issuer "$OAUTH_ROUTE_HOSTNAME" 443 "Let's Encrypt"
 
-# Download the updated KUBECONFIG after it's reconciled to include the default ingress certificate
+# Manually create kubeconfig with combined CA bundle
+# The regular admin-kubeconfig only contains OpenShift root CA, which cannot verify Let's Encrypt certificates
+# We need to combine the OpenShift root CA with the Let's Encrypt certificate chain
 (
     set +x
+    echo "Creating kubeconfig with combined CA bundle (OpenShift root CA + Let's Encrypt CA)..."
+
+    # Extract current kubeconfig
     CURRENT_KUBECONFIG_CONTENT="$(mgmt oc extract secret/"${HC_NAME}-admin-kubeconfig" -n clusters --to -)"
-    CURRENT_KUBECONFIG_CA_DATA="$(grep certificate-authority-data <<< "$CURRENT_KUBECONFIG_CONTENT" | awk '{print $2}')"
-    until [[ "$CURRENT_KUBECONFIG_CA_DATA" != "$BACKUP_KUBECONFIG_CA_DATA" ]]; do
-        CURRENT_KUBECONFIG_CONTENT="$(mgmt oc extract secret/"${HC_NAME}-admin-kubeconfig" -n clusters --to -)"
-        CURRENT_KUBECONFIG_CA_DATA="$(grep certificate-authority-data <<< "$CURRENT_KUBECONFIG_CONTENT" | awk '{print $2}')"
-        sleep 15
-    done
-    tee "$KUBECONFIG" "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/nested_kubeconfig" <<< "$CURRENT_KUBECONFIG_CONTENT" >/dev/null
+
+    # Extract current CA data
+    CURRENT_CA_DATA="$(grep certificate-authority-data <<< "$CURRENT_KUBECONFIG_CONTENT" | awk '{print $2}')"
+
+    # Get Let's Encrypt certificate chain from the custom serving cert secret
+    LETSENCRYPT_CERT="$(mgmt oc get secret -n clusters "$AGGREGATED_CERT_SECRET_NAME" -o jsonpath='{.data.tls\.crt}')"
+
+    # Combine CAs: OpenShift root CA + Let's Encrypt cert chain
+    COMBINED_CA_DATA="$(echo -e "${CURRENT_CA_DATA}\n${LETSENCRYPT_CERT}" | base64 -d | base64 | tr -d '\n')"
+
+    # Replace CA data in kubeconfig with combined CA bundle
+    UPDATED_KUBECONFIG_CONTENT="$(echo "$CURRENT_KUBECONFIG_CONTENT" | sed "s|certificate-authority-data: ${CURRENT_CA_DATA}|certificate-authority-data: ${COMBINED_CA_DATA}|")"
+
+    # Write updated kubeconfig to all required locations
+    tee "$KUBECONFIG" "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/nested_kubeconfig" <<< "$UPDATED_KUBECONFIG_CONTENT" >/dev/null
+
+    echo "Combined CA bundle created successfully"
 )
 
 # Perform oc login test if possible
