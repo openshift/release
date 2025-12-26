@@ -62,26 +62,126 @@ RESOURCE_GROUP=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.resourceGroupName')
 if [[ -z "${RESOURCE_GROUP}" ]]; then
     RESOURCE_GROUP="${INFRA_ID}-rg"
 fi
+REGION="$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.region')"
+OUTBOUND_TYPE="$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.outboundType')"
+OUTBOUND_TYPE=${OUTBOUND_TYPE:-Loadbalancer}
+NETWORK_RESOURCE_GROUP=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.networkResourceGroupName')
+NETWORK_RESOURCE_GROUP="${NETWORK_RESOURCE_GROUP:-$RESOURCE_GROUP}"
+subnets_json_array=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.subnets' -j)
 
-nat_gateway_id=$(az network nat gateway list -g "${RESOURCE_GROUP}" --query '[].id' -otsv)
-vnet_name=$(az network vnet list -g "${RESOURCE_GROUP}" --query '[].name' -otsv)
-subnet_list=$(az network vnet subnet list --vnet-name "${vnet_name}" -g "${RESOURCE_GROUP}" --query '[].name' -otsv)
+if [[ -z "${subnets_json_array}" ]]; then
+    # No byo subnets, installer creates them
+    subnets_json_array="[{\"name\": \"${INFRA_ID}-master-subnet\",\"role\": \"control-plane\"},{\"name\": \"${INFRA_ID}-worker-subnet\",\"role\": \"node\"}]"
+    if [[ "${OUTBOUND_TYPE}" == "NATGatewayMultiZone" ]]; then
+        region_display_name="$(az account list-locations --query "[?name=='${REGION}'].displayName" --output tsv)"
+        zone_number="$(az provider show --namespace Microsoft.Network --query "resourceTypes[?resourceType=='natGateways'].zoneMappings[] | [?location=='${region_display_name}'].zones | [0]" --output tsv | wc -l)"
+        if (( ${zone_number} > 1 )); then
+            additonal_node_subnets=""
+            for (( num=2; num<=${zone_number}; num++ )); do
+                if [[ -n "${additonal_node_subnets}" ]]; then
+                    additonal_node_subnets="${additonal_node_subnets},"
+                fi
+                additonal_node_subnets="${additonal_node_subnets}{\"name\": \"${INFRA_ID}-worker-subnet-${num}\",\"role\": \"node\"}"
+            done
+            additonal_node_subnets="[${additonal_node_subnets}]"
+            subnets_json_array=$(echo "${subnets_json_array}" | jq --argjson second_array "${additonal_node_subnets}" '. + $second_array')
+        else
+            echo "Region ${REGION} does not support available zone, while OUTBOUND_TYPE is NATGatewayMultiZone, installer should exit with error..., exit!"
+            exit 1
+        fi
+    fi
+fi
 
-echo "Expected NAT gateway id: ${nat_gateway_id}"
+echo "INFRA_ID: ${INFRA_ID}"
+echo "OUTBOUND_TYPE: ${OUTBOUND_TYPE}"
+echo "NETWORK_RESOURCE_GROUP: ${NETWORK_RESOURCE_GROUP}"
+echo "SUBNETS: ${subnets_json_array}"
 
 check_result=0
-echo "Check on all subnets, should configure the nat gateway"
-for subnet in ${subnet_list}; do
-    if [[ "${subnet}" == "${INFRA_ID}-master-subnet" ]] && (( ocp_minor_version >= 20 )); then
-        echo "INFO: starting from 4.20, NAT gateway only set on worker nodes, skip checking on master subnet!"
-        continue
-    fi
-    echo "checking on subnet ${subnet}"
-    subnet_natgateway=$(az network vnet subnet show -n "${subnet}" --vnet-name "${vnet_name}" -g "${RESOURCE_GROUP}" --query 'natGateway.id' -otsv)
-    if [[ "${subnet_natgateway}" == "${nat_gateway_id}" ]]; then
-        echo "INFO: ${subnet} check pass!"
+if [[ "${OUTBOUND_TYPE}" != "Loadbalancer" ]]; then
+    echo "check that nat gateways attach to node subnets..."
+    natgateway_json_array=$(az network nat gateway list -g ${RESOURCE_GROUP} | jq '[.[] | {name: .name, subnets: .subnets, zones: .zones}]')
+
+    if [[ "${OUTBOUND_TYPE}" == "NATGatewaySingleZone" ]] || [[ "${OUTBOUND_TYPE}" == "NATGateway" ]]; then
+        nat_gateway_id=$(echo "${natgateway_json_array}" | jq -r '.[].subnets[].id')
+        echo "${subnets_json_array}" | jq -c '.[]' | while IFS= read -r item; do
+            subnet_name=$(echo "${item}" | jq -r '.name')
+            subnet_role=$(echo "${item}" | jq -r '.role')
+            if [[ "${subnet_role}" == "control-plane" ]] && (( ocp_minor_version >= 20 )); then
+                echo "INFO: starting from 4.20, NAT gateways only attach on worker subnets, skip checking on master subnet!"
+                continue
+            fi
+            if [[ "${subnet_name}" == "${nat_gateway_id##*/}" ]]; then
+                echo "INFO: ${subnet_name} check pass!"
+            else
+                echo "ERROR: ${subnet_name} check fail! nat gateway id: ${nat_gateway_id}!"
+                check_result=1
+            fi
+        done
+    elif [[ "${OUTBOUND_TYPE}" == "NATGatewayMultiZone" ]]; then
+        subnets_json_file=$(mktemp)
+        echo "${subnets_json_array}" > ${subnets_json_file}
+        echo "${subnets_json_array}" | jq -c '.[]' | while IFS= read -r item; do
+            subnet_name=$(echo "${item}" | jq -r '.name')
+            subnet_role=$(echo "${item}" | jq -r '.role')
+
+            if [[ "${subnet_role}" == "control-plane" ]]; then
+                echo "INFO: NAT gateways only attach on worker subnets, skip checking on master subnet!"
+                continue
+            fi
+
+            match_count=$(echo "${natgateway_json_array}" | jq --arg name "${subnet_name}" '[.[] | select(.subnets[].id | endswith($name))] | length') 
+            if [[ ${match_count} -gt 0 ]]; then
+                echo "INFO: ${subnet_role} ${subnet_name} check pass!"
+                # insert zone of natgateway associated subnet {subnet_name} into subnets_json_array, for compute machineset check
+                natgateway_zone="$(echo "${natgateway_json_array}" | jq -r --arg name "${subnet_name}" '.[] | select(.subnets[].id | endswith($name)) | .zones[]')"
+                jq --arg name "${subnet_name}" --arg value "${natgateway_zone}" 'map(if .name == $name then . + {"zone": $value} else . end)' ${subnets_json_file} > "${subnets_json_file}.tmp"
+                mv "${subnets_json_file}.tmp" "${subnets_json_file}"
+            else
+                echo "ERROR: ${subnet_role} ${subnet_name} check failed! natgateway list: ${natgateway_json_array}"
+                check_result=1
+            fi
+
+        done
+        subnets_json_array="$(< ${subnets_json_file})"
+        rm ${subnets_json_file}
     else
-        echo "ERROR: ${subnet} check fail! nat gateway configured on ${subnet}: ${subnet_natgateway}!"
+        echo "Unsupported outbound type: ${OUTBOUND_TYPE}"
+        exit 1
+    fi
+fi
+
+#cpms check
+echo "CPMS checking..."
+master_sunbet_name=$(echo "${subnets_json_array}" | jq -r '.[] | select(.role == "control-plane") | .name')
+cpms_subnet=$(oc get controlplanemachineset.machine.openshift.io cluster -n openshift-machine-api -ojson | jq -r '.spec.template."machines_v1beta1_machine_openshift_io".spec.providerSpec.value.subnet')
+if [[ "${master_sunbet_name}" == "${cpms_subnet}" ]]; then
+    echo "INFO: cpms check pass!"
+else
+    echo "ERROR: cpms check failed! acutal value: ${cpms_subnet}, expected value: ${master_sunbet_name}"
+    check_result=1
+fi
+
+#worker machineset check
+echo "Worker machienset checking..."
+worker_machinesets=$(oc get machinesets.machine.openshift.io -n openshift-machine-api -ojson | jq -r '.items[].metadata.name')
+for machineset in ${worker_machinesets}; do
+    machineset_subnet=$(oc get machinesets.machine.openshift.io -n openshift-machine-api ${machineset} -ojson | jq -r '.spec.template.spec.providerSpec.value.subnet')
+    match_count=$(echo "${subnets_json_array}" | jq --arg name "${machineset_subnet}" '[.[] | select(.name == $name)] | length')
+    if [[ ${match_count} -gt 0 ]]; then
+        echo "INFO: subnet ${machineset_subnet} is found in worker machineset ${machineset}!"
+        worker_natgateway_zone=$(echo "${subnets_json_array}" | jq -r --arg name "${machineset_subnet}" '.[] | select(.name == $name) | .zone')
+        if [[ -n "${worker_natgateway_zone}" ]] && [[ "${worker_natgateway_zone}" != "null" ]]; then
+            machineset_zone=$(oc get machinesets.machine.openshift.io -n openshift-machine-api ${machineset} -ojson | jq -r '.spec.template.spec.providerSpec.value.zone')
+            if [[ "${worker_natgateway_zone}" == "${machineset_zone}" ]]; then
+                echo "INFO: natgateway and machineset are in the same zone!"
+            else
+                echo "ERROR: natgateway and machineset are in the different zone! natgateway: ${worker_natgateway_zone}; machineset ${machineset}: ${machineset_zone}"
+                check_result=1
+            fi
+        fi
+    else
+        echo "ERROR: worker machienset ${machineset} check failed! subnet in machineset is ${machineset_subnet}, expect subnets are {subnets_json_array}!"
         check_result=1
     fi
 done
