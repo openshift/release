@@ -51,7 +51,7 @@ EXTRA_FLAGS+=" --metrics-profile metrics.yml,cnv-metrics.yml --gc-metrics=true -
 export ES_SERVER=""
 
 if [[ "${CHURN}" == "true" ]]; then
-    EXTRA_FLAGS+=" --churn=true --namespaced-iterations=true"
+    EXTRA_FLAGS+="  --namespaced-iterations=true"
 fi
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
