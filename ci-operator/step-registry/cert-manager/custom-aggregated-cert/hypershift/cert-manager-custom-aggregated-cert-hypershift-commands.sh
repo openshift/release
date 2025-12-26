@@ -170,13 +170,6 @@ HCP_NS="clusters-$HC_NAME"
 # https://issues.redhat.com/browse/OCPBUGS-53261
 mgmt oc annotate hc -n clusters "$HC_NAME" hypershift.openshift.io/skip-kas-conflict-san-validation=true --overwrite
 
-# Configure KubeAPIServerDNSName to trigger custom kubeconfig creation
-# The custom kubeconfig includes the combined CA bundle (OpenShift root CA + custom serving cert CA)
-# This is needed because the regular admin-kubeconfig only contains the OpenShift root CA,
-# which cannot verify Let's Encrypt certificates used by cert-manager
-echo "Configuring kubeAPIServerDNSName to enable custom kubeconfig with combined CA bundle"
-mgmt oc patch hc -n clusters "$HC_NAME" --type=merge -p "{\"spec\":{\"kubeAPIServerDNSName\":\"$KAS_ROUTE_HOSTNAME\"}}"
-
 create_aggregated_cert
 
 # Configure ic cert
@@ -205,20 +198,32 @@ configure_kas_oauth_serving_cert
 check_cert_issuer "$KAS_ROUTE_HOSTNAME" 443 "Let's Encrypt"
 check_cert_issuer "$OAUTH_ROUTE_HOSTNAME" 443 "Let's Encrypt"
 
-# Download the custom kubeconfig with combined CA bundle
-# The custom-admin-kubeconfig is created when kubeAPIServerDNSName is set and includes
-# both the OpenShift root CA and the custom serving certificate CA chain
+# Manually create kubeconfig with combined CA bundle
+# The regular admin-kubeconfig only contains OpenShift root CA, which cannot verify Let's Encrypt certificates
+# We need to combine the OpenShift root CA with the Let's Encrypt certificate chain
 (
     set +x
-    echo "Waiting for custom-admin-kubeconfig secret to be created..."
-    until mgmt oc get secret -n clusters "${HC_NAME}-custom-admin-kubeconfig" >/dev/null 2>&1; do
-        echo "Custom kubeconfig secret not found, waiting..."
-        sleep 15
-    done
+    echo "Creating kubeconfig with combined CA bundle (OpenShift root CA + Let's Encrypt CA)..."
 
-    echo "Extracting custom kubeconfig with combined CA bundle..."
-    CUSTOM_KUBECONFIG_CONTENT="$(mgmt oc extract secret/"${HC_NAME}-custom-admin-kubeconfig" -n clusters --to -)"
-    tee "$KUBECONFIG" "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/nested_kubeconfig" <<< "$CUSTOM_KUBECONFIG_CONTENT" >/dev/null
+    # Extract current kubeconfig
+    CURRENT_KUBECONFIG_CONTENT="$(mgmt oc extract secret/"${HC_NAME}-admin-kubeconfig" -n clusters --to -)"
+
+    # Extract current CA data
+    CURRENT_CA_DATA="$(grep certificate-authority-data <<< "$CURRENT_KUBECONFIG_CONTENT" | awk '{print $2}')"
+
+    # Get Let's Encrypt certificate chain from the custom serving cert secret
+    LETSENCRYPT_CERT="$(mgmt oc get secret -n clusters "$AGGREGATED_CERT_SECRET_NAME" -o jsonpath='{.data.tls\.crt}')"
+
+    # Combine CAs: OpenShift root CA + Let's Encrypt cert chain
+    COMBINED_CA_DATA="$(echo -e "${CURRENT_CA_DATA}\n${LETSENCRYPT_CERT}" | base64 -d | base64 | tr -d '\n')"
+
+    # Replace CA data in kubeconfig with combined CA bundle
+    UPDATED_KUBECONFIG_CONTENT="$(echo "$CURRENT_KUBECONFIG_CONTENT" | sed "s|certificate-authority-data: ${CURRENT_CA_DATA}|certificate-authority-data: ${COMBINED_CA_DATA}|")"
+
+    # Write updated kubeconfig to all required locations
+    tee "$KUBECONFIG" "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/nested_kubeconfig" <<< "$UPDATED_KUBECONFIG_CONTENT" >/dev/null
+
+    echo "Combined CA bundle created successfully"
 )
 
 # Perform oc login test if possible
