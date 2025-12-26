@@ -64,7 +64,7 @@ spec:
   duration: 2h
   renewBefore: 1h30m
 EOF
-    oc wait certificate "$AGGREGATED_CERT_NAME" -n openshift-ingress --for=condition=Ready=True --timeout=5m
+    oc wait certificate "$AGGREGATED_CERT_NAME" -n openshift-ingress --for=condition=Ready=True --timeout=10m
 }
 
 function configure_default_ic_cert() {
@@ -163,6 +163,20 @@ AGGREGATED_CERT_SECRET_NAME=cert-manager-managed-aggregated-cert-tls
 INGRESS_DOMAIN=$(oc get ingress.config cluster -o jsonpath='{.spec.domain}')
 HC_NAME="$(cut -d '.' -f 2 <<< "$INGRESS_DOMAIN")"
 HCP_NS="clusters-$HC_NAME"
+
+# Add annotation to skip KAS certificate SAN conflict validation
+# This is needed because the test configures a custom serving certificate with DNS names
+# that HyperShift automatically adds to the default KAS certificate will cause conflict.
+# https://issues.redhat.com/browse/OCPBUGS-53261
+mgmt oc annotate hc -n clusters "$HC_NAME" hypershift.openshift.io/skip-kas-conflict-san-validation=true --overwrite
+
+# Configure KubeAPIServerDNSName to trigger custom kubeconfig creation
+# The custom kubeconfig includes the combined CA bundle (OpenShift root CA + custom serving cert CA)
+# This is needed because the regular admin-kubeconfig only contains the OpenShift root CA,
+# which cannot verify Let's Encrypt certificates used by cert-manager
+echo "Configuring kubeAPIServerDNSName to enable custom kubeconfig with combined CA bundle"
+mgmt oc patch hc -n clusters "$HC_NAME" --type=merge -p "{\"spec\":{\"kubeAPIServerDNSName\":\"$KAS_ROUTE_HOSTNAME\"}}"
+
 create_aggregated_cert
 
 # Configure ic cert
@@ -180,9 +194,6 @@ pushd "$TMP_DIR"
 oc extract secret/"$AGGREGATED_CERT_SECRET_NAME" -n openshift-ingress
 mgmt oc create secret tls "$AGGREGATED_CERT_SECRET_NAME" --cert=tls.crt --key=tls.key -n clusters
 
-# Get kubeconfig cluster ca data before configuring kas serving cert
-BACKUP_KUBECONFIG_CA_DATA="$(grep certificate-authority-data "$KUBECONFIG" | awk '{print $2}')"
-
 # Update KUBECONFIG to allow secure communication between kubelets and the external KAS endpoint
 # TODO: remove this workaround once https://issues.redhat.com/browse/OCPBUGS-41853 is resolved
 remove_kubelet_kubeconfig_cluster_ca
@@ -194,17 +205,20 @@ configure_kas_oauth_serving_cert
 check_cert_issuer "$KAS_ROUTE_HOSTNAME" 443 "Let's Encrypt"
 check_cert_issuer "$OAUTH_ROUTE_HOSTNAME" 443 "Let's Encrypt"
 
-# Download the updated KUBECONFIG after it's reconciled to include the default ingress certificate
+# Download the custom kubeconfig with combined CA bundle
+# The custom-admin-kubeconfig is created when kubeAPIServerDNSName is set and includes
+# both the OpenShift root CA and the custom serving certificate CA chain
 (
     set +x
-    CURRENT_KUBECONFIG_CONTENT="$(mgmt oc extract secret/"${HC_NAME}-admin-kubeconfig" -n clusters --to -)"
-    CURRENT_KUBECONFIG_CA_DATA="$(grep certificate-authority-data <<< "$CURRENT_KUBECONFIG_CONTENT" | awk '{print $2}')"
-    until [[ "$CURRENT_KUBECONFIG_CA_DATA" != "$BACKUP_KUBECONFIG_CA_DATA" ]]; do
-        CURRENT_KUBECONFIG_CONTENT="$(mgmt oc extract secret/"${HC_NAME}-admin-kubeconfig" -n clusters --to -)"
-        CURRENT_KUBECONFIG_CA_DATA="$(grep certificate-authority-data <<< "$CURRENT_KUBECONFIG_CONTENT" | awk '{print $2}')"
+    echo "Waiting for custom-admin-kubeconfig secret to be created..."
+    until mgmt oc get secret -n clusters "${HC_NAME}-custom-admin-kubeconfig" >/dev/null 2>&1; do
+        echo "Custom kubeconfig secret not found, waiting..."
         sleep 15
     done
-    tee "$KUBECONFIG" "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/nested_kubeconfig" <<< "$CURRENT_KUBECONFIG_CONTENT" >/dev/null
+
+    echo "Extracting custom kubeconfig with combined CA bundle..."
+    CUSTOM_KUBECONFIG_CONTENT="$(mgmt oc extract secret/"${HC_NAME}-custom-admin-kubeconfig" -n clusters --to -)"
+    tee "$KUBECONFIG" "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/nested_kubeconfig" <<< "$CUSTOM_KUBECONFIG_CONTENT" >/dev/null
 )
 
 # Perform oc login test if possible
