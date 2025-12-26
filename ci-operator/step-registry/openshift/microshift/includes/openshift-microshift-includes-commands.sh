@@ -240,11 +240,11 @@ function ci_custom_link_report() {
 
         # Determine scenario status
         ## Check Tests Set Up phase result
-        for phase_junit_file in "$(ls ${test}/phase_*/junit.xml)"; do
-          if grep -q -E 'message="FAILED"' "${phase_junit_file}"; then
+        for phase_junit_file in "${test}"/phase_*/junit.xml ; do
+          if grep -q 'message="FAILED"' "${phase_junit_file}" 2> /dev/null; then
             scenario_status="fail"
             break
-          elif grep -q -E 'message="SKIPPED"' "${phase_junit_file}"; then
+          elif grep -q 'message="SKIPPED"' "${phase_junit_file}" 2> /dev/null; then
             scenario_status="skip"
           fi
         done
@@ -252,15 +252,16 @@ function ci_custom_link_report() {
         ## Check Test Result
         ### RF, ginkgo or conformance
         junit_file=""
-        if [ "${scenario_status}" == "pass" ]; then
+        if [ "${scenario_status}" = "pass" ]; then
+          # Need to check ginkgo results twice because there was a typo on ginkgo name: ginkgo and gingko
           if [ -f "${test}/ginkgo-results/test-output.log" ]; then
-              junit_file="$( find "${test}/ginkgo-results" -name "junit_e2e_*.xml" -type f | head -1 )"
+              junit_file="$(find "${test}/ginkgo-results" -name "junit_e2e_*.xml" -type f | head -1 )"
           elif [ -f "${test}/gingko-results/test-output.log" ]; then
-              junit_file="$( find "${test}/gingko-results" -name "junit_e2e_*.xml" -type f | head -1 )"
+              junit_file="$(find "${test}/gingko-results" -name "junit_e2e_*.xml" -type f | head -1 )"
           elif [ -f "${test}/log.html" ]; then
               junit_file="${test}/junit.xml"
           elif [ -f "${test}/e2e.log" ]; then
-              junit_file="${test}/junit_01.xml"
+              junit_file="$(find "${test}" -name "junit_*.xml" -type f | head -1 )"
           fi
           if [ -d "${test}/vms/" ]; then
               if [ ! -f "${junit_file}" ]; then
@@ -538,12 +539,12 @@ EOF
 
         # Determine scenario status
         ## Check Tests Set Up phase result
-        for phase_junit_file in "$(ls ${test}/phase_*/junit.xml)"; do
-          if grep -q -E 'message="FAILED"' "${phase_junit_file}"; then
+        for phase_junit_file in "${test}"/phase_*/junit.xml ; do
+          if grep -q 'message="FAILED"' "${phase_junit_file}" 2> /dev/null; then
               status_class="status-fail"
               status_emoji="❌"
               break
-          elif grep -q -E 'message="SKIPPED"' "${phase_junit_file}"; then
+          elif grep -q 'message="SKIPPED"' "${phase_junit_file}" 2> /dev/null; then
               status_class="status-skip"
               status_emoji="⚠️"
           fi
@@ -552,7 +553,8 @@ EOF
         ## Check Test Result
         ### RF, ginkgo or conformance
         junit_file=""
-        if [ "${status_class}" == "status-pass" ]; then
+        if [ "${status_class}" = "status-pass" ]; then
+          # Need to check ginkgo results twice because there was a typo on ginkgo name: ginkgo and gingko
           if [ -f "${test}/ginkgo-results/test-output.log" ]; then
               junit_file="$( find "${test}/ginkgo-results" -name "junit_e2e_*.xml" -type f | head -1 )"
           elif [ -f "${test}/gingko-results/test-output.log" ]; then
@@ -560,7 +562,7 @@ EOF
           elif [ -f "${test}/log.html" ]; then
               junit_file="${test}/junit.xml"
           elif [ -f "${test}/e2e.log" ]; then
-              junit_file="${test}/junit_01.xml"
+              junit_file="$(find "${test}" -name "junit_*.xml" -type f | head -1 )"
           fi
           if [ -d "${test}/vms/" ]; then
             if [ ! -f "${junit_file}" ]; then
