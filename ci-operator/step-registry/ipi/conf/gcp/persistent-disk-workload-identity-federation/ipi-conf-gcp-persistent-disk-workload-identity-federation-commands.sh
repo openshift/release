@@ -87,11 +87,65 @@ else
 	exit 1
 fi
 
+# Determine the node service accounts to use
 # The node service accounts are InfraID plus -m (master) or -w (worker).
 # Ref: https://github.com/openshift/installer/blob/main/pkg/infrastructure/gcp/clusterapi/iam.go#L30
 INFRA_ID=$(jq -r .infraID ${SHARED_DIR}/metadata.json)
+CONFIG="${SHARED_DIR}/install-config.yaml"
+
+# Determine master node service account
+# Default to InfraID-based service account
 MASTER_NODE_SA="${INFRA_ID}-m@${SA_SUFFIX}"
+
+# Override with custom service account if specified in install-config.yaml
+CUSTOM_CONTROL_PLANE_SA=""
+if [ -f "${CONFIG}" ]; then
+	CUSTOM_CONTROL_PLANE_SA=$(yq-go r "${CONFIG}" 'controlPlane.platform.gcp.serviceAccount' 2>/dev/null || echo "")
+fi
+
+if [ -n "${CUSTOM_CONTROL_PLANE_SA}" ] && [ "${CUSTOM_CONTROL_PLANE_SA}" != "null" ]; then
+	MASTER_NODE_SA="${CUSTOM_CONTROL_PLANE_SA}"
+	logger "INFO" "Using master node service account from install-config.yaml: ${MASTER_NODE_SA}"
+fi
+
+# Determine worker node service account
+# Default to InfraID-based service account
 WORKER_NODE_SA="${INFRA_ID}-w@${SA_SUFFIX}"
+
+# Override with custom service account if specified in install-config.yaml
+CUSTOM_COMPUTE_SA=""
+if [ -f "${CONFIG}" ]; then
+	CUSTOM_COMPUTE_SA=$(yq-go r "${CONFIG}" 'compute[0].platform.gcp.serviceAccount' 2>/dev/null || echo "")
+fi
+
+if [ -n "${CUSTOM_COMPUTE_SA}" ] && [ "${CUSTOM_COMPUTE_SA}" != "null" ]; then
+	WORKER_NODE_SA="${CUSTOM_COMPUTE_SA}"
+	logger "INFO" "Using worker node service account from install-config.yaml: ${WORKER_NODE_SA}"
+fi
+
+# Verify master node service account exists
+logger "INFO" "Checking if master node service account exists: ${MASTER_NODE_SA}"
+if ! gcloud iam service-accounts describe "${MASTER_NODE_SA}" --project="${GOOGLE_PROJECT_ID}" &>/dev/null; then
+	logger "ERROR" "Master node service account not found: ${MASTER_NODE_SA}"
+	logger "ERROR" "This can happen if:"
+	logger "ERROR" "  1. Custom service account was specified but doesn't exist in the project"
+	logger "ERROR" "  2. Installer failed to create default service account"
+	logger "ERROR" "  3. Service account was deleted after cluster creation"
+	exit 1
+fi
+logger "INFO" "Master node service account verified: ${MASTER_NODE_SA}"
+
+# Verify worker node service account exists
+logger "INFO" "Checking if worker node service account exists: ${WORKER_NODE_SA}"
+if ! gcloud iam service-accounts describe "${WORKER_NODE_SA}" --project="${GOOGLE_PROJECT_ID}" &>/dev/null; then
+	logger "ERROR" "Worker node service account not found: ${WORKER_NODE_SA}"
+	logger "ERROR" "This can happen if:"
+	logger "ERROR" "  1. Custom service account was specified but doesn't exist in the project"
+	logger "ERROR" "  2. Installer failed to create default service account"
+	logger "ERROR" "  3. Service account was deleted after cluster creation"
+	exit 1
+fi
+logger "INFO" "Worker node service account verified: ${WORKER_NODE_SA}"
 
 # Grant scoped serviceAccountUser role for node service accounts
 SA_USER_ROLE="roles/iam.serviceAccountUser"
