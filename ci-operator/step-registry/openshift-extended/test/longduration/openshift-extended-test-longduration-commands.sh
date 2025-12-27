@@ -28,6 +28,7 @@ function save_oidc_tokens {
 
 function exit_trap {
     echo "Exit trap triggered"
+    sleep 1800s
     date '+%s' > "${SHARED_DIR}/TEST_TIME_TEST_END" || :
     warn_0_case_executed
     if [[ -r "$SHARED_DIR/oc-oidc-token" ]] && [[ -r "$SHARED_DIR/oc-oidc-token-filename" ]]; then
@@ -262,8 +263,39 @@ oc wait nodes --all --for=condition=Ready=true --timeout=15m
 if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
     oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
     oc get clusterversion version -o yaml || true
+    ocpVersion=$(oc get clusterversion -o json | jq -r '.items[0].status.desired.version')
 fi
 
+#if OVERWRITE_OC_MIRROR then overwrite the oc-mirror from the payload
+if [[ $OVERRIDE_OC_MIRROR == "true" ]]; then
+    echo "OCP Version: ${ocpVersion}"
+    if [[ "$ocpVersion" == *arm* ]] || [[ "${OCP_ARCH:-}" != "amd64" ]]; then
+        echo "OCP_ARCH is not amd64, or OCP is not amd64, currently do not support to overwrite the oc-mirror from the OCP release image"
+    fi
+    if [[ -n "${ocpVersion:-}" ]]; then
+        tmpDir=$(mktemp -d)
+        cd ${tmpDir}
+        echo "Extracting oc-mirror from ${ocpVersion}, OCP_ARCH: ${OCP_ARCH}"
+        set -x
+        filter="linux/amd64"      
+        tag=$(oc adm release info "${ocpVersion}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os="${filter}" -o json | jq -r '.references.spec.tags[] | select(.name=="oc-mirror") | .from.name')
+        which oc
+        uname -m
+        lscpu | grep "Architecture"
+        oc image extract "${tag}" --path=/usr/bin/oc-mirror:. -a "${CLUSTER_PROFILE_DIR}/pull-secret" --filter-by-os="${filter}" --confirm
+        sleep 5s
+        ls -la ./oc-mirror
+        md5sum ./oc-mirror
+        chmod +x ./oc-mirror
+        ./oc-mirror version --output yaml
+        cp "$(which oc)" ./oc
+        export PATH="$tmpDir:$PATH"
+        echo "Using oc from: $(which oc)"
+        echo "oc mirror version:"
+        oc mirror version --output yaml
+        set +x
+    fi
+fi
 # execute the cases
 function run {
     test_scenarios=""
