@@ -816,7 +816,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
@@ -2293,12 +2293,24 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
+- as: azure-ipi-ovn-winc-f14
+  cron: 0 8 12,26 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
 - as: gcp-ipi-to-multiarch-mini-perm-f14
   cron: 50 23 13,27 * *
   steps:
@@ -3271,11 +3283,11 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-upi-zones
 - as: vsphere-ipi-ovn-winc-f14
-  cron: 6 22 14 7 *
+  cron: 44 1 1,15 * *
   steps:
     cluster_profile: vsphere-connected-2
     env:
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
