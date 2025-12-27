@@ -1,0 +1,78 @@
+ref:
+  as: trusted-execution-clusters-ref-operator-beaker-deprovision
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  commands: trusted-execution-clusters-ref-operator-beaker-deprovision-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: beaker-bm
+    mount_path: /var/run/beaker-bm
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      memory: 1Gi
+  env:
+  - name: BEAKER_IP
+    default: ""
+    documentation: |-
+      IP address of the Beaker provisioned bare metal machine.
+      If not set, will read from Vault or ${SHARED_DIR}/beaker_ip
+  - name: BEAKER_USER
+    default: "root"
+    documentation: |-
+      Username for SSH access to the Beaker machine.
+      If not set, will read from Vault or default to 'root'
+  - name: DEPROVISION_TIMEOUT
+    default: "600"
+    documentation: |-
+      Timeout in seconds for the cleanup operations.
+      Defaults to 600 seconds (10 minutes).
+  - name: CLEANUP_IMAGES
+    default: "true"
+    documentation: |-
+      Whether to clean up container images (true/false).
+      Defaults to 'true'. Set to 'false' to preserve images for debugging.
+  - name: RESTART_SERVICES
+    default: "true"
+    documentation: |-
+      Whether to restart container runtime services after cleanup (true/false).
+      Defaults to 'true'.
+  documentation: |-
+    This step performs cleanup operations on the Beaker bare metal machine,
+    removing all resources created during CI testing.
+
+    Cleanup operations performed:
+    1. Delete Kind cluster using 'kind delete cluster'
+    2. Clean container resources (containers, images, volumes)
+    3. Remove temporary files (/tmp/kind-*, /tmp/operator-*)
+    4. Clean operator working directories (~/operator-kind-setup)
+    5. Optionally restart Docker service (if RESTART_SERVICES=true)
+    6. Archive important logs before cleanup
+    7. Verify cleanup completed successfully
+
+    Cleanup Strategy:
+    - Best-effort cleanup: Individual operations may fail without causing the step to fail
+    - Ensures cleanup proceeds even if some resources are already gone
+    - Archives logs before deletion to preserve debugging information
+    - Restarts services to ensure clean state for future runs
+
+    Prerequisites:
+    - SSH credentials must be available in Vault
+    - Beaker machine must be accessible
+
+    Outputs:
+    - ${ARTIFACT_DIR}/cleanup-logs/pre-cleanup-state.log: System state before cleanup
+    - ${ARTIFACT_DIR}/cleanup-logs/post-cleanup-state.log: System state after cleanup
+    - ${ARTIFACT_DIR}/cleanup-logs/cleanup-execution.log: Detailed cleanup operation log
+    - ${ARTIFACT_DIR}/cleanup-logs/archived-logs/: Logs archived before deletion
+
+    Exit Codes:
+    - 0: Cleanup completed successfully (best effort)
+    - 1: Critical failure (e.g., SSH connection issues)
+
+    Note: This cleanup is designed for Docker-based Kind clusters only.
+    It does not handle Podman, libvirt, or E2E test resources.

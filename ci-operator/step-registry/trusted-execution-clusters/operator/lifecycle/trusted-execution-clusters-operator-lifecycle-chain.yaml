@@ -1,0 +1,28 @@
+chain:
+  as: trusted-execution-clusters-operator-lifecycle
+  steps:
+  - ref: trusted-execution-clusters-ref-operator-test
+  documentation: |-
+    Runs the complete integration test suite for trusted-execution-clusters operator.
+
+    Operator Integration Tests (trusted-execution-clusters-ref-operator-test):
+      - Connects to Beaker machine via SSH
+      - Uses operator repository from beaker-kind-provision step
+      - Verifies Kind cluster (creates if needed with 'make cluster-up')
+      - Builds and tests the operator:
+        * make push: Build and push images to localhost:5000/trusted-execution-clusters
+        * make install-kubevirt: Install KubeVirt dependency
+        * make integration-tests: Run complete integration test suite
+      - Collects test results and cluster state
+
+    Prerequisites:
+    - SSH credentials available in Vault
+    - Operator repository downloaded by beaker-kind-provision step
+    - Local registry running at localhost:5000
+
+    Environment Variables:
+    - POD_READY_TIMEOUT: Test timeout (default: 900s)
+
+    Outputs:
+    - ${ARTIFACT_DIR}/operator-test-logs/: Test logs and diagnostics
+    - ${ARTIFACT_DIR}/operator-test-logs/installation.log: Complete test execution log
