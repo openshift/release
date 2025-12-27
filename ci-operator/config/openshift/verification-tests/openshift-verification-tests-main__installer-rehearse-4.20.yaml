@@ -47,18 +47,28 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-qe
     env:
-      IPSTACK: dualstack
-      SLEEP_DURATION: 1h
-      VPC_IPv6_ONLY_PRIVATE_SUBNETS: "yes"
-      ZONES_COUNT: "1"
+      BASE_DOMAIN: qe.devcluster.openshift.com
     post:
-    - ref: aws-deprovision-stacks
-    - ref: aws-deprovision-s3buckets
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
     pre:
-    - ref: aws-provision-vpc-shared-dualstack
-    - chain: aws-provision-bastionhost
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ipi-conf-aws-usage-info
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: rhcos-conf-rhcos10
+    - chain: ipi-install
+    - ref: enable-qe-catalogsource
+    - chain: cucushift-installer-check
     test:
-    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-extended-web-tests
+    - ref: openshift-extended-test-supplementary
+    - ref: openshift-e2e-test-clusterinfra-qe
+    - ref: openshift-e2e-test-qe-report
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
