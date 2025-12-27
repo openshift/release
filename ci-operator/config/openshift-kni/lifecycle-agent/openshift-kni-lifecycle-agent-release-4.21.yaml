@@ -1,0 +1,153 @@
+base_images:
+  installer:
+    name: "4.21"
+    namespace: ocp
+    tag: installer
+  previous-lca:
+    name: "4.20"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
+  ubi9-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: ubi9-minimal
+  to: lifecycle-agent-operator
+- dockerfile_path: bundle.Dockerfile
+  to: lifecycle-agent-operator-bundle
+operator:
+  bundles:
+  - as: lifecycle-agent-operator-bundle-pipeline
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift-kni/lifecycle-agent-operator:.*
+    with: pipeline:lifecycle-agent-operator
+promotion:
+  to:
+  - name: "4.21"
+    namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.21"
+      namespace: ocp
+      reference_policy: Local
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: ocp
+      reference_policy: Local
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  ./hack/install-markdownlint.sh
+tests:
+- as: ci-job
+  commands: |
+    unset VERSION
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
+    make ci-job
+    make coveralls-download
+    export COVERALLS_REPO_TOKEN=$(cat /etc/coveralls/TOKEN)
+    ./bin/coveralls report --job-flag "unit-tests" --build-number=$(git rev-parse HEAD) coverage.out
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/coveralls
+    name: lifecycle-agent-coverall
+- always_run: false
+  as: integration
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+  steps:
+    cluster_profile: aws-telco
+    dependencies:
+      OO_INDEX: ci-index-lifecycle-agent-operator-bundle-pipeline
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-lifecycle-agent
+      OO_PACKAGE: lifecycle-agent
+      OO_TARGET_NAMESPACES: '!install'
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-lifecycle-agent-main
+        ci-job-type optional-operators-ci-aws
+        ci-repo-name lifecycle-agent
+        ci-org-name openshift-kni
+    test:
+    - as: integration
+      cli: latest
+      commands: |
+        export XDG_CACHE_HOME=/tmp/.cache
+        export XDG_CONFIG_HOME=/tmp/.config
+        export XDG_DATA_HOME=/tmp/.local/share
+        make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: markdownlint
+  commands: |
+    hack/markdownlint.sh
+  container:
+    from: test-bin
+  run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^.markdown.*)$
+- as: ibu-e2e-flow
+  optional: true
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: lifecycle-agent-operator
+      OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
+      TARGET_LCA_REF: pipeline:previous-lca
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.21"
+      OCP_TARGET_IMAGE_SOURCE: release
+      OCP_TARGET_VERSION: "4.20"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+    workflow: openshift-image-based-upgrade-presubmit
+- as: ibi-e2e-flow
+  optional: true
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+  steps:
+    cluster_profile: aws-5
+    dependencies:
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: lifecycle-agent-operator
+      OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.21"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-install
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: lifecycle-agent
+      SNYK_CODE_ADDITIONAL_ARGS: --policy-path=.snyk --severity-threshold=high
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift-kni
+  repo: lifecycle-agent

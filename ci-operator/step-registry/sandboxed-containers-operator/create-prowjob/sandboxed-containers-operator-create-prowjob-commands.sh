@@ -69,6 +69,44 @@ get_expected_version() {
         echo ""
     fi
 }
+# Function to check if a specific version exists in an OCP release channel
+# Uses the Cincinnati API to query available versions
+check_version_in_channel() {
+    local version="$1"
+    local channel="$2"
+    local major_minor
+
+    # Extract major.minor from version (e.g., 4.18 from 4.18.30)
+    major_minor=$(echo "${version}" | cut -d'.' -f1,2)
+
+    # Cincinnati API endpoint
+    local api_url="https://api.openshift.com/api/upgrades_info/v1/graph?channel=${channel}-${major_minor}&arch=amd64"
+
+    echo "Checking if version ${version} exists in ${channel}-${major_minor} channel..."
+
+    # Query the API and check if version exists
+    local response
+    if ! response=$(curl -sf "${api_url}" 2>/dev/null); then
+        echo "WARNING: Unable to query Cincinnati API. Skipping version check."
+        echo "  URL: ${api_url}"
+        return 0
+    fi
+
+    # Check if the version exists in the response
+    if echo "${response}" | jq -e --arg ver "${version}" '.nodes[] | select(.version == $ver)' >/dev/null 2>&1; then
+        echo "✓ Version ${version} found in ${channel}-${major_minor} channel"
+        return 0
+    else
+        echo "ERROR: Version ${version} not found in ${channel}-${major_minor} channel"
+        echo ""
+        echo "5 newest versions in ${channel}-${major_minor} (newest first):"
+        echo "${response}" | jq -r '.nodes[].version' 2>/dev/null | sort -rV | head -5
+        echo ""
+        echo "Hint: Use a version from the list above, or try a different channel (stable, fast, candidate)"
+        echo "      You can also check https://amd64.ocp.releases.ci.openshift.org/ for CI/nightly builds"
+        return 1
+    fi
+}
 # Function to validate parameters and set defaults
 validate_and_set_defaults() {
     echo "Validating parameters and setting defaults..."
@@ -90,6 +128,13 @@ validate_and_set_defaults() {
     if [[ ! "${OCP_CHANNEL}" =~ ^(stable|fast|candidate|eus)$ ]]; then
         echo "ERROR: OCP_CHANNEL must be one of: stable, fast, candidate, eus. Got: ${OCP_CHANNEL}"
         exit 1
+    fi
+
+    # If a specific patch version (X.Y.Z) is requested, verify it exists in the channel
+    if [[ "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        if ! check_version_in_channel "${OCP_VERSION}" "${OCP_CHANNEL}"; then
+            exit 1
+        fi
     fi
 
     # AWS Region Configuration
