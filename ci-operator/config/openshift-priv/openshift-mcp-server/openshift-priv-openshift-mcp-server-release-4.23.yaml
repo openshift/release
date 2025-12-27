@@ -1,0 +1,44 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/openshift-mcp-server
+images:
+- dockerfile_path: Dockerfile.ci
+  to: openshift-mcp-server
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.23-priv
+  namespace: ocp-private
+tests:
+- as: lint
+  commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
+    make lint
+  container:
+    from: src
+- as: test
+  commands: GOFLAGS='-mod=readonly' XDG_DATA_HOME=/tmp/.local/share make test
+  container:
+    from: src
+- as: fips-image-scan-openshift-mcp-server
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    dependencies:
+      SCAN_IMAGE: openshift-mcp-server
+    test:
+    - ref: fips-check-image-scan
+- as: security
+  optional: true
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: openshift-mcp-server

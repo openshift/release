@@ -114,7 +114,7 @@ tests:
     - as: test
       cli: latest
       commands: |
-        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && !TechPreview"' make test-e2e
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint} && !TechPreview"' make test-e2e
       from: src
       resources:
         requests:
@@ -141,6 +141,94 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-operator-sdk-hypershift
+- always_run: false
+  as: e2e-operator-aws-proxy
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-proxy
+- always_run: false
+  as: e2e-operator-aws-sts
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Manual}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-manual-oidc-sts
+- always_run: false
+  as: e2e-operator-gcp-ovn
+  optional: true
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {GCP} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-gcp-ovn
+- always_run: false
+  as: e2e-operator-gcp-workload-identity
+  optional: true
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {GCP} && CredentialsMode: isSubsetOf {Manual}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
 zz_generated_metadata:
   branch: master
   org: openshift

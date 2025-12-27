@@ -1,0 +1,90 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-9-base-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.14
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/ironic-static-ip-manager
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: ocp_builder_rhel-9-base-openshift-4.14
+  to: ironic-static-ip-manager
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-ipi-bm
+  capabilities:
+  - intranet
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: baremetal
+    workflow: baremetalds-e2e-ovn-ipv4
+- always_run: false
+  as: e2e-metal-ipi-serial-ipv4
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ovn-ipv4
+- always_run: false
+  as: e2e-metal-ipi-upgrade
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      RUN_UPGRADE_TEST: "true"
+    workflow: baremetalds-e2e-upgrade-ovn-ipv4
+- as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
+- always_run: false
+  as: e2e-metal-ipi-virtualmedia
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: ironic-static-ip-manager

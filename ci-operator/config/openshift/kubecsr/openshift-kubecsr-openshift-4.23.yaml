@@ -1,0 +1,62 @@
+base_images:
+  base:
+    name: "4.23"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.10:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: github.com/coreos/kubecsr
+images:
+- dockerfile_path: Dockerfile.kube-client-agent.openshift
+  from: base
+  inputs:
+    openshift_release_golang-1.10:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.10
+  to: kube-client-agent
+- dockerfile_path: Dockerfile.kube-etcd-signer-server.openshift
+  from: base
+  inputs:
+    openshift_release_golang-1.10:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.10
+  to: kube-etcd-signer-server
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make check
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: openshift-4.23
+  org: openshift
+  repo: kubecsr

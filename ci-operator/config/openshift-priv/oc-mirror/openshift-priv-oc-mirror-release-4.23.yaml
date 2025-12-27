@@ -1,0 +1,135 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: latest
+  ocp_4.21_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.24-openshift-4.21
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+binary_build_commands: make build
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/oc-mirror
+images:
+- dockerfile_path: images/cli/Dockerfile.ci
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: oc-mirror
+- dockerfile_path: images/cli/Dockerfile.test
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: oc-mirror-tests
+promotion:
+  to:
+  - excluded_images:
+    - oc-mirror-tests
+    name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build
+tests:
+- as: sanity
+  commands: make sanity
+  container:
+    from: src
+  skip_if_only_changed: ^v1/
+- as: unit
+  commands: |
+    export HOME=/tmp/home
+    mkdir -p $HOME
+    make test-unit
+  container:
+    from: src
+  skip_if_only_changed: ^v1/
+- as: v1-e2e
+  commands: |
+    pushd v1 || true
+    make test-e2e
+  container:
+    from: src
+- as: v1-sanity
+  commands: make -C v1 sanity
+  container:
+    from: src
+- as: v1-unit
+  commands: |
+    export HOME=/tmp/home
+    mkdir -p $HOME
+    make -C v1 test-unit
+  container:
+    from: src
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    pushd v2 || true
+    golangci-lint version
+    maj_version=$((golangci-lint version --short 2>/dev/null || golangci-lint version --format short 2>/dev/null) | cut -f1 -d.)
+    if [ ${maj_version} -eq 1 ]; then
+      golangci-lint run --new-from-rev=HEAD~ \
+        --out-format colored-line-number \
+        --verbose --print-resources-usage --timeout=5m \
+        --build-tags "json1 exclude_graphdriver_btrfs exclude_graphdriver_devicemapper containers_image_openpgp" \
+        --config .golangci.yaml
+    else
+      golangci-lint run --new-from-rev=HEAD~ --verbose --timeout=5m --config .golangci.v2.yaml
+    fi
+  container:
+    clone: true
+    from: golangci-lint
+  skip_if_only_changed: ^v1/
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+- as: integration
+  commands: |
+    ./scripts/flow-controller.sh all_happy_path
+  container:
+    from: oc-mirror-tests
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^v1/)
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: oc-mirror

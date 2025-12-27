@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-NETLIFY_AUTH_TOKEN=$(cat /tmp/vault/validatedpatterns-netlify-secret/NETLIFY_AUTH_TOKEN)
+NETLIFY_AUTH_TOKEN=$(cat /tmp/vault/validatedpatterns-docs-netlify/NETLIFY_AUTH_TOKEN_VP)
 
 export NETLIFY_AUTH_TOKEN
 

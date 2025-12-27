@@ -1,0 +1,129 @@
+build_root:
+  from_repository: true
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install -y skopeo git && dnf clean all
+  from: src
+  to: kueue-base-src
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: "4.23"
+  namespace: ocp
+tests:
+- as: vet
+  commands: make vet
+  container:
+    from: src
+- as: test
+  commands: make -f Makefile-test-ocp.mk test-ocp
+  container:
+    from: src
+- as: integration
+  commands: make -f Makefile-test-ocp.mk test-integration-ocp
+  container:
+    from: src
+- as: e2e-aws-ocp-4-18
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.18"
+  steps:
+    test:
+    - as: e2e-kueue
+      cli: latest
+      commands: |-
+        echo "Current PWD: $(pwd)"
+        echo "Listing directory contents:"
+        ls -lah
+
+        echo "Current Git branch:"
+        git branch --show-current
+
+        echo "Latest Git commits:"
+        git log --oneline -5
+
+        echo "Git status:"
+        git status
+
+        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
+        export IMAGE_TAG=quay.io/redhat-user-workloads/kueue-operator-tenant/kubernetes-sigs-kueue-main:on-pr-${REVISION}
+        echo "Waiting for image ${IMAGE_TAG} to be available..."
+        function wait_for_image() {
+            until skopeo inspect docker://${IMAGE_TAG} >/dev/null 2>&1; do
+                echo "Image not found yet. Retrying in 30s..."
+                sleep 30
+            done
+        }
+        export -f wait_for_image
+        timeout 25m bash -c "wait_for_image"
+
+        echo "Image is available. Proceeding with tests..."
+
+        make -f Makefile-test-ocp.mk test-e2e-ocp
+      from: kueue-base-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+- as: e2e-aws-ocp-4-19
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.19"
+  steps:
+    test:
+    - as: e2e-kueue
+      cli: latest
+      commands: |-
+        echo "Current PWD: $(pwd)"
+        echo "Listing directory contents:"
+        ls -lah
+
+        echo "Current Git branch:"
+        git branch --show-current
+
+        echo "Latest Git commits:"
+        git log --oneline -5
+
+        echo "Git status:"
+        git status
+
+        REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
+        export IMAGE_TAG=quay.io/redhat-user-workloads/kueue-operator-tenant/kubernetes-sigs-kueue-main:on-pr-${REVISION}
+        echo "Waiting for image ${IMAGE_TAG} to be available..."
+        function wait_for_image() {
+            until skopeo inspect docker://${IMAGE_TAG} >/dev/null 2>&1; do
+                echo "Image not found yet. Retrying in 30s..."
+                sleep 30
+            done
+        }
+        export -f wait_for_image
+        timeout 25m bash -c "wait_for_image"
+
+        echo "Image is available. Proceeding with tests..."
+
+        make -f Makefile-test-ocp.mk test-e2e-ocp
+      from: kueue-base-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: kubernetes-sigs-kueue

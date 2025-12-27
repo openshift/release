@@ -1,0 +1,64 @@
+base_images:
+  ocp_4.21_ovn-kubernetes:
+    name: "4.23"
+    namespace: ocp
+    tag: ovn-kubernetes
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  tools:
+    name: "4.23"
+    namespace: ocp
+    tag: tools
+binary_build_commands: '"make build --warn-undefined-variables"'
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: tools
+  inputs:
+    ocp_4.21_ovn-kubernetes:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:ovn-kubernetes
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: network-tools
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: '"make build GO_BUILD_FLAGS:=''-race'' --warn-undefined-variables"'
+tests:
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: network-tools

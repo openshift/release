@@ -1,0 +1,82 @@
+base_images:
+  base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/operator-framework/operator-marketplace
+images:
+- dockerfile_path: Dockerfile.rhel7
+  from: base-rhel9
+  to: operator-marketplace
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make unit
+  container:
+    from: src
+- as: e2e-gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-aws-ovn-serial
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-e2e-aws-ovn-serial
+- as: e2e-gcp-operator
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-job
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-console-olm
+  steps:
+    cluster_profile: gcp-3
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh olmFull
+      from: stable:console-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-ovn-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: operator-marketplace

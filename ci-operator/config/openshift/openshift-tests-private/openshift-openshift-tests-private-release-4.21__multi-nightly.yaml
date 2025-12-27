@@ -141,7 +141,7 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.21
+      OO_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.20
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -157,7 +157,7 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.21
+      OO_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.20
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
@@ -174,7 +174,7 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.21
+      OO_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.20
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -211,6 +211,40 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
+- as: aws-ipi-localzone-rootvolume-f7
+  cron: 52 7 3,10,17,24 * *
+  steps:
+    cluster_profile: aws-1-qe
+    env:
+      AWS_DEFAULT_GP3_THROUGHPUT: "500"
+      AWS_DEFAULT_MACHINE_VOLUME_SIZE: "120"
+      AWS_DEFAULT_MACHINE_VOLUME_TYPE: gp3
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EDGE_ZONES_LIST: us-east-1-dfw-2a
+      ENABLE_AWS_EDGE_ZONE: "yes"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-rootvolume
+- as: aws-ipi-localzone-rootvolume-f28-destructive
+  cron: 16 9 15 * *
+  steps:
+    cluster_profile: aws-1-qe
+    env:
+      AWS_COMPUTE_GP3_THROUGHPUT: "1000"
+      AWS_COMPUTE_VOLUME_SIZE: "120"
+      AWS_COMPUTE_VOLUME_TYPE: gp3
+      AWS_CONTROL_PLANE_GP3_THROUGHPUT: "1200"
+      AWS_CONTROL_PLANE_VOLUME_SIZE: "150"
+      AWS_CONTROL_PLANE_VOLUME_TYPE: gp3
+      AWS_EDGE_GP3_THROUGHPUT: "1000"
+      AWS_EDGE_VOLUME_SIZE: "120"
+      AWS_EDGE_VOLUME_TYPE: gp3
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EDGE_ZONES_LIST: us-east-1-dfw-2a
+      ENABLE_AWS_EDGE_ZONE: "yes"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-rootvolume
 - as: aws-ipi-byo-route53-compact-cloudfront-amd-f28-destructive
   cron: 32 20 19 * *
   steps:
@@ -620,7 +654,7 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.21
+      OO_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.20
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"

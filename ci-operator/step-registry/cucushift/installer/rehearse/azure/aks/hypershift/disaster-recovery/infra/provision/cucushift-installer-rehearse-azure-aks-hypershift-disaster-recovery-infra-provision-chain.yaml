@@ -2,6 +2,7 @@ chain:
   as: cucushift-installer-rehearse-azure-aks-hypershift-disaster-recovery-infra-provision
   steps:
   - chain: cucushift-installer-rehearse-azure-aks-provision
+  - ref: hypershift-azure-aks-attach-kv
   - ref: cucushift-hypershift-extended-k8s-mgmt-apply-crds
   - ref: cucushift-hypershift-extended-install-private
   - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
@@ -11,8 +12,12 @@ chain:
   - ref: disaster-recovery-hypershift-infrastructure-nodepool-autorepair
   - chain: cucushift-hypershift-extended-enable-qe-catalogsource
   env:
+  - name: AKS_ADDONS
+    default: "azure-keyvault-secrets-provider"
   - name: AKS_ZONES
     default: "1 2 3"
+  - name: ASSIGN_SERVICE_PRINCIPAL_ROLES
+    default: "true"
   - name: ENABLE_ICSP
     default: "true"
   - name: EXTRA_ARGS
@@ -33,6 +38,8 @@ chain:
     default: "HighlyAvailable"
   - name: HYPERSHIFT_MANAGED_SERVICE
     default: "ARO-HCP"
+  - name: HYPERSHIFT_AZURE_CP_MI
+    default: "true"
   - name: HYPERSHIFT_NODE_DRAIN_TIMEOUT
     default: "60s"
   - name: HYPERSHIFT_NODE_VOLUME_DETACH_TIMEOUT

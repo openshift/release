@@ -36,7 +36,7 @@ base_images:
     namespace: ci
     tag: latest
 releases:
-  intermediate1:
+  intermediate:
     prerelease:
       architecture: multi
       product: ocp
@@ -114,7 +114,7 @@ tests:
       commands: echo "${INTERMEDIATE_RETARGET}" > ${SHARED_DIR}/upgrade-edge
       dependencies:
       - env: INTERMEDIATE_RETARGET
-        name: release:intermediate1
+        name: release:intermediate
       from: cli
       resources:
         requests:
@@ -123,6 +123,13 @@ tests:
     - ref: cucushift-upgrade-retarget
     - ref: cucushift-upgrade-healthcheck
     workflow: baremetal-lab-ipi
+- as: gcp-ipi-retarget-f28
+  cron: 5 7 24 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - ref: cucushift-upgrade-retarget
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

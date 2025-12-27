@@ -1,0 +1,48 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.22"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  cron: 40 4 * * 1
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws
+- as: e2e-hypershift
+  cron: 2 10 * * 1
+  steps:
+    cluster_profile: hypershift
+    env:
+      CI_TESTS_RUN: ^TestKarpenter$
+      HYPERSHIFT_NODE_COUNT: "1"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-aws-e2e-external
+zz_generated_metadata:
+  branch: release-4.22
+  org: openshift
+  repo: aws-karpenter-provider-aws
+  variant: periodics

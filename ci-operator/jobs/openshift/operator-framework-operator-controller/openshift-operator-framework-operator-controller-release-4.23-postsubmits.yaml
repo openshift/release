@@ -1,0 +1,112 @@
+postsubmits:
+  openshift/operator-framework-operator-controller:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.23$
+    cluster: build01
+    decorate: true
+    labels:
+      ci-operator.openshift.io/is-promotion: "true"
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-openshift-operator-framework-operator-controller-release-4.23-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4.23$
+    cluster: build01
+    decorate: true
+    max_concurrency: 1
+    name: post-ci-openshift-operator-framework-operator-controller-release-4.23-refresh-bumper-pr
+    reporter_config:
+      slack:
+        channel: '#team-operator-fw'
+        job_states_to_report:
+        - failure
+        report_template: Refresh job {{.Spec.Job}} failed. https://prow.ci.openshift.org/?job={{.Spec.Job}}
+    spec:
+      containers:
+      - args:
+        - --github-token-path=/etc/github/oauth
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-login=openshift-bot
+        - --git-name=openshift-bot
+        - --git-email=openshift-bot@redhat.com
+        - --operator-controller-dir=/home/prow/go/src/github.com/openshift/operator-framework-operator-controller
+        - --mode=publish
+        - --fetch-mode=https
+        - --log-level=debug
+        - --self-approve=true
+        - --dry-run=false
+        command:
+        - /usr/bin/bumper
+        env:
+        - name: GOROOT
+          value: /usr/lib/golang
+        - name: HOME
+          value: /home/prow/go
+        image: quay-proxy.ci.openshift.org/openshift/ci:operator-lifecycle-manager_olm-v1-bumper_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: token
+          readOnly: true
+      serviceAccountName: olm-image-puller
+      volumes:
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-bot

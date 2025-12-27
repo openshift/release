@@ -1,0 +1,125 @@
+base_images:
+  ocp_4.21_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  ubi9:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/insights-runtime-extractor
+images:
+- dockerfile_literal: |-
+    FROM registry.access.redhat.com/ubi9:latest AS rust-builder
+    ARG TARGETARCH
+
+    RUN echo Target architecture: ${TARGETARCH}
+
+    COPY . /opt/app-root/src/
+    WORKDIR /opt/app-root/src/insights-runtime-extractor
+
+    USER 0
+    ENV HOME="/root"
+    ENV PATH="${HOME}/.cargo/bin:${HOME}/.local/bin:${PATH}"
+
+    RUN chgrp root /opt/app-root/src/insights-runtime-extractor && \
+        chmod g+w /opt/app-root/src/insights-runtime-extractor && \
+        dnf install -y gcc make rust-toolset rustfmt
+
+    RUN mkdir -p $HOME/.cargo/git/ && \
+        find $HOME/. -type d -exec chmod 777 {} \; && \
+        find $HOME/. -type f -exec chmod ugo+rw {} \;
+
+    USER 1001
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/insights-runtime-extractor
+    ubi9:
+      as:
+      - registry.access.redhat.com/ubi9:latest
+  to: src-rust
+- dockerfile_path: ./Containerfile-extractor
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: insights-runtime-extractor
+- dockerfile_path: ./Containerfile-exporter
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: insights-runtime-exporter
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  src-rust:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+tests:
+- as: rust-unit-tests
+  commands: cd extractor && make unit-tests
+  container:
+    from: src-rust
+- as: unit-tests
+  commands: make unit-tests
+  container:
+    from: src
+- as: e2e-aws
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-e2e-aws
+- as: e2e-tests
+  steps:
+    cluster_profile: aws-3
+    test:
+    - as: e2e-tests
+      cli: latest
+      commands: cd exporter && make e2e-test
+      dependencies:
+      - env: INSIGHTS_RUNTIME_EXPORTER
+        name: insights-runtime-exporter
+      - env: INSIGHTS_RUNTIME_EXTRACTOR
+        name: insights-runtime-extractor
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: insights-runtime-extractor

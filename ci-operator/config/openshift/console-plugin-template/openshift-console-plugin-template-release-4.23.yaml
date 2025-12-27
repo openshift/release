@@ -1,0 +1,61 @@
+build_root:
+  image_stream_tag:
+    name: console-plugin-test-cypress
+    namespace: ci
+    tag: node22
+images:
+- dockerfile_path: Dockerfile
+  to: console-plugin-template
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint-aws-plugin-template
+  steps:
+    test:
+    - as: lint
+      commands: yarn install && yarn run lint
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e-aws-plugin-template
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh
+      dependencies:
+      - env: CYPRESS_PLUGIN_TEMPLATE_PULL_SPEC
+        name: console-plugin-template
+      from: src
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: console-plugin-template

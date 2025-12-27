@@ -1,0 +1,44 @@
+ref:
+  as: insights-onprem-cost-onprem-chart-e2e
+  from: src
+  commands: insights-onprem-cost-onprem-chart-e2e-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: MINIO_HOST
+    default: "minio-storage"
+    documentation: "MinIO S3 hostname (just host, no port) - uses proxy service in app namespace"
+  - name: MINIO_PORT
+    default: "9000"
+    documentation: "MinIO S3 port"
+  - name: MINIO_BUCKET
+    default: "ros-data"
+    documentation: "MinIO bucket name for ROS data"
+  - name: COST_MGMT_CHANNEL
+    default: "stable"
+    documentation: "OLM channel for Cost Management Operator (stable, alpha, etc.)"
+  - name: COST_MGMT_SOURCE
+    default: "redhat-operators"
+    documentation: "CatalogSource for Cost Management Operator"
+  - name: OPERATOR_INSTALL_TIMEOUT
+    default: "300"
+    documentation: "Maximum time in seconds to wait for Cost Management Operator to install"
+  - name: SKIP_COST_MGMT_INSTALL
+    default: "false"
+    documentation: "Set to 'true' to skip Cost Management Operator installation"
+  - name: VERBOSE
+    default: "true"
+    documentation: "Enable verbose output from deployment script"
+  documentation: |-
+    This step runs the cost-onprem e2e tests by executing the
+    deploy-test-cost-onprem.sh script from the cost-onprem-chart repository.
+    
+    It handles:
+    - Dependency installation (yq, kubectl, helm, oc)
+    - MinIO configuration (from insights-onprem-minio-deploy step)
+    - Cost Management Operator installation (without hardcoded version)
+    - Helm wrapper for MinIO storage configuration
+    - RHBK deployment, Strimzi/Kafka setup, Helm chart installation
+    - TLS configuration and JWT authentication testing

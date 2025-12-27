@@ -1,0 +1,77 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: "7"
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/library-go
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 8Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: bin
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-aws-encryption
+  run_if_changed: ^(pkg/operator/encryption)|^(test/e2e-encryption)
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-monitoring
+  run_if_changed: ^(pkg/operator/resource/resourceapply/monitoring.go)|^(test/e2e-monitoring)
+  steps:
+    cluster_profile: aws-3
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-monitoring JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: library-go

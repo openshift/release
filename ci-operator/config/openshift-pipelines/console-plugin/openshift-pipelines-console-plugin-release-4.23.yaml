@@ -1,0 +1,69 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: console-plugin-test-cypress-v18
+images:
+- dockerfile_path: Dockerfile
+  to: console-pipelines-plugin
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: build
+  steps:
+    test:
+    - as: build
+      commands: yarn install && yarn build
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: frontend
+  steps:
+    test:
+    - as: frontend
+      commands: ./test-frontend.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-openshift-ecosystem
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.18"
+  steps:
+    test:
+    - as: e2e
+      cli: latest
+      commands: ./test-prow-e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-pipelines
+  repo: console-plugin

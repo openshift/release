@@ -1,0 +1,94 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.21_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_4.22_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-8-base-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.18
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/images
+images:
+- context_dir: base
+  dockerfile_path: Dockerfile.rhel
+  inputs:
+    ocp_builder_rhel-8-base-openshift-4.18:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.18
+  to: base
+- context_dir: base
+  dockerfile_path: Dockerfile.rhel9
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_4.22_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
+  to: base-rhel9
+- context_dir: ipfailover/keepalived
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+  to: keepalived-ipfailover
+promotion:
+  to:
+  - excluded_images:
+    - base-rhel9
+    name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws
+- as: e2e-aws-upgrade
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-upgrade-aws
+- as: unit
+  commands: go test -race ./...
+  container:
+    from: src
+- as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: images

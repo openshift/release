@@ -1,49 +1,49 @@
 base_images:
   must_gather:
-    name: "4.18"
+    name: "4.21"
     namespace: ocp
     tag: must-gather
-  ocp_4.18_base-rhel9:
-    name: "4.18"
+  ocp_4.21_base-rhel9:
+    name: "4.21"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+  ocp_builder_rhel-9-golang-1.25-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
+    tag: rhel-9-golang-1.25-openshift-4.21
 binary_build_commands: make build
 build_root:
   from_repository: true
 images:
 - inputs:
-    ocp_4.18_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
   to: csi-driver-shared-resource
 - dockerfile_path: Dockerfile.mustgather
   from: must_gather
   to: csi-driver-shared-resource-mustgather
 - dockerfile_path: Dockerfile.webhook
   inputs:
-    ocp_4.18_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
   to: csi-driver-shared-resource-webhook
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.18"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':

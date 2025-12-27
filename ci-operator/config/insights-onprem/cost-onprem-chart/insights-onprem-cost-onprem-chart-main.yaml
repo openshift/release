@@ -1,0 +1,37 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+  use_build_cache: true
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.20"
+  steps:
+    test:
+    - ref: insights-onprem-minio-deploy
+    - ref: insights-onprem-cost-onprem-chart-e2e
+    workflow: insights-onprem-cost-onprem-chart-claim
+zz_generated_metadata:
+  branch: main
+  org: insights-onprem
+  repo: cost-onprem-chart

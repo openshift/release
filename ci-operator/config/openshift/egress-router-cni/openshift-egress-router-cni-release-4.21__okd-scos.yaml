@@ -1,0 +1,61 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.24-openshift-4.21
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  origin_scos-4.21_base-stream9:
+    name: scos-4.21
+    namespace: origin
+    tag: base-stream9
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+images:
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: Dockerfile.openshift
+  from: origin_scos-4.21_base-stream9
+  inputs:
+    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
+      as:
+      - rhel8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - rhel9
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+  to: egress-router-cni
+promotion:
+  to:
+  - name: scos-4.21
+    namespace: origin
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: scos-4.21
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: egress-router-cni
+  variant: okd-scos

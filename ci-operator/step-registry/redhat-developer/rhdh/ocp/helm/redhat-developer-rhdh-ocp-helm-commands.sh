@@ -1,4 +1,38 @@
 #!/bin/bash
+
+echo "========== Repository, Branch, and PR Variables =========="
+GITHUB_ORG_NAME="redhat-developer"
+echo "GITHUB_ORG_NAME: $GITHUB_ORG_NAME"
+GITHUB_REPOSITORY_NAME="rhdh"
+echo "GITHUB_REPOSITORY_NAME: $GITHUB_REPOSITORY_NAME"
+RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
+echo "RELEASE_BRANCH_NAME: $RELEASE_BRANCH_NAME"
+GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
+echo "GIT_PR_NUMBER: $GIT_PR_NUMBER"
+TAG_NAME=""
+export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER TAG_NAME
+
+echo "========== Check for [skip-e2e] commit comments in the PR title =========="
+# Check for [skip-e2e] commit comments in the PR title
+if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
+    PR_TITLE=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}" | jq -r '.title')
+    # only skip e2e tests for a [skip-e2e] PR that has been auto-approved by github-actions[bot]
+    if [[ "$PR_TITLE" == *"[skip-e2e]"* ]]; then
+        echo "PR_TITLE: $PR_TITLE"
+        APPROVALS=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}/reviews") # json array of approvals
+        # iterate through the approvals and check if the approval is from the .user.login = "github-actions[bot]" and if the .state = "APPROVED" 
+        approval_count=$(echo "$APPROVALS" | jq 'length')
+        for ((i=0; i<approval_count; i++)); do
+            user_login=$(echo "$APPROVALS" | jq -r ".[$i].user.login")
+            state=$(echo "$APPROVALS" | jq -r ".[$i].state")
+            if [[ "$user_login" == "github-actions[bot]" ]] && [[ "$state" == "APPROVED" ]]; then
+                echo "Auto-approved by github-actions[bot], so no need to run tests; skip all test execution with exit code 0"
+                exit 0
+            fi
+        done
+    fi
+fi
+
 echo "========== Workdir Setup =========="
 export HOME WORKSPACE
 HOME=/tmp
@@ -61,17 +95,8 @@ echo "========== Cluster kubeadmin logout =========="
 oc logout
 
 echo "========== Git Repository Setup & Checkout =========="
-# Prepare to git checkout
-export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
-GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
-echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
-GITHUB_ORG_NAME="redhat-developer"
-GITHUB_REPOSITORY_NAME="rhdh"
-
-export QUAY_REPO RELEASE_BRANCH_NAME
 QUAY_REPO="rhdh-community/rhdh"
-# Get the base branch name based on job.
-RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+export QUAY_REPO
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
