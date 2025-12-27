@@ -168,7 +168,6 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
       --pool ${BOOT_ARTIFACTS_POOL_NAME} \
       --file ${BOOT_ARTIFACTS_LOCAL_DIR}/${INITRD_NAME}
 
-
   # On power, the rootfs needs to be staged for download via apache
   if [ "$ARCH" == "ppc64le" ]; then
       cat << EOF > ${INSTALL_DIR}/rootfs.xml
@@ -206,6 +205,7 @@ EOF
 else
   RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
   QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
+  VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}-$(date +%s).qcow2"
   VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
   DOWNLOAD_NEW_IMAGE=true
 
