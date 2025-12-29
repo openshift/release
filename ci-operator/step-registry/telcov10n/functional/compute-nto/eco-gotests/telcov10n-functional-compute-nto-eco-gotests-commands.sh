@@ -127,7 +127,12 @@ done
 
 ls -la "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml
 
-echo "Copy junit test reports to shared directory for reporter step"
-cp -v "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml "${SHARED_DIR}/" 2>/dev/null || echo "No junit test reports found to copy to SHARED_DIR"
 
-touch "${SHARED_DIR}/gotest-completed"
+if ls ${ARTIFACT_DIR}/junit_eco_gotests/*.xml 1> /dev/null 2>&1; then
+  echo "Copy junit test reports to shared directory for reporter step"
+  cp -v "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml "${SHARED_DIR}/" 2>/dev/null
+  touch "${SHARED_DIR}/gotest-completed"
+else
+  echo "No junit test reports found to copy to SHARED_DIR"
+  exit 1
+fi
