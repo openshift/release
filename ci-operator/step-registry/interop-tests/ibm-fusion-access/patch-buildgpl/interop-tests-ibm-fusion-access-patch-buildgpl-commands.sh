@@ -1,7 +1,5 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+set -eux -o pipefail; shopt -s inherit_errexit
 
 STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
 
@@ -12,23 +10,13 @@ echo ""
 
 # Wait for buildgpl ConfigMap to be created by operator (may take up to 15 minutes)
 echo "Waiting for buildgpl ConfigMap to be created (timeout: 15 minutes)..."
-COUNTER=0
-MAX_WAIT=900  # 15 minutes
 
-while [ $COUNTER -lt $MAX_WAIT ]; do
-  if oc get configmap buildgpl -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
-    echo "✅ buildgpl ConfigMap found after ${COUNTER}s"
-    break
-  fi
-  sleep 30
-  COUNTER=$((COUNTER + 30))
-  if [ $((COUNTER % 120)) -eq 0 ]; then
-    echo "  Still waiting... ${COUNTER}s elapsed"
-  fi
-done
-
-if ! oc get configmap buildgpl -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
-  echo "⚠️  buildgpl ConfigMap not created after ${MAX_WAIT}s"
+if oc wait configmap buildgpl -n "${STORAGE_SCALE_NAMESPACE}" \
+    --for=jsonpath='{.metadata.name}'=buildgpl --timeout=900s 2>/dev/null; then
+  echo "✅ buildgpl ConfigMap found"
+else
+  # ConfigMap not found within timeout - check if it's needed
+  echo "⚠️  buildgpl ConfigMap not created after 15 minutes"
   echo "   This may indicate:"
   echo "   - Operator is using a different kernel module build method"
   echo "   - KMM is being used instead of buildgpl (ideal)"
@@ -87,8 +75,9 @@ EOF
     oc delete pods -l app.kubernetes.io/instance=ibm-spectrum-scale,app.kubernetes.io/name=core \
       -n "${STORAGE_SCALE_NAMESPACE}" --ignore-not-found
     
-    echo "Waiting for pods to recreate (30 seconds)..."
-    sleep 30
+    echo "Waiting for pods to recreate..."
+    oc wait --for=condition=Ready pods -l app.kubernetes.io/name=core \
+      -n "${STORAGE_SCALE_NAMESPACE}" --timeout=300s || echo "⚠️  Pods not ready yet (will be verified in later steps)"
     
     RUNNING_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" -l app.kubernetes.io/name=core --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
     echo "✅ ${RUNNING_PODS} daemon pods recreated"

@@ -3,16 +3,16 @@ set -eux -o pipefail; shopt -s inherit_errexit
 
 echo "📸 Testing CNV VM snapshot operations with IBM Storage Scale shared storage..."
 
-# Set default values
-CNV_NAMESPACE="${CNV_NAMESPACE:-openshift-cnv}"
-SHARED_STORAGE_CLASS="${SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
-TEST_NAMESPACE="${TEST_NAMESPACE:-cnv-snapshots-test}"
-VM_NAME="${VM_NAME:-test-snapshot-vm}"
-SNAPSHOT_NAME="${SNAPSHOT_NAME:-test-vm-snapshot}"
-RESTORE_VM_NAME="${RESTORE_VM_NAME:-restored-vm}"
-VM_CPU_REQUEST="${VM_CPU_REQUEST:-1}"
-VM_MEMORY_REQUEST="${VM_MEMORY_REQUEST:-1Gi}"
-VM_SNAPSHOT_TIMEOUT="${VM_SNAPSHOT_TIMEOUT:-10m}"
+# Set default values from FA__ prefixed environment variables
+CNV_NAMESPACE="${FA__CNV_NAMESPACE:-openshift-cnv}"
+SHARED_STORAGE_CLASS="${FA__SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
+TEST_NAMESPACE="${FA__TEST_NAMESPACE:-cnv-snapshots-test}"
+VM_NAME="${FA__VM_NAME:-test-snapshot-vm}"
+SNAPSHOT_NAME="${FA__SNAPSHOT_NAME:-test-vm-snapshot}"
+RESTORE_VM_NAME="${FA__RESTORE_VM_NAME:-restored-vm}"
+VM_CPU_REQUEST="${FA__VM_CPU_REQUEST:-1}"
+VM_MEMORY_REQUEST="${FA__VM_MEMORY_REQUEST:-1Gi}"
+VM_SNAPSHOT_TIMEOUT="${FA__VM_SNAPSHOT_TIMEOUT:-10m}"
 
 # JUnit XML test results
 JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_vm_snapshots_tests.xml"
@@ -394,26 +394,14 @@ then
       if oc patch vm "${RESTORE_VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}'; then
         echo "  ✅ Restored VM start command sent"
         
-        # Wait for VMI to be created
-        TIMEOUT=120
-        ELAPSED=0
-        VMI_FOUND=false
-        
-        while [[ $ELAPSED -lt $TIMEOUT ]]; do
-          if oc get vmi "${RESTORE_VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-            VMI_FOUND=true
-            break
-          fi
-          sleep 5
-          ELAPSED=$((ELAPSED + 5))
-        done
-        
-        if [[ "$VMI_FOUND" == "true" ]]; then
-          echo "  ✅ Restored VM VMI created - VM boots successfully"
+        # Wait for VMI to be running using oc wait
+        if oc wait vmi "${RESTORE_VM_NAME}" -n "${TEST_NAMESPACE}" \
+            --for=jsonpath='{.status.phase}'=Running --timeout=120s 2>/dev/null; then
+          echo "  ✅ Restored VM VMI is running - VM boots successfully"
           test_status="passed"
         else
-          echo "  ⚠️  Restored VM VMI not created"
-          test_message="Restored VM VMI not created within timeout"
+          echo "  ⚠️  Restored VM VMI not running within timeout"
+          test_message="Restored VM VMI not running within timeout"
         fi
       else
         echo "  ⚠️  Failed to start restored VM"
@@ -448,22 +436,9 @@ echo "  🗑️  Deleting VirtualMachineSnapshot: ${SNAPSHOT_NAME}..."
 if oc delete vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}"; then
   echo "  ✅ VirtualMachineSnapshot deletion initiated"
   
-  # Wait for snapshot to be deleted
+  # Wait for snapshot to be deleted using oc wait
   echo "  ⏳ Waiting for snapshot to be deleted (2m timeout)..."
-  TIMEOUT=120
-  ELAPSED=0
-  SNAPSHOT_DELETED=false
-  
-  while [[ $ELAPSED -lt $TIMEOUT ]]; do
-    if ! oc get vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      SNAPSHOT_DELETED=true
-      break
-    fi
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
-  done
-  
-  if [[ "$SNAPSHOT_DELETED" == "true" ]]; then
+  if oc wait vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}" --for=delete --timeout=120s 2>/dev/null; then
     echo "  ✅ VirtualMachineSnapshot deleted successfully"
     
     # Verify VolumeSnapshot resources are cleaned up
@@ -514,7 +489,9 @@ fi
 if oc get vm "${RESTORE_VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
   oc patch vm "${RESTORE_VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":false}}' || true
 fi
-sleep 10
+# Wait for VMIs to be deleted before proceeding with cleanup
+oc wait vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" --for=delete --timeout=60s 2>/dev/null || true
+oc wait vmi "${RESTORE_VM_NAME}" -n "${TEST_NAMESPACE}" --for=delete --timeout=60s 2>/dev/null || true
 
 echo "  🗑️  Deleting restore resource..."
 oc delete vmrestore "${RESTORE_VM_NAME}-restore" -n "${TEST_NAMESPACE}" --ignore-not-found
