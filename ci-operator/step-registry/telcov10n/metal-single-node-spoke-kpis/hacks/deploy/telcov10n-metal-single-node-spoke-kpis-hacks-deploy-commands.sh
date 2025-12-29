@@ -9,6 +9,27 @@ echo "************ telcov10n Fix user IDs in a container ************"
 
 source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
+function extract_and_set_ocp_version {
+
+  echo "************ telcov10n Extracting OCP version from JOB_NAME ************"
+
+  echo "[INFO] JOB_NAME: ${JOB_NAME:-not set}"
+
+  OCP_VERSION=$(extract_ocp_version)
+
+  if [ -z "${OCP_VERSION}" ]; then
+    echo "[ERROR] Could not extract OCP version from JOB_NAME"
+    exit 1
+  fi
+
+  echo "[INFO] OCP Version: ${OCP_VERSION}"
+
+  # Store OCP version for other steps
+  echo -n "${OCP_VERSION}" >| ${SHARED_DIR}/ocp_version.txt
+
+  export OCP_VERSION
+}
+
 function define_spoke_cluster_name {
 
   #### Spoke cluster
@@ -36,6 +57,83 @@ function set_spoke_cluster_kubeconfig {
   export KUBECONFIG="${SHARED_DIR}/spoke-${secret_kubeconfig}.yaml"
 }
 
+# Track if we've already created the waiting request file (stored path for cleanup)
+WAITING_FILE_PATH=""
+
+function create_waiting_request_on_bastion {
+
+  local spoke_lock_filename="${1}"
+
+  # Only create the waiting file once per session
+  # Each job gets a unique file (with timestamp) that only it will delete
+  if [ -n "${WAITING_FILE_PATH}" ]; then
+    return 0
+  fi
+
+  echo
+  echo "************ telcov10n Registering wait request before lock attempt ************"
+  echo
+
+  local waiting_file
+  waiting_file=$(create_waiting_request_file "${AUX_HOST}" "${spoke_lock_filename}" "${OCP_VERSION}")
+
+  if [ -n "${waiting_file}" ]; then
+    echo "[INFO] Created waiting request file: ${waiting_file}"
+    echo "       This signals that a job with OCP version ${OCP_VERSION} is waiting."
+    WAITING_FILE_PATH="${waiting_file}"
+    # Store the path in SHARED_DIR for cleanup step
+    echo -n "${waiting_file}" >| ${SHARED_DIR}/own_waiting_file.txt
+  else
+    echo "[WARNING] Failed to create waiting request file."
+  fi
+
+  echo
+}
+
+function validate_lock_for_higher_priority {
+
+  local spoke_lock_filename="${1}"
+
+  echo
+  echo "************ telcov10n Validating lock acquisition for priority ************"
+  echo
+
+  # Check if there's a higher priority job waiting BEFORE removing our waiting file
+  # This way, if we need to release the lock, our waiting file stays intact
+  local check_result
+  check_result=$(check_for_higher_priority_waiter "${AUX_HOST}" "${spoke_lock_filename}" "${OCP_VERSION}")
+
+  if [[ "${check_result}" == quit:* ]]; then
+    local higher_version=${check_result#quit:}
+    echo
+    echo "[WARNING] Lock acquired but a higher priority job is waiting!"
+    echo "          Current job version: ${OCP_VERSION}"
+    echo "          Higher version waiting: ${higher_version}"
+    echo "          Releasing lock to allow higher priority job to proceed..."
+    echo "          (Keeping own waiting file for next attempt)"
+    echo
+    # Release the lock to let the higher priority job acquire it
+    # Keep our waiting file - we're still waiting!
+    timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" "rm -fv ${spoke_lock_filename}"
+    return 1
+  fi
+
+  echo "[INFO] No higher priority jobs waiting. Proceeding with lock."
+
+  # NOW remove our waiting file since we're proceeding
+  if [ -n "${WAITING_FILE_PATH}" ]; then
+    echo "[INFO] Removing own waiting file: ${WAITING_FILE_PATH}"
+    remove_own_waiting_file "${AUX_HOST}" "${WAITING_FILE_PATH}"
+    WAITING_FILE_PATH=""
+    rm -f ${SHARED_DIR}/own_waiting_file.txt 2>/dev/null || true
+  fi
+
+  # Store lock filename for later use by other steps
+  echo -n "${spoke_lock_filename}" >| ${SHARED_DIR}/spoke_lock_filename.txt
+
+  return 0
+}
+
 function select_baremetal_host_from_pool {
 
   echo "************ telcov10n select a baremetal host from the pool ************"
@@ -60,13 +158,24 @@ function select_baremetal_host_from_pool {
       local network_spoke_mac_address
       network_spoke_mac_address="$(cat ${baremetal_host_path}/network_spoke_mac_address)"
       local spoke_lock_filename="/var/run/lock/ztp-baremetal-pool/spoke-baremetal-${network_spoke_mac_address//:/-}.lock"
+
+      # Create waiting request file BEFORE trying to acquire lock (only once)
+      # This ensures our presence is visible even if we immediately get the lock
+      create_waiting_request_on_bastion "${spoke_lock_filename}"
+
       try_to_lock_host "${AUX_HOST}" "${spoke_lock_filename}" "${host_lock_timestamp}" "${LOCK_TIMEOUT}"
-      [[ "$(check_the_host_was_locked "${AUX_HOST}" "${spoke_lock_filename}" "${host_lock_timestamp}")" == "locked" ]] &&
-      {
-        update_host_and_master_yaml_files "$(dirname ${host})" ;
-        echo -n "yes" >| ${SHARED_DIR}/do_you_hold_the_lock_for_the_sno_spoke_cluster_server.txt
-        return 0 ;
-      }
+      if [[ "$(check_the_host_was_locked "${AUX_HOST}" "${spoke_lock_filename}" "${host_lock_timestamp}")" == "locked" ]]; then
+        # Validate that no higher priority job is waiting
+        if validate_lock_for_higher_priority "${spoke_lock_filename}"; then
+          update_host_and_master_yaml_files "$(dirname ${host})"
+          echo -n "yes" >| ${SHARED_DIR}/do_you_hold_the_lock_for_the_sno_spoke_cluster_server.txt
+          return 0
+        else
+          # Higher priority job is waiting, lock was released
+          # Our waiting file is still intact (not removed until validation passes)
+          echo "[INFO] Will retry acquiring lock..."
+        fi
+      fi
     fi
   done
 
@@ -218,6 +327,7 @@ function hack_spoke_deployment {
 function main {
 
   setup_aux_host_ssh_access
+  extract_and_set_ocp_version
   define_spoke_cluster_name
   set_spoke_cluster_kubeconfig
   hack_spoke_deployment
