@@ -75,4 +75,4 @@ oc wait --for=condition=Ready pod -n cilium-test --all --timeout=10m
 sleep "$CILIUM_CONNECTIVITY_TEST_DURATION"
 
 # Error out in case of failing pods
-oc wait --for jsonpath="{status.phase}"=Running pods -n cilium-test --all --timeout=5s
+oc wait --for jsonpath="{status.phase}"=Running pods -n cilium-test --all --timeout=60s

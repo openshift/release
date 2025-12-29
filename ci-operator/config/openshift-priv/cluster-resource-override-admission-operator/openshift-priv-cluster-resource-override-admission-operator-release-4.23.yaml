@@ -1,0 +1,200 @@
+base_images:
+  ocp_4.21_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  openshift_release_rhel-9-release-golang-1.24-openshift-4.21:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.21
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+  previous-bundle:
+    name: 4.20-priv
+    namespace: ocp-private
+    tag: cluster-resource-override-admission-operator-bundle
+  previous-operator:
+    name: 4.20-priv
+    namespace: ocp-private
+    tag: cluster-resource-override-admission-operator
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cluster-resource-override-admission-operator
+images:
+- dockerfile_path: images/ci/Dockerfile
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    openshift_release_rhel-9-release-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.21
+  to: cluster-resource-override-admission-operator
+- dockerfile_path: images/operator-registry/Dockerfile.registry.ci
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+  to: cluster-resource-override-admission-operator-registry
+operator:
+  bundles:
+  - as: cluster-resource-override-admission-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/placeholder/operator.*
+    with: pipeline:cluster-resource-override-admission-operator
+  - pullspec: quay.io/placeholder/operand.*
+    with: stable:cluster-resource-override-admission
+promotion:
+  to:
+  - additional_images:
+      cluster-resource-override-admission-operator-bundle: cluster-resource-override-admission-operator-bundle
+    name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 1Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: verify
+  commands: make verify
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: security
+  optional: true
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    env:
+      PROJECT_NAME: cluster-resource-override-admission-operator
+    workflow: openshift-ci-security
+- as: e2e-aws-operator
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-ci
+      dependencies:
+      - env: CI_OPERATOR_IMAGE
+        name: cluster-resource-override-admission-operator
+      - env: CI_OPERAND_IMAGE
+        name: cluster-resource-override-admission
+      - env: CI_REGISTRY_IMAGE
+        name: cluster-resource-override-admission-operator-registry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-olm
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e-olm-ci
+      dependencies:
+      - env: CI_OPERATOR_IMAGE
+        name: cluster-resource-override-admission-operator
+      - env: CI_OPERAND_IMAGE
+        name: cluster-resource-override-admission
+      - env: CI_REGISTRY_IMAGE
+        name: cluster-resource-override-admission-operator-registry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-upgrade
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        export NS=clusterresourceoverride-operator
+        oc create ns $NS
+
+        # Deploy the bundle which will fail to come up due to it pointing to the operator
+        # image via a tag that is only available to the presubmit job it is created
+        # within. This pipeline image is removed shortly after said job
+        # completes, so the csv needs to be patched to point the equivalent image that has been
+        # promoted.
+        operator-sdk run bundle --timeout=10m -n $NS --security-context-config restricted "$PREVIOUS_BUNDLE" || true
+        export OLD_CSV_NAME=$(oc get csv -n $NS -o jsonpath='{.items[0].metadata.name}')
+
+        oc patch csv -n $NS $OLD_CSV_NAME --type='json' -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$PREVIOUS_OPERATOR\"}]"
+        sleep 10
+
+        # Delete the deployment which will then be recreated by the subscription controller with the correct image.
+        oc delete deployment -n $NS clusterresourceoverride-operator
+
+        oc wait --timeout=10m --for=create -n $NS deployment clusterresourceoverride-operator
+        oc wait --timeout=10m --for condition=Available -n $NS deployment clusterresourceoverride-operator
+      dependencies:
+      - env: PREVIOUS_BUNDLE
+        name: previous-bundle
+      - env: PREVIOUS_OPERATOR
+        name: previous-operator
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: upgrade
+      cli: latest
+      commands: |
+        export NS=clusterresourceoverride-operator
+        operator-sdk run bundle-upgrade --timeout 10m -n $NS --security-context-config restricted "$OO_BUNDLE"
+      dependencies:
+      - env: OO_BUNDLE
+        name: cluster-resource-override-admission-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export KUBECTL=$(which oc)
+        make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: cluster-resource-override-admission-operator

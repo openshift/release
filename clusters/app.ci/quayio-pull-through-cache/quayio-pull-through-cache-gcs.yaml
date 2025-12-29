@@ -1,123 +1,124 @@
+---
+kind: ConfigMap
 apiVersion: v1
-kind: List
-items:
-- kind: ConfigMap
-  apiVersion: v1
-  metadata:
-    name: quayio-pull-through-cache-gcp
-    namespace: ci
-  data:
-    config.yml: |-
-      version: 0.1
-      log:
-        fields:
-          service: registry
-      storage:
-        s3:
-          bucket: quayio-pull-through-cache
-          encrypt: true
-          region: us-east-1
-          rootdirectory: /quay.io
-      http:
-        addr: :5000
-        headers:
-          X-Content-Type-Options: [nosniff]
-      health:
-        storagedriver:
-          enabled: true
-          interval: 10s
-          threshold: 3
-      auth:
-        htpasswd:
-          realm: quay-realm
-          path: /tmp/htpasswd
-      proxy:
-        remoteurl: https://quay.io
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
+metadata:
+  name: quayio-pull-through-cache-gcp
+  namespace: ci
+data:
+  config.yml: |-
+    version: 0.1
+    log:
+      fields:
+        service: registry
+    storage:
+      s3:
+        bucket: quayio-pull-through-cache
+        encrypt: true
+        region: us-east-1
+        rootdirectory: /quay.io
+    http:
+      addr: :5000
+      headers:
+        X-Content-Type-Options: [nosniff]
+    health:
+      storagedriver:
+        enabled: true
+        interval: 10s
+        threshold: 3
+    auth:
+      htpasswd:
+        realm: quay-realm
+        path: /tmp/htpasswd
+    proxy:
+      remoteurl: https://quay.io
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: quayio-pull-through-cache-gcs
+  namespace: ci
+spec:
+  to:
+    kind: Service
     name: quayio-pull-through-cache-gcs
-    namespace: ci
-  spec:
-    to:
-      kind: Service
-      name: quayio-pull-through-cache-gcs
-    tls:
-      termination: Edge
-      insecureEdgeTerminationPolicy: Redirect
-- apiVersion: v1
-  kind: Service
-  metadata:
-    name: quayio-pull-through-cache-gcs
-    namespace: ci
-  spec:
-    selector:
+  tls:
+    termination: Edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: quayio-pull-through-cache-gcs
+  namespace: ci
+spec:
+  selector:
+    app: quayio-pull-through-cache-gcs
+  ports:
+  - port: 5000
+    targetPort: 5000
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quayio-pull-through-cache-gcs
+  namespace: ci
+  labels:
+    app: quayio-pull-through-cache-gcs
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
       app: quayio-pull-through-cache-gcs
-    ports:
-    - port: 5000
-      targetPort: 5000
-    type: ClusterIP
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    name: quayio-pull-through-cache-gcs
-    namespace: ci
-    labels:
-      app: quayio-pull-through-cache-gcs
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-  spec:
-    replicas: 0
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: quayio-pull-through-cache-gcs
-    template:
-      metadata:
-        labels:
-          app: quayio-pull-through-cache-gcs
-      spec:
-        tolerations:
-        - key: node-role.kubernetes.io/infra
-          operator: Exists
-        nodeSelector:
-          node-role.kubernetes.io: infra
-        containers:
-        - command:
-          - /tp-entrypoint.sh
-          env:
-          - name: REGISTRY_STORAGE_S3_ACCESSKEY
-            valueFrom:
-              secretKeyRef:
-                name: quayio-pull-through-cache-r2-credentials
-                key: R2_ACCESS_KEY_ID
-          - name: REGISTRY_STORAGE_S3_SECRETKEY
-            valueFrom:
-              secretKeyRef:
-                name: quayio-pull-through-cache-r2-credentials
-                key: R2_SECRET_ACCESS_KEY
-          - name: REGISTRY_STORAGE_S3_REGIONENDPOINT
-            valueFrom:
-              secretKeyRef:
-                name: quayio-pull-through-cache-r2-credentials
-                key: R2_SECRET_REGIONENDPOINT
-          name: quayio-cache
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_docker-registry_tp-2.8.2-gcs
-          imagePullPolicy: Always
-          ports:
-            - name: http
-              containerPort: 5000
-          volumeMounts:
-          - mountPath: /etc/quay-io-pull-credentials
-            name: quay-io-pull-credentials
-          - mountPath: /etc/docker-registry
-            name: config
-        volumes:
-        - name: config
-          configMap:
-            name: quayio-pull-through-cache-gcp
-        - name: quay-io-pull-credentials
-          secret:
-            secretName: quay-io-pull-credentials
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/infra
+        operator: Exists
+      nodeSelector:
+        node-role.kubernetes.io: infra
+      containers:
+      - command:
+        - /tp-entrypoint.sh
+        env:
+        - name: REGISTRY_STORAGE_S3_ACCESSKEY
+          valueFrom:
+            secretKeyRef:
+              name: quayio-pull-through-cache-r2-credentials
+              key: R2_ACCESS_KEY_ID
+        - name: REGISTRY_STORAGE_S3_SECRETKEY
+          valueFrom:
+            secretKeyRef:
+              name: quayio-pull-through-cache-r2-credentials
+              key: R2_SECRET_ACCESS_KEY
+        - name: REGISTRY_STORAGE_S3_REGIONENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: quayio-pull-through-cache-r2-credentials
+              key: R2_SECRET_REGIONENDPOINT
+        name: quayio-cache
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_docker-registry_tp-2.8.2-gcs
+        imagePullPolicy: Always
+        ports:
+          - name: http
+            containerPort: 5000
+        volumeMounts:
+        - mountPath: /etc/quay-io-pull-credentials
+          name: quay-io-pull-credentials
+        - mountPath: /etc/docker-registry
+          name: config
+      volumes:
+      - name: config
+        configMap:
+          name: quayio-pull-through-cache-gcp
+      - name: quay-io-pull-credentials
+        secret:
+          secretName: quay-io-pull-credentials

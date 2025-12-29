@@ -1,0 +1,100 @@
+base_images:
+  ansible_operator:
+    name: "4.23"
+    namespace: ocp
+    tag: ansible-operator
+  base:
+    name: "4.23"
+    namespace: ocp
+    tag: base
+binary_build_commands: make openshift-ci-make-rpm
+build_root:
+  project_image:
+    dockerfile_path: build/custom-ci-build-root.Dockerfile
+images:
+- context_dir: operator
+  dockerfile_path: build/Dockerfile
+  from: ansible_operator
+  to: ansible-service-broker-operator
+- dockerfile_path: build/Dockerfile-ubi
+  from: base
+  to: ansible-service-broker
+promotion:
+  to:
+  - name: "4.23"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+test_binary_build_commands: make openshift-ci-test-container
+tests:
+- as: fmt
+  commands: make fmt
+  container:
+    from: test-bin
+- as: fmtcheck
+  commands: make fmtcheck
+  container:
+    from: test-bin
+- as: vet
+  commands: make vet
+  container:
+    from: test-bin
+- as: lint
+  commands: make lint
+  container:
+    from: test-bin
+- as: test
+  commands: make test
+  container:
+    from: test-bin
+- as: build
+  commands: make build
+  container:
+    from: test-bin
+- as: operator-molecule-e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        cd operator
+        molecule test -s cluster
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: operator-molecule-olm-e2e
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        cd operator
+        molecule test -s cluster-olm
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: ansible-service-broker

@@ -1,4 +1,8 @@
 base_images:
+  aro-hcp-e2e-base-image:
+    name: aro-hcp-e2e-base
+    namespace: rh_ee_ves
+    tag: v1.0
   nested-podman:
     name: nested-podman
     namespace: ci
@@ -31,29 +35,67 @@ images:
       - destination_dir: src
         source_path: /go/src/github.com/Azure/ARO-HCP
   to: nested-podman-src
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: backend/Dockerfile
+  from: src
+  to: aro-hcp-backend
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: frontend/Dockerfile
+  from: src
+  to: aro-hcp-frontend
 - dockerfile_literal: |
-    FROM src
-    RUN cat /etc/dnf/dnf.conf || true
-    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
-    RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
-    RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
-    RUN dnf install -y azure-cli libicu
+    FROM aro-hcp-e2e-base-image
     USER root
-    RUN mkdir -p /usr/local/bin
-    RUN az bicep install && mv /root/.azure/bin/bicep /usr/local/bin
-    RUN az aks install-cli --install-location /usr/local/bin/kubectl --kubelogin-install-location /usr/local/bin/kubelogin
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    ENV GOBIN="$(go env GOPATH)/bin"
+    ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
     RUN export GOFLAGS='-mod=readonly' && \
         make install-tools && \
         make -C tooling/templatize templatize && \
         make -C test/ aro-hcp-tests prow-job-executor
-    ENV PATH="/usr/local/bin:$PATH"
-  from: src
+  from: aro-hcp-e2e-base-image
   inputs:
     src:
       paths:
       - destination_dir: src
         source_path: /go/src/github.com/Azure/ARO-HCP
   to: aro-hcp-e2e-tools
+- dockerfile_literal: |
+    FROM aro-hcp-e2e-base-image
+    USER root
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    ENV GOBIN="/usr/local/bin"
+    ENV PATH="/usr/local/bin:/usr/bin:$PATH"
+    RUN mkdir -p "$(go env GOROOT)" && chmod 777 "$(go env GOROOT)"
+    RUN mkdir -p "$(go env GOPATH)" && chmod 777 "$(go env GOPATH)"
+    RUN mkdir -p "$(go env GOCACHE)" && chmod 777 "$(go env GOCACHE)"
+    RUN mkdir -p "$(go env GOBIN)" && chmod 777 "$(go env GOBIN)"
+    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
+    RUN curl -sfLo - https://github.com/prometheus/prometheus/releases/download/v3.2.1/prometheus-3.2.1.linux-amd64.tar.gz | tar xzf - && \
+        mv prometheus-3.2.1.linux-amd64/promtool /usr/local/bin/promtool && \
+        chmod +x /usr/local/bin/promtool && \
+        rm -rf prometheus-3.2.1.linux-amd64
+  from: aro-hcp-e2e-base-image
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/Azure/ARO-HCP
+  to: aro-hcp-tools
 releases:
   latest:
     release:
@@ -64,7 +106,7 @@ resources:
     limits:
       memory: 4Gi
     requests:
-      cpu: "8"
+      cpu: "3"
       memory: 4Gi
   aro-hcp-e2e-tools:
     limits:
@@ -74,6 +116,18 @@ resources:
       memory: 8Gi
 test_binary_build_commands: make test-compile
 tests:
+- as: test-unit
+  steps:
+    test:
+    - ref: aro-hcp-test-unit
+- as: verify
+  steps:
+    test:
+    - ref: aro-hcp-verify
+- as: lint
+  steps:
+    test:
+    - ref: aro-hcp-lint
 - always_run: true
   as: frontend-simulation
   capabilities:
@@ -111,8 +165,7 @@ tests:
     workflow: aro-hcp-e2e
 - always_run: true
   as: e2e-parallel
-  optional: true
-  skip_if_only_changed: ^(?:action\.yml|AGENTS\.md|CLAUDE\.md|CODEOWNERS|CONTRIBUTING\.md|\.bingo/|\.cursor/|demo/|\.devcontainer/|docs/|\.editorconfig|GEMINI\.md|generate-repo\.sh|generate-tag\.sh|get-digest\.sh|get-tag-sha\.sh|\.gitattributes|\.gitguardian\.yaml|\.github/|\.gitignore|\.gitleaks\.toml|\.golangci\.yml|hack/|LICENSE|\.mega-linter\.yml|README\.md|SECURITY\.md|svc-deploy\.sh|\.vscode/|\.yamlfmt\.yaml|\.yamllint\.yml)$|\.md$
+  skip_if_only_changed: ^(?:action\.yml|AGENTS\.md|CLAUDE\.md|CODEOWNERS|CONTRIBUTING\.md|\.bingo/|\.cursor/|\.devcontainer/|docs/|\.editorconfig|GEMINI\.md|generate-repo\.sh|generate-tag\.sh|get-digest\.sh|get-tag-sha\.sh|\.gitattributes|\.gitguardian\.yaml|\.github/|\.gitleaks\.toml|\.golangci\.yml|LICENSE|\.mega-linter\.yml|README\.md|SECURITY\.md|svc-deploy\.sh|\.vscode/|\.yamlfmt\.yaml|\.yamllint\.yml)$|\.md$
   steps:
     cluster_profile: aro-hcp-dev
     env:

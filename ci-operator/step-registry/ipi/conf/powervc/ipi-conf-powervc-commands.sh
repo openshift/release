@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.4.6"
+	TAG="v0.5.2"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
 	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
@@ -74,6 +74,37 @@ else
 fi
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
+ls -l /var/run/powervc-ipi-cicd-secrets/powervc-creds/ || true
+
+install_required_tools
+
+#
+# Does the current RHCOS image exist?
+#
+openshift-install coreos print-stream-json | jq -r '.architectures.ppc64le.artifacts.openstack'
+URL=$(openshift-install coreos print-stream-json | jq -r '.architectures.ppc64le.artifacts.openstack' | jq -r '.formats."qcow2.gz".disk.location')
+echo "URL=${URL}"
+if [ -z "${URL}" ]
+then
+	echo "Error: could not parse coreos"
+	exit 1
+fi
+
+FILENAME=${URL##*/}
+echo "FILENAME=${FILENAME}"
+RHCOS_IMAGE_NAME=${FILENAME//.qcow2.gz/}
+echo "RHCOS_IMAGE_NAME=${RHCOS_IMAGE_NAME}"
+
+openstack --os-cloud=ocp-ci image list --format=value | grep rhcos
+
+echo; echo "Checking to see if ${RHCOS_IMAGE_NAME} exists..."
+openstack --os-cloud=ocp-ci image show ${RHCOS_IMAGE_NAME} --format=shell --column=name
+if [ $? -gt 0 ]
+then
+	echo "Error: ${RHCOS_IMAGE_NAME} not found"
+	exit 1
+fi
+
 # Populate install-config with PowerVC Platform specifics
 # Note: we will visit this creation of install-config.yaml file section once the profile support is added to the PowerVC environment
 POWERVC_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.powervccred"
@@ -90,11 +121,9 @@ COMPUTE_NODE_TYPE: ${COMPUTE_NODE_TYPE}
 FLAVOR: ${FLAVOR}
 LEASED_RESOURCE: ${LEASED_RESOURCE}
 NETWORK_NAME: ${NETWORK_NAME}
+RHCOS_IMAGE_NAME: ${RHCOS_IMAGE_NAME}
+SERVER_IP: ${SERVER_IP}
 EOF
-
-ls -l /var/run/powervc-ipi-cicd-secrets/powervc-creds/ || true
-
-install_required_tools
 
 #POWERVC_USER_ID=$(cat "/var/run/powervc-ipi-cicd-secrets/powervc-creds/POWERVC_USER_ID")
 
@@ -138,6 +167,7 @@ PowerVC-Tool \
 	--sshKeyName "${CLUSTER_NAME}-key" \
 	--domainName "${BASE_DOMAIN}" \
 	--enableHAProxy false \
+	--serverIP "${SERVER_IP}" \
 	--shouldDebug true
 RC=$?
 if [ ${RC} -gt 0 ]

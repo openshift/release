@@ -108,7 +108,7 @@ def add_imagestream_namespace_rbac(gendoc):
     })
 
     resources.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'release-controller-modify',
@@ -153,7 +153,7 @@ def add_imagestream_namespace_rbac(gendoc):
     if not context.suffix:
         # Special permissions for x86_64 public rc
         resources.append({
-            'apiVersion': 'authorization.openshift.io/v1',
+            'apiVersion': 'rbac.authorization.k8s.io/v1',
             'kind': 'Role',
             'metadata': {
                 'name': 'release-controller-modify-ocp',
@@ -168,7 +168,7 @@ def add_imagestream_namespace_rbac(gendoc):
         })
 
         resources.append({
-            'apiVersion': 'authorization.openshift.io/v1',
+            'apiVersion': 'rbac.authorization.k8s.io/v1',
             'kind': 'Role',
             'metadata': {
                 'name': 'release-controller-modify-ocp',
@@ -198,7 +198,7 @@ def add_imagestream_namespace_rbac(gendoc):
         })
 
     resources.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'release-controller-import-ocp',
@@ -216,7 +216,7 @@ def add_imagestream_namespace_rbac(gendoc):
     })
 
     resources.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': f'release-controller{context.suffix}-prowjob',
@@ -496,7 +496,7 @@ def add_ocp_priv_puller_token(gendoc):
     # token capable of only reading images with no
     # further powers on app.ci
     gendoc.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'ocp-priv-image-puller-token-reader',
