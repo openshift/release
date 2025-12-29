@@ -1,0 +1,25 @@
+workflow:
+  as: ingress-metallb
+  steps:
+    cluster_profile: packet-assisted
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    env:
+      CLUSTERTYPE: "assisted_medium_el9"
+    pre:
+    - ref: ofcir-acquire
+    - ref: assisted-ofcir-setup
+    - chain: assisted-common-pre
+    - ref: ingress-metallb-conf
+    post:
+    - ref: assisted-common-gather
+    - ref: ofcir-gather
+    - ref: ofcir-release
+  documentation: |-
+    The ingress-metallb workflow provides pre- and post- steps that provision and
+    deprovision an OpenShift cluster with a default configuration on bare metal using
+    assisted installer, allowing job authors to inject their own ingress-related test
+    logic for MetalLB scenarios.
+
+    This workflow uses the assisted-ofcir infrastructure to set up a bare metal cluster
+    suitable for testing ingress features with MetalLB load balancer.
