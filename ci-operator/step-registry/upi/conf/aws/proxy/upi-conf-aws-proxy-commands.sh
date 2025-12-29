@@ -291,7 +291,7 @@ PROXY_DNS="squid.${USER_NAME}.${base_domain}"
 export PROXY_URL="http://${USER_NAME}:${PASSWORD}@${PROXY_DNS}:3128/"
 export TLS_PROXY_URL="https://${USER_NAME}:${PASSWORD}@${PROXY_DNS}:3130/"
 
-echo ${PROXY_URL} > ${SHARED_DIR}/PROXY_URL 
+echo ${PROXY_URL} > ${SHARED_DIR}/PROXY_URL
 echo ${TLS_PROXY_URL} > ${SHARED_DIR}/TLS_PROXY_URL
 
 # TODO:
