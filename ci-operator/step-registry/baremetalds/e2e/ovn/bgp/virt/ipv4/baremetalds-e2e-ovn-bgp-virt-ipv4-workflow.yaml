@@ -1,0 +1,30 @@
+workflow:
+  as: baremetalds-e2e-ovn-bgp-virt-ipv4
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
+      EXTRA_MG_ARGS: --host-network
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="extranet"
+        EXTRANET_NETWORK_SUBNET_V4='192.168.221.0/24'
+      TEST_SUITE: openshift/network/virtualization
+    pre:
+      - ref: baremetalds-devscripts-conf-featureset
+      - chain: baremetalds-ofcir-pre
+      - ref: baremetalds-devscripts-conf-extranetwork
+      - ref: kubevirt-install
+      - ref: baremetalds-e2e-ovn-bgp-pre
+      - ref: baremetalds-e2e-ovn-debug-enable-console
+    test:
+      - chain: baremetalds-ipi-test
+    post:
+      - ref: baremetalds-e2e-ovn-debug-console-gather
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    This workflow executes the common virt end-to-end test suite on a cluster provisioned by running dev-scripts
+    on a packet server with IPv4 enabled with the cluster configured to advertise the default
+    network with BGP feature.

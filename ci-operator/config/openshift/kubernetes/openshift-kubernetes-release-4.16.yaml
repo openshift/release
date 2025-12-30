@@ -299,7 +299,8 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-kubernetes-e2e-aws
-- as: k8s-e2e-aws-ovn-serial
+- always_run: false
+  as: k8s-e2e-aws-ovn-serial
   optional: true
   steps:
     cluster_profile: aws-2
@@ -324,9 +325,10 @@ tests:
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     workflow: openshift-e2e-azure
-- as: e2e-agnostic-ovn-cmd
+- always_run: false
+  as: e2e-agnostic-ovn-cmd
   optional: true
   steps:
     cluster_profile: azure4
@@ -370,8 +372,8 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
-  timeout: 5h0m0s
-- as: e2e-aws-csi
+- always_run: false
+  as: e2e-aws-csi
   optional: true
   steps:
     cluster_profile: aws
@@ -397,7 +399,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: k8s-conformance
-  interval: 48h
+  cron: 25 19 14 6 *
   steps:
     cluster_profile: aws
     test:
@@ -409,15 +411,18 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-multitenant
+- always_run: false
+  as: e2e-aws-multitenant
   optional: true
   steps:
     cluster_profile: aws-3
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-multi
-- as: e2e-metal-ipi
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -426,8 +431,10 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -438,7 +445,8 @@ tests:
     workflow: baremetalds-e2e
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -502,6 +510,7 @@ tests:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-crun
 - as: e2e-aws-crun-wasm
+  skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|SECURITY_CONTACTS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-crun-wasm

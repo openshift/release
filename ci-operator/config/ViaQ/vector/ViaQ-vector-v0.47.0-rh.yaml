@@ -65,10 +65,19 @@ tests:
   container:
     from: logging-vector-test-unit
 - as: cargo-deny-check-bans
-  commands: cargo deny --no-default-features --features ocp-logging --offline check
-    bans
+  commands: cargo deny --no-default-features --features ocp-logging check bans
   container:
     from: logging-vector-test-unit
+- as: cargo-clippy-check
+  commands: cargo clippy --workspace --all-targets -- -D warnings
+  container:
+    from: logging-vector-test-unit
+  optional: true
+- as: cargo-fmt-check
+  commands: cargo fmt --check
+  container:
+    from: logging-vector-test-unit
+  optional: true
 - as: ldd-openssl
   commands: ldd /usr/bin/vector | grep -E 'libcrypto|libssl'
   container:
@@ -108,7 +117,6 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: generic-claim
-  timeout: 5h0m0s
 - as: clo-functional
   cluster_claim:
     architecture: amd64

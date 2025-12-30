@@ -58,15 +58,17 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: e2e-compact-ipv4-static
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: ^(cmd/.*|data/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
   steps:
     allow_skip_on_success: true
     cluster_profile: packet-assisted
     workflow: agent-e2e-appliance-ipv4
-  timeout: 6h0m0s
-- as: e2e-sno-dualstack-dhcp
-  cluster: build05
+- always_run: false
+  as: e2e-sno-dualstack-dhcp
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: ^(cmd/.*|data/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
   steps:
@@ -75,14 +77,13 @@ tests:
     dependencies:
       APPLIANCE_IMAGE: agent-preinstall-image-builder
     workflow: agent-e2e-appliance-dualstack
-  timeout: 6h0m0s
 - as: e2e-sno-dualstack-dhcp-periodic
-  cluster: build05
-  cron: 23 4 13,17 * *
+  capabilities:
+  - intranet
+  cron: 39 18 11 6 *
   steps:
     cluster_profile: packet-assisted
     workflow: agent-e2e-appliance-dualstack
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.17
   org: openshift

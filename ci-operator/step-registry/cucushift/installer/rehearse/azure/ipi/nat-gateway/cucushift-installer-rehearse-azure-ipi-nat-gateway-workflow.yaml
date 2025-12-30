@@ -2,12 +2,17 @@ workflow:
   as: cucushift-installer-rehearse-azure-ipi-nat-gateway
   steps:
     pre:
-      - chain: cucushift-installer-rehearse-azure-ipi-provision
+      - chain: ipi-conf-azure
+      - ref: ipi-conf-azure-custom-region
+      - chain: azure-provision-service-principal-minimal-permission
+      - chain: ipi-install
+      - ref: enable-qe-catalogsource
+      - chain: cucushift-installer-check
       - ref: cucushift-installer-check-azure-nat-gateway
       - ref: cucushift-installer-reportportal-marker
     post:
       - chain: cucushift-installer-rehearse-azure-ipi-deprovision
-      - ref: junit2reportportal
+      - ref: send-results-to-reportportal
     env:
       OUTBOUND_TYPE: NatGateway
   documentation: |-

@@ -50,9 +50,9 @@ function download_automation_code() {
     mkdir -p ${IBMCLOUD_HOME}
     echo "Downloading the head for ocp4-upi-compute-powervs"
     cd "${IBMCLOUD_HOME}" \
-        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-"${OCP_VERSION}"-per.tar.gz -o "${IBMCLOUD_HOME}"/ocp-"${OCP_VERSION}".tar.gz \
-        && tar -xzf "${IBMCLOUD_HOME}"/ocp-"${OCP_VERSION}".tar.gz \
-        && mv "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs-release-${OCP_VERSION}-per" "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs
+        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/main.tar.gz -o "${IBMCLOUD_HOME}"/ocp-main.tar.gz \
+        && tar -xzf "${IBMCLOUD_HOME}"/ocp-main.tar.gz \
+        && mv "${IBMCLOUD_HOME}/ocp4-upi-compute-powervs-main" "${IBMCLOUD_HOME}"/ocp4-upi-compute-powervs
     echo "Down ... Downloading the head for ocp4-upi-compute-powervs"
 }
 

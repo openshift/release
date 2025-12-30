@@ -93,7 +93,12 @@ for component in "${CONTROLPLANE_COMPONENTS[@]}"; do
   fi
 
   for scope in $scopes; do
-    az role assignment create --assignee-object-id "$object_id" --role "$ROLE" --scope "$scope" --assignee-principal-type "ServicePrincipal"
+    if [ -z "$(az role assignment list --assignee $object_id --role "$ROLE" --scope $scope -o tsv)" ]; then
+      echo "Role assignment does not exist. Creating..."
+      az role assignment create --assignee-object-id "$object_id" --role "$ROLE" --scope "$scope" --assignee-principal-type "ServicePrincipal"
+    else
+      echo "Role assignment already exists. Skipping."
+    fi
   done
 done
 

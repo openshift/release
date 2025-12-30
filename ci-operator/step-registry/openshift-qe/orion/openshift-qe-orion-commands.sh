@@ -18,6 +18,13 @@ fi
 git clone --branch $LATEST_TAG $ORION_REPO --depth 1
 pushd orion
 
+# Invoked from orion repo by the openshift-ci bot
+if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
+  echo "Invoked from orion repo by the openshift-ci bot, switching to PR#${PULL_NUMBER}"
+  git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
+  git switch ${PULL_NUMBER}
+fi
+
 pip install -r requirements.txt
 
 case "$ES_TYPE" in
@@ -32,6 +39,15 @@ case "$ES_TYPE" in
     ES_HOST=$(<"/secret/quay-qe/hostname")
     ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
     ;;
+  stackrox)
+    ES_SECRETS_PATH='/secret_stackrox'
+    ES_PASSWORD=$(<"${ES_SECRETS_PATH}/password")
+    ES_USERNAME=$(<"${ES_SECRETS_PATH}/username")
+    if [ -e "${ES_SECRETS_PATH}/host" ]; then
+        ES_HOST=$(<"${ES_SECRETS_PATH}/host")
+    fi
+    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+    ;;
   *)
     ES_PASSWORD=$(<"/secret/internal/password")
     ES_USERNAME=$(<"/secret/internal/username")
@@ -42,19 +58,18 @@ esac
 export ES_SERVER
 
 pip install .
-export EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
+EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
 
 if [[ ! -z "$UUID" ]]; then
-    export EXTRA_FLAGS+=" --uuid ${UUID}"
+    EXTRA_FLAGS+=" --uuid ${UUID}"
 fi
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
-    export EXTRA_FLAGS+=" --output-format junit"
-    export EXTRA_FLAGS+=" --save-output-path=junit.xml"
+    EXTRA_FLAGS+=" --output-format junit --save-output-path=junit.xml"
 elif [ "${OUTPUT_FORMAT}" == "JSON" ]; then
-    export EXTRA_FLAGS+=" --output-format json"
+    EXTRA_FLAGS+=" --output-format json"
 elif [ "${OUTPUT_FORMAT}" == "TEXT" ]; then
-    export EXTRA_FLAGS+=" --output-format text"
+    EXTRA_FLAGS+=" --output-format text"
 else
     echo "Unsupported format: ${OUTPUT_FORMAT}"
     exit 1
@@ -64,24 +79,34 @@ if [[ -n "$ORION_CONFIG" ]]; then
     if [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
         fileBasename="${ORION_CONFIG##*/}"
         if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
-            export CONFIG="$ARTIFACT_DIR/$fileBasename"
+            CONFIG="$ARTIFACT_DIR/$fileBasename"
         else
             echo "Error: Failed to download $ORION_CONFIG" >&2
             exit 1
         fi
     else
-        export CONFIG="$ORION_CONFIG"
+        CONFIG="$ORION_CONFIG"
     fi
 fi
 
-if [[ ! -z "$ACK_FILE" ]]; then
-    # Download the latest ACK file
-    curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} > /tmp/${VERSION}_${ACK_FILE}
-    export EXTRA_FLAGS+=" --ack /tmp/${VERSION}_${ACK_FILE}"
+if [[ -n "$ACK_FILE" ]]; then
+    if [[ "$ACK_FILE" =~ ^https?:// ]]; then
+        fileBasename="${ACK_FILE##*/}"
+        ackFilePath="$ARTIFACT_DIR/$fileBasename"
+        if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then
+            echo "Error: Failed to download $ACK_FILE" >&2
+            exit 1
+        fi
+    else
+        # Download the latest ACK file
+        ackFilePath="$ARTIFACT_DIR/$ACK_FILE"
+        curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} -o "$ackFilePath"
+    fi
+    EXTRA_FLAGS+=" --ack $ackFilePath"
 fi
 
 if [ ${COLLAPSE} == "true" ]; then
-    export EXTRA_FLAGS+=" --collapse"
+    EXTRA_FLAGS+=" --collapse"
 fi
 
 if [[ -n "${ORION_ENVS}" ]]; then
@@ -96,16 +121,30 @@ if [[ -n "${ORION_ENVS}" ]]; then
 fi
 
 if [[ -n "${LOOKBACK_SIZE}" ]]; then
-    export EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
+    EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
+fi
+
+if [[ -n "${LOOKBACK_SIZE}" ]]; then
+    EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
+fi
+
+if [[ -n "${DISPLAY}" ]]; then
+    EXTRA_FLAGS+=" --display ${DISPLAY}"
 fi
 
 set +e
 set -o pipefail
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" orion cmd --node-count ${IGNORE_JOB_ITERATIONS} --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
+es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 
-cp *.csv *.xml ${ARTIFACT_DIR}/
+cp *.csv *.xml *.json *.txt "${ARTIFACT_DIR}/" 2>/dev/null || true
+
+if [ $orion_exit_status -eq 3 ]; then
+  echo "Orion returned exit code 3, which means there are no results to analyze."
+  echo "Exiting zero since there were no regressions found."
+  exit 0
+fi
 
 exit $orion_exit_status

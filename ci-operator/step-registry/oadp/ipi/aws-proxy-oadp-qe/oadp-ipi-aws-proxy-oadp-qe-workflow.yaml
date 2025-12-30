@@ -1,0 +1,23 @@
+workflow:
+  as: oadp-ipi-aws-proxy-oadp-qe
+  steps:
+    env:
+        RE_TRIGGER_ON_FAILURE: "true"
+    pre:
+    - chain: ipi-aws-pre-proxy
+    - ref: optional-operators-configure-proxy-registry
+    - ref: optional-operators-cvp-common-apply-secrets
+    - ref: optional-operators-subscribe
+    - ref: oadp-s3-create
+    post:
+    - ref: oadp-s3-destroy
+    - ref: gather-aws-console
+    - chain: gather
+    - ref: gather-proxy
+    - ref: ipi-deprovision-deprovision
+    - ref: ipi-deprovision-proxy
+    - ref: ipi-deprovision-aws-blackholenetwork
+    - ref: job-re-trigger
+    - ref: send-results-to-reportportal
+  documentation: |-
+    Workflow (proxy variant) that adds the ability to deploy an unreleased operator, S3 bucket creation and destruction steps specific to the OADP interop scenario, and configures proxy settings for registry access. 

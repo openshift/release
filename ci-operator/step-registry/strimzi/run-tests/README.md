@@ -52,7 +52,7 @@ mvn verify -pl systemtest -P all \
   - **If left empty**: It will use `redhat-operators` as default.
 - `OLM_APP_BUNDLE_PREFIX`
   - **Definition**: Specify operator app bundle prefix. This shouldn't be changed from default unless AMQ Streams operator will change the install policy or name.
-  - **If left empty**: It will use `amqstreams` as default.
+  - **If left empty**: It will use `amq-streams` as default.
 - `OLM_OPERATOR_DEPLOYMENT_NAME`
   - **Definition**: Specify operator deployment name. This shouldn't be changed from default unless AMQ Streams operator will change the install policy or name.
   - **If left empty**: It will use `amq-streams-cluster-operator` as default.

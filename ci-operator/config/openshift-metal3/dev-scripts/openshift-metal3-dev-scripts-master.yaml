@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.20
+    tag: rhel-9-release-golang-1.24-openshift-4.22
 images:
 - dockerfile_path: images/Dockerfile.ci
   from: src
@@ -14,12 +14,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.20"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.20"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -28,7 +28,8 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-metal-ipi-bm
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
@@ -36,7 +37,8 @@ tests:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-bm-bond
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
@@ -47,8 +49,10 @@ tests:
         BOND_PRIMARY_INTERFACE=true
         NETWORK_CONFIG_FOLDER=./network-configs/bond
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-upgrade
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-upgrade
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -60,20 +64,24 @@ tests:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade-ovn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-metal-ipi-ovn-dualstack-v6
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-v6
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -81,8 +89,10 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6v4
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-metal-ipi-upgrade-ovn-ipv6
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-upgrade-ovn-ipv6
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -90,44 +100,55 @@ tests:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade-ovn-ipv6
 - as: e2e-metal-ipi-serial-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   shard_count: 2
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv6
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-virtualmedia
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-agent-compact-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
-  timeout: 6h0m0s
 - as: e2e-agent-sno-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-sno-ipv6
+- as: e2e-metal-ovn-arbiter
+  capabilities:
+  - intranet
+  optional: true
+  skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-arbiter
 - as: e2e-agent-ha-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
@@ -137,9 +158,9 @@ tests:
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
         MIRROR_IMAGES=true
     workflow: agent-e2e-generic
-  timeout: 6h0m0s
 - as: e2e-agent-4control-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
@@ -148,9 +169,9 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=4CONTROL_IPV4
     workflow: agent-e2e-generic
-  timeout: 6h0m0s
 - as: e2e-agent-5control-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
@@ -159,22 +180,17 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4
     workflow: agent-e2e-generic
-  timeout: 6h0m0s
-- as: e2e-agent-iso-no-registry-compact-ipv4
-  cluster: build05
+- as: e2e-agent-compact-ipv4-iso-no-registry
+  capabilities:
+  - intranet
   optional: true
   skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
-        AGENT_E2E_TEST_BOOT_MODE=ISO_NO_REGISTRY
-        AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
-    workflow: agent-e2e-generic
-  timeout: 6h0m0s
+    workflow: agent-e2e-compact-ipv4-iso-no-registry
 - as: e2e-agent-bad-dns
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:

@@ -4,11 +4,16 @@ set -o nounset
 set -o pipefail
 set -x
 
-# Fix UID issue (from Telco QE Team)
-~/fix_uid.sh
-
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+target_bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
+
+# Check if target bastion is in maintenance mode
+if ssh ${SSH_ARGS} -o ProxyCommand="ssh ${SSH_ARGS} -W %h:%p root@${bastion}" root@${target_bastion} 'test -f /root/pause'; then
+  echo "The cluster is on maintenance mode. Remove the file /root/pause in the bastion host when the maintenance is over"
+  exit 1
+fi
+
 LAB=$(cat ${CLUSTER_PROFILE_DIR}/lab)
 LAB_CLOUD=$(cat ${CLUSTER_PROFILE_DIR}/lab_cloud)
 export LAB_CLOUD

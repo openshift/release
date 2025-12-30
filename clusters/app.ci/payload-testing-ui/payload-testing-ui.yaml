@@ -11,7 +11,7 @@ objects:
   metadata:
     namespace: ${NAMESPACE}
     name: payload-testing-ui
-- apiVersion: authorization.openshift.io/v1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRole
   metadata:
     name: payload-testing-reader
@@ -24,19 +24,21 @@ objects:
     - get
     - list
     - watch
-- apiVersion: authorization.openshift.io/v1
+- apiVersion: rbac.authorization.k8s.io/v1
   kind: ClusterRoleBinding
   metadata:
     namespace: ${NAMESPACE}
     name: payload-testing-reader
   roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
     name: payload-testing-reader
   subjects:
   - kind: ServiceAccount
     name: payload-testing-ui
     namespace: ${NAMESPACE}
-  userNames:
-  - system:serviceaccount:${NAMESPACE}:payload-testing-ui
+#  userNames:
+#  - system:serviceaccount:${NAMESPACE}:payload-testing-ui
 - apiVersion: v1
   kind: Service
   metadata:
@@ -77,7 +79,10 @@ objects:
     namespace: ${NAMESPACE}
     name: payload-testing-ui
     annotations:
-      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"payload-testing-ui:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"payload-testing-ui\")].image"}]'
+      keel.sh/policy: force
+      keel.sh/matchTag: "true"
+      keel.sh/trigger: poll
+      keel.sh/pollSchedule: "@every 5m"
     labels:
       app: pr-payload-tests
       component: payload-testing-ui
@@ -109,7 +114,8 @@ objects:
                 topologyKey: "kubernetes.io/hostname"
         containers:
         - name: payload-testing-ui
-          image: payload-testing-ui:latest
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_payload-testing-ui_latest
+          imagePullPolicy: Always
           args:
           - --port=8000
           ports:

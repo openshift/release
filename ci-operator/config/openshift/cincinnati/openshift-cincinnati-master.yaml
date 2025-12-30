@@ -3,6 +3,10 @@ base_images:
     name: rust
     namespace: cincinnati-ci-public
     tag: e2e-test-ubi9
+  openapi-validator:
+    name: openapi-validator
+    namespace: cincinnati-ci-public
+    tag: ci-1.35.2
   ubi:
     name: ubi
     namespace: ocp
@@ -42,7 +46,7 @@ images:
 - dockerfile_path: dist/Dockerfile.deploy/Dockerfile
   to: downstream-deploy
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/cincinnati-ci-public/rust:e2e-test-ubi9
+    FROM replaced
     ENV HOME="/root"
     WORKDIR "${HOME}/cincinnati"
     COPY --from=pipeline:test-bin /opt/cincinnati/bin/e2e /usr/bin/cincinnati-e2e-test
@@ -83,6 +87,13 @@ resources:
       memory: 5Gi
 test_binary_build_commands: just build_e2e
 tests:
+- as: verify-openapi
+  commands: |
+    export npm_config_cache=$(mktemp -d)
+    just verify_openapi
+  container:
+    clone: true
+    from: openapi-validator
 - as: cargo-test
   steps:
     pre:
@@ -170,8 +181,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- always_run: false
-  as: osus-e2e
+- as: osus-e2e
   cluster_claim:
     architecture: amd64
     cloud: aws

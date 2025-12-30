@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: /gitops/cluster-manifests/build05
+  name: app-cluster-build05
+  namespace: openshift-gitops
+spec:
+  destination:
+    name: build05
+    namespace: openshift-gitops
+  project: default
+  source:
+    directory:
+      exclude: '{OWNERS,*.md}'
+      include: '{*.yaml,*.yml}'
+      recurse: true
+    path: gitops/cluster-manifests/build05
+    repoURL: https://github.com/liangxia/release.git
+    targetRevision: argocd
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+      - CreateNamespace=true
+      - PruneLast=true
+      - ServerSideApply=true

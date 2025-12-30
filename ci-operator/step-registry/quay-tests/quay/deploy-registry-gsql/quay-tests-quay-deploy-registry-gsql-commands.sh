@@ -57,6 +57,13 @@ DB_CONNECTION_ARGS:
     sslkey: /.postgresql/postgresql.key
     threadlocals: true
 DB_URI: postgresql://${GCP_POSTGRESQL_USERNAME}:${GCP_POSTGRESQL_PASSWORD}@$GCP_SQL_HOSTIP:5432/${GCP_POSTGRESQL_DBNAME}?sslmode=verify-ca&sslcert=/.postgresql/postgresql.crt&sslkey=/.postgresql/postgresql.key&sslrootcert=/.postgresql/root.crt  
+FEATURE_SUPERUSER_CONFIGDUMP: true
+FEATURE_IMAGE_PULL_STATS: true
+REDIS_FLUSH_INTERVAL_SECONDS: 30
+PULL_METRICS_REDIS:
+  host: quay-quay-redis
+  port: 6379
+  db: 1
 EOF
 
 oc create secret generic postgresql-client-certs -n "${QUAYNAMESPACE}" \
@@ -96,7 +103,7 @@ spec:
     managed: true
 EOF
 
-sleep 300  # wait for pods to be ready
+sleep 300 # wait for pods to be ready
 
 for i in {1..60}; do
   if [[ "$(oc -n ${QUAYNAMESPACE} get quayregistry ${QUAYREGISTRY} -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then

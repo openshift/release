@@ -1,0 +1,36 @@
+build_root:
+  image_stream_tag:
+    name: eco-ci-cd
+    namespace: telcov10n-ci
+    tag: eco-ci-cd
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: cnf-ran-standard-tests
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 *
+  restrict_network_access: false
+  steps:
+    env:
+      VERSION: "4.19"
+    pre:
+    - ref: telcov10n-functional-cnf-ran-hub-deploy
+    - ref: telcov10n-functional-cnf-ran-hub-config
+    - ref: telcov10n-functional-cnf-ran-mirror-spoke-operators
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: cnf-ran-standard-4.19

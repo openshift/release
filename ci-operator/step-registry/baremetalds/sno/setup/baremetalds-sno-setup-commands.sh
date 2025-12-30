@@ -45,12 +45,15 @@ echo "Creating Ansible configuration file"
 cat > "${SHARED_DIR}/ansible.cfg" <<-EOF
 
 [defaults]
-callback_whitelist = profile_tasks
+callbacks_enabled = profile_tasks
 host_key_checking = False
 
 verbosity = 2
-stdout_callback = yaml
+stdout_callback = ansible.builtin.default
 bin_ansible_callbacks = True
+
+[callback_default]
+result_format = yaml
 
 EOF
 
@@ -130,6 +133,8 @@ cd "\${REPO_DIR}"
 set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 echo "export NO_MINIKUBE=true" >> /root/config
+# 40GB Size
+echo "export WORKER_DISK=40000000000" >> /root/config
 
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE:-${RELEASE_IMAGE_LATEST}}" >> /root/config
 
@@ -151,8 +156,12 @@ for ingress_app in ${INGRESS_APPS[@]}; do
 done
 echo "export SINGLE_NODE_IP_ADDRESS=${SINGLE_NODE_IP_ADDRESS}" >> /root/config
 
-echo Reloading NetworkManager systemd configuration
-systemctl reload NetworkManager
+# Keeping for posterity, this breaks ofcir nodes resolve config
+#echo Reloading NetworkManager systemd configuration
+#systemctl reload NetworkManager
+
+echo "Enabling podman rest api"
+systemctl --user enable --now podman.socket
 
 export TEST_ARGS="TEST_FUNC=${TEST_FUNC}"
 if [[ -e /root/sno-additional-manifests ]]

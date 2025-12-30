@@ -70,6 +70,31 @@ else
     echo "Detected go.mod in ${PWD}; verifying vendored dependencies."
 fi
 
+if cat go.mod | grep -E "github.com/openshift/(api|client-go) v3\.9\.0\+incompatible"; then
+  echo "ERROR: Detected github.com/openshift/api or client-go v3.9.0+incompatible in go.mod"
+  echo "Do not use this 'version' of openshift/api or client-go . For complex"
+  echo "reasons, this invalid version is a contagion which causes modules"
+  echo "which import your code to also import the invalid version."
+  echo "Fix:"
+  echo "Use an explicit commit in your 'require' statement. You can do"
+  echo "this with 'go get github.com/openshift/api@latest' or just specify"
+  echo "the import directly. For example, for openshift/api require:"
+  echo "        github.com/openshift/api@v0.0.0-20250710004639-926605d3338b"
+  echo "In addition, remove any 'replace' statement that may have been in"
+  echo "use for the module."
+  echo ""
+  echo "Unfortunately, this will be necessary until modules you require"
+  echo "eliminate their own use of v3.9.0+incompatible import."
+  echo ""
+  echo "Detail: v3.9.0+incompatible used to be a valid version/tag. However"
+  echo "managing @latest via tags was not desired, so the version was deleted."
+  echo "Before that deletion, many modules had incorporated the now invalid"
+  echo "version. Since the version is greater than v0.0.0 pseudo-versions,"
+  echo "go 'upgrades' importing go.mods to use v3.9.0+incompatible and the"
+  echo "contagion spreads."
+  exit 1
+fi
+
 # For debugging
 go version
 

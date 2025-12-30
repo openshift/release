@@ -70,6 +70,7 @@ tests:
   container:
     clone: true
     from: golangci-lint
+  run_if_changed: \.go$
 - as: unit
   commands: go test ./...
   container:
@@ -78,12 +79,12 @@ tests:
 - as: e2e-agnostic-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     workflow: openshift-e2e-azure
 - as: e2e-agnostic-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     test:
     - as: e2e-test
       commands: hack/test-integration.sh
@@ -104,7 +105,6 @@ tests:
     test:
     - chain: openshift-e2e-test-ota-qe
     workflow: cucushift-installer-rehearse-gcp-ipi
-  timeout: 8h0m0s
 - as: e2e-agnostic-ovn-upgrade-into-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -113,7 +113,7 @@ tests:
 - as: e2e-agnostic-ovn-upgrade-out-of-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
@@ -167,7 +167,8 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-upgrade-azure
-- as: e2e-agnostic-operator-devpreview
+- always_run: false
+  as: e2e-agnostic-operator-devpreview
   optional: true
   steps:
     cluster_profile: azure4

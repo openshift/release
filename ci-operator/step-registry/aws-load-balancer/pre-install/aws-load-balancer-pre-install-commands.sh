@@ -18,9 +18,7 @@ cp ${AWS_LOAD_BALANCER_OPERATOR_SRC_DIR}/hack/controller/controller-credentials-
 /tmp/yq w -i "${AWS_CREDENTIALS_REQUEST}" 'spec.secretRef.namespace' ${OO_INSTALL_NAMESPACE}
 /tmp/yq w -i "${AWS_CREDENTIALS_REQUEST}" 'spec.secretRef.name' ${OPERATOR_SECRET}
 
-if [ "${OO_APPLY_RESOURCES}" = "true" ] || [ "${OO_APPLY_RESOURCES}" = "controlleronly" ]; then
-    if [ "${OO_APPLY_RESOURCES}" != "controlleronly" ]; then
-        oc apply -f "${AWS_CREDENTIALS_REQUEST}"
-    fi
+if [ "${OO_APPLY_RESOURCES}" = "true" ]; then
+    oc apply -f "${AWS_CREDENTIALS_REQUEST}"
     oc apply -f "${AWS_CONTROLLER_CREDENTIALS_REQUEST}"
 fi

@@ -332,7 +332,7 @@ function set_target_and_upgrade_cmd(){
     if [[ -n "${UPGRADE_TO_VERSION}" ]] && [[ "${UPGRADE_TO_VERSION}" != "latest" ]]; then
         valid_target="false"
         # check if x.y.z is in available_versions, if not, it's invalid target with --to.
-        for version in ${available_versions[*]}; do
+        for version in "${available_versions[@]}"; do
             if [[ "${UPGRADE_TO_VERSION}" == "${version}" ]]; then
                 TARGET_VERSION="${UPGRADE_TO_VERSION}"
                 valid_target="true"
@@ -355,7 +355,7 @@ function set_target_and_upgrade_cmd(){
         # so here we need correct unexpected latest with 4.15.0
         if [[ "${TARGET_VERSION}" =~ "-" ]]; then
             expected_target="${TARGET_VERSION%-*}"
-            for version in ${available_versions[*]}; do
+            for version in "${available_versions[@]}"; do
                 if [[ "${version}" == "${expected_target}" ]]; then
                     TARGET_VERSION="${expected_target}"
                     break

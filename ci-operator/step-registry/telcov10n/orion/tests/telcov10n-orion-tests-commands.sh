@@ -26,7 +26,7 @@ OPENSEARCH_HOST=$(<"/secret/telco5g/hostname")
 ES_SERVER="https://${OPENSEARCH_USERNAME}:${OPENSEARCH_PASSWORD}@${OPENSEARCH_HOST}"
 
 pip install .
-export EXTRA_FLAGS=" --anomaly-detection"
+export EXTRA_FLAGS=" --hunter-analyze"
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
     export EXTRA_FLAGS+=" --output-format junit"
@@ -54,6 +54,21 @@ if [[ -n "$ORION_CONFIG" ]]; then
     fi
 fi
 
+if [[ -n "$ACK_FILE" ]]; then
+    if [[ "$ACK_FILE" =~ ^https?:// ]]; then
+        ackBasename="${ACK_FILE##*/}"
+        if curl -fsSL "$ACK_FILE" -o "$ARTIFACT_DIR/$ackBasename"; then
+            export ACK="$ARTIFACT_DIR/$ackBasename"
+        else
+            echo "Error: Failed to download $ACK_FILE" >&2
+            exit 1
+        fi
+    else
+        export ACK="$ACK_FILE"
+    fi
+    EXTRA_FLAGS+=" --ack ${ACK}"
+fi
+
 
 if [ ${COLLAPSE} == "true" ]; then
     export EXTRA_FLAGS+=" --collapse"
@@ -76,8 +91,9 @@ fi
 
 set +e
 set -o pipefail
+echo "Start orion test"
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-ES_IDX=${ES_METADATA_INDEX} ES_SERVER=${ES_SERVER} orion cmd --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
+orion --config ${CONFIG} --es-server=${ES_SERVER} --benchmark-index=${ES_METADATA_INDEX} --metadata-index=${ES_METADATA_INDEX} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
 orion_exit_status=$?
 set -e
 

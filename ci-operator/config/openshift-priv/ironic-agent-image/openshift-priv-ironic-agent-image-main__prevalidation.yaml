@@ -4,7 +4,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   ocp_4.20_base-rhel9:
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
     tag: base-rhel9
 build_root:
@@ -17,24 +17,24 @@ images:
 promotion:
   to:
   - disabled: true
-    name: 4.20-priv
+    name: 4.21-priv
     namespace: ocp-private
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
       #NOTE(elfosardo): use ironic repos, cause we're special
-      curl http://base-4-20-rhel-9-ironic-prevalidation.ocp.svc > /etc/yum.repos.art/ci/base-4-20-rhel-9-ironic-prevalidation.repo
+      curl http://base-4-21-rhel-9-ironic-prevalidation.ocp.svc > /etc/yum.repos.art/ci/base-4-21-rhel-9-ironic-prevalidation.repo
     from: ocp_4.20_base-rhel9
     to: prevalidation-base
 releases:
   initial:
     integration:
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.20-priv
+      name: 4.21-priv
       namespace: ocp-private
 resources:
   '*':
@@ -43,7 +43,8 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-metal-ipi-bm-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
@@ -51,26 +52,30 @@ tests:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-serial-ipv4-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h30m0s
 - as: e2e-metal-ipi-virtualmedia-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-metal-ipi-ovn-ipv6-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
-- as: e2e-metal-ipi-ovn-dualstack-prevalidation
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-prevalidation
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: .*packages-list.*
   steps:

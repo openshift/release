@@ -1,0 +1,63 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_path: Containerfile
+  to: nvidia-ci
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.18.0-0
+        stream: 4-stable
+        upper: 4.19.0-0
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: nvidia-gpu-operator-e2e-rt-25-10-x
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      MCO_CONF_DAY1_INSTALL_KERNEL_MCPS: master
+      MCO_CONF_DAY1_INSTALL_KERNEL_TYPE: realtime
+      NVIDIAGPU_CLEANUP: "false"
+      NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH: '[{"op": "add", "path": "/spec/driver/env",
+        "value": [{"name": "IGNORE_PREEMPT_RT_PRESENCE", "value": "1"}]}]'
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v25.10
+      SINGLE_NODE_AWS_INSTANCE_TYPE: g4dn.2xlarge
+      TEST_FEATURES: nvidiagpu
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - ref: single-node-conf-aws
+    - ref: mco-conf-day1-kerneltype
+    - chain: ipi-install
+    test:
+    - as: gpu-operator-e2e
+      commands: make run-tests
+      env:
+      - name: NVIDIAGPU_CLEANUP
+      - name: NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH
+      - name: NVIDIAGPU_SUBSCRIPTION_CHANNEL
+      - name: TEST_FEATURES
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: 4.18-rt

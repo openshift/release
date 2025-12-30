@@ -16,6 +16,9 @@ images:
 - dockerfile_path: org_tools/images/Dockerfile.validator
   from: cyborg
   to: org-validator
+- dockerfile_path: org_tools/images/Dockerfile.indexer
+  from: cyborg
+  to: org-indexer
 - dockerfile_path: org_tools/images/Dockerfile.team-tracking-spreadsheet
   from: cyborg
   to: team-tracking-spreadsheet-tool
@@ -32,6 +35,7 @@ promotion:
     - peribolos-generator
     - team-tracking-spreadsheet-tool
     - org-validator
+    - org-indexer
     namespace: continuous-release-jobs
     tag: base
   - excluded_images:
@@ -51,6 +55,11 @@ tests:
     echo "Placeholder for lint job"
   container:
     from: src
+- as: tests
+  commands: |
+    python -m pytest tests/ -v --cov=orglib
+  container:
+    from: cyborg
 - as: security
   optional: true
   steps:

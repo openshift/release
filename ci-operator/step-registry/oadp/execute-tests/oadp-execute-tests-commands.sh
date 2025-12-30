@@ -4,6 +4,55 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function install_yq_if_not_exists() {
+    # Install yq manually if not found in image
+    echo "Checking if yq exists"
+    cmd_yq="$(yq --version 2>/dev/null || true)"
+    if [ -n "$cmd_yq" ]; then
+        echo "yq version: $cmd_yq"
+    else
+        echo "Installing yq"
+        mkdir -p /tmp/bin
+        export PATH=$PATH:/tmp/bin/
+        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+    fi
+}
+
+function mapTestsForComponentReadiness() {
+    if [[ $MAP_TESTS == "true" ]]; then
+        results_file="${1}"
+        echo "Patching Tests Result File: ${results_file}"
+        if [ -f "${results_file}" ]; then
+            echo "Mapping Test Suite Name To: OADP-lp-interop"
+            yq eval -px -ox -iI0 '.testsuites.testsuite."+@name" = "OADP-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+        fi
+    fi
+}
+
+function collect-results() {
+    if [[ $MAP_TESTS == "true" ]]; then
+      install_yq_if_not_exists
+      original_results="${ARTIFACT_DIR}/original_results/"
+      mkdir -p "${original_results}"
+      echo "Collecting original results in ${original_results}"
+
+      # Keep a copy of all the original Junit files before modifying them
+      cp -r "${ARTIFACT_DIR}"/junit_* "${original_results}" || echo "Warning: couldn't copy original files" >&2
+
+      find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
+        # Map tests if needed for related use cases
+        mapTestsForComponentReadiness "${result_file}"
+      done
+
+      # Send modified files to shared dir for Data Router Reporter step
+      cp -r "${ARTIFACT_DIR}"/junit_* "${SHARED_DIR}" || echo "Warning: couldn't copy files to SHARED_DIR" >&2
+    fi
+}
+
+# Post test execution
+trap 'collect-results' SIGINT SIGTERM ERR EXIT
+
 # Set variables needed for test execution
 export PROVIDER=$OADP_CLOUD_PROVIDER
 export BACKUP_LOCATION=$OADP_BACKUP_LOCATION
@@ -12,6 +61,7 @@ export NAMESPACE="openshift-adp"
 export BUCKET="${PROW_NAMESPACE}-${BUCKET_NAME}"
 export KUBECONFIG="/home/jenkins/.kube/config"
 export OADP_TEST_FOCUS="--focus=${OADP_TEST_FOCUS}"
+export TEMP_TEST_FOCUS=$OADP_TEST_FOCUS
 export ANSIBLE_REMOTE_TMP="/tmp/"
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
@@ -68,8 +118,9 @@ if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
   OADP_TEST_FOCUS=""
   export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_cnv_results.xml" &&\
   export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" &&\
-  export EXTRA_GINKGO_PARAMS="--ginkgo.skip=tc-id:OADP-555" &&\
+  export EXTRA_GINKGO_PARAMS="--skip=tc-id:OADP-555" &&\
   (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
+  OADP_TEST_FOCUS=$TEMP_TEST_FOCUS
 fi
 
 # Run OADP tests with the focus

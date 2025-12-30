@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build09
     context: ci/prow/ci-index-lifecycle-agent-operator-bundle-pipeline
     decorate: true
     labels:
@@ -22,7 +22,7 @@ presubmits:
         - --target=ci-index-lifecycle-agent-operator-bundle-pipeline
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -58,7 +58,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build09
     context: ci/prow/ci-job
     decorate: true
     labels:
@@ -72,10 +72,11 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/lifecycle-agent-coverall
         - --target=ci-job
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -84,6 +85,9 @@ presubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/lifecycle-agent-coverall
+          name: lifecycle-agent-coverall
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -96,6 +100,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: lifecycle-agent-coverall
+        secret:
+          secretName: lifecycle-agent-coverall
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -111,14 +118,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build06
     context: ci/prow/ibi-e2e-flow
     decorate: true
-    decoration_config:
-      timeout: 3h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-3
+      ci-operator.openshift.io/cloud-cluster-profile: aws-5
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-lifecycle-agent-main-ibi-e2e-flow
@@ -136,7 +141,7 @@ presubmits:
         - --target=ibi-e2e-flow
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -187,14 +192,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build06
     context: ci/prow/ibu-e2e-flow
     decorate: true
-    decoration_config:
-      timeout: 4h0m0s
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-2
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kni-lifecycle-agent-main-ibu-e2e-flow
@@ -212,7 +215,7 @@ presubmits:
         - --target=ibu-e2e-flow
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -263,7 +266,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build09
     context: ci/prow/images
     decorate: true
     labels:
@@ -280,7 +283,7 @@ presubmits:
         - --target=[images]
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -316,7 +319,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build06
     context: ci/prow/integration
     decorate: true
     labels:
@@ -338,7 +341,7 @@ presubmits:
         - --target=integration
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -389,7 +392,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build09
     context: ci/prow/markdownlint
     decorate: true
     labels:
@@ -407,7 +410,7 @@ presubmits:
         - --target=markdownlint
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -443,7 +446,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build09
     context: ci/prow/security
     decorate: true
     labels:
@@ -463,7 +466,7 @@ presubmits:
         - --target=security
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:

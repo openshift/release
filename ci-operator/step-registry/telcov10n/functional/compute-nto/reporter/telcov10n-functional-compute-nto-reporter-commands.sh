@@ -10,6 +10,11 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
+if [[ ! -f "${SHARED_DIR}/gotest-completed" ]]; then
+  echo "Gotests did not complete, skipping reporter step"
+  exit 0
+fi
+
 echo "Create group_vars directory"
 mkdir -pv "${ECO_CI_CD_INVENTORY_PATH}/group_vars"
 
@@ -40,7 +45,7 @@ echo "Create reports directory"
 mkdir -pv /tmp/reports
 
 echo "Copy reports to reports directory"
-cp "${SHARED_DIR}"/report_*.xml /tmp/reports/ 2>/dev/null || echo "No report_*.xml files found"
+cp "${SHARED_DIR}"/junit_*.xml /tmp/reports/ 2>/dev/null || echo "No report_*.xml files found"
 
 echo "Create junit directory"
 mkdir -pv /tmp/junit

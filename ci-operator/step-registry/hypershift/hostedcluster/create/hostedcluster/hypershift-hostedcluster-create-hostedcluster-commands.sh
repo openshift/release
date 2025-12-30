@@ -37,15 +37,13 @@ else
   exit 1
 fi
 
-# We need to modify BASE_DOMAIN based on which account this job is running.
 if [[ -z "$BASE_DOMAIN" ]]; then
-	if [[ "${CLUSTER_PROFILE_NAME}" == "aws" ]]; then
-		BASE_DOMAIN='hypershift.origin-ci-int-aws.dev.rhcloud.com'
-	else
-		BASE_DOMAIN="hypershift.${CLUSTER_PROFILE_NAME}.ci.openshift.org"
+	if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+		BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
 	fi
 fi
 
+DOMAIN=""
 [[ ! -z "$BASE_DOMAIN" ]] && DOMAIN=${BASE_DOMAIN}
 [[ ! -z "$HYPERSHIFT_BASE_DOMAIN" ]] && DOMAIN=${HYPERSHIFT_BASE_DOMAIN}
 echo "DOMAIN is ${DOMAIN}"
@@ -109,7 +107,7 @@ case "${PLATFORM}" in
       ARGS+=( "--multi-arch" )
     fi
 
-    if [[ "${HYPERSHFIT_SKIP_VERSION_VALIDATION}" == "true" ]]; then
+    if [[ "${HYPERSHIFT_SKIP_VERSION_VALIDATION}" == "true" ]]; then
       ARGS+=( --annotations "hypershift.openshift.io/skip-release-image-validation=true" )
     fi
 
@@ -202,9 +200,11 @@ done
 
 # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
 echo "Waiting for cluster to become available"
-oc wait --timeout=120m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME} || {
+oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME} || {
   echo "Cluster did not become available"
-  oc get hostedcluster --namespace=clusters -o yaml ${CLUSTER_NAME}
+  echo "Collect minimal required cluster information"
+  mkdir -p $ARTIFACT_DIR/hypershift-snapshot
+  oc get hostedcluster ${CLUSTER_NAME} --namespace=clusters -o yaml > $ARTIFACT_DIR/hypershift-snapshot/hostedcluster_failed.yaml
   exit 1
 }
 echo "Cluster became available, creating kubeconfig"

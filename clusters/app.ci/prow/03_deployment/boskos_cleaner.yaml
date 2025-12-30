@@ -12,6 +12,11 @@ metadata:
   labels:
     app: prow
     component: boskos-cleaner
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
   namespace: ci
 spec:
   replicas: 1
@@ -28,7 +33,8 @@ spec:
       terminationGracePeriodSeconds: 300
       containers:
       - name: boskos-cleaner
-        image: quay.io/openshift/ci:ci_cleaner_latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_cleaner_latest
+        imagePullPolicy: Always
         args:
         - --boskos-url=http://boskos
         - --use-v2-implementation=true

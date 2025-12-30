@@ -22,12 +22,20 @@ help:
 
 all:  core services
 
-check: check-core check-services check-boskos
+check: check-core check-services check-boskos check-labels check-cluster-profiles
 	@echo "Service config check: PASS"
 
 check-boskos:
 	hack/validate-boskos.sh
 	@echo "Boskos config check: PASS"
+
+check-labels: python-help
+	python3 hack/validate-labels.py
+	@echo "Labels config check: PASS"
+
+check-cluster-profiles: python-help
+	python3 hack/validate-cluster-profiles-config.py ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+	@echo "Cluster profiles config check: PASS"
 
 check-core:
 	core-services/_hack/validate-core-services.sh core-services
@@ -77,11 +85,12 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig: 
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20250709-d01b8af18 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20251223-f0341d7b5 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs:  ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
 	$(MAKE) sanitize-prow-jobs
+	#$(MAKE) tide-config-manager-verified
 
 ci-operator-checkconfig: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest
@@ -135,6 +144,12 @@ revert-acknowledge-critical-fixes-only:
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_tide-config-manager_latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only
 	$(MAKE) prow-config
 
+tide-config-manager-verified:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_tide-config-manager_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/$(VERIFIED_OPT_IN_FILE):/opt-in.yaml$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/$(VERIFIED_OPT_OUT_FILE):/opt-out.yaml$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_tide-config-manager_latest --lifecycle-phase verified --verified-opt-in /opt-in.yaml --verified-opt-out /opt-out.yaml --ci-operator-config-dir /ci-operator/config --prow-config-dir /config --sharded-prow-config-base-dir /config
+	$(MAKE) prow-config
+.PHONY: tide-config-manager-verified
+
 new-repo: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_repo-init_latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -it -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_repo-init_latest --release-repo /release
@@ -154,6 +169,10 @@ python-validation:
 export RELEASE_URL=https://github.com/openshift/release.git
 export RELEASE_REF=master
 export SKIP_PERMISSIONS_JOB=0
+
+# tide-config-manager verified mode settings
+VERIFIED_OPT_IN_FILE ?= core-services/verified/opt-in.yaml
+VERIFIED_OPT_OUT_FILE ?= core-services/verified/opt-out.yaml
 
 apply:
 	oc apply -f $(WHAT)
@@ -377,8 +396,8 @@ update_github_ldap_mapping_config_map:
 .PHONY: update_github_ldap_mapping_config_map
 
 download_dp_crd:
-	curl -o clusters/build-clusters/common/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/master/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
-	curl -o clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml https://raw.githubusercontent.com/openshift/ci-tools/master/pkg/api/pullrequestpayloadqualification/v1/ci.openshift.io_pullrequestpayloadqualificationruns.yaml
+	curl -o clusters/build-clusters/common/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
+	curl -o clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/pullrequestpayloadqualification/v1/ci.openshift.io_pullrequestpayloadqualificationruns.yaml
 .PHONY: download_dp_crd
 
 download_crt_crd:
@@ -452,6 +471,7 @@ secret-config-updater:
 	--from-file=sa.config-updater.build05.config=$(TMPDIR)/sa.config-updater.build05.config \
 	--from-file=sa.config-updater.build06.config=$(TMPDIR)/sa.config-updater.build06.config \
 	--from-file=sa.config-updater.build07.config=$(TMPDIR)/sa.config-updater.build07.config \
+	--from-file=sa.config-updater.build08.config=$(TMPDIR)/sa.config-updater.build08.config \
 	--from-file=sa.config-updater.build09.config=$(TMPDIR)/sa.config-updater.build09.config \
 	--from-file=sa.config-updater.build10.config=$(TMPDIR)/sa.config-updater.build10.config \
 	--from-file=sa.config-updater.build11.config=$(TMPDIR)/sa.config-updater.build11.config \

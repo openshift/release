@@ -193,7 +193,17 @@ echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 existing_zones_setting=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.zones')
 
 if [[ ${existing_zones_setting} == "" ]] && [[ ${ADD_ZONES} == "yes" ]]; then
-  ZONES_COUNT=${ZONES_COUNT:-2}
+  ZONES_COUNT=${ZONES_COUNT:-auto}
+  if [[ "${ZONES_COUNT}" == "auto" ]]; then
+    if [[ "${JOB_NAME}" == pull-ci-*  || "${JOB_NAME}" == rehearse-*-pull-ci-* ]]; then
+      # For presubmits, limit cloud costs by using only one AZ when in "auto".
+      ZONES_COUNT="1"
+    else
+      # For periodics (which inform component readiness), ensure multiple AZ
+      # usage in "auto" mode.
+      ZONES_COUNT="2"
+    fi
+  fi
   ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
   ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
   echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
@@ -211,6 +221,20 @@ EOF
   yq-go m -x -i "${CONFIG}" "${PATCH}"
 else
   echo "zones already set in install-config.yaml, skipped"
+fi
+
+# See if we can use NAT instances as a cost reduction method.
+# OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY is set to false by the release controller (i.e. do not use NAT instances
+# release controller jobs.
+if [[ "${CI_NAT_REPLACE:-false}" == 'auto' && "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-true}" != "false" ]]; then
+  # Enable the option for anything in the openshift org unless they use a different install topology.
+  # 4.21 is currently excluded as we approach GA.
+  if [[ "${JOB_NAME}" == *-ci-openshift-* && "${JOB_NAME}" != *-4.21-* ]]; then
+    if [[ "${JOB_NAME}" != *'microshift'* && "${JOB_NAME}" != *'hypershift'* && "${JOB_NAME}" != *'vpc'* && "${JOB_NAME}" != *'single-node'* ]]; then
+      CI_NAT_REPLACE='true'
+      echo "IMPORTANT: this job has been selected to use NAT instance instead of NAT gateway. See jupierce if abnormalities are detected."
+    fi
+  fi
 fi
 
 echo "Using control plane instance type: ${CONTROL_PLANE_INSTANCE_TYPE}"
@@ -385,4 +409,44 @@ platform:
     userProvisionedDNS: Enabled
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
+fi
+
+# Add config for dedicated hosts to compute nodes if job is configured
+if [[ "${DEDICATED_HOST}" == "yes" ]]; then
+  echo "Detected dedicated host configured.  Starting install-config patching."
+  patch_dedicated_host="${SHARED_DIR}/install-config-dedicated-host.yaml.patch"
+
+  # Create Host for each zone.  If no zones configured, error out.  Zones can exist before script execution so we'll pull zone listing out for workers.
+  WORKER_ZONES=$(cat "${CONFIG}" | yq-v4 '.compute[] | select(.name == "worker") | .platform.aws.zones'[] )
+  if [[ "${WORKER_ZONES}" == "" ]]; then
+    echo "No zones configured,  Unable to determine where to create dedicated hosts."
+    exit
+  fi
+
+  cat > "${patch_dedicated_host}" << EOF
+compute:
+- name: worker
+  platform:
+    aws:
+      hostPlacement:
+        affinity: DedicatedHost
+        dedicatedHost: []
+EOF
+
+  for zone in ${WORKER_ZONES}; do
+    HOST_TYPE=$(echo "${COMPUTE_NODE_TYPE}" | cut -d'.' -f1)
+    echo "Creating dedicated host.  Region='${aws_source_region}' Zone='${zone}' InstanceFamily='${HOST_TYPE}'"
+
+    EXPIRATION_DATE=$(date -d '6 hours' --iso=minutes --utc)
+    HOST_SPECS='{"ResourceType":"dedicated-host","Tags":[{"Key":"Name","Value":"'${JOB_NAME_SAFE}'-'${zone}'"},{"Key":"CI-JOB","Value":"'${JOB_NAME_SAFE}'"},{"Key":"expirationDate","Value":"'${EXPIRATION_DATE}'"},{"Key":"ci-build-info","Value":"'${BUILD_ID}_${JOB_NAME}'"}]}'
+    HOST_ID=$(aws ec2 allocate-hosts --instance-type "${HOST_TYPE}.4xlarge" --auto-placement 'off' --host-recovery 'off' --tag-specifications "${HOST_SPECS}" --host-maintenance 'off' --quantity '1' --availability-zone "${zone}" --region "${aws_source_region}" | jq -r '.HostIds[0]')
+
+    # We need to pass in the vars since YQ doesnt see the loop variables
+    ZONE_NAME="${zone}" HOST_ID="${HOST_ID}" yq-v4 -i '.compute[] |= (select(.name == "worker") | .platform.aws.hostPlacement.dedicatedHost += [ { "id": strenv(HOST_ID), "zone": strenv(ZONE_NAME) } ])' "${patch_dedicated_host}"
+  done
+
+  # Update config with host ID
+  echo "Patching install-config.yaml for dedicated hosts."
+  yq-go m -x -i ${CONFIG} ${patch_dedicated_host}
+  cp "${patch_dedicated_host}" "${ARTIFACT_DIR}/"
 fi

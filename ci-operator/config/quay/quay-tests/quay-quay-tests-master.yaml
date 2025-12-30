@@ -11,12 +11,16 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM src
-    RUN curl --silent --location  https://rpm.nodesource.com/setup_lts.x | bash - && \
+    RUN curl --silent --location  https://rpm.nodesource.com/setup_20.x | bash - && \
         curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo bzip2 jq" && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo bzip2 jq python3.9" && \
         yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+        ln -sf /usr/bin/python3.9 /usr/bin/python3  && \
+        python3 -m pip install requests  && \
         yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
         yum -y install terraform xz gtk3 alsa-lib libX11-xcb && \
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
+        yum install -y ./google-chrome-stable_current_x86_64.rpm && \
         yum clean all && rm -rf /var/cache/yum/*
     RUN curl -Lo firefox-latest.tar.xz 'https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US' && \
         tar xJf firefox-*.tar.xz && \

@@ -53,9 +53,45 @@ if [[ ${OCP_IMAGE_N2} != "${OCP_IMAGE_LATEST}" ]]; then
   N2_NP_VERSION_TEST_ARGS="--e2e.n2-minor-release-image=${OCP_IMAGE_N2}"
 fi
 
+N3_NP_VERSION_TEST_ARGS=""
+if [[ ${OCP_IMAGE_N3} != "${OCP_IMAGE_LATEST}" ]]; then
+  N3_NP_VERSION_TEST_ARGS="--e2e.n3-minor-release-image=${OCP_IMAGE_N3}"
+fi
+
+N4_NP_VERSION_TEST_ARGS=""
+if [[ ${OCP_IMAGE_N4} != "${OCP_IMAGE_LATEST}" ]]; then
+  N4_NP_VERSION_TEST_ARGS="--e2e.n4-minor-release-image=${OCP_IMAGE_N4}"
+fi
+
 RUN_UPGRADE_PARAM=""
 if [[ "${RUN_UPGRADE_TEST:-}" == "true" ]] && check_e2e_flag "upgrade.run-tests" ; then
   RUN_UPGRADE_PARAM="--upgrade.run-tests --e2e.private-platform=AWS --e2e.ho-enable-ci-debug-output=true --e2e.hypershift-operator-latest-image=${CI_HYPERSHIFT_OPERATOR}"
+fi
+
+OAUTH_EXTERNAL_OIDC_PARAM=""
+if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
+  case "${OAUTH_EXTERNAL_OIDC_PROVIDER}" in
+    "keycloak")
+      # idp-external-oidc-keycloak-server-commands.sh
+      source "${SHARED_DIR}/runtime_env"
+      OAUTH_EXTERNAL_OIDC_PARAM="--e2e.external-oidc-provider=${OAUTH_EXTERNAL_OIDC_PROVIDER} \
+      --e2e.external-oidc-cli-client-id=${KEYCLOAK_CLI_CLIENT_ID} \
+      --e2e.external-oidc-console-client-id=${CONSOLE_CLIENT_ID} \
+      --e2e.external-oidc-issuer-url=${KEYCLOAK_ISSUER} \
+      --e2e.external-oidc-console-secret=${CONSOLE_CLIENT_SECRET_VALUE} \
+      --e2e.external-oidc-ca-bundle-file=${KEYCLOAK_CA_BUNDLE_FILE}  \
+      --e2e.external-oidc-test-users=${KEYCLOAK_TEST_USERS}"
+      ;;
+    "azure")
+      #todo
+      echo "azure is not supported yet"
+      exit 1
+      ;;
+    *)
+      echo "unsupported OAUTH_EXTERNAL_OIDC_PROVIDER ${OAUTH_EXTERNAL_OIDC_PROVIDER}"
+      exit 1
+      ;;
+  esac
 fi
 
 export EVENTUALLY_VERBOSE="false"
@@ -73,10 +109,13 @@ hack/ci-test-e2e.sh -test.v \
   ${PKI_RECONCILIATION_PARAMS:-} \
   ${N1_NP_VERSION_TEST_ARGS:-} \
   ${N2_NP_VERSION_TEST_ARGS:-} \
+  ${N3_NP_VERSION_TEST_ARGS:-} \
+  ${N4_NP_VERSION_TEST_ARGS:-} \
   --e2e.additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
   --e2e.aws-endpoint-access=PublicAndPrivate \
   --e2e.external-dns-domain=service.ci.hypershift.devcluster.openshift.com \
   ${AWS_MULTI_ARCH_PARAMS:-} \
   ${REQUEST_SERVING_COMPONENT_PARAMS:-} \
+  ${OAUTH_EXTERNAL_OIDC_PARAM:-} \
   ${RUN_UPGRADE_PARAM} &
 wait $!

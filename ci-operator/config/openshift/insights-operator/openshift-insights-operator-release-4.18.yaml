@@ -131,6 +131,10 @@ tests:
         mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/insights-rp-access/
+        name: insights-rp-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -144,6 +148,8 @@ tests:
         name: SLACK_BOT_TOKEN
       - default: /secret/slack-webhook-url/slack-webhook-url
         name: SLACK_WEBHOOK_URL
+      - default: /secret/insights-rp-access/insights-rp-token
+        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -152,7 +158,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
 - as: insights-operator-e2e-tests-periodic
-  cron: 0 0 * * *
+  cron: 25 22 20 2 *
   steps:
     cluster_profile: gcp-3
     pre:
@@ -188,6 +194,10 @@ tests:
         mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/insights-rp-access/
+        name: insights-rp-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -197,6 +207,8 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
+      - default: /secret/insights-rp-access/insights-rp-token
+        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -205,7 +217,7 @@ tests:
       timeout: 3h0m0s
     workflow: ipi-gcp
 - as: insights-operator-e2e-tests-slow-tests
-  cron: 25 10 8,19 * *
+  cron: 54 14 21 10 *
   steps:
     cluster_profile: gcp-3
     pre:
@@ -237,6 +249,10 @@ tests:
         mount_path: /secret/aws/aws-secret-access-key
         name: aws-secret-access-key
         namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/insights-rp-access/
+        name: insights-rp-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -246,6 +262,8 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
+      - default: /secret/insights-rp-access/insights-rp-token
+        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
@@ -299,6 +317,10 @@ tests:
         mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/insights-rp-access/
+        name: insights-rp-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -312,6 +334,8 @@ tests:
         name: SLACK_BOT_TOKEN
       - default: /secret/slack-webhook-url/slack-webhook-url
         name: SLACK_WEBHOOK_URL
+      - default: /secret/insights-rp-access/insights-rp-token
+        name: RP_API_KEY
       from: insights-operator-tests
       resources:
         requests:
@@ -356,6 +380,10 @@ tests:
         mount_path: /secret/ocm-access/
         name: insights-ocm-token
         namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/insights-rp-access/
+        name: insights-rp-token
+        namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
@@ -365,13 +393,14 @@ tests:
         name: AWS_REGION_PATH
       - default: /secret/aws/aws-secret-access-key/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
+      - default: /secret/insights-rp-access/insights-rp-token
+        name: RP_API_KEY
       from: insights-operator-tests
       grace_period: 30s
       resources:
         requests:
           cpu: 100m
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-  timeout: 8h0m0s
 - as: fips-image-scan-operator
   cron: 50 16 7,15 * *
   steps:
@@ -381,9 +410,9 @@ tests:
     - ref: fips-check-image-scan
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6

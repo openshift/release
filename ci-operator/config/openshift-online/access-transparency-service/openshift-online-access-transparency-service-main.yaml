@@ -1,0 +1,63 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+images:
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY src/ /opt/app-root/src
+    WORKDIR /opt/app-root/src/access-transparency-service
+    USER root
+    RUN dnf install -y git go make jq
+    RUN dnf clean all
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/openshift-online/access-transparency-service
+  to: golang-plus
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    make db/setup
+    make test
+  container:
+    from: golang-plus
+  nested_podman: true
+- as: integration
+  capabilities:
+  - nested-podman
+  commands: |
+    unset GOFLAGS
+    echo "Go Version: $(go version)"
+    cp /opt/app-root/ats-secrets/* /opt/app-root/src/access-transparency-service/secrets/
+    make db/setup
+    make test-integration
+  container:
+    from: golang-plus
+  nested_podman: true
+  secrets:
+  - mount_path: /opt/app-root/ats-secrets
+    name: openshift-online-ats-secrets
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: access-transparency-service

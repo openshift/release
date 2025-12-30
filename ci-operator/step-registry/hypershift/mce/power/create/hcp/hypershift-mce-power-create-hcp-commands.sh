@@ -19,13 +19,7 @@ curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /t
 curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/bin/yq && chmod +x /tmp/bin/yq
 export PATH=$PATH:/tmp/bin
 
-MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HYPERSHIFT_CLI_NAME=hcp
-if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
- echo "MCE version is less than 2.4, use hypershift command"
- HYPERSHIFT_CLI_NAME=hypershift
-fi
-
 # Installing hypershift cli
 echo "$(date) Installing hypershift cli"
 mkdir /tmp/${HYPERSHIFT_CLI_NAME}_cli
@@ -84,6 +78,10 @@ data:
       prefix = ""
 
       [[registry.mirror]]
+        location = "quay.io:443/acm-d"
+        insecure = false
+
+      [[registry.mirror]]
         location = "brew.registry.redhat.io/multicluster-engine"
         insecure = false
 EOF
@@ -97,6 +95,10 @@ cat <<EOF | oc create -f -
 apiVersion: agent-install.openshift.io/v1beta1
 kind: AgentServiceConfig
 metadata:
+  annotations:
+    # TODO: Remove after OCPBUGS-55106 is fixed
+    # OCPBUGS-55106 workaround
+    unsupported.agent-install.openshift.io/assisted-service-allow-unrestricted-image-pulls: 'true'
   name: agent
 spec:
   databaseStorage:
@@ -144,8 +146,12 @@ fi
 SSH_PUB_KEY_FILE="${AGENT_POWER_CREDENTIALS}/ssh-publickey"
 
 # Set RENDER_COMMAND based on MCE_VERSION
-# >2.6: "--render-sensitive --render", else: "--render"
-RENDER_COMMAND=$( (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" > 2.6)}') )) && echo "--render-sensitive --render" || echo "--render" )
+# >= 2.7: "--render-sensitive --render", else: "--render"
+if [[ "$(printf '%s\n' "2.7" "$MCE_VERSION" | sort -V | head -n1)" == "2.7" ]]; then
+  extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
+else
+  extra_flags+="--render > /tmp/hc.yaml "
+fi
 
 ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --name=${HOSTED_CLUSTER_NAME} \
@@ -159,7 +165,7 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent ${ICSP_COMMAND} \
     --control-plane-availability-policy=${CP_AVAILABILITY_POLICY} \
     --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --node-pool-replicas -1 \
-    ${RENDER_COMMAND} > /tmp/hc-manifests/cluster-agent.yaml
+    ${extra_flags} > /tmp/hc-manifests/cluster-agent.yaml
 
 # Split the manifest to replace routing strategy of various services
 csplit -f /tmp/hc-manifests/manifest_ -k /tmp/hc-manifests/cluster-agent.yaml /---/ "{5}"

@@ -23,13 +23,13 @@ CONFIG = {
     },
     'aws-3-quota-slice': {
         'us-east-1': 50,
-        'us-east-2': 35,
+        'us-east-2': 10,
         'us-west-1': 35,
-        'us-west-2': 35,
+        'us-west-2': 25,
     },
     'aws-4-quota-slice': {
         'us-east-1': 50,
-        'us-east-2': 35,
+        'us-east-2': 4,
         'us-west-1': 35,
         'us-west-2': 35,
     },
@@ -40,8 +40,8 @@ CONFIG = {
         'us-west-2': 35,
     },
     'aws-cspi-qe-quota-slice': {
-        'us-east-1': 30,
         'us-east-2': 30,
+        'us-west-2': 30,
     },
     'aws-managed-cspi-qe-quota-slice': {
         'us-east-1': 10,
@@ -96,8 +96,8 @@ CONFIG = {
     'aws-perfscale-qe-quota-slice': {
         'us-west-2': 20,
     },
-    'metal-perscale-cpt-quota-slice': {
-        'rdu3': 1,
+    'metal-perfscale-cpt-quota-slice': {
+        'metal-perfscale-cpt-rdu3': 1,
     },
     'metal-perfscale-jetlag-quota-slice': {
         'metal-perfscale-jetlag-rdu3': 1,
@@ -111,6 +111,10 @@ CONFIG = {
     'metal-perfscale-telco-quota-slice': {
         'metal-perfscale-telco-rdu2': 1,
     },
+    'aws-restricted-qe-quota-slice': {
+        'us-east-1': 5,
+        'ap-northeast-1': 5,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
@@ -120,7 +124,7 @@ CONFIG = {
     },
     'aws-sustaining-autorelease-412-quota-slice': {
         # We can re-configure later as per requirement
-        'us-east-1': 25,
+        'us-east-1': 60,
     },
     'aws-rhtap-qe-quota-slice': {
         'us-east-1': 10
@@ -153,6 +157,9 @@ CONFIG = {
         'us-west-1': 60,
         'us-west-2': 60,
     },
+    'aws-confidential-qe-quota-slice': {
+        'us-east-2': 6,
+    },
     'aws-devfile-quota-slice': {
         'us-west-2': 10
     },
@@ -163,16 +170,16 @@ CONFIG = {
         'us-west-2': 10,
     },
     'azure4-quota-slice': {
-        'centralus': 33,
-        'eastus': 8,
-        'eastus2': 8,
-        'westus': 8
+        'centralus': 14,
+        'eastus': 14,
+        'eastus2': 14,
+        'westus': 14
     },
     'azure-2-quota-slice': {
         'centralus': 33,
-        'eastus': 8,
-        'eastus2': 8,
-        'westus': 8
+        'eastus': 33,
+        'eastus2': 33,
+        'westus': 33
     },
     'azure-arm64-quota-slice': {
         'centralus': 33,
@@ -203,7 +210,7 @@ CONFIG = {
         'centralus': 10
     },
     'azure-observability-quota-slice': {
-        'centralus': 30
+        'westus': 3
     },
     'azure-hcp-qe-quota-slice': {
         'westus': 5,
@@ -231,16 +238,46 @@ CONFIG = {
         'usgovtexas': 5
     },
     'azure-sustaining-autorelease-412-quota-slice': {
-        'eastus': 25,
+        'eastus': 60,
     },
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
     },
+    'aro-hcp-int-quota-slice': {
+        'default': 1,
+    },
+    'aro-hcp-stg-quota-slice': {
+        'default': 3,
+    },
+    'aro-hcp-prod-quota-slice': {
+        'default': 3,
+    },
+    'aro-hcp-dev-quota-slice': {
+        'default': 10,
+    },
+    'aro-hcp-test-tenant-quota-slice': {
+        'default': 10,
+    },
+    'aro-hcp-test-msi-containers-dev': {
+        'rg': 120,
+    },
+    'aro-hcp-test-msi-containers-int': {
+        'rg': 120,
+    },
+    'aro-hcp-test-msi-containers-stg': {
+        'rg': 120,
+    },
+    'aro-hcp-test-msi-containers-prod': {
+        'rg': 120,
+    },
     'equinix-ocp-metal-quota-slice': {
-        'default': 120,
+        'default': 140,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
+    },
+    'aws-sandboxed-containers-operator-quota-slice': {
+        'us-east-2': 10,
     },
     'oex-aws-qe-quota-slice': {
         'default': 40,
@@ -266,8 +303,11 @@ CONFIG = {
     'gcp-autorelease-qe-quota-slice': {
         'us-central1': 7,
     },
+    'gcp-confidential-qe-quota-slice': {
+        'us-central1': 6,
+    },
     'gcp-sustaining-autorelease-412-quota-slice': {
-        'us-east1': 25,
+        'us-east1': 60,
     },
     'gcp-quota-slice': {
         'us-central1': 70,
@@ -295,7 +335,6 @@ CONFIG = {
     'libvirt-s390x-vpn-quota-slice': {
         'libvirt-s390x-0-1': 1
     },
-    'libvirt-ppc64le-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -309,7 +348,8 @@ CONFIG = {
     'nutanix-qe-flow-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-vexxhost-quota-slice': {
-        'default': 18,
+        # 3 * 512GB RAM, 96 cores (with 4x overcommit) hosts
+        'default': 15,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,
@@ -373,6 +413,9 @@ CONFIG = {
     'hypershift-quota-slice': {
         'default': 50,
     },
+    'powervc-1-quota-slice': {
+        'default': 4,
+    },
     'powervs-1-quota-slice': {
         'mon01': 1,
         'osa21': 1,
@@ -390,6 +433,7 @@ CONFIG = {
     'powervs-5-quota-slice': {},
     'powervs-6-quota-slice': {},
     'powervs-7-quota-slice': {},
+    'powervs-8-quota-slice': {},
     'powervs-multi-1-quota-slice': {
         'wdc06': 2,
     },
@@ -424,7 +468,7 @@ CONFIG = {
         'us-east-1': 10,
     },
     'hypershift-hive-quota-slice': {
-        'default': 80
+        'default': 10,
     },
     'aws-virtualization-quota-slice': {
         'us-east-1': 5,
@@ -569,16 +613,23 @@ CONFIG = {
         'us-east-1': 15,
         'us-east-2': 15,
     },
+    'azure-oadp-qe-quota-slice': {
+        'centralus': 10,
+        'eastus': 10,
+        'eastus2': 10,
+    },
+    'aws-lp-chaos-quota-slice': {
+        'us-west-2': 10,
+    },
+    'metal-redhat-gs-quota-slice': {
+        'default': 1,
+    },
 }
 
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
-# Excluding Mihawk0 from lease pool due to S2S migration
-for i in range(1, 3):
-    for j in range(4):
-        CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
-for i in range(0, 2):
+for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):
@@ -634,6 +685,9 @@ for i in range(4):
 
 for i in range(4):
     CONFIG['powervs-7-quota-slice']['lon06-powervs-7-quota-slice-{}'.format(i)] = 1
+
+for i in range(2):
+    CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
 
 
 config = {

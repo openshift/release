@@ -1,18 +1,18 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-controller:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
@@ -20,15 +20,15 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.15
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   dev-scripts:
@@ -49,38 +49,20 @@ images:
   to: assisted-installer-agent-src
 promotion:
   to:
-  - name: ocm-2.15
+  - name: ocm-2.16
     namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: publish-multi-arch-images
-  postsubmit: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      DOCKERFILE_IMAGE_PAIRS: |
-        Dockerfile.assisted_installer_agent , quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
-      DRY_RUN: "false"
-    workflow: assisted-tools-multi-arch
-- always_run: false
-  as: publish-multi-arch-images-dry-run
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      DOCKERFILE_IMAGE_PAIRS: |
-        Dockerfile.assisted_installer_agent , quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
-    workflow: assisted-tools-multi-arch
 - as: mirror-nightly-image
   cron: '@daily'
   steps:
@@ -133,29 +115,33 @@ tests:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
 - as: subsystem-test
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-ofcir-agent
 - as: subsystem-test-periodic
-  cluster: build05
+  capabilities:
+  - intranet
   cron: 00 09 * * 0-5
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-ofcir-agent
 - always_run: false
-  as: e2e-metal-assisted-4-19
-  cluster: build05
+  as: e2e-metal-assisted-4-20
+  capabilities:
+  - intranet
   pipeline_run_if_changed: ^(hack/.*|pkg/.*|src/.*|scripts/.*|vendor/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore)$
   steps:
     cluster_profile: packet-assisted
     env:
-      ASSISTED_CONFIG: OPENSHIFT_VERSION=4.19
+      ASSISTED_CONFIG: OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-ipv6-4-19
-  cluster: build05
+  as: e2e-metal-assisted-ipv6-4-20
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -163,22 +149,24 @@ tests:
       ASSISTED_CONFIG: |
         IPv6=yes
         IPv4=no
-        OPENSHIFT_VERSION=4.19
+        OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-single-node-4-19
-  cluster: build05
+  as: e2e-metal-assisted-single-node-4-20
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         NUM_MASTERS=1
-        OPENSHIFT_VERSION=4.19
+        OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-cnv-4-19
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -194,8 +182,9 @@ tests:
         WORKER_CPU=5
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-lvm-4-19
-  cluster: build05
+  as: e2e-metal-assisted-lvm-4-20
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -207,11 +196,12 @@ tests:
         MASTER_MEMORY=25600
         MASTER_CPU=9
         MASTER_DISK_COUNT=2
-        OPENSHIFT_VERSION=4.19
+        OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-metal-assisted-odf-4-19
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -222,19 +212,21 @@ tests:
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-day2-4-19
-  cluster: build05
+  as: e2e-metal-assisted-day2-4-20
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
-        OPENSHIFT_VERSION=4.19
+        OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-upgrade-agent-4-19
-  cluster: build05
+  as: e2e-metal-assisted-upgrade-agent-4-20
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -242,12 +234,13 @@ tests:
       ASSISTED_CONFIG: |
         TEST=./src/tests/test_upgrade_agent.py
         TEST_FUNC=test_upgrade_agent
-        OPENSHIFT_VERSION=4.19
+        OPENSHIFT_VERSION=4.20
       TEST_TYPE: none
     workflow: assisted-ofcir-baremetal
 - always_run: false
   as: e2e-ai-operator-ztp
-  cluster: build05
+  capabilities:
+  - intranet
   pipeline_run_if_changed: ^(hack/.*|pkg/.*|src/.*|scripts/.*|vendor/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore)$
   steps:
     cluster_profile: packet-assisted
@@ -259,24 +252,25 @@ tests:
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal-operator-ztp
 - always_run: false
-  as: e2e-oci-assisted-4-19
+  as: e2e-oci-assisted-4-20
   optional: true
   steps:
     cluster_profile: oci-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.19
+        OPENSHIFT_VERSION=4.20
     workflow: assisted-oci
 - always_run: false
-  as: e2e-metal-assisted-external-4-19
-  cluster: build05
+  as: e2e-metal-assisted-external-4-20
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
-        OPENSHIFT_VERSION=4.19
+        OPENSHIFT_VERSION=4.20
     workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: master

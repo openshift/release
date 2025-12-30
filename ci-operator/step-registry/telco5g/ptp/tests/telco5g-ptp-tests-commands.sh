@@ -88,10 +88,11 @@ spec:
           export IMG=PTP_IMAGE
           export T5CI_VERSION="T5CI_VERSION_VAL"
           export LATEST_RELEASE="LATEST_RELEASE_VAL"
+          export USE_UPSTREAM="USE_UPSTREAM_VAL"
 
           # run latest release on upstream main branch
-          if [[ "$T5CI_VERSION" == "$LATEST_RELEASE" ]]; then
-            echo "Running latest release $LATEST_RELEASE on upstream main branch"
+          if [[ "${USE_UPSTREAM:-false}" == "true" ]]; then
+            echo "Running on upstream main branch"
             git clone --single-branch --branch main https://github.com/k8snetworkplumbingwg/ptp-operator.git
           else
             git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
@@ -139,6 +140,7 @@ spec:
   jobdefinition=$(sed "s#PTP_IMAGE#${IMG}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#T5CI_VERSION_VAL#${T5CI_VERSION}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#LATEST_RELEASE_VAL#${LATEST_RELEASE}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#USE_UPSTREAM_VAL#${T5CI_DEPLOY_UPSTREAM:-false}#" <<<"$jobdefinition")
   #oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged
 
   retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
@@ -161,16 +163,15 @@ spec:
     sleep $sleep_time
   done
 
+  # print the build logs
+  oc -n openshift-ptp logs podman
+
   if [[ $success -eq 1 ]]; then
     echo "[INFO] index build succeeded"
   else
     echo "[ERROR] index build failed"
     exit 1
   fi
-
-  # print the build logs
-  oc -n openshift-ptp logs podman
-
 }
 
 # Define the function to retry a command with a timeout
@@ -235,7 +236,7 @@ export CNF_ORIGIN_TESTS
 export TEST_BRANCH="main"
 
 # run latest release on upstream main branch
-if [[ "$T5CI_VERSION" == "$LATEST_RELEASE" ]]; then
+if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
   export PTP_UNDER_TEST_BRANCH="main"
 else
   export PTP_UNDER_TEST_BRANCH="release-${T5CI_VERSION}"
@@ -264,9 +265,8 @@ export IMG=image-registry.openshift-image-registry.svc:5000/openshift-ptp/ptp-op
 build_images
 
 # deploy ptp-operator
-# run latest release on upstream main branch
-if [[ "$T5CI_VERSION" == "$LATEST_RELEASE" ]]; then
-  echo "Running latest release $LATEST_RELEASE on upstream main branch"
+if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
+  echo "Running on upstream main branch"
   git clone https://github.com/k8snetworkplumbingwg/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 else
   git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
@@ -325,8 +325,8 @@ cd ptp-operator-conformance-test
 cat <<'EOF' >"${SHARED_DIR}"/test-config.yaml
 ---
 global:
- maxoffset: 100
- minoffset: -100
+  maxoffset: 100
+  minoffset: -100
 soaktest:
   disable_all: false
   event_output_file: "./event-output.csv"
@@ -369,6 +369,13 @@ soaktest:
             cpu_threshold_mcores: 40
     desc: "The test measures PTP CPU usage and fails if >15mcores"
 EOF
+
+
+# Setup log collection with test markers
+export COLLECT_POD_LOGS=${COLLECT_POD_LOGS:-true}
+export LOG_TEST_MARKERS=true
+export LOG_ARTIFACTS_DIR="${ARTIFACT_DIR}/pod-logs"
+mkdir -p $LOG_ARTIFACTS_DIR
 
 # Set output directory
 export JUNIT_OUTPUT_DIR=${ARTIFACT_DIR}

@@ -15,10 +15,6 @@ base_images:
     name: prow-scripts
     namespace: chaos
     tag: latest
-  upi-installer:
-    name: "4.18"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
@@ -71,6 +67,7 @@ tests:
 - as: chaos-aws-loaded-upgrade-418to419-pod-scenarios
   cron: 0 12 11 * *
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: aws-chaos
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
@@ -94,10 +91,10 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     workflow: openshift-qe-upgrade
-  timeout: 8h0m0s
 - as: chaos-aws-loaded-upgrade-418to419-node-scenarios
   cron: 0 1 11 * *
   steps:
+    allow_best_effort_post_steps: true
     cluster_profile: aws-chaos
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
@@ -124,10 +121,11 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     workflow: openshift-qe-upgrade
-  timeout: 8h0m0s
 - as: chaos-aws-ipsec-loaded-upgrade-418to419-pod-scenarios
   cron: 0 12 11 * *
   steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     cluster_profile: aws-chaos
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
@@ -154,10 +152,11 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     workflow: openshift-qe-upgrade
-  timeout: 8h0m0s
 - as: chaos-aws-ipsec-loaded-upgrade-418to419-node-scenarios
   cron: 0 1 11 * *
   steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     cluster_profile: aws-chaos
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
@@ -187,10 +186,11 @@ tests:
     - chain: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     workflow: openshift-qe-upgrade
-  timeout: 8h0m0s
 - as: chaos-gcp-loaded-upgrade-418to419-node-scenarios
   cron: 0 12 5 * *
   steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     cluster_profile: gcp-chaos
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
@@ -209,10 +209,11 @@ tests:
     - ref: redhat-chaos-start-krkn
     - ref: openshift-qe-upgrade
     workflow: openshift-qe-installer-gcp
-  timeout: 8h0m0s
 - as: chaos-gcp-loaded-upgrade-418to419-pod-scenarios
   cron: 0 12 5 * *
   steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
     cluster_profile: gcp-chaos
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
@@ -231,10 +232,10 @@ tests:
     - ref: redhat-chaos-start-krkn
     - ref: openshift-qe-upgrade
     workflow: openshift-qe-installer-gcp
-  timeout: 8h0m0s
 - as: chaos-gcp-fipsetcd-loaded-upgrade-418to419-node-scenarios
   cron: 0 12 5 * *
   steps:
+    allow_best_effort_post_steps: true
     allow_skip_on_success: true
     cluster_profile: gcp-chaos
     dependencies:
@@ -256,10 +257,10 @@ tests:
     - ref: redhat-chaos-start-krkn
     - ref: openshift-qe-upgrade
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
-  timeout: 8h0m0s
 - as: chaos-gcp-fipsetcd-loaded-upgrade-418to419-pod-scenarios
   cron: 0 12 5 * *
   steps:
+    allow_best_effort_post_steps: true
     allow_skip_on_success: true
     cluster_profile: gcp-chaos
     dependencies:
@@ -277,14 +278,14 @@ tests:
       - redhat-chaos-cerberus
       - redhat-chaos-pod-scenarios-random-system-pods-observer
     test:
-    - chain: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     - ref: openshift-qe-upgrade
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
-  timeout: 8h0m0s
 - always_run: false
   as: chaos-azure-multi-upgrade-418to419-3nodes-pod-scenarios
   steps:
+    allow_best_effort_post_steps: true
     allow_skip_on_success: true
     cluster_profile: azure-qe
     dependencies:
@@ -314,11 +315,10 @@ tests:
     test:
     - ref: ipi-install-heterogeneous
     - chain: workers-scale
-    - chain: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     - ref: openshift-qe-upgrade
     workflow: openshift-qe-installer-azure
-  timeout: 8h0m0s
 - always_run: false
   as: chaos-azure-multi-upgrade-418to419-3nodes-node-scenarios
   steps:
@@ -351,11 +351,10 @@ tests:
     test:
     - ref: ipi-install-heterogeneous
     - chain: workers-scale
-    - chain: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     - ref: openshift-qe-upgrade
     workflow: openshift-qe-installer-azure
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-chaos

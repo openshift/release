@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.23
 releases:
   initial:
     integration:
@@ -19,7 +19,7 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: e2e-aws-ocp4-moderate
+- as: e2e-aws-openshift-platform-compliance
   steps:
     cluster_profile: quay-aws
     env:
@@ -30,9 +30,24 @@ tests:
       cli: latest
       commands: |
         export SKIP_CONTAINER_PUSH=true
-        export PROFILE=moderate
-        export PRODUCT=ocp4
-        make e2e
+        make e2e-platform
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-openshift-node-compliance
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BASE_DOMAIN: quay.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export SKIP_CONTAINER_PUSH=true
+        make e2e-node
       from: src
       resources:
         requests:
@@ -50,7 +65,7 @@ tests:
         export SKIP_CONTAINER_PUSH=true
         export PROFILE=cis
         export PRODUCT=ocp4
-        make e2e
+        make e2e-profile-remediations
       from: src
       resources:
         requests:
@@ -61,7 +76,6 @@ tests:
     cluster_profile: quay-aws
     env:
       BASE_DOMAIN: quay.devcluster.openshift.com
-      FIPS_ENABLED: "true"
     test:
     - as: test
       cli: latest
@@ -69,7 +83,7 @@ tests:
         export SKIP_CONTAINER_PUSH=true
         export PROFILE=stig
         export PRODUCT=ocp4
-        make e2e
+        make e2e-profile-remediations
       from: src
       resources:
         requests:
@@ -80,7 +94,6 @@ tests:
     cluster_profile: quay-aws
     env:
       BASE_DOMAIN: quay.devcluster.openshift.com
-      FIPS_ENABLED: "true"
     test:
     - as: test
       cli: latest
@@ -88,7 +101,7 @@ tests:
         export SKIP_CONTAINER_PUSH=true
         export PROFILE=moderate
         export PRODUCT=rhcos4
-        make e2e
+        make e2e-profile-remediations
       from: src
       resources:
         requests:
