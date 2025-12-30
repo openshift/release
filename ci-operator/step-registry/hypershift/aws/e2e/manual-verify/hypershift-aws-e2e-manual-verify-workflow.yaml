@@ -1,0 +1,34 @@
+workflow:
+  as: hypershift-aws-e2e-manual-verify
+  documentation: |-
+    The HyperShift aws e2e manual verification workflow creates a test cluster
+    and then pauses for manual verification before running automated tests.
+
+    This workflow creates a HostedCluster with NodePools during the pre-phase,
+    then pauses to allow manual inspection of actual NodePool instances and
+    API configuration before proceeding with the full e2e test suite.
+
+    Administrative access to the control plane is provided via the `KUBECONFIG`
+    environment variable.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create
+    test:
+    - ref: hypershift-aws-wait-for-manual-verification
+    - ref: hypershift-aws-run-e2e-external
+    post:
+    - chain: hypershift-destroy-nested-management-cluster
