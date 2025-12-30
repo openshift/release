@@ -27,7 +27,7 @@ oc wait --timeout=15m --for=condition=Available --namespace=clusters "hostedclus
 echo "Waiting for the console operator to be degraded"
 timeout=1800 # 30min
 SECONDS=0
-until [[ "$(oc get -n clusters hostedcluster/"${cluster_name}" -ojsonpath='{.status.conditions[?(@.type=="ClusterVersionSucceeding")]}' | grep "False" | grep "ClusterOperatorNotAvailable" | grep "Cluster operator console is not available")" != "" ]]; do
+until [[ "$(oc get -n clusters hostedcluster/"${cluster_name}" -ojsonpath='{.status.conditions[?(@.type=="ClusterVersionSucceeding")]}' | grep "False" | grep "console")" != "" ]]; do
     sleep 15
     if (( SECONDS >= timeout )); then
         exit 1
