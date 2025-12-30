@@ -52,6 +52,7 @@ echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
 echo "NTO Configuration Environment Variables:"
 echo "  CONTAINER_RUNTIME=${CONTAINER_RUNTIME}"
+echo "  CGROUP_VERSION=${CGROUP_VERSION}"
 echo "  RT_KERNEL=${RT_KERNEL}"
 echo "  HUGEPAGES_DEFAULT_SIZE=${HUGEPAGES_DEFAULT_SIZE}"
 echo "  HUGEPAGES_PAGES=${HUGEPAGES_PAGES}"
@@ -71,6 +72,7 @@ EXTRA_VARS="${EXTRA_VARS} rt_kernel=${RT_KERNEL}"
 EXTRA_VARS="${EXTRA_VARS} high_power_consumption=${HIGH_POWER_CONSUMPTION}"
 EXTRA_VARS="${EXTRA_VARS} per_pod_power_management=${PER_POD_POWER_MANAGEMENT}"
 EXTRA_VARS="${EXTRA_VARS} artifacts_folder=${ARTIFACT_DIR}"
+EXTRA_VARS="${EXTRA_VARS} cgroup_version=${CGROUP_VERSION}"
 EXTRA_VARS="${EXTRA_VARS} day0_installation=${DAY0_INSTALLATION}"
 
 # Handle hugepages configuration
