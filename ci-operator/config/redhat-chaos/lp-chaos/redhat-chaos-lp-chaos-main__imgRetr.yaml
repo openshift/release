@@ -1,0 +1,37 @@
+resources:
+  '*':
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: img-retr
+  steps:
+    test:
+    - as: img-retr--0
+      commands: shopt -op; shopt -p; set -x; set +eu -o pipefail; shopt -s inherit_errexit;  true
+      credentials:
+      - collection: ""
+        mount_path: /secret/telemetry
+        name: cluster-secrets-aws-chaos
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secret/es
+        name: ocp-qe-perfscale-es
+        namespace: test-credentials
+      from_image:
+        name: prow-scripts
+        namespace: chaos
+        tag: latest
+      resources:
+        limits:
+          memory: 1Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: lp-chaos
+  variant: imgRetr
