@@ -804,3 +804,6 @@ fi
 CLUSTER_ID=$(cat "${CLUSTER_INFO}" | grep '^ID:' | tr -d '[:space:]' | cut -d ':' -f 2)
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
+
+# Pause for the job to stick around so HCM can investigate
+sleep 7200
