@@ -26,8 +26,8 @@ tests:
     - ref: olmv1-performance
     - ref: openshift-qe-orion-olmv1
     workflow: openshift-qe-installer-gcp
-- always_run: false
-  as: control-plane-etcd-fips-24nodes
+- as: control-plane-etcd-fips-24nodes
+  cron: 0 15 4,18 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
@@ -37,8 +37,9 @@ tests:
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
-- always_run: false
-  as: node-density-heavy-etcd-fips-24nodes
+  timeout: 5h0m0s
+- as: node-density-heavy-etcd-fips-24nodes
+  cron: 0 13 5,19 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
@@ -48,6 +49,7 @@ tests:
     test:
     - ref: openshift-qe-node-density-heavy
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+  timeout: 5h0m0s
 - always_run: false
   as: control-plane-24nodes
   steps:
@@ -70,6 +72,7 @@ tests:
     - ref: openshift-qe-perfscale-gcp-data-path-fw
     - chain: openshift-qe-data-path-tests
     workflow: openshift-qe-installer-gcp
+  timeout: 6h0m0s
 - always_run: false
   as: node-density-heavy-24nodes
   steps:
@@ -103,6 +106,7 @@ tests:
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-gcp-ipi-ovn-ipsec
+  timeout: 5h0m0s
 - always_run: false
   as: control-plane-etcd-fips-120nodes
   steps:
@@ -116,6 +120,20 @@ tests:
     test:
     - chain: openshift-qe-control-plane
     workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+  timeout: 7h0m0s
+    workflow: openshift-qe-installer-gcp
+- always_run: false
+  as: data-path-etcd-fips
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "9"
+    test:
+    - ref: openshift-qe-perfscale-gcp-data-path-fw
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
