@@ -182,6 +182,13 @@ function post-OCP-53921(){
         echo "Fail to get cluster version!"
         return 1
     fi
+    recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates')
+    if [[ "${version}" == *"${recommends}"* ]]; then
+        echo "current version ${version} should not in recommended updates: ${recommends}"
+        return 1
+    else
+	echo "No installed version found in recommended updates as expected!"
+    fi
     x_ver=$( echo "${version}" | cut -f1 -d. )
     y_ver=$( echo "${version}" | cut -f2 -d. )
     y_ver=$((y_ver+1))
@@ -190,11 +197,27 @@ function post-OCP-53921(){
         echo "Fail to change channel to candidate-${ver}!"
         return 1
     fi
-    recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates')
-    if [[ "${recommends}" == "null" ]]; then
-        echo "No recommended update available!"
+    local retry=3
+    while (( retry > 0 ));do
+        versions=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates[]?.version'| xargs)
+        if [[ -z "${versions}" ]]; then
+            retry=$((retry - 1))
+            sleep 60
+            echo "No recommended update available! Retry..."
+        else
+            if [[ "${version}" == *"${versions}"* ]]; then
+                echo "Current version ${version} should not in recommended updates: ${versions}!"
+                return 1
+            fi
+            echo "No installed version found in recommended updates as expected!"
+            break
+        fi
+    done
+    if (( retry == 0 )); then
+        echo "Timeout to get recommended update!" 
         return 1
     fi
+    recommends=$(oc get clusterversion version -o json|jq -r '.status.availableUpdates')
     mapfile -t images < <(echo ${recommends}|jq -r '.[].image')
     if [ -z "${images[*]}" ]; then
         echo "No image extracted from recommended update!"
