@@ -553,6 +553,18 @@ tests:
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     workflow: cucushift-installer-rehearse-azure-cases-bootstrap
+- as: azure-ipi-byo-subnets-perm-mini-amd-f14
+  cron: 53 0 14,28 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_BYO_COMPUTE_SUBNETS_NUMBER: "3"
+      AZURE_BYO_SUBNETS_ENABLED: "yes"
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-sharednetwork
 - as: azure-ipi-confidentialvm-vmgueststateonly-compute-f28
   cron: 32 4 21 * *
   steps:
@@ -1005,6 +1017,29 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
+- as: azure-mag-ipi-nat-gateway-mzone-amd-f14
+  cron: 39 13 16,30 * *
+  steps:
+    cluster_profile: azuremag-qe
+    env:
+      BASE_DOMAIN: qemag.azure.devcluster.openshift.com
+      CUSTOM_AZURE_REGION: usgovvirginia
+      OUTBOUND_TYPE: NATGatewayMultiZone
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-mag-ipi-nat-gateway
+- as: azure-mag-ipi-nat-gateway-mzone-byo-subnets-amd-f14
+  cron: 45 8 6,22 * *
+  steps:
+    cluster_profile: azuremag-qe
+    env:
+      AZURE_BYO_COMPUTE_SUBNETS_NUMBER: "2"
+      BASE_DOMAIN: qemag.azure.devcluster.openshift.com
+      CUSTOM_AZURE_REGION: usgovvirginia
+      OUTBOUND_TYPE: NATGatewayMultiZone
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-mag-ipi-nat-gateway-byo-subnets
 - as: azure-upi-custom-nsg-f28
   cron: 55 3 18 * *
   steps:
