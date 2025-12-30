@@ -34,7 +34,7 @@ CONSOLE_REDIRECT_URIS="$(az ad app show --id "$CONSOLE_CLIENT_ID" --query 'web.r
 LOCK_ACCOUNT_NAME="$(</var/run/hypershift-azure-lock-blob/account-name)"
 LOCK_BLOB_NAME="$(</var/run/hypershift-azure-lock-blob/blob-name)"
 LOCK_CONTAINER_NAME="$(</var/run/hypershift-azure-lock-blob/container-name)"
-while ! az storage blob lease acquire --container-name "$LOCK_CONTAINER_NAME" --blob-name "$LOCK_BLOB_NAME" --account-name "$LOCK_ACCOUNT_NAME" --lease-duration 15 --auth-mode login; do
+while ! az storage blob lease acquire --container-name "$LOCK_CONTAINER_NAME" --blob-name "$LOCK_BLOB_NAME" --account-name "$LOCK_ACCOUNT_NAME" --lease-duration 15 --auth-mode key; do
     echo "Waiting for lease"
     sleep 60
 done
