@@ -189,7 +189,6 @@ zz_generated_metadata:
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `TELEMETRY_GROUP` | Telemetry grouping identifier | `prow-ocp-4.20` |
-| `CHURN` | Enable workload churn | `"true"` or `"false"` |
 | `GC` | Garbage collection | `"false"` |
 | `ITERATION_MULTIPLIER_ENV` | Test iteration multiplier | `"11"` |
 | `SPOT_INSTANCES` | Use spot instances | `"true"` or `"false"` |
