@@ -236,3 +236,13 @@ echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+echo "Display all hostedclusters and nodepools"
+oc get hostedcluster -A
+oc get nodepool -A
+
+echo "Display all machines ..."
+oc get machines -A
+
+echo "Display all vmi ..."
+oc get vmi -A
