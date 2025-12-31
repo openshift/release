@@ -87,7 +87,14 @@ export ANSIBLE_REMOTE_TEMP="/tmp"
 ansible-playbook ./playbooks/compute/config-cluster.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "${EXTRA_VARS}"
 
-echo "Copy generated artifacts to shared directory"
-cp -v ${ARTIFACT_DIR}/*.yml ${SHARED_DIR}/ 2>/dev/null || echo "No YAML artifacts found to copy"
 
-echo "Compute-NTO configuration completed successfully"
+grep ansible_ssh_private_key -A 100 "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "/tmp/temp_ssh_key"
+
+chmod 600 "/tmp/temp_ssh_key"
+BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
+
+
+echo "Copy logs and artifacts to artifacts directory"
+scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
+    "${BASTION_USER}@${BASTION_IP}":/tmp/artifacts/* "${ARTIFACT_DIR}"
