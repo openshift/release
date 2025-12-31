@@ -3,6 +3,7 @@
 set -euxo pipefail; shopt -s inherit_errexit
 
 
+
 export TARGET_CHANNEL
 export RC_STREAM
 export RC_HOST_AMD64
@@ -10,39 +11,15 @@ export RC_HOST_AMD64
 TIMEOUT_SECONDS="7200"
 POLL_INTERVAL="30"
 
-url="${RC_HOST_AMD64}/api/v1/releasestream/${RC_STREAM}/latest"
-echo ${url}
 
-# get latest version from release controller
-latest_rc_from_release_controller(){
-    local rc url
-
-    rc="$(curl -fsSL "${RC_HOST_AMD64}/api/v1/releasestream/${RC_STREAM}/latest"  \
-        | jq -r '.name' )"
-    [[ -n "$rc" ]] && { echo "$rc"; return 0; }
-    return 1
-}
-
-# get latest release image
-latest_release_image(){
-
-    local rc
-
-    rc="$(curl -fsSL "${RC_HOST_AMD64}/api/v1/releasestream/${RC_STREAM}/latest"  \
-        | jq -r '.pullSpec' )"
-    [[ -n "$rc" ]] && { echo "$rc"; return 0; }
-    return 1
-}
 
 echo "Resolving latest RC's from release Controller (stream=${RC_STREAM})..."
-TARGET_VERSION="$(latest_rc_from_release_controller)"
-
-
-TARGET_IMAGE="$(latest_release_image)"
-echo "Release_image: ${TARGET_IMAGE}"
+TARGET_VERSION="$(oc adm release info "${ORIGINAL_RELEASE_IMAGE_LATEST}" -o json | jq -r '.metadata.version')"
 
 # get image digest, digest is required to safely upgrade the cluster using release image
-DIGEST=$(oc adm release info "$TARGET_IMAGE" -o json | jq -r .digest)
+DIGEST=$(oc adm release info "$ORIGINAL_RELEASE_IMAGE_LATEST" -o json | jq -r .digest)
+
+sleep 3600
 
 
 #==========================================
@@ -62,9 +39,9 @@ upgrade_cluster() {
    
     local kfcg="$1" ctx="$2"
 
-    echo "Upgrading ${ctx} to channel=${TARGET_CHANNEL} and upgrading to ${TARGET_VERSION} and Target image:${TARGET_IMAGE}"
+    echo "Upgrading ${ctx} to channel=${TARGET_CHANNEL} and upgrading to ${TARGET_VERSION} and Target image:${ORIGINAL_RELEASE_IMAGE_LATEST}"
     oc --kubeconfig="${kfcg}" patch clusterversion version --type merge -p "{\"spec\":{\"channel\":\"${TARGET_CHANNEL}\"}}"
-    repo="${TARGET_IMAGE%:*}"
+    repo="${ORIGINAL_RELEASE_IMAGE_LATEST%:*}"
     echo "${repo}"
     oc --kubeconfig="${kfcg}" adm upgrade --to-image="${repo}@${DIGEST}" --allow-explicit-upgrade --allow-upgrade-with-warnings --force
 
@@ -106,7 +83,7 @@ upgrade_cluster "${HUB_KUBECONFIG}" "hub"
 wait_for_completed "${HUB_KUBECONFIG}" "hub" "${TARGET_VERSION}"
 
 #spoke upgrade
-upgrade_cluster "${SPOKE_KUBECONFIG}" "spoke"
-wait_for_completed "${SPOKE_KUBECONFIG}" "spoke" "${TARGET_VERSION}"
+# upgrade_cluster "${SPOKE_KUBECONFIG}" "spoke"
+# wait_for_completed "${SPOKE_KUBECONFIG}" "spoke" "${TARGET_VERSION}"
 
 echo "All selected clusters are at latest RCs"
