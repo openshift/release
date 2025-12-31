@@ -45,13 +45,21 @@ function create_catalog_sources() {
     # get cluster Major.Minor version
     kube_major=$(oc version -o json |jq -r '.serverVersion.major')
     kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
+    cluster_version="$(oc version -o json |jq -r '.openshiftVersion'|cut -d "." -f1-2)"
+    # update this when a new OCP version is GA
+    latest_version="4.21"
+    if [[ $(printf '%s\n' "$cluster_version" "$latest_version" | sort -V | head -n1) == "$latest_version" ]]; then
+         # cluster_version >= latest_version, we use the latest GA version
+         major="${cluster_version%.*}"
+         minor="${cluster_version#*.}"
+         cluster_version="${major}.$((minor - 1))"
+    fi
 
     if [ "${DISCONNECTED}" = "true" ]; then
-        index_image="$(sed 's/5000/6001/' "${SHARED_DIR}/mirror_registry_url")/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+        index_image="$(sed 's/5000/6001/' "${SHARED_DIR}/mirror_registry_url")/redhat/redhat-operator-index:v${cluster_version}"
     else
-        index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+        index_image="registry.redhat.io/redhat/redhat-operator-index:v${cluster_version}"
     fi
-    index_image_repo="${index_image%:*}"
 
     echo "create QE catalogsource: qe-app-registry"
     cat <<EOF | oc create -f -
@@ -61,7 +69,7 @@ metadata:
   name: qe-app-registry
   namespace: openshift-marketplace
   annotations:
-    olm.catalogImageTemplate: "${index_image_repo}:v{kube_major_version}.{kube_minor_version}"
+    olm.catalogImageTemplate: "${index_image}"
 spec:
   displayName: Production Operators
   image: ${index_image}
