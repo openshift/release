@@ -197,6 +197,18 @@ function install_yq_if_not_exists() {
     fi
 }
 
+function mapTestsForComponentReadiness() {
+
+    [[ ${MAP_TESTS:-false} != "true" ]] && return
+
+    results_file="${1}"
+    echo "Patching Tests Result File: ${results_file}"
+    if [ -f "${results_file}" ]; then
+        install_yq_if_not_exists
+        echo "Mapping Test Suite Name To: CNV-lp-interop"
+        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
+    fi
+}
 
 BIN_FOLDER=$(mktemp -d /tmp/bin.XXXX)
 OC_URL="https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/latest/openshift-client-linux.tar.gz"
@@ -230,8 +242,7 @@ unset KUBERNETES_PORT_443_TCP_PORT
 curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
 
 oc whoami --show-console
-# HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
-# If needed add `--tc "hco_subscription:${HCO_SUBSCRIPTION}"` to the pytest command
+HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
 
 oc get sc # Before
 setDefaultStorageClass 'ocs-storagecluster-ceph-rbd-virtualization'
@@ -243,18 +254,33 @@ uv --verbose --cache-dir /tmp/uv-cache \
     run pytest -o cache_dir=/tmp/pytest-cache \
     -s \
     -o log_cli=true \
-    --pytest-log-file="${ARTIFACT_DIR}/pytest.log" \
+    --pytest-log-file="${ARTIFACT_DIR}/tests.log" \
     --data-collector --data-collector-output-dir="${ARTIFACT_DIR}/" \
-    --junit-xml="${ARTIFACT_DIR}/junit_results.xml" \
-    --html="${ARTIFACT_DIR}/tests-report.html" \
-    --self-contained-html \
+    --junitxml "${JUNIT_RESULTS_FILE}" \
+    --html="${HTML_RESULTS_FILE}" --self-contained-html \
     --tc-file=tests/global_config.py \
     --tb=native \
     --tc default_storage_class:ocs-storagecluster-ceph-rbd-virtualization \
     --tc default_volume_mode:Block \
+    --tc "hco_subscription:${HCO_SUBSCRIPTION}" \
     --latest-rhel \
     --storage-class-matrix=ocs-storagecluster-ceph-rbd-virtualization \
     --leftovers-collector \
     -m smoke || rc=$?
+
+# TODO: Fix junit, spyglass still show "nil" for failed jobs.
+#       (This attempt didn't work)
+# if [[ -f "${JUNIT_RESULTS_FILE}" ]]; then
+#     cp -v "${JUNIT_RESULTS_FILE}" "${JUNIT_RESULTS_FILE}.original"
+#     xmllint --format "${JUNIT_RESULTS_FILE}.original" \
+#         | sed --regexp-extended 's#</?testsuites([^>]+)?>##g' \
+#         | xmllint --format - > "${JUNIT_RESULTS_FILE}"
+# fi
+
+# Map tests if needed for related use cases
+mapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
+
+# Send junit file to shared dir for Data Router Reporter step
+cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}"
 
 exit ${rc}
