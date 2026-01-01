@@ -1,0 +1,119 @@
+base_images:
+  das-daemonset:
+    name: "4.18"
+    namespace: ocp
+    tag: das-daemonset
+  das-scheduler:
+    name: "4.18"
+    namespace: ocp
+    tag: das-scheduler
+  das-webhook:
+    name: "4.18"
+    namespace: ocp
+    tag: das-webhook
+  instaslice-operator:
+    name: "4.18"
+    namespace: ocp
+    tag: instaslice-operator
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install -y skopeo git jq && dnf clean all
+  from: src
+  to: instaslice-base-src
+operator:
+  bundles:
+  - as: das-operator-bundle
+    context_dir: .
+    dockerfile_path: bundle-ocp.Dockerfile
+  substitutions:
+  - pullspec: quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator-next:latest
+    with: pipeline:instaslice-operator
+  - pullspec: quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-daemonset-next:latest
+    with: pipeline:das-daemonset
+  - pullspec: quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-webhook-next:latest
+    with: pipeline:das-webhook
+  - pullspec: quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-scheduler-next:latest
+    with: pipeline:das-scheduler
+releases:
+  initial:
+    release:
+      channel: fast
+      version: "4.19"
+  latest:
+    release:
+      channel: fast
+      version: "4.20"
+  target:
+    release:
+      channel: fast
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 2000m
+      memory: 200Mi
+tests:
+- as: periodic-e2e-upgrade-4-19-to-4-20-runc
+  cron: '@weekly'
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      DAEMONSET_IMAGE: das-daemonset
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+      OPERATOR_IMAGE: instaslice-operator
+      SCHEDULER_IMAGE: das-scheduler
+      WEBHOOK_IMAGE: das-webhook
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: a2-highgpu-1g
+      COMPUTE_ON_HOST_MAINTENANCE: Terminate
+      COMPUTE_ZONES: '[us-central1-f]'
+      EMULATED_MODE: disabled
+      IMAGE_REGISTRY: pipeline
+      IMAGE_TAG: e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-gcp-zones
+    - ref: ipi-conf-gcp-confidential-computing
+    - ref: openshift-manifests-runc
+    - ref: ovn-conf
+    - chain: ipi-install-stableinitial
+    test:
+    - ref: openshift-instaslice-operator-e2e-bundle-next-setup
+    - as: install-operator
+      cli: latest
+      commands: |
+        operator-sdk run bundle -n das-operator "$OO_BUNDLE" --timeout 10m0s
+      dependencies:
+      - env: OO_BUNDLE
+        name: das-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - ref: cucushift-upgrade-toimage
+    - ref: openshift-instaslice-operator-e2e-bundle-next-post-upgrade-wait
+    - ref: openshift-instaslice-operator-e2e-bundle-next-run-e2e
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: next
+  org: openshift
+  repo: instaslice-operator
+  variant: periodics-4-20-upgrade-from-4-19
