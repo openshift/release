@@ -6,7 +6,6 @@ set -o pipefail
 
 start_time=$SECONDS
 
-# --- Trap definition ---
 # This trap will be executed when the script exits for any reason (successful, error, or signal).
 trap 'debug_on_exit' EXIT
 
@@ -36,7 +35,12 @@ debug_on_exit() {
 
     runMustGather
     echo "    😴 😴 😴"
-    sleep 2h
+
+    # Use file flag so loop can be interrupted by removing the file
+    touch /tmp/debug_marker
+    while [[ -f /tmp/debug_marker ]]; do
+        sleep 60
+    done
   fi
 
   # exit with the original exit code.
@@ -78,16 +82,35 @@ function runMustGather() {
     # tar -czf must-gather-cnv.tar.gz must-gather-cnv || true
 }
 
+function retry() {
+    local max_retries=$1; shift
+    local delay=$1; shift
+    local count=0
+
+    until "$@"; do
+        exit_code=$?
+        count=$((count + 1))
+        if [ $count -lt $max_retries ]; then
+            echo "Command failed. Attempt $count/$max_retries. Retrying in $delay seconds..."
+            sleep $delay
+        else
+            echo "Command failed after $max_retries attempts."
+            return $exit_code
+        fi
+    done
+    return 0
+}
+
 #
 # Enable or disable Common Boot Image Import
 #
 # Inputs:
 #   * status - true / false
 function cnv::toggle_common_boot_image_import () {
-  local status="${1}"
-  oc patch hco kubevirt-hyperconverged -n openshift-cnv \
-    --type=merge \
-    -p "{\"spec\":{\"enableCommonBootImageImport\": ${status}}}"
+    local status="${1}"
+    retry 5 5 oc patch hco kubevirt-hyperconverged -n openshift-cnv \
+        --type=merge \
+        -p "{\"spec\":{\"enableCommonBootImageImport\": ${status}}}"
 
     # In some edge cases, the HCO deployment will be scaled down, and not scale up.
     oc scale deployment hco-operator --replicas 1 -n openshift-cnv
@@ -174,16 +197,16 @@ function install_yq_if_not_exists() {
     fi
 }
 
-
 function mapTestsForComponentReadiness() {
-    if [[ $MAP_TESTS == "true" ]]; then
-        results_file="${1}"
-        echo "Patching Tests Result File: ${results_file}"
-        if [ -f "${results_file}" ]; then
-            install_yq_if_not_exists
-            echo "Mapping Test Suite Name To: CNV-lp-interop"
-            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
-        fi
+
+    [[ ${MAP_TESTS:-false} != "true" ]] && return
+
+    results_file="${1}"
+    echo "Patching Tests Result File: ${results_file}"
+    if [ -f "${results_file}" ]; then
+        install_yq_if_not_exists
+        echo "Mapping Test Suite Name To: CNV-lp-interop"
+        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name="CNV-lp-interop"' $results_file
     fi
 }
 
@@ -195,7 +218,7 @@ export PATH="${BIN_FOLDER}:${PATH}"
 export OPENSHIFT_PYTHON_WRAPPER_LOG_FILE="${ARTIFACT_DIR}/openshift_python_wrapper.log"
 export JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_results.xml"
 export HTML_RESULTS_FILE="${ARTIFACT_DIR}/report.html"
-set +x # We don't wan't to see it in the logs
+set +x # We don't want to see it in the logs
 ARTIFACTORY_USER=$(head -1 "${BW_PATH}"/artifactory-user || printf ci-read-only-user)
 ARTIFACTORY_TOKEN=$(head -1 "${BW_PATH}"/artifactory-token)
 ARTIFACTORY_SERVER=$(head -1 "${BW_PATH}"/artifactory-server)
@@ -221,21 +244,21 @@ curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
 oc whoami --show-console
 HCO_SUBSCRIPTION=$(oc get subscription.operators.coreos.com -n openshift-cnv -o jsonpath='{.items[0].metadata.name}')
 
-# TODO: We might need to re-import all the images to utlize the new default storage class.
-oc get sc
+oc get sc # Before
 setDefaultStorageClass 'ocs-storagecluster-ceph-rbd-virtualization'
-oc get sc
+oc get sc # After
 cnv::reimport_datavolumes
 
 rc=0
-uv run --verbose --cache-dir /tmp/uv-cache pytest  \
+uv --verbose --cache-dir /tmp/uv-cache \
+    run pytest -o cache_dir=/tmp/pytest-cache \
     -s \
     -o log_cli=true \
-    -o cache_dir=/tmp/pytest-cache \
-    --pytest-log-file "${ARTIFACT_DIR}/tests.log" \
+    --pytest-log-file="${ARTIFACT_DIR}/tests.log" \
     --data-collector --data-collector-output-dir="${ARTIFACT_DIR}/" \
     --junitxml "${JUNIT_RESULTS_FILE}" \
     --html="${HTML_RESULTS_FILE}" --self-contained-html \
+    --tc-file=tests/global_config.py \
     --tb=native \
     --tc default_storage_class:ocs-storagecluster-ceph-rbd-virtualization \
     --tc default_volume_mode:Block \
