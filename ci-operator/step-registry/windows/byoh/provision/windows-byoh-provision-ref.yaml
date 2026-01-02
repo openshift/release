@@ -1,0 +1,46 @@
+ref:
+  as: windows-byoh-provision
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: tools
+  commands: windows-byoh-provision-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: BYOH_INSTANCE_NAME
+      default: "byoh-winc"
+      documentation: "Base name for Windows instances"
+    - name: BYOH_NUM_WORKERS
+      default: "2"
+      documentation: "Number of Windows workers to provision"
+    - name: BYOH_WINDOWS_VERSION
+      default: "2022"
+      documentation: "Windows Server version (2019 or 2022)"
+    - name: WINC_ADMIN_PASSWORD
+      default: "P@ssw0rd123!@#"
+      documentation: "Windows administrator password"
+    - name: NUTANIX_WINDOWS_IMAGE
+      default: "nutanix-windows-server"
+      documentation: "Nutanix golden image name for Windows (Prow CI uses nutanix-windows-server)"
+    - name: AWS_WINDOWS_AMI
+      default: ""
+      documentation: "Override AWS Windows AMI (useful for pinning specific version in upgrade tests)"
+    - name: BYOH_READY_TIMEOUT
+      default: "45m"
+      documentation: "Timeout waiting for BYOH nodes to become Ready (use 45m-60m for vSphere, 30m for cloud platforms)"
+  documentation: |-
+    Provisions Windows BYOH (Bring Your Own Host) nodes using terraform-windows-provisioner.
+
+    This step:
+    1. Clones terraform-windows-provisioner from GitHub
+    2. Provisions Windows worker nodes on the detected cloud platform (AWS, Azure, GCP, vSphere, Nutanix, None)
+    3. Waits for nodes to become Ready
+    4. Exports instance information to SHARED_DIR for WMCO BYOH e2e tests
+
+    Cloud credentials are automatically provided via the cluster profile (CLUSTER_PROFILE_DIR).
+
+    Instance information is exported in the format expected by WMCO BYOH tests:
+    ${SHARED_DIR}/<ip>_windows_instance.txt
