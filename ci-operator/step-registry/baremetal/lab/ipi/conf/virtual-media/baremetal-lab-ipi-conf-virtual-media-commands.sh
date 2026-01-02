@@ -29,10 +29,18 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "$SHARED_DIR/hosts.yaml"); do
     echo "{INFO} Additional worker ${name} will be added as day2 operation"
     continue
   fi
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "false" ]; then
+    echo "Adding additional worker role for ${name}"
+    node_role="worker"
+  else
+    echo "Setting worker role"
+    node_role="${name%%-[0-9]*}"
+  fi
+
   cat >> "$SHARED_DIR/redfish_patch_install_config.yaml" <<EOF
     - name: ${name}
-      role: ${name%%-[0-9]*}
-      bootMACAddress: ${mac}
+      role: ${node_role}
+      bootMACAddress: ${provisioning_mac}
       rootDeviceHints:
         ${root_device:+deviceName: ${root_device}}
         ${root_dev_hctl:+hctl: ${root_dev_hctl}}
