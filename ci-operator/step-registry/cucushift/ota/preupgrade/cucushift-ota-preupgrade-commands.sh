@@ -704,6 +704,8 @@ function pre-OCP-47160(){
     echo "Check the techpreview operator is installed..."
     for op in "${tp_op[@]}"; do
         if check_tp_operator_notfound ${op}; then
+            echo -e "\n# oc get mc\n$(oc get mc)"
+            echo -e "\n# oc get mcp\n$(oc get mcp)"
             return 1
         fi
     done
