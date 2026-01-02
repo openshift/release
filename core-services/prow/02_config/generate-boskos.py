@@ -258,18 +258,10 @@ CONFIG = {
     'aro-hcp-test-tenant-quota-slice': {
         'default': 10,
     },
-    'aro-hcp-test-msi-containers-dev': {
-        'rg': 120,
-    },
-    'aro-hcp-test-msi-containers-int': {
-        'rg': 120,
-    },
-    'aro-hcp-test-msi-containers-stg': {
-        'rg': 120,
-    },
-    'aro-hcp-test-msi-containers-prod': {
-        'rg': 120,
-    },
+    'aro-hcp-test-msi-containers-dev': {},
+    'aro-hcp-test-msi-containers-int': {},
+    'aro-hcp-test-msi-containers-stg': {},
+    'aro-hcp-test-msi-containers-prod': {},
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },
@@ -688,6 +680,13 @@ for i in range(4):
 
 for i in range(2):
     CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
+
+for i in range(120):
+    CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
+    CONFIG['aro-hcp-test-msi-containers-int']['aro-hcp-test-msi-containers-int-{}'.format(i)] = 1
+    CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
+    CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
+
 
 
 config = {
