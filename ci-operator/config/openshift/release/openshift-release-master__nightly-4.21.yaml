@@ -562,6 +562,28 @@ tests:
       DISRUPTIVE_FENCING: "true"
       FENCING_VALIDATION: "true"
     workflow: baremetalds-two-node-fencing-post-install-validation
+- as: e2e-metal-ovn-two-node-fencing-degraded-tn-suite-techpreview
+  capabilities:
+  - intranet
+  cron: 30 23 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEGRADED_NODE: "true"
+      DEVSCRIPTS_CONFIG: |
+        BMC_DRIVER=redfish
+        FEATURE_SET="TechPreviewNoUpgrade"
+        IP_STACK=v4
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        MASTER_VCPU=8
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+      SKIP_READINESS_CHECKS: "true"
+      TEST_ARGS: |
+        --run=.*\[Degraded\].* --disable-monitor=etcd-log-analyzer,node-lifecycle,on-prem-haproxy,on-prem-keepalived,initial-and-final-operator-log-scraper,apiserver-incluster-availability,kubelet-log-collector,audit-log-analyzer,metrics-endpoints-down,alert-summary-serializer,high-cpu-metric-collector,pod-network-avalibility,service-type-load-balancer-availability,ingress-availability,pathological-event-analyzer,legacy-test-framework-invariants,operator-state-analyzer,legacy-cvo-invariants,apiserver-external-availability,azure-metrics-collector,etcd-disk-metrics-intervals --cluster-stability=Disruptive
+      TEST_SUITE: openshift/two-node
+    workflow: baremetalds-two-node-fencing
 - as: e2e-metal-ovn-two-node-fencing-degraded-techpreview
   capabilities:
   - intranet
@@ -580,7 +602,7 @@ tests:
         NUM_MASTERS=2
         NUM_WORKERS=0
       SKIP_READINESS_CHECKS: "true"
-      TEST_ARGS: --disable-monitor=etcd-log-analyzer,node-lifecycle,on-prem-haproxy,on-prem-keepalived,initial-and-final-operator-log-scraper,apiserver-incluster-availability,kubelet-log-collector,audit-log-analyzer,metrics-endpoints-down,alert-summary-serializer,high-cpu-metric-collector,pod-network-avalibility,service-type-load-balancer-availability,ingress-availability,pathological-event-analyzer,legacy-test-framework-invariants,operator-state-analyzer,legacy-cvo-invariants,apiserver-external-availability,azure-metrics-collector
+      TEST_ARGS: --disable-monitor=etcd-log-analyzer,node-lifecycle,on-prem-haproxy,on-prem-keepalived,initial-and-final-operator-log-scraper,apiserver-incluster-availability,kubelet-log-collector,audit-log-analyzer,metrics-endpoints-down,alert-summary-serializer,high-cpu-metric-collector,pod-network-avalibility,service-type-load-balancer-availability,ingress-availability,pathological-event-analyzer,legacy-test-framework-invariants,operator-state-analyzer,legacy-cvo-invariants,apiserver-external-availability,azure-metrics-collector,etcd-disk-metrics-intervals
         --cluster-stability=Disruptive
       TEST_SKIPS: \[Conformance\]\[sig-api-machinery\]\[Feature:APIServer\] local
         kubeconfig \\"check-endpoints\.kubeconfig\\" should be present in all kube-apiserver
@@ -597,8 +619,8 @@ tests:
         and work \[Suite:openshift/conformance/parallel/minimal\]\|\[sig-api-machinery\]\[Feature:APIServer\]\[Late\]
         kubelet terminates kube-apiserver gracefully extended \[Suite:openshift/conformance/parallel\]\|\[sig-arch\]\[Early\]
         Managed cluster should \[apigroup:config\.openshift\.io\] start all core operators
-        \[Skipped:Disconnected\] \[Suite:openshift/conformance/parallel\]\|\[sig-arch\]\[Late\]\[Jira:\\"kube-apiserver\\"\]
-        all registered tls artifacts must have no metadata violation regressions \[Suite:openshift/conformance/parallel\]\|\[sig-arch\]\[Late\]\[Jira:\\"kube-apiserver\\"\]
+        \|\[sig-arch\]\[Late\]\[Jira:\\"kube-apiserver\\"\] all registered tls artifacts
+        must have no metadata violation regressions \[Suite:openshift/conformance/parallel\]\|\[sig-arch\]\[Late\]\[Jira:\\"kube-apiserver\\"\]
         all tls artifacts must be registered \[Suite:openshift/conformance/parallel\]\|\[sig-arch\]\[Late\]\[Jira:\\"kube-apiserver\\"\]
         collect certificate data \[Suite:openshift/conformance/parallel\]\|\[sig-architecture\]
         Conformance Tests should have at least two untainted nodes \[Conformance\]
@@ -610,7 +632,7 @@ tests:
         endpoints configmap \[Early\]\[apigroup:config\.openshift\.io\] \[Suite:openshift/conformance/parallel\]\|\[sig-instrumentation\]
         Prometheus \[apigroup:image\.openshift\.io\] when installed on the cluster
         shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
-        \[Early\]\[apigroup:config\.openshift\.io\] \[Skipped:Disconnected\] \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
+        \[Early\]\[apigroup:config\.openshift\.io\] \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
         Network Policies when using openshift ovn-kubernetes allow ingress traffic
         to one pod from a particular namespace in L2 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-network\]\[OCPFeatureGate:NetworkSegmentation\]\[Feature:UserDefinedPrimaryNetworks\]
         Network Policies when using openshift ovn-kubernetes allow ingress traffic
@@ -651,14 +673,23 @@ tests:
         when using openshift ovn-kubernetes created using UserDefinedNetwork isolates
         overlapping CIDRs with L3 primary UDN \[Suite:openshift/conformance/parallel\]\|\[sig-node\]
         Managed cluster should verify that nodes have no unexpected reboots \[Late\]
-        \[Suite:openshift/conformance/parallel\]\|\[sig-node\]\[apigroup:config\.openshift\.io\]|
+        \[Suite:openshift/conformance/parallel\]\|\[sig-node\]\[apigroup:config\.openshift\.io\]
         CPU Partitioning node validation should have correct cpuset and cpushare set
-        in crio containers \[Suite:openshift/conformance/parallel\]| \|\[sig-instrumentation]
+        in crio containers \[Suite:openshift/conformance/parallel\]\|\[sig-instrumentation]
         Prometheus .* should start and expose a secured proxy and unsecured metrics
         \|\[sig-node]\[apigroup:config\.openshift\.io] CPU Partitioning node validation
         should have correct cpuset and cpushare set in crio containers \|\[sig-instrumentation]\[Late]
         Alerts shouldn.* exceed the series limit of total series sent via telemetry
-        from each cluster \[sig-node].*InPlacePodVerticalScaling
+        from each cluster \[sig-node].*InPlacePodVerticalScaling \|\[sig-instrumentation]
+        Prometheus [apigroup:config\.openshift\.io] when installed on the cluster
+        shouldn't report\|\[sig-architecture] Conformance Tests should have at least
+        two untainted nodes\|\[sig-arch] ocp payload should be based on existing source
+        OLM version should contain the source\|\[sig-arch] Managed cluster should
+        ensure control plane pods do not run in best-effort QoS \|\[sig-cli] oc explain
+        list uncovered GroupVersionResources\|\[sig-olmv1]\[OCPFeatureGate:NewOLM]
+        OLMv1 operator installation should block cluster upgrades if an incompatible
+        operator is installed\|\[sig-etcd]\[apigroup:config\.openshift\.io]\[OCPFeatureGate:DualReplica]
+        Two Node with Fencing should have podman etcd containers running on each node
     workflow: baremetalds-two-node-fencing
 - as: e2e-metal-ovn-two-node-fencing-serial
   capabilities:
