@@ -3,8 +3,8 @@ chain:
   steps:
   - chain: cucushift-installer-rehearse-azure-aks-provision
   - ref: hypershift-azure-aks-attach-kv
+  - ref: azure-provision-vnet-hypershift
   - ref: azure-provision-resourcegroup
-  - ref: azure-provision-vault-key
   - ref: azure-provision-disk-encryption-set
   - ref: azure-provision-storage-account
   - ref: cucushift-hypershift-extended-k8s-mgmt-apply-crds
@@ -12,9 +12,8 @@ chain:
   - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
   - ref: cucushift-hypershift-extended-k8s-mgmt-simulate-icsp
   - chain: hypershift-azure-create
+  - ref: cucushift-hypershift-extended-debug
   - ref: cucushift-hypershift-extended-etcd-encryption-health-check-azure
-  - ref: cucushift-hypershift-extended-vm-encryption-azure-server-side-encryption-customer-managed-keys-health-check
-  - ref: cucushift-hypershift-extended-vm-encryption-azure-encryption-at-host-health-check
   - chain: cucushift-hypershift-extended-enable-qe-catalogsource
   env:
   - name: AKS_ADDONS
@@ -35,6 +34,8 @@ chain:
     default: "qe.azure.devcluster.openshift.com"
   - name: HYPERSHIFT_CUSTOM_RESOURCE_GROUP
     default: "true"
+  - name: HYPERSHIFT_ENABLE_CONVERSION_WEBHOOK
+    default: "false"
   - name: HYPERSHIFT_DISK_ENCRYPTION
     default: "true"
   - name: HYPERSHIFT_ENABLE_CONVERSION_WEBHOOK
@@ -50,6 +51,12 @@ chain:
   - name: HYPERSHIFT_AZURE_CP_MI
     default: "true"
   - name: HYPERSHIFT_OPERATOR_PULL_SECRET
+    default: "true"
+  - name: ASSIGN_SERVICE_PRINCIPAL_ROLES
+    default: "true"
+  - name: AKS_ADDONS
+    default: "azure-keyvault-secrets-provider"
+  - name: HYPERSHIFT_AZURE_CP_MI
     default: "true"
   documentation: |-
     Provisions an aks management cluster and a public hosted cluster utilizing ETCD encryption, 
