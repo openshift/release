@@ -82,12 +82,12 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
+  cron: 14 14 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
     repo: machine-config-operator
-  interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-3
@@ -156,12 +156,12 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
+  cron: 14 14 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
     repo: machine-config-operator
-  interval: 24h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-3
@@ -552,21 +552,14 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.21"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-machine-config-operator-release-4.21-periodics-e2e-azure-mco-disruptive
-  reporter_config:
-    slack:
-      channel: '#trt-alert-mco'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> {{end}}'
+  name: periodic-ci-openshift-machine-config-operator-release-4.21-periodics-e2e-azure-mco-disruptive-1of2
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 1"
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-azure-mco-disruptive
@@ -625,7 +618,81 @@ periodics:
   - base_ref: release-4.21
     org: openshift
     repo: machine-config-operator
-  interval: 24h
+  interval: 72h
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure4
+    ci-operator.openshift.io/variant: periodics
+    ci.openshift.io/generator: prowgen
+    job-release: "4.21"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-machine-config-operator-release-4.21-periodics-e2e-azure-mco-disruptive-2of2
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --multi-stage-param=SHARD_ARGS="--shard-count 2 --shard-id 2"
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-azure-mco-disruptive
+      - --variant=periodics
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build09
+  cron: 6 8 * * 0
+  decorate: true
+  extra_refs:
+  - base_ref: release-4.21
+    org: openshift
+    repo: machine-config-operator
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure-2
@@ -694,12 +761,12 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build09
+  cron: 6 8 * * 0
   decorate: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
     repo: machine-config-operator
-  interval: 24h
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure-2
@@ -849,12 +916,12 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build04
+  cron: 1 15 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
     repo: machine-config-operator
-  interval: 24h
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp-3
@@ -923,12 +990,12 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build04
+  cron: 1 15 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.21
     org: openshift
     repo: machine-config-operator
-  interval: 24h
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp-3
@@ -1079,7 +1146,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build06
-  cron: 0 8 * * *
+  cron: 57 12 * * 0
   decorate: true
   extra_refs:
   - base_ref: release-4.21
@@ -1243,7 +1310,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build06
-  cron: 0 8 * * *
+  cron: 56 12 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.21
@@ -1407,7 +1474,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build06
-  cron: 0 8 * * *
+  cron: 32 7 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.21
@@ -1570,7 +1637,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
-  cron: 0 8 * * *
+  cron: 13 2 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.21
@@ -1644,7 +1711,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: vsphere02
-  cron: 0 8 * * *
+  cron: 13 2 * * 6
   decorate: true
   extra_refs:
   - base_ref: release-4.21
