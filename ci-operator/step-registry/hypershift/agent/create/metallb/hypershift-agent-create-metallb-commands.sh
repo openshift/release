@@ -151,7 +151,7 @@ spec:
     - name: http
       protocol: TCP
       port: 80
-      targetPort: 80
+      targetPort: 81 # Match the custom port for the ingress controller. See https://issues.redhat.com/browse/OCPSTRAT-2519
     - name: https
       protocol: TCP
       port: 443

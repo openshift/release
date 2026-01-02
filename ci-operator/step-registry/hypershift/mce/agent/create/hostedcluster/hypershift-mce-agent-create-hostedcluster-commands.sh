@@ -97,6 +97,16 @@ if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publi
   cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
 fi
 
+echo "Create file for --image-content-sources"
+curl -L https://github.com/mikefarah/yq/releases/download/v4.50.1/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+# Give IDMS priority over ICSP by appending the ICSP to the IDMS file.
+if oc get imagedigestmirrorset &>/dev/null; then
+  oc get imagedigestmirrorset -oyaml | /tmp/yq '.items[].spec.imageDigestMirrors' > "${SHARED_DIR}/mgmt_icsp.yaml"
+fi
+if oc get imagecontentsourcepolicy &>/dev/null; then
+  oc get imagecontentsourcepolicy -oyaml | /tmp/yq '.items[].spec.repositoryDigestMirrors' >> "${SHARED_DIR}/mgmt_icsp.yaml"
+fi
+
 eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
@@ -107,6 +117,23 @@ eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
   --ssh-key=${SHARED_DIR}/id_rsa.pub \
   --release-image ${RELEASE_IMAGE} $(support_np_skew)"
+
+# Patch the hostedcluster to use the HostNetwork endpoint publishing strategy.
+# This is to cover the case where the ingress controller is configured with specific ports.
+# There's no functional change to this scenario, except for different ports.
+# See https://issues.redhat.com/browse/OCPSTRAT-2519
+cat <<EOF | oc patch "hostedcluster/${CLUSTER_NAME}" -n local-cluster --type=merge --patch-file=/dev/stdin
+spec:
+  operatorConfiguration:
+    ingressOperator:
+      endpointPublishingStrategy:
+        type: HostNetwork
+        hostNetwork:
+          httpPort: 81 # Non-default port for the ingress controller
+          httpsPort: 443 # Same as default.
+          protocol: TCP # Same as default.
+          statsPort: 1936 # Same as default.
+EOF
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
