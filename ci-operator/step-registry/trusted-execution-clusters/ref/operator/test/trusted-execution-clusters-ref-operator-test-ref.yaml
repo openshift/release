@@ -1,0 +1,67 @@
+ref:
+  as: trusted-execution-clusters-ref-operator-test
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  commands: trusted-execution-clusters-ref-operator-test-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: beaker-bm
+    mount_path: /var/run/beaker-bm
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      memory: 1Gi
+  env:
+  - name: BEAKER_IP
+    default: ""
+    documentation: |-
+      IP address of the Beaker provisioned bare metal machine.
+      If not set, will read from Vault or ${SHARED_DIR}/beaker_ip
+  - name: BEAKER_USER
+    default: "root"
+    documentation: |-
+      Username for SSH access to the Beaker machine.
+      If not set, will read from Vault or default to 'root'
+  - name: POD_READY_TIMEOUT
+    default: "900"
+    documentation: |-
+      Timeout in seconds for waiting for all pods to be ready.
+      Defaults to 900 seconds (15 minutes).
+  documentation: |-
+    This step runs the integration tests for the trusted-execution-clusters operator.
+
+    The step performs the following operations:
+    1. Connects to the Beaker machine via SSH using credentials from Vault
+    2. Uses the operator repository downloaded by beaker-kind-provision step
+    3. Verifies Kind cluster is running (creates if needed with 'make cluster-up')
+    4. Builds and pushes container images to local registry (localhost:5000/trusted-execution-clusters)
+    5. Installs KubeVirt with 'make install-kubevirt'
+    6. Runs integration tests with 'make integration-tests'
+    7. Collects test results and cluster state
+
+    Prerequisites:
+    - Operator repository must be downloaded (from beaker-kind-provision step)
+    - SSH credentials must be available in Vault
+    - Local container registry must be running at localhost:5000
+
+    Outputs:
+    - ${ARTIFACT_DIR}/operator-test-logs/: Test logs and diagnostics
+    - ${ARTIFACT_DIR}/operator-test-logs/installation.log: Complete test execution log
+    - ${ARTIFACT_DIR}/operator-test-logs/cluster-all-resources.yaml: All cluster resources
+    - ${ARTIFACT_DIR}/operator-test-logs/nodes.yaml: Node information
+
+    After this step completes:
+    - Integration tests have been executed
+    - Test results are collected for analysis
+    - Cluster state is available for debugging
+
+    Exit Codes:
+    - 0: Integration tests passed successfully
+    - 1: Critical failure (SSH issues, cluster creation failed, tests failed)
+
+    Note: This step uses the operator repository downloaded by the beaker-kind-provision step
+    at ~/operator-kind-setup. It does not clone the repository again.
