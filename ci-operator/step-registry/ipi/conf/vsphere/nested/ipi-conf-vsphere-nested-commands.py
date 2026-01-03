@@ -7,13 +7,13 @@ import json
 import os
 import sys
 import yaml
-import shutil 
+import shutil
 
 def log(msg):
   print(msg)
 
 def ip_to_ptr(ip_address):
-    octets = ip_address.split(".")    
+    octets = ip_address.split(".")
     reversed_octets = "-".join(reversed(octets))
     ptr_record = f"{reversed_octets}.in-addr.arpa"
     return ptr_record
@@ -115,10 +115,10 @@ for vcenter in nested_platform["platform"]["vsphere"]["vcenters"]:
     server = vcenter["server"]
     if server not in inventory:
         log(f"{server} not found in ansible inventory. this is probably a bug in the ansible.")
-    
+
     vcenter_ip = inventory[vcenter["server"]]["NESTEDVMIP"]
     ptr_record = ip_to_ptr(vcenter_ip)
-    
+
     for ic_vcenter in install_config["platform"]["vsphere"]["vcenters"]:
         if ic_vcenter["server"] == server:
             ic_vcenter["user"] = "administrator@vsphere.local"
@@ -162,3 +162,4 @@ with open(os.path.join(shared_dir, "install-config.yaml"), "w") as install_confi
     yaml.dump(install_config, install_config_file)
 
 
+print("hello, world!")
