@@ -19,6 +19,10 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: libvirt-installer
+  microshift-ci-brew:
+    name: brew
+    namespace: microshift
+    tag: latest
   ocm-cli:
     name: ocm-cli
     namespace: ci
@@ -45,9 +49,9 @@ base_images:
     tag: upi-installer
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.21
 releases:
   arm64-latest:
     candidate:
@@ -69,6 +73,12 @@ releases:
   multi-latest:
     candidate:
       architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  nightly-arm64:
+    candidate:
+      architecture: arm64
       product: ocp
       stream: nightly
       version: "4.21"
@@ -155,6 +165,27 @@ tests:
     - chain: cucushift-installer-rehearse-gcp-ipi-disconnected-provision
     test:
     - ref: openshift-extended-olm-test-disconnected
+- as: e2e-aws-ovn-hypershift-mgmt-extended-f5
+  cron: 36 15 1-31/5 * *
+  steps:
+    cluster_profile: hypershift
+    env:
+      PUBLIC_ONLY: "true"
+      TEST_ARGS: --monitor=watch-namespaces
+      TEST_SUITE: olmv0/extended/candidate/fast
+    test:
+    - ref: openshift-extended-olm-test-hypershiftmgmt
+    workflow: hypershift-aws-conformance
+- as: e2e-microshift-aws-ovn-extended-f2
+  cron: 23 17 1-31/2 * *
+  steps:
+    cluster_profile: aws
+    env:
+      MICROSHIFT_OS: rhel-9.6
+      OPTIONAL_RPMS: "true"
+      SRC_FROM_GIT: "true"
+      TEST_SUITE: olmv0/extended/candidate/fast
+    workflow: openshift-microshift-e2e-origin-conformance
 - as: aws-rosa-hcp-extended-f4
   cron: 45 3 1-31/4 * *
   steps:
