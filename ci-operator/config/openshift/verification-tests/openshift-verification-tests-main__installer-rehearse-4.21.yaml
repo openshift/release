@@ -47,18 +47,13 @@ tests:
     allow_skip_on_success: true
     cluster_profile: aws-qe
     env:
-      IPSTACK: dualstack
-      SLEEP_DURATION: 1h
-      VPC_IPv6_ONLY_PRIVATE_SUBNETS: "yes"
-      ZONES_COUNT: "1"
-    post:
-    - ref: aws-deprovision-stacks
-    - ref: aws-deprovision-s3buckets
-    pre:
-    - ref: aws-provision-vpc-shared-dualstack
-    - chain: aws-provision-bastionhost
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-52ibs72/release:latest
+      ENABLE_IDMS: "yes"
+      IDMS_SOURCE_POLICY: NeverContactSource
+      OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP: "true"
     test:
-    - ref: cucushift-installer-wait
+    - ref: cucushift-installer-check-idms-source-policy
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
