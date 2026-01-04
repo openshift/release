@@ -54,8 +54,11 @@ function echo_e2e_tags() {
 function filter_test_by_version() {
     local xversion yversion
     IFS='.' read xversion yversion _ < <(oc version -o yaml | yq '.openshiftVersion')
-    if [[ -n $xversion ]] && [[ $xversion -eq 4 ]] && [[ -n $yversion ]] && [[ $yversion =~ [12][0-9] ]] ; then
+    if [[ -n $xversion ]] && [[ $xversion -eq 4 ]] && [[ -n $yversion ]] && [[ $yversion -le 22 ]] ; then
         export E2E_RUN_TAGS="@${xversion}.${yversion} and ${E2E_RUN_TAGS}"
+    else
+        echo "Skip this test as the version is '$xversion.$yversion'"
+        exit 0
     fi
     echo_e2e_tags
 }
