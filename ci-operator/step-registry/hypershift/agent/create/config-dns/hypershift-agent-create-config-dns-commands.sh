@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+set -x
 echo "************ config-dns command ************"
 
 source "${SHARED_DIR}/packet-conf.sh"
@@ -24,7 +24,7 @@ HOSTEDCLUSTER_NAME="${2}"
 WORKER_IP=$(oc get node -lnode-role.kubernetes.io/worker="" -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
 BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
 
-if [[ $IP_STACK == "v4v6" ]]; then
+if [[ $IP_STACK == "v4v6" ]] || [[ $IP_STACK == "v6v4" ]]; then
   IFS=' ' read -ra parts <<< "$WORKER_IP"
   WORKER_IP0="${parts[0]}"
   WORKER_IP1="${parts[1]}"
