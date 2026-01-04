@@ -87,7 +87,6 @@ function post_actions() {
   update_result "CreatedDate" "${CREATED_DATE}"
   update_result "Job" "$(echo "${JOB_SPEC}" | jq -r '.job')"
   update_result "BuildID" "$(echo "${JOB_SPEC}" | jq -r '.buildid')"
-  update_result "URL" "TBD"
   update_result "RowUpdated" "$(current_date)"
 
   echo "RESULT:"
@@ -262,9 +261,11 @@ else
   ZONE_NAME=$(jq -r '[.AvailabilityZones[] | select(.ZoneType=="availability-zone")] | .[0].ZoneName' "${ZONES_JSON}")
 fi
 
-export ZONE_NAME
-yq-v4 eval -i '.controlPlane.platform.aws.zones += [env(ZONE_NAME)]' "${CONFIG}"
-yq-v4 eval -i '.compute[0].platform.aws.zones += [env(ZONE_NAME)]' "${CONFIG}"
+if [ "${TEST_OBJECT}" != "LocalZones" ] && [ "${TEST_OBJECT}" != "WavelengthZones" ]; then
+  export ZONE_NAME
+  yq-v4 eval -i '.controlPlane.platform.aws.zones += [env(ZONE_NAME)]' "${CONFIG}"
+  yq-v4 eval -i '.compute[0].platform.aws.zones += [env(ZONE_NAME)]' "${CONFIG}"
+fi
 
 # Patch Edge nodes
 if [ "${TEST_OBJECT}" == "LocalZones" ] || [ "${TEST_OBJECT}" == "WavelengthZones" ]; then
@@ -272,7 +273,15 @@ if [ "${TEST_OBJECT}" == "LocalZones" ] || [ "${TEST_OBJECT}" == "WavelengthZone
   # patch edge node
   EDGE_ZONES_JSON=/tmp/edge_zones.json
 
-  jq -r -arg t "$ZONE_TYPE" '[.AvailabilityZones[] | select(.ZoneType==$t)]' "${ZONES_JSON}" > "${EDGE_ZONES_JSON}"
+  if [ "$TEST_OBJECT" == "WavelengthZones" ]; then
+    ZONE_TYPE="wavelength-zone"
+  fi
+
+  if [ "$TEST_OBJECT" == "LocalZones" ]; then
+    ZONE_TYPE="local-zone"
+  fi
+
+  jq -r --arg t "$ZONE_TYPE" '[.AvailabilityZones[] | select(.ZoneType==$t)]' "${ZONES_JSON}" > "${EDGE_ZONES_JSON}"
 
   EDGE_ZONE_COUNT=$(jq -r '. | length' ${EDGE_ZONES_JSON})
   EDGE_ZONE_NAMES=$(jq -r '.[].ZoneName' ${EDGE_ZONES_JSON})
