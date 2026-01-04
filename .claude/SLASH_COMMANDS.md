@@ -452,6 +452,164 @@ Potential additions to `/step-finder`:
 5. **Platform filtering**: Exclude certain platforms
 6. **Interactive refinement**: Follow-up questions to narrow results
 
+---
+
+### `/ci-docs-search` - CI Documentation Search
+
+**Purpose**: Search OpenShift CI documentation from docs.ci.openshift.org.
+
+**Usage**:
+```bash
+/ci-docs-search <query> [doc_type]
+```
+
+**Examples**:
+```bash
+/ci-docs-search onboarding new component
+/ci-docs-search image registry how-tos
+```
+
+**Returns**: Relevant docs with URLs, key topics, and when to use them.
+
+---
+
+### `/job-config-validator` - CI Job Configuration Validator
+
+**Purpose**: Validate CI job configurations and identify issues.
+
+**Usage**:
+```bash
+/job-config-validator <config_path> [check_type]
+```
+
+**Examples**:
+```bash
+/job-config-validator ci-operator/config/openshift/origin/openshift-origin-master.yaml
+/job-config-validator ci-operator/config/openshift/origin syntax
+```
+
+**Returns**: Validation results with errors, warnings, and fix suggestions.
+
+**Checks**: File naming, YAML syntax, structure, step-registry references.
+
+---
+
+### `/image-registry-helper` - Image Registry Helper
+
+**Purpose**: Help with QCI (quay.io/openshift/ci) image registry interactions.
+
+**Usage**:
+```bash
+/image-registry-helper <action> [image_ref]
+```
+
+**Examples**:
+```bash
+/image-registry-helper pull ci/ci-operator:latest
+/image-registry-helper access
+```
+
+**Actions**: `access`, `pull`, `promote`, `query`, `help`
+
+**Returns**: Image path conversions, authentication commands, pull instructions.
+
+---
+
+### `/prow-job-helper` - Prow Job Helper
+
+**Purpose**: Help trigger Prow jobs via REST API and query job status.
+
+**Usage**:
+```bash
+/prow-job-helper <action> [job_name] [execution_id]
+```
+
+**Examples**:
+```bash
+/prow-job-helper trigger periodic-ci-openshift-origin-master-e2e-aws
+/prow-job-helper status <execution_id>
+```
+
+**Actions**: `trigger`, `status`, `query`, `list`, `help`
+
+**Returns**: Curl commands, authentication setup, status queries.
+
+**Note**: ⚠️ For advanced users. Prefer `/test` and `/retest` for presubmit jobs.
+
+---
+
+### `/config-resolver-helper` - Config Resolver Helper
+
+**Purpose**: Understand ci-operator config resolution and debug issues.
+
+**Usage**:
+```bash
+/config-resolver-helper <action> [config_path] [test_name]
+```
+
+**Examples**:
+```bash
+/config-resolver-helper resolve ci-operator/config/openshift/origin/openshift-origin-master.yaml
+/config-resolver-helper explain
+```
+
+**Actions**: `resolve`, `explain`, `validate`, `help`
+
+**Returns**: Resolved configs (workflows expanded), validation results, debugging help.
+
+---
+
+### `/cluster-debug` - Cluster Debugging Helper
+
+**Purpose**: Help debug OpenShift CI clusters, access cluster information, and troubleshoot cluster issues.
+
+⚠️ **Note**: Cluster debugging is infrastructure-related and requires admin access. Only authorized administrators should use this command.
+
+**Usage**:
+```bash
+/cluster-debug <action> [cluster_name] [namespace]
+```
+
+**Examples**:
+```bash
+/cluster-debug info build01
+/cluster-debug pods build01 ci
+/cluster-debug operators app.ci
+/cluster-debug access build02
+```
+
+**Actions**: `info`, `access`, `pods`, `nodes`, `operators`, `logs`, `events`, `etcd`, `upgrade`, `clusterpool`, `help`
+
+**Returns**: Cluster information, access commands, debugging commands, troubleshooting guidance.
+
+**Clusters**: app.ci, build01-11, build02/build04/build08, vsphere02, core-ci, hosted-mgmt
+
+---
+
+### `/qci-login` - QCI Registry Login Helper
+
+**Purpose**: Help login to QCI (quay.io/openshift/ci) image registry for pulling images.
+
+**Usage**:
+```bash
+/qci-login <action> [image_ref]
+```
+
+**Examples**:
+```bash
+/qci-login login
+/qci-login verify
+/qci-login pull ci/ci-operator:latest
+```
+
+**Actions**: `login`, `verify`, `pull`, `help`
+
+**Returns**: Login commands, authentication setup, image pull instructions.
+
+**Prerequisites**: Access to app.ci cluster, RBAC permissions, oc CLI configured.
+
+---
+
 ## Documentation
 
 - **Command README**: `.claude/commands/README.md`
