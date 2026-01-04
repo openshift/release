@@ -477,6 +477,19 @@ gcp)
   echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 
+# -------------------
+# Job URL
+# -------------------
+JOB_URL="TBD"
+job_type=$(echo "${JOB_SPEC}" | jq -r '.type // ""')
+if [ "$job_type" == "periodic" ]; then
+  job_url_prefix="https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/qe-private-deck/logs/"
+  job_name=$(echo "${JOB_SPEC}" | jq -r '.job // ""')
+  job_buildid=$(echo "${JOB_SPEC}" | jq -r '.buildid // ""')
+  JOB_URL="${job_url_prefix}${job_name}/${job_buildid}"
+fi
+update_result "URL" "${JOB_URL}"
+
 update_result "Status" "Completed"
 update_result "Health" "${HEALTHCHECK_RESULT}"
 update_result "Storage" "${STORAGE_CHECK_RESULT}"
