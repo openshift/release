@@ -71,7 +71,6 @@ EXTRA_VARS="${EXTRA_VARS} container_runtime=${CONTAINER_RUNTIME}"
 EXTRA_VARS="${EXTRA_VARS} rt_kernel=${RT_KERNEL}"
 EXTRA_VARS="${EXTRA_VARS} high_power_consumption=${HIGH_POWER_CONSUMPTION}"
 EXTRA_VARS="${EXTRA_VARS} per_pod_power_management=${PER_POD_POWER_MANAGEMENT}"
-EXTRA_VARS="${EXTRA_VARS} artifacts_folder=${ARTIFACT_DIR}"
 EXTRA_VARS="${EXTRA_VARS} cgroup_version=${CGROUP_VERSION}"
 EXTRA_VARS="${EXTRA_VARS} day0_installation=${DAY0_INSTALLATION}"
 
