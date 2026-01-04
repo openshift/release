@@ -477,6 +477,31 @@ gcp)
   echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 
+# -------------------
+# Job URL
+# -------------------
+JOB_URL="None"
+
+job_type=$(echo "${JOB_SPEC}" | jq -r '.type // ""')
+if [ "$job_type" == "periodic" ]; then
+  job_url_prefix="https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/"
+  job_bucket=$(echo "${JOB_SPEC}" | jq -r '.decoration_config.gcs_configuration.bucket // ""')
+  job_name=$(echo "${JOB_SPEC}" | jq -r '.job // ""')
+  job_buildid=$(echo "${JOB_SPEC}" | jq -r '.buildid // ""')
+  JOB_URL="${job_url_prefix}gs/${job_bucket}/logs/${job_name}/${job_buildid}"
+fi
+
+if [ "$job_type" == "presubmit" ]; then
+  job_url_prefix=$(echo "${JOB_SPEC}" | jq -r '.decoration_config.gcs_configuration.job_url_prefix // ""')
+  job_bucket=$(echo "${JOB_SPEC}" | jq -r '.decoration_config.gcs_configuration.bucket // ""')
+  job_pr=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number // ""')
+  job_name=$(echo "${JOB_SPEC}" | jq -r '.job // ""')
+  job_buildid=$(echo "${JOB_SPEC}" | jq -r '.buildid // ""')
+  JOB_URL="${job_url_prefix}gs/${job_bucket}/pr-logs/pull/openshift_release/${job_pr}/${job_name}/${job_buildid}"
+fi
+
+update_result "URL" "${JOB_URL}"
+
 update_result "Status" "Completed"
 update_result "Health" "${HEALTHCHECK_RESULT}"
 update_result "Storage" "${STORAGE_CHECK_RESULT}"
