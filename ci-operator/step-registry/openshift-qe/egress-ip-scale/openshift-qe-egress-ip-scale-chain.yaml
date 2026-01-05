@@ -1,31 +1,25 @@
 chain:
   as: openshift-qe-egress-ip-scale
   steps:
-  # Initial setup and baseline validation
+  # Initial setup
   - ref: openshift-qe-egress-ip-scale-setup
-  - ref: openshift-qe-egress-ip-scale-validation
   
   # Pod Network Chaos
   - ref: redhat-chaos-pod-network-chaos
-  - ref: openshift-qe-egress-ip-scale-validation
   
-  # OVN Pod Disruption
+  # OVN Pod Disruption  
   - ref: redhat-chaos-pod-scenarios-custom
-  - ref: openshift-qe-egress-ip-scale-validation
   
   # Node Network Chaos
   - ref: redhat-chaos-network-chaos
-  - ref: openshift-qe-egress-ip-scale-validation
   
   # Worker Node Outage
   - ref: redhat-chaos-node-disruptions-worker-outage
-  - ref: openshift-qe-egress-ip-scale-validation
   
   # Power Outage
   - ref: redhat-chaos-power-outage
-  - ref: openshift-qe-egress-ip-scale-validation
   
-  # Final comprehensive tests
+  # Final comprehensive tests with built-in validation
   - ref: openshift-qe-egress-ip-scale-tests
   env:
   # Scale-specific egress IP configuration
@@ -36,13 +30,6 @@ chain:
   - name: SCALE_TEST_WORKLOADS
     default: "20"
   
-  # Health Check URLs for egress IP monitoring
-  - name: HEALTH_CHECK_URLS
-    default: "https://httpbin.org/ip,https://ifconfig.me/ip,https://api.ipify.org"
-  - name: URL_WATCH_ENABLED
-    default: "True"
-  - name: HEALTH_CHECK_TIMEOUT
-    default: "30"
   
   # Pod Network Chaos configuration
   - name: TEST_NAMESPACE
@@ -113,6 +100,7 @@ chain:
     default: "prow"
   - name: JUNIT_TESTCASE
     default: '[Egress-IP-Scale] Comprehensive chaos resilience test at scale'
+    
   documentation: |-
     SCENARIO: OpenShift Egress IP Performance and Resilience Testing at Scale
     
