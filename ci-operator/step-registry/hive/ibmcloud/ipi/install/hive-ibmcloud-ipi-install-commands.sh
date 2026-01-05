@@ -11,11 +11,14 @@ BASE_DOMAIN="${BASE_DOMAIN:-ibmcloud.qe.devcluster.openshift.com}"
 
 # Create IBM Cloud credentials secret
 # For Hive ClusterDeployment, we primarily need the API key
+# Disable command echo to avoid exposing the API key in logs
+set +x
 IBMCLOUD_API_KEY="$(cat "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
 
 oc create secret generic ibmcloud-credentials \
   --namespace="${NAMESPACE}" \
   --from-literal=ibmcloud_api_key="${IBMCLOUD_API_KEY}"
+set -x
 
 oc label secret ibmcloud-credentials \
   --namespace="${NAMESPACE}" \
@@ -46,6 +49,7 @@ apiVersion: v1
 metadata:
   name: ${HIVE_CLUSTER_NAME}
 baseDomain: ${BASE_DOMAIN}
+credentialsMode: Manual
 controlPlane:
   architecture: amd64
   hyperthreading: Enabled
@@ -83,6 +87,101 @@ oc create secret generic install-config \
   --namespace="${NAMESPACE}" \
   --type=Opaque \
   --from-file=install-config.yaml="${INSTALL_CONFIG_FILE}"
+
+# Create CCO manifests for IBM Cloud Manual credentials mode
+# IBM Cloud requires manual credential manifests for all operators
+echo "Generating CCO manifests for IBM Cloud operators..."
+MANIFESTS_DIR="${SHARED_DIR}/ibmcloud-manifests"
+mkdir -p "${MANIFESTS_DIR}"
+
+# Disable command echo to avoid exposing the API key in manifest generation
+set +x
+
+# cloud-controller-manager credentials manifest
+cat > "${MANIFESTS_DIR}/openshift-cloud-controller-manager-ibm-cloud-credentials.yaml" <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ibm-cloud-credentials
+  namespace: openshift-cloud-controller-manager
+stringData:
+  ibmcloud_api_key: ${IBMCLOUD_API_KEY}
+  ibm-credentials.env: |
+    IBMCLOUD_APIKEY=${IBMCLOUD_API_KEY}
+    IBMCLOUD_AUTHTYPE=iam
+type: Opaque
+EOF
+
+# cluster-csi-drivers credentials manifest
+cat > "${MANIFESTS_DIR}/openshift-cluster-csi-drivers-ibm-cloud-credentials.yaml" <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ibm-cloud-credentials
+  namespace: openshift-cluster-csi-drivers
+stringData:
+  ibmcloud_api_key: ${IBMCLOUD_API_KEY}
+  ibm-credentials.env: |
+    IBMCLOUD_APIKEY=${IBMCLOUD_API_KEY}
+    IBMCLOUD_AUTHTYPE=iam
+type: Opaque
+EOF
+
+# cluster-image-registry-operator credentials manifest
+cat > "${MANIFESTS_DIR}/openshift-image-registry-installer-cloud-credentials.yaml" <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: installer-cloud-credentials
+  namespace: openshift-image-registry
+stringData:
+  ibmcloud_api_key: ${IBMCLOUD_API_KEY}
+  ibm-credentials.env: |
+    IBMCLOUD_APIKEY=${IBMCLOUD_API_KEY}
+    IBMCLOUD_AUTHTYPE=iam
+type: Opaque
+EOF
+
+# cluster-ingress-operator credentials manifest
+cat > "${MANIFESTS_DIR}/openshift-ingress-operator-cloud-credentials.yaml" <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloud-credentials
+  namespace: openshift-ingress-operator
+stringData:
+  ibmcloud_api_key: ${IBMCLOUD_API_KEY}
+  ibm-credentials.env: |
+    IBMCLOUD_APIKEY=${IBMCLOUD_API_KEY}
+    IBMCLOUD_AUTHTYPE=iam
+type: Opaque
+EOF
+
+# machine-api credentials manifest
+cat > "${MANIFESTS_DIR}/openshift-machine-api-ibmcloud-credentials.yaml" <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ibmcloud-credentials
+  namespace: openshift-machine-api
+stringData:
+  ibmcloud_api_key: ${IBMCLOUD_API_KEY}
+  ibm-credentials.env: |
+    IBMCLOUD_APIKEY=${IBMCLOUD_API_KEY}
+    IBMCLOUD_AUTHTYPE=iam
+type: Opaque
+EOF
+
+# Re-enable command echo
+set -x
+
+# Create manifests secret from all generated manifests
+echo "Creating manifests secret..."
+oc create secret generic ibmcloud-manifests \
+  --namespace="${NAMESPACE}" \
+  --from-file="${MANIFESTS_DIR}/"
+
+echo "CCO manifests created successfully"
 
 # Get the latest ClusterImageSet for the current release
 CLUSTER_IMAGESET_NAME="$(
@@ -138,6 +237,8 @@ spec:
       name: install-config
     imageSetRef:
       name: ${CLUSTER_IMAGESET_NAME}
+    manifestsSecretRef:
+      name: ibmcloud-manifests
     sshPrivateKeySecretRef:
       name: ssh-private-key
 EOF
