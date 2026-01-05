@@ -64,11 +64,10 @@ make deploy_test || exit_code=$?
 set +x
 
  # Map tests if needed for related use cases
- mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
+mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
 
  # Send junit files to shared dir for Data Router Reporter step
-cp "${ARTIFACT_DIR}/junit.functest.xml" "${SHARED_DIR}"
-cp "${ARTIFACT_DIR}/junit_cnv_deploy.xml" "${SHARED_DIR}"
+cp "${ARTIFACT_DIR}"/*.xml "${SHARED_DIR}"
 
 
 if [ "${exit_code:-0}" -ne 0 ]; then
