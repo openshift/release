@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-echo "🔧 Installing Fusion Access Operator..."
+echo "🔧 Installing IBM Fusion Access Operator..."
 
 FUSION_ACCESS_NAMESPACE="${FA__NAMESPACE:-ibm-fusion-access}"
 CATALOG_SOURCE_IMAGE="${FA__CATALOG_SOURCE_IMAGE:-quay.io/openshift-storage-scale/openshift-fusion-access-catalog:stable}"
@@ -79,4 +79,4 @@ else
   oc wait --for=jsonpath='{.status.phase}'=Succeeded csv -l operators.coreos.com/openshift-fusion-access-operator.${FUSION_ACCESS_NAMESPACE} -n ${FUSION_ACCESS_NAMESPACE} --timeout=600s
 fi
 
-echo "✅ Fusion Access Operator installation completed!"
+echo "✅ IBM Fusion Access Operator installation completed!"

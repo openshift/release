@@ -1,0 +1,110 @@
+base_images:
+  kubernetes-sigs-jobset:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: kubernetes-sigs-jobset
+  ocp_4.20_base-rhel9:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/jobset-operator
+images:
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    ocp_4.20_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+  to: jobset-operator
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.23-priv
+  namespace: ocp-private
+tests:
+- as: verify
+  commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
+    make verify-gofmt lint
+  container:
+    from: src
+- as: verify-codegen
+  commands: make verify-codegen
+  container:
+    from: src
+- as: verify-controller-manifests
+  commands: make verify-controller-manifests
+  container:
+    from: src
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: fips-image-scan-jobset-operator
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    dependencies:
+      SCAN_IMAGE: jobset-operator
+    test:
+    - ref: fips-check-image-scan
+- as: security
+  optional: true
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    workflow: openshift-ci-security
+- as: e2e-aws-operator
+  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: aws-3
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      dependencies:
+      - env: RELATED_IMAGE_OPERAND_IMAGE
+        name: pipeline:kubernetes-sigs-jobset
+      - env: OPERATOR_IMAGE
+        name: jobset-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-operand
+  skip_if_only_changed: ^\.tekton/|bundle.Dockerfile|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-operand
+      dependencies:
+      - env: RELATED_IMAGE_OPERAND_IMAGE
+        name: pipeline:kubernetes-sigs-jobset
+      - env: OPERATOR_IMAGE
+        name: jobset-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: jobset-operator

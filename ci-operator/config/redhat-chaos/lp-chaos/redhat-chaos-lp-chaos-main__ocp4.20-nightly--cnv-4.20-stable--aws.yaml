@@ -1,0 +1,104 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.20
+images:
+- dockerfile_literal: |
+    FROM cli
+    RUN set -exo pipefail && \
+        # Install openssh-clients and jq
+        declare pkgs='openssh-clients jq' && \
+        if command -v dnf 1> /dev/null; then \
+            dnf install --setopt tsflags=nodocs -y ${pkgs} && \
+            dnf clean all; \
+        else \
+            microdnf install -y ${pkgs} && \
+            microdnf clean all; \
+        fi && \
+        rm -rf /var/cache/dnf/* && \
+        # Install yq
+        wget -qO - 'https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64.tar.gz' | \
+            tar zvx -C /usr/local/bin/ --transform 's|^\./yq_linux_amd64$|yq|' ./yq_linux_amd64
+  from: cli
+  to: cli-plus-tools
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: krkn-hub-tests
+  cron: 0 22 * * 1
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.metal
+      CONTAINER_ETCD_RECOVERY_TIME: "120"
+      ENABLE_ES: "false"
+      LPC_LP_CNV__VM__REPLICA_COUNT: "3"
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      TELEMETRY_GROUP: ocp4.20-nightly--cnv-4.20-stable--aws
+    test:
+    - ref: redhat-lp-chaos-lp-cnv-vm-create
+    - chain: redhat-chaos-krkn-hub-tests
+    - ref: redhat-lp-chaos-lp-cnv-vm-check
+    - ref: redhat-lp-chaos-lp-cnv-vm-clean
+    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
+  timeout: 6h0m0s
+- as: krkn-hub-node-tests
+  cron: 0 8 * * 2
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.metal
+      ENABLE_ES: "false"
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      NODE_OUTAGE_TIMEOUT: "1200"
+      POWER_OUTAGE_TIMEOUT: "1200"
+      TELEMETRY_GROUP: ocp4.20-nightly--cnv-4.20-stable--aws
+    test:
+    - ref: redhat-lp-chaos-lp-cnv-vm-create
+    - chain: redhat-chaos-krkn-hub-node-tests
+    - ref: redhat-lp-chaos-lp-cnv-vm-check
+    - ref: redhat-lp-chaos-lp-cnv-vm-clean
+    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
+  timeout: 8h0m0s
+- as: kubevirt-outage
+  cron: 0 4 * * 2
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.metal
+      ENABLE_ES: "false"
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      TARGET_NAMESPACE: cnv-chaos-test-ns
+      TELEMETRY_GROUP: ocp4.20-nightly--cnv-4.20-stable--aws
+    test:
+    - ref: redhat-lp-chaos-lp-cnv-vm-create
+    - ref: redhat-chaos-kubevirt-outage
+    - ref: redhat-lp-chaos-lp-cnv-vm-check
+    - ref: redhat-lp-chaos-lp-cnv-vm-clean
+    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: lp-chaos
+  variant: ocp4.20-nightly--cnv-4.20-stable--aws

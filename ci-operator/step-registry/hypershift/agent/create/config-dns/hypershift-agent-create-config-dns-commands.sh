@@ -47,7 +47,7 @@ else
   exit 1
 fi
 
-systemctl restart NetworkManager.service
+nmcli general reload dns-full
 virsh net-dumpxml ostestbm > /tmp/ostestbm.xml
 sed -i 's/<dns>/<dns>\n    <forwarder domain='"'"$BASEDOMAIN"'"' addr='"'"'127.0.0.1'"'"'\/>/' /tmp/ostestbm.xml
 virsh net-define /tmp/ostestbm.xml

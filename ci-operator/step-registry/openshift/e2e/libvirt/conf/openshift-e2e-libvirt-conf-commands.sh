@@ -280,6 +280,7 @@ EOF
 elif echo ${BRANCH} | awk -F. '{ if ((($1 == "main") || ($1 == "master")) || (($1 == 4) && ($2 >= 13))) { exit 0 } else { exit 1 } }' && [ "${ARCH}" == "ppc64le" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs"
 "[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"
 "[sig-storage][Feature:DisableStorageClass][Serial] should not reconcile the StorageClass when StorageClassState is Unmanaged [Suite:openshift/conformance/serial]"
 "[sig-network] LoadBalancers should be able to preserve UDP traffic when server pod cycles for a LoadBalancer service on different nodes [Disabled:Broken] [Skipped:SingleReplicaTopology] [Suite:k8s]"
@@ -311,8 +312,8 @@ fi
 #
 
 # Until the yellow-zone network bandwidth is upgraded, we will run the following tests in their own periodic and exclude
-# them from the conformance-parallel workflow.
-if [ "${TEST_TYPE}" == "conformance-parallel" ] || [ "${TEST_TYPE}" == "heavy-build" ]; then
+# them from the conformance-parallel workflow in versions older than 4.21.
+if echo ${BRANCH} | awk -F. '{ if (($1 == 4) && ($2 <= 20)) { exit 0 } else { exit 1 } }' &&  [[ "${TEST_TYPE}" == "conformance-parallel" || "${TEST_TYPE}" == "heavy-build" ]]; then
     cat > "${SHARED_DIR}/temp_tests" << EOF
 "[sig-builds][Feature:Builds] Multi-stage image builds should succeed [apigroup:build.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
 "[sig-apps][Feature:DeploymentConfig] deploymentconfigs with multiple image change triggers should run a successful deployment with a trigger used by different containers [apigroup:apps.openshift.io][apigroup:image.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"

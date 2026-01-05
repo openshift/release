@@ -1,0 +1,20 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-nat-gateway-byo-subnets-provision
+  steps:
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vnet
+  - chain: ipi-conf-azure
+  - ref: ipi-conf-azure-provisionednetwork
+  - ref: ipi-conf-azure-custom-region
+  - chain: azure-provision-service-principal-minimal-permission
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-azure-nat-gateway
+  env:
+  - name: AZURE_BYO_SUBNETS_ENABLED
+    default: "yes"
+  - name: OUTBOUND_TYPE
+    default: "NATGatewaySingleZone"
+  documentation: |-
+    Create an IPI cluster with NATGatewaySingleZone outboundType in byo subnets on Azure for QE e2e tests.

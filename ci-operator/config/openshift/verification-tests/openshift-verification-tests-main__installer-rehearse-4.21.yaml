@@ -65,28 +65,28 @@ tests:
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
-      FEATURE_GATES: '["AzureClusterHostedDNSInstall=true"]'
-      FEATURE_SET: CustomNoUpgrade
-    workflow: cucushift-installer-rehearse-azure-ipi-custom-dns
-- as: installer-rehearse-ibmcloud
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: ibmcloud-qe
-    env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-7d9xkg2/release:latest
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-sno
+      AZURE_BYO_COMPUTE_SUBNETS_NUMBER: "4"
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_AZURE_REGION: centralus
+      OUTBOUND_TYPE: NATGatewayMultiZone
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway-byo-subnets
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints
-- as: installer-rehearse-gcp-proxy
+      MINIMAL_PERMISSIONS_WITHOUT_FIREWALL_PROVISION: "yes"
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-byo-fw-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-byo-fw-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+- as: installer-rehearse-gcp-wif
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
@@ -96,24 +96,8 @@ tests:
       CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
       ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
-      GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist-cco-manual-workload-identity
-- as: installer-rehearse-ibmcloud-dis
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: ibmcloud-qe-2
-    env:
-      MIRROR_BIN: oc-mirror
-      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
-      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
-      SLEEP_DURATION: 5h
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+      MINIMAL_PERMISSIONS_CCO_MANUAL_WITHOUT_FIREWALL_PROVISION: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi-byo-fw-cco-manual-workload-identity
 - as: installer-rehearse-vsphere
   cron: '@yearly'
   steps:

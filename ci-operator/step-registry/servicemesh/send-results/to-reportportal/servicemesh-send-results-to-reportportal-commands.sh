@@ -13,6 +13,12 @@ get_job_url() {
   echo "${job_complete_url}"
 }
 
+# run the upload only if explicitly configured
+if [ "${REPORT_TO_REPORT_PORTAL}" != "true" ]
+then
+  echo "REPORT_TO_REPORT_PORTAL is disabled. Results will not be uploaded."
+  exit 0
+fi
 
 # get ocp info and product version from JOB_NAME
 # TODO: improve this to still get the info dynamically but without relying on JOB_NAME
@@ -36,15 +42,23 @@ then
 fi
 
 product_version="unknown"
+istio_version="unknown"
 if [[ "$JOB_NAME" =~ main|master ]]
 then
   product_version="main"
-elif [[ "$JOB_NAME" =~ release-(3[.][0-9]+)- ]]
+elif [[ "$JOB_NAME" =~ release-(3[.][0-9]+)- ]] # OSSM versioning
 then
   version="${BASH_REMATCH[1]}"
   if [[ -n "$version" ]]
   then
     product_version="$version"
+  fi
+elif [[ "$JOB_NAME" =~ release-(1[.][0-9]+)- ]] # Istio versioning
+then
+  version="${BASH_REMATCH[1]}"
+  if [[ -n "$version" ]]
+  then
+    istio_version="$version"
   fi
 fi
 
@@ -72,7 +86,7 @@ export TESTRUN_DESCRIPTION="Automated ${TEST_SUITE} test run ${JOB_URL}"
 export TEST_RESULTS_DIR="${SHARED_DIR}"
 export PRODUCT_VERSION="${product_version}"
 export PRODUCT_STAGE="midstream"
-export EXTRA_ATTRIBUTES="[{\"key\": \"ocp_cluster_arch\", \"value\": \"${ocp_arch}\"}, {\"key\": \"ocp_version\", \"value\": \"${ocp_version}\"}, {\"key\": \"trigger\", \"value\": \"ci\"}, {\"key\": \"build_type\", \"value\": \"pr_build\"}]"
+export EXTRA_ATTRIBUTES="[{\"key\": \"ocp_cluster_arch\", \"value\": \"${ocp_arch}\"}, {\"key\": \"ocp_version\", \"value\": \"${ocp_version}\"}, {\"key\": \"trigger\", \"value\": \"ci\"}, {\"key\": \"build_type\", \"value\": \"pr_build\"}, {\"key\": \"istio_version\", \"value\": \"${istio_version}\"}]"
 
 validate_environment
 set_defaults

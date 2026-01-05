@@ -13,34 +13,8 @@ chain:
       requests:
         cpu: 200m
         memory: 300Mi
-  - as: kueue-operator-jobset-install-operator
-    cli: latest
-    commands: |
-      CURRENT_BRANCH=$(git branch --show-current)
-      if [[ "$CURRENT_BRANCH" == "release-1.0" || "$CURRENT_BRANCH" == "release-1.1" ]]; then
-          echo "Skipping step due to JobSet not being supported in ${CURRENT_BRANCH}"
-          exit 0
-      fi
-      make install-jobset-operator
-    from: kueue-operator-src
-    resources:
-      requests:
-        cpu: 300m
-        memory: 500Mi
-  - as: kueue-operator-lws-install-operator
-    cli: latest
-    commands: |
-      CURRENT_BRANCH=$(git branch --show-current)
-      if [[ "$CURRENT_BRANCH" == "release-1.0" || "$CURRENT_BRANCH" == "release-1.1" ]]; then
-          echo "Skipping step due to LeaderWorkerSet not being supported in ${CURRENT_BRANCH}"
-          exit 0
-      fi
-      make install-lws-operator
-    from: kueue-operator-src
-    resources:
-      requests:
-        cpu: 300m
-        memory: 500Mi
+  - chain: jobset-install
+  - chain: leader-worker-set-install
   - as: e2e-kueue
     cli: latest
     commands: |

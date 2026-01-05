@@ -54,48 +54,6 @@ get_latest_osc_catalog_tag() {
     echo "${latest_tag}"
 }
 
-get_latest_trustee_catalog_tag() {
-    local page=1
-    local latest_tag=""
-    local test_pattern="^trustee-fbc-${OCP_VER}-on-push-.*-build-image-index$"
-
-    while true; do
-        local resp
-
-        # Query the Quay API for tags
-        if ! resp=$(curl -sf "${APIURL}/tag/?limit=100&page=${page}"); then
-            break
-        fi
-
-        # Check if page has tags
-        if ! jq -e '.tags | length > 0' <<< "${resp}" >/dev/null; then
-            break
-        fi
-
-        # Extract the latest matching tag from this page
-        latest_tag=$(echo "${resp}" | \
-            jq -r --arg test_string "${test_pattern}" \
-            '.tags[]? | select(.name | test($test_string)) | "\(.start_ts) \(.name)"' | \
-            sort -nr | head -n1 | awk '{print $2}')
-
-        if [[ -n "${latest_tag}" ]]; then
-            break
-        fi
-
-        ((page++))
-
-
-        # Safety limit to prevent infinite loops
-        if [[ ${page} -gt 50 ]]; then
-            echo "ERROR: Reached maximum page limit (50) while searching for trustee tags"
-            exit 1
-        fi
-    done
-
-    echo "${latest_tag}"
-}
-
-
 get_expected_version() {
     # Extract expected version from catalog tag
     # If catalog tag is in X.Y.Z-[0-9]+ format, returns X.Y.Z portion
@@ -109,6 +67,44 @@ get_expected_version() {
         echo "0.0.0"
     else
         echo ""
+    fi
+}
+# Function to check if a specific version exists in an OCP release channel
+# Uses the Cincinnati API to query available versions
+check_version_in_channel() {
+    local version="$1"
+    local channel="$2"
+    local major_minor
+
+    # Extract major.minor from version (e.g., 4.18 from 4.18.30)
+    major_minor=$(echo "${version}" | cut -d'.' -f1,2)
+
+    # Cincinnati API endpoint
+    local api_url="https://api.openshift.com/api/upgrades_info/v1/graph?channel=${channel}-${major_minor}&arch=amd64"
+
+    echo "Checking if version ${version} exists in ${channel}-${major_minor} channel..."
+
+    # Query the API and check if version exists
+    local response
+    if ! response=$(curl -sf "${api_url}" 2>/dev/null); then
+        echo "WARNING: Unable to query Cincinnati API. Skipping version check."
+        echo "  URL: ${api_url}"
+        return 0
+    fi
+
+    # Check if the version exists in the response
+    if echo "${response}" | jq -e --arg ver "${version}" '.nodes[] | select(.version == $ver)' >/dev/null 2>&1; then
+        echo "✓ Version ${version} found in ${channel}-${major_minor} channel"
+        return 0
+    else
+        echo "ERROR: Version ${version} not found in ${channel}-${major_minor} channel"
+        echo ""
+        echo "5 newest versions in ${channel}-${major_minor} (newest first):"
+        echo "${response}" | jq -r '.nodes[].version' 2>/dev/null | sort -rV | head -5
+        echo ""
+        echo "Hint: Use a version from the list above, or try a different channel (stable, fast, candidate)"
+        echo "      You can also check https://amd64.ocp.releases.ci.openshift.org/ for CI/nightly builds"
+        return 1
     fi
 }
 # Function to validate parameters and set defaults
@@ -132,6 +128,13 @@ validate_and_set_defaults() {
     if [[ ! "${OCP_CHANNEL}" =~ ^(stable|fast|candidate|eus)$ ]]; then
         echo "ERROR: OCP_CHANNEL must be one of: stable, fast, candidate, eus. Got: ${OCP_CHANNEL}"
         exit 1
+    fi
+
+    # If a specific patch version (X.Y.Z) is requested, verify it exists in the channel
+    if [[ "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        if ! check_version_in_channel "${OCP_VERSION}" "${OCP_CHANNEL}"; then
+            exit 1
+        fi
     fi
 
     # AWS Region Configuration
@@ -172,7 +175,6 @@ validate_and_set_defaults() {
     else
         PROW_RUN_TYPE="release"
         CATALOG_SOURCE_NAME="redhat-operators"
-        TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
         INSTALL_KATA_RPM="false"
     fi
 
@@ -242,38 +244,9 @@ validate_and_set_defaults() {
 
       CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:${OSC_CATALOG_TAG}}"
       CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-brew-catalog}"
-
-      # Trustee Catalog Configuration
-      # Convert OCP version for Trustee catalog naming
-      OCP_VER=$(echo "${OCP_VERSION}" | tr '.' '-')
-      subfolder=""
-      if [[ "${OCP_VER}" == "4-16" ]]; then
-          subfolder="trustee-fbc/"
-      fi
-      # Get latest Trustee catalog tag with page limit safety
-      TRUSTEE_REPO_NAME="${subfolder}trustee-fbc-${OCP_VER}"
-      TRUSTEE_CATALOG_REPO="quay.io/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
-
-      APIURL="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/${TRUSTEE_REPO_NAME}"
-      TRUSTEE_CATALOG_TAG=$(get_latest_trustee_catalog_tag)
-
-      # Extract expected Trustee version from catalog tag if it matches X.Y.Z-[0-9]+ format
-      extracted_trustee_version=$(get_expected_version "${TRUSTEE_CATALOG_TAG}")
-      if [[ -n "${extracted_trustee_version}" ]]; then
-          EXPECTED_TRUSTEE_VERSION="${extracted_trustee_version}"
-          echo "Extracted EXPECTED_TRUSTEE_VERSION from TRUSTEE_CATALOG_TAG: ${EXPECTED_TRUSTEE_VERSION}"
-      else
-          EXPECTED_TRUSTEE_VERSION="${EXPECTED_TRUSTEE_VERSION:-0.0.0}"
-          echo "Using default EXPECTED_TRUSTEE_VERSION: ${EXPECTED_TRUSTEE_VERSION}"
-      fi
-
-      TRUSTEE_CATALOG_SOURCE_IMAGE="${TRUSTEE_CATALOG_SOURCE_IMAGE:-${TRUSTEE_CATALOG_REPO}:${TRUSTEE_CATALOG_TAG}}"
-      TRUSTEE_CATALOG_SOURCE_NAME="${TRUSTEE_CATALOG_SOURCE_NAME:-trustee-catalog}"
     else # GA
       CATALOG_SOURCE_NAME="redhat-operators"
-      TRUSTEE_CATALOG_SOURCE_NAME="redhat-operators"
       CATALOG_SOURCE_IMAGE=""
-      TRUSTEE_CATALOG_SOURCE_IMAGE=""
     fi
 }
 
@@ -308,7 +281,6 @@ show_usage() {
     echo "  AWS_REGION_OVERRIDE            - AWS region (default: us-east-2)"
     echo "  CUSTOM_AZURE_REGION            - Azure region (default: eastus)"
     echo "  OSC_CATALOG_TAG                - OSC catalog tag (auto-detected if not provided)"
-    echo "  TRUSTEE_CATALOG_TAG            - Trustee catalog tag (auto-detected if not provided)"
     echo "  TRUSTEE_URL                    - Trustee URL (default: empty)"
     echo "  INITDATA                       - Initdata from Trustee(default: empty) The gzipped and base64 encoded initdata.toml file from Trustee"
 }
@@ -394,8 +366,6 @@ generate_workflow() {
     "TEST_RELEASE_TYPE: ${TEST_RELEASE_TYPE}"
     "TEST_SCENARIOS: ${TEST_SCENARIOS}"
     "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
-    "TRUSTEE_CATALOG_SOURCE_IMAGE: ${TRUSTEE_CATALOG_SOURCE_IMAGE:-\"\"}"
-    "TRUSTEE_CATALOG_SOURCE_NAME: ${TRUSTEE_CATALOG_SOURCE_NAME}"
     "TRUSTEE_URL: ${TRUSTEE_URL:-\"\"}"
   )
 
@@ -523,10 +493,8 @@ EOF
 
     if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
         echo "  • Catalog Source: ${CATALOG_SOURCE_NAME} (${CATALOG_SOURCE_IMAGE})"
-        echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME} (${TRUSTEE_CATALOG_SOURCE_IMAGE})"
     else
         echo "  • Catalog Source: ${CATALOG_SOURCE_NAME}"
-        echo "  • Trustee Catalog: ${TRUSTEE_CATALOG_SOURCE_NAME}"
     fi
 
     echo "=========================================="
