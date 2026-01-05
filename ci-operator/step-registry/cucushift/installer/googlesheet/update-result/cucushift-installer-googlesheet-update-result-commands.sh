@@ -408,18 +408,36 @@ fi
 # -------------------------
 
 echo "Checking health check result ..."
+
+health_check_ret=0
+
 if [ -f "${SHARED_DIR}"/install-health-check-status.txt ]; then
-  healthcheck_ret=$(< "${SHARED_DIR}"/install-health-check-status.txt)
-  echo "Health check ret: $healthcheck_ret"
-  if [ "$healthcheck_ret" == "0" ]; then
-    HEALTHCHECK_RESULT="PASS"
-  else
-    HEALTHCHECK_RESULT="FAIL"
-  fi
+  r=$(< "${SHARED_DIR}"/install-health-check-status.txt)
+  echo "install health check: $r"
+  health_check_ret=$((health_check_ret+r))
 else
-  echo "Health check failed: No health check was performed."
+  echo "ERROR: Cluster health check was not performed."
+  health_check_ret=$((health_check_ret+1))
+fi
+
+if [ "${TEST_OBJECT}" == "LocalZones" ] || [ "${TEST_OBJECT}" == "WavelengthZones" ]; then
+  if [ -f "${SHARED_DIR}"/install-post-check-status.txt ]; then
+    r=$(< "${SHARED_DIR}"/install-post-check-status.txt)
+    echo "edge zone check: $r"
+    health_check_ret=$((health_check_ret+r))
+  else
+    echo "ERROR: Cluster edge zone check was not performed."
+    health_check_ret=$((health_check_ret+1))
+  fi
+fi
+
+if [ "$health_check_ret" == "0" ]; then
+  HEALTHCHECK_RESULT="PASS"
+else
   HEALTHCHECK_RESULT="FAIL"
 fi
+
+echo "HEALTHCHECK_RESULT: $HEALTHCHECK_RESULT"
 
 # Update result
 OVERALL_RESULT="PASS"
@@ -432,7 +450,7 @@ fi
 
 # -------------------------
 # storage check result
-# openshift-extended-test:
+# openshift-extended-test-longduration:
 #   total: 1
 #   failures: 0
 #   errors: 0
@@ -440,10 +458,10 @@ fi
 TEST_RESULT_FILE="${SHARED_DIR}"/openshift-e2e-test-qe-report
 
 if [ -f "$TEST_RESULT_FILE" ]; then
-  total=$(yq-v4 e '.openshift-extended-test.total' "$TEST_RESULT_FILE")
-  failures=$(yq-v4 e '.openshift-extended-test.failures' "$TEST_RESULT_FILE")
-  errors=$(yq-v4 e '.openshift-extended-test.errors' "$TEST_RESULT_FILE")
-  skipped=$(yq-v4 e '.openshift-extended-test.skipped' "$TEST_RESULT_FILE")
+  total=$(yq-v4 e '.openshift-extended-test-longduration.total' "$TEST_RESULT_FILE")
+  failures=$(yq-v4 e '.openshift-extended-test-longduration.failures' "$TEST_RESULT_FILE")
+  errors=$(yq-v4 e '.openshift-extended-test-longduration.errors' "$TEST_RESULT_FILE")
+  skipped=$(yq-v4 e '.openshift-extended-test-longduration.skipped' "$TEST_RESULT_FILE")
 
   if [ "$total" -gt "0" ] && [ "$failures" -eq "0" ] && [ "$errors" -eq "0" ] && [ "$skipped" -eq "0" ]; then
     STORAGE_CHECK_RESULT="PASS"

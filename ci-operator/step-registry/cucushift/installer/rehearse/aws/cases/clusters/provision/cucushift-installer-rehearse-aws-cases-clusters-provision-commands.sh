@@ -307,6 +307,8 @@ fi
 echo "install-config.yaml:"
 yq-v4 '({"compute": .compute, "controlPlane": .controlPlane, "platform": .platform})' "${CONFIG}"
 
+cp "${CONFIG}" "${SHARED_DIR}"/install-config.yaml
+
 # ---------------------------------------
 
 echo "--- Create manifests ---"
