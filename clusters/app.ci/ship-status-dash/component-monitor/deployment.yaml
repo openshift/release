@@ -5,6 +5,11 @@ metadata:
   namespace: ship-status
   labels:
     app: component-monitor
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
 spec:
   replicas: 1
   selector:
@@ -15,34 +20,69 @@ spec:
       labels:
         app: component-monitor
     spec:
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
       containers:
-        - name: component-monitor
-          image: quay-proxy.ci.openshift.org/openshift/ci:ship-status-dash_component-monitor_latest
-          command: ["./component-monitor"]
-          args:
-            - "--config-path=/etc/config/config.yaml"
-            - "--name=app-ci-component-monitor"
-            - "--dashboard-url=https://protected.ship-status.ci.openshift.org"
-            - "--kubeconfig-dir=/etc/kubeconfig"
-            - "--report-auth-token-file=/etc/kubeconfig/sa.component-monitor.app.ci.token.txt"
-          volumeMounts:
-            - name: config
-              mountPath: /etc/config
-              readOnly: true
-            - name: kubeconfig
-              mountPath: /etc/kubeconfig
-              readOnly: true
-          resources:
-            requests:
-              memory: "64Mi"
-              cpu: "100m"
-            limits:
-              memory: "128Mi"
-              cpu: "200m"
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=master
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "100m"
+      - name: component-monitor
+        image: quay-proxy.ci.openshift.org/openshift/ci:ship-status-dash_component-monitor_latest
+        command: ["./component-monitor"]
+        args:
+          - "--config-path=/var/repo/release/core-services/ship-status/component-monitor-config.yaml"
+          - "--name=app-ci-component-monitor"
+          - "--dashboard-url=https://protected.ship-status.ci.openshift.org"
+          - "--kubeconfig-dir=/etc/kubeconfig"
+          - "--report-auth-token-file=/etc/kubeconfig/sa.component-monitor.app.ci.token.txt"
+        volumeMounts:
+          - name: release
+            mountPath: /var/repo
+            readOnly: true
+          - name: kubeconfig
+            mountPath: /etc/kubeconfig
+            readOnly: true
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
       volumes:
-        - name: config
-          configMap:
-            name: component-monitor-config
+        - name: release
+          emptyDir: {}
         - name: kubeconfig
           secret:
             secretName: component-monitor-kubeconfigs
