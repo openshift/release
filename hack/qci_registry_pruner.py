@@ -64,17 +64,18 @@
 # cleaned up when payloads are retired.
 
 import time
+import asyncio
 import os
 import sys
 import json
 import re
 import argparse
-import urllib.request
 import subprocess
 import logging
-from typing import Optional, Set, Dict, List
+from typing import Optional, Set, Dict, List, Tuple
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import aiohttp
 
 QUAY_OAUTH_TOKEN_ENV_NAME = "QUAY_OAUTH_TOKEN"
 
@@ -105,28 +106,19 @@ remove_rc_payload_match = re.compile(rf"^{re.escape(REMOVE_RC_PAYLOAD_PREFIX)}(?
 rc_payload_component_match = re.compile(rf"^{re.escape(RC_PAYLOAD_PREFIX)}(?P<version>.+){re.escape(COMPONENT_INFIX)}(?P<component>.+)$")
 
 
-def create_tag(repository: str, tag: str, manifest_digest: str, token: str):
+async def create_tag(session: aiohttp.ClientSession, repository: str, tag: str, manifest_digest: str, token: str) -> bool:
     """Create a tag in a quay.io repository pointing to a specific manifest digest"""
-    # PUT /api/v1/repository/{repository}/tag/{tag}
     create_url = f"https://quay.io/api/v1/repository/{repository}/tag/{tag}"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
-
-    # The manifest_digest should be in the form "sha256:..."
-    data = json.dumps({
-        "manifest_digest": manifest_digest
-    }).encode('utf-8')
-
-    request = urllib.request.Request(create_url, data=data, method='PUT')
-    for key, value in headers.items():
-        request.add_header(key, value)
+    data = {"manifest_digest": manifest_digest}
 
     try:
-        with urllib.request.urlopen(request) as response:
-            response_data = response.read()
+        async with session.put(create_url, headers=headers, json=data) as response:
             if response.status not in [200, 201, 204]:
+                response_data = await response.text()
                 logging.error("Failed to create tag '%s': %d %s", tag, response.status, response_data)
                 return False
             return True
@@ -135,23 +127,17 @@ def create_tag(repository: str, tag: str, manifest_digest: str, token: str):
         return False
 
 
-def delete_tag(repository: str, tag: str, token: str) -> bool:
+async def delete_tag(session: aiohttp.ClientSession, repository: str, tag: str, token: str) -> bool:
     """Delete a tag from a quay.io repository. Returns True on success, False on failure."""
     delete_url = f"https://quay.io/api/v1/repository/{repository}/tag/{tag}"
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
-
-    request = urllib.request.Request(delete_url, method='DELETE')
-    for key, value in headers.items():
-        request.add_header(key, value)
+    headers = {"Authorization": f"Bearer {token}"}
 
     try:
-        with urllib.request.urlopen(request) as response:
-            response_data = response.read()
+        async with session.delete(delete_url, headers=headers) as response:
             if response.status == 204:
                 logging.info('Successfully deleted %s', tag)
                 return True
+            response_data = await response.text()
             logging.error("Failed to delete tag '%s': %d %s", tag, response.status, response_data)
             return False
     except Exception:  # pylint: disable=broad-except
@@ -159,24 +145,18 @@ def delete_tag(repository: str, tag: str, token: str) -> bool:
         return False
 
 
-def fetch_tags(repository: str, token: str, page: int = 1, like: Optional[str] = None):
+async def fetch_tags(session: aiohttp.ClientSession, repository: str, token: str, page: int = 1, like: Optional[str] = None) -> Tuple[List, bool]:
     """Fetch tags from the quay.io repository with pagination"""
     like_adder = ''
     if like:
         like_adder = f'&filter_tag_name=like:{like}'
     tags_url = f"https://quay.io/api/v1/repository/{repository}/tag/?page={page}&limit=100&onlyActiveTags=true" + like_adder
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
+    headers = {"Authorization": f"Bearer {token}"}
 
-    request = urllib.request.Request(tags_url, method='GET')
-    for key, value in headers.items():
-        request.add_header(key, value)
-
-    start_time = time.time()
-    with urllib.request.urlopen(request) as response:
-        response_data = response.read()
-        duration = time.time() - start_time
+    fetch_start = time.time()
+    async with session.get(tags_url, headers=headers) as response:
+        response_data = await response.text()
+        duration = time.time() - fetch_start
         logging.info('fetch_tags page=%d took %.2fs', page, duration)
         if response.status == 200:
             data = json.loads(response_data)
@@ -186,21 +166,15 @@ def fetch_tags(repository: str, token: str, page: int = 1, like: Optional[str] =
         raise IOError(f"Failed to fetch tags: {response.status} {response_data}")
 
 
-def get_tag_manifest_digest(repository: str, tag: str, token: str) -> Optional[str]:
+async def get_tag_manifest_digest(session: aiohttp.ClientSession, repository: str, tag: str, token: str) -> Optional[str]:
     """Get the manifest digest for a specific tag"""
     tag_url = f"https://quay.io/api/v1/repository/{repository}/tag/?specificTag={tag}"
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
-
-    request = urllib.request.Request(tag_url, method='GET')
-    for key, value in headers.items():
-        request.add_header(key, value)
+    headers = {"Authorization": f"Bearer {token}"}
 
     try:
-        with urllib.request.urlopen(request) as response:
-            response_data = response.read()
+        async with session.get(tag_url, headers=headers) as response:
             if response.status == 200:
+                response_data = await response.text()
                 data = json.loads(response_data)
                 tags = data.get("tags", [])
                 if tags and len(tags) > 0:
@@ -251,14 +225,14 @@ def get_release_component_images(payload_pullspec: str) -> List[Dict[str, str]]:
     return components
 
 
-def preserve_release_components(payload_version: str, payload_tag: str, token: str, confirm: bool) -> bool:  # pylint: disable=too-many-statements
+async def preserve_release_components(session: aiohttp.ClientSession, payload_version: str, payload_tag: str, token: str, confirm: bool) -> bool:  # pylint: disable=too-many-statements
     """Preserve component images for a release payload"""
     logging.info("Preserving components for release payload: %s", payload_version)
 
     # Construct the pullspec for the payload
     payload_pullspec = f"{QUAY_REGISTRY}:{payload_tag}"
 
-    # Get component images
+    # Get component images (this is still sync as it calls subprocess)
     components = get_release_component_images(payload_pullspec)
 
     if not components:
@@ -281,7 +255,7 @@ def preserve_release_components(payload_version: str, payload_tag: str, token: s
         digest = component["digest"]
 
         if confirm:
-            if create_tag(QUAY_CI_REPO, component_tag, digest, token):
+            if await create_tag(session, QUAY_CI_REPO, component_tag, digest, token):
                 preserved_count += 1
                 logging.debug("Preserved component %s with tag %s", tag_name, component_tag)
             else:
@@ -295,10 +269,10 @@ def preserve_release_components(payload_version: str, payload_tag: str, token: s
     # Create the preserved__ marker tag
     if confirm and preserved_count > 0:
         # Get the manifest digest of the payload
-        payload_digest = get_tag_manifest_digest(QUAY_CI_REPO, payload_tag, token)
+        payload_digest = await get_tag_manifest_digest(session, QUAY_CI_REPO, payload_tag, token)
         if payload_digest:
             preserved_tag = f"{PRESERVED_RC_PAYLOAD_PREFIX}{payload_version}"
-            if create_tag(QUAY_CI_REPO, preserved_tag, payload_digest, token):
+            if await create_tag(session, QUAY_CI_REPO, preserved_tag, payload_digest, token):
                 logging.info("Created preservation marker tag: %s", preserved_tag)
                 return True
             logging.error("Failed to create preservation marker tag: %s", preserved_tag)
@@ -308,7 +282,7 @@ def preserve_release_components(payload_version: str, payload_tag: str, token: s
     return preserved_count > 0
 
 
-def process_page(page: int, repository: str, token: str, ttl_days: int, start_time, confirm: bool):
+async def process_page(session: aiohttp.ClientSession, page: int, repository: str, token: str, ttl_days: int, start_time, confirm: bool):  # pylint: disable=too-many-arguments,too-many-positional-arguments,redefined-outer-name
     """
     Fetch and process a single page of tags.
     Returns a dict with collected data and tags to delete.
@@ -328,7 +302,7 @@ def process_page(page: int, repository: str, token: str, ttl_days: int, start_ti
     retries = 5
     while True:
         try:
-            tags, has_more = fetch_tags(repository, token, page)
+            tags, has_more = await fetch_tags(session, repository, token, page)
             result['has_more'] = has_more
             break
         except Exception as e:  # pylint: disable=broad-except
@@ -337,7 +311,7 @@ def process_page(page: int, repository: str, token: str, ttl_days: int, start_ti
                 result['error'] = str(e)
                 return result
             logging.info('Retrying page %d in 1 minute..', page)
-            time.sleep(60)
+            await asyncio.sleep(60)
             retries -= 1
 
     for tag in tags:
@@ -393,7 +367,7 @@ def process_page(page: int, repository: str, token: str, ttl_days: int, start_ti
     return result
 
 
-def run(args, start_time):  # pylint: disable=too-many-statements,redefined-outer-name
+async def run(args, start_time):  # pylint: disable=too-many-statements,redefined-outer-name
 
     token = args.token
     if not token:
@@ -416,168 +390,180 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
     remove_requests: Set[str] = set()  # versions to remove
     component_tags: Dict[str, List[str]] = {}  # version -> list of component tag names
 
-    # Executor for concurrent page fetching and tag deletions
-    # Use 100 workers for both fetching pages and deleting tags
-    executor = ThreadPoolExecutor(max_workers=100)
-    delete_futures = []  # List of delete futures
+    # Semaphore to limit concurrent operations
+    page_semaphore = asyncio.Semaphore(args.page_batch_size)
+    delete_semaphore = asyncio.Semaphore(100)  # Limit concurrent deletes
 
-    # Parallel page fetching with continuous streaming
-    MAX_CONCURRENT_PAGES = 20  # Maximum pages in flight at once
-    next_page_to_submit = 1
-    max_known_page = 1  # Highest page we know exists
-    pending_page_futures = {}  # future -> page number
+    # Create aiohttp session with connection pooling
+    connector = aiohttp.TCPConnector(limit=100)
+    async with aiohttp.ClientSession(connector=connector) as session:
 
-    logging.info('Starting parallel page fetching with max %d concurrent requests', MAX_CONCURRENT_PAGES)
+        # Parallel page fetching with continuous streaming
+        next_page_to_submit = args.page_start
+        max_known_page = args.page_start  # Highest page we know exists
+        pending_page_tasks = {}  # task -> page number
+        delete_tasks = []  # List of delete tasks
 
-    while True:
-        # Fill up the pending queue with page requests
-        while len(pending_page_futures) < MAX_CONCURRENT_PAGES and next_page_to_submit <= max_known_page + MAX_CONCURRENT_PAGES:
-            future = executor.submit(process_page, next_page_to_submit, QUAY_CI_REPO, token, ttl_days, start_time, confirm)
-            pending_page_futures[future] = next_page_to_submit
-            next_page_to_submit += 1
+        async def delete_with_semaphore(tag):
+            async with delete_semaphore:
+                return await delete_tag(session, QUAY_CI_REPO, tag, token)
 
-        if not pending_page_futures:
-            break
+        async def process_page_with_semaphore(page):
+            async with page_semaphore:
+                return await process_page(session, page, QUAY_CI_REPO, token, ttl_days, start_time, confirm)
 
-        # Wait for ANY page to complete (not all of them)
-        # Use a short timeout to allow checking for new pages to submit
-        completed_futures = []
-        for future in as_completed(pending_page_futures.keys(), timeout=None):
-            completed_futures.append(future)
-            # Process one at a time so we can immediately submit more work
-            break
+        logging.info('Starting parallel page fetching with max %d concurrent requests, starting at page %d', args.page_batch_size, args.page_start)
 
-        # Process completed futures
-        for future in completed_futures:
-            page_num = pending_page_futures.pop(future)
+        while True:
+            # Fill up the pending queue with page requests
+            while len(pending_page_tasks) < args.page_batch_size and next_page_to_submit <= max_known_page + args.page_batch_size:
+                task = asyncio.create_task(process_page_with_semaphore(next_page_to_submit))
+                pending_page_tasks[task] = next_page_to_submit
+                next_page_to_submit += 1
 
-            try:
-                result = future.result()
+            if not pending_page_tasks:
+                break
 
-                if result['error']:
-                    logging.error('Failed to process page %d: %s', page_num, result['error'])
-                    continue
+            # Wait for ANY page task to complete
+            done, _ = await asyncio.wait(pending_page_tasks.keys(), return_when=asyncio.FIRST_COMPLETED)
 
-                # Update max known page if this page has more
-                if result['has_more'] and page_num >= max_known_page:
-                    max_known_page = page_num + 1
+            # Process completed tasks
+            for task in done:
+                page_num = pending_page_tasks.pop(task)
 
-                # Aggregate results
-                tag_count += result['tag_count']
-                rc_payload_tags.update(result['rc_payload_tags'])
-                preserved_versions.update(result['preserved_versions'])
-                remove_requests.update(result['remove_requests'])
-                for version, tags_list in result['component_tags'].items():
-                    if version not in component_tags:
-                        component_tags[version] = []
-                    component_tags[version].extend(tags_list)
+                try:
+                    result = task.result()
 
-                # Submit delete tasks for prune tags immediately
-                for image_tag in result['prune_tags']:
-                    if image_tag not in prune_target_tags:
-                        prune_target_tags.add(image_tag)
-                        delete_futures.append(executor.submit(delete_tag, QUAY_CI_REPO, image_tag, token))
+                    if result['error']:
+                        logging.error('Failed to process page %d: %s', page_num, result['error'])
+                        continue
 
-                logging.info('Processed page %d: %d tags, has_more=%s, pending_pages=%d',
-                             page_num, result['tag_count'], result['has_more'], len(pending_page_futures))
+                    # Update max known page if this page has more
+                    if result['has_more'] and page_num >= max_known_page:
+                        max_known_page = page_num + 1
 
-            except Exception:  # pylint: disable=broad-except
-                logging.exception('Error processing page %d', page_num)
+                    # Aggregate results
+                    tag_count += result['tag_count']
+                    rc_payload_tags.update(result['rc_payload_tags'])
+                    preserved_versions.update(result['preserved_versions'])
+                    remove_requests.update(result['remove_requests'])
+                    for version, tags_list in result['component_tags'].items():
+                        if version not in component_tags:
+                            component_tags[version] = []
+                        component_tags[version].extend(tags_list)
 
-        # Check if we should stop: no pending futures and we've gone past the known range
-        if not pending_page_futures and next_page_to_submit > max_known_page + 1:
-            logging.info('No more pages to fetch (last page with data: %d)', max_known_page)
-            break
+                    # Submit delete tasks for prune tags immediately
+                    for image_tag in result['prune_tags']:
+                        if image_tag not in prune_target_tags:
+                            prune_target_tags.add(image_tag)
+                            delete_tasks.append(asyncio.create_task(delete_with_semaphore(image_tag)))
 
-    logging.info('Total tags scanned: %d', tag_count)
+                    logging.info('Processed page %d: %d tags, has_more=%s, pending_pages=%d, pending_deletes=%d',
+                                 page_num, result['tag_count'], result['has_more'], len(pending_page_tasks), len(delete_tasks))
 
-    # Wait for all prune delete operations to complete
-    prune_success_count = 0
-    if delete_futures:
-        logging.info('Waiting for %d prune delete operations to complete...', len(delete_futures))
-        for future in delete_futures:
-            if future.result():  # Returns True on success
-                prune_success_count += 1
-        delete_futures.clear()
+                except Exception:  # pylint: disable=broad-except
+                    logging.exception('Error processing page %d', page_num)
 
-    # Process release payload preservation
-    logging.info("Processing release payload preservation...")
-    logging.info("Found %d rc_payload__ tags", len(rc_payload_tags))
-    logging.info("Found %d preserved markers", len(preserved_versions))
+            # Check if we should stop: no pending tasks and we've gone past the known range
+            if not pending_page_tasks and next_page_to_submit > max_known_page + 1:
+                logging.info('No more pages to fetch (last page with data: %d)', max_known_page)
+                break
 
-    payloads_needing_preservation = 0
-    payloads_preserved = 0
+        logging.info('Total tags scanned: %d', tag_count)
 
-    for version, payload_tag in rc_payload_tags.items():
-        # Skip preservation if there's a pending removal request
-        if version in remove_requests:
-            logging.info("Skipping preservation for %s - has pending removal request", version)
-            continue
+        # Wait for all prune delete operations to complete
+        prune_success_count = 0
+        if delete_tasks:
+            logging.info('Waiting for %d prune delete operations to complete...', len(delete_tasks))
+            results = await asyncio.gather(*delete_tasks, return_exceptions=True)
+            for result in results:
+                if result is True:
+                    prune_success_count += 1
+                elif isinstance(result, Exception):
+                    logging.exception('Delete task failed: %s', result)
+            delete_tasks.clear()
 
-        if version not in preserved_versions:
-            payloads_needing_preservation += 1
-            logging.info("Release payload %s has not been preserved yet", version)
-            if preserve_release_components(version, payload_tag, token, confirm):
-                payloads_preserved += 1
-        else:
-            logging.debug("Release payload %s already preserved", version)
+        # Process release payload preservation
+        logging.info("Processing release payload preservation...")
+        logging.info("Found %d rc_payload__ tags", len(rc_payload_tags))
+        logging.info("Found %d preserved markers", len(preserved_versions))
 
-    # Process removal requests
-    removal_requests_processed = 0
-    removal_tags_target = 0
-    removal_success_count = 0
+        payloads_needing_preservation = 0
+        payloads_preserved = 0
 
-    if remove_requests:
-        logging.info("Processing %d removal requests...", len(remove_requests))
+        for version, payload_tag in rc_payload_tags.items():
+            # Skip preservation if there's a pending removal request
+            if version in remove_requests:
+                logging.info("Skipping preservation for %s - has pending removal request", version)
+                continue
 
-        for version in remove_requests:
-            if version in rc_payload_tags:
-                logging.info("Processing removal request for %s", version)
-                removal_requests_processed += 1
-
-                # Find all tags related to this payload (payload tag + preserved marker + components)
-                tags_to_remove = []
-
-                # Add the main payload tag
-                tags_to_remove.append(f"{RC_PAYLOAD_PREFIX}{version}")
-
-                # Add the preserved marker if it exists
-                if version in preserved_versions:
-                    tags_to_remove.append(f"{PRESERVED_RC_PAYLOAD_PREFIX}{version}")
-
-                # Add component tags if they exist
-                if version in component_tags:
-                    tags_to_remove.extend(component_tags[version])
-                    logging.info("Found %d component tags for %s", len(component_tags[version]), version)
-
-                logging.info("Found %d tags to remove for %s", len(tags_to_remove), version)
-                removal_tags_target += len(tags_to_remove)
-
-                # Remove all related tags
-                if confirm:
-                    for tag_to_remove in tags_to_remove:
-                        delete_futures.append(executor.submit(delete_tag, QUAY_CI_REPO, tag_to_remove, token))
-                else:
-                    for tag_to_remove in tags_to_remove:
-                        logging.info("Would remove tag: %s", tag_to_remove)
+            if version not in preserved_versions:
+                payloads_needing_preservation += 1
+                logging.info("Release payload %s has not been preserved yet", version)
+                if await preserve_release_components(session, version, payload_tag, token, confirm):
+                    payloads_preserved += 1
             else:
-                # No matching rc_payload__ tag found, so we can delete the remove__ request
-                remove_tag = f"{REMOVE_RC_PAYLOAD_PREFIX}{version}"
-                logging.info("No rc_payload__ tag found for %s, removing request tag", version)
-                removal_tags_target += 1
+                logging.debug("Release payload %s already preserved", version)
 
-                if confirm:
-                    delete_futures.append(executor.submit(delete_tag, QUAY_CI_REPO, remove_tag, token))
+        # Process removal requests
+        removal_requests_processed = 0
+        removal_tags_target = 0
+        removal_success_count = 0
+
+        if remove_requests:
+            logging.info("Processing %d removal requests...", len(remove_requests))
+
+            for version in remove_requests:
+                if version in rc_payload_tags:
+                    logging.info("Processing removal request for %s", version)
+                    removal_requests_processed += 1
+
+                    # Find all tags related to this payload (payload tag + preserved marker + components)
+                    tags_to_remove = []
+
+                    # Add the main payload tag
+                    tags_to_remove.append(f"{RC_PAYLOAD_PREFIX}{version}")
+
+                    # Add the preserved marker if it exists
+                    if version in preserved_versions:
+                        tags_to_remove.append(f"{PRESERVED_RC_PAYLOAD_PREFIX}{version}")
+
+                    # Add component tags if they exist
+                    if version in component_tags:
+                        tags_to_remove.extend(component_tags[version])
+                        logging.info("Found %d component tags for %s", len(component_tags[version]), version)
+
+                    logging.info("Found %d tags to remove for %s", len(tags_to_remove), version)
+                    removal_tags_target += len(tags_to_remove)
+
+                    # Remove all related tags
+                    if confirm:
+                        for tag_to_remove in tags_to_remove:
+                            delete_tasks.append(asyncio.create_task(delete_with_semaphore(tag_to_remove)))
+                    else:
+                        for tag_to_remove in tags_to_remove:
+                            logging.info("Would remove tag: %s", tag_to_remove)
                 else:
-                    logging.info("Would remove request tag: %s", remove_tag)
+                    # No matching rc_payload__ tag found, so we can delete the remove__ request
+                    remove_tag = f"{REMOVE_RC_PAYLOAD_PREFIX}{version}"
+                    logging.info("No rc_payload__ tag found for %s, removing request tag", version)
+                    removal_tags_target += 1
 
-        # Wait for all removal delete operations to complete
-        if delete_futures:
-            logging.info('Waiting for %d removal delete operations to complete...', len(delete_futures))
-            for future in delete_futures:
-                if future.result():  # Returns True on success
-                    removal_success_count += 1
-            delete_futures.clear()
+                    if confirm:
+                        delete_tasks.append(asyncio.create_task(delete_with_semaphore(remove_tag)))
+                    else:
+                        logging.info("Would remove request tag: %s", remove_tag)
+
+            # Wait for all removal delete operations to complete
+            if delete_tasks:
+                logging.info('Waiting for %d removal delete operations to complete...', len(delete_tasks))
+                results = await asyncio.gather(*delete_tasks, return_exceptions=True)
+                for result in results:
+                    if result is True:
+                        removal_success_count += 1
+                    elif isinstance(result, Exception):
+                        logging.exception('Delete task failed: %s', result)
+                delete_tasks.clear()
 
     finish_time = datetime.now()
     logging.info('Duration: %s', finish_time - start_time)
@@ -595,9 +581,6 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
     if confirm:
         logging.info('Release payload tags successfully removed: %d', removal_success_count)
 
-    # Cleanup executor
-    executor.shutdown(wait=False)
-
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%dT%H:%M:%S')
 
 if __name__ == '__main__':
@@ -609,6 +592,8 @@ if __name__ == '__main__':
     parser.add_argument('--token', type=str, help=f'quay.io oauth application token (or set {QUAY_OAUTH_TOKEN_ENV_NAME} environment variable)')
     parser.add_argument('--ttl-days', type=int, default=5, help='Only prune tags older than this (defaults to 5; -1 for all prunable tags)')
     parser.add_argument('--confirm', action='store_true', help='Actually delete and refresh tags')
+    parser.add_argument('--page-batch-size', type=int, default=20, help='Number of pages to fetch concurrently (defaults to 20)')
+    parser.add_argument('--page-start', type=int, default=1, help='Page number to start fetching from (defaults to 1)')
 
-    run(parser.parse_args(), start_time)
+    asyncio.run(run(parser.parse_args(), start_time))
     sys.exit(0)
