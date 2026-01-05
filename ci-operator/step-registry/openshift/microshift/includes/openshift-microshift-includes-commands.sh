@@ -269,6 +269,7 @@ function ci_custom_link_report() {
               test_scenario_status="fail"
             elif [ ! -f "${test_junit_file}" ]; then
               test_scenario_status="fail"
+            fi
           fi
         else
           test_scenario_status="fail"
