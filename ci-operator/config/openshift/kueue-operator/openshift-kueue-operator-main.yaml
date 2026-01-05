@@ -7,10 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-base-openshift-4.19
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+  ocp_builder_rhel-9-golang-1.25-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.25-openshift-4.21
   operator-sdk:
     name: "4.17"
     namespace: origin
@@ -29,22 +29,23 @@ images:
     ocp_builder_rhel-9-base-openshift-4.19:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.19
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
   to: kueue-operator
 - additional_architectures:
   - arm64
   dockerfile_literal: |
     FROM src
-    RUN dnf install -y skopeo git && dnf clean all
     RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+    RUN dnf install -y jq skopeo git && dnf clean all
   from: src
   to: kueue-operator-src
 - dockerfile_literal: |
     FROM src
     COPY oc /usr/bin/oc
     RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN wget -qO /usr/local/bin/jq https://github.com/jqlang/jq/releases/latest/download/jq-linux64 && chmod +x /usr/local/bin/jq
     RUN dnf install -y skopeo git podman && dnf clean all
   from: src
   inputs:
@@ -220,22 +221,92 @@ tests:
     test:
     - chain: kueue-operator-test-e2e-upstream
 - always_run: false
-  as: perfscale-payload-kueue-operator-9nodes
+  as: perfscale-pr-kueue-operator-9nodes
   optional: true
   steps:
-    cluster_profile: aws-perfscale-qe
+    cluster_profile: aws-perfscale
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
       BUNDLE_COMPONENT: kueue-bundle-main
       COMPUTE_NODE_REPLICAS: "9"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      KUBE_BURNER_VERSION: 1.8.3
       OPERAND_COMPONENT: kueue-operand-main
       OPERATOR_COMPONENT: kueue-operator-main
       ZONES_COUNT: "3"
     test:
     - chain: kueue-operator-test-perfscale
     workflow: openshift-qe-installer-aws
+- as: perfscale-kueue-operator-9nodes
+  cron: 0 1 1,15 * *
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      BUNDLE_COMPONENT: kueue-bundle-main
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      KUBE_BURNER_VERSION: 1.8.3
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+      ZONES_COUNT: "3"
+    test:
+    - chain: kueue-operator-test-perfscale
+    workflow: openshift-qe-installer-aws
+- as: test-e2e-disconnected
+  capabilities:
+  - arm64
+  minimum_interval: 96h
+  steps:
+    cluster_profile: gcp
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      CATSRC_IMG: registry.redhat.io/redhat/redhat-operator-index:v4.19
+      CATSRC_NAME: redhat-operators
+      MIRROR_OPERATORS: "true"
+      MUST_GATHER_COMPONENT: kueue-must-gather-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - as: kueue-must-gather-disconnected
+      cli: latest
+      commands: |
+        source "${SHARED_DIR}/env"
+        export MUST_GATHER_IMAGE
+        echo "Running must-gather to gather diagnostics..."
+        mkdir -p ${ARTIFACT_DIR:-must-gather}/must-gather
+        oc adm must-gather --image=${MUST_GATHER_IMAGE} --dest-dir=${ARTIFACT_DIR:-must-gather}/must-gather
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: kueue-cleanup-disconnected
+      cli: latest
+      commands: make undeploy-ocp
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    test:
+    - chain: cert-manager-install
+    - chain: jobset-install
+    - chain: leader-worker-set-install
+    - chain: kueue-operator-disconnected
+    - as: e2e-kueue
+      cli: latest
+      commands: |
+        export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
+        make test-e2e
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
 zz_generated_metadata:
   branch: main
   org: openshift

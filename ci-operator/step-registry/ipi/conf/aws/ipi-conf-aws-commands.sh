@@ -193,7 +193,17 @@ echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 existing_zones_setting=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.zones')
 
 if [[ ${existing_zones_setting} == "" ]] && [[ ${ADD_ZONES} == "yes" ]]; then
-  ZONES_COUNT=${ZONES_COUNT:-2}
+  ZONES_COUNT=${ZONES_COUNT:-auto}
+  if [[ "${ZONES_COUNT}" == "auto" ]]; then
+    if [[ "${JOB_NAME}" == pull-ci-*  || "${JOB_NAME}" == rehearse-*-pull-ci-* ]]; then
+      # For presubmits, limit cloud costs by using only one AZ when in "auto".
+      ZONES_COUNT="1"
+    else
+      # For periodics (which inform component readiness), ensure multiple AZ
+      # usage in "auto" mode.
+      ZONES_COUNT="2"
+    fi
+  fi
   ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
   ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
   echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
@@ -213,11 +223,17 @@ else
   echo "zones already set in install-config.yaml, skipped"
 fi
 
-if [[ "${CI_NAT_REPLACE:-false}" == 'auto' ]]; then
-  # Target 50% of pull request jobs in master or main.
-  if [[ "${BUILD_ID: -1}" == [0-5] && "${JOB_NAME}" == *pull-ci-openshift-*-ma*e2e*aws* && "${JOB_NAME}" != *'microshift'* && "${JOB_NAME}" != *'hypershift'* && "${JOB_NAME}" != *'vpc'* && "${JOB_NAME}" != *'single-node'* ]]; then
-    CI_NAT_REPLACE='true'
-    echo "IMPORTANT: this job has been selected to use NAT instance instead of NAT gateway. See jupierce if abnormalities are detected."
+# See if we can use NAT instances as a cost reduction method.
+# OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY is set to false by the release controller (i.e. do not use NAT instances
+# release controller jobs.
+if [[ "${CI_NAT_REPLACE:-false}" == 'auto' && "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-true}" != "false" ]]; then
+  # Enable the option for anything in the openshift org unless they use a different install topology.
+  # 4.21 is currently excluded as we approach GA.
+  if [[ "${JOB_NAME}" == *-ci-openshift-* && "${JOB_NAME}" != *-4.21-* ]]; then
+    if [[ "${JOB_NAME}" != *'microshift'* && "${JOB_NAME}" != *'hypershift'* && "${JOB_NAME}" != *'vpc'* && "${JOB_NAME}" != *'single-node'* ]]; then
+      CI_NAT_REPLACE='true'
+      echo "IMPORTANT: this job has been selected to use NAT instance instead of NAT gateway. See jupierce if abnormalities are detected."
+    fi
   fi
 fi
 

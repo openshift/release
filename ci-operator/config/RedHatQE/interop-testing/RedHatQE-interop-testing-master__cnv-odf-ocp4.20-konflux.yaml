@@ -1,0 +1,75 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  openshift-virtualization-tests:
+    name: openshift-virtualization-tests
+    namespace: ci
+    tag: cnv-4.20
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+images:
+- build_args:
+  - name: OCP_VERSION
+    value: "4.20"
+  - name: OC_CLI_VERSION
+    value: latest
+  context_dir: cnv-ci
+  dockerfile_path: Dockerfile
+  to: cnv-ci
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: cnv-odf-smoke-tests-aws-ipi-ocp420
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-interop-qe
+    env:
+      BASE_DOMAIN: release-ci.cnv-qe.rhood.us
+      CNV_VERSION: "4.20"
+      COMPUTE_NODE_TYPE: c5n.metal
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "cucushift-*"                      , "failure_type": "all"          , "classification": "Cluster Health Check" , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
+              {"step": "*deploy-odf"                      , "failure_type": "all"          , "classification": "Operator Setup"       , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests","test-initialization"]                          },
+              {"step": "*deploy-cnv"                      , "failure_type": "all"          , "classification": "Operator Setup"       , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests","test-initialization"]                          },
+              {"step": "*-openshift-virtualization-tests" , "failure_type": "test_failure" , "classification": "CNV Tests Failure"    , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default", "interop-tests"], "jira_project": "CNV", "jira_assignee": "!default"}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp", "self-managed-lp", "cnv-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dkeler@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCP_VERSION: "4.20"
+      ODF_OPERATOR_CHANNEL: stable-4.20
+      ODF_VERSION_MAJOR_MINOR: "4.20"
+      RE_TRIGGER_ON_FAILURE: "false"
+      USER_TAGS: |
+        scenario cnv
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-deploy-cnv
+    - ref: interop-tests-deploy-odf
+    - ref: interop-tests-openshift-virtualization-tests
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: cnv-odf-ocp4.20-konflux

@@ -1,110 +1,114 @@
-kind: List
+---
+kind: ServiceAccount
 apiVersion: v1
-items:
+metadata:
+  name: hive
+  namespace: ci
 
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-hive-creator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ci-hive-creator
+subjects:
 - kind: ServiceAccount
-  apiVersion: v1
-  metadata:
-    name: hive
-    namespace: ci
+  name: hive
+  namespace: ci
 
-- kind: ClusterRoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: ci-hive-creator
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: ClusterRole
-    name: ci-hive-creator
-  subjects:
-  - kind: ServiceAccount
-    name: hive
-    namespace: ci
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-hive-creator
+rules:
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterclaims
+  verbs:
+  - create
+  - delete
 
-- kind: ClusterRole
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: ci-hive-creator
-  rules:
-  - apiGroups:
-    - hive.openshift.io
-    resources:
-    - clusterclaims
-    verbs:
-    - create
-    - delete
-
-- kind: ClusterRoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: ci-hive-viewer
-  roleRef:
-    apiGroup: rbac.authorization.k8s.io
-    kind: ClusterRole
-    name: ci-hive-viewer
-  subjects:
-  - kind: ServiceAccount
-    name: hive
-    namespace: ci
-  - kind: ServiceAccount
-    name: cluster-display
-    namespace: ci
-  - kind: ServiceAccount
-    name: dptp-pools-cm
-    namespace: ci
-
-- kind: ClusterRole
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: ci-hive-viewer
-  rules:
-  - apiGroups:
-    - ""
-    resources:
-    - secrets
-    verbs:
-    - get
-  - apiGroups:
-    - hive.openshift.io
-    resources:
-    - clusterclaims
-    - clusterdeployments
-    - clusterpools
-    - clusterimagesets
-    verbs:
-    - get
-    - list
-    - watch
-
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-hive-viewer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ci-hive-viewer
+subjects:
 - kind: ServiceAccount
-  apiVersion: v1
-  metadata:
-    name: clusterpool-manager
-    namespace: ci
+  name: hive
+  namespace: ci
+- kind: ServiceAccount
+  name: cluster-display
+  namespace: ci
+- kind: ServiceAccount
+  name: dptp-pools-cm
+  namespace: ci
 
-- kind: ClusterRole
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: clusterpool-manager-role
-  rules:
-  - apiGroups:
-    - hive.openshift.io
-    resources:
-    - clusterpools
-    verbs:
-    - get
-    - list
-    - delete
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-hive-viewer
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterclaims
+  - clusterdeployments
+  - clusterpools
+  - clusterimagesets
+  verbs:
+  - get
+  - list
+  - watch
 
-- kind: ClusterRoleBinding
-  apiVersion: rbac.authorization.k8s.io/v1
-  metadata:
-    name: clusterpool-manager-binding
-  subjects:
-  - kind: ServiceAccount
-    name: clusterpool-manager
-    namespace: ci
-  roleRef:
-    kind: ClusterRole
-    name: clusterpool-manager-role
-    apiGroup: rbac.authorization.k8s.io
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: clusterpool-manager
+  namespace: ci
+
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: clusterpool-manager-role
+rules:
+- apiGroups:
+  - hive.openshift.io
+  resources:
+  - clusterpools
+  verbs:
+  - get
+  - list
+  - delete
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: clusterpool-manager-binding
+subjects:
+- kind: ServiceAccount
+  name: clusterpool-manager
+  namespace: ci
+roleRef:
+  kind: ClusterRole
+  name: clusterpool-manager-role
+  apiGroup: rbac.authorization.k8s.io

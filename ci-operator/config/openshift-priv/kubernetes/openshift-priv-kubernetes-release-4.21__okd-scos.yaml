@@ -1,0 +1,89 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  origin_scos-4.21_base-stream9:
+    name: scos-4.21
+    namespace: origin
+    tag: base-stream9
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.21
+canonical_go_repository: github.com/openshift/kubernetes
+images:
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: openshift-hack/images/kube-proxy/Dockerfile.rhel
+  from: origin_scos-4.21_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: kube-proxy
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
+  from: origin_scos-4.21_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: hyperkube
+- build_args:
+  - name: TAGS
+    value: scos
+  context_dir: build/pause
+  dockerfile_path: Dockerfile.Rhel
+  from: origin_scos-4.21_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: pod
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
+  from: origin_scos-4.21_base-stream9
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: installer-kube-apiserver-artifacts
+promotion:
+  to:
+  - disabled: true
+    name: scos-4.21
+    namespace: origin
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: scos-4.21
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift-priv
+  repo: kubernetes
+  variant: okd-scos

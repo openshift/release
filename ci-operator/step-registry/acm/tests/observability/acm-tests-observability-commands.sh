@@ -35,6 +35,9 @@ export HUB_CLUSTER_NAME
 OC_HUB_CLUSTER_PASS=$(cat $SHARED_DIR/kubeadmin-password)
 export OC_HUB_CLUSTER_PASS
 
+CLOUD_PROVIDER=${CLOUD_PROVIDER:-}
+export CLOUD_PROVIDER
+
 set +x
    oc login ${OC_HUB_CLUSTER_API_URL} --insecure-skip-tls-verify=true -u kubeadmin -p ${OC_HUB_CLUSTER_PASS}
 set -x
@@ -78,3 +81,5 @@ bash +x ./execute_obs_interop_commands.sh || :
 
 # Copy the test cases results to an external directory
 cp -r tests/pkg/tests $ARTIFACT_DIR/
+
+mv $ARTIFACT_DIR/tests/results.xml $ARTIFACT_DIR/tests/junit_results.xml

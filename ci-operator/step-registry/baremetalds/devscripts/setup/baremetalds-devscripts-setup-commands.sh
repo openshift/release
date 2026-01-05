@@ -395,6 +395,12 @@ then
   echo "export APPLIANCE_IMAGE=${APPLIANCE_IMAGE}" >> /root/dev-scripts/config_root.sh
 fi
 
+# Add AGENT_ISO_BUILDER_IMAGE only for OVE ISOBuilder e2e tests
+if [ "${AGENT_E2E_TEST_BOOT_MODE}" == "ISO_NO_REGISTRY" ];
+then
+  echo "export AGENT_ISO_BUILDER_IMAGE=${AGENT_ISO_BUILDER_IMAGE}" >> /root/dev-scripts/config_root.sh
+fi
+
 # If any extra manifests, then set ASSETS_EXTRA_FOLDER
 if [ "${EXTRA_MANIFESTS}" == "true" ];
 then
