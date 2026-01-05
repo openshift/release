@@ -4,9 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
+
 # Auto-detect namespace based on cluster version if not explicitly set
 if [[ -z "${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
-  CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
   MINOR_VERSION=$(echo $CLUSTER_VERSION | cut -d. -f2)
 
   echo "Detected OpenShift version: ${CLUSTER_VERSION}"
@@ -29,8 +30,9 @@ if [[ -z "${LVM_OPERATOR_SUB_PACKAGE}" ]]; then
 fi
 
 if [[ -z "${LVM_OPERATOR_SUB_CHANNEL}" ]]; then
-  echo "ERROR: CHANNEL is not defined"
-  exit 1
+  echo "CHANNEL is not defined, use the channel for current cluster version"
+  LVM_OPERATOR_SUB_CHANNEL="stable-${CLUSTER_VERSION}"
+  echo "Set LVM_OPERATOR_SUB_CHANNEL to: ${LVM_OPERATOR_SUB_CHANNEL}"
 fi
 
 if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_SUB_CHANNEL" ]]; then

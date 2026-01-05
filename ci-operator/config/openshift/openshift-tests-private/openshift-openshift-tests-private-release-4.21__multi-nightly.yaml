@@ -141,7 +141,7 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.21
+      OO_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.20
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -157,7 +157,7 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.21
+      OO_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.20
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
@@ -174,7 +174,7 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.21
+      OO_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.20
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -211,6 +211,40 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
+- as: aws-ipi-localzone-rootvolume-f7
+  cron: 52 7 3,10,17,24 * *
+  steps:
+    cluster_profile: aws-1-qe
+    env:
+      AWS_DEFAULT_GP3_THROUGHPUT: "500"
+      AWS_DEFAULT_MACHINE_VOLUME_SIZE: "120"
+      AWS_DEFAULT_MACHINE_VOLUME_TYPE: gp3
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EDGE_ZONES_LIST: us-east-1-dfw-2a
+      ENABLE_AWS_EDGE_ZONE: "yes"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-rootvolume
+- as: aws-ipi-localzone-rootvolume-f28-destructive
+  cron: 16 9 15 * *
+  steps:
+    cluster_profile: aws-1-qe
+    env:
+      AWS_COMPUTE_GP3_THROUGHPUT: "1000"
+      AWS_COMPUTE_VOLUME_SIZE: "120"
+      AWS_COMPUTE_VOLUME_TYPE: gp3
+      AWS_CONTROL_PLANE_GP3_THROUGHPUT: "1200"
+      AWS_CONTROL_PLANE_VOLUME_SIZE: "150"
+      AWS_CONTROL_PLANE_VOLUME_TYPE: gp3
+      AWS_EDGE_GP3_THROUGHPUT: "1000"
+      AWS_EDGE_VOLUME_SIZE: "120"
+      AWS_EDGE_VOLUME_TYPE: gp3
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EDGE_ZONES_LIST: us-east-1-dfw-2a
+      ENABLE_AWS_EDGE_ZONE: "yes"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-edge-zone-rootvolume
 - as: aws-ipi-byo-route53-compact-cloudfront-amd-f28-destructive
   cron: 32 20 19 * *
   steps:
@@ -620,7 +654,7 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.21
+      OO_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.20
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"
@@ -1466,21 +1500,77 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-multidisk
-- as: azure-ipi-nat-gateway-single-zone-amd-f28-destructive
-  cron: 45 22 9 * *
+- as: azure-ipi-nat-gateway-mzone-mini-perm-amd-f28-destructive
+  cron: 52 15 20 * *
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_AZURE_REGION: centralus
+      OUTBOUND_TYPE: NATGatewayMultiZone
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway
+- as: azure-ipi-nat-gateway-mzone-mini-perm-arm-f7
+  cron: 28 4 7,16,23,30 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      CUSTOM_AZURE_REGION: centralus
+      OCP_ARCH: arm64
+      OUTBOUND_TYPE: NATGatewayMultiZone
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway
+- as: azure-ipi-nat-gateway-mzone-byo-subnets-amd-f28-destructive
+  cron: 56 14 14 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_BYO_COMPUTE_SUBNETS_NUMBER: "3"
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_AZURE_REGION: centralus
+      OUTBOUND_TYPE: NATGatewayMultiZone
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway-byo-subnets
+- as: azure-ipi-nat-gateway-mzone-byo-subnets-mini-perm-arm-f7
+  cron: 11 7 2,11,18,25 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_BYO_COMPUTE_SUBNETS_NUMBER: "3"
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      CUSTOM_AZURE_REGION: centralus
+      OCP_ARCH: arm64
+      OUTBOUND_TYPE: NATGatewayMultiZone
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway-byo-subnets
+- as: azure-ipi-nat-gateway-szone-mini-perm-amd-f28-destructive
+  cron: 45 18 25 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       OUTBOUND_TYPE: NATGatewaySingleZone
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway
-- as: azure-ipi-nat-gateway-single-zone-arm-f7
-  cron: 3 21 5,14,21,28 * *
+- as: azure-ipi-nat-gateway-szone-mini-perm-arm-f7
+  cron: 4 10 3,10,17,26 * *
   steps:
     cluster_profile: azure-qe
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
@@ -1488,6 +1578,29 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway
+- as: azure-ipi-nat-gateway-szone-byo-subnets-amd-f28-destructive
+  cron: 16 14 2 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      OUTBOUND_TYPE: NATGatewaySingleZone
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway-byo-subnets
+- as: azure-ipi-nat-gateway-szone-byo-subnets-mini-perm-arm-f7
+  cron: 56 2 7,14,21,28 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+      OUTBOUND_TYPE: NATGatewaySingleZone
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway-byo-subnets
 - as: azure-ipi-oidc-mini-perm-amd-f28-destructive
   cron: 14 10 27 * *
   steps:
@@ -2499,6 +2612,52 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
+- as: gcp-ipi-xpn-mini-perm-dns-project-amd-f28-destructive
+  cron: 20 22 23 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      PRE_CREATE_PRIVATE_ZONE: "no"
+      PRIVATE_ZONE_PROJECT: openshift-qe-regional
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
+- as: gcp-ipi-xpn-mini-perm-dns-project-arm-f14
+  cron: 58 20 1,17 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+      PRIVATE_ZONE_PROJECT: openshift-qe-regional
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
+- as: gcp-ipi-xpn-mini-perm-dns-project-priv-amd-f28-destructive
+  cron: 2 12 18 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      PRE_CREATE_PRIVATE_ZONE: "no"
+      PRIVATE_ZONE_PROJECT: openshift-qe-regional
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-private
+- as: gcp-ipi-xpn-mini-perm-dns-project-priv-arm-f14
+  cron: 26 1 16,30 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+      PRIVATE_ZONE_PROJECT: openshift-qe-regional
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-private
 - as: gcp-ipi-xpn-min-byo-zone-f28-longduration-cloud
   cron: 56 12 15 * *
   steps:

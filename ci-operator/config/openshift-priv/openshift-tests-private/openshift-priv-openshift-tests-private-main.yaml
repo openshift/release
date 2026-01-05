@@ -1,0 +1,245 @@
+base_images:
+  ci_tests-private-base:
+    name: tests-private-base
+    namespace: ci
+    tag: latest
+  ci_tests-private-baseui:
+    name: tests-private-baseui
+    namespace: ci
+    tag: latest
+  cli:
+    name: 4.22-priv
+    namespace: ocp-private
+    tag: cli
+  upi-installer:
+    name: 4.22-priv
+    namespace: ocp-private
+    tag: upi-installer
+binary_build_commands: make go-mod-tidy;make all
+build_root:
+  image_stream_tag:
+    name: builder-priv
+    namespace: ocp-private
+    tag: rhel-9-golang-1.24-openshift-4.21
+canonical_go_repository: github.com/openshift/openshift-tests-private
+images:
+- dockerfile_literal: |
+    FROM src AS builder
+    FROM this-is-ignored-and-not-used
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+  from: ci_tests-private-baseui
+  inputs:
+    src:
+      as:
+      - src
+  to: tests-private-ui
+- dockerfile_literal: |
+    FROM bin AS builder
+    FROM this-is-ignored-and-not-used
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+    RUN chmod g+w /go/src/github.com/openshift/openshift-tests-private && \
+        rm -rf /usr/bin/oc /usr/bin/kubectl
+  from: ci_tests-private-base
+  inputs:
+    bin:
+      as:
+      - bin
+  to: tests-private-pr
+promotion:
+  to:
+  - excluded_images:
+    - tests-private-ui
+    - tests-private-pr
+    name: 4.22-priv
+    namespace: ocp-private
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+  bin:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+test_binary_build_commands: make test
+tests:
+- as: title-check
+  commands: make name-check
+  container:
+    from: src
+  skip_if_only_changed: OWNERS$
+- as: bindata-check
+  commands: |
+    make update
+    ret=0 && git diff --quiet test/extended/testdata/bindata.go || ret=$?
+    if [ $ret -ne 0 ]; then
+        echo "bindata is not correct updated by your PR, please refer to the following and re-execute \"make update\" on your terminal and then update PR"
+        echo "---"
+        git diff test/extended/testdata/bindata.go || true
+        echo "---"
+        exit 1
+    fi
+  container:
+    from: src
+  skip_if_only_changed: ^images/|OWNERS$
+- as: code-check
+  commands: |
+    unset GOFLAGS
+    go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.2.2 2> /dev/null
+    which golangci-lint
+    make check-code
+  container:
+    from: src
+  skip_if_only_changed: OWNERS$
+- always_run: false
+  as: e2e-aws
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-5
+    test:
+    - ref: enable-qe-catalogsource
+    - as: pr-test
+      cli: latest
+      commands: |
+        oc version
+        export tmphome="/tmp/home"
+        mkdir -p "${tmphome}"
+
+        curl -s -k https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-318.0.0-linux-x86_64.tar.gz -o gcsl.tar.gz && tar -C ${tmphome} -xzf gcsl.tar.gz && rm -fr gcsl.tar.gz
+        mkdir -p ${tmphome}/gcloudconfig && export CLOUDSDK_CONFIG=${tmphome}/gcloudconfig && export PATH=$PATH:${tmphome}/google-cloud-sdk/bin
+
+        export PATH="$PATH:$HOME/.krew/bin:/usr/local/krew/bin:/opt/OpenShift4-tools:$tmphome"
+
+        if ! which kubectl; then
+          ln -s "$(which oc)" ${tmphome}/kubectl
+        fi
+
+        python3 ./hack/pr.py
+      from: tests-private-pr
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-console
+  optional: true
+  run_if_changed: frontend/tests/.*.cy.ts
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    test:
+    - ref: enable-qe-catalogsource
+    - as: console-test
+      cli: latest
+      commands: python3 ./frontend/hack/console_pr.py
+      from: tests-private-ui
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: ipi-gcp
+- as: debug-disasterrecovery-aws-ipi
+  optional: true
+  run_if_changed: test/extended/disaster_recovery/
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+    test:
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
+    workflow: cucushift-installer-rehearse-aws-ipi-private
+- as: debug-disasterrecovery-baremetal-upi
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: test/extended/disaster_recovery/
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      FORCE_SUCCESS_EXIT: "no"
+      architecture: arm64
+    test:
+    - chain: openshift-e2e-test-qe-disasterrecovery-sanity
+    workflow: baremetal-lab-upi
+- as: debug-winc-aws-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
+- as: debug-winc-gcp-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
+- as: debug-winc-azure-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
+- as: debug-winc-vsphere-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: openshift-tests-private

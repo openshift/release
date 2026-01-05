@@ -1,12 +1,29 @@
-
 chain:
   as: stackrox-perfscale
   steps:
   - chain: openshift-qe-cluster-density-v2
+  - ref: openshift-qe-orion-cluster-density
   - chain: openshift-qe-node-density
   # TODO: fix scanner failing in cni and reenable:
   # - chain: openshift-qe-node-density-cni
   - chain: openshift-qe-crd-scale
+  env:
+  - name: ES_BENCHMARK_INDEX
+    default: "ripsaw-kube-burner*"
+  - name: ES_METADATA_INDEX
+    default: "perf_scale_ci*"
+  - name: ES_SECRETS_PATH
+    default: /secret_stackrox
+  - name: ES_TYPE
+    default: "stackrox"
+  - name: ORION_CONFIG
+    default: https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/orion-acs-cluster-density-v2.yml
+  - name: OUTPUT_FORMAT
+    default: "JUNIT"
+    documentation: Output format for Orion (JUNIT, JSON, or TEXT). JUNIT format enables better error display in Prow.
+  - name: RUN_ORION
+    default: "true"
+  - name: VERSION
+    default: "4.19"
   documentation: |-
-    Base set of perf&scale workloads for stackrox on ocp:
-    node density
+    perf&scale workloads for stackrox on ocp
