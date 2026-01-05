@@ -1,12 +1,64 @@
 chain:
   as: openshift-qe-egress-ip-scale
   steps:
+  # Initial setup and baseline validation
   - ref: openshift-qe-egress-ip-scale-setup
+  - ref: openshift-qe-egress-ip-scale-validation
+  
+  # Pod Network Chaos
+  - ref: redhat-chaos-pod-network-chaos
+  - ref: openshift-qe-egress-ip-scale-validation
+  
+  # OVN Pod Disruption
   - ref: redhat-chaos-pod-scenarios-custom
+  - ref: openshift-qe-egress-ip-scale-validation
+  
+  # Node Network Chaos
+  - ref: redhat-chaos-network-chaos
+  - ref: openshift-qe-egress-ip-scale-validation
+  
+  # Worker Node Outage
   - ref: redhat-chaos-node-disruptions-worker-outage
+  - ref: openshift-qe-egress-ip-scale-validation
+  
+  # Power Outage
+  - ref: redhat-chaos-power-outage
+  - ref: openshift-qe-egress-ip-scale-validation
+  
+  # Final comprehensive tests
   - ref: openshift-qe-egress-ip-scale-tests
   env:
-  # Scaled cluster chaos testing environment variables
+  # Scale-specific egress IP configuration
+  - name: EGRESS_IP_COUNT
+    default: "5"
+  - name: EGRESS_NODES_COUNT
+    default: "10"
+  - name: SCALE_TEST_WORKLOADS
+    default: "20"
+  
+  # Health Check URLs for egress IP monitoring
+  - name: HEALTH_CHECK_URLS
+    default: "https://httpbin.org/ip,https://ifconfig.me/ip,https://api.ipify.org"
+  - name: URL_WATCH_ENABLED
+    default: "True"
+  - name: HEALTH_CHECK_TIMEOUT
+    default: "30"
+  
+  # Pod Network Chaos configuration
+  - name: TEST_NAMESPACE
+    default: "egress-test-scale"
+  - name: TRAFFIC_TYPE
+    default: "[egress]"
+  - name: LABEL_SELECTOR
+    default: "egress-enabled=true"
+  - name: EGRESS_PORTS
+    default: "80,443,8080"
+  - name: TEST_DURATION
+    default: "180"
+  - name: INSTANCE_COUNT
+    default: "5"
+  
+  # OVN Pod disruption chaos environment variables
   - name: TARGET_NAMESPACE
     default: "openshift-ovn-kubernetes"
   - name: POD_LABEL
@@ -19,6 +71,34 @@ chain:
     default: "300"
   - name: EXPECTED_RECOVERY_TIME
     default: "180"
+  
+  # Node Network Chaos configuration
+  - name: NETWORK_PARAMS
+    default: '{"latency": "100ms", "packet_loss": "1%", "bandwidth": "100mbit"}'
+  - name: INTERFACES
+    default: "eth0"
+  - name: EGRESS
+    default: '{"latency": "50ms", "packet_loss": "0.5%"}'
+  
+  # Worker node outage configuration
+  - name: ACTION
+    default: "node_reboot_scenario"
+  - name: LABEL_SELECTOR
+    default: "node-role.kubernetes.io/worker="
+  - name: RUNS
+    default: "3"
+  - name: NODE_OUTAGE_TIMEOUT
+    default: "240"
+  
+  # Power outage configuration
+  - name: SHUTDOWN_DURATION
+    default: "300"
+  - name: POWER_OUTAGE_TIMEOUT
+    default: "900"
+  - name: CLOUD_TYPE
+    default: "aws"
+  
+  # Common chaos testing configuration
   - name: ENABLE_ALERTS
     default: "True"
   - name: CHECK_CRITICAL_ALERTS
@@ -28,29 +108,11 @@ chain:
   - name: TELEMETRY_ENABLED
     default: "True"
   - name: TELEMETRY_RUN_TAG
-    default: "-egress-ip-scale-pod-disruption"
+    default: "-egress-ip-scale-comprehensive"
   - name: TELEMETRY_GROUP
     default: "prow"
   - name: JUNIT_TESTCASE
-    default: '[Egress-IP-Scale] OVN pod disruption resilience test at scale'
-  # Scaled node disruption chaos environment variables
-  - name: ACTION
-    default: "node_reboot_scenario"
-  - name: LABEL_SELECTOR
-    default: "node-role.kubernetes.io/worker="
-  - name: RUNS
-    default: "8"
-  - name: NODE_OUTAGE_TIMEOUT
-    default: "240"
-  - name: INSTANCE_COUNT
-    default: "3"
-  # Scale-specific egress IP configuration
-  - name: EGRESS_IP_COUNT
-    default: "5"
-  - name: EGRESS_NODES_COUNT
-    default: "10"
-  - name: SCALE_TEST_WORKLOADS
-    default: "20"
+    default: '[Egress-IP-Scale] Comprehensive chaos resilience test at scale'
   documentation: |-
     SCENARIO: OpenShift Egress IP Performance and Resilience Testing at Scale
     
