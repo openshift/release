@@ -24,6 +24,18 @@
 # The pruner works by looking for "_prune_" tags that are over X days old. The old tag
 # is removed and the old image will finally be garbage collected.
 #
+# NOTE: Large batches of prune tags with identical timestamps (e.g., 4516 tags with
+# timestamp 20251227080241) have been observed. Analysis shows:
+# 1. Each component can have multiple promotion targets (e.g., origin_scos-4.21_component,
+#    origin_scos-4.21-test_component, origin_scos-4.21-quay_component), creating multiple
+#    prune tags per component when promoted simultaneously.
+# 2. During batch promotion events (like branch creation), ci-operator appears to use a
+#    single shared timestamp for all promotions in that batch, rather than generating
+#    individual timestamps per promotion.
+# 3. This creates a "thundering herd" effect where thousands of prune tags become eligible
+#    for deletion simultaneously, overwhelming the pruner.
+# This is expected behavior for batch operations but creates scaling challenges for the pruner.
+#
 # RELEASE PAYLOAD PRESERVATION:
 # The pruner manages preservation of release payload component images through
 # cooperation with the release controller.
@@ -70,6 +82,7 @@ import json
 import re
 import argparse
 import urllib.request
+import urllib.error
 import subprocess
 import logging
 from typing import Optional, Set, Dict, List
@@ -135,7 +148,7 @@ def create_tag(repository: str, tag: str, manifest_digest: str, token: str):
         return False
 
 
-def delete_tag(repository: str, tag: str, token: str) -> bool:
+def delete_tag(repository: str, tag: str, token: str, timeout: int = 30) -> bool:
     """Delete a tag from a quay.io repository. Returns True on success, False on failure."""
     delete_url = f"https://quay.io/api/v1/repository/{repository}/tag/{tag}"
     headers = {
@@ -147,24 +160,28 @@ def delete_tag(repository: str, tag: str, token: str) -> bool:
         request.add_header(key, value)
 
     try:
-        with urllib.request.urlopen(request) as response:
+        # Add timeout to prevent hanging
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             response_data = response.read()
             if response.status == 204:
-                logging.info('Successfully deleted %s', tag)
                 return True
             logging.error("Failed to delete tag '%s': %d %s", tag, response.status, response_data)
             return False
+    except urllib.error.HTTPError as e:
+        # 404 means tag already deleted, treat as success
+        if e.code == 404:
+            logging.debug('Tag %s already deleted (404)', tag)
+            return True
+        logging.error("HTTP error deleting tag '%s': %d", tag, e.code)
+        return False
     except Exception:  # pylint: disable=broad-except
         logging.exception('Failed to delete tag "%s"', tag)
         return False
 
 
-def fetch_tags(repository: str, token: str, page: int = 1, like: Optional[str] = None):
+def fetch_tags(repository: str, token: str, page: int = 1):
     """Fetch tags from the quay.io repository with pagination"""
-    like_adder = ''
-    if like:
-        like_adder = f'&filter_tag_name=like:{like}'
-    tags_url = f"https://quay.io/api/v1/repository/{repository}/tag/?page={page}&limit=100&onlyActiveTags=true" + like_adder
+    tags_url = f"https://quay.io/api/v1/repository/{repository}/tag/?page={page}&limit=100&onlyActiveTags=true"
     headers = {
         "Authorization": f"Bearer {token}"
     }
@@ -173,14 +190,82 @@ def fetch_tags(repository: str, token: str, page: int = 1, like: Optional[str] =
     for key, value in headers.items():
         request.add_header(key, value)
 
-    with urllib.request.urlopen(request) as response:
-        response_data = response.read()
-        if response.status == 200:
-            data = json.loads(response_data)
-            tags = data.get("tags", [])
-            has_more = data.get("has_additional", False)
-            return tags, has_more
-        raise IOError(f"Failed to fetch tags: {response.status} {response_data}")
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            response_data = response.read()
+            if response.status == 200:
+                data = json.loads(response_data)
+                tags = data.get("tags", [])
+                has_more = data.get("has_additional", False)
+                return tags, has_more
+            raise IOError(f"Failed to fetch tags: {response.status} {response_data}")
+    except Exception as e:
+        raise IOError(f"Error fetching tags page {page}: {e}")
+
+
+def fetch_tags_parallel(repository: str, token: str, max_workers: int = 10) -> List[Dict]:
+    """Fetch all tags using parallel page requests for better performance"""
+    logging.info('Starting parallel tag fetch with %d workers...', max_workers)
+    
+    # First, fetch page 1 to get total count and determine number of pages
+    tags_page_1, has_more = fetch_tags(repository, token, page=1)
+    all_tags = tags_page_1.copy()
+    
+    if not has_more:
+        logging.info('Fetched all tags in single page: %d tags', len(all_tags))
+        return all_tags
+    
+    # Estimate total pages (we'll discover the actual number as we go)
+    # Start fetching pages in parallel
+    fetch_executor = ThreadPoolExecutor(max_workers=max_workers)
+    page_futures = {}
+    max_page_seen = 1
+    active_pages = set([1])
+    
+    # Start fetching initial batch of pages
+    initial_batch = min(max_workers, 10)  # Start with up to 10 pages in parallel
+    for page in range(2, initial_batch + 1):
+        page_futures[page] = fetch_executor.submit(fetch_tags, repository, token, page)
+        active_pages.add(page)
+        max_page_seen = page
+    
+    # Process results and fetch more pages as needed
+    while page_futures:
+        completed_pages = []
+        for page, future in list(page_futures.items()):
+            try:
+                if future.done():
+                    tags, has_more_page = future.result(timeout=120)
+                    all_tags.extend(tags)
+                    completed_pages.append(page)
+                    
+                    # If this page had more, and we haven't fetched the next page yet, queue it
+                    if has_more_page:
+                        next_page = page + 1
+                        if next_page not in active_pages and next_page <= max_page_seen + max_workers:
+                            page_futures[next_page] = fetch_executor.submit(fetch_tags, repository, token, next_page)
+                            active_pages.add(next_page)
+                            max_page_seen = max(max_page_seen, next_page)
+            except Exception:  # pylint: disable=broad-except
+                logging.exception('Error fetching page %d', page)
+                completed_pages.append(page)
+        
+        # Remove completed pages
+        for page in completed_pages:
+            del page_futures[page]
+            active_pages.discard(page)
+        
+        # Log progress
+        if len(all_tags) % 10000 == 0:
+            logging.info('Fetched %d tags so far, %d pages in flight', len(all_tags), len(page_futures))
+        
+        # Small sleep to avoid overwhelming the API
+        if page_futures:
+            time.sleep(0.1)
+    
+    fetch_executor.shutdown(wait=True)
+    logging.info('Parallel fetch complete: %d total tags', len(all_tags))
+    return all_tags
 
 
 def get_tag_manifest_digest(repository: str, tag: str, token: str) -> Optional[str]:
@@ -305,6 +390,56 @@ def preserve_release_components(payload_version: str, payload_tag: str, token: s
     return preserved_count > 0
 
 
+def process_deletions_in_batches(delete_executor: ThreadPoolExecutor, tags_to_delete: List[str], 
+                                   repository: str, token: str, batch_size: int = 1000, 
+                                   operation_name: str = "deletion") -> int:
+    """Process tag deletions in batches to avoid overwhelming the system and provide progress updates."""
+    total_tags = len(tags_to_delete)
+    if total_tags == 0:
+        return 0
+    
+    logging.info('Processing %d tags for %s in batches of %d...', total_tags, operation_name, batch_size)
+    success_count = 0
+    processed_count = 0
+    
+    for batch_start in range(0, total_tags, batch_size):
+        batch_end = min(batch_start + batch_size, total_tags)
+        batch = tags_to_delete[batch_start:batch_end]
+        batch_num = (batch_start // batch_size) + 1
+        total_batches = (total_tags + batch_size - 1) // batch_size
+        
+        logging.info('Processing batch %d/%d: tags %d-%d of %d', 
+                     batch_num, total_batches, batch_start + 1, batch_end, total_tags)
+        
+        # Submit batch deletions
+        batch_futures = []
+        for tag in batch:
+            batch_futures.append(delete_executor.submit(delete_tag, repository, tag, token))
+        
+        # Wait for batch to complete with progress updates
+        batch_success = 0
+        for i, future in enumerate(batch_futures):
+            try:
+                if future.result(timeout=60):  # 60 second timeout per deletion
+                    batch_success += 1
+                    success_count += 1
+            except Exception:  # pylint: disable=broad-except
+                logging.warning('Deletion failed or timed out for tag in batch %d', batch_num)
+            
+            processed_count += 1
+            # Log progress every 100 deletions
+            if processed_count % 100 == 0:
+                logging.info('Progress: %d/%d tags processed, %d successful', 
+                           processed_count, total_tags, success_count)
+        
+        logging.info('Batch %d/%d complete: %d/%d successful', 
+                     batch_num, total_batches, batch_success, len(batch))
+    
+    logging.info('%s complete: %d/%d tags successfully processed', 
+                 operation_name, success_count, total_tags)
+    return success_count
+
+
 def run(args, start_time):  # pylint: disable=too-many-statements,redefined-outer-name
 
     token = args.token
@@ -318,104 +453,135 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
     confirm = args.confirm
     ttl_days = args.ttl_days
 
-    # Fetch all tags with pagination
-    page = 1
-    has_more = True
+    # Executor for concurrent tag deletions (up to 100 simultaneous requests)
+    delete_executor = ThreadPoolExecutor(max_workers=100)
 
-    prune_target_tags = set()
+    # OPTIMIZATION: Use parallel page fetching for better performance
+    # Note: We don't use API filtering (like=_prune_) as it causes Quay.io to be very slow
+    logging.info('=== Pass 1: Collecting all tags (parallel fetch) ===')
+    
+    try:
+        all_tags = fetch_tags_parallel(QUAY_CI_REPO, token, max_workers=10)
+    except Exception:  # pylint: disable=broad-except
+        logging.exception("Error in parallel tag fetch, falling back to sequential")
+        # Fallback to sequential fetching
+        all_tags = []
+        page = 1
+        has_more = True
+        while has_more:
+            retries = 5
+            while True:
+                try:
+                    tags, has_more = fetch_tags(QUAY_CI_REPO, token, page)
+                    all_tags.extend(tags)
+                    break
+                except Exception:  # pylint: disable=broad-except
+                    logging.exception("Error retrieving tags page %d", page)
+                    if retries == 0:
+                        raise
+                    logging.info('Retrying in 1 minute..')
+                    time.sleep(60)
+                    retries -= 1
+            page += 1
+            if len(all_tags) % 10000 == 0:
+                logging.info('Fetched %d tags so far...', len(all_tags))
+
+    logging.info('Total tags fetched: %d', len(all_tags))
+    
+    # Filter for prune tags and check age
+    logging.info('=== Pass 2: Filtering prune tags and checking age ===')
+    prune_target_tags = []
+    prune_tag_count = 0
     tag_count = 0
-    mod_by = 5
+    
+    for tag in all_tags:
+        tag_count += 1
+        image_tag = tag['name']
+        
+        if tag_count % 10000 == 0:
+            logging.info('Processed %d/%d tags, found %d prune tags to delete', 
+                        tag_count, len(all_tags), len(prune_target_tags))
+        
+        # Check for prune tags
+        match = prune_tag_match.match(image_tag)
+        if match:
+            prune_tag_count += 1
+            year = int(match.group('year'))
+            month = int(match.group('month'))
+            day = int(match.group('day'))
+            prune_tag_date = datetime(year, month, day)
 
+            date_difference = start_time - prune_tag_date
+            days_difference = date_difference.days
+            if days_difference > ttl_days:
+                prune_target_tags.append(image_tag)
+
+    logging.info('Found %d prune tags to delete (out of %d prune tags, %d total tags)', 
+                len(prune_target_tags), prune_tag_count, tag_count)
+
+    # Process prune tag deletions in batches
+    prune_success_count = 0
+    if prune_target_tags:
+        if confirm:
+            prune_success_count = process_deletions_in_batches(
+                delete_executor, prune_target_tags, QUAY_CI_REPO, token,
+                batch_size=1000, operation_name="prune tag deletion"
+            )
+        else:
+            logging.info('Would delete %d prune tags (dry run)', len(prune_target_tags))
+
+    # OPTIMIZATION: Process payload tags from already-fetched tags
+    # No need to fetch again - we already have all tags
+    logging.info('=== Pass 3: Processing release payload tags ===')
+    
     # Track release payload tags
     rc_payload_tags: Dict[str, str] = {}  # version -> tag
     preserved_versions: Set[str] = set()
     remove_requests: Set[str] = set()  # versions to remove
     component_tags: Dict[str, List[str]] = {}  # version -> list of component tag names
+    
+    payload_tag_count = 0
+    for tag in all_tags:
+        image_tag = tag['name']
+        
+        # Skip prune tags (already processed)
+        if prune_tag_match.match(image_tag):
+            continue
+            
+        payload_tag_count += 1
+        
+        if payload_tag_count % 10000 == 0:
+            logging.info('Processed %d payload-related tags...', payload_tag_count)
 
-    # Executor for concurrent tag deletions (up to 100 simultaneous requests)
-    delete_executor = ThreadPoolExecutor(max_workers=100)
-    delete_futures = []  # List of futures
+        # Check for rc_payload__ tags
+        payload_match = rc_payload_tag_match.match(image_tag)
+        if payload_match:
+            version = payload_match.group('version')
+            rc_payload_tags[version] = image_tag
+            continue
 
-    while has_more:
-        retries = 5
-        while True:
-            try:
-                tags, has_more = fetch_tags(QUAY_CI_REPO, token, page)
-                break
-            except Exception:  # pylint: disable=broad-except
-                logging.exception("Error retrieving tags")
-                if retries == 0:
-                    raise
-                logging.info('Retrying in 1 minute..')
-                time.sleep(60)
-                retries -= 1
+        # Check for preserved marker tags
+        preserved_match = rc_payload_preserved_match.match(image_tag)
+        if preserved_match:
+            version = preserved_match.group('version')
+            preserved_versions.add(version)
+            continue
 
-        # Iterate through tags and delete those that match the pattern "YYMMDDHHMMSS_prune_%" and collecting payload information
-        for tag in tags:
-            tag_count += 1
-            image_tag = tag['name']
+        # Check for removal requests
+        remove_match = remove_rc_payload_match.match(image_tag)
+        if remove_match:
+            version = remove_match.group('version')
+            remove_requests.add(version)
+            continue
 
-            if tag_count % mod_by == 0:
-                mod_by = min(mod_by * 2, 1000)
-                logging.info('%d tags have been checked', tag_count)
-
-            # Check for rc_payload__ tags
-            payload_match = rc_payload_tag_match.match(image_tag)
-            if payload_match:
-                version = payload_match.group('version')
-                rc_payload_tags[version] = image_tag
-                continue
-
-            # Check for preserved marker tags
-            preserved_match = rc_payload_preserved_match.match(image_tag)
-            if preserved_match:
-                version = preserved_match.group('version')
-                preserved_versions.add(version)
-                continue
-
-            # Check for removal requests
-            remove_match = remove_rc_payload_match.match(image_tag)
-            if remove_match:
-                version = remove_match.group('version')
-                remove_requests.add(version)
-                continue
-
-            # Check for component preservation tags
-            component_match = rc_payload_component_match.match(image_tag)
-            if component_match:
-                version = component_match.group('version')
-                if version not in component_tags:
-                    component_tags[version] = []
-                component_tags[version].append(image_tag)
-                continue
-
-            # Check for prune tags
-            match = prune_tag_match.match(image_tag)
-            if match:
-                year = int(match.group('year'))
-                month = int(match.group('month'))
-                day = int(match.group('day'))
-                prune_tag_date = datetime(year, month, day)
-
-                date_difference = start_time - prune_tag_date
-                days_difference = date_difference.days
-                if days_difference > ttl_days and image_tag not in prune_target_tags:
-                    prune_target_tags.add(image_tag)
-                    if confirm:
-                        delete_futures.append(delete_executor.submit(delete_tag, QUAY_CI_REPO, image_tag, token))
-                    else:
-                        logging.debug('Would have removed %s', image_tag)
-
-        page += 1
-
-    # Wait for all prune delete operations to complete
-    prune_success_count = 0
-    if delete_futures:
-        logging.info('Waiting for %d prune delete operations to complete...', len(delete_futures))
-        for future in delete_futures:
-            if future.result():  # Returns True on success
-                prune_success_count += 1
-        delete_futures.clear()
+        # Check for component preservation tags
+        component_match = rc_payload_component_match.match(image_tag)
+        if component_match:
+            version = component_match.group('version')
+            if version not in component_tags:
+                component_tags[version] = []
+            component_tags[version].append(image_tag)
+            continue
 
     # Process release payload preservation
     logging.info("Processing release payload preservation...")
@@ -443,6 +609,7 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
     removal_requests_processed = 0
     removal_tags_target = 0
     removal_success_count = 0
+    all_removal_tags = []
 
     if remove_requests:
         logging.info("Processing %d removal requests...", len(remove_requests))
@@ -468,40 +635,34 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                     logging.info("Found %d component tags for %s", len(component_tags[version]), version)
 
                 logging.info("Found %d tags to remove for %s", len(tags_to_remove), version)
+                all_removal_tags.extend(tags_to_remove)
                 removal_tags_target += len(tags_to_remove)
-
-                # Remove all related tags
-                if confirm:
-                    for tag_to_remove in tags_to_remove:
-                        delete_futures.append(delete_executor.submit(delete_tag, QUAY_CI_REPO, tag_to_remove, token))
-                else:
-                    for tag_to_remove in tags_to_remove:
-                        logging.info("Would remove tag: %s", tag_to_remove)
             else:
                 # No matching rc_payload__ tag found, so we can delete the remove__ request
                 remove_tag = f"{REMOVE_RC_PAYLOAD_PREFIX}{version}"
                 logging.info("No rc_payload__ tag found for %s, removing request tag", version)
+                all_removal_tags.append(remove_tag)
                 removal_tags_target += 1
 
-                if confirm:
-                    delete_futures.append(delete_executor.submit(delete_tag, QUAY_CI_REPO, remove_tag, token))
-                else:
-                    logging.info("Would remove request tag: %s", remove_tag)
-
-        # Wait for all removal delete operations to complete
-        if delete_futures:
-            logging.info('Waiting for %d removal delete operations to complete...', len(delete_futures))
-            for future in delete_futures:
-                if future.result():  # Returns True on success
-                    removal_success_count += 1
-            delete_futures.clear()
+        # Process removal deletions in batches
+        if all_removal_tags:
+            if confirm:
+                removal_success_count = process_deletions_in_batches(
+                    delete_executor, all_removal_tags, QUAY_CI_REPO, token,
+                    batch_size=1000, operation_name="removal tag deletion"
+                )
+            else:
+                logging.info('Would remove %d tags (dry run)', len(all_removal_tags))
+                removal_success_count = len(all_removal_tags)
 
     finish_time = datetime.now()
     logging.info('Duration: %s', finish_time - start_time)
-    logging.info('Total tags scanned: %d', tag_count)
+    logging.info('Total tags fetched: %d', len(all_tags))
+    logging.info('Prune tags found: %d', prune_tag_count)
     logging.info('Tags targeted for pruning: %d', len(prune_target_tags))
     if confirm:
         logging.info('Tags successfully pruned: %d', prune_success_count)
+    logging.info('Payload tags processed: %d', payload_tag_count)
     logging.info('Release payloads needing preservation: %d', payloads_needing_preservation)
     if confirm:
         logging.info('Release payloads preserved: %d', payloads_preserved)
