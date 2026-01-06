@@ -73,6 +73,8 @@ generate_nmstate_machineconfigs() {
     mode: active-backup
     options:
       miimon: '100'
+      primary: ${master_bond_port1}
+      primary_reselect: always
     port:
     - ${master_bond_port1}
     - ${master_bond_port2}
@@ -111,6 +113,8 @@ generate_nmstate_machineconfigs() {
     mode: active-backup
     options:
       miimon: '100'
+      primary: ${master_bond_port1}
+      primary_reselect: always
     port:
     - ${worker_bond_port1}
     - ${worker_bond_port2}
