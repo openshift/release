@@ -4,84 +4,41 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Starting prow-failure-analysis..."
+echo "Starting prow-failure-analysis (Red Hat AppStudio)..."
 
-if [[ -z "${LLM_PROVIDER:-}" ]]; then
-    echo "ERROR: LLM_PROVIDER is required but not set"
-    exit 1
-fi
+# Export LLM configuration
+export LLM_PROVIDER="${LLM_PROVIDER:-gemini}"
+export LLM_MODEL="${LLM_MODEL:-gemini-2.5-flash-lite}"
 
-if [[ -z "${LLM_MODEL:-}" ]]; then
-    echo "ERROR: LLM_MODEL is required but not set"
-    exit 1
-fi
-
-if [[ -z "${LLM_API_KEY_PATH:-}" ]]; then
-    echo "ERROR: LLM_API_KEY_PATH is required but not set"
-    exit 1
-fi
-
-if [[ ! -f "${LLM_API_KEY_PATH}" ]]; then
-    echo "ERROR: LLM API key file not found at ${LLM_API_KEY_PATH}"
-    echo "Make sure you have mounted your secret correctly in the CI config"
-    exit 1
-fi
-
-# read the LLM API key from the mounted secret
+# Read the LLM API key from the mounted secret
 export LLM_API_KEY
 LLM_API_KEY=$(cat "${LLM_API_KEY_PATH}")
 
-# set optional LLM base URL if provided
-if [[ -n "${LLM_BASE_URL:-}" ]]; then
-    export LLM_BASE_URL
-fi
-
-# read GitHub token if provided for PR comments
+# Read GitHub token if provided for PR comments
 if [[ -n "${GITHUB_TOKEN_PATH:-}" ]] && [[ -f "${GITHUB_TOKEN_PATH}" ]]; then
     export GITHUB_TOKEN
     GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
 fi
 
-export JOB_NAME="${JOB_NAME:-}"
-export BUILD_ID="${BUILD_ID:-}"
-export PULL_NUMBER="${PULL_NUMBER:-}"
-
-# construct ORG_REPO from Prow variables if not explicitly set
+# Construct ORG_REPO from Prow variables if not explicitly set
 if [[ -z "${ORG_REPO:-}" ]] && [[ -n "${REPO_OWNER:-}" ]] && [[ -n "${REPO_NAME:-}" ]]; then
     export ORG_REPO="${REPO_OWNER}/${REPO_NAME}"
 fi
 
-# export optional configuration
+# Export GCS and embedding configuration
 export GCS_BUCKET="${GCS_BUCKET:-test-platform-results}"
-
-if [[ -n "${GCS_CREDS_PATH:-}" ]]; then
-    export GCS_CREDS_PATH
-fi
-
-if [[ -n "${IGNORED_STEPS:-}" ]]; then
-    export IGNORED_STEPS
-fi
-
-if [[ -n "${INCLUDED_ARTIFACTS:-}" ]]; then
-    export INCLUDED_ARTIFACTS
-fi
-
 export CORDON_DEVICE="${CORDON_DEVICE:-cpu}"
-export CORDON_BACKEND="${CORDON_BACKEND:-sentence-transformers}"
-export CORDON_MODEL_NAME="${CORDON_MODEL_NAME:-all-MiniLM-L6-v2}"
+export CORDON_BACKEND="${CORDON_BACKEND:-remote}"
+export CORDON_MODEL_NAME="${CORDON_MODEL_NAME:-google/gemini-embedding-001}"
 export CORDON_BATCH_SIZE="${CORDON_BATCH_SIZE:-32}"
 
-# handle remote embedding API key if provided
+# Handle remote embedding API key
 if [[ -n "${CORDON_API_KEY_PATH:-}" ]] && [[ -f "${CORDON_API_KEY_PATH}" ]]; then
     export CORDON_API_KEY
     CORDON_API_KEY=$(cat "${CORDON_API_KEY_PATH}")
 fi
 
-if [[ -n "${CORDON_ENDPOINT:-}" ]]; then
-    export CORDON_ENDPOINT
-fi
-
-# build the command
+# Build the command
 cmd="prow-failure-analysis analyze"
 
 if [[ -n "${PULL_NUMBER:-}" ]]; then
@@ -106,9 +63,8 @@ echo "LLM Model: ${LLM_MODEL}"
 echo "GCS Bucket: ${GCS_BUCKET}"
 echo "Embedding Backend: ${CORDON_BACKEND}"
 echo "Embedding Model: ${CORDON_MODEL_NAME}"
-echo "Embedding Device: ${CORDON_DEVICE}"
 
-# execute the analysis
+# Execute the analysis (don't fail the job on error)
 set +e
 eval "${cmd}"
 exit_code=$?
@@ -121,3 +77,4 @@ else
     echo "This may indicate an API error or configuration issue."
     echo "The CI job result is not affected by this failure."
 fi
+
