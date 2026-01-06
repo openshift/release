@@ -1,0 +1,36 @@
+workflow:
+  as: hypershift-azure-aks-external-oidc
+  documentation: |-
+    The HyperShift azure aks e2e external oidc workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-azure-aks-provision
+    - ref: idp-external-oidc-keycloak-aks-server
+    - ref: hypershift-azure-aks-attach-kv
+    - ref: hypershift-install
+    - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations 
+    test:
+    - ref: hypershift-azure-run-e2e
+    post:
+    - ref: idp-external-oidc-keycloak-aks-cleanup
+    - chain: cucushift-installer-rehearse-azure-aks-deprovision
+    env:
+      AKS_NODE_COUNT: "3"
+      CLOUD_PROVIDER: "Azure"
+      AKS: "true"
+      USE_HYPERSHIFT_AZURE_CREDS: "true"
+      HYPERSHIFT_BASE_DOMAIN: "hypershift.azure.devcluster.openshift.com"
+      HYPERSHIFT_AZURE_LOCATION: "eastus2"
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "aks-e2e.hypershift.azure.devcluster.openshift.com"
+      # This will create a single nodePool for each zone with min=1 and max=2 Nodes.
+      AKS_CLUSTER_AUTOSCALER_MIN_NODES: "1"
+      AKS_CLUSTER_AUTOSCALER_MAX_NODES: "2"
+      AKS_ZONES: "1 2 3"
+      ENABLE_CLUSTER_AUTOSCALER: "true"
+      AKS_ADDONS: "azure-keyvault-secrets-provider"
+      ENABLE_AKS_CERT_ROTATION: "true"
+      AKS_CERT_ROTATION_POLL_INTERVAL: "1m"
+      AKS_USE_HYPERSHIFT_MI: "true"
+      ENABLE_SIZE_TAGGING: "true"

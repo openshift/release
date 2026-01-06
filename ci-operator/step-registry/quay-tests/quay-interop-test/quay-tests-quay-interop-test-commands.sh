@@ -5,7 +5,18 @@ set -o errexit
 set -o pipefail
 
 #Set Kubeconfig:
-cd quay-frontend-tests
+
+echo "Quay version is ${QUAY_VERSION}"
+QUAY_VERSION_THRESHOLD="3.16"
+if [ "$(printf '%s\n%s' "${QUAY_VERSION_THRESHOLD}" "${QUAY_VERSION}" | sort -V | head -n1)" = "${QUAY_VERSION_THRESHOLD}" ]; then
+    #For Quay versions equal to or higher than 3.16, use the new UI test suite.
+    cd new-ui-tests
+else
+    #For Quay versions lower than 3.16, use the old UI test suite.
+    cd quay-frontend-tests
+fi
+echo "Current testing directory is $(pwd)"
+
 skopeo -v
 oc version
 terraform version
@@ -51,6 +62,16 @@ done
 registryEndpoint="$(oc -n "$quay_ns" get quayregistry "$quay_registry" -o jsonpath='{.status.registryEndpoint}')"
 registry="${registryEndpoint#https://}"
 echo "The Quay hostname is $registryEndpoint"
-export CYPRESS_QUAY_ENDPOINT=$registry
-yarn run smoke || true
+
+
+if [ "$(printf '%s\n%s' "${QUAY_VERSION_THRESHOLD}" "${QUAY_VERSION}" | sort -V | head -n1)" = "${QUAY_VERSION_THRESHOLD}" ]; then
+    export CYPRESS_QUAY_ENDPOINT=${registry}
+    export CYPRESS_QUAY_PROJECT=${quay_ns}
+    export CYPRESS_OLD_UI_DISABLED=true
+else
+    export CYPRESS_QUAY_ENDPOINT=${registry}
+    export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
+fi
+
+NO_COLOR=1 yarn run smoke || true
 
