@@ -1,4 +1,8 @@
 base_images:
+  ci_tests-private-base:
+    name: tests-private-base
+    namespace: ci
+    tag: latest
   cluster-control-plane-machine-set-tests:
     name: "4.21"
     namespace: ocp
@@ -64,6 +68,17 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-aws
+- as: aws-ipi-f60-longduration-apiserver-masterdelete
+  cron: 0 4 14 2,4,6,8,10,12 *
+  steps:
+    cluster_profile: aws
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_SCENARIOS: "55725"
+      TEST_TIMEOUT: "110"
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-longrun
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: e2e-aws-arm
   interval: 24h
   steps:
