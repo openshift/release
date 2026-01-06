@@ -98,6 +98,23 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
       MINIMAL_PERMISSIONS_CCO_MANUAL_WITHOUT_FIREWALL_PROVISION: "yes"
     workflow: cucushift-installer-rehearse-gcp-ipi-byo-fw-cco-manual-workload-identity
+- as: installer-rehearse-ibmcloud-subnets
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-qe
+    env:
+      APPLY_ALL_SUBNETS: "yes"
+      CONTROL_PLANE_REPLICAS: "1"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2026-01-04-010945
+      NO_REPORTPORTAL: "true"
+      NUMBER_SUBNETS_PAIR_PER_ZONE: "5"
+      PICKUP_SUBNETS_ORDER: ascending
+      WORKERS: "0"
+      ZONES_COUNT: "3"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc
 - as: installer-rehearse-vsphere
   cron: '@yearly'
   steps:
