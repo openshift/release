@@ -132,6 +132,10 @@ if [[ -n "${DISPLAY}" ]]; then
     EXTRA_FLAGS+=" --display ${DISPLAY}"
 fi
 
+if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
+    EXTRA_FLAGS+=" --github-repos ${CHANGE_POINT_REPOS}"
+fi
+
 set +e
 set -o pipefail
 FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
