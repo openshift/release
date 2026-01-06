@@ -1,0 +1,61 @@
+base_images:
+  installer:
+    name: "4.22"
+    namespace: ocp
+    tag: installer
+  lifecycle-agent-operator:
+    name: "4.22"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator
+  lifecycle-agent-operator-bundle:
+    name: "4.22"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
+  tests:
+    name: "4.22"
+    namespace: ocp
+    tag: tests
+releases:
+  latest:
+    integration:
+      name: "4.22"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 10m
+      memory: 100Mi
+tests:
+- as: seedgen-aws-ocp-4-22
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      OO_BUNDLE_OVERRIDE: quay.io/openshift-kni/lifecycle-agent-operator-bundle:4.22
+      SEED_FLOATING_TAG: "4.22"
+      SEED_IMAGE_TAG_FORMAT: nightly
+    workflow: openshift-image-based-upgrade-seed-create
+- as: image-based-install
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: nightly
+      SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-install
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: lifecycle-agent
+  variant: nightly-4.22

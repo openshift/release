@@ -52,6 +52,7 @@ echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
 echo "NTO Configuration Environment Variables:"
 echo "  CONTAINER_RUNTIME=${CONTAINER_RUNTIME}"
+echo "  CGROUP_VERSION=${CGROUP_VERSION}"
 echo "  RT_KERNEL=${RT_KERNEL}"
 echo "  HUGEPAGES_DEFAULT_SIZE=${HUGEPAGES_DEFAULT_SIZE}"
 echo "  HUGEPAGES_PAGES=${HUGEPAGES_PAGES}"
@@ -70,7 +71,7 @@ EXTRA_VARS="${EXTRA_VARS} container_runtime=${CONTAINER_RUNTIME}"
 EXTRA_VARS="${EXTRA_VARS} rt_kernel=${RT_KERNEL}"
 EXTRA_VARS="${EXTRA_VARS} high_power_consumption=${HIGH_POWER_CONSUMPTION}"
 EXTRA_VARS="${EXTRA_VARS} per_pod_power_management=${PER_POD_POWER_MANAGEMENT}"
-EXTRA_VARS="${EXTRA_VARS} artifacts_folder=${ARTIFACT_DIR}"
+EXTRA_VARS="${EXTRA_VARS} cgroup_version=${CGROUP_VERSION}"
 EXTRA_VARS="${EXTRA_VARS} day0_installation=${DAY0_INSTALLATION}"
 
 # Handle hugepages configuration
@@ -85,7 +86,14 @@ export ANSIBLE_REMOTE_TEMP="/tmp"
 ansible-playbook ./playbooks/compute/config-cluster.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "${EXTRA_VARS}"
 
-echo "Copy generated artifacts to shared directory"
-cp -v ${ARTIFACT_DIR}/*.yml ${SHARED_DIR}/ 2>/dev/null || echo "No YAML artifacts found to copy"
+echo "Set bastion ssh configuration"
+grep ansible_ssh_private_key -A 100 "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "/tmp/temp_ssh_key"
 
-echo "Compute-NTO configuration completed successfully"
+chmod 600 "/tmp/temp_ssh_key"
+BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
+
+
+echo "Copy logs and artifacts to artifacts directory"
+scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
+    "${BASTION_USER}@${BASTION_IP}":/tmp/artifacts/* "${ARTIFACT_DIR}"

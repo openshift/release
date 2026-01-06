@@ -239,14 +239,21 @@ function test_kpis {
 
   echo "************ telcov10n Run oslat Telco KPIs test ************"
 
+  # Check for graceful quit request before starting this test
+  check_for_quit "oslat_test" "graceful"
+
   make_up_inventory
   make_up_remote_test_command
   make_up_ansible_playbook
   run_ansible_playbook
   setup_test_result_for_component_readiness
+
+  # Mark successful completion
+  echo -n "completed" >| ${SHARED_DIR}/oslat_test_status.txt
 }
 
 function main {
+  setup_ssh_and_lock_info
   set_spoke_cluster_kubeconfig
   test_kpis
 }
