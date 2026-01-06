@@ -3,6 +3,10 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: ansible
+  assisted-service-scripts:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   aws-efs-csi-operator-create-efs:
     name: "4.21"
     namespace: ocp
@@ -178,6 +182,38 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
+- as: aws-ipi-confidential-fips-mini-perm-f7
+  cron: 38 12 4,11,18,27 * *
+  steps:
+    cluster_profile: aws-confidential-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: confcluster.devcluster.openshift.com
+      COMPUTE_CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualizationNestedPaging
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONFIDENTIAL_COMPUTE: ""
+      CONTROL_PLANE_CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualizationNestedPaging
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-confidential-computing
+- as: aws-ipi-confidential-fips-mini-perm-f28-destructive
+  cron: 47 10 16 * *
+  steps:
+    cluster_profile: aws-confidential-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: confcluster.devcluster.openshift.com
+      COMPUTE_CONFIDENTIAL_COMPUTE: ""
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualizationNestedPaging
+      CONTROL_PLANE_CONFIDENTIAL_COMPUTE: ""
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-confidential-computing
 - as: aws-ipi-disc-priv-f28-longrun-ota
   cron: 52 7 7 * *
   steps:
@@ -634,7 +670,7 @@ tests:
     dependencies:
       RELEASE_IMAGE_LATEST: release:multi-latest
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.21
+      OO_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.20
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --arch=arm64
@@ -653,7 +689,7 @@ tests:
     dependencies:
       RELEASE_IMAGE_LATEST: release:multi-latest
     dependency_overrides:
-      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.21
+      OO_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.20
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRA_ARGS: --arch=arm64
@@ -680,6 +716,25 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: baremetalds-hypershift-agent-mce-lab-arm-mgmt-f28
+  capabilities:
+  - intranet
+  cron: 56 23 20 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:multi-latest
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: arm64
+      AGENTSERVICECONFIG_CPU_ARCHITECTURE: arm64
+      EXTRA_ARGS: --arch=arm64
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.21
+      MCE_VERSION: "2.11"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-lab
 - as: aws-ipi-ovn-hypershift-capacity-reservation-gpu-guest-f999
   cron: 8 8 29 2 *
   steps:
@@ -1085,7 +1140,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
@@ -1659,6 +1714,34 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-lifecycle-private-advanced
+- as: aws-usgov-ipi-custom-dns-mini-perm-tp-f7
+  cron: 41 1 3,10,17,26 * *
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.gcp.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.2xlarge
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-custom-dns
+- as: aws-usgov-ipi-custom-dns-mini-perm-tp-f28-destructive
+  cron: 12 14 2 * *
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.gcp.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.2xlarge
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-custom-dns
 - as: aws-sc2s-ipi-disc-priv-fips-f7
   cron: 2 4 6,15,22,29 * *
   steps:
@@ -2074,7 +2157,7 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: aro_419
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 419.6.20250523
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&;~STORAGE&
       TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe
@@ -2090,7 +2173,7 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: aro_419
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 419.6.20250523
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&;~STORAGE&
       TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe
@@ -2106,7 +2189,7 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: aro_419
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 419.6.20250523
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&;~STORAGE&
       TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe
@@ -2131,7 +2214,7 @@ tests:
     cluster_profile: azure-qe
     env:
       HYPERSHIFT_AZURE_MARKETPLACE_ENABLED: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&;~STORAGE&
       TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe
@@ -2143,7 +2226,7 @@ tests:
     env:
       HYPERSHIFT_AZURE_IMAGE_GENERATION: Gen1
       HYPERSHIFT_AZURE_MARKETPLACE_ENABLED: "false"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&;~STORAGE&
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-azure-hypershift-guest
@@ -2281,6 +2364,7 @@ tests:
     cluster_profile: azuremag-qe
     env:
       BASE_DOMAIN: qemag.azure.devcluster.openshift.com
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: disruptive&&!autoscaler&&!connected-only
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
@@ -2765,29 +2849,40 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-f7-longduration-mco-g1
-  cron: 38 23 2,9,16,23 * *
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: gcp-qe
-    env:
-      COMPUTE_NODE_REPLICAS: "2"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: High
-      TEST_SCENARIOS: MCO
-      TEST_TIMEOUT: "140"
-    test:
-    - chain: openshift-e2e-test-mco-qe-longrun
-    workflow: cucushift-installer-rehearse-gcp-ipi
-- as: gcp-ipi-f7-longduration-mco-g2
+- as: gcp-ipi-f7-longduration-mco-p1
   cron: 56 3 5,14,21,28 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
       COMPUTE_NODE_REPLICAS: "2"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: Critical|Medium|Low
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P1&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-f7-longduration-mco-p2
+  cron: 56 3 5,14,21,28 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P2&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-f7-longduration-mco-p3
+  cron: 56 3 5,14,21,28 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;~P1&;~P2&
       TEST_SCENARIOS: MCO
       TEST_TIMEOUT: "140"
     test:
@@ -2903,12 +2998,47 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
+- as: azure-ipi-ovn-winc-f7
+  cron: 31 2 3,10,17,24 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
+- as: vsphere-ipi-ovn-winc-f7
+  cron: 19 4 7,14,21,30 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
+- as: nutanix-ipi-ovn-winc-f7
+  cron: 3 19 2,9,16,23 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-nutanix-ipi-ovn-winc
 - as: gcp-ipi-to-multiarch-mini-perm-f14
   cron: 0 20 11,27 * *
   steps:
@@ -3170,6 +3300,7 @@ tests:
     cluster_profile: ibmcloud-qe
     env:
       RT_ENABLED: "true"
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: disruptive&&!autoscaler&&!connected-only
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
@@ -3519,29 +3650,40 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
-- as: vsphere-ipi-longduration-mco-fips-proxy-g1-f14
+- as: vsphere-ipi-longduration-mco-fips-proxy-p1-f14
   cron: 2 16 11,27 * *
   steps:
     cluster_profile: vsphere-elastic
     env:
       COMPUTE_NODE_REPLICAS: "2"
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: High
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P1&
       TEST_SCENARIOS: MCO
       TEST_TIMEOUT: "140"
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
-- as: vsphere-ipi-longduration-mco-fips-proxy-g2-f14
+- as: vsphere-ipi-longduration-mco-fips-proxy-p2-f14
   cron: 5 12 6,22 * *
   steps:
     cluster_profile: vsphere-elastic
     env:
       COMPUTE_NODE_REPLICAS: "2"
       FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&
-      TEST_IMPORTANCE: Critical|Medium|Low
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;P2&
+      TEST_SCENARIOS: MCO
+      TEST_TIMEOUT: "140"
+    test:
+    - chain: openshift-e2e-test-mco-qe-longrun
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: vsphere-ipi-longduration-mco-fips-proxy-p3-f14
+  cron: 5 12 6,22 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;~P1&;~P2&
       TEST_SCENARIOS: MCO
       TEST_TIMEOUT: "140"
     test:
@@ -4314,8 +4456,10 @@ tests:
     cluster_profile: equinix-ocp-metal-qe
     env:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@disconnected'
       FIPS_ENABLED: "true"
       IPSEC_OVN: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       architecture: amd64
       masters: "3"
       workers: "2"

@@ -74,6 +74,7 @@ import subprocess
 import logging
 from typing import Optional, Set, Dict, List
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
 QUAY_OAUTH_TOKEN_ENV_NAME = "QUAY_OAUTH_TOKEN"
 
@@ -134,8 +135,8 @@ def create_tag(repository: str, tag: str, manifest_digest: str, token: str):
         return False
 
 
-def delete_tag(repository: str, tag: str, token: str):
-    """Delete a tag from a quay.io repository"""
+def delete_tag(repository: str, tag: str, token: str) -> bool:
+    """Delete a tag from a quay.io repository. Returns True on success, False on failure."""
     delete_url = f"https://quay.io/api/v1/repository/{repository}/tag/{tag}"
     headers = {
         "Authorization": f"Bearer {token}"
@@ -148,10 +149,14 @@ def delete_tag(repository: str, tag: str, token: str):
     try:
         with urllib.request.urlopen(request) as response:
             response_data = response.read()
-            if response.status != 204:
-                logging.error("Failed to delete tag '%s': %d %s", tag, response.status, response_data)
+            if response.status == 204:
+                logging.info('Successfully deleted %s', tag)
+                return True
+            logging.error("Failed to delete tag '%s': %d %s", tag, response.status, response_data)
+            return False
     except Exception:  # pylint: disable=broad-except
         logging.exception('Failed to delete tag "%s"', tag)
+        return False
 
 
 def fetch_tags(repository: str, token: str, page: int = 1, like: Optional[str] = None):
@@ -318,7 +323,6 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
     has_more = True
 
     prune_target_tags = set()
-    pruned_tags = set()
     tag_count = 0
     mod_by = 5
 
@@ -327,6 +331,10 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
     preserved_versions: Set[str] = set()
     remove_requests: Set[str] = set()  # versions to remove
     component_tags: Dict[str, List[str]] = {}  # version -> list of component tag names
+
+    # Executor for concurrent tag deletions (up to 100 simultaneous requests)
+    delete_executor = ThreadPoolExecutor(max_workers=100)
+    delete_futures = []  # List of futures
 
     while has_more:
         retries = 5
@@ -394,16 +402,20 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                 if days_difference > ttl_days and image_tag not in prune_target_tags:
                     prune_target_tags.add(image_tag)
                     if confirm:
-                        try:
-                            delete_tag(QUAY_CI_REPO, tag=image_tag, token=token)
-                            logging.debug('Removed %s', image_tag)
-                            pruned_tags.add(image_tag)
-                        except Exception:  # pylint: disable=broad-except
-                            logging.exception('Error while trying to delete tag %s', image_tag)
+                        delete_futures.append(delete_executor.submit(delete_tag, QUAY_CI_REPO, image_tag, token))
                     else:
                         logging.debug('Would have removed %s', image_tag)
 
         page += 1
+
+    # Wait for all prune delete operations to complete
+    prune_success_count = 0
+    if delete_futures:
+        logging.info('Waiting for %d prune delete operations to complete...', len(delete_futures))
+        for future in delete_futures:
+            if future.result():  # Returns True on success
+                prune_success_count += 1
+        delete_futures.clear()
 
     # Process release payload preservation
     logging.info("Processing release payload preservation...")
@@ -429,8 +441,8 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
 
     # Process removal requests
     removal_requests_processed = 0
-    removal_tags_removed = 0
     removal_tags_target = 0
+    removal_success_count = 0
 
     if remove_requests:
         logging.info("Processing %d removal requests...", len(remove_requests))
@@ -461,12 +473,7 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                 # Remove all related tags
                 if confirm:
                     for tag_to_remove in tags_to_remove:
-                        try:
-                            delete_tag(QUAY_CI_REPO, tag_to_remove, token)
-                            logging.info("Removed tag: %s", tag_to_remove)
-                            removal_tags_removed += 1
-                        except Exception:  # pylint: disable=broad-except
-                            logging.exception("Error removing tag %s", tag_to_remove)
+                        delete_futures.append(delete_executor.submit(delete_tag, QUAY_CI_REPO, tag_to_remove, token))
                 else:
                     for tag_to_remove in tags_to_remove:
                         logging.info("Would remove tag: %s", tag_to_remove)
@@ -477,30 +484,36 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                 removal_tags_target += 1
 
                 if confirm:
-                    try:
-                        delete_tag(QUAY_CI_REPO, remove_tag, token)
-                        logging.info("Removed removal request tag: %s", remove_tag)
-                        removal_tags_removed += 1
-                    except Exception:  # pylint: disable=broad-except
-                        logging.exception("Error removing request tag %s", remove_tag)
+                    delete_futures.append(delete_executor.submit(delete_tag, QUAY_CI_REPO, remove_tag, token))
                 else:
                     logging.info("Would remove request tag: %s", remove_tag)
+
+        # Wait for all removal delete operations to complete
+        if delete_futures:
+            logging.info('Waiting for %d removal delete operations to complete...', len(delete_futures))
+            for future in delete_futures:
+                if future.result():  # Returns True on success
+                    removal_success_count += 1
+            delete_futures.clear()
 
     finish_time = datetime.now()
     logging.info('Duration: %s', finish_time - start_time)
     logging.info('Total tags scanned: %d', tag_count)
-    logging.info('Tags pruned (if --confirm): %d', len(prune_target_tags))
-    logging.info('Tags actually pruned: %d', len(pruned_tags))
+    logging.info('Tags targeted for pruning: %d', len(prune_target_tags))
+    if confirm:
+        logging.info('Tags successfully pruned: %d', prune_success_count)
     logging.info('Release payloads needing preservation: %d', payloads_needing_preservation)
     if confirm:
         logging.info('Release payloads preserved: %d', payloads_preserved)
     else:
         logging.info('Release payloads that would be preserved: %d', payloads_needing_preservation)
     logging.info('Removal requests processed: %d', removal_requests_processed)
+    logging.info('Release payload tags targeted for removal: %d', removal_tags_target)
     if confirm:
-        logging.info('Release payload tags removed: %d', removal_tags_removed)
-    else:
-        logging.info('Release payload tags that would be removed: %d', removal_tags_target)
+        logging.info('Release payload tags successfully removed: %d', removal_success_count)
+
+    # Cleanup executor
+    delete_executor.shutdown(wait=False)
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%dT%H:%M:%S')
 

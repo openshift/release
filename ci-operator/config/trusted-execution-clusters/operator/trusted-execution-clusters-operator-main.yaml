@@ -1,0 +1,37 @@
+base_images:
+  telco-runner:
+    name: telco-runner
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: infra-provision-verify
+  cluster: build03
+  steps:
+    post:
+    - chain: trusted-execution-clusters-operator-cleanup
+    test:
+    - chain: trusted-execution-clusters-operator-infra-provision
+- as: operator-lifecycle-verify
+  cluster: build03
+  steps:
+    post:
+    - chain: trusted-execution-clusters-operator-cleanup
+    test:
+    - chain: trusted-execution-clusters-operator-infra-provision
+    - chain: trusted-execution-clusters-operator-lifecycle
+zz_generated_metadata:
+  branch: main
+  org: trusted-execution-clusters
+  repo: operator
