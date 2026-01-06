@@ -105,11 +105,6 @@ MACHINE_TYPE="n2-standard-2"
 #####################################
 ##########Create Bastion#############
 #####################################
-
-# we need to be able to tear down the proxy even if install fails
-# cannot rely on presence of ${SHARED_DIR}/metadata.json
-echo "${REGION}" >> "${SHARED_DIR}/proxyregion"
-
 bastion_name="${CLUSTER_NAME}-bastion"
 CMD="gcloud compute instances create ${bastion_name} \
   --hostname=${bastion_name}.test.com \
