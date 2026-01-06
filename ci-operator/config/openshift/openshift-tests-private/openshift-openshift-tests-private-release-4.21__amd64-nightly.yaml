@@ -3,6 +3,10 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: ansible
+  assisted-service-scripts:
+    name: ocm-2.16
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   aws-efs-csi-operator-create-efs:
     name: "4.21"
     namespace: ocp
@@ -712,6 +716,25 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: baremetalds-hypershift-agent-mce-lab-arm-mgmt-f28
+  capabilities:
+  - intranet
+  cron: 56 23 20 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:multi-latest
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: arm64
+      AGENTSERVICECONFIG_CPU_ARCHITECTURE: arm64
+      EXTRA_ARGS: --arch=arm64
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.21
+      MCE_VERSION: "2.11"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-lab
 - as: aws-ipi-ovn-hypershift-capacity-reservation-gpu-guest-f999
   cron: 8 8 29 2 *
   steps:
@@ -1691,6 +1714,34 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: rosa-lifecycle-private-advanced
+- as: aws-usgov-ipi-custom-dns-mini-perm-tp-f7
+  cron: 41 1 3,10,17,26 * *
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.gcp.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.2xlarge
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-custom-dns
+- as: aws-usgov-ipi-custom-dns-mini-perm-tp-f28-destructive
+  cron: 12 14 2 * *
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.gcp.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.2xlarge
+      FEATURE_GATES: '["AWSClusterHostedDNSInstall=true"]'
+      FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-custom-dns
 - as: aws-sc2s-ipi-disc-priv-fips-f7
   cron: 2 4 6,15,22,29 * *
   steps:
@@ -2313,6 +2364,7 @@ tests:
     cluster_profile: azuremag-qe
     env:
       BASE_DOMAIN: qemag.azure.devcluster.openshift.com
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: disruptive&&!autoscaler&&!connected-only
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
@@ -3248,6 +3300,7 @@ tests:
     cluster_profile: ibmcloud-qe
     env:
       RT_ENABLED: "true"
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: disruptive&&!autoscaler&&!connected-only
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
