@@ -67,6 +67,19 @@ if [[ -n "${INCLUDED_ARTIFACTS:-}" ]]; then
 fi
 
 export CORDON_DEVICE="${CORDON_DEVICE:-cpu}"
+export CORDON_BACKEND="${CORDON_BACKEND:-sentence-transformers}"
+export CORDON_MODEL_NAME="${CORDON_MODEL_NAME:-all-MiniLM-L6-v2}"
+export CORDON_BATCH_SIZE="${CORDON_BATCH_SIZE:-32}"
+
+# handle remote embedding API key if provided
+if [[ -n "${CORDON_API_KEY_PATH:-}" ]] && [[ -f "${CORDON_API_KEY_PATH}" ]]; then
+    export CORDON_API_KEY
+    CORDON_API_KEY=$(cat "${CORDON_API_KEY_PATH}")
+fi
+
+if [[ -n "${CORDON_ENDPOINT:-}" ]]; then
+    export CORDON_ENDPOINT
+fi
 
 # build the command
 cmd="prow-failure-analysis analyze"
@@ -91,6 +104,9 @@ echo "Executing: ${cmd}"
 echo "LLM Provider: ${LLM_PROVIDER}"
 echo "LLM Model: ${LLM_MODEL}"
 echo "GCS Bucket: ${GCS_BUCKET}"
+echo "Embedding Backend: ${CORDON_BACKEND}"
+echo "Embedding Model: ${CORDON_MODEL_NAME}"
+echo "Embedding Device: ${CORDON_DEVICE}"
 
 # execute the analysis
 set +e

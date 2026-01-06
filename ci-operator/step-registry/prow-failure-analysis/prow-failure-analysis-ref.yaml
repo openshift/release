@@ -71,6 +71,32 @@ ref:
       documentation: |-
         Device to use for semantic log preprocessing (cpu, cuda, mps).
         Defaults to cpu. Use cuda or mps if GPU is available for faster processing.
+    - name: CORDON_BACKEND
+      default: "sentence-transformers"
+      documentation: |-
+        Backend to use for embeddings: "sentence-transformers", "llama-cpp", or "remote".
+        Use "remote" with CORDON_API_KEY_PATH for hosted embedding APIs (OpenAI, Cohere, etc.).
+    - name: CORDON_MODEL_NAME
+      default: "all-MiniLM-L6-v2"
+      documentation: |-
+        Model name for embeddings. For sentence-transformers, use HuggingFace model names.
+        For remote backends, use provider/model format (e.g., openai/text-embedding-3-small).
+    - name: CORDON_API_KEY_PATH
+      default: ""
+      documentation: |-
+        Path to a file containing the embedding API key for remote backends.
+        Required when CORDON_BACKEND is set to "remote". Mount a secret similar to LLM_API_KEY_PATH.
+    - name: CORDON_ENDPOINT
+      default: ""
+      documentation: |-
+        Optional custom endpoint URL for remote embedding API.
+        Only needed for custom/self-hosted OpenAI-compatible endpoints.
+        Standard providers (OpenAI, Cohere, Gemini) use their default endpoints automatically.
+    - name: CORDON_BATCH_SIZE
+      default: "32"
+      documentation: |-
+        Batch size for embedding operations. Higher values = faster processing but more memory.
+        Default is 32. Increase for faster processing if memory allows.
     - name: VERBOSE
       default: "false"
       documentation: |-
@@ -90,7 +116,7 @@ ref:
     Users must provide their own LLM API credentials by creating a secret
     in the test-credentials namespace and mounting it in their CI config.
 
-    Example CI config usage:
+    Example CI config usage (local embeddings):
     ```yaml
     tests:
     - as: my-test
@@ -103,6 +129,29 @@ ref:
           LLM_PROVIDER: openai
           LLM_MODEL: gpt-4
           LLM_API_KEY_PATH: /tmp/secrets/llm/api_key
+        post:
+          - ref: prow-failure-analysis
+    ```
+
+    Example with remote embeddings (faster, no local model download):
+    ```yaml
+    tests:
+    - as: my-test
+      steps:
+        credentials:
+          - namespace: test-credentials
+            name: my-llm-credentials
+            mount_path: /tmp/secrets/llm
+          - namespace: test-credentials
+            name: my-embedding-credentials
+            mount_path: /tmp/secrets/embedding
+        env:
+          LLM_PROVIDER: openai
+          LLM_MODEL: gpt-4
+          LLM_API_KEY_PATH: /tmp/secrets/llm/api_key
+          CORDON_BACKEND: remote
+          CORDON_MODEL_NAME: openai/text-embedding-3-small
+          CORDON_API_KEY_PATH: /tmp/secrets/embedding/api_key
         post:
           - ref: prow-failure-analysis
     ```

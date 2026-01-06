@@ -39,6 +39,13 @@ DEFAULT_TAG_EXPIRATION: 2w
 TAG_EXPIRATION_OPTIONS:
   - 2w
   - 1d
+FEATURE_SUPERUSER_CONFIGDUMP: true
+FEATURE_IMAGE_PULL_STATS: true
+REDIS_FLUSH_INTERVAL_SECONDS: 30
+PULL_METRICS_REDIS:
+  host: quay-quay-redis
+  port: 6379
+  db: 1
 EOF
 
 # Create secret bundle upon env variable TLS, by default it is false.
