@@ -3,22 +3,24 @@ workflow:
   steps:
     pre:
       - chain: cucushift-installer-rehearse-ibmcloud-ipi-provision
-      - ref: hive-mce-install
+      - ref: hive-operator-install
       - ref: hive-clusterimageset-create
       - ref: hive-ibmcloud-ipi-install
     post:
       - ref: hive-ibmcloud-ipi-cleanup
       - chain: cucushift-installer-rehearse-ibmcloud-ipi-deprovision-check
+    dependencies:
+      HIVE_IMAGE: hive
     env:
       BASE_DOMAIN: "ibmcloud.qe.devcluster.openshift.com"
   documentation: |-
-    This workflow provisions an IBM Cloud management cluster, installs MCE/Hive operator on it,
+    This workflow provisions an IBM Cloud management cluster, installs Hive operator on it,
     creates a ClusterDeployment to provision another IBM Cloud IPI cluster via Hive,
     and cleans up both clusters.
 
     The workflow performs the following steps:
     1. Provision an IBM Cloud management cluster (via cucushift-installer-rehearse-ibmcloud-ipi-provision)
-    2. Install MCE operator which includes Hive (via hive-mce-install)
+    2. Install Hive operator using pre-merge image (via hive-operator-install)
     3. Create a Hive ClusterDeployment to install an IBM Cloud IPI cluster (via hive-ibmcloud-ipi-install)
     4. Delete the Hive-managed cluster (via hive-ibmcloud-ipi-cleanup)
     5. Deprovision the management cluster (via cucushift-installer-rehearse-ibmcloud-ipi-deprovision-check)
