@@ -34,7 +34,8 @@ if [[ "$JOB_TYPE" == "presubmit" ]] && [[ "$REPO_OWNER" = "cloud-bulldozer" ]] &
     git switch ${PULL_NUMBER}
     pushd workloads/kube-burner-ocp-wrapper
     export WORKLOAD=rds-core
-    ES_SERVER="" ITERATIONS=1 PPROF=false CHURN=false PERFORMANCE_PROFILE="cpt-pao" ./run.sh
+    export EXTRA_VARS="--perf-profile=cpt-pao"
+    ES_SERVER="" ITERATIONS=1 ./run.sh
 
     if [ ${BAREMETAL} == "true" ]; then
       # kill the ssh tunnel so the job completes

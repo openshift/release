@@ -170,16 +170,16 @@ CONFIG = {
         'us-west-2': 10,
     },
     'azure4-quota-slice': {
-        'centralus': 33,
-        'eastus': 8,
-        'eastus2': 8,
-        'westus': 8
+        'centralus': 14,
+        'eastus': 14,
+        'eastus2': 14,
+        'westus': 14
     },
     'azure-2-quota-slice': {
         'centralus': 33,
-        'eastus': 8,
-        'eastus2': 8,
-        'westus': 8
+        'eastus': 33,
+        'eastus2': 33,
+        'westus': 33
     },
     'azure-arm64-quota-slice': {
         'centralus': 33,
@@ -237,9 +237,6 @@ CONFIG = {
         'usgovvirginia': 5,
         'usgovtexas': 5
     },
-    'aro-hcp-dev-quota-slice': {
-        'default': 10,
-    },    
     'azure-sustaining-autorelease-412-quota-slice': {
         'eastus': 60,
     },
@@ -261,9 +258,10 @@ CONFIG = {
     'aro-hcp-test-tenant-quota-slice': {
         'default': 10,
     },
-    'aro-hcp-test-tenant-msi-quota-slice': {
-        'default': 10,
-    },
+    'aro-hcp-test-msi-containers-dev': {},
+    'aro-hcp-test-msi-containers-int': {},
+    'aro-hcp-test-msi-containers-stg': {},
+    'aro-hcp-test-msi-containers-prod': {},
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },
@@ -275,6 +273,9 @@ CONFIG = {
     },
     'oex-aws-qe-quota-slice': {
         'default': 40,
+    },
+    'hyperfleet-e2e-quota-slice': {
+        'default': 20,
     },
     'equinix-ocp-hcp-quota-slice': {
         'default': 20,
@@ -682,6 +683,13 @@ for i in range(4):
 
 for i in range(2):
     CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
+
+for i in range(120):
+    CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
+    CONFIG['aro-hcp-test-msi-containers-int']['aro-hcp-test-msi-containers-int-{}'.format(i)] = 1
+    CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
+    CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
+
 
 
 config = {

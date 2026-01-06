@@ -1,0 +1,46 @@
+base_images:
+  base:
+    name: 4.23-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.10
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: github.com/openshift/node-problem-detector-operator
+images:
+- dockerfile_path: Dockerfile.rhel7
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+  to: node-problem-detector-operator
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: node-problem-detector-operator

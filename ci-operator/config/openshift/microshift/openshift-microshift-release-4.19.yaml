@@ -69,6 +69,12 @@ tests:
   commands: make test-unit
   container:
     from: src
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 - as: test-rpm
   commands: RPM_INFO=true make rpm srpm
   container:
@@ -202,7 +208,7 @@ tests:
       MICROSHIFT_OS: rhel-9.6
     workflow: openshift-microshift-e2e-bare-metal-tests
 - as: e2e-aws-ai-model-serving
-  run_if_changed: ^(scripts/ci-ai-model-serving/.*)$
+  run_if_changed: ^(scripts/ci-ai-model-serving/.*|assets/optional/ai-model-serving/.*)$
   steps:
     cluster_profile: aws-3
     env:

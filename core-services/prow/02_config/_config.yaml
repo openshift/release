@@ -345,10 +345,10 @@ plank:
             memory: 250Mi
       timeout: 8h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20251205-476eedbb0
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20251205-476eedbb0
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20251205-476eedbb0
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20251205-476eedbb0
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20251223-f0341d7b5
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20251223-f0341d7b5
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20251223-f0341d7b5
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20251223-f0341d7b5
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -638,6 +638,7 @@ slack_reporter_configs:
 status_error_link: https://github.com/kubernetes/test-infra/issues
 tide:
   batch_size_limit:
+    Azure/ARO-HCP: 5
     cri-o/cri-o: -1
   blocker_label: tide/merge-blocker
   context_options:
@@ -645,6 +646,21 @@ tide:
     optional-regex-contexts:
     - multi-pr-.*
     orgs:
+      Azure:
+        repos:
+          ARO-HCP:
+            branches:
+              main:
+                from-branch-protection: true
+                required-if-present-contexts:
+                - change-detection
+                - lint
+                - mega-linter
+                - test
+                - validate_bicep
+                - test-grafana-script
+                - test-prometheus-rules
+                skip-unknown-contexts: true
       ViaQ:
         repos:
           vector:

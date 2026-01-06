@@ -12,7 +12,7 @@ az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}"
 az account set --subscription "${SUBSCRIPTION_ID}"
 
 unset GOFLAGS
-make -C dev-infrastructure/ svc.aks.kubeconfig SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
+make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
 export KUBECONFIG=kubeconfig
 PIDFILE="/tmp/svc-tunnel.pid"
 MONITOR_PIDFILE="/tmp/svc-monitor.pid"
@@ -115,3 +115,7 @@ trap stop_tunnel EXIT
 start_tunnel
 make e2e/local -o test/aro-hcp-tests
 stop_tunnel
+
+# the make target produces a junit.xml in ARTIFACT_DIR.  We want to copy to SHARED_DIR so we can create
+# direct debugging links for the individual tests that failed.
+cp "${ARTIFACT_DIR}/junit.xml" "${SHARED_DIR}/junit-e2e.xml"

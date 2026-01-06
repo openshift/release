@@ -254,8 +254,7 @@ images:
   to: virtctl
 promotion:
   to:
-  - disabled: true
-    excluded_images:
+  - excluded_images:
     - src-oc
     name: 4.21-priv
     namespace: ocp-private
@@ -641,7 +640,7 @@ tests:
   optional: true
   run_if_changed: azure
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     post:
@@ -654,7 +653,7 @@ tests:
 - as: e2e-azure-ovn
   run_if_changed: azure
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       USER_TAGS: |
         keyA valueA
@@ -665,7 +664,7 @@ tests:
   as: e2e-azure-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       FEATURE_SET: TechPreviewNoUpgrade
@@ -679,7 +678,7 @@ tests:
   optional: true
   run_if_changed: azure
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-sharednetwork
@@ -687,7 +686,7 @@ tests:
   as: e2e-azure-ovn-resourcegroup
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     workflow: openshift-e2e-azure-resourcegroup
@@ -1304,6 +1303,8 @@ tests:
   run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
+    dependencies:
+      AGENT_ISO_BUILDER_IMAGE: agent-iso-builder
     workflow: agent-e2e-compact-ipv4-iso-no-registry
 - always_run: false
   as: e2e-aws-ovn-public-subnets
@@ -1353,6 +1354,27 @@ tests:
     - chain: ipi-install
     - ref: ipi-azure-rbac
     - ref: cucushift-installer-check-azure-osimage
+- always_run: false
+  as: e2e-azure-confidential-trustedlaunch
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_CONFIDENTIAL_COMPUTE: "true"
+      ENABLE_CONFIDENTIAL_CONTROL_PLANE: "true"
+    post:
+    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
+    pre:
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-azure-confidential
+    - chain: azure-provision-service-principal-minimal-permission
+    - chain: ipi-install
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-check-azure-confidential
+    test:
+    - ref: openshift-e2e-test
 - as: gcp-private
   optional: true
   run_if_changed: (gcp|google)

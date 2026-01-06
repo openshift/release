@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: /gitops/common-manifests
+  name: appset-common
+  namespace: openshift-gitops
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - list:
+      elements:
+      - cluster: core-ci
+        name: core-ci
+      - cluster: build05
+        name: build05
+  template:
+    metadata:
+      name: 'app-cluster-{{.cluster}}-common'
+    spec:
+      destination:
+        name: '{{.name}}'
+        namespace: openshift-gitops
+      ignoreDifferences:
+        - group: rbac.authorization.k8s.io
+          jsonPointers:
+            - /rules
+          kind: ClusterRole
+          name: ci-admins-aggregated
+        - group: '*'
+          jsonPointers:
+            - /imagePullSecrets
+            - /secrets
+          kind: ServiceAccount
+      project: default
+      source:
+        directory:
+          exclude: '{OWNERS,*.md}'
+          include: '{*.yaml,*.yml}'
+          recurse: true
+        path: gitops/common-manifests
+        repoURL: https://github.com/liangxia/release.git
+        targetRevision: argocd
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - ServerSideApply=true

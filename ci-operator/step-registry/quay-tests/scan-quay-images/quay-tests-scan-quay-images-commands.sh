@@ -60,6 +60,40 @@ if [[ "${QUAY_VERSION}" == "3.14" ]]; then
   QUAY_BUILDER_QEMU_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-builder-qemu-v3-14-password)
 fi
 
+if [[ "${QUAY_VERSION}" == "3.13" ]]; then
+  QUAY_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-v3-13-username)
+  QUAY_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-v3-13-password)
+  QUAY_CLAIR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-clair-v3-13-username)
+  QUAY_CLAIR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-clair-v3-13-password)
+  QUAY_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-operator-v3-13-username)
+  QUAY_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-operator-v3-13-password)
+  QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/container-security-operator-v3-13-username)
+  QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/container-security-operator-v3-13-password)
+  QUAY_BRIDGE_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-bridge-operator-v3-13-username)
+  QUAY_BRIDGE_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-bridge-operator-v3-13-password)
+  QUAY_BUILDER_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-builder-v3-13-username)
+  QUAY_BUILDER_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-builder-v3-13-password)
+  QUAY_BUILDER_QEMU_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-builder-qemu-v3-13-username)
+  QUAY_BUILDER_QEMU_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-builder-qemu-v3-13-password)
+fi
+
+if [[ "${QUAY_VERSION}" == "3.12" ]]; then
+  QUAY_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-v3-12-username)
+  QUAY_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-v3-12-password)
+  QUAY_CLAIR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-clair-v3-12-username)
+  QUAY_CLAIR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-clair-v3-12-password)
+  QUAY_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-operator-v3-12-username)
+  QUAY_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-operator-v3-12-password)
+  QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/container-security-operator-v3-12-username)
+  QUAY_CONTAINER_SECURITY_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/container-security-operator-v3-12-password)
+  QUAY_BRIDGE_OPERATOR_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-bridge-operator-v3-12-username)
+  QUAY_BRIDGE_OPERATOR_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-bridge-operator-v3-12-password)
+  QUAY_BUILDER_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-builder-v3-12-username)
+  QUAY_BUILDER_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-builder-v3-12-password)
+  QUAY_BUILDER_QEMU_IMAGE_USERNAME=$(cat /var/run/quay-qe-konflux-secret/quay-builder-qemu-v3-12-username)
+  QUAY_BUILDER_QEMU_IMAGE_PASSWORD=$(cat /var/run/quay-qe-konflux-secret/quay-builder-qemu-v3-12-password)
+fi
+
 #Retrieve the private key of Quay Security Testing Hostname
 cp /var/run/quay-qe-omr-secret/quaybuilder /tmp && cd /tmp && chmod 600 quaybuilder && echo "" >>quaybuilder || true
 
