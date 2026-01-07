@@ -82,9 +82,9 @@ function install_required_tools() {
 	done
 
 	mkdir -p ${HOME}/.config/openstack/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/clouds.yaml ${HOME}/.config/openstack/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/clouds.yaml ${HOME}/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/ocp-ci-ca.pem ${HOME}/
+	cp ${SECRETS_DIR}/clouds.yaml ${HOME}/.config/openstack/
+	cp ${SECRETS_DIR}/clouds.yaml ${HOME}/
+	cp ${SECRETS_DIR}/ocp-ci-ca.pem ${HOME}/
 
 	which PowerVC-Tool
 	which jq
@@ -274,8 +274,16 @@ export DIR
 mkdir -p "${DIR}"
 cp "${SHARED_DIR}/install-config.yaml" "${DIR}/"
 
-IBMCLOUD_API_KEY=$(cat "/var/run/powervc-ipi-cicd-secrets/powervc-creds/IBMCLOUD_API_KEY")
-#POWERVC_USER_ID=$(cat "/var/run/powervc-ipi-cicd-secrets/powervc-creds/POWERVC_USER_ID")
+export SECRETS_DIR=/var/run/powervc-ipi-cicd-secrets/powervc-creds
+if [ ! -d "${SECRETS_DIR}" ]
+then
+	echo "Error: ${SECRETS_DIR} directory does not exist!"
+	exit 1
+fi
+ls -l ${SECRETS_DIR}/ || true
+
+IBMCLOUD_API_KEY=$(cat "${SECRETS_DIR}/IBMCLOUD_API_KEY")
+#POWERVC_USER_ID=$(cat "${SECRETS_DIR}/POWERVC_USER_ID")
 
 install_required_tools
 
