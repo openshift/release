@@ -31,14 +31,18 @@ deploy_lokistack
 deploy_kafka
 deploy_netobserv
 
-PARAMETERS="-p KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS}"
+PARAMETERS="-p KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS} FLPConsumerReplicas=${FLP_CONSUMER_REPLICAS}"
+
+if [[ -n ${DEPLOYMENT_MODEL:-} ]]; then
+    PARAMETERS+=" DeploymentModel=${DEPLOYMENT_MODEL}"
+fi
 
 if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_SAMPLING:-} ]]; then
     PARAMETERS+=" EBPFSamplingRate=${MULTISTAGE_PARAM_OVERRIDE_SAMPLING}"
 fi
 
-if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]]; then
-    PARAMETERS+=" LokiEnable=${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE}"
+if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]] || [[ ${LOKI_OPERATOR:-} == "None" ]]; then
+    PARAMETERS+=" LokiEnable=false"
 fi
 
 createFlowCollector ${PARAMETERS}
