@@ -137,6 +137,7 @@ fi
 
 echo -e "\n--- FINAL STATUS ---"
 oc get pods -A | grep -E "istio|sail|ztunnel" || true
+oc get istio,istiocni,ztunnel -A || true
 
 echo "Sail Operator and Istio control plane deployed successfully."
 
