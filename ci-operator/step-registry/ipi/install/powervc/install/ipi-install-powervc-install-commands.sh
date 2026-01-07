@@ -252,7 +252,7 @@ function dump_resources() {
 			--bastionUsername "cloud-user" \
 			--bastionRsa "${SSH_PRIV_KEY_PATH}" \
 			--kubeconfig "${DIR}/auth/kubeconfig" \
-			--shouldDebug true
+			--shouldDebug false
 	else
 		echo "Could not find ${DIR}/metadata.json for watch-create"
 	fi
