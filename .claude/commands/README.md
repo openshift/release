@@ -14,7 +14,7 @@ See detailed documentation below.
 
 ### `/rehearse-debug-cluster` - Add Debug Reference and Rehearse Changes
 
-**Purpose**: Automated workflow to add cucushift-hypershift-extended-debug reference to a test configuration and trigger CI rehearsal.
+**Purpose**: Automated workflow to add wait reference to a test configuration and trigger CI rehearsal.
 
 **Usage**:
 ```bash
@@ -33,7 +33,7 @@ See detailed documentation below.
 **What it does**:
 1. Creates a new branch named `debug-cluster-<config_name>`
 2. Finds the target configuration file in `ci-operator/config/openshift/openshift-tests-private/`
-3. Adds `- ref: cucushift-hypershift-extended-debug` after the `-chain` line in the test block
+3. Adds `- ref: wait` after the `-chain` line in the test block
 4. Commits, pushes, and creates a PR to openshift/release with title `debug-cluster-<config_name>`
 5. Waits for the openshift-ci-robot REHEARSALNOTIFIER comment
 6. Extracts the test name and posts the `/pj-rehearse` comment to trigger rehearsal
