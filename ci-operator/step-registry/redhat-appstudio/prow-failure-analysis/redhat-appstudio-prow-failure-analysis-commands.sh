@@ -14,6 +14,11 @@ export LLM_MODEL="${LLM_MODEL:-gemini-2.5-flash-lite}"
 export LLM_API_KEY
 LLM_API_KEY=$(cat "${LLM_API_KEY_PATH}")
 
+# Set optional LLM base URL if provided
+if [[ -n "${LLM_BASE_URL:-}" ]]; then
+    export LLM_BASE_URL
+fi
+
 # Read GitHub token if provided for PR comments
 if [[ -n "${GITHUB_TOKEN_PATH:-}" ]] && [[ -f "${GITHUB_TOKEN_PATH}" ]]; then
     export GITHUB_TOKEN
@@ -25,8 +30,23 @@ if [[ -z "${ORG_REPO:-}" ]] && [[ -n "${REPO_OWNER:-}" ]] && [[ -n "${REPO_NAME:
     export ORG_REPO="${REPO_OWNER}/${REPO_NAME}"
 fi
 
-# Export GCS and embedding configuration
+# Export GCS configuration
 export GCS_BUCKET="${GCS_BUCKET:-test-platform-results}"
+
+if [[ -n "${GCS_CREDS_PATH:-}" ]]; then
+    export GCS_CREDS_PATH
+fi
+
+# Export optional step filtering and artifact inclusion
+if [[ -n "${IGNORED_STEPS:-}" ]]; then
+    export IGNORED_STEPS
+fi
+
+if [[ -n "${INCLUDED_ARTIFACTS:-}" ]]; then
+    export INCLUDED_ARTIFACTS
+fi
+
+# Export embedding configuration
 export CORDON_DEVICE="${CORDON_DEVICE:-cpu}"
 export CORDON_BACKEND="${CORDON_BACKEND:-remote}"
 export CORDON_MODEL_NAME="${CORDON_MODEL_NAME:-google/gemini-embedding-001}"
@@ -36,6 +56,11 @@ export CORDON_BATCH_SIZE="${CORDON_BATCH_SIZE:-32}"
 if [[ -n "${CORDON_API_KEY_PATH:-}" ]] && [[ -f "${CORDON_API_KEY_PATH}" ]]; then
     export CORDON_API_KEY
     CORDON_API_KEY=$(cat "${CORDON_API_KEY_PATH}")
+fi
+
+# Set optional custom embedding endpoint
+if [[ -n "${CORDON_ENDPOINT:-}" ]]; then
+    export CORDON_ENDPOINT
 fi
 
 # Build the command
@@ -63,6 +88,7 @@ echo "LLM Model: ${LLM_MODEL}"
 echo "GCS Bucket: ${GCS_BUCKET}"
 echo "Embedding Backend: ${CORDON_BACKEND}"
 echo "Embedding Model: ${CORDON_MODEL_NAME}"
+echo "Embedding Device: ${CORDON_DEVICE}"
 
 # Execute the analysis (don't fail the job on error)
 set +e
