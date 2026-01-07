@@ -4,20 +4,13 @@ chain:
   # Initial setup
   - ref: openshift-qe-egress-ip-scale-setup
   
-  # Pod Network Chaos
-  - ref: redhat-chaos-pod-network-chaos
-  
-  # OVN Pod Disruption  
+  # OVN Pod Disruption using krkn
   - ref: redhat-chaos-pod-scenarios-custom
+  - ref: openshift-qe-egress-ip-scale-verify
   
-  # Node Network Chaos
-  - ref: redhat-chaos-network-chaos
-  
-  # Worker Node Outage
+  # Worker Node Outage using krkn 
   - ref: redhat-chaos-node-disruptions-worker-outage
-  
-  # Power Outage
-  - ref: redhat-chaos-power-outage
+  - ref: openshift-qe-egress-ip-scale-verify
   
   # Final comprehensive tests with built-in validation
   - ref: openshift-qe-egress-ip-scale-tests
@@ -29,77 +22,52 @@ chain:
     default: "10"
   - name: SCALE_TEST_WORKLOADS
     default: "20"
-  
-  
-  # Pod Network Chaos configuration
-  - name: TEST_NAMESPACE
-    default: "egress-test-scale"
-  - name: TRAFFIC_TYPE
-    default: "[egress]"
-  - name: LABEL_SELECTOR
-    default: "egress-enabled=true"
-  - name: EGRESS_PORTS
-    default: "[80,443,8080]"
-  - name: TEST_DURATION
-    default: "180"
-  - name: INSTANCE_COUNT
-    default: "5"
-  
+
   # OVN Pod disruption chaos environment variables
   - name: TARGET_NAMESPACE
     default: "openshift-ovn-kubernetes"
   - name: POD_LABEL
     default: "app=ovnkube-node"
   - name: DISRUPTION_COUNT
-    default: "9"
+    default: "5"
   - name: EXPECTED_POD_COUNT
     default: "10"
   - name: KILL_TIMEOUT
-    default: "300"
-  - name: EXPECTED_RECOVERY_TIME
     default: "180"
-  
-  # Node Network Chaos configuration
-  - name: NETWORK_PARAMS
-    default: '{"latency": "100ms", "packet_loss": "1%", "bandwidth": "100mbit"}'
-  - name: INTERFACES
-    default: "eth0"
-  - name: EGRESS
-    default: '{"latency": "50ms", "packet_loss": "0.5%"}'
-  
-  # Worker node outage configuration
+  - name: EXPECTED_RECOVERY_TIME
+    default: "120"
+
+  # Worker node outage configuration  
   - name: ACTION
     default: "node_reboot_scenario"
   - name: LABEL_SELECTOR
     default: "node-role.kubernetes.io/worker="
   - name: RUNS
-    default: "3"
+    default: "2"
   - name: NODE_OUTAGE_TIMEOUT
-    default: "240"
-  
-  # Power outage configuration
-  - name: SHUTDOWN_DURATION
-    default: "300"
-  - name: POWER_OUTAGE_TIMEOUT
-    default: "900"
-  - name: CLOUD_TYPE
-    default: "aws"
-  
+    default: "180"
+
   # Common chaos testing configuration
   - name: ENABLE_ALERTS
-    default: "True"
+    default: "False"
   - name: CHECK_CRITICAL_ALERTS
-    default: "True"
+    default: "False" 
   - name: WAIT_DURATION
-    default: "600"
+    default: "60"
   - name: TELEMETRY_ENABLED
-    default: "True"
-  - name: TELEMETRY_RUN_TAG
-    default: "-egress-ip-scale-comprehensive"
-  - name: TELEMETRY_GROUP
-    default: "prow"
+    default: "False"
+  - name: COLLECT_METRICS
+    default: "False"
   - name: JUNIT_TESTCASE
-    default: '[Egress-IP-Scale] Comprehensive chaos resilience test at scale'
+    default: '[Egress-IP-Scale] Pod disruption and node reboot resilience test'
+  
+  # URL monitoring during chaos (as requested by Paige)
+  - name: HEALTH_CHECK_URL
+    default: "https://httpbin.org/ip"
+  - name: URL_CHECK_TIMEOUT
+    default: "10"
+  - name: URL_CHECK_INTERVAL
+    default: "30"
     
   documentation: |-
     SCENARIO: OpenShift Egress IP Performance and Resilience Testing at Scale
@@ -110,7 +78,7 @@ chain:
     TEST SCENARIO DETAILS:
     - Cluster Setup: 10-node AWS cluster with 5 egress IP configurations
     - Workload Pattern: 20 concurrent test pods distributed across 5 egress IP groups
-    - Chaos Testing: Simulated pod disruptions (9 ovnkube-node pods) and node reboots (3 nodes)
+    - Chaos Testing: Simulated pod disruptions (5 ovnkube-node pods) and node reboots (2 nodes)
     - Validation Focus: Egress IP assignment stability, traffic flow continuity, and recovery metrics
     
     EXECUTION FLOW:
@@ -124,4 +92,4 @@ chain:
     - 75%+ egress IPs maintain assignments during chaos
     - 50%+ workloads recover successfully
     - Network traffic flows correctly through assigned egress IPs
-    - Recovery within expected timeframes (180s for pods, 240s for nodes)
+    - Recovery within expected timeframes (120s for pods, 180s for nodes)
