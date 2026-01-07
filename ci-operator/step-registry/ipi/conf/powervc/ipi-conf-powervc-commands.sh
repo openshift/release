@@ -153,7 +153,7 @@ openstack \
 openstack \
 	--os-cloud=${CLOUD} \
 	keypair create \
-	--public-key "${CLUSTER_PROFILE_DIR}/ssh-publickey" \
+	--public-key "${SECRETS_DIR}/ssh-publickey" \
 	"${CLUSTER_NAME}-key"
 
 echo "Running PowerVC-Tool create-bastion..."

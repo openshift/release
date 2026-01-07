@@ -250,7 +250,7 @@ function dump_resources() {
 			--cisInstanceCRN "${CRN}" \
 			--metadata "${DIR}/metadata.json" \
 			--bastionUsername "cloud-user" \
-			--bastionRsa "${SSH_PRIV_KEY_PATH}" \
+			--bastionRsa "${SSH_PRIV_KEY_FILE}" \
 			--kubeconfig "${DIR}/auth/kubeconfig" \
 			--shouldDebug false
 	else
@@ -309,7 +309,7 @@ export FLAVOR
 export LEASED_RESOURCE
 export NETWORK_NAME
 
-export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+export SSH_PRIV_KEY_FILE=${SECRETS_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 #export POWERVC_USER_ID
@@ -333,7 +333,7 @@ destroy_resources
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
 mkdir -p ~/.ssh
-cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
+cp "${CLUSTER_PROFILE_DIR}/*" ~/.ssh/
 
 date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
