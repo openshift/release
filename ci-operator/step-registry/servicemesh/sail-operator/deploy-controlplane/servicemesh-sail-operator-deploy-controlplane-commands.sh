@@ -28,7 +28,8 @@ debug_on_failure() {
         # 2. Iterate through relevant namespaces
         local namespaces=("openshift-operators" "istio-system" "istio-cni" "ztunnel")
         for ns in "${namespaces[@]}"; do
-            if oc get ns "$ns" >/dev/null 2>&1; then
+            local ns_check_output
+            if ns_check_output=$(oc get ns "$ns" 2>&1); then
                 echo -e "\n--- [DEBUG] Namespace: $ns ---"
                 
                 echo ">> Pod Status:"
@@ -47,6 +48,9 @@ debug_on_failure() {
                     echo ">> [DEBUG] Logs for $pod (last 50 lines):"
                     oc logs "$pod" -n "$ns" --all-containers --tail=50 || echo "Could not retrieve logs."
                 done
+            else
+                echo -e "\n--- [DEBUG] Namespace: $ns (NOT FOUND) ---"
+                echo ">> Namespace check failed: $ns_check_output"
             fi
         done
 
