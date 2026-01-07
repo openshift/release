@@ -1,27 +1,27 @@
 presubmits:
-  maistra/istio-images-centos:
+  openshift/openshift-docs:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^maistra-2\.4$
-    - ^maistra-2\.4-
-    cluster: build11
-    context: ci/prow/istio-images-centos-lint-2-4
+    - ^rhcl-docs-1\.1$
+    - ^rhcl-docs-1\.1-
+    cluster: build01
+    context: ci/prow/validate-asciidoc
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-maistra-istio-images-centos-maistra-2.4-istio-images-centos-lint-2-4
-    rerun_command: /test istio-images-centos-lint-2-4
+    name: pull-ci-openshift-openshift-docs-rhcl-docs-1.1-validate-asciidoc
+    rerun_command: /test validate-asciidoc
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=istio-images-centos-lint-2-4
+        - --target=validate-asciidoc
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -54,33 +54,29 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )istio-images-centos-lint-2-4,?($|\s.*)
+    trigger: (?m)^/test( | .* )validate-asciidoc,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^maistra-2\.4$
-    - ^maistra-2\.4-
-    cluster: build11
-    context: ci/prow/istio-images-validate-2-4
+    - ^rhcl-docs-1\.1$
+    - ^rhcl-docs-1\.1-
+    cluster: build01
+    context: ci/prow/validate-portal
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-maistra-istio-images-centos-maistra-2.4-istio-images-validate-2-4
-    rerun_command: /test istio-images-validate-2-4
+    name: pull-ci-openshift-openshift-docs-rhcl-docs-1.1-validate-portal
+    rerun_command: /test validate-portal
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=istio-images-validate-2-4
+        - --target=validate-portal
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -90,12 +86,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -110,15 +100,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -128,4 +109,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )istio-images-validate-2-4,?($|\s.*)
+    trigger: (?m)^/test( | .* )validate-portal,?($|\s.*)
