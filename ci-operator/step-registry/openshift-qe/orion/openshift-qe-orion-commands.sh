@@ -58,11 +58,7 @@ esac
 export ES_SERVER
 
 pip install .
-EXTRA_FLAGS=" --lookback ${LOOKBACK}d --hunter-analyze"
-
-if [[ ! -z "$UUID" ]]; then
-    EXTRA_FLAGS+=" --uuid ${UUID}"
-fi
+EXTRA_FLAGS="${ORION_EXTRA_FLAGS} --lookback ${LOOKBACK}d --hunter-analyze"
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
     EXTRA_FLAGS+=" --output-format junit --save-output-path=junit.xml"
