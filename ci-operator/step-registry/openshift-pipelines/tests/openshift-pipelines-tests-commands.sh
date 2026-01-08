@@ -75,6 +75,8 @@ else #login for ROSA & Hypershift platforms
   eval "$(cat "${SHARED_DIR}/api.login")"
 fi
 
+gauge uninstall xml-report
+gauge install xml-report --version 0.5.3
 echo "Running gauge specs"
 IFS=';' read -r -a specs <<< "$PIPELINES_TEST_SPECS"
 for spec in "${specs[@]}"; do

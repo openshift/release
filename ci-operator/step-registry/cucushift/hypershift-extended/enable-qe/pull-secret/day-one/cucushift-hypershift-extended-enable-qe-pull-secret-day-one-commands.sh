@@ -23,9 +23,9 @@ openshifttest_auth_password="$(jq -r '.password' '/var/run/vault/mirror-registry
 openshifttest_registry_auth="$(echo -n "${openshifttest_auth_user}:${openshifttest_auth_password}" | base64 -w 0)"
 
 # acr auth
-acr_login_server="$(</var/run/vault/acr-pull-credentials/loginserver)"
-acr_user="$(</var/run/vault/acr-pull-credentials/username)"
-acr_password="$(</var/run/vault/acr-pull-credentials/password)"
+acr_login_server="$(</var/run/vault/preservehypershiftaks/loginserver)"
+acr_user="$(</var/run/vault/preservehypershiftaks/username)"
+acr_password="$(</var/run/vault/preservehypershiftaks/password)"
 acr_auth="$(echo -n "${acr_user}:${acr_password}" | base64 -w 0)"
 
 echo "Merging extra auth info into the existing pull secret"
