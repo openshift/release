@@ -27,11 +27,18 @@ aws configure get region
 aws_region=${REGION:-$LEASED_RESOURCE}
 export AWS_DEFAULT_REGION=$aws_region
 source scripts/netobserv.sh
-deploy_lokistack
-deploy_kafka
+
+if [[ ${LOKI_OPERATOR:-} != "None" ]] && [[ -z ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]]; then
+    deploy_lokistack
+fi
+
+if [[ ${DEPLOYMENT_MODEL:-} == "Kafka" ]]; then
+    deploy_kafka
+fi
+
 deploy_netobserv
 
-PARAMETERS="-p KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS} FLPConsumerReplicas=${FLP_CONSUMER_REPLICAS}"
+PARAMETERS="-p"
 
 if [[ -n ${DEPLOYMENT_MODEL:-} ]]; then
     PARAMETERS+=" DeploymentModel=${DEPLOYMENT_MODEL}"
@@ -43,6 +50,14 @@ fi
 
 if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]] || [[ ${LOKI_OPERATOR:-} == "None" ]]; then
     PARAMETERS+=" LokiEnable=false"
+fi
+
+if [[ ${DEPLOYMENT_MODEL:-} == "Kafka" ]]; then
+    PARAMETERS+=" KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS}"
+fi
+
+if [[ ${DEPLOYMENT_MODEL:-} == "Service" ]]; then
+    PARAMETERS+=" FLPConsumerReplicas=${FLP_CONSUMER_REPLICAS}"
 fi
 
 createFlowCollector ${PARAMETERS}
@@ -57,11 +72,30 @@ fi
 
 # get NetObserv metadata 
 NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*].spec.containers[0].env[?(@.name=='OPERATOR_CONDITION_NAME')].value}" -A)
-LOKI_RELEASE=$(oc get sub -n openshift-operators-redhat loki-operator -o jsonpath="{.status.currentCSV}")
-KAFKA_RELEASE=$(oc get sub -n openshift-operators amq-streams  -o jsonpath="{.status.currentCSV}")
+
+if [[ ${LOKI_OPERATOR:-} != "None" ]] && [[ -z ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]]; then
+    LOKI_RELEASE=$(oc get sub -n openshift-operators-redhat loki-operator -o jsonpath="{.status.currentCSV}")
+fi
+
+if [[ ${DEPLOYMENT_MODEL:-} == "Kafka" ]]; then
+    KAFKA_RELEASE=$(oc get sub -n openshift-operators amq-streams  -o jsonpath="{.status.currentCSV}")
+fi
+
 opm --help
 NOO_BUNDLE_INFO=$(scripts/build_info.sh)
-export METADATA="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$LOKI_RELEASE\", \"kafka_version\": \"$KAFKA_RELEASE\", \"noo_bundle_info\":\"$NOO_BUNDLE_INFO\"}"
+
+# Build metadata JSON conditionally
+LOKI_VERSION_JSON=""
+if [[ -n ${LOKI_RELEASE:-} ]]; then
+    LOKI_VERSION_JSON=", \"loki_version\": \"$LOKI_RELEASE\""
+fi
+
+KAFKA_VERSION_JSON=""
+if [[ -n ${KAFKA_RELEASE:-} ]]; then
+    KAFKA_VERSION_JSON=", \"kafka_version\": \"$KAFKA_RELEASE\""
+fi
+
+export METADATA="{\"release\": \"$NETOBSERV_RELEASE\"${LOKI_VERSION_JSON}${KAFKA_VERSION_JSON}, \"noo_bundle_info\":\"$NOO_BUNDLE_INFO\"}"
 
 echo "$METADATA" >> "$SHARED_DIR/additional_params.json"
 cp "$SHARED_DIR/additional_params.json" "$ARTIFACT_DIR/additional_params.json"
