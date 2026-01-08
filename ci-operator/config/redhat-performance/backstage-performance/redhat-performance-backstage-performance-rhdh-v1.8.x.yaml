@@ -16,6 +16,7 @@ images:
     RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.40.5/yq_linux_amd64 && chmod +x /usr/local/bin/yq
     RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
     RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && helm version
+    RUN curl -Lso /usr/local/bin/kn-workflow https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.36.0/kn-workflow-linux-amd64 && chmod +x /usr/local/bin/kn-workflow
   from: src
   to: backstage-performance-runner
 releases:
@@ -155,27 +156,6 @@ tests:
       SCENARIO: mvp
       SPAWN_RATE: "40"
       USE_PR_BRANCH: "true"
-      USERS: "200"
-      WORKERS: "40"
-    workflow: redhat-performance-backstage-performance
-- as: mvp-cpt
-  cron: 0 4 * * *
-  steps:
-    cluster_profile: aws-rhdh-performance
-    env:
-      API_COUNT: "2500"
-      BACKSTAGE_USER_COUNT: "1000"
-      COMPONENT_COUNT: "2500"
-      DURATION: 10m
-      GROUP_COUNT: "250"
-      PRE_LOAD_DB: "true"
-      RHDH_DB_REPLICAS: "1"
-      RHDH_DB_STORAGE: 1Gi
-      RHDH_DEPLOYMENT_REPLICAS: "1"
-      RHDH_KEYCLOAK_REPLICAS: "1"
-      SCENARIO: mvp
-      SPAWN_RATE: "40"
-      USE_PR_BRANCH: "false"
       USERS: "200"
       WORKERS: "40"
     workflow: redhat-performance-backstage-performance
@@ -423,6 +403,6 @@ tests:
       WAIT_FOR_SEARCH_INDEX: "false"
     workflow: redhat-performance-backstage-performance-scalability
 zz_generated_metadata:
-  branch: main
+  branch: rhdh-v1.8.x
   org: redhat-performance
   repo: backstage-performance
