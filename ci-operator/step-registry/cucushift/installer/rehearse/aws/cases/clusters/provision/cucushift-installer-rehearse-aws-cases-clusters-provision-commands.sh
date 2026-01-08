@@ -243,28 +243,47 @@ if [[ ${COMPUTE_INSTANCE_TYPE} != "" ]]; then
   yq-v4 eval -i '.compute[0].platform.aws.type = env(COMPUTE_INSTANCE_TYPE)' "${CONFIG}"
 fi
 
-# Patch AZ, only use one AZ to reduce EIP usage
-if [ "$TEST_OBJECT" == "InstanceTypes" ];  then
-  # check the instance type offering
-  
+AZ_NAME=""
+
+case "$TEST_OBJECT" in
+InstanceTypes)
   t1=$(mktemp)
   t2=$(mktemp)
-  aws --region "$REGION" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="$CONTROL_PLANE_INSTANCE_TYPE" --query 'InstanceTypeOfferings[*].Location' | jq -r '.[]' | sort > "$t1"
-  aws --region "$REGION" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="$COMPUTE_INSTANCE_TYPE" --query 'InstanceTypeOfferings[*].Location' | jq -r '.[]' | sort > "$t2"
-  ZONE_NAME=$(comm -12 "$t1" "$t2" | head -n 1)
-  if [ "$ZONE_NAME" == "" ]; then
+  aws --region "$REGION" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="$CONTROL_PLANE_INSTANCE_TYPE" --query 'InstanceTypeOfferings[*].Location' | jq -r '.[]' | sort | grep -E '^[a-z]+-[a-z]+-[0-9][a-z]$' > "$t1"
+  aws --region "$REGION" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="$COMPUTE_INSTANCE_TYPE" --query 'InstanceTypeOfferings[*].Location' | jq -r '.[]' | sort | grep -E '^[a-z]+-[a-z]+-[0-9][a-z]$' > "$t2"
+
+  echo "AZs for ${CONTROL_PLANE_INSTANCE_TYPE}:"
+  cat $t1
+  echo "AZs for ${COMPUTE_INSTANCE_TYPE}:"
+  cat $t2
+  echo "AZ_INDEX: $AZ_INDEX"
+
+  AZ_NAME=$(comm -12 "$t1" "$t2" | jq -Rs 'split("\n") | map(select(length > 0))' | jq -r --argjson i "$AZ_INDEX" '.[$i] // ""')
+  if [ "$AZ_NAME" == "" ]; then
     echo "ERROR: Can not find an Availability Zone that provides both $CONTROL_PLANE_INSTANCE_TYPE and $COMPUTE_INSTANCE_TYPE"
     exit 1
   fi
-else
-  # select the first one
-  ZONE_NAME=$(jq -r '[.AvailabilityZones[] | select(.ZoneType=="availability-zone")] | .[0].ZoneName' "${ZONES_JSON}")
-fi
+  echo "AZ configuration: Auto select $AZ_NAME for TEST_OBJECT: $TEST_OBJECT"
+  ;;
+Regions)
+  # Only use one AZ to reduce EIP usage
+  echo "AZ_INDEX: $AZ_INDEX"
+  AZ_NAME=$(jq -r --argjson i "$AZ_INDEX" '[.AvailabilityZones[] | select(.ZoneType=="availability-zone")] | .[$i].ZoneName // ""' "${ZONES_JSON}")
+  if [ "$AZ_NAME" == "" ]; then
+    echo "ERROR: Can not find an Availability Zone for $REGION"
+    exit 1
+  fi
+  echo "AZ configuration: Auto select $AZ_NAME for TEST_OBJECT: $TEST_OBJECT"
+  ;;
+*)
+  echo "AZ configuration: Skip for TEST_OBJECT: $TEST_OBJECT"
+  ;;
+esac
 
-if [ "${TEST_OBJECT}" != "LocalZones" ] && [ "${TEST_OBJECT}" != "WavelengthZones" ]; then
-  export ZONE_NAME
-  yq-v4 eval -i '.controlPlane.platform.aws.zones += [env(ZONE_NAME)]' "${CONFIG}"
-  yq-v4 eval -i '.compute[0].platform.aws.zones += [env(ZONE_NAME)]' "${CONFIG}"
+if [ -n "$AZ_NAME" ]; then
+  export AZ_NAME
+  yq-v4 eval -i '.controlPlane.platform.aws.zones += [env(AZ_NAME)]' "${CONFIG}"
+  yq-v4 eval -i '.compute[0].platform.aws.zones += [env(AZ_NAME)]' "${CONFIG}"
 fi
 
 # Patch Edge nodes
