@@ -268,6 +268,11 @@ EOF
 else
   echo "TEST_NAME not defined. Skipping Regulus job.config generation."
 fi
+
+# To disable must-gather especially with high node count cluster like rds.
+if [ "${REG_BRANCH}" == "rds" ]; then
+   printf 'export KUBE=1\n' >> /tmp/jobs.config
+fi
 # ───────────────────────────────────────────────────────────────────────────
 # Launch Regulus (tests are listed in regulus_repo/jobs.config)
 # ───────────────────────────────────────────────────────────────────────────

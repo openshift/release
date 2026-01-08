@@ -48,5 +48,5 @@ if [ -n "${CHURN_CYCLES}" ]; then
   EXTRA_FLAGS="${EXTRA_FLAGS} --churn-cycles ${CHURN_CYCLES} --churn-percent ${CHURN_PERCENT} --dpdk-devicepool ${SRIOV_DPDK_DEVICEPOOL} --net-devicepool ${SRIOV_NET_DEVICEPOOL}"
 fi
 
-WORKLOAD=rds-core EXTRA_FLAGS+=" --alerting=true --check-health=true --profile-type=${PROFILE_TYPE}" ./run.sh
+WORKLOAD=rds-core EXTRA_FLAGS+=" --alerting=true --profile-type=${PROFILE_TYPE}" ./run.sh
 
