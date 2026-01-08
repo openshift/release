@@ -11,7 +11,7 @@ set -o pipefail
 # cd to writable directory
 cd /tmp/
 
-git clone https://github.com/stolostron/acm-inspector.git
+git clone -b fix-timedelta-import https://github.com/tanfengshuang/acm-inspector.git
 cd acm-inspector/src/supervisor
 python3.9 -m venv venv
 ./venv/bin/pip3.9 install -r requirements.txt
