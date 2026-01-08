@@ -42,12 +42,27 @@ except Exception as e:
 EOF
 }
 
+handle_error_and_exit() {
+  local error_msg="$1"
+  local exit_code="${2:-1}"
+
+  echo "Error: $error_msg" >&2
+
+  local prow_base_url="https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/qe-private-deck/logs"
+  local prow_link="N/A"
+  if [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+    prow_link="${prow_base_url}/${JOB_NAME}/${BUILD_ID}"
+  fi
+
+  send_slack_notification "$prow_link" || true
+  exit "$exit_code"
+}
+
 notify_slack_if_failure() {
   local xml_file="$1"
 
   if [[ ! -f "$xml_file" ]]; then
-    echo "Error: File $xml_file not found" >&2
-    return 1
+    handle_error_and_exit "File $xml_file not found"
   fi
 
   local failures
@@ -56,8 +71,7 @@ notify_slack_if_failure() {
   echo "[DEBUG] Detected failures = '$failures'"
 
   if [[ -z "$failures" || ! "$failures" =~ ^[0-9]+$ ]]; then
-    echo "[ERROR] Unable to parse failure count from XML." >&2
-    return 1
+    handle_error_and_exit "Unable to parse failure count from XML"
   fi
 
   if [[ "$failures" != "0" ]]; then
@@ -69,7 +83,7 @@ notify_slack_if_failure() {
       prow_link="${prow_base_url}/${JOB_NAME}/${BUILD_ID}"
     fi
     send_slack_notification "$prow_link"
-    
+
   else
     echo "All tests passed. No Slack notification sent."
   fi
@@ -121,8 +135,7 @@ elif [ "${OUTPUT_FORMAT}" == "JSON" ]; then
 elif [ "${OUTPUT_FORMAT}" == "TEXT" ]; then
     export EXTRA_FLAGS+=" --output-format text"
 else
-    echo "Unsupported format: ${OUTPUT_FORMAT}"
-    exit 1
+    handle_error_and_exit "Unsupported format: ${OUTPUT_FORMAT}"
 fi
 
 if [[ -n "$ORION_CONFIG" ]]; then
@@ -131,8 +144,7 @@ if [[ -n "$ORION_CONFIG" ]]; then
         if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
             export CONFIG="$ARTIFACT_DIR/$fileBasename"
         else
-            echo "Error: Failed to download $ORION_CONFIG" >&2
-            exit 1
+            handle_error_and_exit "Failed to download $ORION_CONFIG"
         fi
     else
         export CONFIG="$ORION_CONFIG"
@@ -172,12 +184,13 @@ orion_exit_status=$?
 set -e
 
 if [[ "$OUTPUT_FORMAT" == "JUNIT" ]]; then
-  # Remove timestamps field since RP doesn't support it, 
+  # Remove timestamps field since RP doesn't support it,
   # details: https://redhat-internal.slack.com/archives/CH76YSYSC/p1754418769901119?thread_ts=1754385612.115479&cid=CH76YSYSC
   python3 <<'EOF'
 import xml.etree.ElementTree as ET
+import sys
 
-file_path = "junit_olmv1-GCP.xml"
+file_path = "junit.xml"
 
 try:
     tree = ET.parse(file_path)
@@ -190,14 +203,24 @@ try:
     print(f"Successfully removed timestamps and saved to {file_path}")
 
 except ET.ParseError as e:
-    print(f"Error parsing XML file: {e}")
+    print(f"Error parsing XML file: {e}", file=sys.stderr)
+    sys.exit(1)
 except IOError as e:
-    print(f"Error reading or writing file: {e}")
+    print(f"Error reading or writing file: {e}", file=sys.stderr)
+    sys.exit(1)
 EOF
+
+  if [[ $? -ne 0 ]]; then
+    handle_error_and_exit "Failed to process junit.xml file"
+  fi
+
   mkdir -p "${ARTIFACT_DIR}"
-  cp *.csv *.xml ${ARTIFACT_DIR}/ 
+
+  if ! cp *.csv *.xml "${ARTIFACT_DIR}/"; then
+    handle_error_and_exit "Failed to copy artifacts to ${ARTIFACT_DIR}"
+  fi
 fi
 
-notify_slack_if_failure "junit_olmv1-GCP.xml"
+notify_slack_if_failure "junit.xml"
 
 exit $orion_exit_status

@@ -66,6 +66,7 @@ fi
 
 # Execute OpenTelemetry e2e tests
 chainsaw test \
+--quiet \
 --report-name "junit_otel_e2e" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \
@@ -84,6 +85,7 @@ tests/e2e-targetallocator || any_errors=true
 
 # Execute sidecar-related tests with version-dependent selector
 chainsaw test \
+--quiet \
 --report-name "junit_otel_e2e_sidecar_prometheuscr" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \
@@ -105,6 +107,7 @@ fi
 
 # Execute OpenTelemetry e2e tests
 chainsaw test \
+--quiet \
 --report-name "junit_otel_metadata_filters" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \
@@ -124,11 +127,13 @@ fi
 
 # Execute OpenTelemetry e2e-instrumentation tests with pipeline instrumentation images
 chainsaw test \
+--quiet \
 --report-name "junit_otel_e2e_instrumentation_pipeline_images" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \
 --test-dir \
-tests/e2e-instrumentation || any_errors=true
+tests/e2e-instrumentation \
+tests/e2e-multi-instrumentation || any_errors=true
 
 # Check if any errors occurred
 if $any_errors; then

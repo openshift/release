@@ -48,3 +48,7 @@ do
 gcloud --project ${project_id} dns record-sets delete ${name} --type ${record_type} --zone ${base_domain_zone_name}
 EOF
 done
+
+echo "Waiting for ${GCP_NEW_PUBLIC_DNS_RECORD_WAITING_TIME}s to ensure DNS records can be resolved ..."
+sleep $GCP_NEW_PUBLIC_DNS_RECORD_WAITING_TIME
+

@@ -1,0 +1,166 @@
+base_images:
+  ci_tests-private-base:
+    name: tests-private-base
+    namespace: ci
+    tag: latest
+  ci_tests-private-baseui:
+    name: tests-private-baseui
+    namespace: ci
+    tag: latest
+  network-observability-cli:
+    name: network-observability-cli
+    namespace: netobserv
+    tag: ci
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  tools:
+    name: "4.22"
+    namespace: ocp
+    tag: tools
+binary_build_commands: make go-mod-tidy;make all
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.22
+images:
+- dockerfile_literal: |
+    FROM src AS builder
+    FROM registry.ci.openshift.org/netobserv/network-observability-cli:ci as netobservcli
+    FROM registry.ci.openshift.org/ci/rosa-aws-cli:latest as rosacli
+    FROM this-is-ignored-and-not-used
+    ENV ART_DNF_WRAPPER_POLICY=append
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private/pipeline/handleresult.py /usr/bin/
+    COPY --from=netobservcli /oc-netobserv /usr/bin/
+    COPY --from=rosacli /usr/bin/rosa /usr/bin/
+    COPY --from=quay.io/hypershift/hypershift-operator:latest usr/bin/hypershift /usr/bin/hypershift
+    COPY --from=quay.io/openshifttest/oc-compliance:latest /tmp/oc-compliance /usr/bin/oc-compliance
+    COPY --from=quay.io/openshifttest/openshift4-tools:v2 /tmp/OpenShift4-tools.tar /tmp/OpenShift4-tools.tar
+    RUN set -x && \
+        yum config-manager --disable ubi-9-appstream ubi-9-baseos ubi-9-codeready-builder && \
+        yum update -y && \
+        PACKAGES="git gzip httpd-tools openssh-clients python3-pip skopeo util-linux zip" && \
+        yum -y install --setopt=tsflags=nodocs $PACKAGES && \
+        git config --system user.name openshift-tests-private && \
+        git config --system user.email openshift-tests-private@redhat.com && \
+        tar -C /opt -xf /tmp/OpenShift4-tools.tar && \
+        pip3 uninstall PyYAML -y && yum -y remove python3-requests && pip3 install --upgrade setuptools pip && pip3 install dotmap minio python-openstackclient pyyaml requests && \
+        sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=0\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" > /etc/yum.repos.d/azure-cli.repo' && \
+        yum -y install --setopt=tsflags=nodocs --enablerepo=azure-cli azure-cli && \
+        sh -c 'echo -e "[google-cloud-cli]\nname=Google Cloud CLI\nbaseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el9-x86_64\nenabled=0\ngpgcheck=1\nrepo_gpgcheck=0\ngpgkey=https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg" > /etc/yum.repos.d/google-cloud-sdk.repo' && \
+        yum -y install --setopt=tsflags=nodocs --enablerepo=google-cloud-cli google-cloud-cli && \
+        yum -y install sos && \
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+        unzip -q awscliv2.zip && ./aws/install -b /bin && \
+        rm -rf ./aws awscliv2.zip && \
+        chmod g+w /etc/passwd && \
+        MIRRORURL=https://mirror2.openshift.com/pub/openshift-v4/x86_64/clients && \
+        curl -skL ${MIRRORURL}/ocp/candidate/opm-linux-rhel9.tar.gz -o opm-linux.tar.gz  && \
+        tar -C /usr/bin/ -xzvf opm-linux.tar.gz && mv /usr/bin/opm-rhel9 /usr/bin/opm && opm version && rm -f opm-linux.tar.gz && \
+        curl -skL ${MIRRORURL}/ocp-dev-preview/latest/oc-mirror.rhel9.tar.gz -o oc-mirror.tar.gz && \
+        tar -C /usr/bin/ -xzvf oc-mirror.tar.gz && chmod +x /usr/bin/oc-mirror && oc-mirror version && rm -f oc-mirror.tar.gz && \
+        curl -skL ${MIRRORURL}/operator-sdk/latest/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz && \
+        tar -C ./ -xzvf opt-sdk.tar.gz && mv ./x86_64/operator-sdk /usr/bin && rm -fr opt-sdk.tar.gz ./x86_64 && \
+        curl -skL https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o govc_Linux_x86_64.tar.gz && \
+        tar -C /usr/bin/ -xvf govc_Linux_x86_64.tar.gz govc && rm -f govc_Linux_x86_64.tar.gz && \
+        KREW_ROOT="/usr/local/krew" && \
+        OS="$(uname | tr '[:upper:]' '[:lower:]')" && \
+        ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" && \
+        KREW="krew-${OS}_${ARCH}" && \
+        pushd "$(mktemp -d)" && \
+        curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" && \
+        tar zxvf "${KREW}.tar.gz" && ./"${KREW}" install krew && \
+        popd && export PATH="$PATH:${KREW_ROOT}/bin:$HOME/.krew/bin" && which kubectl-krew && \
+        yum clean all && \
+        rm -rf /usr/bin/oc /usr/bin/kubectl /root/.config/gcloud /var/cache/yum/* /tmp/*
+  from: tools
+  inputs:
+    network-observability-cli:
+      as:
+      - registry.ci.openshift.org/netobserv/network-observability-cli:ci
+    rosa-aws-cli:
+      as:
+      - registry.ci.openshift.org/ci/rosa-aws-cli:latest
+    src:
+      as:
+      - src
+  to: tests-private-base
+- dockerfile_literal: |
+    FROM this-is-ignored-and-not-used
+    ARG YQ_VERSION="v4.30.8"
+    ENV ART_DNF_WRAPPER_POLICY=append
+    RUN set -x && \
+        curl --silent --location https://rpm.nodesource.com/setup_22.x | bash - && \
+        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="alsa-lib gtk2-devel gtk3-devel httpd-tools libnotify-devel libXScrnSaver nodejs nss openssh-clients xorg-x11-server-Xvfb yarn" && \
+        yum -y install --setopt=tsflags=nodocs $PACKAGES && \
+        declare -A YQ_HASH=([amd64]='6c911103e0dcc54e2ba07e767d2d62bcfc77452b39ebaee45b1c46f062f4fd26' \
+                            [arm64]='95092e8b5332890c46689679b5e4360d96873c025ad8bafd961688f28ea434c7') && \
+        arch="$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" && \
+        YQ_URI="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${arch}" && \
+        curl -sSL "${YQ_URI}" -o /usr/local/bin/yq && \
+        echo "${YQ_HASH[$arch]} */usr/local/bin/yq" | sha256sum --strict --status --check && \
+        chmod +x /usr/local/bin/yq && \
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
+        yum install -y ./google-chrome-stable_current_*.rpm && rm -f ./google-chrome-stable_current_*.rpm && \
+        yum clean all && rm -rf /var/cache/yum/* /tmp/*
+  from: tools
+  to: tests-private-baseui
+- dockerfile_literal: |
+    FROM src AS builder
+    FROM this-is-ignored-and-not-used
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+  from: ocp-qe-perfscale-ci
+  inputs:
+    src:
+      as:
+      - src
+  to: tests-private-burner
+- dockerfile_literal: |
+    FROM bin AS bin
+    FROM this-is-ignored-and-not-used
+    COPY --from=bin /go/src/github.com/openshift/openshift-tests-private/bin/extended-platform-tests /usr/bin/
+  from: ci_tests-private-base
+  inputs:
+    bin:
+      as:
+      - bin
+  to: tests-private
+- dockerfile_literal: |
+    FROM src AS builder
+    FROM this-is-ignored-and-not-used
+    WORKDIR /go/src/github.com/openshift/openshift-tests-private
+    COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
+  from: ci_tests-private-baseui
+  inputs:
+    src:
+      as:
+      - src
+  to: tests-private-ui
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 16Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+  bin:
+    requests:
+      cpu: "3"
+      memory: 12Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: openshift-tests-private
+  variant: images

@@ -3,7 +3,7 @@
 ## Unrelated histories
 
 A force-push in one of the repositories which has a counterpart in
-`openshfit-priv` will cause the job to fail to synchronize the repositories,
+`openshift-priv` will cause the job to fail to synchronize the repositories,
 e.g.:
 
 ```

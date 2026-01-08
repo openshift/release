@@ -44,7 +44,7 @@ CLOUD_OUTPUT=$(curl -fsSk -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d "{
-    \"description\":\"Temporary allocation from openshift-ci: $REPO_OWNER-$REPO_NAME-$JOB_TYPE-$PULL_NUMBER\",
+    \"description\":\"$REPO_OWNER-$REPO_NAME-$JOB_TYPE-$PULL_NUMBER\",
     \"owner\":\"metal-perfscale-cpt\",
     \"qinq\":1,
     $([ -n "$VLAN_ID" ] && echo "\"vlan\":\"$VLAN_ID\",")

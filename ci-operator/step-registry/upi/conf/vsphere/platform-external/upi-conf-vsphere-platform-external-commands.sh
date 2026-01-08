@@ -16,6 +16,34 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+# release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
+# RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST,
+# but for some ci jobs triggerred by remote api, RELEASE_IMAGE_LATEST might be overridden with
+# user specified image pullspec, to avoid auth error when accessing it, always use build farm
+# registry pullspec.
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+# seem like release-controller does not expose RELEASE_IMAGE_INITIAL, even job configuraiton defines
+# release:initial image, once that, use 'oc get istag release:inital' to workaround it.
+echo "RELEASE_IMAGE_INITIAL: ${RELEASE_IMAGE_INITIAL:-}"
+if [[ -n ${RELEASE_IMAGE_INITIAL:-} ]]; then
+    tmp_release_image_initial=${RELEASE_IMAGE_INITIAL}
+    echo "Getting inital release image from RELEASE_IMAGE_INITIAL..."
+elif oc get istag "release:initial" -n ${NAMESPACE} &>/dev/null; then
+    tmp_release_image_initial=$(oc -n ${NAMESPACE} get istag "release:initial" -o jsonpath='{.tag.from.name}')
+    echo "Getting inital release image from build farm imagestream: ${tmp_release_image_initial}"
+fi
+# For some ci upgrade job (stable N -> nightly N+1), RELEASE_IMAGE_INITIAL and
+# RELEASE_IMAGE_LATEST are pointed to different imgaes, RELEASE_IMAGE_INITIAL has
+# higher priority than RELEASE_IMAGE_LATEST
+TESTING_RELEASE_IMAGE=""
+if [[ -n ${tmp_release_image_initial:-} ]]; then
+    TESTING_RELEASE_IMAGE=${tmp_release_image_initial}
+else
+    TESTING_RELEASE_IMAGE=${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}
+fi
+echo "TESTING_RELEASE_IMAGE: ${TESTING_RELEASE_IMAGE}"
+
 openshift_install_path="/var/lib/openshift-install"
 
 # subnets.json is no longer available in vault
@@ -243,6 +271,17 @@ then
   echo ${ROUTE53_DELETE_JSON} > "${SHARED_DIR}"/dns-nodes-delete.json
 fi
 
+VERSION=$(oc adm release info "${TESTING_RELEASE_IMAGE}" --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+
+Z_VERSION=1000
+
+if [ ! -z "${VERSION}" ]; then
+  Z_VERSION=$(echo "${VERSION}" | cut -d'.' -f2)
+  echo "$(date -u --rfc-3339=seconds) - determined version is 4.${Z_VERSION}"
+else
+  echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
+fi
+
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat >"${SHARED_DIR}/terraform.tfvars" <<-EOF
 machine_cidr = "${machine_cidr}"
@@ -266,6 +305,17 @@ lb_ip_address = "${lb_ip_address}"
 compute_ip_addresses = ${compute_ip_addresses}
 control_plane_ip_addresses = ${control_plane_ip_addresses}
 EOF
+
+SPEC_CONFIG="/var/run/vault/vsphere-ibmcloud-config/vm-specs.json"
+
+# Older versions of UPI image do not support changing coresPerSocket.  It is hard coded to 4 for CPS.  In these environments, We'll default to 4 cores.
+control_plane_cpu=$(jq -r '.spec.controlplane.cpus' ${SPEC_CONFIG})
+compute_cpu=$(jq -r '.spec.compute.cpus' ${SPEC_CONFIG})
+if [ "${Z_VERSION}" -lt 20 ]; then
+    echo "$(date -u --rfc-3339=seconds) - Detected legacy jobs.  Configuring CPU counts to 4 ..."
+    control_plane_cpu=4
+    compute_cpu=4
+fi
 
 echo "$(date -u --rfc-3339=seconds) - Create variables.ps1 ..."
 cat >"${SHARED_DIR}/variables.ps1" <<-EOF
@@ -293,16 +343,22 @@ cat >"${SHARED_DIR}/variables.ps1" <<-EOF
 \$netmask ="${netmask}"
 
 \$bootstrap_ip_address = "${bootstrap_ip_address}"
+
+\$lb_memory =  $(jq -r '.spec.lb.memoryMB' ${SPEC_CONFIG})
+\$lb_num_cpus = $(jq -r '.spec.lb.cpus' ${SPEC_CONFIG})
+\$lb_cores_per_socket = $(jq -r '.spec.lb.coresPerSocket' ${SPEC_CONFIG})
 \$lb_ip_address = "${lb_ip_address}"
 
-\$control_plane_memory = 16384
-\$control_plane_num_cpus = 4
+\$control_plane_memory =  $(jq -r '.spec.controlplane.memoryMB' ${SPEC_CONFIG})
+\$control_plane_num_cpus = ${control_plane_cpu}
+\$control_plane_cores_per_socket = $(jq -r '.spec.controlplane.coresPerSocket' ${SPEC_CONFIG})
 \$control_plane_count = 3
 \$control_plane_ip_addresses = $(echo ${control_plane_ip_addresses} | tr -d '[]')
 \$control_plane_hostnames = $(printf "\"%s\"," "${control_plane_hostnames[@]}" | sed 's/,$//')
 
-\$compute_memory = 16384
-\$compute_num_cpus = 4
+\$compute_memory =  $(jq -r '.spec.compute.memoryMB' ${SPEC_CONFIG})
+\$compute_num_cpus = ${compute_cpu}
+\$compute_cores_per_socket = $(jq -r '.spec.compute.coresPerSocket' ${SPEC_CONFIG})
 \$compute_count = 3
 \$compute_ip_addresses = $(echo ${compute_ip_addresses} | tr -d '[]')
 \$compute_hostnames = $(printf "\"%s\"," "${compute_hostnames[@]}" | sed 's/,$//')

@@ -60,6 +60,36 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
+  cluster: build04
+  cron: 30 7 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build04-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build04` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: upgrader
+- agent: kubernetes
   cluster: build06
   cron: 30 7 * * 1-5
   decorate: true
@@ -120,7 +150,67 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
-  cluster: build10
+  cluster: build08
+  cron: 30 7 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build08-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build08` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: upgrader
+- agent: kubernetes
+  cluster: build09
+  cron: 30 7 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build09-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build09` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: upgrader
+- agent: kubernetes
+  cluster: app.ci
   cron: 30 7 * * 1-5
   decorate: true
   labels:
@@ -150,7 +240,7 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
-  cluster: build11
+  cluster: app.ci
   cron: 30 7 * * 1-5
   decorate: true
   labels:
@@ -1025,7 +1115,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250903-f49c6158b
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20251223-f0341d7b5
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1060,7 +1150,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20250903-f49c6158b
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20251223-f0341d7b5
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1100,8 +1190,8 @@ periodics:
       - --git-email=openshift-bot@redhat.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
-      - --current-release=4.21
-      - --future-release=4.22
+      - --current-release=4.22
+      - --future-release=4.23
       - --self-approve=true
       - --assign=openshift/test-platform
       - --rebalancer-cron=0 0 * * 2,5
@@ -1145,6 +1235,7 @@ periodics:
   spec:
     containers:
     - args:
+      - --upstream-branch=master
       - --github-token-path=/etc/github/oauth
       - --github-endpoint=http://ghproxy
       - --github-endpoint=https://api.github.com
@@ -1272,6 +1363,8 @@ periodics:
       - --log-level=debug
       - --self-approve=true
       - --dry-run=false
+      - --jira=OCPBUGS
+      - --jira=OPRUN
       command:
       - /usr/bin/bumper
       env:
@@ -1308,6 +1401,7 @@ periodics:
   spec:
     containers:
     - args:
+      - --pr-base-branch=master
       - --github-token-path=/etc/github/oauth
       - --github-endpoint=http://ghproxy
       - --github-endpoint=https://api.github.com
@@ -1347,6 +1441,7 @@ periodics:
       - --ignore-org=kubernetes-sigs
       - --ignore-org=CSPI-QE
       - --ignore-org=openshift-online/ocm-cli
+      - --ignore-org=netobserv
       - --extra-config-dir=core-services/prow/02_config/
       command:
       - /usr/bin/autoowners
@@ -1397,7 +1492,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250903-f49c6158b
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20251223-f0341d7b5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1454,7 +1549,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20250903-f49c6158b
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20251223-f0341d7b5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1545,7 +1640,7 @@ periodics:
           --github-hourly-tokens=600 \
           --github-allowed-burst=600 \
           --allow-repo-archival
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20250903-f49c6158b
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20251223-f0341d7b5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1614,7 +1709,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20250903-f49c6158b
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20251223-f0341d7b5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1644,8 +1739,8 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=4.21
-      - --future-release=4.22
+      - --current-release=4.22
+      - --future-release=4.23
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -1730,8 +1825,8 @@ periodics:
       - --github-graphql-endpoint=http://ghproxy/graphql
       - --dry-run=false
       - --config-dir=./ci-operator/config/
-      - --current-release=4.21
-      - --future-release=4.22
+      - --current-release=4.22
+      - --future-release=4.23
       command:
       - blocking-issue-creator
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_blocking-issue-creator_latest
@@ -1899,7 +1994,14 @@ periodics:
       - --vault-prefix=kv/dptp
       - --bootstrap-config=/etc/ci-secret-bootstrap/_config.yaml
       - --config=/etc/ci-secret-generator/_config.yaml
+      - --enable-gsm-sync=false
+      - --gsm-credentials-file=/etc/gcp-credentials/key.json
       - --dry-run=false
+      env:
+      - name: GCP_PROJECT_ID
+        value: openshift-ci-secrets
+      - name: GCP_PROJECT_NUMBER
+        value: "384486694155"
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-generator_latest
       imagePullPolicy: Always
       name: ci-secret-generator
@@ -1914,6 +2016,9 @@ periodics:
         readOnly: true
       - mountPath: /etc/ci-secret-generator
         name: ci-secret-generator
+      - mountPath: /etc/gcp-credentials
+        name: gcp-sa-key
+        readOnly: true
     serviceAccountName: secret-generator
     volumes:
     - configMap:
@@ -1925,6 +2030,9 @@ periodics:
     - name: build-farm-credentials
       secret:
         secretName: config-updater
+    - name: gcp-sa-key
+      secret:
+        secretName: gsm-secrets-reconciler-sa-credentials
 - agent: kubernetes
   cluster: app.ci
   decorate: true
@@ -1951,27 +2059,29 @@ periodics:
       - --dry-run=false
       - --force=true
       - --validate-bitwarden-items-usage
-      - --bw-allow-unused=dptp/openshift-ci-robot
-      - --bw-allow-unused=dptp/openshift-merge-robot
-      - --bw-allow-unused=dptp/openshift-build-robot
-      - --bw-allow-unused=dptp/openshift-publish-robot
-      - --bw-allow-unused=dptp/openshift-bugzilla-robot
-      - --bw-allow-unused=dptp/openshift-cherrypick-robot
-      - --bw-allow-unused=dptp/openshift-bugzilla-robot@redhat.com
-      - --bw-allow-unused=dptp/openshift-bot
-      - --bw-allow-unused=dptp/openshift-github-robots@redhat.com
       - --bw-allow-unused=dptp/aos-cicd@redhat.com
       - --bw-allow-unused=dptp/aos-team-dp-testplatform@redhat.com mailing list
       - --bw-allow-unused=dptp/AWS ci-longlivedcluster-bot
       - --bw-allow-unused=dptp/bugzilla.redhat.com
-      - --bw-allow-unused=dptp/kata-jenkins-ci.westus2.cloudapp.azure.com
-      - --bw-allow-unused=dptp/quay.io
-      - --bw-allow-unused=dptp/quay.io/multi-arch
-      - --bw-allow-unused=dptp/cluster-bot-cloud-sso-for-ocm-ephemeral-osd
-      - --bw-allow-unused=dptp/cluster-bot-aws-account-for-ephemeral-osd
+      - --bw-allow-unused=dptp/build_farm
       - --bw-allow-unused=dptp/build_farm_osd_aws
       - --bw-allow-unused=dptp/build_farm_osd_gcp
-      - --bw-allow-unused=dptp/build_farm
+      - --bw-allow-unused=dptp/cluster-bot-aws-account-for-ephemeral-osd
+      - --bw-allow-unused=dptp/cluster-bot-cloud-sso-for-ocm-ephemeral-osd
+      - --bw-allow-unused=dptp/gitops-cluster-build05
+      - --bw-allow-unused=dptp/gitops-cluster-core-ci
+      - --bw-allow-unused=dptp/kata-jenkins-ci.westus2.cloudapp.azure.com
+      - --bw-allow-unused=dptp/openshift-bot
+      - --bw-allow-unused=dptp/openshift-bugzilla-robot
+      - --bw-allow-unused=dptp/openshift-bugzilla-robot@redhat.com
+      - --bw-allow-unused=dptp/openshift-build-robot
+      - --bw-allow-unused=dptp/openshift-cherrypick-robot
+      - --bw-allow-unused=dptp/openshift-ci-robot
+      - --bw-allow-unused=dptp/openshift-github-robots@redhat.com
+      - --bw-allow-unused=dptp/openshift-merge-robot
+      - --bw-allow-unused=dptp/openshift-publish-robot
+      - --bw-allow-unused=dptp/quay.io
+      - --bw-allow-unused=dptp/quay.io/multi-arch
       - --kubeconfig-dir=/etc/build-farm-credentials
       - --kubeconfig-suffix=config
       command:
@@ -2005,7 +2115,7 @@ periodics:
   cron: '@yearly'
   decorate: true
   extra_refs:
-  - base_ref: openshift-4.21
+  - base_ref: openshift-4.22
     org: openshift
     repo: ocp-build-data
   labels:
@@ -2020,7 +2130,7 @@ periodics:
       - --github-graphql-endpoint=http://ghproxy/graphql
       - --ocp-build-data-repo-dir=./
       - --create-prs=true
-      - --minor=21
+      - --minor=22
       - --pr-creation-ceiling=1000
       command:
       - /usr/bin/ocp-build-data-enforcer
@@ -2060,6 +2170,7 @@ periodics:
   spec:
     containers:
     - args:
+      - --upstream-branch=master
       - --github-token-path=/etc/github/oauth
       - --github-endpoint=http://ghproxy
       - --github-endpoint=https://api.github.com
@@ -2107,7 +2218,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250903-f49c6158b
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20251223-f0341d7b5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2139,7 +2250,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250903-f49c6158b
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20251223-f0341d7b5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2171,7 +2282,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20250903-f49c6158b
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20251223-f0341d7b5
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2259,8 +2370,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-image-service
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.15
-      - --future-release=ocm-2.15
+      - --current-release=ocm-2.16
+      - --future-release=ocm-2.16
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2304,8 +2415,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/cluster-api-provider-agent
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.15
-      - --future-release=ocm-2.15
+      - --current-release=ocm-2.16
+      - --future-release=ocm-2.16
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2349,8 +2460,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-installer
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.15
-      - --future-release=ocm-2.15
+      - --current-release=ocm-2.16
+      - --future-release=ocm-2.16
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2394,8 +2505,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-installer-agent
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.15
-      - --future-release=ocm-2.15
+      - --current-release=ocm-2.16
+      - --future-release=ocm-2.16
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2439,8 +2550,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-service
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.15
-      - --future-release=ocm-2.15
+      - --current-release=ocm-2.16
+      - --future-release=ocm-2.16
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2484,8 +2595,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-test-infra
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.15
-      - --future-release=ocm-2.15
+      - --current-release=ocm-2.16
+      - --future-release=ocm-2.16
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2639,6 +2750,7 @@ periodics:
       - --ignore=ran-telco5g/kpi-results
       - --ignore=jws-qe/interop-ocp-ci
       - --ignore=openshift-logging/extended-logging-tests-interop
+      - --ignore=Azure/ARO-HCP
       command:
       - ./hack/check-gh-automation.sh
       env:
@@ -2706,6 +2818,7 @@ periodics:
       - --ignore=rh-openjdk/jdkContainerOcpTests
       - --ignore=jws-qe/interop-ocp-ci
       - --ignore=red-hat-storage/rook
+      - --ignore=Azure/ARO-HCP
       command:
       - ./hack/check-gh-automation.sh
       env:
@@ -2839,7 +2952,7 @@ periodics:
         if [ -f "require_review" ]; then
             echo "review required"
             cat require_review
-            extra_flag="-pr-assignee dgoodwin,neisw,DennisPeriquet"
+            extra_flag="-pr-assignee xueqzhan,neisw,smg247"
             rm require_review
         else
             echo "review not required"
@@ -2930,7 +3043,7 @@ periodics:
         requests:
           cpu: 500m
 - agent: kubernetes
-  cluster: build10
+  cluster: app.ci
   cron: '@daily'
   decorate: true
   extra_refs:
@@ -2986,6 +3099,7 @@ periodics:
         #     "Status": {
         #       "header": {
         #         "member_id": 14942490142531888693,
+        #         "revision": 437385818,,
         #         ...
         #       },
         #       "leader": 11239076790641432752,
@@ -3041,10 +3155,10 @@ periodics:
             if [[ $compacted -eq 0 ]]; then
                 echo "Compacting $pod_name - $ip"
                 oc -n openshift-etcd exec pod/"$pod_name" -- sh -c 'unset ETCDCTL_ENDPOINTS;
-                rev=$(ETCDCTL_API=3 etcdctl --insecure-skip-tls-verify=true --endpoints=:2379 endpoint status --write-out="json" | egrep -o '"revision":[0-9]*' | egrep -o '[0-9]*');
+                rev=$(ETCDCTL_API=3 etcdctl --insecure-skip-tls-verify=true --endpoints=:2379 endpoint status --write-out="json" | jq ".[0].Status.header.revision");
                 ETCDCTL_API=3 etcdctl compact $rev;'
                 compacted=1
-            else
+            fi
 
             # Defragment
             echo "Defragmenting $pod_name - $ip"

@@ -4,9 +4,24 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
+
+# Auto-detect namespace based on cluster version if not explicitly set
 if [[ -z "${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
-  echo "ERROR: INSTALL_NAMESPACE is not defined"
-  exit 1
+  MINOR_VERSION=$(echo $CLUSTER_VERSION | cut -d. -f2)
+
+  echo "Detected OpenShift version: ${CLUSTER_VERSION}"
+
+  # For OpenShift 4.20+, use openshift-lvm-storage, otherwise use openshift-storage
+  if [[ ${MINOR_VERSION} -ge 20 ]]; then
+    LVM_OPERATOR_SUB_INSTALL_NAMESPACE="openshift-lvm-storage"
+  else
+    LVM_OPERATOR_SUB_INSTALL_NAMESPACE="openshift-storage"
+  fi
+
+  echo "Auto-detected namespace: ${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
+else
+  echo "Using explicitly set namespace: ${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
 fi
 
 if [[ -z "${LVM_OPERATOR_SUB_PACKAGE}" ]]; then
@@ -15,8 +30,9 @@ if [[ -z "${LVM_OPERATOR_SUB_PACKAGE}" ]]; then
 fi
 
 if [[ -z "${LVM_OPERATOR_SUB_CHANNEL}" ]]; then
-  echo "ERROR: CHANNEL is not defined"
-  exit 1
+  echo "CHANNEL is not defined, use the channel for current cluster version"
+  LVM_OPERATOR_SUB_CHANNEL="stable-${CLUSTER_VERSION}"
+  echo "Set LVM_OPERATOR_SUB_CHANNEL to: ${LVM_OPERATOR_SUB_CHANNEL}"
 fi
 
 if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_SUB_CHANNEL" ]]; then
@@ -27,7 +43,7 @@ echo "$LVM_OPERATOR_SUB_CHANNEL"
 if [[ "${LVM_SUB_TARGET_NAMESPACES}" == "!install" ]]; then
   LVM_SUB_TARGET_NAMESPACES="${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
 fi
-echo "Installing ${LVM_OPERATOR_SUB_PACKAGE} from ${LVM_OPERATOR_SUB_CHANNEL} into ${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
+echo "Installing ${LVM_OPERATOR_SUB_PACKAGE} from channel: ${LVM_OPERATOR_SUB_CHANNEL} in source: ${LVM_OPERATOR_SUB_SOURCE} into ${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
 
 # create the install namespace
 oc apply -f - <<EOF

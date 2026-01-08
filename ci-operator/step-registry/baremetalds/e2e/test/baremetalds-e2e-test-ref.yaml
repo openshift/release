@@ -11,6 +11,11 @@ ref:
     limits:
       memory: 12Gi
   env:
+  - name: SKIP_READINESS_CHECKS
+    default: "false"
+    documentation: |-
+      If set to "true", skips the checks for nodes & cluster operators to be ready before running the test suite.
+      This is useful for testing the cluster in a degraded state.
   - name: ARCHITECTURE
     default: "amd64"
     documentation: Set the architecturefor
@@ -117,6 +122,13 @@ ref:
       "[sig-node] ConfigMap should fail to create ConfigMap with empty key [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
       "[sig-scheduling] LimitRange should create a LimitRange with defaults and ensure pod has those defaults applied. [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
     documentation: This is a minimal list of working tests to be used when test images mirroring is not supported by openshift-test (baremetal ipi only)
+  - name: ENABLE_HYPERVISOR_SSH_CONFIG
+    default: "false"
+    documentation: |-
+      When set to true, passes hypervisor SSH configuration to openshift-tests via the
+      --with-hypervisor-json flag. This is required for tests that need to interact with
+      the hypervisor host (e.g., two-node fencing tests). The configuration includes the
+      hypervisor IP, SSH user, and private key path.
   dependencies:
   - name: "release:latest"
     env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE

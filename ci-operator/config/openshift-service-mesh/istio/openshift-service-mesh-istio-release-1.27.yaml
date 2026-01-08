@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.19"
+    name: "4.20"
     namespace: ocp
     tag: cli
 build_root:
@@ -13,8 +13,8 @@ releases:
   latest:
     release:
       architecture: multi
-      channel: candidate
-      version: "4.19"
+      channel: stable
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -34,7 +34,6 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-  timeout: 1h0m0s
 - as: gencheck
   steps:
     cluster_profile: ossm-aws
@@ -123,16 +122,20 @@ tests:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 2h0m0s
+      timeout: 3h0m0s
     workflow: servicemesh-istio-e2e-hypershift
 - as: integ-helm
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.27
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: Istio Integration helm
       XDG_CACHE_HOME: /tmp/cache
     test:
     - as: copy-src
@@ -156,6 +159,9 @@ tests:
         cleanup() {
           echo "Copying artifacts..."
           oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+          # share artifacts with next job step which is uploading results to report portal
+          echo "Copying artifacts to SHARED_DIR..."
+          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
         }
         trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" <<EOF
@@ -180,7 +186,7 @@ tests:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 2h0m0s
+      timeout: 3h0m0s
     workflow: servicemesh-istio-e2e-hypershift
 - as: integ-security
   steps:
@@ -188,9 +194,13 @@ tests:
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.27
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: Istio Integration security
       XDG_CACHE_HOME: /tmp/cache
     test:
     - as: copy-src
@@ -214,6 +224,9 @@ tests:
         cleanup() {
           echo "Copying artifacts..."
           oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+          # share artifacts with next job step which is uploading results to report portal
+          echo "Copying artifacts to SHARED_DIR..."
+          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
         }
         trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -237,16 +250,20 @@ tests:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 2h0m0s
+      timeout: 3h0m0s
     workflow: servicemesh-istio-e2e-hypershift
 - as: integ-pilot
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.27
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: Istio Integration pilot
       XDG_CACHE_HOME: /tmp/cache
     test:
     - as: copy-src
@@ -270,6 +287,9 @@ tests:
         cleanup() {
           echo "Copying artifacts..."
           oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+          # share artifacts with next job step which is uploading results to report portal
+          echo "Copying artifacts to SHARED_DIR..."
+          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
         }
         trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -282,8 +302,7 @@ tests:
           cd /work && \
           entrypoint \
           prow/integ-suite-ocp.sh \
-          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway' 'gatewayinstance'"
-          # TestGatewayInstance should be fixed in https://issues.redhat.com/browse/OSSM-10830
+          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway'"
           # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6316
       env:
       - name: MAISTRA_NAMESPACE
@@ -295,16 +314,20 @@ tests:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 2h0m0s
+      timeout: 3h0m0s
     workflow: servicemesh-istio-e2e-hypershift
 - as: integ-telemetry
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.27
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: Istio Integration telemetry
       XDG_CACHE_HOME: /tmp/cache
     test:
     - as: copy-src
@@ -328,6 +351,9 @@ tests:
         cleanup() {
           echo "Copying artifacts..."
           oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+          # share artifacts with next job step which is uploading results to report portal
+          echo "Copying artifacts to SHARED_DIR..."
+          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
         }
         trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -351,16 +377,20 @@ tests:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 2h0m0s
+      timeout: 3h0m0s
     workflow: servicemesh-istio-e2e-hypershift
 - as: integ-ambient
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.27
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: Istio Integration ambient
       XDG_CACHE_HOME: /tmp/cache
     test:
     - as: copy-src
@@ -384,6 +414,9 @@ tests:
         cleanup() {
           echo "Copying artifacts..."
           oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+          # share artifacts with next job step which is uploading results to report portal
+          echo "Copying artifacts to SHARED_DIR..."
+          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
         }
         trap cleanup EXIT  # Ensure cleanup always runs when the script exits
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -398,7 +431,7 @@ tests:
           entrypoint \
           prow/integ-suite-ocp.sh \
           ambient 'TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestTCPRoute|TestTLSRoute'"
-        # TestTCPRoute and TestTLSRoute should be fixed in https://issues.redhat.com/browse/OSSM-10830
+          # TestTCPRoute|TestTLSRoute require experimental gateway API CRDs which are not available in OCP 4.19+ and it's not possible to install them manually
         # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-8725
       env:
       - name: MAISTRA_NAMESPACE
@@ -410,7 +443,7 @@ tests:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 2h0m0s
+      timeout: 3h0m0s
     workflow: servicemesh-istio-e2e-hypershift
 - as: update-istio-module
   commands: |
@@ -431,7 +464,6 @@ tests:
   secrets:
   - mount_path: /creds-github
     name: ossm-github-simple-job
-  timeout: 1h0m0s
 zz_generated_metadata:
   branch: release-1.27
   org: openshift-service-mesh

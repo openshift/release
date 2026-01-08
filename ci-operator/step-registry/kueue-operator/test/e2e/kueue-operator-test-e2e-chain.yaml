@@ -7,13 +7,15 @@ chain:
     commands: |
       source "${SHARED_DIR}/env"
       echo "Using Bundle Image: ${BUNDLE_IMAGE}"
-      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE"
+      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE" --security-context-config=restricted
     from: operator-sdk
     resources:
       requests:
         cpu: 200m
         memory: 300Mi
   - ref: kueue-operator-image-patch
+  - ref: jobset-install-operator
+  - ref: leader-worker-set-install-operator
   - as: e2e-kueue
     cli: latest
     env:
@@ -26,8 +28,8 @@ chain:
     from: kueue-operator-src
     resources:
       requests:
-        cpu: 300m
-        memory: 500Mi
+        cpu: "4"
+        memory: "4Gi"
   - as: e2e-kueue-upstream
     cli: latest
     commands: |
@@ -36,7 +38,7 @@ chain:
     from: kueue-operator-src
     resources:
       requests:
-        cpu: 300m
-        memory: 500Mi
+        cpu: "4"
+        memory: "4Gi"
   documentation: |-
     This chain runs the e2e test suites for The Kueue operator.

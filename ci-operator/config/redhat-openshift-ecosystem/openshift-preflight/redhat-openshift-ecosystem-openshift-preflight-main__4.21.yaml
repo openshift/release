@@ -1,0 +1,97 @@
+binary_build_commands: |
+  unset GOFLAGS
+  make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.21
+images:
+- dockerfile_literal: |
+    FROM registry.access.redhat.com/ubi9/ubi:latest
+
+    RUN cat /etc/os-release
+    ARG OPERATOR_SDK_VERSION=1.40.0
+    ARG ARCH=amd64
+
+    ADD openshift-preflight /src
+    ADD preflight /src/preflight
+
+    RUN dnf install -y make \
+      jq \
+      bzip2 \
+      gzip \
+      iptables \
+      findutils \
+      git \
+      && dnf clean all
+
+    RUN curl -Lo /usr/local/bin/operator-sdk https://github.com/operator-framework/operator-sdk/releases/download/v${OPERATOR_SDK_VERSION}/operator-sdk_linux_${ARCH} \
+      && chmod 755 /usr/local/bin/operator-sdk
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-openshift-ecosystem/openshift-preflight/preflight
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-openshift-ecosystem/openshift-preflight
+  to: preflight-bin
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: rh-openshift-ecosystem
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  steps:
+    env:
+      CHANGE_CHANNEL_BASE: candidate
+      CINCINNATI_URL: https://api.integration.openshift.com/api/upgrades_info/graph
+    post:
+    - ref: gather-must-gather
+    pre:
+    - ref: ipi-install-rbac
+    - ref: openshift-configure-cincinnati
+    - ref: operator-pipelines-preflight-prod-approve-csrs
+    - ref: operator-pipelines-preflight-prod-operator-registry-cache-fix
+    test:
+    - as: e2e
+      commands: |
+        unset GOFLAGS
+        cd src
+        PREFLIGHT_E2E_ARTIFACTS=$(mktemp --directory)
+        echo "placeholder" >> ${PREFLIGHT_E2E_ARTIFACTS}/placeholder
+        echo "== pull request sha under test =="
+        echo ${PULL_PULL_SHA} | tee ${ARTIFACT_DIR}/pull-request-sha.txt
+        echo "== preflight version - this includes the merge pr for this commit =="
+        ./preflight --version | tee ${ARTIFACT_DIR}/preflight-version.txt
+        echo "== operator-sdk version =="
+        operator-sdk version | tee ${ARTIFACT_DIR}/operator-sdk-version.txt
+        git log --oneline | head > ${ARTIFACT_DIR}/git-log-last-ten.txt
+        git rev-parse HEAD > ${ARTIFACT_DIR}/git-rev-parse-head.txt
+        make test-e2e ARTIFACTS_DIR=${PREFLIGHT_E2E_ARTIFACTS}
+        mv --verbose "${PREFLIGHT_E2E_ARTIFACTS}"/* ${ARTIFACT_DIR}/
+      from: preflight-bin
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: main
+  org: redhat-openshift-ecosystem
+  repo: openshift-preflight
+  variant: "4.21"

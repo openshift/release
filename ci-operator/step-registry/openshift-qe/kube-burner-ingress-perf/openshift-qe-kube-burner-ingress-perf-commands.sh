@@ -56,9 +56,8 @@ sleep 300
 # Run ingress-perf
 popd
 pushd e2e-benchmarking/workloads/ingress-perf
-ES_INDEX="ingress-performance" ./run.sh &> "${ARTIFACT_DIR}"/ingress-perf-run.log &
+ES_INDEX="ingress-performance" WORKLOAD="ingress-perf" ./run.sh &> "${ARTIFACT_DIR}"/ingress-perf-run.log &
 WORKLOAD_PIDS["ingress-perf"]=$!
-#ingress_perf_pid=$!
 
 function check_pids(){
     pid_rc=$1
@@ -89,23 +88,6 @@ wait -n -p ended_pid
 ended_pid_rc=$?
 #shellcheck disable=SC2154
 check_pids $ended_pid_rc $ended_pid
-
-NODE_DENSITY_HEAVY_UUID=$(grep 'uuid"' "${ARTIFACT_DIR}/$WORKLOAD-run.log" | cut -d'"' -f 4)
-INGRESS_PERF_UUID=$(grep 'uuid"' "${ARTIFACT_DIR}/ingress-perf-run.log" | cut -d'"' -f 4)
-
-echo "===> $WORKLOAD UUID $NODE_DENSITY_HEAVY_UUID"
-echo "===> ingress-perf UUID $INGRESS_PERF_UUID"
-
-if [[ -d "/tmp/$NODE_DENSITY_HEAVY_UUID" &&  -f "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json" ]]; then
-    jq ".iterations = $PODS_PER_NODE"  >> "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json"
-    cp "/tmp/$NODE_DENSITY_HEAVY_UUID"/index_data.json "${ARTIFACT_DIR}/${WORKLOAD}-index_data.json"
-    cp "/tmp/$NODE_DENSITY_HEAVY_UUID/index_data.json" "${SHARED_DIR}/${WORKLOAD}-index_data.json"
-fi
-
-if [[ -d "/tmp/$INGRESS_PERF_UUID" && -f "/tmp/$INGRESS_PERF_UUID/index_data.json" ]]; then
-    cp "/tmp/$INGRESS_PERF_UUID/index_data.json" "${ARTIFACT_DIR}/ingress-perf-index_data.json"
-    cp "/tmp/$INGRESS_PERF_UUID/index_data.json" "${SHARED_DIR}/ingress-perf-index_data.json"
-fi
 
 echo "######## $WORKLOAD run logs ########"
 cat  "${ARTIFACT_DIR}/$WORKLOAD-run.log"

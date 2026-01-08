@@ -6,19 +6,37 @@ ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 REPORT_DIR=/tmp/artifacts/
 PROJECT_DIR="/tmp"
 
-echo "Create group_vars directory"
-mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/group_vars"
+# backwards compatibility for process inventory step
+if [[ -f "${SHARED_DIR}/process-inventory-completed" ]]; then
+  echo "Copy inventory files"
+  mkdir -pv ${ECO_CI_CD_INVENTORY_PATH}/group_vars
+  mkdir -pv ${ECO_CI_CD_INVENTORY_PATH}/host_vars
 
-echo "Copy group inventory files"
-# shellcheck disable=SC2154
-cp "${SHARED_DIR}/all" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all"
-cp "${SHARED_DIR}/bastions" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/bastions"
+  for file in ${SHARED_DIR}/*; do 
+      if [[ "$file" == *"group_vars_"* || "$file" == *"host_vars_"* ]]; then
+          DEST_DIR=$( basename $file | cut -d'_' -f1,2 )
+          DEST_FILE=$( basename $file | cut -d'_' -f3 )
+          cp $file ${ECO_CI_CD_INVENTORY_PATH}/$DEST_DIR/$DEST_FILE
+      fi
+  done
+else
 
-echo "Create host_vars directory"
-mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/host_vars"
+  echo "Create group_vars directory"
+  mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/group_vars"
 
-echo "Copy host inventory files"
-cp "${SHARED_DIR}/bastion" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/bastion"
+  echo "Copy group inventory files"
+  # shellcheck disable=SC2154
+  cp "${SHARED_DIR}/all" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all"
+  cp "${SHARED_DIR}/bastions" "${ECO_CI_CD_INVENTORY_PATH}/group_vars/bastions"
+
+  echo "Create host_vars directory"
+  mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/host_vars"
+
+  echo "Copy host inventory files"
+  cp "${SHARED_DIR}/bastion" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/bastion"
+
+fi
+
 
 echo "Set CLUSTER_NAME env var"
 if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
@@ -50,14 +68,16 @@ ansible-playbook ./playbooks/compute/deploy-nto-gotest.yml -i ./inventories/ocp-
 echo "Run NTO gotests via SSH (playbook creates files on bastion, not locally)"
 
 echo "Set bastion ssh configuration"
-grep ansible_ssh_private_key -A 100 "${SHARED_DIR}/all" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "${PROJECT_DIR}/temp_ssh_key"
+grep ansible_ssh_private_key -A 100 "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "${PROJECT_DIR}/temp_ssh_key"
 
 chmod 600 "${PROJECT_DIR}/temp_ssh_key"
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
 
 echo "Run compute-nto eco-gotests via ssh tunnel"
-timeout -s 9 5h ssh \
+# Temporarily disable set -e to capture SSH exit code
+set +e
+timeout -s 9 "${ECO_GOTESTS_SSH_TIMEOUT}" ssh \
   -o ServerAliveInterval=60 \
   -o ServerAliveCountMax=3 \
   -o StrictHostKeyChecking=no \
@@ -75,7 +95,20 @@ echo "--------------------------------------------------"
 echo
 cd /tmp/gotest && ./run_gotests.sh || true
 EOF
+ssh_ret=$?
+# Re-enable set -e for the rest of the script
+set -e
 set +x
+if [[ $ssh_ret -ne 0 ]]; then
+    echo
+    echo "-------------------------------------------------------------"
+    echo "[WARNING] The test script exited with $ssh_ret from ssh!!!!"
+    echo "-------------------------------------------------------------"
+    echo "The step will continue to run but the test results"
+    echo "might not be available or might be incomplete."
+    echo "-------------------------------------------------------------"
+    echo
+fi
 
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${PROJECT_DIR}/temp_ssh_key \
   "${BASTION_USER}@${BASTION_IP}":"${REPORT_DIR}/*.xml" "${ARTIFACT_DIR}/junit_eco_gotests/"
@@ -94,5 +127,12 @@ done
 
 ls -la "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml
 
-echo "Copy junit test reports to shared directory for reporter step"
-cp -v "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml "${SHARED_DIR}/" 2>/dev/null || echo "No junit test reports found to copy to SHARED_DIR"
+
+if ls ${ARTIFACT_DIR}/junit_eco_gotests/*.xml 1> /dev/null 2>&1; then
+  echo "Copy junit test reports to shared directory for reporter step"
+  cp -v "${ARTIFACT_DIR}"/junit_eco_gotests/*.xml "${SHARED_DIR}/" 2>/dev/null
+  touch "${SHARED_DIR}/gotest-completed"
+else
+  echo "No junit test reports found to copy to SHARED_DIR"
+  exit 1
+fi

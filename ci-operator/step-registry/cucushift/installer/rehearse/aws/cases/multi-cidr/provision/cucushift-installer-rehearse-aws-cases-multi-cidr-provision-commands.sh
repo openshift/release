@@ -21,6 +21,28 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION=${LEASED_RESOURCE}
 
 
+function patch_legcy_subnets()
+{
+    local config=$1
+    shift
+    for subnet in "$@"; do
+        export subnet
+        yq-v4 eval -i '.platform.aws.subnets += [env(subnet)]' ${config}
+        unset subnet
+    done
+}
+
+function patch_new_subnet_with_roles()
+{
+    local config=$1
+    local subnet=$2
+    shift 2
+    roles=$(echo "$@" | yq-v4 -o yaml 'split(" ") | map({"type": .})')
+    export subnet roles
+    yq-v4 eval -i '.platform.aws.vpc.subnets += [{"id": env(subnet), "roles": env(roles)}]' ${config}
+    unset subnet roles
+}
+
 # -----------------------------------------
 # Create VPC with multi CIDR
 # -----------------------------------------
@@ -432,9 +454,8 @@ pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 function create_install_config()
 {
   local cluster_name=$1
-  local subnet_file=$2
-  local machine_cidr=$3
-  local install_dir=$4
+  local machine_cidr=$2
+  local install_dir=$3
 
   cat > ${install_dir}/install-config.yaml << EOF
 apiVersion: v1
@@ -465,7 +486,6 @@ networking:
 platform:
   aws:
     region: ${REGION}
-    subnets: $(cat "${subnet_file}")
 publish: External
 pullSecret: >
   ${pull_secret}
@@ -507,18 +527,39 @@ install_dir2=/tmp/${cluster_name2}
 mkdir -p ${install_dir1} 2>/dev/null
 mkdir -p ${install_dir2} 2>/dev/null
 
-subnet_file1=/tmp/subnet1
-subnet_file2=/tmp/subnet2
+create_install_config $cluster_name1 "${cluster_cidr1}" $install_dir1
+create_install_config $cluster_name2 "${cluster_cidr2}" $install_dir2
 
-# format: 
-#  ['subnet-017437c760cf617a0','subnet-01febfaef930e48f1']
-jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetsIdsForCidr2")).OutputValue | split(",")[]]' "${SHARED_DIR}/vpc_stack_output" | sed "s/\"/'/g" > ${subnet_file1}
-jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetsIdsForCidr3")).OutputValue | split(",")[]]' "${SHARED_DIR}/vpc_stack_output" | sed "s/\"/'/g" > ${subnet_file2}
+subnet_1_priv=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetsIdsForCidr2")).OutputValue | split(",")[0]' "${SHARED_DIR}/vpc_stack_output")
+subnet_1_pub=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetsIdsForCidr2")).OutputValue | split(",")[1]' "${SHARED_DIR}/vpc_stack_output")
+subnet_2_priv=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetsIdsForCidr3")).OutputValue | split(",")[0]' "${SHARED_DIR}/vpc_stack_output")
+subnet_2_pub=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetsIdsForCidr3")).OutputValue | split(",")[1]' "${SHARED_DIR}/vpc_stack_output")
 
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
+# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
+# so that the credentials of the build farm registry can be saved in docker client config file.
+# A direct connection is required while communicating with build-farm, instead of through proxy
+KUBECONFIG="" oc --loglevel=8 registry login
+ocp_version=$(oc adm release info ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+echo "OCP Version: $ocp_version"
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
-
-create_install_config $cluster_name1 ${subnet_file1} "${cluster_cidr1}" $install_dir1
-create_install_config $cluster_name2 ${subnet_file2} "${cluster_cidr2}" $install_dir2
+if (( ocp_minor_version <= 18 && ocp_major_version == 4 )); then
+    patch_legcy_subnets ${install_dir1}/install-config.yaml ${subnet_1_priv}
+    patch_legcy_subnets ${install_dir1}/install-config.yaml ${subnet_1_pub}
+    patch_legcy_subnets ${install_dir2}/install-config.yaml ${subnet_2_priv}
+    patch_legcy_subnets ${install_dir2}/install-config.yaml ${subnet_2_pub}
+else
+    patch_new_subnet_with_roles ${install_dir1}/install-config.yaml ${subnet_1_priv} ClusterNode ControlPlaneInternalLB
+    patch_new_subnet_with_roles ${install_dir1}/install-config.yaml ${subnet_1_pub} IngressControllerLB ControlPlaneExternalLB BootstrapNode
+    patch_new_subnet_with_roles ${install_dir2}/install-config.yaml ${subnet_2_priv} ClusterNode ControlPlaneInternalLB
+    patch_new_subnet_with_roles ${install_dir2}/install-config.yaml ${subnet_2_pub} IngressControllerLB ControlPlaneExternalLB BootstrapNode
+fi
 
 function save_artifacts()
 {
@@ -590,31 +631,37 @@ sg_api_lb2=${infra_id2}-apiserver-lb
 sg_cp1=${infra_id1}-controlplane
 sg_cp2=${infra_id2}-controlplane
 
+sg_node1=${infra_id1}-node
+sg_node2=${infra_id2}-node
 
 
 # -------------------------------------------------------------------------------------
-# check apiserver-lb sg, expect cidr ip is the same as machine cidr for port 22623
+# check apiserver-lb sg, expect node and controlplane SGs attached.
+# https://github.com/openshift/installer/pull/9689
+#  CidrBlocks:  []string{capiutils.CIDRFromInstallConfig(ic).String()},
+#  is now replaced by
+#  SourceSecurityGroupRoles: []capa.SecurityGroupRole{"node", "controlplane"},
 # -------------------------------------------------------------------------------------
 
-# Cluster 1 MCS internal traffic from cluster, expect ${cluster_cidr1}
-cidr_ip1=$(cat $sg_info1 | jq --arg sg_api_lb  $sg_api_lb1 -r '.SecurityGroups[] | select(any(.Tags[]; .Key == "Name" and .Value == $sg_api_lb)) | .IpPermissions[] | select(.FromPort==22623 and .ToPort==22623) | .IpRanges[0].CidrIp')
+# ["sg-03cf2e2a438489edb","sg-03e0948e09fdf7dbe"]
+h1=$(cat $sg_info1 | jq -c --arg sg_api_lb  $sg_api_lb1 -r '[.SecurityGroups[] | select(any(.Tags[]; .Key == "Name" and .Value == $sg_api_lb)) | .IpPermissions[] | select(.FromPort==22623 and .ToPort==22623) | .UserIdGroupPairs[].GroupId] | sort' | md5sum | awk '{print $1}')
+h2=$(cat $sg_info1 | jq -c --arg sg_node $sg_node1 --arg sg_cp $sg_cp1 -r '[.SecurityGroups[] | select(any(.Tags[]; .Key == "Name" and .Value == $sg_node) or any(.Tags[]; .Key == "Name" and .Value == $sg_cp)) | .GroupId] | sort' | md5sum | awk '{print $1}')
 
-if [ ${cidr_ip1} != "${cluster_cidr1}" ]; then
-  echo "Error: cluster 1 apiserver-lb sg: except ${cluster_cidr1} for port 22623, but got ${cidr_ip1}"
-  ret=$((ret+1))
+if [[ "${h1}" != "${h2}" ]]; then
+    echo "Error: cluster 1 apiserver-lb sg: except $sg_cp1 and $sg_node1 attached to apiserver-lb sg in port 22623, please check."
+    ret=$((ret+1))
 else
-  echo "Pass: cluster 1 apiserver-lb sg: ${cluster_cidr1} for port 22623"
+    echo "Pass: cluster 1 apiserver-lb sg: $sg_cp1 and $sg_node1 attached to apiserver-lb sg in port 22623."
 fi
 
+h1=$(cat $sg_info2 | jq -c --arg sg_api_lb  $sg_api_lb2 -r '[.SecurityGroups[] | select(any(.Tags[]; .Key == "Name" and .Value == $sg_api_lb)) | .IpPermissions[] | select(.FromPort==22623 and .ToPort==22623) | .UserIdGroupPairs[].GroupId] | sort' | md5sum | awk '{print $1}')
+h2=$(cat $sg_info2 | jq -c --arg sg_node $sg_node2 --arg sg_cp $sg_cp2 -r '[.SecurityGroups[] | select(any(.Tags[]; .Key == "Name" and .Value == $sg_node) or any(.Tags[]; .Key == "Name" and .Value == $sg_cp)) | .GroupId] | sort' | md5sum | awk '{print $1}')
 
-# Cluster 1 MCS internal traffic from cluster, expect ${cluster_cidr2}
-cidr_ip2=$(cat $sg_info2 | jq --arg sg_api_lb  $sg_api_lb2 -r '.SecurityGroups[] | select(any(.Tags[]; .Key == "Name" and .Value == $sg_api_lb)) | .IpPermissions[] | select(.FromPort==22623 and .ToPort==22623) | .IpRanges[0].CidrIp')
-
-if [ ${cidr_ip2} != "${cluster_cidr2}" ]; then
-  echo "Error: cluster 2 apiserver-lb sg: except ${cluster_cidr2} for port 22623, but got ${cidr_ip2}"
-  ret=$((ret+1))
+if [[ "${h1}" != "${h2}" ]]; then
+    echo "Error: cluster 2 apiserver-lb sg: except $sg_cp2 and $sg_node2 attached to apiserver-lb sg in port 22623, please check."
+    ret=$((ret+1))
 else
-  echo "Pass: cluster 2 apiserver-lb sg: ${cluster_cidr2} for port 22623"
+    echo "Pass: cluster 2 apiserver-lb sg: $sg_cp2 and $sg_node2 attached to apiserver-lb sg in port 22623."
 fi
 
 # -------------------------------------------------------------------------------------
@@ -900,6 +947,11 @@ if [[ -f ${install_dir1}/auth/kubeconfig ]]; then
   export KUBECONFIG=${install_dir1}/auth/kubeconfig
   health_check
   health_ret=$?
+  if [ "${health_ret}" == "0" ]; then
+    echo "PASS: Health chcek for cluster 1"
+  else
+    echo "ERROR: Health chcek for cluster 1"
+  fi
   ret=$((ret+health_ret))
 else
   echo "Error: no kubeconfig found for cluster 1"
@@ -912,6 +964,11 @@ if [[ -f ${install_dir2}/auth/kubeconfig ]]; then
   export KUBECONFIG=${install_dir2}/auth/kubeconfig
   health_check
   health_ret=$?
+  if [ "${health_ret}" == "0" ]; then
+    echo "PASS: Health chcek for cluster 2"
+  else
+    echo "ERROR: Health chcek for cluster 2"
+  fi
   ret=$((ret+health_ret))
 else
   echo "Error: no kubeconfig found for cluster 2"

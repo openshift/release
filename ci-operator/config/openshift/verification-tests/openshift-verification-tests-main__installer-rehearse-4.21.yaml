@@ -65,58 +65,39 @@ tests:
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
-      AZURE_COMPUTE_MULTIDISK_MOUNT_PATH: /var/lib/containers
-      AZURE_COMPUTE_MULTIDISK_TYPE: user-defined
-      AZURE_CONTROL_PLANE_MULTIDISK_TYPE: etcd
+      AZURE_BYO_COMPUTE_SUBNETS_NUMBER: "4"
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FEATURE_GATES: '[''AzureMultiDisk=true'', ''MultiDiskSetup=true'']'
-      FEATURE_SET: CustomNoUpgrade
-    workflow: cucushift-installer-rehearse-azure-ipi-multidisk
-- as: installer-rehearse-ibmcloud
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: ibmcloud-qe
-    env:
-      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build06.ci.openshift.org/ci-ln-7d9xkg2/release:latest
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-sno
+      CUSTOM_AZURE_REGION: centralus
+      OUTBOUND_TYPE: NATGatewayMultiZone
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway-byo-subnets
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa@openshift-qe.iam.gserviceaccount.com
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa@openshift-qe.iam.gserviceaccount.com
-      PRE_CREATE_PRIVATE_ZONE: "no"
-      PRIVATE_ZONE_PROJECT: openshift-qe-regional
-    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone-private
-- as: installer-rehearse-gcp-dedicated-dns-project
+      MINIMAL_PERMISSIONS_WITHOUT_FIREWALL_PROVISION: "yes"
+      SLEEP_DURATION: 10m
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-gcp-ipi-byo-fw-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-gcp-ipi-byo-fw-provision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+- as: installer-rehearse-gcp-wif
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
-      PRIVATE_ZONE_PROJECT: openshift-qe-regional
-    workflow: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-byo-hosted-zone
-- as: installer-rehearse-ibmcloud-dis
-  cron: '@yearly'
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: ibmcloud-qe-2
-    env:
-      MIRROR_BIN: oc-mirror
-      SERVICE_ENDPOINT_COSConfig: DEFAULT_ENDPOINT
-      SERVICE_ENDPOINT_GlobalCatalog: DEFAULT_ENDPOINT
-      SLEEP_DURATION: 5h
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private-deprovision
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-disconnected-private
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      MINIMAL_PERMISSIONS_CCO_MANUAL_WITHOUT_FIREWALL_PROVISION: "yes"
+    workflow: cucushift-installer-rehearse-gcp-ipi-byo-fw-cco-manual-workload-identity
 - as: installer-rehearse-vsphere
   cron: '@yearly'
   steps:

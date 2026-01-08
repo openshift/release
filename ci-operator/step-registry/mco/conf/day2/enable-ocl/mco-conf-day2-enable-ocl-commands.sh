@@ -56,7 +56,7 @@ function debug_and_exit() {
     echo '####################################################'
     echo ''
     echo 'Builder pods logs'
-    run_command "oc logs pods -l machineconfiguration.openshift.io/on-cluster-layering"
+    run_command "oc logs -l machineconfiguration.openshift.io/on-cluster-layering"
     exit 255
 }
 

@@ -32,9 +32,9 @@ cp /go/src/github.com/openshift/openshift-tests-private/test/extended/operators/
 # use e2e-benchmarking
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 # LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
-# TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
-# git clone $REPO_URL $TAG_OPTION --depth 1
-git clone $REPO_URL --branch master --depth 1
+TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
+git clone $REPO_URL $TAG_OPTION --depth 1
+
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=olm LOG_LEVEL=debug 
 
@@ -45,14 +45,13 @@ EXTRA_FLAGS+=" --metrics-profile=${KUBE_DIR}/olm-metrics.yml,${KUBE_DIR}/extende
 
 export EXTRA_FLAGS ADDITIONAL_PARAMS ITERATIONS
 
-rm -f ${SHARED_DIR}/index.json
+if [[ "${LOG_LEVEL}" == "debug" ]]; then
+  echo "[DEBUG] ITERATIONS value = ${ITERATIONS:-<unset>}"
+  echo "[DEBUG] Searching ITERATIONS usage in run.sh"
+  grep -R "ITERATIONS" run.sh || echo "[DEBUG] ITERATIONS not referenced in run.sh"
+fi
+
 ./run.sh
-
-folder_name=$(ls -t -d /tmp/*/ | head -1)
-jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
-
-cp "${SHARED_DIR}"/index_data.json "${SHARED_DIR}"/${WORKLOAD}-index_data.json 
-cp "${SHARED_DIR}"/${WORKLOAD}-index_data.json  "${ARTIFACT_DIR}"/${WORKLOAD}-index_data.json
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)

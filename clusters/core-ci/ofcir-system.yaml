@@ -4,6 +4,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
     openshift.io/description: Ofcir CI
     openshift.io/display-name: Ofcir
   name: ofcir-system
@@ -374,11 +375,11 @@ spec:
           protocol: TCP
         resources:
           limits:
-            cpu: 500m
-            memory: 128Mi
+            cpu: 2m
+            memory: 96Mi
           requests:
-            cpu: 5m
-            memory: 64Mi
+            cpu: 2m
+            memory: 96Mi
       - args:
         - --health-probe-bind-address=:8081
         - --metrics-bind-address=127.0.0.1:8080
@@ -399,6 +400,13 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
+        resources:
+          limits:
+            cpu: 50m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 256Mi
         securityContext:
           allowPrivilegeEscalation: false
       - command:
@@ -411,11 +419,11 @@ spec:
           protocol: TCP
         resources:
           limits:
-            cpu: 500m
-            memory: 128Mi
+            cpu: 10m
+            memory: 96Mi
           requests:
             cpu: 10m
-            memory: 64Mi
+            memory: 96Mi
         securityContext:
           allowPrivilegeEscalation: false
       serviceAccountName: ofcir-controller-manager
@@ -449,3 +457,22 @@ subjects:
 - apiGroup: rbac.authorization.k8s.io
   kind: Group
   name: ofcir-admin
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: ofcir-route
+  namespace: ofcir-system
+  labels:
+    internal: "true"
+  annotations:
+    haproxy.router.openshift.io/ip_allowlist: 10.29.0.0/18 10.28.64.0/18
+spec:
+  host: ofcir.apps-int.master.ci.devcluster.openshift.com
+  to:
+    kind: Service
+    name: ofcir-service
+  port:
+    targetPort: https
+  tls:
+    termination: passthrough

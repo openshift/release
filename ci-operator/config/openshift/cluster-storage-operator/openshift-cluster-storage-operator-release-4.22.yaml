@@ -7,28 +7,29 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.20_base-rhel9:
+  ocp_4.22_base-rhel9:
     name: "4.22"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.22
 build_root:
   from_repository: true
 images:
 - inputs:
-    ocp_4.20_base-rhel9:
+    ocp_4.22_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: cluster-storage-operator
 promotion:
   to:
-  - name: "4.22"
+  - disabled: true
+    name: "4.22"
     namespace: ocp
 releases:
   initial:
@@ -76,9 +77,10 @@ tests:
     workflow: openshift-upgrade-aws
 - as: e2e-aws-csi
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-csi
-- as: e2e-gcp-manual-oidc
+- always_run: false
+  as: e2e-gcp-manual-oidc
   optional: true
   steps:
     cluster_profile: gcp
@@ -130,12 +132,14 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi-file
-- as: e2e-ibmcloud-csi
+- always_run: false
+  as: e2e-ibmcloud-csi
   optional: true
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud-csi
-- as: e2e-openstack
+- always_run: false
+  as: e2e-openstack
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -143,7 +147,8 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-parallel
+- always_run: false
+  as: e2e-openstack-parallel
   optional: true
   steps:
     cluster_profile: openstack-vexxhost

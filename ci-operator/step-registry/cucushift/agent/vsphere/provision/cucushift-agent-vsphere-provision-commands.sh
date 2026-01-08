@@ -97,7 +97,7 @@ for ((i = 0; i < total_host; i++)); do
   vm_name=${hostnames[$i]}
   echo "creating Vm $vm_name.."
   /tmp/govc vm.create \
-    -m=16384 \
+    -m=32768 \
     -g=coreos64Guest \
     -c=${cpu} \
     -disk=120GB \

@@ -43,6 +43,13 @@ echo "get ocp version: ${version}"
 rm pull-secret
 popd
 
+if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+  echo "Using default value: ${BASE_DOMAIN}"
+  AZURE_BASE_DOMAIN="${BASE_DOMAIN}"
+else
+  AZURE_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
+fi
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 REGION="${LEASED_RESOURCE}"
@@ -80,7 +87,7 @@ echo "Using compute node replicas: ${workers}"
 echo "Using controlPlane node replicas: ${master_replicas}"
 
 cat >> "${CONFIG}" << EOF
-baseDomain: ${BASE_DOMAIN}
+baseDomain: ${AZURE_BASE_DOMAIN}
 platform:
   azure:
     region: ${REGION}
@@ -103,7 +110,9 @@ EOF
 if [ -z "${OUTBOUND_TYPE}" ]; then
   echo "Outbound Type is not defined"
 else
-  if [ X"${OUTBOUND_TYPE}" == X"UserDefinedRouting" ] || [ X"${OUTBOUND_TYPE}" == X"NATGatewaySingleZone" ] || [ X"${OUTBOUND_TYPE}" == X"NatGateway" ]; then
+  OUTBOUND_TYPE_VALUE="UserDefinedRouting NATGatewaySingleZone NATGatewayMultiZone NatGateway"
+  #shellcheck disable=SC2076
+  if [[ " ${OUTBOUND_TYPE_VALUE} " =~ " ${OUTBOUND_TYPE} " ]]; then
     echo "Writing 'outboundType: ${OUTBOUND_TYPE}' to install-config"
     PATCH="${SHARED_DIR}/install-config-outboundType.yaml.patch"
     cat > "${PATCH}" << EOF
@@ -113,7 +122,7 @@ platform:
 EOF
     yq-go m -x -i "${CONFIG}" "${PATCH}"
   else
-    echo "${OUTBOUND_TYPE} is not supported yet" || exit 1
+    echo "${OUTBOUND_TYPE} is not supported yet" && exit 1
   fi
 fi
 

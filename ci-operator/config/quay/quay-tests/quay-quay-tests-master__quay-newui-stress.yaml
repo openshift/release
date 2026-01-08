@@ -24,7 +24,7 @@ images:
       yum install -y ./google-chrome-stable_current_x86_64.rpm && \
       yum clean all && rm -rf /var/cache/yum/*
   from: src
-  to: quay-test-console
+  to: quay-newui-test
 releases:
   latest:
     candidate:
@@ -41,11 +41,11 @@ resources:
       memory: 200Mi
 tests:
 - as: quay-e2e-tests-quay312-ocp416-newui-stress
-  cron: 0 12 1 * *
+  cron: '@yearly'
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-quay-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       QUAY_INDEX_IMAGE_BUILD: brew.registry.redhat.io/rh-osbs/iib:864031
       QUAY_OPERATOR_CHANNEL: stable-3.13
@@ -55,7 +55,6 @@ tests:
     - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-test-quay-newui-stress
     workflow: cucushift-installer-rehearse-aws-ipi
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: master
   org: quay

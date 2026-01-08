@@ -1,0 +1,50 @@
+base_images:
+  aro-hcp-e2e-base-image:
+    name: aro-hcp-e2e-base
+    namespace: rh_ee_ves
+    tag: v1.0
+  prcreator:
+    name: prcreator
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
+images:
+- dockerfile_literal: |
+    FROM aro-hcp-e2e-base-image
+    RUN dnf install -y skopeo jq
+    RUN curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq &&\
+        chmod +x /usr/local/bin/yq
+    ADD prcreator /usr/bin/prcreator
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+  from: aro-hcp-e2e-base-image
+  inputs:
+    prcreator:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/prcreator
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/Azure/ARO-HCP
+  to: aro-hcp-automation-image-update
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- as: image-updater-tooling
+  cron: 0 2 * * 1-5
+  steps:
+    test:
+    - ref: aro-hcp-automation-image-update
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP
+  variant: image-updater

@@ -35,6 +35,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: gofmt
+  commands: |
+    make fmt
+    if ! git diff --stat --exit-code; then
+      echo 'error: found unformatted go files. Please run `make fmt`'
+      exit 1
+    fi
+  container:
+    from: src
 - as: check
   commands: GOFLAGS="" make test
   container:
@@ -44,7 +53,7 @@ tests:
 - as: sandboxed-containers-operator-e2e
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-2
     dependencies:
       OO_INDEX: ci-index-openshift-sandboxed-containers-operator-bundle
     env:

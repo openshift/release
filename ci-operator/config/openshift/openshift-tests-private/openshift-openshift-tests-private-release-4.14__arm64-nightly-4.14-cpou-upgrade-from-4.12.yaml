@@ -32,31 +32,31 @@ base_images:
     namespace: ocp
     tag: upi-installer
 releases:
-  intermediate-arm64:
+  arm64-intermediate:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
       version: "4.13"
+  arm64-latest:
+    release:
+      architecture: arm64
+      channel: candidate
+      version: "4.12"
+  arm64-target:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.14"
   latest:
     release:
       architecture: amd64
       channel: candidate
       version: "4.12"
-  latest-arm64:
-    release:
-      architecture: arm64
-      channel: candidate
-      version: "4.12"
   target:
     candidate:
       architecture: amd64
-      product: ocp
-      stream: nightly
-      version: "4.14"
-  target-arm64:
-    candidate:
-      architecture: arm64
       product: ocp
       stream: nightly
       version: "4.14"
@@ -71,7 +71,7 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-arm64
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
@@ -83,9 +83,9 @@ tests:
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
       - env: RELEASE_IMAGE_ARM64_INTERMEDIATE
-        name: release:intermediate-arm64
+        name: release:arm64-intermediate
       - env: RELEASE_IMAGE_ARM64_TARGET
-        name: release:target-arm64
+        name: release:arm64-target
       from: cli
       resources:
         requests:
@@ -100,7 +100,7 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-arm64
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       ARCHITECTURE: arm64
       NVME_DEVICE: /dev/nvme1n1
@@ -112,9 +112,9 @@ tests:
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
       - env: RELEASE_IMAGE_ARM64_INTERMEDIATE
-        name: release:intermediate-arm64
+        name: release:arm64-intermediate
       - env: RELEASE_IMAGE_ARM64_TARGET
-        name: release:target-arm64
+        name: release:arm64-target
       from: cli
       resources:
         requests:
