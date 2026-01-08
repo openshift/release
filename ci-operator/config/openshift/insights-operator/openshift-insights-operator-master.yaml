@@ -144,15 +144,17 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-ovn-techpreview
+- as: e2e-gcp-ovn-techpreview-debug
   steps:
     cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TIMEOUT: +12 hours
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
     test:
+    - ref: wait
     - as: test
       cli: latest
       commands: pytest.sh -m "not UI and (techpreview or tp_only) and not interval"
