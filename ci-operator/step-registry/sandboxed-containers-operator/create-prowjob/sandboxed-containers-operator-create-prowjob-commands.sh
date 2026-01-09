@@ -113,14 +113,6 @@ validate_and_set_defaults() {
 
     # OCP version to test
     OCP_VERSION="${OCP_VERSION:-4.19}"
-    # Validate OCP version format (X.Y or X.Y.Z)
-    if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
-        echo "ERROR: Invalid OCP_VERSION format. Expected format: X.Y or X.Y.Z (e.g., 4.19 or 4.20.6)"
-        exit 1
-    fi
-
-    # UPI installer version - always X.Y (major.minor only)
-    UPI_INSTALLER_VERSION=$(echo "${OCP_VERSION}" | cut -d'.' -f1,2)
 
     # OCP release channel (stable, fast, candidate, eus)
     OCP_CHANNEL="${OCP_CHANNEL:-fast}"
@@ -130,8 +122,27 @@ validate_and_set_defaults() {
         exit 1
     fi
 
-    # If a specific patch version (X.Y.Z) is requested, verify it exists in the channel
-    if [[ "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    # Validate OCP version format
+    # - X.Y (e.g., 4.19) - latest from channel
+    # - X.Y.Z (e.g., 4.20.6) - specific GA version
+    # - X.Y.Z-rc.N or X.Y.Z-ec.N (e.g., 4.21.0-rc.0) - pre-release, only with OCP_CHANNEL candidate
+    if [[ "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(rc|ec)\.[0-9]+$ ]]; then
+        # RC/EC version - require candidate channel
+        if [[ "${OCP_CHANNEL}" != "candidate" ]]; then
+            echo "ERROR: RC/EC versions (${OCP_VERSION}) require OCP_CHANNEL=candidate. Got: ${OCP_CHANNEL}"
+            exit 1
+        fi
+    elif [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+        echo "ERROR: Invalid OCP_VERSION format. Expected: X.Y, X.Y.Z, or X.Y.Z-rc.N/ec.N (with candidate channel)"
+        echo "Examples: 4.19, 4.20.6, 4.21.0-rc.0"
+        exit 1
+    fi
+
+    # UPI installer version - always X.Y (major.minor only)
+    UPI_INSTALLER_VERSION=$(echo "${OCP_VERSION}" | cut -d'.' -f1,2)
+
+    # If a specific version (X.Y.Z or X.Y.Z-rc.N/ec.N) is requested, verify it exists in the channel
+    if [[ "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(rc|ec)\.[0-9]+)?$ ]]; then
         if ! check_version_in_channel "${OCP_VERSION}" "${OCP_CHANNEL}"; then
             exit 1
         fi
@@ -266,8 +277,9 @@ show_usage() {
     echo ""
     echo "Environment variables for 'create' command:"
     echo "  ARO_CLUSTER_VERSION            - ARO cluster version (default: ${ARO_CLUSTER_VERSION})"
-    echo "  OCP_VERSION                    - OpenShift version (default: 4.19)"
+    echo "  OCP_VERSION                    - OpenShift version: X.Y, X.Y.Z, or X.Y.Z-rc.N/ec.N (default: 4.19)"
     echo "  OCP_CHANNEL                    - Release channel: stable, fast, candidate, eus (default: fast)"
+    echo "                                   Note: RC/EC versions require OCP_CHANNEL=candidate"
     echo "  TEST_RELEASE_TYPE              - Test release type: Pre-GA or GA (default: Pre-GA)"
     echo "  EXPECTED_OSC_VERSION           - Expected OSC version (default: 1.10.1)"
     echo "  INSTALL_KATA_RPM               - Install Kata RPM: true or false (default: true)"
