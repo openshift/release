@@ -16,6 +16,11 @@ set -o pipefail
 GANGWAY_API_ENDPOINT="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions"
 ARO_CLUSTER_VERSION="${ARO_CLUSTER_VERSION:-4.17}"
 
+# Tests-private fork configuration
+TESTS_PRIVATE_FORK_ORG="${TESTS_PRIVATE_FORK_ORG:-tbuskey}"
+TESTS_PRIVATE_FORK_BRANCH="${TESTS_PRIVATE_FORK_BRANCH:-beforeOTE}"
+TESTS_PRIVATE_FORK_ENABLED="${TESTS_PRIVATE_FORK_ENABLED:-false}"
+
 # Function to get latest OSC catalog tag
 get_latest_osc_catalog_tag() {
     local apiurl="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
@@ -283,6 +288,11 @@ show_usage() {
     echo "  OSC_CATALOG_TAG                - OSC catalog tag (auto-detected if not provided)"
     echo "  TRUSTEE_URL                    - Trustee URL (default: empty)"
     echo "  INITDATA                       - Initdata from Trustee(default: empty) The gzipped and base64 encoded initdata.toml file from Trustee"
+    echo ""
+    echo "Tests-private fork configuration:"
+    echo "  TESTS_PRIVATE_FORK_ENABLED     - Enable tests-private fork job: true or false (default: false)"
+    echo "  TESTS_PRIVATE_FORK_ORG         - GitHub org/user for openshift-tests-private fork (default: tbuskey)"
+    echo "  TESTS_PRIVATE_FORK_BRANCH      - Branch name in the fork (default: beforeOTE)"
 }
 
 # Main function
@@ -388,6 +398,47 @@ generate_workflow() {
   echo "  timeout: 24h0m0s"
 }
 
+# Generate the e2e-tests-private-fork workflow that clones and builds from a fork
+generate_tests_private_fork_workflow() {
+  local cron="0 0 31 2 1"
+
+  cat <<EOF
+- as: e2e-tests-private-fork
+  cron: ${cron}
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - as: test-from-fork
+      cli: latest
+      commands: |
+        # Clone your fork of openshift-tests-private
+        TESTS_PRIVATE_DIR="/go/src/github.com/openshift/openshift-tests-private"
+        mkdir -p "\$(dirname \${TESTS_PRIVATE_DIR})"
+        git clone --depth=1 --branch=${TESTS_PRIVATE_FORK_BRANCH} \\
+          https://github.com/${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private.git \\
+          "\${TESTS_PRIVATE_DIR}"
+        cd "\${TESTS_PRIVATE_DIR}"
+
+        # Build tests from your fork
+        make go-mod-tidy
+        make all
+
+        # Run sig-kata tests (dry-run example)
+        ./bin/extended-platform-tests run all \\
+          --dry-run \\
+          -o /tmp/results.txt
+      from: tests-private-builder
+      resources:
+        requests:
+          cpu: "3"
+          memory: 12Gi
+    workflow: cucushift-installer-rehearse-azure-ipi
+  timeout: 24h0m0s
+EOF
+}
+
 # Function to create prowjob configuration
 command_create() {
     echo "=========================================="
@@ -415,6 +466,19 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.21"
+EOF
+
+    # Add tests-private-builder base image only if fork is enabled
+    if [[ "${TESTS_PRIVATE_FORK_ENABLED}" == "true" ]]; then
+        cat >> "${OUTPUT_FILE}" <<EOF
+  tests-private-builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.22
+EOF
+    fi
+
+    cat >> "${OUTPUT_FILE}" <<EOF
   upi-installer:
     name: "${UPI_INSTALLER_VERSION}"
     namespace: ocp
@@ -439,6 +503,12 @@ generate_workflow aro azure-qe sandboxed-containers-operator-e2e-aro peerpods >>
 generate_workflow aro azure-qe sandboxed-containers-operator-e2e-aro coco >> "${OUTPUT_FILE}"
 generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws peerpods >> "${OUTPUT_FILE}"
 generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws coco >> "${OUTPUT_FILE}"
+
+# Generate tests-private-fork workflow if enabled
+if [[ "${TESTS_PRIVATE_FORK_ENABLED}" == "true" ]]; then
+    echo "Adding e2e-tests-private-fork workflow..."
+    generate_tests_private_fork_workflow >> "${OUTPUT_FILE}"
+fi
 	cat >> "${OUTPUT_FILE}" <<EOF
 zz_generated_metadata:
   branch: devel
@@ -495,6 +565,12 @@ EOF
         echo "  • Catalog Source: ${CATALOG_SOURCE_NAME} (${CATALOG_SOURCE_IMAGE})"
     else
         echo "  • Catalog Source: ${CATALOG_SOURCE_NAME}"
+    fi
+
+    if [[ "${TESTS_PRIVATE_FORK_ENABLED}" == "true" ]]; then
+        echo "  • Tests-private fork: ${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private@${TESTS_PRIVATE_FORK_BRANCH}"
+    else
+        echo "  • Tests-private fork: disabled"
     fi
 
     echo "=========================================="
