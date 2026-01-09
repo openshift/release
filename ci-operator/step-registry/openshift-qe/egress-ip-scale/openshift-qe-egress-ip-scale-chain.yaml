@@ -1,83 +1,19 @@
 chain:
   as: openshift-qe-egress-ip-scale
   steps:
-  # Initial setup
-  - ref: openshift-qe-egress-ip-scale-setup
-  
-  # OVN Pod Disruption using krkn
-  - ref: redhat-chaos-pod-scenarios-custom
-  
-  # Worker Node Outage using krkn 
+  - ref: openshift-qe-egress-ip-setup
+  - ref: redhat-chaos-power-outage
   - ref: redhat-chaos-node-disruptions-worker-outage
-  
-  # Final comprehensive tests with built-in validation
-  - ref: openshift-qe-egress-ip-scale-tests
+  - ref: redhat-chaos-pod-network-chaos
+  - ref: openshift-qe-egress-ip-validate
+  - ref: openshift-qe-egress-ip-cleanup
   env:
-  # Scale-specific egress IP configuration
-  - name: EGRESS_IP_COUNT
-    default: "5"
-  - name: EGRESS_NODES_COUNT
-    default: "10"
-  - name: SCALE_TEST_WORKLOADS
-    default: "20"
-
-  # OVN Pod disruption chaos environment variables
-  - name: TARGET_NAMESPACE
-    default: "openshift-ovn-kubernetes"
-  - name: POD_LABEL
-    default: "app=ovnkube-node"
-  - name: DISRUPTION_COUNT
-    default: "5"
-  - name: EXPECTED_POD_COUNT
-    default: "10"
-  - name: KILL_TIMEOUT
-    default: "180"
-  - name: EXPECTED_RECOVERY_TIME
-    default: "120"
-
-  # Worker node outage configuration  
-  - name: ACTION
-    default: "node_reboot_scenario"
-  - name: LABEL_SELECTOR
-    default: "node-role.kubernetes.io/worker="
-  - name: RUNS
-    default: "2"
-  - name: NODE_OUTAGE_TIMEOUT
-    default: "180"
-
-  # Common chaos testing configuration
-  - name: ENABLE_ALERTS
-    default: "False"
-  - name: CHECK_CRITICAL_ALERTS
-    default: "False" 
-  - name: WAIT_DURATION
-    default: "60"
   - name: TELEMETRY_ENABLED
-    default: "False"
-  - name: JUNIT_TESTCASE
-    default: '[Egress-IP-Scale] Pod disruption and node reboot resilience test'
-    
+    default: "false"
+  - name: ENABLE_ALERTS
+    default: "false"
   documentation: |-
-    SCENARIO: OpenShift Egress IP Performance and Resilience Testing at Scale
-    
-    This test validates egress IP functionality in a scaled environment (10 nodes, 5 egress IPs)
-    under chaos engineering scenarios to ensure enterprise-grade reliability.
-    
-    TEST SCENARIO DETAILS:
-    - Cluster Setup: 10-node AWS cluster with 5 egress IP configurations
-    - Workload Pattern: 20 concurrent test pods distributed across 5 egress IP groups
-    - Chaos Testing: Simulated pod disruptions (5 ovnkube-node pods) and node reboots (2 nodes)
-    - Validation Focus: Egress IP assignment stability, traffic flow continuity, and recovery metrics
-    
-    EXECUTION FLOW:
-    1. Infrastructure Setup: Configure 10 worker nodes as egress-assignable, create 5 egress IPs
-    2. Workload Deployment: Deploy test applications across different namespaces with egress IP labels
-    3. Chaos Injection: Disrupt OVN network pods and reboot worker nodes to test resilience
-    4. Traffic Validation: Verify external connectivity and proper egress IP source addressing
-    5. Performance Analysis: Measure recovery times, assignment stability, and network metrics
-    
-    SUCCESS CRITERIA: 
-    - 75%+ egress IPs maintain assignments during chaos
-    - 50%+ workloads recover successfully
-    - Network traffic flows correctly through assigned egress IPs
-    - Recovery within expected timeframes (120s for pods, 180s for nodes)
+    Comprehensive egress IP scale testing with chaos engineering scenarios.
+    Uses Huiran's proven methodology for validation combined with krkn chaos testing.
+    Includes power outages, node network chaos, and pod network chaos with validation
+    steps between each chaos scenario. Suitable for 10+ node clusters.
