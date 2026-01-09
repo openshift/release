@@ -45,7 +45,15 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 # RUN THE WORKLOAD
 
 if [ -n "${CHURN_CYCLES}" ]; then
-  EXTRA_FLAGS="${EXTRA_FLAGS} --churn-cycles ${CHURN_CYCLES} --churn-percent ${CHURN_PERCENT} --dpdk-devicepool ${SRIOV_DPDK_DEVICEPOOL} --net-devicepool ${SRIOV_NET_DEVICEPOOL}"
+  EXTRA_FLAGS="${EXTRA_FLAGS} --churn-cycles ${CHURN_CYCLES} --churn-percent ${CHURN_PERCENT}"
+fi
+
+if [ -n "${SRIOV_DPDK_DEVICEPOOL}" ]; then
+  EXTRA_FLAGS="${EXTRA_FLAGS} --dpdk-devicepool ${SRIOV_DPDK_DEVICEPOOL}"
+fi
+
+if [ -n "${SRIOV_NET_DEVICEPOOL}" ]; then
+  EXTRA_FLAGS="${EXTRA_FLAGS} --net-devicepool ${SRIOV_NET_DEVICEPOOL}"
 fi
 
 WORKLOAD=rds-core EXTRA_FLAGS+=" --alerting=true --profile-type=${PROFILE_TYPE}" ./run.sh
