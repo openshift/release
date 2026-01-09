@@ -94,14 +94,21 @@ fi
 # Build destination image reference
 DESTINATION_IMAGE_REF="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$IMAGE_TAG"
 
+# Build mirror options
+MIRROR_OPTS=""
+if [[ "${KEEP_MANIFEST_LIST:-false}" == "true" ]]; then
+    echo "INFO Multi-arch mode enabled: preserving manifest lists"
+    MIRROR_OPTS="--keep-manifest-list=true"
+fi
+
 echo "INFO Image mirroring command is:"
-echo "     oc image mirror ${SOURCE_IMAGE_REF} ${DESTINATION_IMAGE_REF} --dry-run=$dry"
+echo "     oc image mirror ${SOURCE_IMAGE_REF} ${DESTINATION_IMAGE_REF} ${MIRROR_OPTS} --dry-run=$dry"
 
 echo "INFO Mirroring Image"
 echo "     From   : $SOURCE_IMAGE_REF"
 echo "     To     : $DESTINATION_IMAGE_REF"
 echo "     Dry Run: $dry"
-oc image mirror "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" --dry-run=$dry || {
+oc image mirror "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" ${MIRROR_OPTS} --dry-run=$dry || {
     echo "ERROR Unable to mirror image"
     exit 1
 }
@@ -109,14 +116,14 @@ oc image mirror "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" --dry-run=$dry || {
 # tag the image with its own digest to ensure the image can always be pulled by digest even if $IMAGE_TAG is updated.
 IMAGE_DIGEST_TAG=$(oc image info "${SOURCE_IMAGE_REF}" -o json | jq -r '(.digest | capture(".+:(?<digest>.+)").digest)')
 DIGEST_TAG_DESTINATION_IMAGE_REF="${REGISTRY_HOST}/${REGISTRY_ORG}/${IMAGE_REPO}:${IMAGE_DIGEST_TAG}"
-oc image mirror "${SOURCE_IMAGE_REF}" "${DIGEST_TAG_DESTINATION_IMAGE_REF}" --dry-run=$dry || {
+oc image mirror "${SOURCE_IMAGE_REF}" "${DIGEST_TAG_DESTINATION_IMAGE_REF}" ${MIRROR_OPTS} --dry-run=$dry || {
     echo "ERROR Unable to mirror image"
     exit 1
 }
 
 if [[ ${EXTRA_TAG:-} != "" ]]; then
     EXTRA_TAG_DESTINATION_IMAGE_REF="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$EXTRA_TAG"
-    oc image mirror "$DESTINATION_IMAGE_REF" "$EXTRA_TAG_DESTINATION_IMAGE_REF" --dry-run=$dry || {
+    oc image mirror "$DESTINATION_IMAGE_REF" "$EXTRA_TAG_DESTINATION_IMAGE_REF" ${MIRROR_OPTS} --dry-run=$dry || {
         echo "ERROR Unable to mirror image"
         exit 1
     }
