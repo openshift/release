@@ -38,11 +38,11 @@ debug_on_failure() {
                 echo ">> Recent Events (Sorted by Time):"
                 oc get events -n "$ns" --sort-by='.lastTimestamp' | tail -n 15 || true
                 
-                # Identify and describe pods that are NOT Running or Completed
-                local failed_pods
-                failed_pods=$(oc get pods -n "$ns" --no-headers | grep -vE "Running|Completed" | awk '{print $1}' || true)
+                # Identify, describe and get logs from all the pods in the namespace
+                local pods
+                pods=$(oc get pods -n "$ns" --no-headers | awk '{print $2}' || true)
                 
-                for pod in $failed_pods; do
+                for pod in $pods; do
                     echo -e "\n>> [DEBUG] Describing failing pod: $pod"
                     oc describe pod "$pod" -n "$ns" || true
                     echo ">> [DEBUG] Logs for $pod (last 50 lines):"
@@ -56,7 +56,7 @@ debug_on_failure() {
 
         # 3. Check Istio Custom Resources
         echo -e "\n>> [DEBUG] Global Istio Resources State:"
-        oc get istio,istiocni,ztunnel -A || true
+        oc get istio,istiocni,ztunnel -A -o yaml || true
         
         echo -e "\n################################################################"
     fi
