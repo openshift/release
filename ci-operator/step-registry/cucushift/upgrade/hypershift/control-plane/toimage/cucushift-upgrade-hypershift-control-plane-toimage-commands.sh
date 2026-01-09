@@ -46,9 +46,9 @@ function check_node() {
         echo "All nodes status Ready"
         return 0
     else
-        echo "Find Not Ready worker nodes, node recreated"
+        echo "Some nodes are not Ready yet:"
         oc get no
-        exit 1
+        return 1
     fi
 }
 
@@ -138,6 +138,9 @@ echo "Monitoring for node recreation for 10 minutes..."
 END_TIME=$((SECONDS + 600))
 while [ $SECONDS -lt $END_TIME ]; do
   check_node
+  if [ $? -eq 0 ]; then
+    break
+  fi
   sleep 60
 done
 
