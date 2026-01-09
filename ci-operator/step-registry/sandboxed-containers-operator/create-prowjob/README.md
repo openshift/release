@@ -61,7 +61,7 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 
 | Variable                   | Default Value            | Description                                                                 | Validation               |
 | -------------------------- | ------------------------ | --------------------------------------------------------------------------- | ------------------------ |
-| `OCP_VERSION`              | `4.19`                   | OpenShift Container Platform version. Supports `X.Y` (latest from channel), `X.Y.Z` (specific GA version), or `X.Y.Z-rc.N`/`X.Y.Z-ec.N` (pre-release). When a specific version is provided, it is validated against the Cincinnati API. | Format: X.Y, X.Y.Z, or X.Y.Z-rc.N/ec.N |
+| `OCP_VERSION`              | `4.19`                   | OpenShift Container Platform version. Supports `X.Y` (latest), `X.Y.Z` (specific), or `X.Y.Z-rc.N`/`X.Y.Z-ec.N` (candidate). If a specific version doesn't exist, error out |
 | `OCP_CHANNEL`              | `fast`                   | OCP release channel. Default is `fast` because it contains all versions that could become `stable`.  Further explanation below | `stable`, `fast`, `candidate`, or `eus` |
 | `AWS_REGION_OVERRIDE`      | `us-east-2`              | AWS region for testing                                                      | Any valid AWS region     |
 | `CUSTOM_AZURE_REGION`      | `eastus`                 | Azure region for testing                                                    | Any valid Azure region   |
@@ -94,29 +94,10 @@ The `OCP_CHANNEL` variable determines which OpenShift release channel to use. Ea
 
 | Channel | Stability | Recency | Pre-Release | Use Case |
 |---------|-----------|---------|-------------|----------|
-| `candidate` | ⚠️ Lowest | 🚀 Newest | ✅ Yes (RC/EC) | Pre-release testing |
-| `fast` | ✅ High | ⏩ Recent | ❌ No | **Default** - Most testing |
-| `stable` | ✅✅ Highest | ⏱️ Delayed | ❌ No | Conservative testing |
-| `eus` | ✅✅ Highest | 📅 Selected | ❌ No | Long-term support |
-
-#### Channel Details
-
-- **`candidate`**: Contains pre-release builds (RC/EC versions). Required for testing upcoming releases like `4.20.0-rc.1`.
-- **`fast`** (Default): Provides recent GA versions with timely patches while remaining production-ready. Not tested for upgrades.  Best balance for CI/testing.
-- **`stable`**: Most conservative channel with fully validated GA releases and upgrades between them. Updates more slowly than `fast` for maximum stability.
-- **`eus`**: Long-term support versions only (typically every 4th minor version like 4.14, 4.18, 4.22). Extended maintenance window.
-
-#### Channel Relationship
-
-```
-candidate (pre-release)
-    ↓ (release candidates tested)
-fast (recent GA, quick patches)
-    ↓ (additional validation)
-stable (conservative GA)
-    ↓ (selected versions only)
-eus (long-term support)
-```
+| `candidate` |  Lowest |  Newest |  Yes (RC/EC) | Pre-release testing |
+| `fast` |  High | Recent | No | **Default** - has all versions except `candidate` |
+| `stable` |  Highest |  Delayed |  No | version tested for upgrades |
+| `eus` |  Highest |  Selected |  No | Long-term support |
 
 ### Advanced Configuration Examples
 
