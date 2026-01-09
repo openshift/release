@@ -22,3 +22,8 @@ else
     echo "ERROR: could not find kubeadmin-password file, exit..."
     exit 1
 fi
+
+if [[ -f "${cluster_info_dir}/proxy-conf.sh" ]]; then
+    echo "This is proxy environment, copy proxy-conf.sh to SHARED_DIR..."
+    cp "${cluster_info_dir}/proxy-conf.sh" "${SHARED_DIR}"
+fi
