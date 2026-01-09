@@ -82,6 +82,25 @@ in 3.11).''')
         'kind': 'RoleBinding',
         'metadata': {
             'name': 'art-publish',
+            'namespace': 'origin'
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'ClusterRole',
+            'name': 'system:image-builder'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'art-publish',
+            'namespace': 'ocp'
+        }]
+    }, comment='Allow ART to mirror images to the origin namespace so that OKD images can be provided')
+
+    gendoc.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'art-publish',
             'namespace': 'ocp-private'
         },
         'roleRef': {
