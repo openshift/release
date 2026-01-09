@@ -21,15 +21,68 @@ resources:
       memory: 200Mi
 tests:
 - as: mirror-vcsref-image
-  postsubmit: true
-  steps:
+  literal_steps:
+    cluster_profile: ""
     dependencies:
       SOURCE_IMAGE_REF: console-plugin-nvidia-gpu
     env:
       IMAGE_REPO: console-plugin-nvidia-gpu
       IMAGE_TAG: release-0.2.6
+      REGISTRY_HOST: quay.io
+      REGISTRY_ORG: edge-infrastructure
     test:
-    - ref: assisted-baremetal-images-publish
+    - as: mirror
+      commands: |-
+        #!/bin/bash
+        set -euo pipefail
+
+        export HOME=/tmp/home
+        mkdir -p "$HOME/.docker"
+        cd "$HOME" || exit 1
+
+        echo "INFO Image repo is $IMAGE_REPO"
+        echo "INFO Image tag is $IMAGE_TAG"
+
+        # Setup registry credentials
+        REGISTRY_TOKEN_FILE="/secrets/docker/config.json"
+        config_file="$HOME/.docker/config.json"
+        cat "$REGISTRY_TOKEN_FILE" > "$config_file" || {
+            echo "ERROR Could not read registry secret file"
+            exit 1
+        }
+
+        if [[ ! -r "$REGISTRY_TOKEN_FILE" ]]; then
+            echo "ERROR Registry authentication file not found: $REGISTRY_TOKEN_FILE"
+            exit 1
+        fi
+
+        echo "INFO Login to internal Openshift CI registry"
+        oc registry login
+
+        # Build destination image reference
+        DESTINATION_IMAGE_REF="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$IMAGE_TAG"
+
+        echo "INFO Mirroring multi-arch image"
+        echo "     From: $SOURCE_IMAGE_REF"
+        echo "     To  : $DESTINATION_IMAGE_REF"
+
+        oc image mirror --keep-manifest-list=true "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" || {
+            echo "ERROR Unable to mirror image"
+            exit 1
+        }
+
+        echo "INFO Mirroring complete."
+      credentials:
+      - collection: ""
+        mount_path: /secrets/docker
+        name: edge-infrastructure-quay-push
+        namespace: test-credentials
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+  postsubmit: true
 zz_generated_metadata:
   branch: release-0.2.6
   org: rh-ecosystem-edge
