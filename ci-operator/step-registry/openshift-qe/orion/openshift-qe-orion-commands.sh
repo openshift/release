@@ -73,22 +73,19 @@ fi
 
 if [[ -n "$ORION_CONFIG" ]]; then
     if [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
-        fileBasename="${ORION_CONFIG##*/}"
+        fileBasename="$(basename ${ORION_CONFIG})"
         if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
-            CONFIG="$ARTIFACT_DIR/$fileBasename"
+            ORION_CONFIG="$ARTIFACT_DIR/$fileBasename"
         else
             echo "Error: Failed to download $ORION_CONFIG" >&2
             exit 1
         fi
-    else
-        CONFIG="$ORION_CONFIG"
     fi
 fi
 
 if [[ -n "$ACK_FILE" ]]; then
     if [[ "$ACK_FILE" =~ ^https?:// ]]; then
-        fileBasename="${ACK_FILE##*/}"
-        ackFilePath="$ARTIFACT_DIR/$fileBasename"
+        ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
         if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then
             echo "Error: Failed to download $ACK_FILE" >&2
             exit 1
@@ -130,8 +127,9 @@ fi
 
 set +e
 set -o pipefail
-FILENAME=$(echo $CONFIG | awk -F/ '{print $2}' | awk -F. '{print $1}')
-es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/$FILENAME.txt
+FILENAME=$(basename ${ORION_CONFIG} | awk -F. '{print $1}')
+export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" 
+orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/${FILENAME}.txt
 orion_exit_status=$?
 set -e
 
