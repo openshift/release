@@ -11,7 +11,7 @@ echo "Starting OpenShift QE Egress IP Resilience Tests"
 echo "==============================================="
 
 # Configuration
-EIP_NAME="${EIP_NAME:-egressip1}"
+EIP_NAME="${EIP_NAME:-egress-ip-test}"
 POD_KILL_RETRIES="${POD_KILL_RETRIES:-10}"
 REBOOT_RETRIES="${REBOOT_RETRIES:-5}"
 NAMESPACE="openshift-ovn-kubernetes"
@@ -124,7 +124,7 @@ kind: Namespace
 metadata:
   name: egress-test-temp
   labels:
-    egress: egressip1
+    egress: egress-ip-test
 ---
 apiVersion: v1
 kind: Pod
@@ -341,7 +341,7 @@ kind: Namespace
 metadata:
   name: egress-reboot-test
   labels:
-    egress: egressip1
+    egress: egress-ip-test
 ---
 apiVersion: v1
 kind: Pod

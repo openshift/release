@@ -11,7 +11,7 @@ echo "Starting Egress IP Target Discovery for Chaos Testing"
 echo "=================================================="
 
 # Configuration
-EIP_NAME="${EIP_NAME:-egressip1}"
+EIP_NAME="${EIP_NAME:-egress-ip-test}"
 NAMESPACE="openshift-ovn-kubernetes"
 
 # Artifact directory
