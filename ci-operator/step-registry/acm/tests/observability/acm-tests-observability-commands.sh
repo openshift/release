@@ -83,3 +83,5 @@ bash +x ./execute_obs_interop_commands.sh || :
 cp -r tests/pkg/tests $ARTIFACT_DIR/
 
 mv $ARTIFACT_DIR/tests/results.xml $ARTIFACT_DIR/tests/junit_results.xml
+
+sleep 8h
