@@ -76,17 +76,8 @@ mkdir -p /alabama/.kube
 # Copy Kubeconfig file to the directory where Obs is looking it up
 cp ${SHARED_DIR}/kubeconfig ~/.kube/config
 
-# Temporarily disable the policy to allow tests to freely enable/disable MCOA capabilities
-# Without this, the policy's enforce mode would immediately revert any changes made by test code
-oc patch policy.policy.open-cluster-management.io/policy-observability-operator -n policies \
-  --type=merge -p '{"spec":{"disabled":true}}'
-
 # run the test execution script
 bash +x ./execute_obs_interop_commands.sh || :
-
-# Re-enable the policy after tests complete to restore enforcement
-oc patch policy.policy.open-cluster-management.io/policy-observability-operator -n policies \
-  --type=merge -p '{"spec":{"disabled":false}}'
 
 # Copy the test cases results to an external directory
 cp -r tests/pkg/tests $ARTIFACT_DIR/
