@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Setting up egress IP configuration using Huiran's proven methodology"
+echo "Setting up egress IP configuration using e2e methodology"
 
 # Detect the CNI type
 RUNNING_CNI=$(oc get network.operator cluster -o=jsonpath='{.spec.defaultNetwork.type}')
@@ -26,9 +26,29 @@ if [[ $RUNNING_CNI == "OVNKubernetes" ]]; then
     oc label node --overwrite "$WORKER_NODE" k8s.ovn.org/egress-assignable=
     
     # Extract egress IP range from node annotations
-    egress_cidrs=$(oc get node "$WORKER_NODE" -o jsonpath="{.metadata.annotations.cloud\.network\.openshift\.io/egress-ipconfig}" | jq -r '.[].ifaddr.ipv4')
-    ip_part=$(echo "$egress_cidrs" | cut -d'/' -f1)
-    egress_ip="${ip_part%.*}.10"  # Use .10 instead of .5 to avoid conflicts
+    # Use a simple approach: try to get the subnet and assign an IP from it
+    # If annotation exists, parse it; otherwise use a default approach
+    egress_config=$(oc get node "$WORKER_NODE" -o jsonpath="{.metadata.annotations.cloud\.network\.openshift\.io/egress-ipconfig}" 2>/dev/null || echo "")
+    
+    if [[ -n "$egress_config" && "$egress_config" != "null" ]]; then
+        # Parse the JSON manually to extract ipv4 CIDR
+        # Look for "ipv4":"x.x.x.x/xx" pattern
+        egress_cidrs=$(echo "$egress_config" | sed -n 's/.*"ipv4":"\([^"]*\)".*/\1/p' | head -n1)
+        if [[ -n "$egress_cidrs" ]]; then
+            ip_part=$(echo "$egress_cidrs" | cut -d'/' -f1)
+            egress_ip="${ip_part%.*}.10"  # Use .10 instead of .5 to avoid conflicts
+        else
+            # Fallback: extract node IP and use same subnet
+            node_ip=$(oc get node "$WORKER_NODE" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+            egress_ip="${node_ip%.*}.10"
+            egress_cidrs="${node_ip}/24"
+        fi
+    else
+        # Fallback: extract node IP and use same subnet
+        node_ip=$(oc get node "$WORKER_NODE" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}')
+        egress_ip="${node_ip%.*}.10"
+        egress_cidrs="${node_ip}/24"
+    fi
     
     echo "Egress IP CIDR: $egress_cidrs"
     echo "Assigned egress IP: $egress_ip"
