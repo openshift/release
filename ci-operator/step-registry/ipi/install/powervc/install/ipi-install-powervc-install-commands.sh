@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.5.2"
+	TAG="v0.6.2"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
 	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
@@ -82,9 +82,9 @@ function install_required_tools() {
 	done
 
 	mkdir -p ${HOME}/.config/openstack/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/clouds.yaml ${HOME}/.config/openstack/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/clouds.yaml ${HOME}/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/ocp-ci-ca.pem ${HOME}/
+	cp ${SECRETS_DIR}/clouds.yaml ${HOME}/.config/openstack/
+	cp ${SECRETS_DIR}/clouds.yaml ${HOME}/
+	cp ${SECRETS_DIR}/ocp-ci-ca.pem ${HOME}/
 
 	which PowerVC-Tool
 	which jq
@@ -250,9 +250,9 @@ function dump_resources() {
 			--cisInstanceCRN "${CRN}" \
 			--metadata "${DIR}/metadata.json" \
 			--bastionUsername "cloud-user" \
-			--bastionRsa "${SSH_PRIV_KEY_PATH}" \
+			--bastionRsa "${SSH_PRIV_KEY_FILE}" \
 			--kubeconfig "${DIR}/auth/kubeconfig" \
-			--shouldDebug true
+			--shouldDebug false
 	else
 		echo "Could not find ${DIR}/metadata.json for watch-create"
 	fi
@@ -274,8 +274,16 @@ export DIR
 mkdir -p "${DIR}"
 cp "${SHARED_DIR}/install-config.yaml" "${DIR}/"
 
-IBMCLOUD_API_KEY=$(cat "/var/run/powervc-ipi-cicd-secrets/powervc-creds/IBMCLOUD_API_KEY")
-#POWERVC_USER_ID=$(cat "/var/run/powervc-ipi-cicd-secrets/powervc-creds/POWERVC_USER_ID")
+export SECRETS_DIR=/var/run/powervc-ipi-cicd-secrets/powervc-creds
+if [ ! -d "${SECRETS_DIR}" ]
+then
+	echo "Error: ${SECRETS_DIR} directory does not exist!"
+	exit 1
+fi
+ls -l ${SECRETS_DIR}/ || true
+
+IBMCLOUD_API_KEY=$(cat "${SECRETS_DIR}/IBMCLOUD_API_KEY")
+#POWERVC_USER_ID=$(cat "${SECRETS_DIR}/POWERVC_USER_ID")
 
 install_required_tools
 
@@ -301,7 +309,7 @@ export FLAVOR
 export LEASED_RESOURCE
 export NETWORK_NAME
 
-export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+export SSH_PRIV_KEY_FILE=${SECRETS_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 #export POWERVC_USER_ID
@@ -325,7 +333,7 @@ destroy_resources
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
 mkdir -p ~/.ssh
-cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
+cp "${CLUSTER_PROFILE_DIR}/*" ~/.ssh/
 
 date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 

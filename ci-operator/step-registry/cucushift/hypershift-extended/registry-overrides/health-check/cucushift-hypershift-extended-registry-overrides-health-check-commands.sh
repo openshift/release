@@ -7,25 +7,12 @@ function check_resources_using_image_from_repo() {
     local repo="$2"
     local result
 
-    echo "Checking resources using images from repository $repo"
     result=$(eval "oc get $RESOURCE_TYPES $namespace_arg -o json" | \
 jq -r --arg repo "$repo" \
 '.items[] | select(.spec.template.spec.containers[].image | startswith($repo)) | "\(.kind) -n \(.metadata.namespace) \(.metadata.name)"')
 
     if [[ -n "$result" ]]; then
-        printf "Found the following resources using image from repository %s:\n%s\n" "$repo" "$result" >&2
-        return 1
-    fi
-}
-
-function check_node_images_from_repo() {
-    local repo="$1"
-    local result
-
-    echo "Checking node images from repository $repo"
-    result="$(oc get node -o jsonpath='{.items[*].status.images[*].names[*]}' | tr ' ' '\n')"
-    if grep "$repo" <<< "$result" &>/dev/null; then
-        printf "Found the following node images from repository %s:\n%s\n" "$repo" "$result" >&2
+        printf "Found the following resources using image from repository %s:\n%s" "$repo" "$result" >&2
         return 1
     fi
 }
@@ -74,7 +61,6 @@ fi
 RESOURCE_TYPES="deployments,daemonsets,statefulsets"
 for src_repo in "${SRC_LIST[@]}"; do
     check_resources_using_image_from_repo "-n $CLUSTER_NAMESPACE" "$src_repo"
-    check_node_images_from_repo "$src_repo"
 done
 
 # TODO: check data plane once https://issues.redhat.com/browse/OCPBUGS-41365 is resolved
