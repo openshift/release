@@ -29,8 +29,8 @@ OC_HUB_CLUSTER_API_URL=$(oc whoami --show-server)
 export OC_HUB_CLUSTER_API_URL
 
 # HUB_CLUSTER_NAME=${BASE_DOMAIN/.cspilp.interop.ccitredhat.com/}
-HUB_CLUSTER_NAME=$(cat $SHARED_DIR/metadata.json |jq -r '.clusterName') 
-export HUB_CLUSTER_NAME
+# HUB_CLUSTER_NAME=$(cat $SHARED_DIR/metadata.json |jq -r '.clusterName') 
+export HUB_CLUSTER_NAME='local-cluster'
 
 OC_HUB_CLUSTER_PASS=$(cat $SHARED_DIR/kubeadmin-password)
 export OC_HUB_CLUSTER_PASS
@@ -76,30 +76,6 @@ mkdir -p /alabama/.kube
 # Copy Kubeconfig file to the directory where Obs is looking it up
 cp ${SHARED_DIR}/kubeconfig ~/.kube/config
 
-cat > /tmp/obs/mcoa_test.patch << 'EOF'
-diff --git a/tests/pkg/tests/observability_mcoa_test.go b/tests/pkg/tests/observability_mcoa_test.go
-index e760209f..9d9becc7 100644
---- a/tests/pkg/tests/observability_mcoa_test.go
-+++ b/tests/pkg/tests/observability_mcoa_test.go
-@@ -64,6 +64,12 @@ var _ = Describe("Observability Addon (MCOA)", Ordered, func() {
-                accessibleOCPClusterNames = append(accessibleOCPClusterNames, testOptions.HubCluster.Name)
-                By(fmt.Sprintf("Running tests against the following OCP managed clusters with API access: %v", accessibleOCPClusterNames))
-
-+               By("Disabling ObservabilityAddon before MCOA testing", func() {
-+                       Expect(utils.ModifyMCOAddonSpecMetrics(testOptions, false)).NotTo(HaveOccurred())
-+                       time.Sleep(30 * time.Second)
-+                       utils.CheckDeploymentAvailability(testOptions.HubCluster, metricsCollectorDeploymentName, utils.MCO_NAMESPACE, false)
-+                       utils.CheckDeploymentAvailabilityOnClusters(managedClusters, metricsCollectorDeploymentName, utils.MCO_ADDON_NAMESPACE, false)
-+               })
-                By("Disabling MCOA", func() {
-                        Expect(utils.SetMCOACapabilities(testOptions, false, false)).NotTo(HaveOccurred())
-                        utils.CheckStatefulSetAvailabilityOnClusters(managedClustersWithHub, platformPrometheusAgentStatefulSetName, utils.MCO_AGENT_ADDON_NAMESPACE, false)
-EOF
-
-# /tmp/obs/tests/pkg/tests/observability_mcoa_test.go
-# /tmp/obs/tests/mcoa_test.patch
-patch -p1 < /tmp/obs/mcoa_test.patch 2>/dev/null || echo "Patch already applied or failed, continuing..."
-
 # run the test execution script
 bash +x ./execute_obs_interop_commands.sh || :
 
@@ -108,4 +84,3 @@ cp -r tests/pkg/tests $ARTIFACT_DIR/
 
 mv $ARTIFACT_DIR/tests/results.xml $ARTIFACT_DIR/tests/junit_results.xml
 
-sleep 8h
