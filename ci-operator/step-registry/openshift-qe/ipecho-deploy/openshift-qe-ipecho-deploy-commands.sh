@@ -80,6 +80,11 @@ spec:
         - name: http
           containerPort: 8080
           protocol: TCP
+        env:
+        - name: PORT
+          value: "8080"
+        - name: LISTEN
+          value: ":8080"
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
