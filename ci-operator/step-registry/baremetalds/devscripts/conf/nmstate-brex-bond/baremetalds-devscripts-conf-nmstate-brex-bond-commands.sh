@@ -18,7 +18,6 @@ generate_nmstate_machineconfigs() {
     echo "*******************************************************************************"
   fi
 
-  local output_dir="${NMS_BREX_OUT_DIR:-"/tmp/nmstate-brex-bond"}"
   local master_bond_port1="${NMS_BREX_MASTER_NIC1:-"enp2s0"}"
   local worker_bond_port1="${NMS_BREX_WORKER_NIC1:-$master_bond_port1}"
   local master_bond_port2="${NMS_BREX_MASTER_NIC2:-"enp3s0"}"
@@ -50,8 +49,7 @@ generate_nmstate_machineconfigs() {
   echo "IP_STACK: ${IP_STACK:-<empty>} -> IPv4: ${ipv4_enabled}, IPv6: ${ipv6_enabled}"
   echo "*******************************************************************************"
 
-  mkdir -p "${output_dir}/assets"
-  mkdir -p "${output_dir}/network-config"
+  mkdir -p "${SHARED_DIR}/nmstate-network-config"
 
   if [ -n "${NMS_BREX_ASSET_CONF_MASTER:-}" ]; then
     echo "Using custom NMS_BREX_ASSET_CONF for asset configuration"
@@ -148,7 +146,7 @@ generate_nmstate_machineconfigs() {
   master_b64=$(echo -n "${master_nmstate_config}" | base64 -w 0)
   worker_b64=$(echo -n "${worker_nmstate_config}" | base64 -w 0)
 
-  cat > "${output_dir}/assets/00-generated-nmstate-brex-bond-master.yaml" <<EOF
+  cat > "${SHARED_DIR}/manifest_00-generated-nmstate-brex-bond-master.yaml" <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -168,7 +166,7 @@ spec:
           path: /etc/nmstate/openshift/cluster.yml
 EOF
 
-  cat > "${output_dir}/assets/00-generated-nmstate-brex-bond-worker.yaml" <<EOF
+  cat > "${SHARED_DIR}/manifest_00-generated-nmstate-brex-bond-worker.yaml" <<EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -191,12 +189,12 @@ EOF
   # Check if custom network config is provided
   if [ -n "${NMS_BREX_NETWORK_CONF_MASTER:-}" ]; then
     echo "Using custom NMS_BREX_NETWORK_CONF_MASTER for network configuration"
-    cat > "${output_dir}/network-config/ostest-master-0.yaml" <<EOF
+    cat > "${SHARED_DIR}/nmstate-network-config/ostest-master-0.yaml" <<EOF
 ${NMS_BREX_NETWORK_CONF_MASTER}
 EOF
   else
     echo "Generating default network configuration"
-    cat > "${output_dir}/network-config/ostest-master-0.yaml" <<EOF
+    cat > "${SHARED_DIR}/nmstate-network-config/ostest-master-0.yaml" <<EOF
 networkConfig: &BOND
   interfaces:
   - name: bond0
@@ -219,38 +217,36 @@ EOF
   fi
 
   for ((i=1; i<masters; i++)); do
-    cat > "${output_dir}/network-config/ostest-master-${i}.yaml" <<EOF
+    cat > "${SHARED_DIR}/nmstate-network-config/ostest-master-${i}.yaml" <<EOF
 networkConfig: *BOND
 EOF
   done
 
   for ((i=0; i<workers; i++)); do
-    cat > "${output_dir}/network-config/ostest-worker-${i}.yaml" <<EOF
+    cat > "${SHARED_DIR}/nmstate-network-config/ostest-worker-${i}.yaml" <<EOF
 networkConfig: *BOND
 EOF
   done
 
-  echo "--- Generated MachineConfigs in ${output_dir}/assets: ---"
-  echo "  - 00-generated-nmstate-brex-bond-master.yaml"
-  echo "  - 00-generated-nmstate-brex-bond-worker.yaml"
+  echo "--- Generated MachineConfigs as manifests in ${SHARED_DIR}: ---"
+  echo "  - manifest_00-generated-nmstate-brex-bond-master.yaml"
+  echo "  - manifest_00-generated-nmstate-brex-bond-worker.yaml"
 
-  echo "---------- Generated network configs in ${output_dir}/network-config: ---------"
+  echo "---------- Generated network configs in ${SHARED_DIR}/nmstate-network-config: ---------"
   echo "  - ostest-master-{0...$((masters-1))}.yaml"
   echo "  - ostest-worker-{0...$((workers-1))}.yaml"
 
-  echo "------- Generated config in: 00-generated-nmstate-brex-bond-master.yaml -------"
-  cat "${output_dir}"/assets/00-generated-nmstate-brex-bond-master.yaml
+  echo "------- Generated config in: manifest_00-generated-nmstate-brex-bond-master.yaml -------"
+  cat "${SHARED_DIR}/manifest_00-generated-nmstate-brex-bond-master.yaml"
 
-  echo "------- Generated config in: 00-generated-nmstate-brex-bond-worker.yaml -------"
-  cat "${output_dir}"/assets/00-generated-nmstate-brex-bond-worker.yaml
+  echo "------- Generated config in: manifest_00-generated-nmstate-brex-bond-worker.yaml -------"
+  cat "${SHARED_DIR}/manifest_00-generated-nmstate-brex-bond-worker.yaml"
 
-  echo "-------------------------- Generated assets config: ---------------------------"
-  cat "${output_dir}"/network-config/ostest-master-0.yaml
+  echo "-------------------------- Generated network config: ---------------------------"
+  cat "${SHARED_DIR}/nmstate-network-config/ostest-master-0.yaml"
 
-  echo "------------------ Setting assets and network-config paths --------------------"
-  echo "ASSETS_EXTRA_FOLDER=${output_dir}/assets" >> "${SHARED_DIR}/dev-scripts-additional-config"
-  echo "NETWORK_CONFIG_FOLDER=${output_dir}/network-config" >> "${SHARED_DIR}/dev-scripts-additional-config"
-  echo "Paths set: (${output_dir}/assets, ${output_dir}/network-config)"
+  echo "------------------ Setting network-config path --------------------"
+  echo "NETWORK_CONFIG_FOLDER=${SHARED_DIR}/nmstate-network-config" >> "${SHARED_DIR}/dev-scripts-additional-config"
 }
 
 echo "NETWORK_TYPE=\"OVNKubernetes\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
