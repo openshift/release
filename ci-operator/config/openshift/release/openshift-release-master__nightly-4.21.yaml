@@ -1064,6 +1064,22 @@ tests:
     - chain: ipi-aws-pre-stableinitial
     - ref: fips-check
     workflow: openshift-upgrade-aws-ovn
+- as: e2e-aws-ovn-upgrade-fips-no-nat-instance
+  interval: 168h
+  steps:
+    cluster_profile: aws-5
+    env:
+      CI_NAT_REPLACE: "false"
+      FAIL_ON_CORE_DUMP: "true"
+      FIPS_ENABLED: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - ref: fips-check
+    workflow: openshift-upgrade-aws-ovn
 - as: e2e-gcp-ovn-upgrade
   interval: 168h
   steps:
@@ -1242,22 +1258,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-cnf
-- as: e2e-telco5g-sno-cnftests
-  capabilities:
-  - intranet
-  cron: 00 18 */1 * 1-5
-  restrict_network_access: false
-  steps:
-    env:
-      E2E_TESTS_CONFIG: |
-        CNF_E2E_TESTS=true
-        CNF_ORIGIN_TESTS=false
-      T5CI_JOB_TYPE: sno-cnftests
-      T5CI_VERSION: "4.21"
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   capabilities:
   - intranet
@@ -1275,7 +1275,7 @@ tests:
 - as: e2e-telco5g-hcp-cnftests
   capabilities:
   - intranet
-  cron: 00 10 */1 * 1-5
+  cron: 00 12 */1 * 1-5
   restrict_network_access: false
   steps:
     env:
@@ -1307,7 +1307,7 @@ tests:
 - as: e2e-telco5g-mno-ztp-cnftests
   capabilities:
   - intranet
-  cron: 10 08 */1 * 1-5
+  cron: 10 01 */1 * 1-5
   restrict_network_access: false
   steps:
     env:

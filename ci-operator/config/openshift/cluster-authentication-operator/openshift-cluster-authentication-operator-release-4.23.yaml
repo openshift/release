@@ -3,26 +3,26 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.21_base-rhel9:
+  ocp_4.22_base-rhel9:
     name: "4.23"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.24-openshift-4.22
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel7
   inputs:
-    ocp_4.21_base-rhel9:
+    ocp_4.22_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: cluster-authentication-operator
 promotion:
   to:
@@ -195,6 +195,41 @@ tests:
     make test-operator-integration
   container:
     from: src
+- always_run: false
+  as: e2e-aws-external-oidc-conformance-parallel
+  optional: true
+  steps:
+    cluster_profile: aws-3
+    env:
+      TEST_SKIPS: ExternalOIDC\|\[Feature:OAuthServer\]\|\[Feature:RoleBindingRestrictions\]\|oauth-apiserver\|\[apigroup:oauth.openshift.io\]\|\[apigroup:user.openshift.io\]\|OAuth
+        access token\|\[sig-auth\]\[Feature:OpenShiftAuthorization\] authorization
+        TestAuthorizationSubjectAccessReview should succeed \[apigroup:authorization.openshift.io\]\|\[sig-cli\]
+        templates process \[apigroup:template.openshift.io\]\[Skipped:Disconnected\]
+        \[Suite:openshift\/conformance\/parallel\]\|\[sig-auth\]\[Feature:Authentication\]
+        TestFrontProxy should succeed \[Suite:openshift\/conformance\/parallel\]\|\[sig-devex\]\[Feature:Templates\]
+        templateinstance security tests \[apigroup:authorization.openshift.io\]\[apigroup:template.openshift.io\]
+        should pass security tests \[apigroup:route.openshift.io\] \[Suite:openshift\/conformance\/parallel\]\|\[sig-devex\]\[Feature:Templates\]
+        templateinstance impersonation tests \[apigroup:user.openshift.io\]\[apigroup:authorization.openshift.io\]
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: idp-external-oidc-keycloak-aws
+  timeout: 8h0m0s
+- always_run: false
+  as: e2e-aws-external-oidc-conformance-serial
+  optional: true
+  steps:
+    cluster_profile: aws-3
+    env:
+      TEST_ARGS: --disable-monitor=legacy-test-framework-invariants
+      TEST_SKIPS: ExternalOIDC\|\[Feature:OAuthServer\]\|\[Feature:RoleBindingRestrictions\]\|oauth-apiserver\|\[apigroup:oauth.openshift.io\]\|\[apigroup:user.openshift.io\]\|OAuth
+        access token\|\[sig-auth\]\[Feature:OpenShiftAuthorization\]\[Serial\] authorization
+        TestAuthorizationResourceAccessReview should succeed \[apigroup:authorization.openshift.io\]\|\[sig-auth\]\[Feature:OpenShiftAuthorization\]
+        authorization TestAuthorizationSubjectAccessReview should succeed \[apigroup:authorization.openshift.io\]\|\[sig-devex\]\[Feature:Templates\]
+        templateinstance impersonation tests \[apigroup:user.openshift.io\]\[apigroup:authorization.openshift.io\]\|\[sig-api-machinery\]
+        API data in etcd should be stored at the correct location and version for
+        all resources \[Serial\]
+      TEST_SUITE: openshift/conformance/serial
+    workflow: idp-external-oidc-keycloak-aws
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: release-4.23
   org: openshift
