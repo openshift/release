@@ -1,4 +1,8 @@
 base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -80,7 +84,7 @@ tests:
   as: e2e-azure-manual-oidc
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -117,7 +121,7 @@ tests:
 - as: e2e-azure-operator
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     test:
     - as: test
       cli: latest
@@ -181,6 +185,16 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- always_run: false
+  as: e2e-baremetalds-metallb-gatewayapi-conformance
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    test:
+    - ref: ingress-baremetalds-metallb-gatewayapi-conformance-test
+    workflow: ingress-baremetalds-metallb
 - always_run: false
   as: e2e-aws-ovn-techpreview
   optional: true

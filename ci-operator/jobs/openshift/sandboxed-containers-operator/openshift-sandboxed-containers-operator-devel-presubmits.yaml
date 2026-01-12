@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^devel$
     - ^devel-
-    cluster: build04
+    cluster: build09
     context: ci/prow/check
     decorate: true
     decoration_config:
@@ -61,7 +61,7 @@ presubmits:
     branches:
     - ^devel$
     - ^devel-
-    cluster: build04
+    cluster: build09
     context: ci/prow/ci-index-openshift-sandboxed-containers-operator-bundle
     decorate: true
     decoration_config:
@@ -116,7 +116,62 @@ presubmits:
     branches:
     - ^devel$
     - ^devel-
-    cluster: build04
+    cluster: build09
+    context: ci/prow/gofmt
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-sandboxed-containers-operator-devel-gofmt
+    rerun_command: /test gofmt
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=gofmt
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )gofmt,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^devel$
+    - ^devel-
+    cluster: build09
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -171,7 +226,7 @@ presubmits:
     branches:
     - ^devel$
     - ^devel-
-    cluster: build04
+    cluster: build09
     context: ci/prow/sandboxed-containers-operator-e2e
     decorate: true
     decoration_config:

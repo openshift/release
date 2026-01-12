@@ -49,6 +49,10 @@ AGENT_SERVICE_CONFIG="
 apiVersion: agent-install.openshift.io/v1beta1
 kind: AgentServiceConfig
 metadata:
+ annotations:
+  # TODO: Remove after OCPBUGS-55106 is fixed
+  # OCPBUGS-55106 workaround
+  unsupported.agent-install.openshift.io/assisted-service-allow-unrestricted-image-pulls: 'true'
  name: agent
 spec:
  databaseStorage:
