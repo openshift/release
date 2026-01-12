@@ -60,12 +60,23 @@ tests:
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
-      AZURE_BYO_COMPUTE_SUBNETS_NUMBER: "4"
       AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       CUSTOM_AZURE_REGION: centralus
+      FIPS_ENABLED: "true"
       OUTBOUND_TYPE: NATGatewayMultiZone
-    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway-byo-subnets
+      SLEEP_DURATION: 24h
+    post:
+      - ref: cucushift-installer-wait
+      - chain: cucushift-installer-rehearse-azure-ipi-deprovision
+    pre:
+      - chain: ipi-conf-azure
+      - ref: ipi-conf-azure-custom-region
+      - chain: azure-provision-service-principal-minimal-permission
+      - chain: ipi-install
+      - ref: enable-qe-catalogsource
+      - chain: cucushift-installer-check
+      - ref: cucushift-installer-check-azure-nat-gateway
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
