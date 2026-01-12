@@ -15,6 +15,8 @@ EIP_NAME="${EIP_NAME:-egress-ip-test}"
 POD_KILL_RETRIES="${POD_KILL_RETRIES:-10}"
 REBOOT_RETRIES="${REBOOT_RETRIES:-5}"
 NAMESPACE="openshift-ovn-kubernetes"
+IPECHO_NAMESPACE="${IPECHO_NAMESPACE:-ipecho-validation}"
+IPECHO_SERVICE_URL="http://ipecho.${IPECHO_NAMESPACE}.svc.cluster.local"
 
 # Test artifacts directory
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
@@ -110,8 +112,8 @@ validate_post_disruption() {
     
     log_success "Egress IP $EIP_NAME still assigned to: $current_node"
     
-    # INTERNAL NETWORKING VALIDATION (e2e methodology)
-    log_info "Validating egress IP internal networking configuration..."
+    # FUNCTIONAL EGRESS IP VALIDATION (using ipecho service)
+    log_info "Validating actual egress IP traffic flow using functional testing..."
     
     local eip_address
     eip_address=$(oc get egressip "$EIP_NAME" -o jsonpath='{.spec.egressIPs[0]}' 2>/dev/null || echo "")
@@ -194,51 +196,96 @@ EOF
                 done
             fi
             
-            # Validate egress IP internal networking using e2e methodology
-            log_info "🔧 Testing egress IP internal networking configuration..."
+            # FUNCTIONAL EGRESS IP VALIDATION using ipecho service
+            log_info "🎯 Testing actual egress IP traffic flow with functional validation..."
             
-            # 1. Verify egress IP is assigned to correct node
-            local assigned_node_ip
-            assigned_node_ip=$(oc get node "$current_node" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || echo "")
-            log_info "📍 Egress IP $eip_address assigned to node $current_node (internal IP: $assigned_node_ip)"
+            # 1. Test egress IP enabled pod - should use egress IP
+            log_info "📡 Testing egress IP enabled pod (should show egress IP: $eip_address)"
+            local egress_response
+            egress_response=$(oc exec -n egress-test-temp traffic-test-pod -- timeout 30 curl -s "$IPECHO_SERVICE_URL" 2>/dev/null || echo "")
+            log_info "📥 Egress IP pod response: '$egress_response'"
             
-            # 2. Check OVN logical router policy for egress IP
-            log_info "🔍 Verifying OVN logical router policy configuration..."
-            local ovn_pod
-            ovn_pod=$(oc get pods -n "$NAMESPACE" -l app=ovnkube-node -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+            # Clean and validate the response
+            local clean_egress_response
+            clean_egress_response=$(echo "$egress_response" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
             
-            if [[ -n "$ovn_pod" ]]; then
-                # Check for logical router policies related to our egress IP
-                local lr_policies
-                lr_policies=$(oc exec -n "$NAMESPACE" "$ovn_pod" -c ovnkube-controller -- ovn-nbctl lr-policy-list ovn_cluster_router 2>/dev/null | grep -c "$eip_address" || echo "0")
-                log_info "📊 Found $lr_policies logical router policies for egress IP $eip_address"
-                
-                # Check for NAT rules
-                local nat_rules
-                nat_rules=$(oc exec -n "$NAMESPACE" "$ovn_pod" -c ovnkube-controller -- ovn-nbctl --format=csv --no-heading find nat external_ip="$eip_address" 2>/dev/null | wc -l || echo "0")
-                log_info "📊 Found $nat_rules NAT rules for egress IP $eip_address"
-                
-                if [[ "$nat_rules" -gt 0 ]] && [[ "$lr_policies" -gt 0 ]]; then
-                    log_success "✅ INTERNAL NETWORKING VALIDATION PASSED: OVN configuration correct"
-                    echo "post_disruption,internal_validation,PASS,$eip_address" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
-                else
-                    log_warning "⚠️  OVN configuration incomplete: NAT rules: $nat_rules, LR policies: $lr_policies"
-                    echo "post_disruption,internal_validation,PARTIAL,$eip_address" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
-                fi
+            if [[ "$clean_egress_response" == "$eip_address" ]]; then
+                log_success "✅ EGRESS IP VALIDATION PASSED: Pod uses egress IP $eip_address"
+                echo "post_disruption,functional_validation,PASS,$eip_address" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
             else
-                log_warning "⚠️  Could not find OVN pod for internal validation"
-                echo "post_disruption,internal_validation,SKIP,no_ovn_pod" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                log_error "❌ EGRESS IP VALIDATION FAILED: Expected $eip_address, got '$clean_egress_response'"
+                echo "post_disruption,functional_validation,FAIL,$clean_egress_response" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                
+                # Debug information
+                log_info "🔍 Debug info:"
+                log_info "  - Raw response: '$egress_response'"
+                log_info "  - ipecho service URL: $IPECHO_SERVICE_URL"
+                log_info "  - Expected egress IP: $eip_address"
+                log_info "  - Actual response IP: '$clean_egress_response'"
+                
+                return 1
             fi
             
-            # 3. Verify pod can reach external connectivity (but don't check source IP)
-            log_info "🌐 Testing basic external connectivity (without egress IP verification)..."
-            if oc exec -n egress-test-temp traffic-test-pod -- timeout 10 curl -s -f https://httpbin.org/status/200 >/dev/null 2>&1; then
-                log_success "✅ CONNECTIVITY VALIDATION PASSED: Pod has external connectivity"
-                echo "post_disruption,connectivity_validation,PASS,external_reachable" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+            # 2. Create and test control pod (non-egress IP namespace) - should NOT use egress IP
+            log_info "🔍 Testing control pod (should NOT use egress IP)"
+            
+            # Create control namespace without egress IP labels
+            cat << CONTROL_EOF | oc apply -f -
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: egress-control-test
+  # Note: NO egress IP labels
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: control-test-pod
+  namespace: egress-control-test
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - name: curl-container
+    image: quay.io/openshift/origin-network-tools:latest
+    command: ["/bin/sleep", "300"]
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      runAsUser: 1001
+      capabilities:
+        drop:
+        - ALL
+      seccompProfile:
+        type: RuntimeDefault
+  restartPolicy: Never
+CONTROL_EOF
+            
+            # Wait for control pod
+            if oc wait --for=condition=Ready pod/control-test-pod -n egress-control-test --timeout=60s; then
+                local control_response
+                control_response=$(oc exec -n egress-control-test control-test-pod -- timeout 30 curl -s "$IPECHO_SERVICE_URL" 2>/dev/null || echo "")
+                log_info "📥 Control pod response: '$control_response'"
+                
+                local clean_control_response
+                clean_control_response=$(echo "$control_response" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
+                
+                if [[ "$clean_control_response" != "$eip_address" ]]; then
+                    log_success "✅ CONTROL VALIDATION PASSED: Non-egress pod does NOT use egress IP (uses: $clean_control_response)"
+                    echo "post_disruption,control_validation,PASS,$clean_control_response" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                else
+                    log_error "❌ CONTROL VALIDATION FAILED: Non-egress pod incorrectly uses egress IP $eip_address"
+                    echo "post_disruption,control_validation,FAIL,$clean_control_response" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                fi
+                
+                # Cleanup control resources
+                oc delete namespace egress-control-test --ignore-not-found=true &>/dev/null
             else
-                log_error "❌ CONNECTIVITY VALIDATION FAILED: Pod cannot reach external services"
-                echo "post_disruption,connectivity_validation,FAIL,external_unreachable" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
-                return 1
+                log_warning "⚠️  Control pod not ready, skipping control validation"
+                echo "post_disruption,control_validation,SKIP,pod_not_ready" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
             fi
         else
             log_warning "⚠️  Test pod not ready, skipping traffic validation"
@@ -339,8 +386,8 @@ validate_post_reboot() {
     
     log_success "Egress IPs reassigned to nodes: ${egress_nodes[*]}"
     
-    # INTERNAL NETWORKING VALIDATION (e2e methodology)
-    log_info "Validating egress IP internal networking after node reboot..."
+    # FUNCTIONAL EGRESS IP VALIDATION (using ipecho service)
+    log_info "Validating actual egress IP traffic flow after node reboot..."
     
     local eip_address
     eip_address=$(oc get egressip "$EIP_NAME" -o jsonpath='{.spec.egressIPs[0]}' 2>/dev/null || echo "")
