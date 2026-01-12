@@ -340,6 +340,60 @@ main() {
     esac
 }
 
+# Generate a pre step to build tests-private from fork
+generate_fork_pre_step() {
+  cat <<EOF
+    pre:
+    - as: build-tests-private-fork
+      commands: |
+        echo "============================================"
+        echo "Building openshift-tests-private from fork"
+        echo "============================================"
+
+        # Clone the fork
+        TESTS_PRIVATE_DIR="/tmp/openshift-tests-private"
+        git clone --depth=1 --branch=${TESTS_PRIVATE_FORK_BRANCH} \\
+          https://github.com/${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private.git \\
+          "\${TESTS_PRIVATE_DIR}"
+        cd "\${TESTS_PRIVATE_DIR}"
+
+        # Log git info for verification
+        echo "Fork: https://github.com/${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private"
+        echo "Branch: ${TESTS_PRIVATE_FORK_BRANCH}"
+        echo "Commit: \$(git rev-parse HEAD)"
+        echo "Commit Msg: \$(git log -1 --format=%s)"
+
+        # Save git info to shared dir for later steps
+        {
+          echo "Fork: https://github.com/${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private"
+          echo "Branch: ${TESTS_PRIVATE_FORK_BRANCH}"
+          echo "Commit: \$(git rev-parse HEAD)"
+          echo "Date: \$(git log -1 --format=%ci)"
+          echo "Message: \$(git log -1 --format=%s)"
+        } > "\${SHARED_DIR}/tests-private-fork-info.txt"
+
+        # Build
+        echo "Building extended-platform-tests..."
+        make go-mod-tidy
+        make all
+
+        # Copy binary to shared dir
+        cp ./bin/extended-platform-tests "\${SHARED_DIR}/"
+        chmod +x "\${SHARED_DIR}/extended-platform-tests"
+
+        echo "Binary saved to \${SHARED_DIR}/extended-platform-tests"
+        ls -la "\${SHARED_DIR}/extended-platform-tests"
+
+        # Mark that fork binary should be used
+        echo "true" > "\${SHARED_DIR}/use-tests-private-fork"
+      from: tests-private-builder
+      resources:
+        requests:
+          cpu: "3"
+          memory: 12Gi
+EOF
+}
+
 # Generate one variant of our workflow
 generate_workflow() {
   local platform=$1       # e.g. azure or aws
@@ -352,6 +406,12 @@ generate_workflow() {
   echo "  cron: ${cron}"
   echo "  steps:"
   echo "    cluster_profile: ${profile}"
+
+  # Add pre step to build fork if enabled
+  if [[ "${TESTS_PRIVATE_FORK_ENABLED}" == "true" ]]; then
+    generate_fork_pre_step
+  fi
+
   echo "    env:"
 
   # Collect environment variables into a temporary array
@@ -391,6 +451,8 @@ generate_workflow() {
     "TRUSTEE_URL: ${TRUSTEE_URL:-\"\"}"
   )
 
+  # Fork env vars are embedded directly in the pre and test steps, not needed here
+
   # Workload-specific
   case $workload in
     kata)
@@ -405,6 +467,78 @@ generate_workflow() {
 
   # Sort and print alphabetically
   printf '%s\n' "${env_vars[@]}" | sort | sed 's/^/      /'
+
+  # If fork is enabled, add a test step that uses the fork binary
+  if [[ "${TESTS_PRIVATE_FORK_ENABLED}" == "true" ]]; then
+    cat <<EOF
+    test:
+    - as: run-tests-from-fork
+      cli: latest
+      commands: |
+        # Use the fork binary built in the pre step
+        FORK_BINARY="\${SHARED_DIR}/extended-platform-tests"
+
+        if [[ -f "\${FORK_BINARY}" ]]; then
+          echo "Using fork binary from: \${FORK_BINARY}"
+          chmod +x "\${FORK_BINARY}"
+
+          # Show fork info
+          if [[ -f "\${SHARED_DIR}/tests-private-fork-info.txt" ]]; then
+            echo "=== Fork Information ==="
+            cat "\${SHARED_DIR}/tests-private-fork-info.txt"
+            echo "========================"
+            cp "\${SHARED_DIR}/tests-private-fork-info.txt" "\${ARTIFACT_DIR}/"
+          fi
+        else
+          echo "ERROR: Fork binary not found at \${FORK_BINARY}"
+          echo "Contents of SHARED_DIR:"
+          ls -la "\${SHARED_DIR}/"
+          exit 1
+        fi
+
+        # Run the tests using the fork binary
+        echo "Running tests with fork binary..."
+        cd /tmp
+
+        # Build test list
+        SCENARIOS="\${TEST_SCENARIOS:-sig-kata.*Kata Author}"
+        FILTERS="\${TEST_FILTERS:-~DisconnectedOnly&;~Disruptive&}"
+        TIMEOUT="\${TEST_TIMEOUT:-90}"
+        PARALLEL="\${TEST_PARALLEL:-1}"
+
+        echo "Test scenarios: \${SCENARIOS}"
+        echo "Test filters: \${FILTERS}"
+
+        # Get test cases
+        TEST_CASES=\$("\${FORK_BINARY}" run all --dry-run 2>/dev/null | \\
+          grep -E "\${SCENARIOS}" | \\
+          grep -v -E "^#" || true)
+
+        if [[ -z "\${TEST_CASES}" ]]; then
+          echo "No test cases matched the scenario filter"
+          "\${FORK_BINARY}" run all --dry-run 2>/dev/null | head -50
+          exit 1
+        fi
+
+        echo "Found \$(echo "\${TEST_CASES}" | wc -l) test cases"
+        echo "\${TEST_CASES}" > "\${ARTIFACT_DIR}/test-cases.txt"
+
+        # Run tests
+        "\${FORK_BINARY}" run --max-parallel-tests "\${PARALLEL}" \\
+          --timeout "\${TIMEOUT}m" \\
+          -o "\${ARTIFACT_DIR}/e2e-tests.txt" \\
+          --junit-dir "\${ARTIFACT_DIR}/junit" \\
+          -- "\${TEST_CASES}" || true
+
+        echo "Test results saved to \${ARTIFACT_DIR}/"
+        ls -la "\${ARTIFACT_DIR}/"
+      from: cli
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+EOF
+  fi
 
   echo "    workflow: ${workflow}"
   echo "  timeout: 24h0m0s"
@@ -575,7 +709,7 @@ zz_generated_metadata:
   branch: devel
   org: openshift
   repo: sandboxed-containers-operator
-  variant: downstream-${PROW_RUN_TYPE}
+  variant: downstream-${PROW_RUN_TYPE}${OCP_PROWJOB_VERSION}
 EOF
 
     # Validate the generated file
