@@ -108,7 +108,7 @@ function verify_node_osimage() {
 
   # Run rpm-ostree status on the node
   local rpm_ostree_output
-  if ! rpm_ostree_output=$(oc debug node/"${node_name}" -- chroot /host rpm-ostree status 2>&1); then
+  if ! rpm_ostree_output=$(oc debug -n default node/"${node_name}" -- chroot /host rpm-ostree status 2>&1); then
     echo "ERROR: Failed to run rpm-ostree status on node '${node_name}'"
     echo "${rpm_ostree_output}"
     return 1

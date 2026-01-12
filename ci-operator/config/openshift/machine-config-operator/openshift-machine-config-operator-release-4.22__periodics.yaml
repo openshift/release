@@ -215,6 +215,20 @@ tests:
       COMPUTE_NODE_REPLICAS: "2"
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/machine-config-operator/longduration
+    test:
+    - chain: mco-e2e-test
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-mco-tp-longduration-rhel10
+  interval: 168h
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      FEATURE_SET: TechPreviewNoUpgrade
+      MCO_CONF_DAY2_OS_IMAGE_STREAM_NAME: rhel-10
+      TEST_SUITE: openshift/machine-config-operator/longduration
+    test:
+    - chain: mco-e2e-test
     workflow: openshift-e2e-vsphere
 - as: e2e-aws-mco-fips-proxy-longduration
   interval: 168h
@@ -225,33 +239,9 @@ tests:
       FIPS_ENABLED: "true"
       TEST_SKIPS: ""
       TEST_SUITE: openshift/machine-config-operator/longduration
+    test:
+    - chain: mco-e2e-test
     workflow: openshift-e2e-aws-proxy
-- as: e2e-aws-ovn-day1-rhel10
-  interval: 24h
-  steps:
-    cluster_profile: aws-3
-    env:
-      MCO_CONF_DAY1_OS_IMAGE_STREAM_NAME: rhel-10
-      MCO_CONF_DAY1_OS_IMAGE_STREAM_POOLS: master worker
-    pre:
-    - chain: ipi-conf-aws
-    - ref: mco-conf-day1-os-image-stream
-    - chain: ipi-install
-    test:
-    - ref: openshift-e2e-test
-    workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-day2-rhel10-disruptive
-  interval: 72h
-  steps:
-    cluster_profile: aws-3
-    env:
-      MCO_CONF_DAY2_OS_IMAGE_STREAM_NAME: rhel-10
-      MCO_CONF_DAY2_OS_IMAGE_STREAM_POOLS: master worker
-      TEST_SUITE: openshift/machine-config-operator/disruptive
-    test:
-    - ref: mco-conf-day2-os-image-stream
-    - ref: openshift-e2e-test
-    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.22
   org: openshift
