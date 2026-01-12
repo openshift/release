@@ -233,6 +233,11 @@ echo "Helm wrapper installed at /tmp/helm"
 echo "Original helm binary: ${ORIGINAL_HELM}"
 echo "MinIO storage type will be injected for cost-onprem chart only"
 
+# Ensure /tmp is at the front of PATH so our wrapper is found first
+export PATH="/tmp:${PATH}"
+echo "PATH updated: /tmp is now first in PATH"
+echo "helm resolves to: $(command -v helm)"
+
 echo "========== Running E2E Tests =========="
 
 # Export environment variables for the deployment script
