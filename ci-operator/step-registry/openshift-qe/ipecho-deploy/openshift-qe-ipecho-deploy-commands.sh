@@ -70,7 +70,6 @@ spec:
     spec:
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1001
         seccompProfile:
           type: RuntimeDefault
       containers:
@@ -84,7 +83,6 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
-          runAsUser: 1001
           capabilities:
             drop:
             - ALL
@@ -170,7 +168,6 @@ metadata:
 spec:
   securityContext:
     runAsNonRoot: true
-    runAsUser: 1001
     seccompProfile:
       type: RuntimeDefault
   containers:
@@ -180,7 +177,6 @@ spec:
     securityContext:
       allowPrivilegeEscalation: false
       runAsNonRoot: true
-      runAsUser: 1001
       capabilities:
         drop:
         - ALL

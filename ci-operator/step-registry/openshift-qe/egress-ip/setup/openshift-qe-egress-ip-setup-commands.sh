@@ -95,6 +95,11 @@ EOF
     echo "$assigned_node" > "$SHARED_DIR/egress-node"
     echo "$TEST_NAMESPACE" > "$SHARED_DIR/egress-namespace"
     
+    # Create health check URL for krkn chaos testing
+    # This allows chaos scripts to monitor the actual egress IP during disruption
+    echo "http://ipecho.ipecho-validation.svc.cluster.local" > "$SHARED_DIR/egress-health-check-url"
+    echo "Created egress IP health check URL for chaos monitoring: http://ipecho.ipecho-validation.svc.cluster.local"
+    
 elif [[ $RUNNING_CNI == "OpenShiftSDN" ]]; then
     echo "OpenShiftSDN configuration not implemented in this version"
     echo "This test focuses on OVNKubernetes clusters"
