@@ -11,7 +11,7 @@ run() {
 }
 
 set_proxy() {
-  if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+  if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
     echo "setting the proxy"
     echo "source ${SHARED_DIR}/proxy-conf.sh"
     source "${SHARED_DIR}/proxy-conf.sh"
