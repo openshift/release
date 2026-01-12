@@ -94,35 +94,24 @@ tests:
     cluster_profile: aws-4
     workflow: openshift-upgrade-aws
 - as: e2e-aws-operator
+  shard_count: 2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
-    test:
-    - as: test
-      commands: |
-        make e2e-presubmit
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: ipi-aws
+    env:
+      TEST_ARGS: --max-parallel-tests 1
+      TEST_SUITE: cpmso/presubmit
+    workflow: openshift-e2e-aws
 - as: e2e-aws-operator-techpreview
+  shard_count: 2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-5
     env:
       FEATURE_SET: TechPreviewNoUpgrade
-    test:
-    - as: test
-      commands: |
-        make e2e-presubmit
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: ipi-aws
+      TEST_ARGS: --max-parallel-tests 1
+      TEST_SUITE: cpmso/presubmit
+    workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-periodic-pre
   optional: true
