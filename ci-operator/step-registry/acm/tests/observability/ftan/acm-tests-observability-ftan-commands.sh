@@ -85,6 +85,8 @@ if [[ "$OUTPUT" != "" ]]; then
         oc delete subscription.apps.open-cluster-management.io -n policies openshift-plus-sub
 fi
 
+sleep 8h
+
 # run the test execution script
 bash +x ./execute_obs_interop_commands.sh || :
 
