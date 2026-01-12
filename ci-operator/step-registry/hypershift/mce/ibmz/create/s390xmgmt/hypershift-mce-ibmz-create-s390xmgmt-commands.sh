@@ -9,6 +9,7 @@ export CLUSTER_NAME="${CLUSTER_NAME_PREFIX}-${job_id}"
 CLUSTER_ARCH=s390x
 export CLUSTER_ARCH
 #export CLUSTER_VERSION="4.19.0"
+echo $MCE_VERSION
 cat "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret" | jq -c > "$HOME/pull-secret" 
 export PULL_SECRET_FILE="$HOME/pull-secret"
 
