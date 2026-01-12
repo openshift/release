@@ -95,21 +95,15 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
-- always_run: false
-  as: e2e-tests-extension
+- as: e2e-aws-operator-serial-ote
   optional: true
   steps:
+    cluster_profile: aws
+    env:
+      TEST_SUITE: openshift/cluster-config-operator/operator/serial
     test:
-    - as: tests-extension
-      commands: |
-        echo "Build binary cluster-config-operator-tests-ext"
-        make tests-ext-build
-        echo "Running ./cluster-config-operator-tests-ext with sanity test"
-        ./cluster-config-operator-tests-ext run-suite openshift/cluster-config-operator/conformance/parallel -j ${ARTIFACT_DIR}/junit_$(shell date +%Y%m%d-%H%M%S).xml
-      from: src
-      resources:
-        requests:
-          cpu: 100m
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift
