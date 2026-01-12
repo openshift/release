@@ -204,14 +204,13 @@ ORIGINAL_HELM="__ORIGINAL_HELM__"
 # Check if this is an install/upgrade command for cost-onprem specifically
 if [[ "$*" == *"cost-onprem"* ]] && { [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"install"* ]]; }; then
     echo "[helm-wrapper] Detected cost-onprem chart - injecting MinIO storage configuration..."
-    # IMPORTANT: Do NOT set global.storageType=minio as that changes isOpenShift detection
-    # which breaks security contexts (runAsUser: 1000 not allowed on OpenShift)
-    #
+    # Set storageType=minio to skip NooBaa CRD lookups
+    # Also set isOpenShift=true to preserve OpenShift-specific security contexts
     # We use a proxy service (minio-storage) in the app namespace that routes to MinIO.
-    # - odf.endpoint = minio-storage (just hostname)
-    # - odf.port = 9000
     echo "[helm-wrapper] Using MinIO host: ${MINIO_HOST:-minio-storage}, port: ${MINIO_PORT:-9000}"
     exec "$ORIGINAL_HELM" "$@" \
+        --set "global.storageType=minio" \
+        --set "global.isOpenShift=true" \
         --set "odf.endpoint=${MINIO_HOST:-minio-storage}" \
         --set "odf.port=${MINIO_PORT:-9000}" \
         --set "odf.useSSL=false" \
