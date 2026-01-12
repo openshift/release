@@ -7,6 +7,22 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  installer:
+    name: "4.22"
+    namespace: ocp
+    tag: installer
+  lifecycle-agent-operator-4-22:
+    name: "4.22"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator
+  lifecycle-agent-operator-bundle-4-21:
+    name: "4.21"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
+  lifecycle-agent-operator-bundle-4-22:
+    name: "4.22"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
   tests-private:
     name: tests-private
     namespace: ci
@@ -135,6 +151,37 @@ tests:
     - ref: baremetalds-sno-rename
     - ref: baremetalds-sno-test
     workflow: baremetalds-sno
+- as: ibu-e2e-flow
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: recert
+      TARGET_LCA_REF: pipeline:lifecycle-agent-operator-bundle-4-21
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      OCP_TARGET_IMAGE_SOURCE: ci
+      OCP_TARGET_VERSION: "4.21"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+    workflow: openshift-image-based-upgrade-presubmit
+- as: ibi-e2e-flow
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  steps:
+    cluster_profile: aws
+    dependencies:
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: recert
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-install
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge

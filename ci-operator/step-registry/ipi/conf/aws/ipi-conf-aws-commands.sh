@@ -227,24 +227,19 @@ fi
 # OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY is set to false by the release controller (i.e. do not use NAT instances
 # release controller jobs.
 if [[ "${CI_NAT_REPLACE:-false}" == 'auto' ]]; then
-  if [[ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-true}" == "false" ]]; then
-    # Release controller jobs set OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY explicitly to 
-    # prevent the use of public networks. We assume if it is set, 
-    # it is likely a release controller job and to avoid NAT instance use
-    # as well.
-    CI_NAT_REPLACE='false_release_controller_job'
   # Enable the option for jobs using the shared aws cluster profiles unless they use a different install topology.
   # 4.21 is currently excluded as we approach GA.
-  elif [[ "${CLUSTER_PROFILE_NAME}" != "aws" && ! "${CLUSTER_PROFILE_NAME}" =~ ^aws-[0-9]+$ ]]; then
-    CI_NAT_REPLACE='false_CLUSTER_PROFILE_NAME_is_not_a_shared_aws_profile'
-  elif [[ "${JOB_NAME}" == *-4.21-* ]]; then
-    CI_NAT_REPLACE='false_4_21_jobs_are_excluded'
+  if [[ "${CLUSTER_PROFILE_NAME}" != "aws" && ! "${CLUSTER_PROFILE_NAME}" =~ ^aws-[0-9]+$ ]]; then
+    CI_NAT_REPLACE='false_CLUSTER_PROFILE_NAME_is_not_a_testplatform_aws_profile'
   elif [[ "${JOB_NAME}" == *'microshift'* || "${JOB_NAME}" == *'hypershift'* || "${JOB_NAME}" == *'vpc'* || "${JOB_NAME}" == *'single-node'* ]]; then
-    CI_NAT_REPLACE='false_job_uses_non_standard_install_topology'
+    CI_NAT_REPLACE='false_job_uses_non_standalone_install_topology'
   else
     CI_NAT_REPLACE='true'
-    echo "IMPORTANT: this job has been selected to use NAT instance instead of NAT gateway. See jupierce if abnormalities are detected."
   fi
+fi
+
+if [[ "${CI_NAT_REPLACE:-false}" == 'true' ]]; then
+    echo "IMPORTANT: this job has been selected to use NAT instance instead of NAT gateway. See jupierce if abnormalities are detected."
 fi
 
 echo "Using control plane instance type: ${CONTROL_PLANE_INSTANCE_TYPE}"
