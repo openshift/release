@@ -3,7 +3,8 @@ set -o errexit
 
 # Use egress IP health check if available, fallback to console
 if [[ -f "$SHARED_DIR/egress-health-check-url" ]]; then
-    export HEALTH_CHECK_URL=$(cat "$SHARED_DIR/egress-health-check-url")
+    HEALTH_CHECK_URL=$(cat "$SHARED_DIR/egress-health-check-url")
+    export HEALTH_CHECK_URL
     echo "Using egress IP health check URL for chaos monitoring: $HEALTH_CHECK_URL"
 else
     console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
