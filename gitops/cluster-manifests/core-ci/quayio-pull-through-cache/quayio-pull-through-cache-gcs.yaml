@@ -1,7 +1,8 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: qci-pull-through-cache-us-east-1
+  name: quayio-pull-through-cache-gcp
+  namespace: ci
 data:
   config.yml: |-
     version: 0.1
@@ -33,11 +34,12 @@ data:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: qci-pull-through-cache-us-east-1
+  name: quayio-pull-through-cache-gcs
+  namespace: ci
 spec:
   to:
     kind: Service
-    name: qci-pull-through-cache-us-east-1
+    name: quayio-pull-through-cache-gcs
   tls:
     termination: Edge
     insecureEdgeTerminationPolicy: Redirect
@@ -45,10 +47,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: qci-pull-through-cache-us-east-1
+  name: quayio-pull-through-cache-gcs
+  namespace: ci
 spec:
   selector:
-    app: qci-pull-through-cache-us-east-1
+    app: quayio-pull-through-cache-gcs
   ports:
   - port: 5000
     targetPort: 5000
@@ -57,35 +60,32 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: qci-pull-through-cache-us-east-1
+  name: quayio-pull-through-cache-gcs
+  namespace: ci
   labels:
-    app: qci-pull-through-cache-us-east-1
+    app: quayio-pull-through-cache-gcs
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
 spec:
   selector:
     matchLabels:
-      app: qci-pull-through-cache-us-east-1
+      app: quayio-pull-through-cache-gcs
   template:
     metadata:
       labels:
-        app: qci-pull-through-cache-us-east-1
+        app: quayio-pull-through-cache-gcs
     spec:
       tolerations:
-      - key: "node-role.kubernetes.io/qci-cache-worker"
-        operator: "Equal"
-        value: "qci-cache-worker"
-        effect: "NoSchedule"
+      - key: node-role.kubernetes.io/infra
+        operator: Exists
       nodeSelector:
-        cache-workload: qci-cache
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-          - labelSelector:
-              matchLabels:
-                app: qci-pull-through-cache-us-east-1
-            topologyKey: "kubernetes.io/hostname"
+        node-role.kubernetes.io: infra
       containers:
-      - name: qci-cache
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_docker-registry_tp-2.8.1
+      - name: quayio-cache
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_docker-registry_tp-2.8.2-gcs
         command:
         - /tp-entrypoint.sh
         env:
@@ -107,11 +107,6 @@ spec:
         ports:
           - name: http
             containerPort: 5000
-        volumeMounts:
-        - mountPath: /etc/quay-io-pull-credentials
-          name: quay-io-pull-credentials
-        - mountPath: /etc/docker-registry
-          name: config
         resources:
           requests:
             memory: "512Mi"
@@ -119,10 +114,15 @@ spec:
           limits:
             memory: "2Gi"
             cpu: "1000m"
+        volumeMounts:
+        - mountPath: /etc/quay-io-pull-credentials
+          name: quay-io-pull-credentials
+        - mountPath: /etc/docker-registry
+          name: config
       volumes:
       - name: config
         configMap:
-          name: qci-pull-through-cache-us-east-1
+          name: quayio-pull-through-cache-gcp
       - name: quay-io-pull-credentials
         secret:
           secretName: quay-io-pull-credentials
