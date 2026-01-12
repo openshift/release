@@ -130,7 +130,6 @@ fi
 
 # Validate service is working
 log_info "Validating ipecho service functionality..."
-IPECHO_SERVICE_IP=$(oc get service ipecho -n "$IPECHO_NAMESPACE" -o jsonpath='{.spec.clusterIP}')
 
 # Create temporary test pod to validate ipecho
 cat << EOF | oc apply -f -
