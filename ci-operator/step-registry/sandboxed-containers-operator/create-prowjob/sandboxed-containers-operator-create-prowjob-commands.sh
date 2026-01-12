@@ -433,14 +433,63 @@ generate_tests_private_fork_workflow() {
           "\${TESTS_PRIVATE_DIR}"
         cd "\${TESTS_PRIVATE_DIR}"
 
+        # Verify and log git info (shows in job logs)
+        echo "============================================"
+        echo "VERIFICATION: Fork and Branch Information"
+        echo "============================================"
+        echo "Expected: https://github.com/${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private @ ${TESTS_PRIVATE_FORK_BRANCH}"
+        echo "Actual Remote: \$(git remote get-url origin)"
+        echo "Actual Branch: \$(git branch --show-current)"
+        echo "Actual Commit: \$(git rev-parse HEAD)"
+        echo "Commit Date:   \$(git log -1 --format=%ci)"
+        echo "Commit Msg:    \$(git log -1 --format=%s)"
+        echo "============================================"
+
+        # Save git info to artifacts -> artifacts/test-from-fork/git-info.txt
+        {
+          echo "=== Git Repository Verification ==="
+          echo "Expected Remote: https://github.com/${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private"
+          echo "Expected Branch: ${TESTS_PRIVATE_FORK_BRANCH}"
+          echo ""
+          echo "=== Actual Values ==="
+          echo "Remote URL: \$(git remote get-url origin)"
+          echo "Branch: \$(git branch --show-current)"
+          echo "Commit SHA: \$(git rev-parse HEAD)"
+          echo "Commit Date: \$(git log -1 --format=%ci)"
+          echo "Commit Author: \$(git log -1 --format='%an <%ae>')"
+          echo ""
+          echo "=== Commit Details ==="
+          git log -1 --format=full
+          echo ""
+          echo "=== Recent Commits ==="
+          git log -10 --oneline
+        } > "\${ARTIFACT_DIR}/git-info.txt"
+
+        # Save git remote info -> artifacts/test-from-fork/git-remote.txt
+        git remote -v > "\${ARTIFACT_DIR}/git-remote.txt"
+
         # Build tests from your fork
+        echo "Building openshift-tests-private..."
         make go-mod-tidy
         make all
 
-        # Run sig-kata tests (dry-run example)
+        # Verify binary was built -> artifacts/test-from-fork/binary-info.txt
+        {
+          echo "=== Binary Information ==="
+          echo "Binary path: \${TESTS_PRIVATE_DIR}/bin/extended-platform-tests"
+          ls -la ./bin/extended-platform-tests
+          echo ""
+          echo "=== Binary Version ==="
+          ./bin/extended-platform-tests version 2>&1 || echo "Version command not available"
+        } > "\${ARTIFACT_DIR}/binary-info.txt"
+
+        # Run sig-kata tests (dry-run example) -> artifacts/test-from-fork/test-results.txt
         ./bin/extended-platform-tests run all \\
           --dry-run \\
-          -o /tmp/results.txt
+          -o "\${ARTIFACT_DIR}/test-results.txt"
+
+        echo "Artifacts saved to \${ARTIFACT_DIR}/"
+        ls -la "\${ARTIFACT_DIR}/"
       from: tests-private-builder
       resources:
         requests:
