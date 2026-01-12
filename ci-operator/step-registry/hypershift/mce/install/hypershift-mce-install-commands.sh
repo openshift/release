@@ -232,11 +232,6 @@ spec:
   installNamespace: open-cluster-management-agent-addon
 EOF
 
-oc delete crd ipaddressclaims.ipam.cluster.x-k8s.io
-oc delete crd ipaddresses.ipam.cluster.x-k8s.io
-
-oc delete pod -n open-cluster-management-agent-addon --all
-
 # wait for hypershift operator to come online
 _hypershiftReady=0
 set +e
