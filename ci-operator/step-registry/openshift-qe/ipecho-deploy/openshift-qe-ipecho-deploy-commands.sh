@@ -39,6 +39,12 @@ log_info "Creating namespace for ipecho service..."
 # Create namespace for ipecho service
 oc create namespace "$IPECHO_NAMESPACE" --dry-run=client -o yaml | oc apply -f -
 
+# Validate image availability (optional check to catch pull issues early)
+log_info "Validating ipecho image availability..."
+if ! oc run ipecho-image-test --image="$IPECHO_IMAGE" --dry-run=server -o yaml -n "$IPECHO_NAMESPACE" &>/dev/null; then
+    log_warning "Image validation check failed, but proceeding with deployment..."
+fi
+
 log_info "Deploying ipecho service components..."
 
 # Deploy ipecho service
@@ -70,6 +76,7 @@ spec:
       containers:
       - name: ipecho
         image: $IPECHO_IMAGE
+        imagePullPolicy: Always
         ports:
         - name: http
           containerPort: 8080
@@ -94,14 +101,20 @@ spec:
           httpGet:
             path: /
             port: 8080
-          initialDelaySeconds: 5
+            scheme: HTTP
+          initialDelaySeconds: 10
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         livenessProbe:
           httpGet:
             path: /
             port: 8080
-          initialDelaySeconds: 10
+            scheme: HTTP
+          initialDelaySeconds: 15
           periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
@@ -122,9 +135,25 @@ spec:
     app: ipecho
 EOF
 
-# Wait for deployment to be ready
+# Wait for deployment to be ready with extended timeout
 log_info "Waiting for ipecho deployment to be ready..."
-if ! oc rollout status deployment/ipecho -n "$IPECHO_NAMESPACE" --timeout=120s; then
+if ! oc rollout status deployment/ipecho -n "$IPECHO_NAMESPACE" --timeout=300s; then
+    log_error "ipecho deployment failed to become ready within 300 seconds"
+    log_info "Gathering debug information..."
+    
+    # Show pod status and events for debugging
+    log_info "Pod status:"
+    oc get pods -n "$IPECHO_NAMESPACE" -l app=ipecho -o wide || true
+    
+    log_info "Pod events:"
+    oc get events -n "$IPECHO_NAMESPACE" --sort-by='.lastTimestamp' || true
+    
+    log_info "Pod logs:"
+    oc logs -n "$IPECHO_NAMESPACE" -l app=ipecho --tail=50 || true
+    
+    log_info "Deployment status:"
+    oc describe deployment ipecho -n "$IPECHO_NAMESPACE" || true
+    
     error_exit "ipecho deployment failed to become ready"
 fi
 
@@ -161,7 +190,8 @@ spec:
 EOF
 
 # Wait for test pod and validate ipecho service
-if oc wait --for=condition=Ready pod/ipecho-test-pod -n "$IPECHO_NAMESPACE" --timeout=60s; then
+log_info "Waiting for test pod to become ready..."
+if oc wait --for=condition=Ready pod/ipecho-test-pod -n "$IPECHO_NAMESPACE" --timeout=120s; then
     log_info "Testing ipecho service functionality..."
     
     # Test ipecho service response
