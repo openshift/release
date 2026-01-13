@@ -232,7 +232,7 @@ function deploy_acs_operator_default_setting() {
    wait_deploy sensor
 
   # Artifacts archiv into ${ARTIFACT_DIR}/ folder, detail violation report in detail/ folder
-   sleep 120 # wait for vulnerability scan
+   sleep 180 # wait for vulnerability scan
    generate_quay_violation_report
    generate_vuln_id_detail_report
 
