@@ -17,7 +17,7 @@ echo "Cloud-bulldozer methodology: Detected $CURRENT_WORKER_COUNT ready worker n
 
 # Get worker nodes for egress IP assignment (using cloud-bulldozer kube-burner pattern)
 # Use the same node selection criteria as cloud-bulldozer egressip workload
-WORKER_NODES=($(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= -o jsonpath='{.items[*].metadata.name}'))
+mapfile -t WORKER_NODES < <(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n')
 WORKER_NODE="${WORKER_NODES[0]}"
 echo "Cloud-bulldozer pattern: Selected worker node: $WORKER_NODE (from ${#WORKER_NODES[@]} available workers)"
 
