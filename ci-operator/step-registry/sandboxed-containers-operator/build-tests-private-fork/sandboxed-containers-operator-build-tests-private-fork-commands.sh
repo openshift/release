@@ -8,7 +8,9 @@ echo "Building openshift-tests-private from fork"
 echo "============================================"
 
 # Check for GitHub token
-GITHUB_TOKEN_FILE="/var/run/secrets/github/oauth"
+# The secret is at selfservice/sandboxed-containers-operator/otp-fork with key "oauth"
+# When mounted, the file path is: /var/run/secrets/github/otp-fork
+GITHUB_TOKEN_FILE="/var/run/secrets/github/otp-fork"
 if [[ -f "${GITHUB_TOKEN_FILE}" ]]; then
     GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_FILE}")
     echo "GitHub token found, will use authenticated clone"
