@@ -76,15 +76,12 @@ spec:
       - name: ipecho
         image: $IPECHO_IMAGE
         imagePullPolicy: Always
+        command: ["/ip-echo"]
+        args: ["--listen=0.0.0.0:8080"]
         ports:
         - name: http
           containerPort: 8080
           protocol: TCP
-        env:
-        - name: PORT
-          value: "8080"
-        - name: LISTEN
-          value: ":8080"
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true

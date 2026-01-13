@@ -2,7 +2,6 @@ chain:
   as: openshift-qe-egress-ip
   steps:
   - ref: openshift-qe-egress-ip-setup
-  - ref: openshift-qe-ipecho-deploy
   - ref: redhat-chaos-pod-scenarios-custom
   - ref: redhat-chaos-node-disruptions-worker-outage
   - ref: openshift-qe-egress-ip-tests
@@ -55,16 +54,21 @@ chain:
   - name: JUNIT_TESTCASE
     default: '[Egress-IP] OVN pod disruption resilience test'
   documentation: >-
-    Executes comprehensive OpenShift QE egress IP test suite using functional validation.
+    Executes comprehensive OpenShift QE egress IP test suite using cloud-bulldozer methodology 
+    integrated with chaos engineering validation framework.
     
     This chain orchestrates:
-    1. Infrastructure setup using egress IP setup with proper node assignment
-    2. Deploy ipecho service for functional traffic flow validation  
-    3. Chaos engineering pod disruption using krkn framework (targets ovnkube-node pods)
-    4. Chaos engineering node reboot using krkn framework (targets worker nodes)  
-    5. Functional validation using real traffic flow testing with ipecho service
+    1. Infrastructure setup using cloud-bulldozer kube-burner egressip workload methodology
+       - Uses worker node count scaling (ITERATIONS=${worker_count})
+       - Applies cloud-bulldozer proven node selection and EgressIP configuration
+       - Deploys external ipecho service for functional validation
+    2. Chaos engineering pod disruption using krkn framework (targets ovnkube-node pods)
+    3. Chaos engineering node reboot using krkn framework (targets worker nodes)  
+    4. Functional validation using real traffic flow testing with external ipecho service
     
-    The test suite validates actual egress IP functionality by testing real traffic
-    flow rather than just checking implementation details. Uses ipecho service to
-    verify that pods in egress IP namespaces actually use the designated egress IP
-    address for outbound traffic, providing true end-to-end functional validation.
+    The test suite combines cloud-bulldozer's proven egressip workload setup with advanced
+    chaos engineering capabilities. It validates actual egress IP functionality by testing 
+    real traffic flow rather than just checking implementation details. Uses external ipecho 
+    service on jump host to verify that pods in egress IP namespaces actually use the designated 
+    egress IP address for outbound traffic, providing true end-to-end functional validation 
+    with enterprise-grade chaos testing.

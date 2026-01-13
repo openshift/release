@@ -4,19 +4,34 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# OpenShift QE Egress IP Resilience Tests
+# OpenShift QE Egress IP Resilience Tests using Cloud-Bulldozer Methodology
 # Comprehensive end-to-end testing of egress IP functionality under disruption
+# Integrated with cloud-bulldozer kube-burner egressip workload approach
 
-echo "Starting OpenShift QE Egress IP Resilience Tests"
-echo "==============================================="
+echo "Starting OpenShift QE Egress IP Resilience Tests with Cloud-Bulldozer Integration"
+echo "=================================================================================="
 
-# Configuration
+# Load cloud-bulldozer configuration if available
+if [[ -f "$SHARED_DIR/cloud-bulldozer-config" ]]; then
+    echo "Loading cloud-bulldozer kube-burner egressip workload configuration..."
+    source "$SHARED_DIR/cloud-bulldozer-config"
+    echo "Cloud-bulldozer settings: WORKLOAD=$WORKLOAD, ITERATIONS=$ITERATIONS workers"
+fi
+
+# Configuration (cloud-bulldozer + chaos engineering hybrid)
 EIP_NAME="${EIP_NAME:-egress-ip-test}"
 POD_KILL_RETRIES="${POD_KILL_RETRIES:-10}"
 REBOOT_RETRIES="${REBOOT_RETRIES:-5}"
 NAMESPACE="openshift-ovn-kubernetes"
-IPECHO_NAMESPACE="${IPECHO_NAMESPACE:-ipecho-validation}"
-IPECHO_SERVICE_URL="http://ipecho.${IPECHO_NAMESPACE}.svc.cluster.local"
+WORKER_COUNT="${WORKER_COUNT:-3}"
+
+# Get external ipecho service URL from setup
+if [[ -f "$SHARED_DIR/egress-health-check-url" ]]; then
+    IPECHO_SERVICE_URL=$(cat "$SHARED_DIR/egress-health-check-url")
+else
+    IPECHO_SERVICE_URL="https://httpbin.org/ip"  # Fallback
+fi
+echo "Using external ipecho service: $IPECHO_SERVICE_URL"
 
 # Test artifacts directory
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
