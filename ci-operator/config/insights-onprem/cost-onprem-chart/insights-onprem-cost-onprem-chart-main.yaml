@@ -1,9 +1,22 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.22
-  use_build_cache: true
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/ubi
+      RUN dnf install -y git && dnf clean all
+images:
+- dockerfile_literal: |-
+    FROM src
+    USER root
+    RUN dnf install -y python3.11 python3.11-pip jq && dnf clean all && \
+        alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 20 && \
+        python3 -m pip install --no-cache-dir pytest pyyaml requests
+    RUN curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq && \
+        chmod +x /usr/local/bin/yq && \
+        curl -sL https://get.helm.sh/helm-v3.13.0-linux-amd64.tar.gz | tar xz -C /tmp && \
+        mv /tmp/linux-amd64/helm /usr/local/bin/helm && \
+        curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xz -C /usr/local/bin oc kubectl
+  from: src
+  to: cost-onprem-test
 releases:
   latest:
     release:
