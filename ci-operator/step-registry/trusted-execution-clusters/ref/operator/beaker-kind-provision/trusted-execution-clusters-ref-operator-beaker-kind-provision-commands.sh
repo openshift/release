@@ -283,7 +283,7 @@ else
 fi
 
 echo "[INFO] Installing basic prerequisites..."
-${SUDO} ${PKG_MGR} install -y curl gcc make dnf-plugins-core wget tar git jq
+${SUDO} ${PKG_MGR} install -y curl gcc make dnf-plugins-core wget tar git jq file
 
 # Install Rust
 echo "[INFO] Installing Rust via rustup..."
@@ -512,91 +512,28 @@ go env -w GOSUMDB="${GOSUMDB}"
 
 echo "[SUCCESS] Go proxy configured: ${GOPROXY}"
 
-# Download operator Repository
-echo "[INFO] Downloading operator repository..."
+# Clone operator Repository
+echo "[INFO] Cloning operator repository..."
 
 WORK_DIR="${HOME}/operator-kind-setup"
 rm -rf "${WORK_DIR}"
 
-REPO_URL_CLEAN="${OPERATOR_REPO%.git}"
-REPO_OWNER=$(echo "${REPO_URL_CLEAN}" | awk -F'/' '{print $(NF-1)}')
-REPO_NAME=$(echo "${REPO_URL_CLEAN}" | awk -F'/' '{print $NF}')
-
-echo "[INFO] Repository: ${REPO_OWNER}/${REPO_NAME}"
+echo "[INFO] Repository: ${OPERATOR_REPO}"
 echo "[INFO] Branch: ${OPERATOR_BRANCH}"
 
-TARBALL_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}/archive/refs/heads/${OPERATOR_BRANCH}.tar.gz"
-TEMP_TARBALL="/tmp/operator-${OPERATOR_BRANCH}.tar.gz"
-
-echo "[INFO] Downloading from: ${TARBALL_URL}"
-
-if ! curl -L -f -o "${TEMP_TARBALL}" "${TARBALL_URL}"; then
-  echo "[INFO] Trying with wget as fallback..."
-  if ! wget -O "${TEMP_TARBALL}" "${TARBALL_URL}"; then
-    echo "[ERROR] Both curl and wget failed to download repository"
-    exit 1
-  fi
-fi
-
-echo "[SUCCESS] Downloaded tarball"
-
-echo "[INFO] Extracting tarball..."
-tar -xzf "${TEMP_TARBALL}" -C "${HOME}"
-
-EXTRACTED_DIR=$(ls -dt "${HOME}"/*operator* 2>/dev/null | grep -v "operator-kind-setup" | head -1)
-
-if [ -z "${EXTRACTED_DIR}" ] || [ ! -d "${EXTRACTED_DIR}" ]; then
-  echo "[ERROR] Could not find extracted directory"
+if ! git clone --depth 1 --branch "${OPERATOR_BRANCH}" "${OPERATOR_REPO}" "${WORK_DIR}"; then
+  echo "[ERROR] Failed to clone repository from ${OPERATOR_REPO}"
   exit 1
 fi
-
-mv "${EXTRACTED_DIR}" "${WORK_DIR}"
-rm -f "${TEMP_TARBALL}"
 
 cd "${WORK_DIR}"
-echo "[SUCCESS] Repository downloaded and extracted to ${WORK_DIR}"
 
-# Apply patch from PR #113
-echo "[INFO] Applying patch from PR #113..."
-PATCH_URL_113="https://github.com/trusted-execution-clusters/operator/pull/113.patch"
-if curl -L -f -o /tmp/pr-113.patch "${PATCH_URL_113}"; then
-  if git apply /tmp/pr-113.patch; then
-    echo "[SUCCESS] PR #113 patch applied successfully"
-  else
-    echo "[WARN] Failed to apply patch with git apply, trying patch command..."
-    if patch -p1 < /tmp/pr-113.patch; then
-      echo "[SUCCESS] PR #113 patch applied successfully with patch command"
-    else
-      echo "[ERROR] Failed to apply PR #113 patch"
-      exit 1
-    fi
-  fi
-  rm -f /tmp/pr-113.patch
-else
-  echo "[ERROR] Failed to download patch from ${PATCH_URL_113}"
-  exit 1
-fi
+CURRENT_COMMIT=$(git rev-parse HEAD)
+CURRENT_COMMIT_SHORT=$(git rev-parse --short HEAD)
 
-# Apply patch from PR #119
-echo "[INFO] Applying patch from PR #119..."
-PATCH_URL_119="https://github.com/trusted-execution-clusters/operator/pull/119.patch"
-if curl -L -f -o /tmp/pr-119.patch "${PATCH_URL_119}"; then
-  if git apply /tmp/pr-119.patch; then
-    echo "[SUCCESS] PR #119 patch applied successfully"
-  else
-    echo "[WARN] Failed to apply patch with git apply, trying patch command..."
-    if patch -p1 < /tmp/pr-119.patch; then
-      echo "[SUCCESS] PR #119 patch applied successfully with patch command"
-    else
-      echo "[ERROR] Failed to apply PR #119 patch"
-      exit 1
-    fi
-  fi
-  rm -f /tmp/pr-119.patch
-else
-  echo "[ERROR] Failed to download patch from ${PATCH_URL_119}"
-  exit 1
-fi
+echo "[SUCCESS] Repository cloned to ${WORK_DIR}"
+echo "[INFO] Current commit: ${CURRENT_COMMIT_SHORT} (${CURRENT_COMMIT})"
+echo "[INFO] Commit message: $(git log -1 --pretty=%B | head -1)"
 
 # Adapt Kind Config for External Access
 echo "[INFO] Adapting kind configuration for external access..."

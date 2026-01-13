@@ -3,13 +3,21 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  stolostron_builder_go1.25-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
 build_root:
   from_repository: true
 images:
 - additional_architectures:
   - arm64
-  dockerfile_path: Dockerfile.e2etest
+  dockerfile_path: build/Dockerfile.e2etest
   from: base
+  inputs:
+    stolostron_builder_go1.25-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.25-linux
   optional: true
   to: grc-policy-framework-tests
 promotion:
@@ -46,16 +54,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
-- as: latest-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: grc-policy-framework-tests
-    env:
-      IMAGE_REPO: grc-policy-framework-tests
-      IMAGE_TAG: latest-2.14
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:

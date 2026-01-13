@@ -27,7 +27,6 @@ FEATURE_USER_INITIALIZE: true
 FEATURE_GENERAL_OCI_SUPPORT: true
 FEATURE_HELM_OCI_SUPPORT: true
 FEATURE_PROXY_STORAGE: true
-IGNORE_UNKNOWN_MEDIATYPES: true
 SUPER_USERS:
   - quay
 FEATURE_UI_V2: true
@@ -40,6 +39,12 @@ TAG_EXPIRATION_OPTIONS:
   - 1d
   - 1h
 FEATURE_SUPERUSER_CONFIGDUMP: true
+FEATURE_IMAGE_PULL_STATS: true
+REDIS_FLUSH_INTERVAL_SECONDS: 30
+PULL_METRICS_REDIS:
+  host: quay-quay-redis
+  port: 6379
+  db: 1
 EOF
 
 oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret

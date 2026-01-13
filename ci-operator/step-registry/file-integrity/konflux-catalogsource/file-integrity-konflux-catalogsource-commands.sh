@@ -424,6 +424,14 @@ function tmp_prune_disruptive_resource() {
 main() {
   echo "Enabling konflux catalogsource"
 
+  set_proxy
+  if [ -f "${SHARED_DIR}/nested_kubeconfig" ]; then
+    export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+  fi
+
+  run "oc whoami"
+  run "oc version -o yaml"
+
   #Delete any existing ImageContentSourcePolicy
   oc delete imagecontentsourcepolicies brew-registry --ignore-not-found=true || {
     echo "failed to delete existing imagecontentsourcepolicies"
@@ -439,14 +447,6 @@ main() {
     echo "'MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE' is empty. Skipping catalog source creation..."
     exit 0
   fi
-
-  set_proxy
-  if [ -f "${SHARED_DIR}/nested_kubeconfig" ]; then
-    export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-  fi
-
-  run "oc whoami"
-  run "oc version -o yaml"
 
   if [ "${MIRROR_OPERATORS}" == "true" ]; then
     export TMP_DIR=/tmp/mirror-operators

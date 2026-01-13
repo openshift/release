@@ -7,6 +7,10 @@ base_images:
     name: "4.17"
     namespace: ocp-kni
     tag: lifecycle-agent-operator-bundle
+  recert:
+    name: recert
+    namespace: edge-infrastructure
+    tag: release-4.18
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -110,13 +114,13 @@ tests:
     dependencies:
       LCA_PULL_REF: lifecycle-agent-operator
       OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
+      RECERT_IMAGE: pipeline:recert
       TARGET_LCA_REF: pipeline:previous-lca
     env:
       OCP_BASE_IMAGE_SOURCE: release
       OCP_BASE_VERSION: "4.18"
       OCP_TARGET_IMAGE_SOURCE: release
       OCP_TARGET_VERSION: "4.17"
-      RECERT_IMAGE: quay.io/edge-infrastructure/recert:release-4.18
       SEED_IMAGE_TAG_FORMAT: presubmit
     workflow: openshift-image-based-upgrade-presubmit
 - as: ibi-e2e-flow
@@ -128,10 +132,10 @@ tests:
       INSTALLER_PULL_REF: pipeline:installer
       LCA_PULL_REF: lifecycle-agent-operator
       OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
+      RECERT_IMAGE: pipeline:recert
     env:
       OCP_BASE_IMAGE_SOURCE: release
       OCP_BASE_VERSION: "4.18"
-      RECERT_IMAGE: quay.io/edge-infrastructure/recert:release-4.18
       SEED_IMAGE_TAG_FORMAT: presubmit
       SEED_IMAGE_TAG_PREFIX: ibi
     workflow: openshift-image-based-install

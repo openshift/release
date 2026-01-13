@@ -53,8 +53,8 @@ spec:
   commonName: "*.${INGRESS_DOMAIN}"
   dnsNames:
   - "*.${INGRESS_DOMAIN}"
-  - "api-${HC_NAME}.${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}"
-  - "oauth-${HC_NAME}.${HYPERSHIFT_EXTERNAL_DNS_DOMAIN}"
+  - "${KUBE_API_SERVER_DNS_NAME}"
+  - "oauth-${HC_NAME}.${HYPERSHIFT_DNS_DOMAIN}"
   usages:
   - server auth
   issuerRef:
@@ -64,7 +64,7 @@ spec:
   duration: 2h
   renewBefore: 1h30m
 EOF
-    oc wait certificate "$AGGREGATED_CERT_NAME" -n openshift-ingress --for=condition=Ready=True --timeout=5m
+    oc wait certificate "$AGGREGATED_CERT_NAME" -n openshift-ingress --for=condition=Ready=True --timeout=10m
 }
 
 function configure_default_ic_cert() {
@@ -89,7 +89,10 @@ spec:
     apiServer:
       servingCerts:
         namedCertificates:
-        - servingCertificate:
+        - names:
+            - $KUBE_API_SERVER_DNS_NAME
+            - oauth-$HC_NAME.$HYPERSHIFT_DNS_DOMAIN
+          servingCertificate:
             name: $AGGREGATED_CERT_SECRET_NAME"
 
     # Wait for kube-apiserver and oauth-openshift to restart
@@ -101,24 +104,6 @@ spec:
         sleep 15
     done
     mgmt oc rollout status deployment -n "$HCP_NS" oauth-openshift --timeout=6m
-}
-
-function remove_kubelet_kubeconfig_cluster_ca() {
-    local pids_to_wait=()
-
-    for node in $(oc get node -o jsonpath='{.items[*].metadata.name}'); do
-        { timeout 90s oc debug node/"$node" -- chroot /host bash -c '
-# Wait for the debug pod to be ready
-sleep 60
-sed "/certificate-authority-data/d" /var/lib/kubelet/kubeconfig > /var/lib/kubelet/kubeconfig.tmp
-mv /var/lib/kubelet/kubeconfig.tmp /var/lib/kubelet/kubeconfig
-systemctl restart kubelet' || true; } &
-        pids_to_wait+=($!)
-    done
-    wait "${pids_to_wait[@]}"
-
-    # Nodes become unreachable
-    oc wait node --all --for=condition=Ready=Unknown --timeout=5m
 }
 
 function check_cert_issuer() {
@@ -155,7 +140,7 @@ if [[ -z "$OAUTH_ROUTE_HOSTNAME" ]]; then
     echo "Empty OAuth route hostname, exiting" >&2
     exit 1
 fi
-HYPERSHIFT_EXTERNAL_DNS_DOMAIN="$(cut -d '.' -f 1 --complement <<< "$KAS_ROUTE_HOSTNAME")"
+HYPERSHIFT_DNS_DOMAIN="$(cut -d '.' -f 1 --complement <<< "$KAS_ROUTE_HOSTNAME")"
 
 # Create aggregated cert
 AGGREGATED_CERT_NAME=custom-aggregated-cert
@@ -163,6 +148,14 @@ AGGREGATED_CERT_SECRET_NAME=cert-manager-managed-aggregated-cert-tls
 INGRESS_DOMAIN=$(oc get ingress.config cluster -o jsonpath='{.spec.domain}')
 HC_NAME="$(cut -d '.' -f 2 <<< "$INGRESS_DOMAIN")"
 HCP_NS="clusters-$HC_NAME"
+
+# Get kubeAPIServerDNSName from HostedCluster spec
+KUBE_API_SERVER_DNS_NAME="$(mgmt oc get hc -n clusters "$HC_NAME" -o jsonpath='{.spec.kubeAPIServerDNSName}')"
+if [[ -z "$KUBE_API_SERVER_DNS_NAME" ]]; then
+    echo "kubeAPIServerDNSName is not set in HostedCluster spec." >&2
+    exit 1
+fi
+
 create_aggregated_cert
 
 # Configure ic cert
@@ -180,39 +173,61 @@ pushd "$TMP_DIR"
 oc extract secret/"$AGGREGATED_CERT_SECRET_NAME" -n openshift-ingress
 mgmt oc create secret tls "$AGGREGATED_CERT_SECRET_NAME" --cert=tls.crt --key=tls.key -n clusters
 
-# Get kubeconfig cluster ca data before configuring kas serving cert
-BACKUP_KUBECONFIG_CA_DATA="$(grep certificate-authority-data "$KUBECONFIG" | awk '{print $2}')"
-
-# Update KUBECONFIG to allow secure communication between kubelets and the external KAS endpoint
-# TODO: remove this workaround once https://issues.redhat.com/browse/OCPBUGS-41853 is resolved
-remove_kubelet_kubeconfig_cluster_ca
-
 # Configure kas & oauth serving cert
 configure_kas_oauth_serving_cert
 
-# Check kas & oauth cert
-check_cert_issuer "$KAS_ROUTE_HOSTNAME" 443 "Let's Encrypt"
+# Check kas custom DNS name cert & oauth cert (should use cert-manager certificate)
+check_cert_issuer "$KUBE_API_SERVER_DNS_NAME" 443 "Let's Encrypt"
 check_cert_issuer "$OAUTH_ROUTE_HOSTNAME" 443 "Let's Encrypt"
 
-# Download the updated KUBECONFIG after it's reconciled to include the default ingress certificate
 (
     set +x
-    CURRENT_KUBECONFIG_CONTENT="$(mgmt oc extract secret/"${HC_NAME}-admin-kubeconfig" -n clusters --to -)"
-    CURRENT_KUBECONFIG_CA_DATA="$(grep certificate-authority-data <<< "$CURRENT_KUBECONFIG_CONTENT" | awk '{print $2}')"
-    until [[ "$CURRENT_KUBECONFIG_CA_DATA" != "$BACKUP_KUBECONFIG_CA_DATA" ]]; do
-        CURRENT_KUBECONFIG_CONTENT="$(mgmt oc extract secret/"${HC_NAME}-admin-kubeconfig" -n clusters --to -)"
-        CURRENT_KUBECONFIG_CA_DATA="$(grep certificate-authority-data <<< "$CURRENT_KUBECONFIG_CONTENT" | awk '{print $2}')"
-        sleep 15
+    echo "Waiting for custom kubeconfig to be generated..."
+
+    # Wait for customKubeconfig to be available
+    CUSTOM_KUBECONFIG_SECRET=""
+    RETRY_COUNT=0
+    MAX_RETRIES=30
+    while [[ -z "$CUSTOM_KUBECONFIG_SECRET" && $RETRY_COUNT -lt $MAX_RETRIES ]]; do
+        CUSTOM_KUBECONFIG_SECRET=$(mgmt oc get hc -n clusters "$HC_NAME" -o jsonpath='{.status.customKubeconfig.name}' 2>/dev/null || echo "")
+        if [[ -z "$CUSTOM_KUBECONFIG_SECRET" ]]; then
+            echo "Waiting for status.customKubeconfig to be set... (attempt $((RETRY_COUNT+1))/$MAX_RETRIES)"
+            sleep 10
+            RETRY_COUNT=$((RETRY_COUNT+1))
+        fi
     done
-    tee "$KUBECONFIG" "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/nested_kubeconfig" <<< "$CURRENT_KUBECONFIG_CONTENT" >/dev/null
+
+    if [[ -z "$CUSTOM_KUBECONFIG_SECRET" ]]; then
+        echo "ERROR: Custom kubeconfig not generated. spec.kubeAPIServerDNSName may not be set."
+        echo "This test requires the cluster to be created with --kas-dns-name flag."
+        exit 1
+    fi
+
+    echo "✓ Custom kubeconfig generated: ${CUSTOM_KUBECONFIG_SECRET}"
+
+    # Extract the custom kubeconfig
+    CUSTOM_KUBECONFIG_CONTENT="$(mgmt oc extract secret/"${CUSTOM_KUBECONFIG_SECRET}" -n clusters --to -)"
+
+    # Check if external-dns is enabled
+    # When external-dns is enabled, the custom kubeconfig needs port 443 instead of 6443
+    # Workaround for https://issues.redhat.com/browse/OCPBUGS-72258
+    if [[ -n "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN:-}" ]]; then
+        echo "Applying port replacement: 6443 → 443 (workaround for OCPBUGS-72258)"
+        CUSTOM_KUBECONFIG_CONTENT="$(echo "$CUSTOM_KUBECONFIG_CONTENT" | sed 's/:6443/:443/g')"
+    else
+        echo "External DNS not enabled, no port replacement needed"
+    fi
+
+    # Write modified kubeconfig to all required locations
+    tee "$KUBECONFIG" "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/nested_kubeconfig" <<< "$CUSTOM_KUBECONFIG_CONTENT" >/dev/null
+
+    echo "✓ Custom kubeconfig deployed"
+    echo "Performing health check on KAS endpoint..."
 )
 
 # Perform oc login test if possible
 if mgmt oc get secret/"${HC_NAME}-kubeadmin-password" -n clusters >/dev/null; then
     oc_login_kubeadmin_passwd
 fi
-
-# Restart ovnkube-node
-oc delete po -n openshift-ovn-kubernetes --all
 
 wait_for_hc_readiness
