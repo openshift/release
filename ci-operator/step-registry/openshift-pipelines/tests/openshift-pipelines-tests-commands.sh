@@ -25,7 +25,8 @@ function mapTestsForComponentReadiness() {
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
             echo "Mapping Test Suite Name To: OpenshiftPipelines-lp-interop"
-            yq eval -px -ox -iI0 '.testsuites.testsuite[]."+@name" = "OpenshiftPipelines-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+	    yq eval -px -ox -iI0 '.testsuites.testsuite[]."+@name" = "OpenshiftPipelines-lp-interop"' "$results_file" 2>/dev/null || \
+	    yq eval -px -ox -iI0 '.testsuites.testsuite."+@name" = "OpenshiftPipelines-lp-interop"' "$results_file" 
         fi
     fi
 }
