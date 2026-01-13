@@ -145,6 +145,7 @@ go mod vendor
 make vet
 
 run_tests_status=0
+echo "test"
 
 run_tests() {
     echo "************ Running ${GINKGO_LABEL} tests ************"
