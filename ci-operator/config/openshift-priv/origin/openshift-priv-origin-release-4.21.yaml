@@ -1,6 +1,6 @@
 base_images:
   assisted-test-infra:
-    name: ocm-2.12
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -57,8 +57,7 @@ images:
   to: hello-openshift
 promotion:
   to:
-  - disabled: true
-    name: 4.21-priv
+  - name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
@@ -130,7 +129,7 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -163,10 +162,22 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
 - always_run: false
+  as: e2e-gcp-ovn-kube-apiserver-rollout
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/kube-apiserver/rollout
+      TEST_TYPE: suite
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-ovn
+- always_run: false
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     observers:
       enable:
       - observers-resource-watch
@@ -257,7 +268,7 @@ tests:
 - always_run: false
   as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     observers:
       enable:
       - observers-resource-watch
@@ -266,7 +277,7 @@ tests:
   as: e2e-gcp-ovn-rt-upgrade
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     observers:
       enable:
       - observers-resource-watch
@@ -558,7 +569,6 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     env:
-      PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
     workflow: baremetalds-sno
 - always_run: false
@@ -673,7 +683,7 @@ tests:
   as: e2e-azure-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-e2e-azure-etcd-scaling
 - always_run: false
   as: e2e-vsphere-ovn-etcd-scaling
@@ -712,7 +722,7 @@ tests:
   as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -736,7 +746,7 @@ tests:
   as: e2e-gcp-ovn-usernamespace
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/usernamespace

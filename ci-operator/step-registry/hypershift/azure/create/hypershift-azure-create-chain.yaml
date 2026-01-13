@@ -168,11 +168,25 @@ chain:
       fi
       
       ENCRYPTION_KEY_ID=""
+      KMS_CREDENTIALS_SECRET_NAME=""
       if [[ $HYPERSHIFT_ETCD_ENCRYPTION == "true" ]]; then
         if [[ -f "${SHARED_DIR}/azure_active_key_url" ]]; then
           ENCRYPTION_KEY_ID="$(cat "${SHARED_DIR}/azure_active_key_url")"
         else
           ENCRYPTION_KEY_ID="$(cat "/etc/hypershift-aro-azurecreds/encryption-key-url")"
+        fi
+
+        # Get KMS credentials secret name
+        if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
+          KMS_SECRET_INFO_FILE="/etc/hypershift-ci-jobs-azurecreds/aks-kms-info.json"
+          while IFS= read -r line; do
+            if [[ $line == *"aks-kms-credentials-secret"* ]]; then
+              KMS_CREDENTIALS_SECRET_NAME=$(echo "$line" | awk -F'"' '{print $4}')
+              break
+            fi
+          done < "$AKS_KMS_INFO_LOCATION"
+        else
+          KMS_CREDENTIALS_SECRET_NAME="$(cat "/etc/hypershift-aro-azurecreds/kms-credentials-secret-name")"
         fi
       fi
       
@@ -321,6 +335,10 @@ chain:
         COMMAND+=(${EXTRA_ARGS})
       fi
       
+      if [[ -n "${KMS_CREDENTIALS_SECRET_NAME}" ]]; then
+        COMMAND+=(--kms-credentials-secret-name=${KMS_CREDENTIALS_SECRET_NAME})
+      fi
+
       if [[ $HYPERSHIFT_AZURE_FIPS == "true" ]]; then
         COMMAND+=(--fips=true)
       fi

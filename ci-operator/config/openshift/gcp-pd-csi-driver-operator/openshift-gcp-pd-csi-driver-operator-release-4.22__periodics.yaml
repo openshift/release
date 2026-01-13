@@ -1,0 +1,41 @@
+base_images:
+  gcp-pd-csi-driver-operator-test:
+    name: "4.22"
+    namespace: ocp
+    tag: gcp-pd-csi-driver-operator-test
+build_root:
+  from_repository: true
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: periodic-e2e-gcp-csi-c3
+  cron: 40 4 * * 0
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-csi-custom-worker
+- as: periodic-e2e-gcp-csi-n4
+  cron: 2 10 * * 5
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n4-standard-4
+    workflow: openshift-e2e-gcp-csi-custom-worker
+zz_generated_metadata:
+  branch: release-4.22
+  org: openshift
+  repo: gcp-pd-csi-driver-operator
+  variant: periodics

@@ -7,10 +7,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.39.2
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.24-openshift-4.22
 binary_build_commands: make go-build
 build_root:
   from_repository: true
@@ -19,9 +19,9 @@ images:
 - dockerfile_path: Dockerfile.openshift
   from: base-rhel9
   inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: must-gather-operator
 operator:
   bundles:
@@ -36,7 +36,8 @@ operator:
     with: stable:must-gather
 promotion:
   to:
-  - name: 4.22-priv
+  - disabled: true
+    name: 4.22-priv
     namespace: ocp-private
 releases:
   initial:
@@ -108,7 +109,14 @@ tests:
           cpu: 100m
     - as: test
       cli: latest
-      commands: make test-e2e
+      commands: |
+        export CASE_MANAGEMENT_CREDS_CONFIG_DIR=/var/run/secrets/must-gather-operator/case-management-creds
+        make test-e2e
+      credentials:
+      - collection: must-gather-operator
+        mount_path: /var/run/secrets/must-gather-operator/case-management-creds
+        name: case-management-creds
+        namespace: test-credentials
       from: src
       resources:
         requests:

@@ -70,6 +70,9 @@ function prepare_next_steps() {
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
   
+   # capture install duration for post e2e-analysis
+  awk '/Time elapsed per stage:/,/Time elapsed:/' "${dir}/.openshift_install.log" > "${SHARED_DIR}/install-duration.log"
+
   # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
   # the workaround is gather log-bundle from bastion host
   # copying install folder to bastion host for gathering logs

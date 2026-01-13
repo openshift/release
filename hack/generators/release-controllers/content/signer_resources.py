@@ -3,7 +3,7 @@ def generate_signer_resources(gendoc):
     context = gendoc.context
 
     resources.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'release-controller-signer',
@@ -73,6 +73,9 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                 },
                 'spec': {
                     'serviceAccountName': 'release-controller',
+                    'imagePullSecrets': [{
+                        'name': 'registry-pull-credentials'
+                    }],
                     'volumes': [{
                         'name': 'publisher',
                         'secret': {

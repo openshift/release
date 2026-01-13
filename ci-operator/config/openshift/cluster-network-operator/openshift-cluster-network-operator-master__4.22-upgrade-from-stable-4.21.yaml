@@ -1,0 +1,73 @@
+base_images:
+  ocp_4.21_base-rhel9:
+    name: "4.21"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+binary_build_commands: hack/build-go.sh
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: cluster-network-operator
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.22"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      EXTRA_MG_ARGS: --host-network
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws-ovn
+  timeout: 6h0m0s
+- as: e2e-azure-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: azure4
+    env:
+      EXTRA_MG_ARGS: --host-network
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-azure-ovn
+  timeout: 6h0m0s
+- as: e2e-gcp-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: gcp-3
+    env:
+      EXTRA_MG_ARGS: --host-network
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-gcp-ovn
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: cluster-network-operator
+  variant: 4.22-upgrade-from-stable-4.21
