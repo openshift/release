@@ -54,9 +54,9 @@ fi
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION=""
-JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
-stack_name="${JOB_NAME}"
-cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
+STACK_TIMESTAMP="$(date +%s)"
+stack_name="${NAMESPACE}-${STACK_TIMESTAMP}"
+cf_tpl_file="${SHARED_DIR}/${NAMESPACE}-cf-tpl.yaml"
 
 curl -o "${cf_tpl_file}" https://raw.githubusercontent.com/openshift/microshift/refs/heads/main/scripts/aws/cf-gen.yaml
 
@@ -83,15 +83,6 @@ for aws_region in "${regions[@]}"; do
   REGION="${aws_region}"
   echo "Current region: ${REGION}"
   ami_id="${ami_map[$REGION,$ARCH,$MICROSHIFT_OS]}"
-
-  if "${aws}" --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
-    --query "Stacks[].Outputs[?OutputKey == 'InstanceId'].OutputValue" > /dev/null; then
-      echo "Appears that stack ${stack_name} already exists"
-      "${aws}" --region $REGION cloudformation delete-stack --stack-name "${stack_name}"
-      echo "Deleted stack ${stack_name}"
-      "${aws}" --region $REGION cloudformation wait stack-delete-complete --stack-name "${stack_name}"
-      echo "Waited for stack-delete-complete ${stack_name}"
-  fi
 
   echo -e "${REGION} ${stack_name}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 
