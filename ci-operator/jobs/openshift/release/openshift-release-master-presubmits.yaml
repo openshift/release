@@ -1123,7 +1123,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260107-b51ff4a6e
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260112-782d8a7cf
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1138,6 +1138,54 @@ presubmits:
         secret:
           secretName: openshift-prow-github-app
     trigger: (?m)^/test( | .* )config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: app.ci
+    context: ci/build-farm/core-ci-config-dry
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-core-ci-config-dry
+    rerun_command: /test core-ci-config-dry
+    run_if_changed: ^gitops/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=gitops/cluster-manifests/core-ci
+        - --confirm=false
+        - --as=
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: PAGERDUTY_INTEGRATION_KEY
+          valueFrom:
+            secretKeyRef:
+              key: integration_key
+              name: pagerduty
+        - name: SLACK_API_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )core-ci-config-dry,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
