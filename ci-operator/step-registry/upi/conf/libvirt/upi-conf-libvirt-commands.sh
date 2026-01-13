@@ -89,6 +89,10 @@ featureSet: ${FEATURE_SET}
 EOF
 fi
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 37dcbb4ade3 (Added techpreview no upgrade job)
 if [ ${NODE_TUNING} = "true" ]; then
   echo "Saving node tuning yaml config..."
   cat >> ${SHARED_DIR}/99-sysctl-worker.yaml << EOF
