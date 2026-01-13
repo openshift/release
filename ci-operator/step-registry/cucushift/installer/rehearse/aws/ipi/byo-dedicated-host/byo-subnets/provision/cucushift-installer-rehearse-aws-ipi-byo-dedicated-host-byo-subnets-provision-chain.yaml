@@ -1,0 +1,24 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-byo-dedicated-host-byo-subnets-provision
+  steps:
+  - ref: aws-provision-vpc-shared
+  - ref: aws-provision-dedicated-host
+  - chain: ipi-conf-aws
+  - ref: aws-provision-security-group
+  - ref: ipi-conf-aws-custom-vpc
+  - ref: ipi-conf-aws-custom-security-groups
+  - ref: ipi-conf-aws-usage-info
+  - ref: ipi-conf-aws-dedicated-host
+  - chain: aws-provision-iam-user-minimal-permission
+  - chain: ipi-install
+  - ref: aws-provision-tags-for-byo-vpc
+  - ref: cucushift-installer-check-aws-custom-vpc
+  - chain: cucushift-installer-check
+  - ref: enable-qe-catalogsource
+  env:
+  - name: AWS_DEDICATED_HOST_APPLY_TO
+    default: "defaultMachinePlatform"
+    documentation: |-
+      compute, controlPlane, defaultMachinePlatform
+  documentation: |-
+    Create an IPI cluster on AWS for QE e2e tests.
