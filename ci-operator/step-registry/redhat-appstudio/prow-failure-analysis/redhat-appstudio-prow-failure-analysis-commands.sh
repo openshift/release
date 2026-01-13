@@ -49,7 +49,7 @@ fi
 # Export embedding configuration
 export CORDON_DEVICE="${CORDON_DEVICE:-cpu}"
 export CORDON_BACKEND="${CORDON_BACKEND:-remote}"
-export CORDON_MODEL_NAME="${CORDON_MODEL_NAME:-google/gemini-embedding-001}"
+export CORDON_MODEL_NAME="${CORDON_MODEL_NAME:-gemini/gemini-embedding-001}"
 export CORDON_BATCH_SIZE="${CORDON_BATCH_SIZE:-32}"
 
 # Handle remote embedding API key
