@@ -58,10 +58,6 @@ spec:
   sourceNamespace: openshift-marketplace
 EOF
 
-
-
-sleep 30
-
 RETRIES=30
 CSV=
 for i in $(seq ${RETRIES}); do

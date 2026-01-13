@@ -100,8 +100,6 @@ oc wait --for=jsonpath='{.status.phase}'=Succeeded \
     -n openshift-local-storage \
     csv/${CSV}
 
-sleep 30
-
 # Create LocalVolumeDiscovery
 oc apply -f - <<EOF
 kind: LocalVolumeDiscovery

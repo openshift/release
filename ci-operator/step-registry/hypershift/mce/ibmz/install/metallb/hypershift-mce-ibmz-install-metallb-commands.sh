@@ -80,13 +80,13 @@ for plugin in "${plugins_list[@]}"; do
     fi
 done
 
-# 1. Login to IBM Cloud
+# Login to IBM Cloud
 # -----------------------------
 echo "Logging in to IBM Cloud..."
 ibmcloud login --apikey "$IC_API_KEY" -r "$IC_REGION" -g "$RESOURCE_GROUP" || { echo "Login failed"; exit 1; }
 
 # -------------------------
-# 2. Fetch ALL reserved IPs of all VSIs
+#Fetch ALL reserved IPs of all VSIs
 # -------------------------
 mapfile -t ALL_RESERVED_IPS < <(
   ibmcloud is instances --json |
@@ -96,7 +96,7 @@ mapfile -t ALL_RESERVED_IPS < <(
 echo "All Reserved IPs:" "${ALL_RESERVED_IPS[@]}"
 
 # -------------------------
-# 3. Fetch only CONTROL node IPs
+#Fetch only CONTROL node IPs
 # -------------------------
 mapfile -t CONTROL_RIP < <(
   ibmcloud is instances --json |
@@ -106,7 +106,7 @@ mapfile -t CONTROL_RIP < <(
 echo "All Reserved IPs:" "${CONTROL_RIP[@]}"
 
 # -------------------------
-# 4. Pick one control node subnet for MetalLB
+#Pick one control node subnet for MetalLB
 # -------------------------
 BASE_IP="${CONTROL_RIP[0]}"
 SUBNET_PREFIX=$(echo "$BASE_IP" | awk -F. '{print $1"."$2"."$3"."}')
@@ -115,7 +115,7 @@ BASE_LAST_OCTET=$(echo "$BASE_IP" | awk -F. '{print $4}')
 echo "Using subnet: ${SUBNET_PREFIX}0/24"
 
 # -------------------------
-# 5. Function to check collision with existing VSIs
+#Function to check collision with existing VSIs
 # -------------------------
 function ip_in_list() {
     local ip=$1
@@ -128,7 +128,7 @@ function ip_in_list() {
 }
 
 # -------------------------
-# 6. Find next available 3-IP range in subnet
+#Find next available 3-IP range in subnet
 # -------------------------
 START=$((BASE_LAST_OCTET + 1))
 
@@ -152,7 +152,7 @@ done
 
 echo "Selected MetalLB Safe Range: ${METALLB_RANGE_START}-${METALLB_RANGE_END}"
 
-# Create ImageContentSourcePolicy
+#Create ImageContentSourcePolicy
 oc apply -f - <<EOF
 ---
 apiVersion: operator.openshift.io/v1alpha1
@@ -172,7 +172,7 @@ spec:
     source: registry-proxy.engineering.redhat.com
 EOF
 
-# Create LSO catalog Source
+#Create LSO catalog Source
 oc apply -f - <<EOF
 ---
 apiVersion: operators.coreos.com/v1alpha1
@@ -211,7 +211,7 @@ EOF
 echo "$METALLB_OPERATOR_SUB_SOURCE"
 
 echo "install metallb operator"
-# create the install namespace
+#create the install namespace
 oc apply -f - <<EOF
 apiVersion: v1
 kind: Namespace
@@ -221,7 +221,7 @@ metadata:
     openshift.io/cluster-monitoring: "true"
 EOF
 
-# deploy new operator group
+#deploy new operator group
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
@@ -231,7 +231,7 @@ metadata:
 spec: {}
 EOF
 
-# subscribe to the operator
+#subscribe to the operator
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -275,7 +275,7 @@ if [[ "$i" == "max" ]]; then
 fi
 echo "successfully installed metallb-operator"
 
-# Install metallb operator
+#Install metallb operator
 
 oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
@@ -307,12 +307,10 @@ spec:
    - metallb
 EOF
 
-sleep 30
-
 if oc get pods -n metallb-system 2>/dev/null | grep -E "Running" >/dev/null; then
-    echo "✅ Successfully installed metallb-operator."
+    echo "Successfully installed metallb-operator."
 else
-    echo "❌ metallb-operator installation failed."
+    echo "metallb-operator installation failed."
     exit 1
 fi
 

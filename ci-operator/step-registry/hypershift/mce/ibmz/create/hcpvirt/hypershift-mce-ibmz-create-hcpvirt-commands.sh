@@ -92,8 +92,6 @@ oc apply -f /tmp/hc-manifests/cluster-agent.yaml
 oc wait --timeout=15m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
 echo "$(date) Kubevirt cluster is available"
 
-
-
 # Install IBM Cloud CLI
 export PATH="$HOME/.tmp/bin:$PATH"
 mkdir -p "$HOME/.tmp/bin"
@@ -477,57 +475,6 @@ else
 fi
 
 echo "$(date) Successfully completed the Hosted cluster creation with type Kubevirt"
-
-# Downloading the script to set proxy server
-echo "Downloading the setup script for proxy"
-
-GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
-git clone -b proxy-tst git@github.ibm.com:OpenShift-on-Z/hosted-control-plane.git &&
-
-echo "Getting the proxy setup script"
-cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
-
-# Configuring proxy server on bastion
-echo "Getting management cluster basedomain to allow traffic to proxy server"
-mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
-
-echo "Getting the proxy setup script"
-cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
-
-sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh 
-sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 
-chmod 700 $HOME/setup_proxy.sh
-
-echo "Transferring the setup script to Bastion"
-scp -i "$SSH_KEY" \
-  -o StrictHostKeyChecking=no \
-  -o UserKnownHostsFile=/dev/null \
-  "$HOME/setup_proxy.sh" \
-  root@"$BASTION_FIP":/root/setup_proxy.sh
-
-echo "Triggering the proxy server setup on Bastion"
-ssh -i "$SSH_KEY" \
-  -o StrictHostKeyChecking=no \
-  -o UserKnownHostsFile=/dev/null \
-  root@"$BASTION_FIP" \
-  bash /root/setup_proxy.sh
-
-echo "To debug the proxy issue"
-sleep 600
-
-cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
-export HTTP_PROXY=http://${BASTION_FIP}:3128/
-export HTTPS_PROXY=http://${BASTION_FIP}:3128/
-export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,$BASTION_FIP,cloudfront.net,localhost,127.0.0.1"
-export http_proxy=http://${BASTION_FIP}:3128/
-export https_proxy=http://${BASTION_FIP}:3128/
-export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,$BASTION_FIP,cloudfront.net,localhost,127.0.0.1"
-EOF
-
-# Sourcing the proxy settings for the next steps
-if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-  source "${SHARED_DIR}/proxy-conf.sh"
-fi
 
 
 
