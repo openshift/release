@@ -344,53 +344,12 @@ main() {
 generate_fork_pre_step() {
   cat <<EOF
     pre:
-    - as: build-tests-private-fork
-      commands: |
-        echo "============================================"
-        echo "Building openshift-tests-private from fork"
-        echo "============================================"
-
-        # Clone the fork
-        TESTS_PRIVATE_DIR="/tmp/openshift-tests-private"
-        git clone --depth=1 --branch=${TESTS_PRIVATE_FORK_BRANCH} \\
-          https://github.com/${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private.git \\
-          "\${TESTS_PRIVATE_DIR}"
-        cd "\${TESTS_PRIVATE_DIR}"
-
-        # Log git info for verification
-        echo "Fork: https://github.com/${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private"
-        echo "Branch: ${TESTS_PRIVATE_FORK_BRANCH}"
-        echo "Commit: \$(git rev-parse HEAD)"
-        echo "Commit Msg: \$(git log -1 --format=%s)"
-
-        # Save git info to shared dir for later steps
-        {
-          echo "Fork: https://github.com/${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private"
-          echo "Branch: ${TESTS_PRIVATE_FORK_BRANCH}"
-          echo "Commit: \$(git rev-parse HEAD)"
-          echo "Date: \$(git log -1 --format=%ci)"
-          echo "Message: \$(git log -1 --format=%s)"
-        } > "\${SHARED_DIR}/tests-private-fork-info.txt"
-
-        # Build
-        echo "Building extended-platform-tests..."
-        make go-mod-tidy
-        make all
-
-        # Copy binary to shared dir
-        cp ./bin/extended-platform-tests "\${SHARED_DIR}/"
-        chmod +x "\${SHARED_DIR}/extended-platform-tests"
-
-        echo "Binary saved to \${SHARED_DIR}/extended-platform-tests"
-        ls -la "\${SHARED_DIR}/extended-platform-tests"
-
-        # Mark that fork binary should be used
-        echo "true" > "\${SHARED_DIR}/use-tests-private-fork"
-      from: tests-private-builder
-      resources:
-        requests:
-          cpu: "3"
-          memory: 12Gi
+    - ref: sandboxed-containers-operator-build-tests-private-fork
+      env:
+      - name: TESTS_PRIVATE_FORK_ORG
+        default: "${TESTS_PRIVATE_FORK_ORG}"
+      - name: TESTS_PRIVATE_FORK_BRANCH
+        default: "${TESTS_PRIVATE_FORK_BRANCH}"
 EOF
 }
 
@@ -542,96 +501,6 @@ EOF
   echo "  timeout: 24h0m0s"
 }
 
-# Generate the e2e-tests-private-fork workflow that clones and builds from a fork
-generate_tests_private_fork_workflow() {
-  local cron="0 0 31 2 1"
-
-  cat <<EOF
-- as: e2e-tests-private-fork
-  cron: ${cron}
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    test:
-    - as: test-from-fork
-      cli: latest
-      commands: |
-        # Clone your fork of openshift-tests-private
-        TESTS_PRIVATE_DIR="/go/src/github.com/openshift/openshift-tests-private"
-        mkdir -p "\$(dirname \${TESTS_PRIVATE_DIR})"
-        git clone --depth=1 --branch=${TESTS_PRIVATE_FORK_BRANCH} \\
-          https://github.com/${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private.git \\
-          "\${TESTS_PRIVATE_DIR}"
-        cd "\${TESTS_PRIVATE_DIR}"
-
-        # Verify and log git info (shows in job logs)
-        echo "============================================"
-        echo "VERIFICATION: Fork and Branch Information"
-        echo "============================================"
-        echo "Expected: https://github.com/${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private @ ${TESTS_PRIVATE_FORK_BRANCH}"
-        echo "Actual Remote: \$(git remote get-url origin)"
-        echo "Actual Branch: \$(git branch --show-current)"
-        echo "Actual Commit: \$(git rev-parse HEAD)"
-        echo "Commit Date:   \$(git log -1 --format=%ci)"
-        echo "Commit Msg:    \$(git log -1 --format=%s)"
-        echo "============================================"
-
-        # Save git info to artifacts -> artifacts/test-from-fork/git-info.txt
-        {
-          echo "=== Git Repository Verification ==="
-          echo "Expected Remote: https://github.com/${TESTS_PRIVATE_FORK_ORG}/openshift-tests-private"
-          echo "Expected Branch: ${TESTS_PRIVATE_FORK_BRANCH}"
-          echo ""
-          echo "=== Actual Values ==="
-          echo "Remote URL: \$(git remote get-url origin)"
-          echo "Branch: \$(git branch --show-current)"
-          echo "Commit SHA: \$(git rev-parse HEAD)"
-          echo "Commit Date: \$(git log -1 --format=%ci)"
-          echo "Commit Author: \$(git log -1 --format='%an <%ae>')"
-          echo ""
-          echo "=== Commit Details ==="
-          git log -1 --format=full
-          echo ""
-          echo "=== Recent Commits ==="
-          git log -10 --oneline
-        } > "\${ARTIFACT_DIR}/git-info.txt"
-
-        # Save git remote info -> artifacts/test-from-fork/git-remote.txt
-        git remote -v > "\${ARTIFACT_DIR}/git-remote.txt"
-
-        # Build tests from your fork
-        echo "Building openshift-tests-private..."
-        make go-mod-tidy
-        make all
-
-        # Verify binary was built -> artifacts/test-from-fork/binary-info.txt
-        {
-          echo "=== Binary Information ==="
-          echo "Binary path: \${TESTS_PRIVATE_DIR}/bin/extended-platform-tests"
-          ls -la ./bin/extended-platform-tests
-          echo ""
-          echo "=== Binary Version ==="
-          ./bin/extended-platform-tests version 2>&1 || echo "Version command not available"
-        } > "\${ARTIFACT_DIR}/binary-info.txt"
-
-        # Run sig-kata tests (dry-run example) -> artifacts/test-from-fork/test-results.txt
-        ./bin/extended-platform-tests run all \\
-          --dry-run \\
-          -o "\${ARTIFACT_DIR}/test-results.txt"
-
-        echo "Artifacts saved to \${ARTIFACT_DIR}/"
-        ls -la "\${ARTIFACT_DIR}/"
-      from: tests-private-builder
-      resources:
-        requests:
-          cpu: "3"
-          memory: 12Gi
-    workflow: cucushift-installer-rehearse-azure-ipi
-  timeout: 24h0m0s
-EOF
-}
-
 # Function to create prowjob configuration
 command_create() {
     echo "=========================================="
@@ -697,11 +566,6 @@ generate_workflow aro azure-qe sandboxed-containers-operator-e2e-aro coco >> "${
 generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws peerpods >> "${OUTPUT_FILE}"
 generate_workflow aws aws-sandboxed-containers-operator sandboxed-containers-operator-e2e-aws coco >> "${OUTPUT_FILE}"
 
-# Generate tests-private-fork workflow if enabled
-if [[ "${TESTS_PRIVATE_FORK_ENABLED}" == "true" ]]; then
-    echo "Adding e2e-tests-private-fork workflow..."
-    generate_tests_private_fork_workflow >> "${OUTPUT_FILE}"
-fi
 	cat >> "${OUTPUT_FILE}" <<EOF
 zz_generated_metadata:
   branch: devel

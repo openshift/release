@@ -27,9 +27,16 @@ tests:
   cron: 0 0 31 2 1
   steps:
     cluster_profile: azure-qe
+    pre:
+    - ref: sandboxed-containers-operator-build-tests-private-fork
+      env:
+      - name: TESTS_PRIVATE_FORK_ORG
+        default: "tbuskey"
+      - name: TESTS_PRIVATE_FORK_BRANCH
+        default: "beforeOTE"
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768223136
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768299121
       CATALOG_SOURCE_NAME: brew-catalog
       CUSTOM_AZURE_REGION: eastus
       ENABLE_MUST_GATHER: "true"
@@ -45,54 +52,6 @@ tests:
       TEST_SCENARIOS: sig-kata.*Kata Author
       TEST_TIMEOUT: "120"
       TRUSTEE_URL: https://kbs-service-trustee-operator-system.apps.trustee-1.0.azure.sandboxedcontainers.com
-    pre:
-    - as: build-tests-private-fork
-      commands: |
-        echo "============================================"
-        echo "Building openshift-tests-private from fork"
-        echo "============================================"
-
-        # Clone the fork
-        TESTS_PRIVATE_DIR="/tmp/openshift-tests-private"
-        git clone --depth=1 --branch=beforeOTE \
-          https://github.com/tbuskey/openshift-tests-private.git \
-          "${TESTS_PRIVATE_DIR}"
-        cd "${TESTS_PRIVATE_DIR}"
-
-        # Log git info for verification
-        echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-        echo "Branch: beforeOTE"
-        echo "Commit: $(git rev-parse HEAD)"
-        echo "Commit Msg: $(git log -1 --format=%s)"
-
-        # Save git info to shared dir for later steps
-        {
-          echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-          echo "Branch: beforeOTE"
-          echo "Commit: $(git rev-parse HEAD)"
-          echo "Date: $(git log -1 --format=%ci)"
-          echo "Message: $(git log -1 --format=%s)"
-        } > "${SHARED_DIR}/tests-private-fork-info.txt"
-
-        # Build
-        echo "Building extended-platform-tests..."
-        make go-mod-tidy
-        make all
-
-        # Copy binary to shared dir
-        cp ./bin/extended-platform-tests "${SHARED_DIR}/"
-        chmod +x "${SHARED_DIR}/extended-platform-tests"
-
-        echo "Binary saved to ${SHARED_DIR}/extended-platform-tests"
-        ls -la "${SHARED_DIR}/extended-platform-tests"
-
-        # Mark that fork binary should be used
-        echo "true" > "${SHARED_DIR}/use-tests-private-fork"
-      from: tests-private-builder
-      resources:
-        requests:
-          cpu: "3"
-          memory: 12Gi
     test:
     - as: run-tests-from-fork
       cli: latest
@@ -165,9 +124,16 @@ tests:
   cron: 0 0 31 2 1
   steps:
     cluster_profile: azure-qe
+    pre:
+    - ref: sandboxed-containers-operator-build-tests-private-fork
+      env:
+      - name: TESTS_PRIVATE_FORK_ORG
+        default: "tbuskey"
+      - name: TESTS_PRIVATE_FORK_BRANCH
+        default: "beforeOTE"
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768223136
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768299121
       CATALOG_SOURCE_NAME: brew-catalog
       CUSTOM_AZURE_REGION: eastus
       ENABLE_MUST_GATHER: "true"
@@ -186,54 +152,6 @@ tests:
       TEST_TIMEOUT: "120"
       TRUSTEE_URL: https://kbs-service-trustee-operator-system.apps.trustee-1.0.azure.sandboxedcontainers.com
       WORKLOAD_TO_TEST: peer-pods
-    pre:
-    - as: build-tests-private-fork
-      commands: |
-        echo "============================================"
-        echo "Building openshift-tests-private from fork"
-        echo "============================================"
-
-        # Clone the fork
-        TESTS_PRIVATE_DIR="/tmp/openshift-tests-private"
-        git clone --depth=1 --branch=beforeOTE \
-          https://github.com/tbuskey/openshift-tests-private.git \
-          "${TESTS_PRIVATE_DIR}"
-        cd "${TESTS_PRIVATE_DIR}"
-
-        # Log git info for verification
-        echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-        echo "Branch: beforeOTE"
-        echo "Commit: $(git rev-parse HEAD)"
-        echo "Commit Msg: $(git log -1 --format=%s)"
-
-        # Save git info to shared dir for later steps
-        {
-          echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-          echo "Branch: beforeOTE"
-          echo "Commit: $(git rev-parse HEAD)"
-          echo "Date: $(git log -1 --format=%ci)"
-          echo "Message: $(git log -1 --format=%s)"
-        } > "${SHARED_DIR}/tests-private-fork-info.txt"
-
-        # Build
-        echo "Building extended-platform-tests..."
-        make go-mod-tidy
-        make all
-
-        # Copy binary to shared dir
-        cp ./bin/extended-platform-tests "${SHARED_DIR}/"
-        chmod +x "${SHARED_DIR}/extended-platform-tests"
-
-        echo "Binary saved to ${SHARED_DIR}/extended-platform-tests"
-        ls -la "${SHARED_DIR}/extended-platform-tests"
-
-        # Mark that fork binary should be used
-        echo "true" > "${SHARED_DIR}/use-tests-private-fork"
-      from: tests-private-builder
-      resources:
-        requests:
-          cpu: "3"
-          memory: 12Gi
     test:
     - as: run-tests-from-fork
       cli: latest
@@ -306,9 +224,16 @@ tests:
   cron: 0 0 31 2 1
   steps:
     cluster_profile: azure-qe
+    pre:
+    - ref: sandboxed-containers-operator-build-tests-private-fork
+      env:
+      - name: TESTS_PRIVATE_FORK_ORG
+        default: "tbuskey"
+      - name: TESTS_PRIVATE_FORK_BRANCH
+        default: "beforeOTE"
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768223136
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768299121
       CATALOG_SOURCE_NAME: brew-catalog
       CUSTOM_AZURE_REGION: eastus
       ENABLE_MUST_GATHER: "true"
@@ -327,54 +252,6 @@ tests:
       TEST_TIMEOUT: "120"
       TRUSTEE_URL: https://kbs-service-trustee-operator-system.apps.trustee-1.0.azure.sandboxedcontainers.com
       WORKLOAD_TO_TEST: coco
-    pre:
-    - as: build-tests-private-fork
-      commands: |
-        echo "============================================"
-        echo "Building openshift-tests-private from fork"
-        echo "============================================"
-
-        # Clone the fork
-        TESTS_PRIVATE_DIR="/tmp/openshift-tests-private"
-        git clone --depth=1 --branch=beforeOTE \
-          https://github.com/tbuskey/openshift-tests-private.git \
-          "${TESTS_PRIVATE_DIR}"
-        cd "${TESTS_PRIVATE_DIR}"
-
-        # Log git info for verification
-        echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-        echo "Branch: beforeOTE"
-        echo "Commit: $(git rev-parse HEAD)"
-        echo "Commit Msg: $(git log -1 --format=%s)"
-
-        # Save git info to shared dir for later steps
-        {
-          echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-          echo "Branch: beforeOTE"
-          echo "Commit: $(git rev-parse HEAD)"
-          echo "Date: $(git log -1 --format=%ci)"
-          echo "Message: $(git log -1 --format=%s)"
-        } > "${SHARED_DIR}/tests-private-fork-info.txt"
-
-        # Build
-        echo "Building extended-platform-tests..."
-        make go-mod-tidy
-        make all
-
-        # Copy binary to shared dir
-        cp ./bin/extended-platform-tests "${SHARED_DIR}/"
-        chmod +x "${SHARED_DIR}/extended-platform-tests"
-
-        echo "Binary saved to ${SHARED_DIR}/extended-platform-tests"
-        ls -la "${SHARED_DIR}/extended-platform-tests"
-
-        # Mark that fork binary should be used
-        echo "true" > "${SHARED_DIR}/use-tests-private-fork"
-      from: tests-private-builder
-      resources:
-        requests:
-          cpu: "3"
-          memory: 12Gi
     test:
     - as: run-tests-from-fork
       cli: latest
@@ -447,9 +324,16 @@ tests:
   cron: 0 0 31 2 1
   steps:
     cluster_profile: azure-qe
+    pre:
+    - ref: sandboxed-containers-operator-build-tests-private-fork
+      env:
+      - name: TESTS_PRIVATE_FORK_ORG
+        default: "tbuskey"
+      - name: TESTS_PRIVATE_FORK_BRANCH
+        default: "beforeOTE"
     env:
       ARO_CLUSTER_VERSION: "4.17"
-      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768223136
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768299121
       CATALOG_SOURCE_NAME: brew-catalog
       ENABLE_MUST_GATHER: "true"
       ENABLEPEERPODS: "true"
@@ -469,54 +353,6 @@ tests:
       TEST_TIMEOUT: "120"
       TRUSTEE_URL: https://kbs-service-trustee-operator-system.apps.trustee-1.0.azure.sandboxedcontainers.com
       WORKLOAD_TO_TEST: peer-pods
-    pre:
-    - as: build-tests-private-fork
-      commands: |
-        echo "============================================"
-        echo "Building openshift-tests-private from fork"
-        echo "============================================"
-
-        # Clone the fork
-        TESTS_PRIVATE_DIR="/tmp/openshift-tests-private"
-        git clone --depth=1 --branch=beforeOTE \
-          https://github.com/tbuskey/openshift-tests-private.git \
-          "${TESTS_PRIVATE_DIR}"
-        cd "${TESTS_PRIVATE_DIR}"
-
-        # Log git info for verification
-        echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-        echo "Branch: beforeOTE"
-        echo "Commit: $(git rev-parse HEAD)"
-        echo "Commit Msg: $(git log -1 --format=%s)"
-
-        # Save git info to shared dir for later steps
-        {
-          echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-          echo "Branch: beforeOTE"
-          echo "Commit: $(git rev-parse HEAD)"
-          echo "Date: $(git log -1 --format=%ci)"
-          echo "Message: $(git log -1 --format=%s)"
-        } > "${SHARED_DIR}/tests-private-fork-info.txt"
-
-        # Build
-        echo "Building extended-platform-tests..."
-        make go-mod-tidy
-        make all
-
-        # Copy binary to shared dir
-        cp ./bin/extended-platform-tests "${SHARED_DIR}/"
-        chmod +x "${SHARED_DIR}/extended-platform-tests"
-
-        echo "Binary saved to ${SHARED_DIR}/extended-platform-tests"
-        ls -la "${SHARED_DIR}/extended-platform-tests"
-
-        # Mark that fork binary should be used
-        echo "true" > "${SHARED_DIR}/use-tests-private-fork"
-      from: tests-private-builder
-      resources:
-        requests:
-          cpu: "3"
-          memory: 12Gi
     test:
     - as: run-tests-from-fork
       cli: latest
@@ -589,9 +425,16 @@ tests:
   cron: 0 0 31 2 1
   steps:
     cluster_profile: azure-qe
+    pre:
+    - ref: sandboxed-containers-operator-build-tests-private-fork
+      env:
+      - name: TESTS_PRIVATE_FORK_ORG
+        default: "tbuskey"
+      - name: TESTS_PRIVATE_FORK_BRANCH
+        default: "beforeOTE"
     env:
       ARO_CLUSTER_VERSION: "4.17"
-      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768223136
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768299121
       CATALOG_SOURCE_NAME: brew-catalog
       ENABLE_MUST_GATHER: "true"
       ENABLEPEERPODS: "true"
@@ -611,54 +454,6 @@ tests:
       TEST_TIMEOUT: "120"
       TRUSTEE_URL: https://kbs-service-trustee-operator-system.apps.trustee-1.0.azure.sandboxedcontainers.com
       WORKLOAD_TO_TEST: coco
-    pre:
-    - as: build-tests-private-fork
-      commands: |
-        echo "============================================"
-        echo "Building openshift-tests-private from fork"
-        echo "============================================"
-
-        # Clone the fork
-        TESTS_PRIVATE_DIR="/tmp/openshift-tests-private"
-        git clone --depth=1 --branch=beforeOTE \
-          https://github.com/tbuskey/openshift-tests-private.git \
-          "${TESTS_PRIVATE_DIR}"
-        cd "${TESTS_PRIVATE_DIR}"
-
-        # Log git info for verification
-        echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-        echo "Branch: beforeOTE"
-        echo "Commit: $(git rev-parse HEAD)"
-        echo "Commit Msg: $(git log -1 --format=%s)"
-
-        # Save git info to shared dir for later steps
-        {
-          echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-          echo "Branch: beforeOTE"
-          echo "Commit: $(git rev-parse HEAD)"
-          echo "Date: $(git log -1 --format=%ci)"
-          echo "Message: $(git log -1 --format=%s)"
-        } > "${SHARED_DIR}/tests-private-fork-info.txt"
-
-        # Build
-        echo "Building extended-platform-tests..."
-        make go-mod-tidy
-        make all
-
-        # Copy binary to shared dir
-        cp ./bin/extended-platform-tests "${SHARED_DIR}/"
-        chmod +x "${SHARED_DIR}/extended-platform-tests"
-
-        echo "Binary saved to ${SHARED_DIR}/extended-platform-tests"
-        ls -la "${SHARED_DIR}/extended-platform-tests"
-
-        # Mark that fork binary should be used
-        echo "true" > "${SHARED_DIR}/use-tests-private-fork"
-      from: tests-private-builder
-      resources:
-        requests:
-          cpu: "3"
-          memory: 12Gi
     test:
     - as: run-tests-from-fork
       cli: latest
@@ -731,9 +526,16 @@ tests:
   cron: 0 0 31 2 1
   steps:
     cluster_profile: aws-sandboxed-containers-operator
+    pre:
+    - ref: sandboxed-containers-operator-build-tests-private-fork
+      env:
+      - name: TESTS_PRIVATE_FORK_ORG
+        default: "tbuskey"
+      - name: TESTS_PRIVATE_FORK_BRANCH
+        default: "beforeOTE"
     env:
       AWS_REGION_OVERRIDE: us-east-2
-      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768223136
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768299121
       CATALOG_SOURCE_NAME: brew-catalog
       ENABLE_MUST_GATHER: "true"
       ENABLEPEERPODS: "true"
@@ -751,54 +553,6 @@ tests:
       TEST_TIMEOUT: "120"
       TRUSTEE_URL: https://kbs-service-trustee-operator-system.apps.trustee-1.0.azure.sandboxedcontainers.com
       WORKLOAD_TO_TEST: peer-pods
-    pre:
-    - as: build-tests-private-fork
-      commands: |
-        echo "============================================"
-        echo "Building openshift-tests-private from fork"
-        echo "============================================"
-
-        # Clone the fork
-        TESTS_PRIVATE_DIR="/tmp/openshift-tests-private"
-        git clone --depth=1 --branch=beforeOTE \
-          https://github.com/tbuskey/openshift-tests-private.git \
-          "${TESTS_PRIVATE_DIR}"
-        cd "${TESTS_PRIVATE_DIR}"
-
-        # Log git info for verification
-        echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-        echo "Branch: beforeOTE"
-        echo "Commit: $(git rev-parse HEAD)"
-        echo "Commit Msg: $(git log -1 --format=%s)"
-
-        # Save git info to shared dir for later steps
-        {
-          echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-          echo "Branch: beforeOTE"
-          echo "Commit: $(git rev-parse HEAD)"
-          echo "Date: $(git log -1 --format=%ci)"
-          echo "Message: $(git log -1 --format=%s)"
-        } > "${SHARED_DIR}/tests-private-fork-info.txt"
-
-        # Build
-        echo "Building extended-platform-tests..."
-        make go-mod-tidy
-        make all
-
-        # Copy binary to shared dir
-        cp ./bin/extended-platform-tests "${SHARED_DIR}/"
-        chmod +x "${SHARED_DIR}/extended-platform-tests"
-
-        echo "Binary saved to ${SHARED_DIR}/extended-platform-tests"
-        ls -la "${SHARED_DIR}/extended-platform-tests"
-
-        # Mark that fork binary should be used
-        echo "true" > "${SHARED_DIR}/use-tests-private-fork"
-      from: tests-private-builder
-      resources:
-        requests:
-          cpu: "3"
-          memory: 12Gi
     test:
     - as: run-tests-from-fork
       cli: latest
@@ -871,9 +625,16 @@ tests:
   cron: 0 0 31 2 1
   steps:
     cluster_profile: aws-sandboxed-containers-operator
+    pre:
+    - ref: sandboxed-containers-operator-build-tests-private-fork
+      env:
+      - name: TESTS_PRIVATE_FORK_ORG
+        default: "tbuskey"
+      - name: TESTS_PRIVATE_FORK_BRANCH
+        default: "beforeOTE"
     env:
       AWS_REGION_OVERRIDE: us-east-2
-      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768223136
+      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.11.2-1768299121
       CATALOG_SOURCE_NAME: brew-catalog
       ENABLE_MUST_GATHER: "true"
       ENABLEPEERPODS: "true"
@@ -891,54 +652,6 @@ tests:
       TEST_TIMEOUT: "120"
       TRUSTEE_URL: https://kbs-service-trustee-operator-system.apps.trustee-1.0.azure.sandboxedcontainers.com
       WORKLOAD_TO_TEST: coco
-    pre:
-    - as: build-tests-private-fork
-      commands: |
-        echo "============================================"
-        echo "Building openshift-tests-private from fork"
-        echo "============================================"
-
-        # Clone the fork
-        TESTS_PRIVATE_DIR="/tmp/openshift-tests-private"
-        git clone --depth=1 --branch=beforeOTE \
-          https://github.com/tbuskey/openshift-tests-private.git \
-          "${TESTS_PRIVATE_DIR}"
-        cd "${TESTS_PRIVATE_DIR}"
-
-        # Log git info for verification
-        echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-        echo "Branch: beforeOTE"
-        echo "Commit: $(git rev-parse HEAD)"
-        echo "Commit Msg: $(git log -1 --format=%s)"
-
-        # Save git info to shared dir for later steps
-        {
-          echo "Fork: https://github.com/tbuskey/openshift-tests-private"
-          echo "Branch: beforeOTE"
-          echo "Commit: $(git rev-parse HEAD)"
-          echo "Date: $(git log -1 --format=%ci)"
-          echo "Message: $(git log -1 --format=%s)"
-        } > "${SHARED_DIR}/tests-private-fork-info.txt"
-
-        # Build
-        echo "Building extended-platform-tests..."
-        make go-mod-tidy
-        make all
-
-        # Copy binary to shared dir
-        cp ./bin/extended-platform-tests "${SHARED_DIR}/"
-        chmod +x "${SHARED_DIR}/extended-platform-tests"
-
-        echo "Binary saved to ${SHARED_DIR}/extended-platform-tests"
-        ls -la "${SHARED_DIR}/extended-platform-tests"
-
-        # Mark that fork binary should be used
-        echo "true" > "${SHARED_DIR}/use-tests-private-fork"
-      from: tests-private-builder
-      resources:
-        requests:
-          cpu: "3"
-          memory: 12Gi
     test:
     - as: run-tests-from-fork
       cli: latest
@@ -1006,88 +719,6 @@ tests:
           cpu: "1"
           memory: 1Gi
     workflow: sandboxed-containers-operator-e2e-aws
-  timeout: 24h0m0s
-- as: e2e-tests-private-fork
-  cron: 0 0 31 2 1
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    test:
-    - as: test-from-fork
-      cli: latest
-      commands: |
-        # Clone your fork of openshift-tests-private
-        TESTS_PRIVATE_DIR="/go/src/github.com/openshift/openshift-tests-private"
-        mkdir -p "$(dirname ${TESTS_PRIVATE_DIR})"
-        git clone --depth=1 --branch=beforeOTE \
-          https://github.com/tbuskey/openshift-tests-private.git \
-          "${TESTS_PRIVATE_DIR}"
-        cd "${TESTS_PRIVATE_DIR}"
-
-        # Verify and log git info (shows in job logs)
-        echo "============================================"
-        echo "VERIFICATION: Fork and Branch Information"
-        echo "============================================"
-        echo "Expected: https://github.com/tbuskey/openshift-tests-private @ beforeOTE"
-        echo "Actual Remote: $(git remote get-url origin)"
-        echo "Actual Branch: $(git branch --show-current)"
-        echo "Actual Commit: $(git rev-parse HEAD)"
-        echo "Commit Date:   $(git log -1 --format=%ci)"
-        echo "Commit Msg:    $(git log -1 --format=%s)"
-        echo "============================================"
-
-        # Save git info to artifacts -> artifacts/test-from-fork/git-info.txt
-        {
-          echo "=== Git Repository Verification ==="
-          echo "Expected Remote: https://github.com/tbuskey/openshift-tests-private"
-          echo "Expected Branch: beforeOTE"
-          echo ""
-          echo "=== Actual Values ==="
-          echo "Remote URL: $(git remote get-url origin)"
-          echo "Branch: $(git branch --show-current)"
-          echo "Commit SHA: $(git rev-parse HEAD)"
-          echo "Commit Date: $(git log -1 --format=%ci)"
-          echo "Commit Author: $(git log -1 --format='%an <%ae>')"
-          echo ""
-          echo "=== Commit Details ==="
-          git log -1 --format=full
-          echo ""
-          echo "=== Recent Commits ==="
-          git log -10 --oneline
-        } > "${ARTIFACT_DIR}/git-info.txt"
-
-        # Save git remote info -> artifacts/test-from-fork/git-remote.txt
-        git remote -v > "${ARTIFACT_DIR}/git-remote.txt"
-
-        # Build tests from your fork
-        echo "Building openshift-tests-private..."
-        make go-mod-tidy
-        make all
-
-        # Verify binary was built -> artifacts/test-from-fork/binary-info.txt
-        {
-          echo "=== Binary Information ==="
-          echo "Binary path: ${TESTS_PRIVATE_DIR}/bin/extended-platform-tests"
-          ls -la ./bin/extended-platform-tests
-          echo ""
-          echo "=== Binary Version ==="
-          ./bin/extended-platform-tests version 2>&1 || echo "Version command not available"
-        } > "${ARTIFACT_DIR}/binary-info.txt"
-
-        # Run sig-kata tests (dry-run example) -> artifacts/test-from-fork/test-results.txt
-        ./bin/extended-platform-tests run all \
-          --dry-run \
-          -o "${ARTIFACT_DIR}/test-results.txt"
-
-        echo "Artifacts saved to ${ARTIFACT_DIR}/"
-        ls -la "${ARTIFACT_DIR}/"
-      from: tests-private-builder
-      resources:
-        requests:
-          cpu: "3"
-          memory: 12Gi
-    workflow: cucushift-installer-rehearse-azure-ipi
   timeout: 24h0m0s
 zz_generated_metadata:
   branch: devel
