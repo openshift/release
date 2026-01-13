@@ -341,15 +341,12 @@ main() {
 }
 
 # Generate a pre step to build tests-private from fork
+# Note: The step ref already has defaults for TESTS_PRIVATE_FORK_ORG and TESTS_PRIVATE_FORK_BRANCH
+# defined in the step-registry, so we just reference it without overrides.
 generate_fork_pre_step() {
   cat <<EOF
     pre:
     - ref: sandboxed-containers-operator-build-tests-private-fork
-      env:
-      - name: TESTS_PRIVATE_FORK_ORG
-        default: "${TESTS_PRIVATE_FORK_ORG}"
-      - name: TESTS_PRIVATE_FORK_BRANCH
-        default: "${TESTS_PRIVATE_FORK_BRANCH}"
 EOF
 }
 
