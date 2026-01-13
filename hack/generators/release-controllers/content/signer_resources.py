@@ -73,6 +73,9 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                 },
                 'spec': {
                     'serviceAccountName': 'release-controller',
+                    'imagePullSecrets': [{
+                        'name': 'registry-pull-credentials'
+                    }],
                     'volumes': [{
                         'name': 'publisher',
                         'secret': {

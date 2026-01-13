@@ -228,6 +228,9 @@ def _deployment_resources(gendoc, namespaces):
                             }
                         ],
                         'serviceAccountName': 'release-mirror-cleanup-controller',
+                        'imagePullSecrets': [{
+                            'name': 'registry-pull-credentials'
+                        }],
                     }
                 }
             }
