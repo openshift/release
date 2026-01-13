@@ -244,6 +244,9 @@ def _add_origin_resources(gendoc):
                             }
                         ],
                         "serviceAccountName": "release-controller",
+                        "imagePullSecrets": [{
+                            "name": "registry-pull-credentials"
+                        }],
                         "volumes": get_rc_volumes(context)
                     }
                 }
@@ -313,6 +316,9 @@ def _add_origin_resources(gendoc):
                             }
                         ],
                         "serviceAccountName": "release-controller",
+                        "imagePullSecrets": [{
+                            "name": "registry-pull-credentials"
+                        }],
                         "volumes": get_rcapi_volumes(context, secret_name=context.secret_name_tls_api)
                     }
                 }

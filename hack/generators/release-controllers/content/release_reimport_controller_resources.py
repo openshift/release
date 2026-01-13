@@ -190,6 +190,9 @@ def _deployment_resources(gendoc, namespaces):
                             }
                         ],
                         'serviceAccountName': 'release-reimport-controller',
+                        'imagePullSecrets': [{
+                            'name': 'registry-pull-credentials'
+                        }],
                     }
                 }
             }
