@@ -55,7 +55,8 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION=""
 JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
-stack_name="${JOB_NAME}"
+STACK_TIMESTAMP="$(date +%s)"
+stack_name="${JOB_NAME}-${STACK_TIMESTAMP}"
 cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
 
 curl -o "${cf_tpl_file}" https://raw.githubusercontent.com/openshift/microshift/refs/heads/main/scripts/aws/cf-gen.yaml
