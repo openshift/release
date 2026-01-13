@@ -79,9 +79,9 @@ export DATA_ROUTER_URL="https://datarouter.ccitredhat.com"
 
 # upload results to report portal
 export VERBOSE=true
-export TESTRUN_NAME="${TEST_SUITE} test run"
+export TESTRUN_NAME="${TEST_SUITE_DESC} test run"
 JOB_URL=$(get_job_url)
-export TESTRUN_DESCRIPTION="Automated ${TEST_SUITE} test run ${JOB_URL}"
+export TESTRUN_DESCRIPTION="Automated ${TEST_SUITE_DESC} test run ${JOB_URL}"
 # we have to use SHARED_DIR to be able to get results generated in the previous test step
 export TEST_RESULTS_DIR="${SHARED_DIR}"
 export PRODUCT_VERSION="${product_version}"
