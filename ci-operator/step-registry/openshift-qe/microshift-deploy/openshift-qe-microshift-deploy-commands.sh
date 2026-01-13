@@ -50,9 +50,9 @@ cat <<EOF >/tmp/microshift-inventory
 [microshift]
 EOF
 
-# Add each node with proper ansible_host
+# Add each node to inventory
 for node in $NODES; do
-  echo "microshift-${node} ansible_host=\"${node}\"" >> /tmp/microshift-inventory
+  echo "${node}" >> /tmp/microshift-inventory
 done
 
 cat <<EOF >>/tmp/microshift-inventory
@@ -67,22 +67,6 @@ localhost ansible_connection=local
 
 [logging:vars]
 ansible_user=root
-EOF
-
-# Clean up previous attempts
-cat > /tmp/clean-microshift.sh << 'EOF'
-echo 'Running clean-microshift.sh'
-# Use the official cleanup tool if available
-if command -v microshift-cleanup-data &> /dev/null; then
-  echo "Using microshift-cleanup-data tool to clean data"
-  echo 1 | sudo /usr/bin/microshift-cleanup-data --all || true
-else
-  echo "microshift-cleanup-data not found, manually removing data"
-  rm -rf /var/lib/microshift /etc/microshift || true
-fi
-# Remove packages
-echo "Removing MicroShift packages"
-dnf remove -y microshift microshift-networking microshift-release-info || true
 EOF
 
 # Setup MicroShift
@@ -109,9 +93,8 @@ ssh ${SSH_ARGS} root@${bastion} "
    fi
 "
 
-# Copy inventory and scripts to bastion
+# Copy inventory and pull secret to bastion
 scp -q ${SSH_ARGS} /tmp/microshift-inventory root@${bastion}:${microshift_repo}/ansible/${ANSIBLE_INVENTORY}
-scp -q ${SSH_ARGS} /tmp/clean-microshift.sh root@${bastion}:/tmp/
 set +x
 scp -q ${SSH_ARGS} ${CLUSTER_PROFILE_DIR}/pull_secret root@${bastion}:${microshift_repo}/pull_secret.txt
 set -x
@@ -121,10 +104,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
    cd ${microshift_repo}/ansible
-   
-   # Clean up previous installations
-   ansible -i ${ANSIBLE_INVENTORY} microshift -m script -a /tmp/clean-microshift.sh
-   
+
    # Run the deployment playbook
    if [[ -f '${ANSIBLE_PLAYBOOK}' ]]; then
      ansible-playbook -i ${ANSIBLE_INVENTORY} ${ANSIBLE_PLAYBOOK} -v | tee /tmp/ansible-microshift-deploy-$(date +%s)
