@@ -160,8 +160,22 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     test:
-    - ref: ingress-baremetalds-metallb-gatewayapi-conformance-test
-    workflow: ingress-baremetalds-metallb
+    - ref: ingress-metallb-conf-gatewayapi-conformance-test
+    workflow: ingress-metallb-conf
+- always_run: false
+  as: e2e-vsphere-gatewayapi-conformance
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: make TEST=TestGatewayAPI test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ingress-vsphere-metallb
 - always_run: false
   as: e2e-aws-ovn-techpreview
   optional: true
