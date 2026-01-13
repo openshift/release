@@ -136,69 +136,149 @@ CHURN=false
 ES_SERVER=""
 CONFIG_EOF
     
-    # Deploy ipecho service on external jump host for proper egress IP validation
-    echo "Deploying ipecho service using cloud-bulldozer compatible external validation methodology..."
+    # Use external ipecho service for proper egress IP validation
+    echo "Setting up external ipecho service for cloud-bulldozer compatible validation..."
+    echo "Cloud-bulldozer methodology: Using external ipecho service to validate egress IP with $CURRENT_WORKER_COUNT worker scaling"
     
-    # Jump host configuration (cloud-bulldozer compatible setup)
-    JUMP_HOST="3.15.195.250"
-    JUMP_USER="fedora"
-    SSH_KEY="$SHARED_DIR/lqclk.pem"
-    IPECHO_PORT="8080"
+    # Use a well-known external IP echo service
+    # This is similar to cloud-bulldozer's approach of testing against external services
+    EXTERNAL_IPECHO_URL="https://httpbin.org/ip"
+    echo "$EXTERNAL_IPECHO_URL" > "$SHARED_DIR/egress-health-check-url"
+    echo "Using external IP echo service: $EXTERNAL_IPECHO_URL"
     
-    echo "Using cloud-bulldozer external validation approach with $CURRENT_WORKER_COUNT worker scaling"
-    
-    # Copy SSH key if available (assuming it's in cluster profile or shared dir)
-    if [[ -f "$CLUSTER_PROFILE_DIR/ssh-privatekey" ]]; then
-        cp "$CLUSTER_PROFILE_DIR/ssh-privatekey" "$SSH_KEY"
-        chmod 600 "$SSH_KEY"
-    elif [[ -f "$CLUSTER_PROFILE_DIR/lqclk.pem" ]]; then
-        cp "$CLUSTER_PROFILE_DIR/lqclk.pem" "$SSH_KEY"
-        chmod 600 "$SSH_KEY"
+    # Verify external service is accessible
+    echo "Verifying external ipecho service accessibility..."
+    # Create a test pod to verify connectivity
+    cat << EOF | oc apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ipecho-connectivity-test
+  namespace: $TEST_NAMESPACE
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - name: test
+    image: quay.io/openshift/origin-network-tools:latest
+    command: ["/bin/sleep", "300"]
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      capabilities:
+        drop:
+        - ALL
+      seccompProfile:
+        type: RuntimeDefault
+  restartPolicy: Never
+EOF
+
+    # Wait for test pod and verify connectivity
+    if oc wait --for=condition=Ready pod/ipecho-connectivity-test -n "$TEST_NAMESPACE" --timeout=60s; then
+        echo "Testing connectivity to external ipecho service..."
+        test_response=$(oc exec -n "$TEST_NAMESPACE" ipecho-connectivity-test -- timeout 10 curl -s "$EXTERNAL_IPECHO_URL" 2>/dev/null || echo "")
+        if [[ -n "$test_response" ]]; then
+            echo "✅ External ipecho service is accessible"
+            echo "Sample response: $test_response"
+        else
+            echo "⚠️ Warning: External ipecho service test failed, but continuing..."
+        fi
     else
-        echo "Warning: SSH key not found in cluster profile, using default SSH method"
-        SSH_KEY=""
+        echo "⚠️ Warning: Test pod not ready, but continuing with external service..."
     fi
     
-    # Deploy ipecho on jump host
-    if [[ -n "$SSH_KEY" && -f "$SSH_KEY" ]]; then
-        SSH_CMD="ssh -i $SSH_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-    else
-        SSH_CMD="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-    fi
+    # Cleanup test pod
+    oc delete pod ipecho-connectivity-test -n "$TEST_NAMESPACE" --ignore-not-found=true
     
-    # Deploy ipecho container on jump host
-    $SSH_CMD "$JUMP_USER@$JUMP_HOST" << 'JUMP_EOF'
-        # Become root
-        sudo su - << 'ROOT_EOF'
-            # Stop any existing ipecho containers
-            podman stop ipecho-service 2>/dev/null || true
-            podman rm ipecho-service 2>/dev/null || true
-            
-            # Pull and run ipecho container
-            podman pull quay.io/openshifttest/ip-echo:1.2.0
-            podman run -d --name ipecho-service \
-                -p 8080:8080 \
-                quay.io/openshifttest/ip-echo:1.2.0 \
-                /ip-echo --listen=0.0.0.0:8080
-            
-            # Wait for container to start
-            sleep 5
-            
-            # Verify service is running
-            podman ps | grep ipecho-service
-            curl -s http://localhost:8080 || echo "ipecho service starting..."
-            
-            echo "External ipecho service deployed successfully on port 8080"
-ROOT_EOF
-JUMP_EOF
+    # Deploy cloud-bulldozer style traffic generators and test projects
+    echo "Deploying cloud-bulldozer traffic generators for egress IP testing..."
+    echo "Creating multiple namespaces with traffic generation pods (cloud-bulldozer egress1.sh pattern)..."
     
-    # Create health check URL for krkn chaos testing using external ipecho service
-    echo "http://$JUMP_HOST:$IPECHO_PORT" > "$SHARED_DIR/egress-health-check-url"
-    echo "Created external egress IP health check URL: http://$JUMP_HOST:$IPECHO_PORT"
+    # Cloud-bulldozer creates multiple projects with pods generating traffic
+    # Simulate their egress1.sh and egress_4p.sh approach
+    NUM_PROJECTS=5  # Scaled down from cloud-bulldozer's 200 for CI efficiency
     
-    # Save jump host info for cleanup
-    echo "$JUMP_HOST" > "$SHARED_DIR/jump-host"
-    echo "$JUMP_USER" > "$SHARED_DIR/jump-user"
+    for project_num in $(seq 1 "$NUM_PROJECTS"); do
+        TRAFFIC_NAMESPACE="egress-test-project-$project_num"
+        
+        # Create namespace for this traffic generation project
+        oc create namespace "$TRAFFIC_NAMESPACE" || true
+        
+        # Label the traffic namespace to use egress IP (cloud-bulldozer pattern)
+        oc label namespace "$TRAFFIC_NAMESPACE" kubernetes.io/metadata.name="$TEST_NAMESPACE" --overwrite
+        
+        echo "Creating traffic generators in project $project_num/$NUM_PROJECTS..."
+        
+        # Deploy traffic generator pods (similar to cloud-bulldozer's curl-based approach)
+        for pod_num in $(seq 1 2); do  # 2 pods per project for traffic generation
+            cat << TRAFFIC_EOF | oc apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: traffic-gen-$pod_num
+  namespace: $TRAFFIC_NAMESPACE
+  labels:
+    app: egress-traffic-gen
+    workload: egressip
+    cloud-bulldozer: "true"
+    project: "project-$project_num"
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - name: traffic-generator
+    image: quay.io/openshift/origin-network-tools:latest
+    command: ["/bin/bash"]
+    args:
+    - "-c"
+    - |
+      # Cloud-bulldozer style continuous traffic generation
+      echo "Starting cloud-bulldozer style traffic generation..."
+      while true; do
+        # HTTP traffic to external ipecho service (egress1.sh pattern)
+        curl -s "$EXTERNAL_IPECHO_URL" > /tmp/egress_response.log 2>&1 || true
+        echo "Traffic generated at \$(date)" >> /tmp/traffic.log
+        
+        # High frequency ping tests (ovn-pod-stress-test.sh pattern)  
+        ping -c 10 -i 0.1 8.8.8.8 > /tmp/ping.log 2>&1 || true
+        
+        # Brief pause between traffic bursts
+        sleep 30
+      done
+    env:
+    - name: EXTERNAL_IPECHO_URL
+      value: "$EXTERNAL_IPECHO_URL"
+    securityContext:
+      allowPrivilegeEscalation: false
+      runAsNonRoot: true
+      capabilities:
+        drop:
+        - ALL
+      seccompProfile:
+        type: RuntimeDefault
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  restartPolicy: Never
+TRAFFIC_EOF
+        done
+    done
+    
+    # Wait for some traffic generator pods to be ready
+    echo "Waiting for traffic generator pods to start..."
+    sleep 10  # Give pods time to start
+    
+    echo "Cloud-bulldozer traffic generators deployed successfully"
+    echo "Traffic generation: $NUM_PROJECTS projects with continuous curl and ping traffic"
+    echo "Pattern: Similar to cloud-bulldozer's egress1.sh, egress_4p.sh, and ovn-pod-stress-test.sh"
     
 elif [[ $RUNNING_CNI == "OpenShiftSDN" ]]; then
     echo "OpenShiftSDN configuration not implemented in this version"

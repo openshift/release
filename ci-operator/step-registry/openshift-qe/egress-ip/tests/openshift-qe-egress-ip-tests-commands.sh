@@ -25,13 +25,13 @@ REBOOT_RETRIES="${REBOOT_RETRIES:-5}"
 NAMESPACE="openshift-ovn-kubernetes"
 WORKER_COUNT="${WORKER_COUNT:-3}"
 
-# Get external ipecho service URL from setup
+# Get external validation service URL from setup (cloud-bulldozer compatible)
 if [[ -f "$SHARED_DIR/egress-health-check-url" ]]; then
     IPECHO_SERVICE_URL=$(cat "$SHARED_DIR/egress-health-check-url")
 else
     IPECHO_SERVICE_URL="https://httpbin.org/ip"  # Fallback
 fi
-echo "Using external ipecho service: $IPECHO_SERVICE_URL"
+echo "Using cloud-bulldozer compatible external validation service: $IPECHO_SERVICE_URL"
 
 # Test artifacts directory
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
