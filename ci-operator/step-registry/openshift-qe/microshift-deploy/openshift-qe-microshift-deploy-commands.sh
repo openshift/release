@@ -88,9 +88,14 @@ ssh ${SSH_ARGS} root@${bastion} "
    
    # Install ansible if not present
    if ! command -v ansible &> /dev/null; then
-     dnf install -y ansible-core python3-pip
-     pip3 install ansible
+     dnf install -y ansible-core
    fi
+
+   # Install kubernetes module
+   if ! command -v pip3 &> /dev/null; then
+     dnf install -y python3-pip
+   fi
+   pip3 install kubernetes
 "
 
 # Copy inventory and pull secret to bastion
