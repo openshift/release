@@ -143,8 +143,22 @@ CONFIG_EOF
     # Use a well-known external IP echo service
     # This is similar to cloud-bulldozer's approach of testing against external services
     EXTERNAL_IPECHO_URL="https://httpbin.org/ip"
+    
+    # Store the expected egress IP for health check validation
+    # The chaos framework will check if httpbin.org/ip is reachable
+    # Our test scripts will validate the actual content/functionality
     echo "$EXTERNAL_IPECHO_URL" > "$SHARED_DIR/egress-health-check-url"
     echo "Using external IP echo service: $EXTERNAL_IPECHO_URL"
+    
+    # Store the expected external IP (AWS NAT public IP) for validation
+    # This helps validate that egress IP pods reach external services consistently
+    EXPECTED_EXTERNAL_IP=$(oc run temp-ip-check --image=registry.redhat.io/ubi9/ubi:latest --rm -i --restart=Never -- sh -c "curl -s --max-time 10 https://httpbin.org/ip" 2>/dev/null | jq -r .origin 2>/dev/null || echo "")
+    if [[ -n "$EXPECTED_EXTERNAL_IP" && "$EXPECTED_EXTERNAL_IP" != "null" ]]; then
+        echo "$EXPECTED_EXTERNAL_IP" > "$SHARED_DIR/expected-external-ip"
+        echo "Baseline external IP for health monitoring: $EXPECTED_EXTERNAL_IP"
+    else
+        echo "Warning: Could not determine baseline external IP for health monitoring"
+    fi
     
     # Verify external service is accessible
     echo "Verifying external ipecho service accessibility..."
