@@ -1070,3 +1070,47 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  labels:
+    ci.openshift.io/area: ship-status-dash
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-ship-status-dash
+  spec:
+    automountServiceAccountToken: true
+    containers:
+    - args:
+      - -c
+      - curl -sL https://raw.githubusercontent.com/openshift/release/refs/heads/master/hack/periodic-mirroring.sh
+        | bash
+      command:
+      - bash
+      env:
+      - name: HOME
+        value: /tmp/user
+      - name: MAPPING_FILE_PREFIX
+        value: mapping_ship_status_dash
+      - name: dry_run
+        value: "false"
+      image: registry.redhat.io/openshift4/ose-cli-rhel9
+      imagePullPolicy: IfNotPresent
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /tmp/user/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: config.json
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-quay-io-openshiftci
+    - configMap:
+        name: image-mirror-mappings
+      name: config
