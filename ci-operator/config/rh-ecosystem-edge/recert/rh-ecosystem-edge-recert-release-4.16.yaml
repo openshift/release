@@ -7,6 +7,18 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  lifecycle-agent-operator-4-16:
+    name: "4.16"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator
+  lifecycle-agent-operator-bundle-4-15:
+    name: "4.15"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
+  lifecycle-agent-operator-bundle-4-16:
+    name: "4.16"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
   tests-private:
     name: tests-private
     namespace: ci
@@ -153,6 +165,22 @@ tests:
     - ref: cucushift-e2e
     - ref: openshift-e2e-test-qe-report
     workflow: baremetal-lab-agent-install-pxe
+- as: ibu-e2e-flow
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  steps:
+    cluster_profile: aws
+    dependencies:
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-16
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-16
+      RECERT_IMAGE: recert
+      TARGET_LCA_REF: pipeline:lifecycle-agent-operator-bundle-4-15
+    env:
+      OCP_BASE_IMAGE_SOURCE: release
+      OCP_BASE_VERSION: "4.16"
+      OCP_TARGET_IMAGE_SOURCE: release
+      OCP_TARGET_VERSION: "4.15"
+      SEED_IMAGE_TAG_FORMAT: release
+    workflow: openshift-image-based-upgrade-presubmit
 zz_generated_metadata:
   branch: release-4.16
   org: rh-ecosystem-edge

@@ -23,7 +23,11 @@ export DOCKER_USERNAME="$DOCKER_USERNAME"
 export DOCKER_PASSWORD="$DOCKER_PASSWORD"
 
 python3 --version
-python3 utility/quayio_test_push_images.py -n 20 > $ARTIFACT_DIR/quayio_push_image_report 
+python3 utility/quayio_test_push_images.py -n 20 > $ARTIFACT_DIR/quayio_push_image_report || true
+
+export SOURCE_REPO="quay.io/quay-qetest/node"
+mkdir -p cypress/downloads
+python3 utility/quayio_test_pull_images.py -n 50 > $ARTIFACT_DIR/quay_io_pull_image_report || true
 
 #Clone Quay-test repo to get the local test images
 git clone https://"$GITHUB_ACCESS_TOKEN"@github.com/quay/quay-tests.git

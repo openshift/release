@@ -35,6 +35,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: gofmt
+  commands: |
+    make fmt
+    if ! git diff --stat --exit-code; then
+      echo 'error: found unformatted go files. Please run `make fmt`'
+      exit 1
+    fi
+  container:
+    from: src
 - as: check
   commands: GOFLAGS="" make test
   container:
