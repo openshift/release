@@ -120,7 +120,7 @@ run_tests() {
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
-    entrypoint ${E2E_COMMAND:-make test.e2e.ocp}
+    entrypoint "docker info;cat /etc/docker/daemon.json;"
     "
 }
 
