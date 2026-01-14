@@ -1,0 +1,33 @@
+ref:
+  as: cucushift-installer-rehearse-azure-cases-instance-types-provision
+  from: upi-installer
+  grace_period: 10m
+  commands: cucushift-installer-rehearse-azure-cases-instance-types-provision-commands.sh
+  timeout: 24h0m0s
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  env:
+  - name: BASE_DOMAIN
+    default: "qe.azure.devcluster.openshift.com"
+  - name: BASE_DOMAIN_RESOURCE_GROUP
+    default: "os4-common"
+    documentation: |-
+      The base resource group where base domain resides.
+  - name: SPILT_INSTANCE_TYPE
+    default: ""
+    documentation: |-
+      Currently there are more than 60 instance types to be tested, it's really a long run test.
+      This parm can split regions into 3 parts, and pick one part to test.
+
+      Allowed values:
+      "": Default, all regions will be tested
+      "INSTANCE_TYPE_SET_A": The 1st part of instance types listed in ${ARTIFACT_DIR}/instance_types.yaml
+      "INSTANCE_TYPE_SET_B": The 2nd part of instance types listed in ${ARTIFACT_DIR}/instance_types.yaml
+      "INSTANCE_TYPE_SET_C": The 3rd part of instance types listed in ${ARTIFACT_DIR}/instance_types.yaml 
+  documentation: >-
+    Create clusters on all supported regions.
