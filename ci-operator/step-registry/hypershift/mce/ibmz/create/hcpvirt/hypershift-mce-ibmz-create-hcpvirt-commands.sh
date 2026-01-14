@@ -270,7 +270,6 @@ create_sg_rule() {
 # Create security group rules to open the port range 30000-33000 for TCP traffic
 sg_name="$CLUSTER_NAME-sg"
 create_sg_rule $sg_name inbound tcp 30000 33000
-create_sg_rule $sg_name inbound tcp 3128 3128
 
 
 echo "$(date) Create hosted cluster kubeconfig"
