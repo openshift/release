@@ -410,26 +410,27 @@ echo "[SUCCESS] kubectl installed"
 echo "[INFO] Installing Kind..."
 KIND_VERSION="v0.30.0"
 KIND_PATH="/usr/local/bin/kind"
+OUT_FILE="/tmp/kind"
 if [[ "$(kind version -q 2>/dev/null)" == "${KIND_VERSION}" ]]; then
     echo "[INFO] kind is already installed at the desired version (${KIND_VERSION})."
 else
     echo "[INFO] Installing kind version ${KIND_VERSION}..."
     KIND_URL="https://github.com/kubernetes-sigs/kind/releases/download/${KIND_VERSION}/kind-linux-amd64"
 
-    if ! curl -Lo ./kind "${KIND_URL}"; then
+    if ! curl -Lo "${OUT_FILE}" "${KIND_URL}"; then
         echo "[ERROR] Failed to download kind from ${KIND_URL}"
         exit 1
     fi
 
-    if file ./kind | grep -q "ELF.*executable"; then
+    if file "${OUT_FILE}" | grep -q "ELF.*executable"; then
         echo "[INFO] Download verified: ELF executable"
     else
         echo "[ERROR] Downloaded file is not an ELF executable"
         exit 1
     fi
 
-    chmod +x kind
-    ${SUDO} mv kind "${KIND_PATH}"
+    chmod +x "${OUT_FILE}"
+    ${SUDO} mv "${OUT_FILE}" "${KIND_PATH}"
 fi
 
 kind version || {
