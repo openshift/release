@@ -17,7 +17,7 @@ fi
 # Build up the hypershift install command
 COMMAND=(
     "${HCP_CLI}" install
-    --hypershift-image="${OPERATOR_IMAGE}"
+    --hypershift-image="quay.io/heli/hypershift-operator:7399"
     --platform-monitoring=All
     --wait-until-available
 )
