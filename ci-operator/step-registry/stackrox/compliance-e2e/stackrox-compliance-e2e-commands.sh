@@ -20,16 +20,8 @@ function InstallYq() {
     curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${arch}" \
         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
 
-    # Verify installation
-    # Using || true to prevent script exit if yq is not available
-    typeset cmdYq=""
-    cmdYq="$(/tmp/bin/yq --version || true)"
-
-    if [ -n "${cmdYq}" ]; then
-        : "yq installed: ${cmdYq}"
-    else
-        : "Warning: yq installation failed, test mapping will be skipped"
-    fi
+    # Skip test mapping if yq installation failed
+    /tmp/bin/yq --version || MAP_TESTS=false
 
     true
 }
@@ -39,20 +31,10 @@ function MapTestsForComponentReadiness() {
 
     if [[ "${MAP_TESTS}" == "true" && -n "${resultsFile}" ]]; then
         if [ -f "${resultsFile}" ]; then
-            # Check if yq is available before attempting to use it
-            typeset yqCmd=""
-            if command -v yq >/dev/null 2>&1; then
-                yqCmd="yq"
-            elif [ -f /tmp/bin/yq ]; then
-                yqCmd="/tmp/bin/yq"
-            fi
-
-            if [ -n "${yqCmd}" ]; then
-                : "Mapping test suite name in: ${resultsFile}"
-                "${yqCmd}" eval -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' "${resultsFile}" || : "Warning: yq failed for ${resultsFile}"
-            else
-                : "Warning: yq not available, skipping test mapping for ${resultsFile}"
-            fi
+            # Use /tmp/bin/yq since InstallYq was already called
+            typeset yqCmd="/tmp/bin/yq"
+            : "Mapping test suite name in: ${resultsFile}"
+            "${yqCmd}" eval -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' "${resultsFile}" || : "Warning: yq failed for ${resultsFile}"
         fi
     fi
 
