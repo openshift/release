@@ -4,6 +4,17 @@ set -o nounset
 set -o pipefail
 set -x
 cat /etc/os-release
+
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 oc config view
 oc projects
 python --version
@@ -25,10 +36,6 @@ cluster_infra=$(oc get  infrastructure cluster -ojsonpath='{.status.platformStat
 hypershift_pods=$(! oc -n hypershift get pods| grep operator >/dev/null ||oc -n hypershift get pods| grep operator |wc -l)
 if [[ $cluster_infra == "BareMetal" && $hypershift_pods -ge 1 ]];then
   echo "Executing cluster-density-v2 in hypershift cluster"
-  if [[ -f $SHARED_DIR/proxy-conf.sh ]];then
-    echo "Set http proxy for hypershift cluster"
-    . $SHARED_DIR/proxy-conf.sh
-  fi
   echo "Configure KUBECONFIG for hosted cluster and execute kube-buner in it"
   export KUBECONFIG=$SHARED_DIR/nested_kubeconfig
 fi
