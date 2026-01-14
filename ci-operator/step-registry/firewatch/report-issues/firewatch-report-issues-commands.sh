@@ -9,18 +9,6 @@ firewatch jira-config-gen --token-path "${FIREWATCH_JIRA_API_TOKEN_PATH}" --serv
 
 report_command="firewatch report"
 
-if [ "${FIREWATCH_PRIVATE_DECK,,}" = "true" ]; then
-    report_command+=" --gcs-bucket qe-private-deck --gcs-creds-file /tmp/secrets/private-deck/creds.json"
-fi
-
-if [ "${FIREWATCH_FAIL_WITH_TEST_FAILURES,,}" = "true" ]; then
-    report_command+=" --fail-with-test-failures"
-fi
-
-if [ "${FIREWATCH_FAIL_WITH_POD_FAILURES,,}" = "true" ]; then
-    report_command+=" --fail-with-pod-failures"
-fi
-
 # If the user has specified verbose test failure reporting
 if [ "${FIREWATCH_VERBOSE_TEST_FAILURE_REPORTING,,}" = "true" ]; then
     report_command+=" --verbose-test-failure-reporting"
@@ -39,4 +27,15 @@ fi
 
 echo $report_command
 
-eval "$report_command"
+export JOB_NAME=periodic-ci-RedHatQE-interop-testing-master-cnv-odf-ocp-4.21-lp-interop-cr-cnv-component-readiness-aws-ipi-ocp421
+export JOB_NAME_SAFE=cnv-component-readiness-aws-ipi-ocp421
+
+build_ids=(1996414251467542528 1996595447770124288 1996776643972042752)
+
+for id in "${build_ids[@]}"
+do
+    echo "------------------------------------------"
+    echo "Processing Build ID: $id"
+    export BUILD_ID=$id
+    eval "$report_command"
+done
