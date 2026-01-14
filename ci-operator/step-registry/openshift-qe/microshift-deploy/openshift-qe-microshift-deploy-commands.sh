@@ -25,6 +25,13 @@ export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
 
+# Derive MicroShift version from release image if not explicitly set
+if [[ -z "${MICROSHIFT_VERSION:-}" ]] && [[ -n "${RELEASE_IMAGE_LATEST:-}" ]]; then
+  OCP_VERSION=$(oc adm release info --registry-config ${CLUSTER_PROFILE_DIR}/pull_secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+  MICROSHIFT_VERSION="latest-${OCP_VERSION}"
+  echo "Derived MICROSHIFT_VERSION: ${MICROSHIFT_VERSION}"
+fi
+
 # Get allocated nodes from QUADS
 echo "Getting allocated nodes from QUADS..."
 OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
@@ -112,7 +119,13 @@ ssh ${SSH_ARGS} root@${bastion} "
 
    # Run the deployment playbook
    if [[ -f '${ANSIBLE_PLAYBOOK}' ]]; then
-     ansible-playbook -i ${ANSIBLE_INVENTORY} ${ANSIBLE_PLAYBOOK} -v | tee /tmp/ansible-microshift-deploy-$(date +%s)
+     ansible-playbook -i ${ANSIBLE_INVENTORY} ${ANSIBLE_PLAYBOOK} \
+       -e "microshift_version=${MICROSHIFT_VERSION}" \
+       -e "setup_microshift_host=${SETUP_MICROSHIFT_HOST}" \
+       -e "install_microshift=${INSTALL_MICROSHIFT}" \
+       -e "manage_repos=${MANAGE_REPOS}" \
+       -e "prometheus_logging=${PROMETHEUS_LOGGING}" \
+       -v | tee /tmp/ansible-microshift-deploy-$(date +%s)
    else
      echo 'ERROR: Ansible playbook ${ANSIBLE_PLAYBOOK} not found'
      echo 'Available playbooks:'
