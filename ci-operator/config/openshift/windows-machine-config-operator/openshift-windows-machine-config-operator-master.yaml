@@ -113,6 +113,24 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
+- as: aws-e2e-olmv1-install
+  cron: 0 9 * * 1
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      FEATURE_SET: TechPreviewNoUpgrade
+    post:
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ovn-conf-hybrid-manifest
+    - chain: ipi-install
+    test:
+    - ref: windows-conf-operator-olmv1
 - always_run: false
   as: vsphere-disconnected-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
