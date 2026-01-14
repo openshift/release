@@ -15,9 +15,9 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-python --version
+python3 --version
 pushd /tmp
-python -m virtualenv ./venv_qe
+python3 -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 oc config view

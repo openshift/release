@@ -6,9 +6,9 @@ set -x
 cat /etc/os-release
 oc config view
 oc projects
-python --version
+python3 --version
 pushd /tmp
-python -m virtualenv ./venv_qe
+python3 -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}

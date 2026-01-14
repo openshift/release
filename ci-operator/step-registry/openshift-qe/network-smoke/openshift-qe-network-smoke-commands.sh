@@ -18,9 +18,9 @@ fi
 
 oc config view
 oc projects
-python --version
+python3 --version
 pushd /tmp
-python -m virtualenv ./venv_qe
+python3 -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";

@@ -5,9 +5,9 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
-python --version
+python3 --version
 pushd /tmp
-python -m virtualenv ./venv_qe
+python3 -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 if [[ $TAG == "latest" ]]; then
