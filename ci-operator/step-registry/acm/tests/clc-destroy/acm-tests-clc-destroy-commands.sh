@@ -1,6 +1,6 @@
 #!/bin/bash
 set -o nounset
-# set -o errexit
+set -o errexit
 set -o pipefail
 
 # The variables defined in this step come from files in the `SHARED_DIR` and credentials from Vault.
@@ -35,6 +35,6 @@ CLOUD_PROVIDERS=$(cat $SECRETS_DIR/clc/ocp_cloud_providers)
 export CLOUD_PROVIDERS
 
 # run the test execution script
-./execute_clc_interop_commands.sh || :
+./execute_clc_interop_commands.sh
 
 cp -r reports $ARTIFACT_DIR/
