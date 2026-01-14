@@ -156,16 +156,17 @@ git commit --all --quiet --message "chore: execute image-updater for all compone
 info "acm: rendering ACM helm-charts"
 run make -C acm helm-charts
 
+# Render helm chart
+debug "acm: running yaml formatting and updating helm fixtures"
+run make yamlfmt
+run make update-helm-fixtures
+
 # Check if helm chart rendering produced changes
 if [[ $(git status --porcelain) != "" ]]; then
-  debug "acm: running yaml formatting and updating helm fixtures"
-  run make yamlfmt
-  run make update-helm-fixtures
-
   info "git: committing rendered helm charts"
   git commit --all --quiet --message "chore: render ACM helm-charts"
 else
-  info "acm: no changes to helm charts"
+  info "acm: no changes after helm chart rendering and formatting"
 fi
 
 # Configuration: Materialize final configuration
