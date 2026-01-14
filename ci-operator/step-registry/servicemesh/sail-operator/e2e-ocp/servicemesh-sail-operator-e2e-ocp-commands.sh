@@ -120,7 +120,7 @@ run_tests() {
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
-    entrypoint 'docker info;cat /etc/docker/daemon.json || true;systemctl status docker || true;service docker status || true;journalctl -u docker.service || true;containerd config dump'
+    entrypoint docker info;containerd config dump;cat /etc/docker/daemon.json;systemctl status docker;service docker status;journalctl -u docker.service -n 100 --no-pager
     "
 }
 
