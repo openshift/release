@@ -10,6 +10,6 @@ export GOPATH=/opt/app-root
 go install gotest.tools/gotestsum@latest
 export PATH=${PATH}:"${GOPATH}/bin"
 
-frontend/hack/start-cosmos-emulator.sh
-frontend/hack/test-simulation.sh
-frontend/hack/stop-cosmos-emulator.sh
+test-integration/hack/start-cosmos-emulator.sh
+test-integration/hack/test-integration.sh
+test-integration/hack/stop-cosmos-emulator.sh
