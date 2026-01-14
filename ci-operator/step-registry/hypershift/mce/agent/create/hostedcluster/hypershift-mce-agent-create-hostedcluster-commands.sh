@@ -78,6 +78,9 @@ case "${IP_STACK}" in
   "v6")
     EXTRA_ARGS+="--cluster-cidr fd03::/48 --service-cidr fd04::/112 "
     ;;
+  "v6v4")
+    EXTRA_ARGS+="--cluster-cidr fd03::/48 --cluster-cidr 10.132.0.0/14 --service-cidr fd04::/112 --service-cidr 172.31.0.0/16 "
+    ;;
 esac
 
 if [[ "$DISCONNECTED" == "true" ]]; then

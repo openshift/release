@@ -122,6 +122,19 @@ spec:
   addresses:
   - fd2e:6f44:5dd8:c956::1e-fd2e:6f44:5dd8:c956::1e
 EOF
+elif [[ $IP_STACK == "v6v4" ]]; then
+  oc create -f - <<EOF
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: ingress-public-ip
+  namespace: metallb-system
+spec:
+  autoAssign: false
+  addresses:
+  - fd2e:6f44:5dd8:c956::1e-fd2e:6f44:5dd8:c956::1e
+  - 192.168.111.30-192.168.111.30
+EOF
 else
   echo "$IP_STACK don't support"
   exit 1
