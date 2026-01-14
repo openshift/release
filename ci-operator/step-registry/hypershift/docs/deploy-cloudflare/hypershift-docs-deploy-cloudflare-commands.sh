@@ -5,8 +5,10 @@ set -o errexit
 set -o pipefail
 
 # Load credentials from vault
-export CLOUDFLARE_ACCOUNT_ID=$(cat /var/run/vault/cloudflare-pages/CLOUDFLARE_ACCOUNT_ID)
-export CLOUDFLARE_API_TOKEN=$(cat /var/run/vault/cloudflare-pages/CLOUDFLARE_API_TOKEN)
+CLOUDFLARE_ACCOUNT_ID=$(cat /var/run/vault/cloudflare-pages/CLOUDFLARE_ACCOUNT_ID)
+export CLOUDFLARE_ACCOUNT_ID
+CLOUDFLARE_API_TOKEN=$(cat /var/run/vault/cloudflare-pages/CLOUDFLARE_API_TOKEN)
+export CLOUDFLARE_API_TOKEN
 
 PROJECT="${CLOUDFLARE_PAGES_PROJECT}"
 PR_NUMBER="${PULL_NUMBER:-local}"
