@@ -134,21 +134,12 @@ export AZURE_TENANT_ID
 debug "azure: authentication configured successfully (credentials redacted)"
 
 # Image Updater: Build and run the image-updater tool
-debug "image: change to tooling/image-updater directory"
-cd tooling/image-updater
-
-debug "image: build image-updater binary"
-run make build
-
 info "image: fetching the latest image digests for all components"
 if [[ ${VERBOSITY-0} -ge 2 ]]; then
-  ./image-updater update --verbosity 1 --config config.yaml | tee "${IMAGE_UPDATER_OUTPUT}"
+  VERBOSITY=1 make image-updater update | tee "${IMAGE_UPDATER_OUTPUT}"
 else
-  ./image-updater update --config config.yaml > "${IMAGE_UPDATER_OUTPUT}"
+  VERBOSITY=0 make image-updater update > "${IMAGE_UPDATER_OUTPUT}"
 fi
-
-debug "image: return to root directory"
-cd ../..
 
 # Check if there are any changes from image updates
 if [[ $(git status --porcelain) == "" ]]; then
