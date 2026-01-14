@@ -103,6 +103,7 @@ EOF
 
 function ci_subscription_register() {
     # Check if the system is already registered
+    sudo subscription-manager config --server.hostname=subscription-legacy.rhsm.redhat.com --rhsm.baseurl=https://cdn-legacy.redhat.com
     if sudo subscription-manager status >&/dev/null; then
         return 0
     fi
