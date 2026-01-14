@@ -249,9 +249,6 @@ def _deployment_resources(gendoc):
                             }
                         ],
                         'serviceAccountName': 'release-payload-controller',
-                        'imagePullSecrets': [{
-                            'name': 'registry-pull-credentials'
-                        }],
                     }
                 }
             }
