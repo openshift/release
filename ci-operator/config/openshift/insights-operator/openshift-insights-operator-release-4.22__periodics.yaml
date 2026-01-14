@@ -295,16 +295,18 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-azure
-- as: e2e-vsphere-techpreview
+- as: e2e-vsphere-techpreview-debug
   cron: 56 3 * * *
   steps:
     cluster_profile: vsphere-connected-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+      TIMEOUT: +12 hours
     pre:
     - chain: ipi-vsphere-pre
     - ref: insights-live
     test:
+    - ref: wait
     - as: api-insights-tests
       cli: latest
       commands: |
@@ -350,11 +352,9 @@ tests:
       - default: /secret/insights-rp-access/insights-rp-token
         name: RP_API_KEY
       from: insights-operator-tests
-      grace_period: 30s
       resources:
         requests:
           cpu: 100m
-      timeout: 3h0m0s
     workflow: ipi-vsphere
 - as: e2e-aws-single-node-techpreview
   cron: 22 3 * * *
