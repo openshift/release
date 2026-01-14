@@ -152,13 +152,46 @@ CONFIG_EOF
     
     # Store the expected external IP (AWS NAT public IP) for validation
     # This helps validate that egress IP pods reach external services consistently
-    EXPECTED_EXTERNAL_IP=$(oc run temp-ip-check --image=registry.redhat.io/ubi9/ubi:latest --rm -i --restart=Never -- sh -c "curl -s --max-time 10 https://httpbin.org/ip" 2>/dev/null | jq -r .origin 2>/dev/null || echo "")
-    if [[ -n "$EXPECTED_EXTERNAL_IP" && "$EXPECTED_EXTERNAL_IP" != "null" ]]; then
-        echo "$EXPECTED_EXTERNAL_IP" > "$SHARED_DIR/expected-external-ip"
-        echo "Baseline external IP for health monitoring: $EXPECTED_EXTERNAL_IP"
+    echo "Determining baseline external IP for health monitoring..."
+    
+    # Create a simple job instead of interactive pod
+    cat << 'EOF' | oc apply -f -
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: baseline-ip-check
+  namespace: default
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: curl
+        image: registry.redhat.io/ubi9/ubi:latest
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          # Install curl if not available
+          curl --version >/dev/null 2>&1 || (echo "curl not found, trying to install..." && microdnf install -y curl)
+          # Get external IP
+          curl -s --max-time 15 https://httpbin.org/ip | grep -o '"origin"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "FAILED"
+EOF
+
+    # Wait for job completion
+    if oc wait --for=condition=complete job/baseline-ip-check --timeout=90s >/dev/null 2>&1; then
+        EXPECTED_EXTERNAL_IP=$(oc logs job/baseline-ip-check 2>/dev/null | tail -n1 | tr -d '\r\n')
+        if [[ -n "$EXPECTED_EXTERNAL_IP" && "$EXPECTED_EXTERNAL_IP" != "FAILED" && "$EXPECTED_EXTERNAL_IP" != "null" ]]; then
+            echo "$EXPECTED_EXTERNAL_IP" > "$SHARED_DIR/expected-external-ip"
+            echo "Baseline external IP for health monitoring: $EXPECTED_EXTERNAL_IP"
+        else
+            echo "Warning: Could not determine baseline external IP - got: '$EXPECTED_EXTERNAL_IP'"
+        fi
     else
-        echo "Warning: Could not determine baseline external IP for health monitoring"
+        echo "Warning: Baseline IP detection job timed out"
     fi
+    
+    # Cleanup
+    oc delete job baseline-ip-check >/dev/null 2>&1 || true
     
     # Verify external service is accessible
     echo "Verifying external ipecho service accessibility..."
