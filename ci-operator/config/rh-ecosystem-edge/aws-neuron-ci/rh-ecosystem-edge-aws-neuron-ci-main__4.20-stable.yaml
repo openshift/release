@@ -1,0 +1,66 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+images:
+- dockerfile_path: Containerfile
+  to: aws-neuron-ci
+- dockerfile_literal: |
+    FROM quay.io/ocp-edge-qe/eco-gotests:latest
+    USER 0
+    RUN chgrp -R 0 /home/testuser && chmod -R g=u /home/testuser
+    RUN ln -s /home/testuser/go/bin/ginkgo /usr/local/bin/ginkgo
+    RUN dnf install -y openssh-clients && dnf clean all
+  to: eco-gotests
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.20.0-0
+        stream: 4-stable
+        upper: 4.21.0-0
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: aws-neuron-operator-e2e
+  steps:
+    cluster_profile: aws-qe
+    env:
+      # Cluster configuration
+      OCM_LOGIN_ENV: "production"
+      OPENSHIFT_VERSION: "4.20"
+      REGION: "us-east-1"
+      
+      # Test configuration
+      TEST_FEATURES: "neuron"
+      ECO_TEST_LABELS: "neuron"
+      
+      # Neuron images (required)
+      ECO_HWACCEL_NEURON_DRIVERS_IMAGE: "public.ecr.aws/q5p6u7h8/neuron-openshift/neuron-kernel-module:2.24.7.0"
+      ECO_HWACCEL_NEURON_DRIVER_VERSION: "2.24.7.0"
+      ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE: "public.ecr.aws/neuron/neuron-device-plugin:2.24.23.0"
+      ECO_HWACCEL_NEURON_SCHEDULER_IMAGE: "public.ecr.aws/eks-distro/kubernetes/kube-scheduler:v1.32.9-eks-1-32-24"
+      ECO_HWACCEL_NEURON_SCHEDULER_EXTENSION_IMAGE: "public.ecr.aws/neuron/neuron-scheduler:2.24.23.0"
+      
+      # vLLM test configuration
+      ECO_HWACCEL_NEURON_VLLM_IMAGE: "public.ecr.aws/neuron/vllm:latest"
+      ECO_HWACCEL_NEURON_MODEL_NAME: "facebook/opt-125m"
+      
+      # Upgrade test configuration
+      ECO_HWACCEL_NEURON_UPGRADE_TARGET_VERSION: "2.25.0.0"
+      ECO_HWACCEL_NEURON_UPGRADE_TARGET_DRIVERS_IMAGE: "public.ecr.aws/q5p6u7h8/neuron-openshift/neuron-kernel-module:2.25.0.0"
+      
+    workflow: aws-neuron-operator-e2e-rosa
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: aws-neuron-ci
+  variant: 4.20-stable
