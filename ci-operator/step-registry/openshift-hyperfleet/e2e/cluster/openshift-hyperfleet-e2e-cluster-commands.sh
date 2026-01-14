@@ -12,3 +12,7 @@ log(){
 
 # TODO : implement the hyperfleet e2e CI workflow here
 echo "This is an empty job for openshift-hyperfleet-e2e-cluster now. Will update it once the hyperfleet-e2e test cases are ready"
+GCP_PROJECT_ID=$(cat "${HYPERFLEET_E2E_PATH}/gcp_project_id")
+if [[ "${GCP_PROJECT_ID}" =~ "hcm" ]]; then
+    echo "Get the GCP project successfully"
+fi
