@@ -55,10 +55,6 @@ if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-cpo-overrides"
 fi
 
-if [ "${ENABLE_SCALE_FROM_ZERO}" == "true" ]; then
-  EXTRA_ARGS="${EXTRA_ARGS} --scale-from-zero-aws-creds=/etc/hypershift-pool-aws-credentials/credentials"
-fi
-
 if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
   --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
@@ -72,6 +68,8 @@ if [ "${CLOUD_PROVIDER}" == "AWS" ]; then
   --external-dns-provider=aws \
   --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
   --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
+  --scale-from-zero-provider aws \
+  --scale-from-zero-creds=/etc/hypershift-pool-aws-credentials/credentials \
   --wait-until-available \
   ${EXTRA_ARGS}
 fi
