@@ -18,6 +18,7 @@ check_e2e_flag() {
   return $?
 }
 
+OCP_IMAGE_LATEST="4.18.0-0-2026-01-15-135944-test-ci-ln-inrtr72-latest"
 REQUEST_SERVING_COMPONENT_TEST="${REQUEST_SERVING_COMPONENT_TEST:-}"
 REQUEST_SERVING_COMPONENT_PARAMS=""
 
@@ -95,8 +96,11 @@ if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
 fi
 
 export EVENTUALLY_VERBOSE="false"
+# dump e2e binary from own built image
+oc image quay.io/rhn_engineering_lgao/cpo_image:e2e_from_main_for_418 --path /hypershift/bin/test-e2e:/tmp/ --confirm
+chmod a+x /tmp/test-e2e
 
-hack/ci-test-e2e.sh -test.v \
+/tmp/test-e2e -test.v \
   -test.run=${CI_TESTS_RUN:-''} \
   -test.parallel=20 \
   --e2e.aws-credentials-file=/etc/hypershift-pool-aws-credentials/credentials \
