@@ -65,15 +65,35 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_DC4as_v6
-      CONTROL_PLANE_INSTANCE_TYPE: Standard_DC8ads_v6
-      CUSTOM_AZURE_REGION: westcentralus
-      ENABLE_CONFIDENTIAL_COMPUTE: "true"
-      ENABLE_CONFIDENTIAL_CONTROL_PLANE: "true"
-      ENABLE_ENCRYPTIONATHOST_CONTROL_PLANE: "false"
+      CUSTOM_AZURE_REGION: centralus
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-qgc2xp2/release:latest
+      OUTBOUND_TYPE: NATGatewayMultiZone
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-azure-ipi-confidential-confidentialvm
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway
+- as: installer-rehearse-azure-1
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-qgc2xp2/release:latest
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-usertags-storage-account-encryption
+- as: installer-rehearse-azure-2
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-qgc2xp2/release:latest
+      ENABLE_DES_DEFAULT_MACHINE: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
