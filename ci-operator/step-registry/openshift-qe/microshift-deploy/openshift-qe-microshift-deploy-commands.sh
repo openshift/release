@@ -25,13 +25,6 @@ export QUADS_INSTANCE
 LOGIN=$(cat "${CLUSTER_PROFILE_DIR}/login")
 export LOGIN
 
-# Derive MicroShift version from release image if not explicitly set
-if [[ -z "${MICROSHIFT_VERSION:-}" ]] && [[ -n "${RELEASE_IMAGE_LATEST:-}" ]]; then
-  OCP_VERSION=$(oc adm release info --registry-config ${CLUSTER_PROFILE_DIR}/pull_secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-  MICROSHIFT_VERSION="latest-${OCP_VERSION}"
-  echo "Derived MICROSHIFT_VERSION: ${MICROSHIFT_VERSION}"
-fi
-
 # Get allocated nodes from QUADS
 echo "Getting allocated nodes from QUADS..."
 OCPINV=$QUADS_INSTANCE/instack/$LAB_CLOUD\_ocpinventory.json
