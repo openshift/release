@@ -55,20 +55,20 @@ echo $BASE_DOMAIN
 export BASE_DOMAIN
 
 # Set the dynamic vars needed to execute the Observability scenarios on the managed clusters
-# MANAGED_CLUSTER_NAME=$(cat $SHARED_DIR/managed.cluster.name)
-# export MANAGED_CLUSTER_NAME
+MANAGED_CLUSTER_NAME=$(cat $SHARED_DIR/managed.cluster.name)
+export MANAGED_CLUSTER_NAME
 
-# MANAGED_CLUSTER_BASE_DOMAIN=$(cat $SHARED_DIR/managed.cluster.base.domain)
-# export MANAGED_CLUSTER_BASE_DOMAIN
+MANAGED_CLUSTER_BASE_DOMAIN=$(cat $SHARED_DIR/managed.cluster.base.domain)
+export MANAGED_CLUSTER_BASE_DOMAIN
 
-# MANAGED_CLUSTER_USER=$(cat $SHARED_DIR/managed.cluster.username)
-# export MANAGED_CLUSTER_USER
+MANAGED_CLUSTER_USER=$(cat $SHARED_DIR/managed.cluster.username)
+export MANAGED_CLUSTER_USER
 
-# MANAGED_CLUSTER_PASS=$(cat $SHARED_DIR/managed.cluster.password)
-# export MANAGED_CLUSTER_PASS
+MANAGED_CLUSTER_PASS=$(cat $SHARED_DIR/managed.cluster.password)
+export MANAGED_CLUSTER_PASS
 
-# MANAGED_CLUSTER_API_URL=$(cat $SHARED_DIR/managed.cluster.api.url)
-# export MANAGED_CLUSTER_API_URL
+MANAGED_CLUSTER_API_URL=$(cat $SHARED_DIR/managed.cluster.api.url)
+export MANAGED_CLUSTER_API_URL
 
 # Create a .kube directory inside the alabama dir
 mkdir -p /alabama/.kube
@@ -85,10 +85,11 @@ if [[ "$OUTPUT" != "" ]]; then
         oc delete subscription.apps.open-cluster-management.io -n policies openshift-plus-sub
 fi
 
-sleep 8h
-
 # run the test execution script
 bash +x ./execute_obs_interop_commands.sh || :
+
+
+sleep 8h 
 
 #
 # Restore the ACM subscription

@@ -93,20 +93,11 @@ if [[ -f "$RBAC_TEST_FILE" ]]; then
     # Create a backup
     cp "$RBAC_TEST_FILE" "${RBAC_TEST_FILE}.bak"
 
-    # Apply the fix using perl for better multiline handling
-    perl -i -pe '
-        # Change != 1 to == 0
-        s/if len\(res\.Data\.Result\) != 1 \{/if len(res.Data.Result) == 0 {/;
-
-        # Add logging after the error message (look for the specific error and add log on next line)
-        if (/return fmt\.Errorf\("no data found for node_memory_MemAvailable_bytes/) {
-            $_ .= "\t\t\t\t}\n\t\t\t\tklog.V(5).Infof(\"Successfully queried metrics as user1, got %d results\", len(res.Data.Result))\n";
-        }
-    ' "$RBAC_TEST_FILE"
+    # Apply the fix using sed
+    sed -i 's/if len(res\.Data\.Result) != 1 {/if len(res.Data.Result) == 0 {/g' "$RBAC_TEST_FILE"
 
     echo "✓ Applied fix to $RBAC_TEST_FILE"
     echo "  - Changed result check from '!= 1' to '== 0'"
-    echo "  - Added logging for result count"
 
     # Verify the changes
     if grep -q 'len(res.Data.Result) == 0' "$RBAC_TEST_FILE"; then
