@@ -57,7 +57,7 @@ function verify_arn_exists() {
                     return 0
                     ;;
                 volume)
-                    aws ec2 describe-volumes --region "$check_region" --volume-ids "$resource_id" &>/dev/null
+                    aws ec2 describe-volumes --region "$check_region" --volume-ids "$resource_id" --filters "Name=status,Values=available,in-use" &>/dev/null
                     return $?
                     ;;
                 security-group)
@@ -74,6 +74,10 @@ function verify_arn_exists() {
                     ;;
                 network-interface)
                     aws ec2 describe-network-interfaces --region "$check_region" --network-interface-ids "$resource_id" &>/dev/null
+                    return $?
+                    ;;
+                egress-only-internet-gateway)
+                    aws ec2 describe-egress-only-internet-gateways --region "$check_region" --egress-only-internet-gateway-ids "$resource_id" &>/dev/null
                     return $?
                     ;;
                 internet-gateway)
