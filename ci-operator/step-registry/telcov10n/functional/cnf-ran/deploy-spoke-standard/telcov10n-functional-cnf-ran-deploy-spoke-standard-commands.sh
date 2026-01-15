@@ -18,13 +18,29 @@ process_inventory() {
         return 1
     fi
 
+    # Clear destination file first
+    : > "${dest_file}"
+
     find "$directory" -type f | while IFS= read -r filename; do
         if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-          continue
-        else
-          echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
+            continue
         fi
-    done > "${dest_file}"
+
+        local key
+        local value
+        key=$(basename "${filename}")
+        value=$(cat "$filename")
+
+        # Handle multi-line values (e.g., certificates) with YAML literal block scalar
+        if [[ "$value" == *$'\n'* ]]; then
+            echo "${key}: |" >> "${dest_file}"
+            while IFS= read -r line; do
+                echo "  ${line}" >> "${dest_file}"
+            done <<< "$value"
+        else
+            echo "${key}: '${value}'" >> "${dest_file}"
+        fi
+    done
 
     echo "Processing complete. Check \"${dest_file}\""
 }
@@ -32,12 +48,14 @@ process_inventory() {
 echo "Create group_vars directory"
 mkdir -p /eco-ci-cd/inventories/ocp-deployment/group_vars
 
-echo "Copy group inventory files from SHARED_DIR"
-cp "${SHARED_DIR}/all" /eco-ci-cd/inventories/ocp-deployment/group_vars/all
-cp "${SHARED_DIR}/bastions" /eco-ci-cd/inventories/ocp-deployment/group_vars/bastions
+echo "Process common group variables (all, bastions)"
+find /var/group_variables/common/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
+    echo "Process group inventory file: ${dir}"
+    process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
+done
 
 echo "Process spoke cluster group variables"
-find "/var/group_variables/${SPOKE_CLUSTER}/" -mindepth 1 -type d | while read -r dir; do
+find "/var/group_variables/${SPOKE_CLUSTER}/" -mindepth 1 -type d 2>/dev/null | while read -r dir; do
     echo "Process group inventory file: ${dir}"
     process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
 done
@@ -45,11 +63,14 @@ done
 echo "Create host_vars directory"
 mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
 
-echo "Copy host inventory files from SHARED_DIR"
-cp "${SHARED_DIR}/bastion" /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
+echo "Process bastion host variables (from hub kni-qe-99)"
+find /var/host_variables/kni-qe-99/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
+    echo "Process host inventory file: ${dir}"
+    process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
+done
 
 echo "Process spoke cluster host variables"
-find "/var/host_variables/${SPOKE_CLUSTER}/" -mindepth 1 -type d | while read -r dir; do
+find "/var/host_variables/${SPOKE_CLUSTER}/" -mindepth 1 -type d 2>/dev/null | while read -r dir; do
     echo "Process host inventory file: ${dir}"
     process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
 done

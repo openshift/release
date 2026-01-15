@@ -17,13 +17,29 @@ process_inventory() {
         return 1
     fi
 
+    # Clear destination file first
+    : > "${dest_file}"
+
     find "$directory" -type f | while IFS= read -r filename; do
         if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-          continue
-        else
-          echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
+            continue
         fi
-    done > "${dest_file}"
+
+        local key
+        local value
+        key=$(basename "${filename}")
+        value=$(cat "$filename")
+
+        # Handle multi-line values (e.g., certificates) with YAML literal block scalar
+        if [[ "$value" == *$'\n'* ]]; then
+            echo "${key}: |" >> "${dest_file}"
+            while IFS= read -r line; do
+                echo "  ${line}" >> "${dest_file}"
+            done <<< "$value"
+        else
+            echo "${key}: '${value}'" >> "${dest_file}"
+        fi
+    done
 
     echo "Processing complete. Check \"${dest_file}\""
 }
