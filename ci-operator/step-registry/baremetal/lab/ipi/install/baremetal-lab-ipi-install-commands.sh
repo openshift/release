@@ -32,13 +32,41 @@ function oinst() {
    --line-buffered -v 'password\|X-Auth-Token\|UserData:'
 }
 
+function get_ready_nodes_count() {
+  oc get nodes \
+    -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | \
+    grep -c -E ",True$"
+}
+
+# wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
+function wait_for_nodes_readiness()
+{
+  local expected_nodes=${1}
+  local max_retries=${2:-10}
+  local period=${3:-5}
+  for i in $(seq 1 "${max_retries}") max; do
+    if [ "${i}" == "max" ]; then
+      echo "[ERROR] Timeout reached. ${expected_nodes} ready nodes expected, found ${ready_nodes}... Failing."
+      return 1
+    fi
+    sleep "${period}m"
+    ready_nodes=$(get_ready_nodes_count)
+    if [ "${ready_nodes}" == "${expected_nodes}" ]; then
+        echo "[INFO] Found ${ready_nodes}/${expected_nodes} ready nodes, continuing..."
+        return 0
+    fi
+    echo "[INFO] - ${expected_nodes} ready nodes expected, found ${ready_nodes}..." \
+      "Waiting ${period}min before retrying (timeout in $(( (max_retries - i) * (period) ))min)..."
+  done
+}
+
 function update_image_registry() {
   # from OCP 4.14, the image-registry is optional, check if ImageRegistry capability is added
-  knownCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}"`
+  knownCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.knownCapabilities}")
   if [[ ${knownCaps} =~ "ImageRegistry" ]]; then
       echo "knownCapabilities contains ImageRegistry"
       # check if ImageRegistry capability enabled
-      enabledCaps=`oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}"`
+      enabledCaps=$(oc get clusterversion version -o=jsonpath="{.status.capabilities.enabledCapabilities}")
         if [[ ! ${enabledCaps} =~ "ImageRegistry" ]]; then
             echo "ImageRegistry capability is not enabled, skip image registry configuration..."
             return 0
@@ -81,6 +109,14 @@ if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-mirror.
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 file /tmp/openshift-baremetal-install
+echo "[INFO] Set the worker architecture"
+if [ -n "${ADDITIONAL_WORKER_ARCHITECTURE}" ] && [ "${ADDITIONAL_WORKERS_DAY2}" == "false" ]; then
+  worker_arch=$(echo "${ADDITIONAL_WORKER_ARCHITECTURE}" | sed 's/aarch64/arm64/;s/x86_64/amd64/')
+  workers=${ADDITIONAL_WORKERS}
+  EXPECTED_NODES=$(( masters + workers ))
+else
+  worker_arch=${architecture}
+fi
 
 echo "[INFO] Processing the install-config.yaml..."
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
@@ -96,7 +132,7 @@ controlPlane:
    name: master
    replicas: ${masters}
 compute:
-- architecture: ${architecture}
+- architecture: ${worker_arch}
   hyperthreading: Enabled
   name: worker
   replicas: ${workers}
@@ -123,9 +159,17 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "{INFO} Additional worker ${name} will be added as day2 operation"
     continue
   fi
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "false" ]; then
+    echo "Adding additional worker role for ${name}"
+    node_role="worker"
+  else
+    echo "Setting worker role"
+    node_role="${name%%-[0-9]*}"
+  fi
+
   ADAPTED_YAML="
   name: ${name}
-  role: ${name%%-[0-9]*}
+  role: ${node_role}
   bootMACAddress: ${provisioning_mac}
   rootDeviceHints:
     ${root_device:+deviceName: ${root_device}}
@@ -248,6 +292,13 @@ oinst wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   exit 1
+fi
+
+# Additional check to wait for all the nodes to be ready. Especially important
+# for multi-arch compute nodes clusters with mixed arch nodes.
+if [ "${ADDITIONAL_WORKERS_DAY2}" == "false" ]; then
+  echo -e "\nWaiting for all the nodes to be ready..."
+  wait_for_nodes_readiness ${EXPECTED_NODES}
 fi
 update_image_registry
 
