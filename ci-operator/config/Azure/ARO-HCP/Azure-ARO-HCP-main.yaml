@@ -55,25 +55,16 @@ images:
   dockerfile_path: frontend/Dockerfile
   from: src
   to: aro-hcp-frontend
-- dockerfile_literal: |
-    FROM src
-    USER root
-    COPY /src /opt/app-root/src/github.com/Azure
-    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-    ENV GOBIN="/usr/local/bin"
-    ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
-    # Install Python for grafana tests
-    RUN dnf install -y python3 python3-pip
-    RUN pip3 install black    
-    ENV GOFLAGS='-mod=readonly'
-    RUN make install-tools && \
-        make -C tooling/templatize templatize && \
-        make -C test/ aro-hcp-tests prow-job-executor
-    RUN mkdir -p "$(go env GOROOT)" && chmod -R 777 "$(go env GOROOT)"
-    RUN mkdir -p "$(go env GOPATH)" && chmod -R 777 "$(go env GOPATH)"
-    RUN mkdir -p "$(go env GOCACHE)" && chmod -R 777 "$(go env GOCACHE)"
-    RUN mkdir -p "$(go env GOBIN)" && chmod -R 777 "$(go env GOBIN)"
-    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
+- dockerfile_literal: "FROM src\nUSER root\nCOPY /src /opt/app-root/src/github.com/Azure\nWORKDIR
+    /opt/app-root/src/github.com/Azure/ARO-HCP\nENV GOBIN=\"/usr/local/bin\"\nENV
+    PATH=\"$GOBIN:/usr/local/bin:/usr/bin:$PATH\"\n# Install Python for grafana tests\nRUN
+    dnf install -y python3 python3-pip\nRUN pip3 install black    \nENV GOFLAGS='-mod=readonly'\nRUN
+    make install-tools && \\\n    make -C tooling/templatize templatize && \\\n    make
+    -C test/ aro-hcp-tests prow-job-executor\nRUN mkdir -p \"$(go env GOROOT)\" &&
+    chmod -R 777 \"$(go env GOROOT)\"\nRUN mkdir -p \"$(go env GOPATH)\" && chmod
+    -R 777 \"$(go env GOPATH)\"\nRUN mkdir -p \"$(go env GOCACHE)\" && chmod -R 777
+    \"$(go env GOCACHE)\"\nRUN mkdir -p \"$(go env GOBIN)\" && chmod -R 777 \"$(go
+    env GOBIN)\"\nRUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP\n"
   from: src
   inputs:
     src:
