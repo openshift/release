@@ -58,6 +58,126 @@ function wait_public_dns() {
 
 }
 
+# Function to convert IP to decimal
+ip2dec() {
+    local a b c d ip=$1
+    IFS=. read -r a b c d <<< "$ip"
+    echo "$((a * 256 ** 3 + b * 256 ** 2 + c * 256 + d))"
+}
+
+# Function to convert decimal to IP
+dec2ip() {
+    local dec=$1
+    echo "$((dec / 256 ** 3)).$((dec / 256 ** 2 % 256)).$((dec / 256 % 256)).$((dec % 256))"
+}
+
+# Function to get network address (base) of a CIDR
+get_network_base() {
+    local cidr=$1
+    local ip prefix ip_dec mask network
+    ip=$(echo "$cidr" | cut -d'/' -f1)
+    prefix=$(echo "$cidr" | cut -d'/' -f2)
+
+    ip_dec=$(ip2dec "$ip")
+    mask=$((0xFFFFFFFF << (32 - prefix)))
+    network=$((ip_dec & mask))
+
+    echo "$network"
+}
+
+# Function to check if two CIDR ranges overlap (FIXED)
+cidrs_overlap() {
+    local cidr1=$1
+    local cidr2=$2
+    local prefix1 prefix2 start1 start2 size1 size2 end1 end2
+
+    prefix1=$(echo "$cidr1" | cut -d'/' -f2)
+    prefix2=$(echo "$cidr2" | cut -d'/' -f2)
+
+    # Get network bases
+    start1=$(get_network_base "$cidr1")
+    start2=$(get_network_base "$cidr2")
+
+    # Calculate sizes
+    size1=$((2 ** (32 - prefix1)))
+    size2=$((2 ** (32 - prefix2)))
+
+    # Calculate end addresses
+    end1=$((start1 + size1 - 1))
+    end2=$((start2 + size2 - 1))
+
+    # Check for overlap
+    if [ $start1 -le $end2 ] && [ $end1 -ge $start2 ]; then
+        return 0  # Overlaps
+    else
+        return 1  # No overlap
+    fi
+}
+
+# Function to get first available subnet CIDR (IMPROVED)
+get_first_available_subnet() {
+    local RG_NAME=$1
+    local VNET_NAME=$2
+    local DESIRED_PREFIX=${3:-24}
+    local VNET_CIDR SUBNET_CIDRS VNET_PREFIX VNET_START VNET_SIZE VNET_END SUBNET_SIZE CANDIDATE_IP CANDIDATE_CIDR CANDIDATE_END OVERLAP
+
+    # Get VNet CIDR
+    VNET_CIDR=$(az network vnet show --name "$VNET_NAME" --resource-group "$RG_NAME" \
+        --query "addressSpace.addressPrefixes[0]" -o tsv 2>/dev/null)
+
+    if [ -z "$VNET_CIDR" ]; then
+        echo "" >&2
+        echo "Error: Could not find VNet" >&2
+        return 1
+    fi
+
+    # Get existing subnets
+    SUBNET_CIDRS=$(az network vnet subnet list --vnet-name "$VNET_NAME" --resource-group "$RG_NAME" \
+        --query "[].addressPrefix" -o tsv)
+
+    # Parse VNet CIDR and get network base
+    VNET_PREFIX=$(echo "$VNET_CIDR" | cut -d'/' -f2)
+    VNET_START=$(get_network_base "$VNET_CIDR")
+    VNET_SIZE=$((2 ** (32 - VNET_PREFIX)))
+    VNET_END=$((VNET_START + VNET_SIZE - 1))
+    SUBNET_SIZE=$((2 ** (32 - DESIRED_PREFIX)))
+
+    # Find first available subnet
+    for ((i=VNET_START; i<=VNET_END - SUBNET_SIZE + 1; i+=SUBNET_SIZE)); do
+        CANDIDATE_IP=$(dec2ip $i)
+        CANDIDATE_CIDR="$CANDIDATE_IP/$DESIRED_PREFIX"
+        CANDIDATE_END=$((i + SUBNET_SIZE - 1))
+
+        # Check if candidate exceeds VNet boundary
+        if [ $CANDIDATE_END -gt $VNET_END ]; then
+            continue
+        fi
+
+        # Check for overlaps with ALL existing subnets
+        OVERLAP=0
+        while IFS= read -r existing; do
+            if [ -z "$existing" ]; then
+                continue
+            fi
+
+            if cidrs_overlap "$CANDIDATE_CIDR" "$existing"; then
+                OVERLAP=1
+                break
+              fi
+        done <<< "$SUBNET_CIDRS"
+
+        if [ $OVERLAP -eq 0 ]; then
+            echo "$CANDIDATE_CIDR"
+            return 0
+        fi
+    done
+
+    # No available subnet found
+    echo "" >&2
+    echo "Error: No available /$DESIRED_PREFIX subnet found" >&2
+    return 1
+}
+
 #####################################
 ##############Initialize#############
 #####################################
@@ -105,6 +225,7 @@ if [ -z "${VNET_NAME}" ]; then
 else
   bastion_vnet_name="${VNET_NAME}"
 fi
+
 
 #####################################
 ###############Log In################
@@ -204,8 +325,9 @@ if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
     bastion_nsg="${bastion_name}-nsg" bastion_subnet="${bastion_name}Subnet"
     run_command "az network nsg create -g ${bastion_rg} -n ${bastion_nsg}"
     run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
-    #subnet cidr for int service is xx.xx.99.0/24, it should be a sub rang of the whole VNet cidr, and not conflicts with master subnet and worker subnet
-    bastion_subnet_cidr=$(echo ${AZURE_VNET_ADDRESS_PREFIXES%/*} | awk -F'.' '{print $1"."$2".99.0/24"}')
+    #subnet cidr for int service is caculated from existing vnet and subents, the cidr is defalut as 29, it should be a sub rang of the whole VNet cidr, and not conflicts with master subnet and worker subnet
+    bastion_subnet_cidr=$(get_first_available_subnet "${bastion_rg}" "${bastion_vnet_name}" "29")
+    echo "Get avaiable subnet cidr for bastion host: $bastion_subnet_cidr"
     if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
         # for ash wwt, the parameter name get changed
         vnet_subnet_address_parameter="--address-prefix ${bastion_subnet_cidr}"
