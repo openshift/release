@@ -58,11 +58,12 @@ class Config:
     def _get_releases(self):
         releases = []
 
-        # Collect the 4.x releases...
-        for name in self.paths.path_ci_operator_jobs_release.glob('openshift-release-release-4.*-periodics.yaml'):
-            bn = os.path.splitext(os.path.basename(name))[0]  # e.g. openshift-release-release-4.4-periodics
-            major_minor = bn.split('-')[-2]  # 4.4
-            releases.append(major_minor)
+        # Collect the 4.x and 5.x releases...
+        for major in ('4', '5'):
+            for name in self.paths.path_ci_operator_jobs_release.glob(f'openshift-release-release-{major}.*-periodics.yaml'):
+                bn = os.path.splitext(os.path.basename(name))[0]  # e.g. openshift-release-release-4.4-periodics
+                major_minor = bn.split('-')[-2]  # 4.4
+                releases.append(major_minor)
 
         releases.sort()  # Glob does provide any guarantees on ordering, so force an order by sorting.
         return releases
