@@ -93,6 +93,26 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
       MINIMAL_PERMISSIONS_CCO_MANUAL_WITHOUT_FIREWALL_PROVISION: "yes"
     workflow: cucushift-installer-rehearse-gcp-ipi-byo-fw-cco-manual-workload-identity
+- as: installer-rehearse-ibmcloud-subnets
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-qe
+    env:
+      APPLY_ALL_SUBNETS: "yes"
+      CONTROL_PLANE_REPLICAS: "3"
+      NO_REPORTPORTAL: "true"
+      NUMBER_SUBNETS_PAIR_PER_ZONE: "4"
+      PICKUP_SUBNETS_ORDER: ascending
+      SLEEP_DURATION: 2h
+      WORKERS: "3"
+      ZONES_COUNT: "2"
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc-deprovision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-customer-vpc
 - as: installer-rehearse-vsphere
   cron: '@yearly'
   steps:
