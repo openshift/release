@@ -1,0 +1,40 @@
+ref:
+  as: openshift-qe-network-perf-ipsec
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  timeout: 8h0m0s
+  commands: openshift-qe-network-perf-ipsec-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: ADDITIONAL_WORKER_NODES
+    default: "0"
+    documentation: |-
+      Additional worker nodes that will be added to the cluster
+  - name: EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Add args for e2e-benchmarking network performance tests
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  documentation: |-
+    This step runs network performance testing with IPSec verification and packet capture logging.
+    It fixes the git dependency issue and provides comprehensive evidence of IPSec encryption status.
+    
+    The step:
+    1. Installs git dependency to fix clone issues
+    2. Runs k8s-netperf network performance tests
+    3. Captures ESP packets to verify IPSec encryption
+    4. Saves packet captures and analysis as artifacts
+    5. Generates encryption analysis summary for dev teams
