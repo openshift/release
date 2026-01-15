@@ -1,0 +1,29 @@
+ref:
+  as: cluster-health-analyzer
+  from: src
+  cli: latest
+  commands: cluster-health-analyzer-commands.sh
+  timeout: 30m0s
+  grace_period: 60s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: CHA_MANIFESTS_PATH
+    default: "manifests/backend"
+    documentation: "Path to the manifests directory relative to the repo root."
+  - name: CHA_DEPLOYMENT_NAME
+    default: "cluster-health-analyzer"
+    documentation: "Name of the deployment to wait for."
+  - name: CHA_NAMESPACE
+    default: "openshift-cluster-health-analyzer"
+    documentation: "Namespace where cluster-health-analyzer is deployed."
+  dependencies:
+  - name: "cluster-health-analyzer"
+    env: CHA_IMAGE
+  documentation: |-
+    The cluster-health-analyzer step deploys cluster-health-analyzer
+    from the built image to an OpenShift cluster using the manifests in the repo.
+    It patches the image reference and waits for the deployment to become available.
+
