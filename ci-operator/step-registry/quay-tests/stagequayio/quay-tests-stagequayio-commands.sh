@@ -26,7 +26,7 @@ python3 --version
 python3 utility/quayio_test_push_images.py -n 20 > $ARTIFACT_DIR/stage_quay_io_push_image_report || true
 
 mkdir -p cypress/downloads
-python3 utility/quayio_test_pull_images.py -n 50 > $ARTIFACT_DIR/stage_quay_io_pull_image_report || true
+python3 utility/quayio_test_pull_images.py -n 100 > $ARTIFACT_DIR/stage_quay_io_pull_image_report || true
 
 cd stage-quay-io-tests && mkdir -p cypress/downloads && mkdir -p cypress/results 
 yarn install
