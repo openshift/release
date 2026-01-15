@@ -2,12 +2,6 @@
 set -e
 set -o pipefail
 
-echo "Checking if the job should be skipped..."
-if [ -f "${SHARED_DIR}/skip.txt" ]; then
-  echo "Detected skip.txt file — skipping the job"
-  exit 0
-fi
-
 
 echo "Create group_vars directory"
 mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
@@ -70,11 +64,15 @@ ansible-playbook playbooks/ran/hub-sno-configure-lvm-storage.yml -i ./inventorie
     --extra-vars "kubeconfig=${KUBECONFIG_PATH}" -vv
 
 # configure acm
-ansible-playbook playbooks/ran/configure-acm.yml -i ./inventories/ocp-deployment/build-inventory.py \
+ansible-playbook playbooks/ran/hub-sno-configure-acm.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=$VERSION" -vv
 
 # configure kustomize plugin
-ansible-playbook playbooks/ran/configure-kustomize-plugin.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=v$VERSION" -vv
+ansible-playbook playbooks/ran/hub-sno-configure-kustomize-plugin.yml -i ./inventories/ocp-deployment/build-inventory.py \
+    --extra-vars "kubeconfig=${KUBECONFIG_PATH} ocp_version=$VERSION" -vv
+
+# configure gitops
+ansible-playbook playbooks/ran/hub-sno-configure-gitops.yml -i ./inventories/ocp-deployment/build-inventory.py \
+    --extra-vars "kubeconfig=${KUBECONFIG_PATH} gitlab_repo_url=${GITLAB_REPO_URL}" -vv
 
 
