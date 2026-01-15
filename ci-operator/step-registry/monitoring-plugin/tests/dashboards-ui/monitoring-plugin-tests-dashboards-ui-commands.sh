@@ -141,4 +141,4 @@ ls -ltr
 npm install
 
 # Run the Cypress tests
-npm run test-cypress-monitoring-dashboards
+npm run test-cypress-dashboards
