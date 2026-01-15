@@ -9,17 +9,58 @@ mkdir -p /tmp/ipsec-verification-artifacts
 mkdir -p /tmp/ipsec-verification-logs
 
 echo "=== Installing Git Dependency ==="
-if command -v yum &> /dev/null; then
-    yum install -y git
-    echo "Git installed via yum"
-elif command -v apt-get &> /dev/null; then
-    apt-get update && apt-get install -y git
-    echo "Git installed via apt-get"
-elif command -v apk &> /dev/null; then
-    apk add --no-cache git
-    echo "Git installed via apk"
-else
-    echo "WARNING: Could not determine package manager, trying to continue without git..."
+# Try installing git with sudo first, then fallback to alternatives
+if command -v sudo &> /dev/null; then
+    if command -v yum &> /dev/null; then
+        sudo yum install -y git && echo "Git installed via sudo yum"
+    elif command -v apt-get &> /dev/null; then
+        sudo apt-get update && sudo apt-get install -y git && echo "Git installed via sudo apt-get"
+    elif command -v apk &> /dev/null; then
+        sudo apk add --no-cache git && echo "Git installed via sudo apk"
+    fi
+fi
+
+# If sudo installation failed, try without sudo
+if ! command -v git &> /dev/null; then
+    echo "Trying installation without sudo..."
+    if command -v yum &> /dev/null; then
+        yum install -y git 2>/dev/null && echo "Git installed via yum"
+    elif command -v apt-get &> /dev/null; then
+        apt-get update && apt-get install -y git 2>/dev/null && echo "Git installed via apt-get"
+    elif command -v apk &> /dev/null; then
+        apk add --no-cache git 2>/dev/null && echo "Git installed via apk"
+    fi
+fi
+
+# If git still not available, try downloading a static binary
+if ! command -v git &> /dev/null; then
+    echo "Attempting to download static git binary..."
+    mkdir -p /tmp/git-static
+    cd /tmp/git-static
+    
+    # Download static git binary for Linux x86_64
+    if command -v curl &> /dev/null; then
+        curl -L -o git-static.tar.xz "https://github.com/git/git/releases/download/v2.41.0/git-2.41.0.tar.xz" 2>/dev/null || echo "Could not download git"
+    elif command -v wget &> /dev/null; then
+        wget -O git-static.tar.xz "https://github.com/git/git/releases/download/v2.41.0/git-2.41.0.tar.xz" 2>/dev/null || echo "Could not download git"
+    fi
+    
+    # Alternative: try to get git from busybox or other minimal sources
+    if ! command -v git &> /dev/null && command -v apk &> /dev/null; then
+        apk add --no-cache git --force 2>/dev/null || echo "Force install failed"
+    fi
+    
+    cd /tmp
+fi
+
+# Final fallback: check if git is available in alternative paths
+if ! command -v git &> /dev/null; then
+    echo "Searching for git in alternative locations..."
+    find /usr /opt /bin 2>/dev/null | grep -E "bin/git$" | head -1 | while read gitpath; do
+        if [ -x "$gitpath" ]; then
+            ln -sf "$gitpath" /usr/local/bin/git 2>/dev/null || echo "Could not link git"
+        fi
+    done
 fi
 
 # Verify git installation
@@ -86,12 +127,43 @@ LATEST_TAG=$(curl -s https://api.github.com/repos/cloud-bulldozer/e2e-benchmarki
 TAG_OPTION="--branch ${LATEST_TAG}"
 
 echo "Cloning e2e-benchmarking ${LATEST_TAG}..." | tee /tmp/ipsec-verification-artifacts/repo-clone.log
+
 if command -v git &> /dev/null; then
     git clone $REPO_URL $TAG_OPTION --depth 1 >> /tmp/ipsec-verification-artifacts/repo-clone.log 2>&1
-    echo "Repository cloned successfully"
+    echo "Repository cloned successfully via git"
 else
-    echo "ERROR: Git not available, cannot clone repository"
+    echo "Git not available, trying alternative download methods..."
+    
+    # Try using curl to download and extract the repository
+    ARCHIVE_URL="https://github.com/cloud-bulldozer/e2e-benchmarking/archive/refs/tags/${LATEST_TAG}.tar.gz"
+    echo "Attempting to download ${ARCHIVE_URL}" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
+    
+    if command -v curl &> /dev/null; then
+        curl -L -o e2e-benchmarking.tar.gz "$ARCHIVE_URL" 2>&1 | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
+        if [ -f e2e-benchmarking.tar.gz ]; then
+            tar -xzf e2e-benchmarking.tar.gz 2>&1 | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
+            mv e2e-benchmarking-* e2e-benchmarking 2>/dev/null || echo "Repository directory rename failed"
+            echo "Repository downloaded and extracted via curl" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
+        fi
+    elif command -v wget &> /dev/null; then
+        wget -O e2e-benchmarking.tar.gz "$ARCHIVE_URL" 2>&1 | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
+        if [ -f e2e-benchmarking.tar.gz ]; then
+            tar -xzf e2e-benchmarking.tar.gz 2>&1 | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
+            mv e2e-benchmarking-* e2e-benchmarking 2>/dev/null || echo "Repository directory rename failed"
+            echo "Repository downloaded and extracted via wget" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
+        fi
+    else
+        echo "ERROR: Neither git, curl, nor wget available for repository download" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
+        exit 1
+    fi
+fi
+
+# Verify repository was downloaded
+if [ ! -d "e2e-benchmarking" ]; then
+    echo "ERROR: Failed to obtain e2e-benchmarking repository" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
     exit 1
+else
+    echo "Repository successfully obtained" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
 fi
 
 cd e2e-benchmarking
