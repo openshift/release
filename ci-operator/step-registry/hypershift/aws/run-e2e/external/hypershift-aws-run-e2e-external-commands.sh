@@ -97,7 +97,7 @@ fi
 
 export EVENTUALLY_VERBOSE="false"
 # dump e2e binary from own built image
-oc image quay.io/rhn_engineering_lgao/cpo_image:e2e_from_main_for_418 --path /hypershift/bin/test-e2e:/tmp/ --confirm
+oc image extract quay.io/rhn_engineering_lgao/cpo_image:e2e_from_main_for_418 --path /hypershift/bin/test-e2e:/tmp/ --confirm
 chmod a+x /tmp/test-e2e
 
 /tmp/test-e2e -test.v \
