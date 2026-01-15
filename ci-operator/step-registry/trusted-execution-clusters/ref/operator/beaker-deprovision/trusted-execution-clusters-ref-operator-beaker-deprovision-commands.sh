@@ -171,6 +171,11 @@ ls -la /tmp/operator-* 2>&1 || echo "No operator temp directories"
 ls -la /tmp/e2e-test-* 2>&1 || echo "No E2E test temp directories"
 echo ""
 
+echo "--- SSH Agent Processes ---"
+pgrep -u $(whoami) -a ssh-agent 2>&1 || echo "No ssh-agent processes found"
+echo "Total ssh-agent count: $(pgrep -u $(whoami) ssh-agent 2>/dev/null | wc -l)"
+echo ""
+
 EOF
 
 log_success "Pre-cleanup state collected"
@@ -189,6 +194,14 @@ scp "${SSHOPTS[@]}" -r \
 scp "${SSHOPTS[@]}" -r \
   "${BEAKER_USER}@${BEAKER_IP}:/tmp/operator-install-logs/*" \
   "${ARTIFACT_DIR}/cleanup-logs/archived-logs/" 2>&1 || log_warn "Could not archive operator install logs"
+
+scp "${SSHOPTS[@]}" -r \
+  "${BEAKER_USER}@${BEAKER_IP}:/tmp/e2e-test-logs/*" \
+  "${ARTIFACT_DIR}/cleanup-logs/archived-logs/" 2>&1 || log_warn "Could not archive E2E test logs"
+
+scp "${SSHOPTS[@]}" -r \
+  "${BEAKER_USER}@${BEAKER_IP}:/var/log/kbs_logs_*" \
+  "${ARTIFACT_DIR}/cleanup-logs/archived-logs/" 2>&1 || log_warn "Could not archive KBS logs"
 
 log_success "Log archiving completed (best effort)"
 
@@ -245,58 +258,63 @@ else
     echo "[WARN] kubectl not found, skipping kubeconfig cleanup"
 fi
 
-echo "--- Step 2: Cleaning up container resources ---"
+echo "--- Step 2: Cleaning up Kind-related containers ---"
 
 if [ "${CLEANUP_IMAGES}" == "true" ]; then
-    # Docker cleanup
+    # Clean up only Kind-related containers
     if command -v docker &> /dev/null; then
-        echo "[INFO] Performing Docker cleanup..."
-        docker kill $(docker ps -aq) 2>&1 || echo "[INFO] No containers to kill"
-        docker rm -f $(docker ps -aq) 2>&1 || echo "[INFO] No containers to remove"
-        docker rmi -f $(docker images -q) 2>&1 || echo "[INFO] No images to remove"
-        docker system prune -af --volumes 2>&1 || echo "[WARN] Docker system prune failed"
-        echo "[SUCCESS] Docker resources cleaned up"
+        echo "[INFO] Cleaning up Kind-related Docker containers and volumes..."
+        # Remove containers with kind label
+        docker ps -a --filter "label=io.x-k8s.kind.cluster" -q | xargs -r docker rm -f 2>&1 || echo "[INFO] No Kind containers to remove"
+        # Remove volumes created by Kind
+        docker volume ls --filter "label=io.x-k8s.kind.cluster" -q | xargs -r docker volume rm 2>&1 || echo "[INFO] No Kind volumes to remove"
+        # Note: Removed 'docker system prune' as it can corrupt containerd state
+        # Kind cleanup above is sufficient for test cleanup
+        echo "[SUCCESS] Kind-related Docker resources cleaned up"
     fi
 
-    # Podman cleanup
     if command -v podman &> /dev/null; then
-        echo "[INFO] Performing Podman cleanup..."
-        sudo podman kill $(sudo podman ps -aq) 2>&1 || echo "[INFO] No containers to kill"
-        sudo podman rm -f $(sudo podman ps -aq) 2>&1 || echo "[INFO] No containers to remove"
-        sudo podman rmi -f $(sudo podman images -q) 2>&1 || echo "[INFO] No images to remove"
-        sudo podman system prune -af --volumes 2>&1 || echo "[WARN] Podman system prune failed"
-        echo "[SUCCESS] Podman resources cleaned up"
+        echo "[INFO] Cleaning up Kind-related Podman containers..."
+        sudo podman ps -a --filter "label=io.x-k8s.kind.cluster" -q | xargs -r sudo podman rm -f 2>&1 || echo "[INFO] No Kind containers to remove"
+        sudo podman volume ls --filter "label=io.x-k8s.kind.cluster" -q | xargs -r sudo podman volume rm 2>&1 || echo "[INFO] No Kind volumes to remove"
+        echo "[SUCCESS] Kind-related Podman resources cleaned up"
     fi
 else
     echo "[INFO] Container resource cleanup skipped"
 fi
 
-echo "--- Step 3: Cleaning up network resources ---"
+echo "--- Step 3: Cleaning up Kind network resources ---"
 
-echo "[INFO] Cleaning docker0 bridge..."
-sudo ip link set docker0 down 2>&1 || echo "[INFO] docker0 not found or already down"
-sudo ip link delete docker0 2>&1 || echo "[INFO] docker0 not found or already deleted"
+# Clean up only Kind-created networks, not docker0 or system networks
+if command -v docker &> /dev/null; then
+    echo "[INFO] Cleaning up Kind-created Docker networks..."
+    docker network ls --filter "label=io.x-k8s.kind.cluster" -q | xargs -r docker network rm 2>&1 || echo "[INFO] No Kind networks to remove"
+    # Also remove the 'kind' network if it exists
+    docker network rm kind 2>&1 || echo "[INFO] Kind network not found"
+    echo "[SUCCESS] Kind networks cleaned up"
+fi
 
-# Libvirt networks cleanup
+# Clean up only test-related Libvirt networks, keep default
 if command -v virsh &> /dev/null; then
-    for net in $(sudo virsh net-list --all --name 2>/dev/null | grep -v "^default$"); do
+    echo "[INFO] Cleaning up test-related Libvirt networks..."
+    for net in $(sudo virsh net-list --all --name 2>/dev/null | grep -E "kind|test" || true); do
         if [ -n "$net" ]; then
             sudo virsh net-destroy "$net" 2>&1 || echo "[INFO] Network $net not running"
             sudo virsh net-undefine "$net" 2>&1 || echo "[INFO] Network $net not defined"
         fi
     done
+    echo "[SUCCESS] Test Libvirt networks cleaned up"
+else
+    echo "[INFO] Libvirt not available, skipping network cleanup"
 fi
 
-echo "[SUCCESS] Network resources cleaned up"
+echo "--- Step 4: Skipping container runtime data directories ---"
 
-echo "--- Step 4: Cleaning container runtime data directories ---"
+echo "[INFO] NOT deleting /var/lib/docker, /var/lib/containerd, or /var/lib/containers"
+echo "[INFO] These directories must be preserved to keep Docker/containerd functional"
+echo "[INFO] Only test-specific containers and images are cleaned up in previous steps"
 
-echo "[INFO] Cleaning data directories..."
-sudo rm -rf /var/lib/docker/* 2>&1 || echo "[INFO] No Docker data to clean"
-sudo rm -rf /var/lib/containerd/* 2>&1 || echo "[INFO] No Containerd data to clean"
-sudo rm -rf /var/lib/containers/storage/* 2>&1 || echo "[INFO] No Podman storage to clean"
-
-echo "[SUCCESS] Container runtime data directories cleaned"
+echo "[SUCCESS] Container runtime data directories preserved"
 
 echo "--- Step 5: Removing temporary files ---"
 
@@ -306,7 +324,12 @@ rm -rf /tmp/e2e-test-* 2>&1 || echo "[WARN] Could not remove e2e-test temp direc
 
 echo "[SUCCESS] Temporary files cleaned up"
 
-echo "--- Step 6: Cleaning up cocl-operator directories ---"
+echo "--- Step 6: Cleaning up operator working directories ---"
+
+if [ -d "${HOME}/operator-kind-setup" ]; then
+    echo "[INFO] Removing operator-kind-setup directory..."
+    rm -rf "${HOME}/operator-kind-setup" 2>&1 || echo "[WARN] Could not remove directory"
+fi
 
 if [ -d "${HOME}/cocl-operator-kind-setup" ]; then
     echo "[INFO] Removing cocl-operator-kind-setup directory..."
@@ -318,7 +341,7 @@ if [ -d "${HOME}/cocl-operator" ]; then
     rm -rf "${HOME}/cocl-operator" 2>&1 || echo "[WARN] Could not remove directory"
 fi
 
-echo "[SUCCESS] cocl-operator directories cleaned up"
+echo "[SUCCESS] Operator working directories cleaned up"
 
 echo "--- Step 7: Cleaning up Libvirt VMs and resources ---"
 
@@ -351,28 +374,15 @@ fi
 
 echo "[SUCCESS] Libvirt VMs and resources cleaned up"
 
-echo "--- Step 8: Cleaning up FCOS images and artifacts ---"
+echo "--- Step 8: Cleaning up test-specific build artifacts ---"
 
-if [ "${CLEANUP_IMAGES}" == "true" ]; then
-    # Clean FCOS container images
-    if command -v podman &> /dev/null; then
-        echo "[INFO] Cleaning FCOS container images..."
-        sudo podman images | grep -i "fedora-coreos\|fcos" | awk '{print $3}' | xargs -r sudo podman rmi -f 2>&1 || \
-            echo "[WARN] Could not remove FCOS images"
-        sudo podman images | grep "trusted-execution-clusters" | awk '{print $3}' | \
-            xargs -r sudo podman rmi -f 2>&1 || echo "[WARN] Could not remove trusted-execution-clusters images"
-    fi
+# Clean build artifacts but not container images (images already cleaned in Step 2)
+echo "[INFO] Cleaning build artifacts..."
+rm -rf "${HOME}/investigations" 2>&1 || echo "[WARN] Could not remove investigations directory"
+rm -rf "${HOME}/.cache/osbuild" 2>&1 || echo "[WARN] Could not remove osbuild cache"
+sudo rm -rf /var/cache/osbuild 2>&1 || echo "[WARN] Could not remove system osbuild cache"
 
-    # Clean build artifacts
-    echo "[INFO] Cleaning build artifacts..."
-    rm -rf "${HOME}/investigations" 2>&1 || echo "[WARN] Could not remove investigations directory"
-    rm -rf "${HOME}/.cache/osbuild" 2>&1 || echo "[WARN] Could not remove osbuild cache"
-    sudo rm -rf /var/cache/osbuild 2>&1 || echo "[WARN] Could not remove system osbuild cache"
-
-    echo "[SUCCESS] Build artifacts cleaned up"
-else
-    echo "[INFO] FCOS image and artifact cleanup skipped"
-fi
+echo "[SUCCESS] Build artifacts cleaned up"
 
 echo "--- Step 9: Cleaning up test logs and SSH keys ---"
 
@@ -387,34 +397,58 @@ if [ -f "/root/.ssh/id_ed25519.pub" ]; then
     sudo rm -f /root/.ssh/id_ed25519.pub 2>&1 || echo "[WARN] Could not remove VM SSH public key"
 fi
 
-echo "[SUCCESS] Test logs and SSH keys cleaned up"
-
-echo "--- Step 10: Restarting services with clean state ---"
-
-if [ "${RESTART_SERVICES}" == "true" ]; then
-    # Restart Docker
-    if command -v docker &> /dev/null; then
-        echo "[INFO] Restarting Docker service..."
-        sudo systemctl start docker 2>&1 || echo "[ERROR] Failed to start Docker service"
-    fi
-
-    # Restart other services
-    if command -v containerd &> /dev/null; then
-        echo "[INFO] Starting containerd service..."
-        sudo systemctl start containerd 2>&1 || echo "[WARN] Could not start containerd"
-    fi
-
-    if command -v podman &> /dev/null; then
-        echo "[INFO] Starting Podman socket..."
-        sudo systemctl start podman.socket 2>&1 || echo "[WARN] Could not start Podman socket"
-    fi
-
-    if command -v virsh &> /dev/null; then
-        echo "[INFO] Starting Libvirt service..."
-        sudo systemctl start libvirtd 2>&1 || echo "[WARN] Could not start Libvirt service"
+# Kill all ssh-agent processes to prevent accumulation
+echo "[INFO] Cleaning up ssh-agent processes..."
+AGENT_COUNT=$(pgrep -u $(whoami) ssh-agent 2>/dev/null | wc -l)
+if [ "$AGENT_COUNT" -gt 0 ]; then
+    echo "[INFO] Found ${AGENT_COUNT} ssh-agent process(es), terminating..."
+    sudo pkill -u $(whoami) ssh-agent 2>&1 || echo "[WARN] Could not kill some ssh-agent processes"
+    sleep 1
+    REMAINING=$(pgrep -u $(whoami) ssh-agent 2>/dev/null | wc -l)
+    if [ "$REMAINING" -eq 0 ]; then
+        echo "[SUCCESS] All ssh-agent processes terminated"
+    else
+        echo "[WARN] ${REMAINING} ssh-agent process(es) still running"
     fi
 else
-    echo "[INFO] Service restart skipped"
+    echo "[INFO] No ssh-agent processes found"
+fi
+
+echo "[SUCCESS] Test logs, SSH keys, and ssh-agent cleaned up"
+
+echo "--- Step 10: Reinitializing Docker and containerd ---"
+
+# Ensure containerd directory structure exists and restart Docker
+if command -v docker &> /dev/null; then
+    echo "[INFO] Ensuring containerd directories exist with correct permissions..."
+    sudo mkdir -p /var/lib/containerd/io.containerd.content.v1.content/ingest
+    sudo mkdir -p /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots
+    sudo mkdir -p /var/lib/containerd/tmpmounts
+    sudo chmod -R 755 /var/lib/containerd
+    echo "[SUCCESS] Containerd directories created"
+
+    echo "[INFO] Restarting Docker service to reinitialize containerd..."
+    if sudo systemctl restart docker 2>&1; then
+        echo "[SUCCESS] Docker service restarted"
+        # Wait for Docker to fully initialize
+        sleep 10
+        if docker info > /dev/null 2>&1; then
+            echo "[SUCCESS] Docker daemon is responsive"
+        else
+            echo "[WARN] Docker daemon is not responsive after restart, this may indicate a problem"
+        fi
+    else
+        echo "[ERROR] Failed to restart Docker service"
+    fi
+fi
+
+if command -v virsh &> /dev/null; then
+    echo "[INFO] Checking Libvirt service status..."
+    if sudo systemctl is-active --quiet libvirtd; then
+        echo "[SUCCESS] Libvirt service is running"
+    else
+        echo "[INFO] Libvirt service is not running"
+    fi
 fi
 
 echo "--- Step 11: Verifying clean state ---"

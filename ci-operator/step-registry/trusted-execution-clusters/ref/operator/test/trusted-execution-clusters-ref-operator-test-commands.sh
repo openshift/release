@@ -270,15 +270,26 @@ fi
 echo "[SUCCESS] Rust CRDs generated"
 
 echo "[INFO] Setting up SSH agent for integration tests..."
-if [ -n "${SSH_AGENT_PID:-}" ]; then
-  echo "[INFO] Killing existing SSH agent (PID: ${SSH_AGENT_PID})"
-  kill "${SSH_AGENT_PID}" 2>/dev/null || true
-fi
 
+# Kill ALL existing ssh-agent processes to prevent accumulation
+echo "[INFO] Cleaning up any existing ssh-agent processes..."
+${SUDO} pkill -u $(whoami) ssh-agent 2>/dev/null || echo "[INFO] No existing ssh-agent processes found"
+
+# Wait a moment for processes to terminate
+sleep 1
+
+# Start fresh ssh-agent
+echo "[INFO] Starting new ssh-agent..."
 eval "$(ssh-agent -s)"
-ssh-add </dev/null || echo "[WARN] ssh-add returned non-zero, continuing..."
 
-echo "[SUCCESS] SSH agent configured"
+# Verify ssh-agent is running
+if [ -n "${SSH_AGENT_PID:-}" ] && kill -0 "${SSH_AGENT_PID}" 2>/dev/null; then
+  echo "[SUCCESS] SSH agent started (PID: ${SSH_AGENT_PID})"
+  echo "[INFO] SSH_AUTH_SOCK: ${SSH_AUTH_SOCK}"
+else
+  echo "[ERROR] Failed to start ssh-agent"
+  exit 1
+fi
 
 echo "[INFO] Running integration tests..."
 if ! make integration-tests; then
