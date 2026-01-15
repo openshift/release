@@ -42,23 +42,29 @@ function MapTestsForComponentReadiness() {
 }
 
 function CleanupCollect() {
+    # Disable exit on error in cleanup to be resilient to timeouts/interruptions
+    # This ensures cleanup completes even if individual operations fail
+    set +e
+    
     if [[ "${MAP_TESTS}" == "true" ]]; then
-        InstallYq
+        InstallYq || : "Warning: yq installation failed, skipping test mapping"
 
         typeset originalResults="${ARTIFACT_DIR}/original_results"
-        mkdir -p "${originalResults}"
+        mkdir -p "${originalResults}" 2>/dev/null || true
 
         # Keep a copy of all the original JUnit files
-        cp -r "${ARTIFACT_DIR}"/junit-* "${originalResults}" || : "Warning: couldn't copy original files"
+        cp -r "${ARTIFACT_DIR}"/junit-* "${originalResults}" 2>/dev/null || : "Warning: couldn't copy original files"
 
-        # Safely handle filenames with spaces using null-delimited find
+        # First, copy all XML files to SHARED_DIR (do this before yq processing)
+        # Process files in a single pass: copy first, then modify with yq
         typeset resultFile
         while IFS= read -r -d '' resultFile; do
-            MapTestsForComponentReadiness "${resultFile}"
-        done < <(find "${ARTIFACT_DIR}" -type f -iname "*.xml" -print0 || true)
-
-        # Send modified files to shared dir
-        cp -r "${ARTIFACT_DIR}"/junit-* "${SHARED_DIR}" || : "Warning: couldn't copy files to SHARED_DIR"
+            # Copy file to SHARED_DIR
+            cp -- "${resultFile}" "${SHARED_DIR}/$(basename "${resultFile}")" 2>/dev/null || : "Warning: couldn't copy ${resultFile} to SHARED_DIR"
+            
+            # Process with yq (can be interrupted without losing files)
+            MapTestsForComponentReadiness "${resultFile}" 2>/dev/null || true
+        done < <(find "${ARTIFACT_DIR}" -type f -iname "*.xml" -print0 2>/dev/null || true)
     fi
 
     true
