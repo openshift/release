@@ -3,12 +3,6 @@ set -e
 set -o pipefail
 MOUNTED_HOST_INVENTORY="/var/host_variables"
 
-echo "Checking if the job should be skipped..."
-if [ -f "${SHARED_DIR}/skip.txt" ]; then
-  echo "Detected skip.txt file — skipping the job"
-  exit 0
-fi
-
 process_inventory() {
     local directory="$1"
     local dest_file="$2"
