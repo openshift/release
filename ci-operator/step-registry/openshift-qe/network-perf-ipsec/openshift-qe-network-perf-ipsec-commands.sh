@@ -111,9 +111,9 @@ else
 fi
 
 echo "=== Setting Up E2E Benchmarking Environment ==="
-# Create python virtual environment
-python3 -m venv ./venv_qe
-source ./venv_qe/bin/activate
+# Create python virtual environment in /tmp where we have write permissions
+python3 -m venv /tmp/venv_qe
+source /tmp/venv_qe/bin/activate
 
 # Get credentials
 ES_PASSWORD=$(cat /secret/password 2>/dev/null || echo "no-password")
