@@ -15,6 +15,10 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
   upi-installer:
     name: "4.21"
     namespace: ocp
@@ -71,28 +75,41 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      MINIMAL_PERMISSIONS_WITHOUT_FIREWALL_PROVISION: "yes"
-      SLEEP_DURATION: 10m
-    post:
-    - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-byo-fw-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-byo-fw-provision
+      CLUSTER_PARAMETER_SELECT_CONDITIONS: |
+        [
+          [
+              {"column": "Region", "value": "us-west4", "operator": "equals"}
+          ]
+        ]
+      TEST_FILTERS: "57148"
+      TEST_OBJECT: Regions
     test:
-    - chain: cucushift-installer-check-cluster-health
-- as: installer-rehearse-gcp-wif
+    - ref: openshift-extended-test-longduration
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-cases-clusters
+- as: installer-rehearse-gcp-regions
   cron: '@yearly'
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
-      ENABLE_MIN_PERMISSION_FOR_STS: "true"
-      EXTRACT_MANIFEST_INCLUDED: "true"
-      MINIMAL_PERMISSIONS_CCO_MANUAL_WITHOUT_FIREWALL_PROVISION: "yes"
-    workflow: cucushift-installer-rehearse-gcp-ipi-byo-fw-cco-manual-workload-identity
+      CLUSTER_PARAMETER_SELECT_CONDITIONS: |
+        [
+          [
+              {"column": "Region", "value": "europe-west3", "operator": "equals"}
+          ]
+        ]
+      TEST_FILTERS: "57148"
+      TEST_OBJECT: Regions
+    test:
+    - ref: openshift-extended-test-longduration
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-gcp-cases-clusters
 - as: installer-rehearse-vsphere
   cron: '@yearly'
   steps:

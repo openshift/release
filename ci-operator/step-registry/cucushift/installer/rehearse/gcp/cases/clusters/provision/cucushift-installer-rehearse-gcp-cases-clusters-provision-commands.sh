@@ -12,10 +12,10 @@ if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   exit 1
 fi
 
-echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+echo "$(date -u --rfc-3339=seconds) - Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 
-echo "TEST_OBJECT: $TEST_OBJECT"
+echo "$(date -u --rfc-3339=seconds) - TEST_OBJECT: $TEST_OBJECT"
 OUT_SELECT=${SHARED_DIR}/select.json
 OUT_SELECT_DICT=${SHARED_DIR}/select.dict.json
 OUT_RESULT=${SHARED_DIR}/result.json
@@ -55,17 +55,17 @@ function post_actions() {
 
   current_time=$(date +%s)
 
-  echo "Copying kubeconfig and metadata.json to shared dir"
+  echo "$(date -u --rfc-3339=seconds) - Copying kubeconfig and metadata.json to shared dir"
   cp \
       -t "${SHARED_DIR}" \
       "${INSTALL_DIR}/auth/kubeconfig" \
       "${INSTALL_DIR}/auth/kubeadmin-password" \
       "${INSTALL_DIR}/metadata.json"
 
-  echo "Copying log bundle..."
+  echo "$(date -u --rfc-3339=seconds) - Copying log bundle..."
   cp "${INSTALL_DIR}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
 
-  echo "Copying install log and removing REDACTED info from log..."
+  echo "$(date -u --rfc-3339=seconds) - Copying install log and removing REDACTED info from log..."
   sed '
     s/password: .*/password: REDACTED/;
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
@@ -82,14 +82,13 @@ function post_actions() {
   update_result "CType" "${COMPUTE_INSTANCE_TYPE}"
   update_result "CFamily" "${COMPUTE_INSTANCE_TYPE_FAMILY}"
   update_result "Arch" "${ARCH}"
-  update_result "AMI" "${AMI_RESULT}"
   update_result "Install" "${INSTALL_RESULT}"
   update_result "CreatedDate" "${CREATED_DATE}"
   update_result "Job" "$(echo "${JOB_SPEC}" | jq -r '.job')"
   update_result "BuildID" "$(echo "${JOB_SPEC}" | jq -r '.buildid')"
   update_result "RowUpdated" "$(current_date)"
 
-  echo "RESULT:"
+  echo "$(date -u --rfc-3339=seconds) - RESULT:"
   jq -r . "${OUT_RESULT}"
 
   # save JOB_SPEC to ARTIFACT_DIR for debugging
@@ -102,6 +101,10 @@ function post_actions() {
 SSH_PUB_KEY=$(< "${CLUSTER_PROFILE_DIR}/ssh-publickey")
 PULL_SECRET=$(< "${CLUSTER_PROFILE_DIR}/pull-secret")
 
+GCP_BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
+if [[ -n "${BASE_DOMAIN}" ]]; then
+  GCP_BASE_DOMAIN="${BASE_DOMAIN}"
+fi
 REGION="$(jq -r '.Region' "${OUT_SELECT_DICT}")"
 ARCH="$(jq -r '.Arch' "${OUT_SELECT_DICT}")"
 
@@ -118,12 +121,11 @@ if is_empty "$ARCH"; then
   ARCH="arm64"
 fi
 
-echo "Creating cluster in region ${REGION}:"
-echo "ARCH: $ARCH"
-echo "CONTROL_PLANE_INSTANCE*: $CONTROL_PLANE_INSTANCE_TYPE $CONTROL_PLANE_INSTANCE_TYPE_FAMILY"
-echo "COMPUTE_INSTANCE*: $COMPUTE_INSTANCE_TYPE $COMPUTE_INSTANCE_TYPE_FAMILY"
+echo "$(date -u --rfc-3339=seconds) - Creating cluster in region ${REGION}:"
+echo "$(date -u --rfc-3339=seconds) - ARCH: $ARCH"
+echo "$(date -u --rfc-3339=seconds) - CONTROL_PLANE_INSTANCE*: $CONTROL_PLANE_INSTANCE_TYPE $CONTROL_PLANE_INSTANCE_TYPE_FAMILY"
+echo "$(date -u --rfc-3339=seconds) - COMPUTE_INSTANCE*: $COMPUTE_INSTANCE_TYPE $COMPUTE_INSTANCE_TYPE_FAMILY"
 
-AMI_RESULT=""
 INSTALL_RESULT=""
 CREATED_DATE="$(current_date)"
 
@@ -136,7 +138,7 @@ function create_install_config() {
 
   cat > "${config}" << EOF
 apiVersion: v1
-baseDomain: ${BASE_DOMAIN}
+baseDomain: ${GCP_BASE_DOMAIN}
 compute:
 - architecture: ${ARCH}
   hyperthreading: Enabled
@@ -182,145 +184,85 @@ mkdir -p ${INSTALL_DIR}
 openshift-install version
 
 # ---------------------------------------
-# Pre-checks
-# ---------------------------------------
-
-echo "--- Check AMI ---"
-
-if [ "$ARCH" == "amd64" ]; then
-  ami_arch="x86_64"
-elif [ "$ARCH" == "arm64" ]; then
-  ami_arch="aarch64"
-fi
-
-set +e
-amiid=$(openshift-install coreos print-stream-json | jq -r --arg a "$ami_arch" --arg r "$REGION" '.architectures[$a].images.aws.regions[$r].image')
-set -e
-
-echo "AMI architecture: ${ami_arch}, region: ${REGION}"
-
-if is_empty "$amiid"; then
-  AMI_RESULT="FAIL"
-else
-  AMI_RESULT="PASS"
-fi
-
-# ---------------------------------------
 # Create install-config
 # ---------------------------------------
 
-echo "--- Create install-config ---"
+echo "$(date -u --rfc-3339=seconds) - Create install-config"
 
 create_install_config "${CLUSTER_NAME}" "${INSTALL_DIR}"
 CONFIG="${INSTALL_DIR}"/install-config.yaml
 
-export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/gce.json"
+GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}"
+gcloud config set project "${GOOGLE_PROJECT_ID}"
 
-ZONES_JSON=/tmp/zones.json
-aws --region "$REGION" ec2 describe-availability-zones --filters Name=opt-in-status,Values=opted-in,opt-in-not-required > ${ZONES_JSON}
-
-# Patch region
+echo "$(date -u --rfc-3339=seconds) - Patch region and projectID"
 export REGION
-yq-v4 eval -i '.platform.aws.region = env(REGION)' "${CONFIG}"
+yq-v4 eval -i '.platform.gcp.region = env(REGION)' "${CONFIG}"
+export GOOGLE_PROJECT_ID
+yq-v4 eval -i '.platform.gcp.projectID = env(GOOGLE_PROJECT_ID)' "${CONFIG}"
 
-# Patch instance type
+echo "$(date -u --rfc-3339=seconds) - Patch instance types and osDisk.diskType"
 if [[ ${CONTROL_PLANE_INSTANCE_TYPE} != "" ]]; then
   export CONTROL_PLANE_INSTANCE_TYPE
-  yq-v4 eval -i '.controlPlane.platform.aws.type = env(CONTROL_PLANE_INSTANCE_TYPE)' "${CONFIG}"
+  yq-v4 eval -i '.controlPlane.platform.gcp.type = env(CONTROL_PLANE_INSTANCE_TYPE)' "${CONFIG}"
+
+  # Patch OS disk type for N4 / C4 / C4A machine series
+  if [[ ${CONTROL_PLANE_INSTANCE_TYPE_FAMILY} == N4 ]] || \
+  [[ ${CONTROL_PLANE_INSTANCE_TYPE_FAMILY} == C4 ]] || \
+  [[ ${CONTROL_PLANE_INSTANCE_TYPE_FAMILY} == C4A ]]; then
+    export OS_DISK_TYPE="hyperdisk-balanced"
+    yq-v4 eval -i '.controlPlane.platform.gcp.osDisk.diskType = env(OS_DISK_TYPE)' "${CONFIG}"
+  fi
 fi
 if [[ ${COMPUTE_INSTANCE_TYPE} != "" ]]; then
   export COMPUTE_INSTANCE_TYPE
-  yq-v4 eval -i '.compute[0].platform.aws.type = env(COMPUTE_INSTANCE_TYPE)' "${CONFIG}"
+  yq-v4 eval -i '.compute[0].platform.gcp.type = env(COMPUTE_INSTANCE_TYPE)' "${CONFIG}"
+
+  # Patch OS disk type for N4 / C4 / C4A machine series
+  if [[ ${COMPUTE_INSTANCE_TYPE_FAMILY} == N4 ]] || \
+  [[ ${COMPUTE_INSTANCE_TYPE_FAMILY} == C4 ]] || \
+  [[ ${COMPUTE_INSTANCE_TYPE_FAMILY} == C4A ]]; then
+    export OS_DISK_TYPE="hyperdisk-balanced"
+    yq-v4 eval -i '.compute[0].platform.gcp.osDisk.diskType = env(OS_DISK_TYPE)' "${CONFIG}"
+  fi
 fi
 
-AZ_NAME=""
-
-case "$TEST_OBJECT" in
-InstanceTypes)
-  t1=$(mktemp)
-  t2=$(mktemp)
-  aws --region "$REGION" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="$CONTROL_PLANE_INSTANCE_TYPE" --query 'InstanceTypeOfferings[*].Location' | jq -r '.[]' | sort | grep -E '^[a-z]+-[a-z]+-[0-9][a-z]$' > "$t1"
-  aws --region "$REGION" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="$COMPUTE_INSTANCE_TYPE" --query 'InstanceTypeOfferings[*].Location' | jq -r '.[]' | sort | grep -E '^[a-z]+-[a-z]+-[0-9][a-z]$' > "$t2"
-
-  echo "AZs for ${CONTROL_PLANE_INSTANCE_TYPE}:"
-  cat $t1
-  echo "AZs for ${COMPUTE_INSTANCE_TYPE}:"
-  cat $t2
-  echo "AZ_INDEX: $AZ_INDEX"
-
-  AZ_NAME=$(comm -12 "$t1" "$t2" | jq -Rs 'split("\n") | map(select(length > 0))' | jq -r --argjson i "$AZ_INDEX" '.[$i] // ""')
-  if [ "$AZ_NAME" == "" ]; then
-    echo "ERROR: Can not find an Availability Zone that provides both $CONTROL_PLANE_INSTANCE_TYPE and $COMPUTE_INSTANCE_TYPE"
-    exit 1
-  fi
-  echo "AZ configuration: Auto select $AZ_NAME for TEST_OBJECT: $TEST_OBJECT"
-  ;;
-Regions)
-  # Only use one AZ to reduce EIP usage
-  echo "AZ_INDEX: $AZ_INDEX"
-  AZ_NAME=$(jq -r --argjson i "$AZ_INDEX" '[.AvailabilityZones[] | select(.ZoneType=="availability-zone")] | .[$i].ZoneName // ""' "${ZONES_JSON}")
-  if [ "$AZ_NAME" == "" ]; then
-    echo "ERROR: Can not find an Availability Zone for $REGION"
-    exit 1
-  fi
-  echo "AZ configuration: Auto select $AZ_NAME for TEST_OBJECT: $TEST_OBJECT"
-  ;;
-*)
-  echo "AZ configuration: Skip for TEST_OBJECT: $TEST_OBJECT"
-  ;;
-esac
-
-if [ -n "$AZ_NAME" ]; then
-  export AZ_NAME
-  yq-v4 eval -i '.controlPlane.platform.aws.zones += [env(AZ_NAME)]' "${CONFIG}"
-  yq-v4 eval -i '.compute[0].platform.aws.zones += [env(AZ_NAME)]' "${CONFIG}"
-fi
-
-# Patch Edge nodes
-if [ "${TEST_OBJECT}" == "LocalZones" ] || [ "${TEST_OBJECT}" == "WavelengthZones" ]; then
-
-  # patch edge node
-  EDGE_ZONES_JSON=/tmp/edge_zones.json
-
-  if [ "$TEST_OBJECT" == "WavelengthZones" ]; then
-    ZONE_TYPE="wavelength-zone"
-  fi
-
-  if [ "$TEST_OBJECT" == "LocalZones" ]; then
-    ZONE_TYPE="local-zone"
-  fi
-
-  jq -r --arg t "$ZONE_TYPE" '[.AvailabilityZones[] | select(.ZoneType==$t)]' "${ZONES_JSON}" > "${EDGE_ZONES_JSON}"
-
-  EDGE_ZONE_COUNT=$(jq -r '. | length' ${EDGE_ZONES_JSON})
-  EDGE_ZONE_NAMES=$(jq -r '.[].ZoneName' ${EDGE_ZONES_JSON})
-
-  if [ "${ARCH}" == "" ]; then
-    yq-v4 eval -i '.compute[1].architecture = "amd64"' "${CONFIG}"
+echo "$(date -u --rfc-3339=seconds) - Patch availability zones"
+found_az_for_control_plane=false
+found_az_for_comute=false
+readarray -t availability_zones < <(gcloud compute regions describe "${REGION}" | grep 'https://www.googleapis.com/compute/v1/projects/.*/zones/' | sed 's#- https://www.googleapis.com/compute/v1/projects/[_a-zA-Z0-9-]*/zones/##g')
+for ZONE_NAME in "${availability_zones[@]}"
+do
+  if gcloud compute machine-types describe "${CONTROL_PLANE_INSTANCE_TYPE}" --zone "${ZONE_NAME}"; then
+    export ZONE_NAME
+    yq-v4 eval -i '.controlPlane.platform.gcp.zones += [env(ZONE_NAME)]' "${CONFIG}"
+    found_az_for_control_plane=true
   else
-    export ARCH
-    yq-v4 eval -i '.compute[1].architecture = env(ARCH)' "${CONFIG}"
+    echo "Skip zone '${ZONE_NAME}' for machine type '${CONTROL_PLANE_INSTANCE_TYPE}'."
   fi
-
-  yq-v4 eval -i '.compute[1].hyperthreading = "Enabled"' "${CONFIG}"
-  yq-v4 eval -i '.compute[1].name = "edge"' "${CONFIG}"
-  export EDGE_ZONE_COUNT
-  yq-v4 eval -i '.compute[1].replicas = env(EDGE_ZONE_COUNT)' "${CONFIG}"
-  for edge_zone in ${EDGE_ZONE_NAMES}; do
-    export edge_zone
-    yq-v4 eval -i '.compute[1].platform.aws.zones += [env(edge_zone)]' "${CONFIG}"
-    unset edge_zone
-  done
+  if gcloud compute machine-types describe "${COMPUTE_INSTANCE_TYPE}" --zone "${ZONE_NAME}"; then
+    export ZONE_NAME
+    yq-v4 eval -i '.compute[0].platform.gcp.zones += [env(ZONE_NAME)]' "${CONFIG}"
+    found_az_for_comute=true
+  else
+    echo "Skip zone '${ZONE_NAME}' for machine type '${COMPUTE_INSTANCE_TYPE}'."
+  fi
+done
+if ! (${found_az_for_control_plane} && ${found_az_for_comute}); then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to find availability zone for control-plane and/or compute."
+  exit 1
 fi
 
 echo "install-config.yaml:"
-yq-v4 '({"compute": .compute, "controlPlane": .controlPlane, "platform": .platform})' "${CONFIG}"
+yq-v4 '({"compute": .compute, "controlPlane": .controlPlane, "platform": .platform, "baseDomain": .baseDomain})' "${CONFIG}"
 
 cp "${CONFIG}" "${SHARED_DIR}"/install-config.yaml
 
 # ---------------------------------------
 
-echo "--- Create manifests ---"
+echo "$(date -u --rfc-3339=seconds) - Create manifests"
 
 set +e
 openshift-install create manifests --dir ${INSTALL_DIR} &
@@ -330,15 +272,15 @@ set -e
 
 ret=$((ret + install_ret))
 if [ $install_ret -ne 0 ]; then
-  echo "Failed to create manifests. Exit code: $install_ret"
+  echo "$(date -u --rfc-3339=seconds) - Failed to create manifests. Exit code: $install_ret"
   INSTALL_RESULT="FAIL"
 else
-  echo "Created manifests."
+  echo "$(date -u --rfc-3339=seconds) - Created manifests."
 fi
 
 # ---------------------------------------
 
-echo "--- Create ignition configs ---"
+echo "$(date -u --rfc-3339=seconds) - Create ignition configs"
 
 set +e
 openshift-install create ignition-configs --dir ${INSTALL_DIR} &
@@ -348,15 +290,15 @@ set -e
 
 ret=$((ret + install_ret))
 if [ $install_ret -ne 0 ]; then
-  echo "Failed to ignition configs. Exit code: $install_ret"
+  echo "$(date -u --rfc-3339=seconds) - Failed to ignition configs. Exit code: $install_ret"
   INSTALL_RESULT="FAIL"
 else
-  echo "Created ignition configs."
+  echo "$(date -u --rfc-3339=seconds) - Created ignition configs."
 fi
 
 # ---------------------------------------
 
-echo "--- Create cluster ---"
+echo "$(date -u --rfc-3339=seconds) - Create cluster"
 
 set +e
 openshift-install create cluster --dir ${INSTALL_DIR} 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
@@ -365,13 +307,13 @@ install_ret="$?"
 set -e
 
 if [ $install_ret -ne 0 ]; then
-  echo "Failed to create clusters. Exit code: $install_ret"
+  echo "$(date -u --rfc-3339=seconds) - Failed to create clusters ($install_ret)"
   INSTALL_RESULT="FAIL"
 else
-  echo "Created cluster."
+  echo "$(date -u --rfc-3339=seconds) - Created cluster."
   INSTALL_RESULT="PASS"
 fi
 ret=$((ret + install_ret))
 
-echo "ret: $ret"
+echo "Exit code: $ret"
 exit $ret
