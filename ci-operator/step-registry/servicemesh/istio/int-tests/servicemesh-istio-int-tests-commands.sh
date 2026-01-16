@@ -26,6 +26,7 @@ run_tests() {
     sh -c "
     export KUBECONFIG=/work/ci-kubeconfig
     export BUILD_WITH_CONTAINER=\"0\"
+    export ENABLE_OVERLAY2_STORAGE_DRIVER=true
     export DOCKER_INSECURE_REGISTRIES=\"default-route-openshift-image-registry.\$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr(\$0, index(\$0,\$2))}')\"
     export ARTIFACT_DIR=\"${ARTIFACT_DIR}\"
     export CONTROL_PLANE_SOURCE=\"${CONTROL_PLANE_SOURCE}\"
