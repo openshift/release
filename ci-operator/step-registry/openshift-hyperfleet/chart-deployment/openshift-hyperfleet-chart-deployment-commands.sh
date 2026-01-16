@@ -136,21 +136,16 @@ done
 
 log "=== Deployment Configuration ==="
 echo "helm get values $RELEASE_NAME -n $NAMESPACE_NAME"
-helm get values $RELEASE_NAME -n $NAMESPACE_NAME | tee "${SHARED_DIR}/values.yaml"
+helm get values $RELEASE_NAME -n $NAMESPACE_NAME | tee "${ARTIFACT_DIR}/values.yaml"
 
 log "=== Checking all deployed resources ==="
-kubectl get all -n $NAMESPACE_NAME | tee "${SHARED_DIR}/all-resources.txt"
+kubectl get all -n $NAMESPACE_NAME | tee "${ARTIFACT_DIR}/all-resources.txt"
 
 log "=== Checking pod logs for all pods ==="
 for pod in $(kubectl get pods -n $NAMESPACE_NAME -o jsonpath='{.items[*].metadata.name}'); do
   log "Collecting logs for pod: $pod"
-  kubectl logs "$pod" -n $NAMESPACE_NAME --tail=100 > "${SHARED_DIR}/${pod}-logs.txt" 2>&1 || log "WARNING: Cannot retrieve logs for pod $pod"
+  kubectl logs "$pod" -n $NAMESPACE_NAME --tail=100 > "${ARTIFACT_DIR}/${pod}-logs.txt" 2>&1 || log "WARNING: Cannot retrieve logs for pod $pod"
 done
-
-
-# Will replace this once the PR is ready: https://github.com/openshift-hyperfleet/hyperfleet-chart/pull/4
-# TODO: Port forwarding to access hyperfleet-api
-echo "You can run gcloud cmd to get credentials to access GKE cluster for prow and forward port to access hyperfleet-api"
 
 if [ "$PODS_READY" != "true" ]; then
   log "ERROR: Deployment failed - not all pods are Running in $TIMEOUT seconds"
@@ -158,3 +153,30 @@ if [ "$PODS_READY" != "true" ]; then
 fi
 
 log "SUCCESS: All pods are Running and deployment is healthy"
+
+log "=== Exposing external IP for hyperfleet-api service ==="
+kubectl patch svc hyperfleet-api -n $NAMESPACE_NAME -p '{"spec": {"type": "LoadBalancer"}}'
+
+log "=== Waiting for EXTERNAL-IP to be assigned ==="
+EXTERNAL_IP_READY=false
+
+for i in $(seq 1 $((TIMEOUT / 10))); do
+  EXTERNAL_IP=$(kubectl get svc hyperfleet-api -n $NAMESPACE_NAME -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+
+  if [ -n "$EXTERNAL_IP" ] && [ "$EXTERNAL_IP" != "<pending>" ]; then
+    log "EXTERNAL-IP assigned: $EXTERNAL_IP"
+    log "You can access hyperfleet-api via http://$EXTERNAL_IP:8000/api/hyperfleet/v1/clusters"
+    EXTERNAL_IP_READY=true
+    break
+  fi
+
+  log "Waiting for EXTERNAL-IP to be assigned... (currently pending)"
+  sleep 10
+done
+
+if [ "$EXTERNAL_IP_READY" != "true" ]; then
+  log "ERROR: EXTERNAL-IP was not assigned within ${TIMEOUT} seconds"
+  kubectl get svc hyperfleet-api -n $NAMESPACE_NAME
+  exit 1
+fi
+
