@@ -41,19 +41,7 @@ function backoff() {
 	return $failed
 }
 
-logger "INFO" "Starting GCP Persistent Disk Workload Identity Federation configuration"
-
-# For disconnected or otherwise unreachable environments, we want to
-# have steps use an HTTP(S) proxy to reach the API server. This proxy
-# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
-# environment variables, as well as their lowercase equivalents (note
-# that libcurl doesn't recognize the uppercase variables).
-if test -f "${SHARED_DIR}/proxy-conf.sh"
-then
-	# shellcheck disable=SC1091
-	source "${SHARED_DIR}/proxy-conf.sh"
-	logger "INFO" "Loaded proxy configuration from ${SHARED_DIR}/proxy-conf.sh"
-fi
+logger "INFO" "Starting GCP Persistent Disk Workload Identity Federation cleanup"
 
 GOOGLE_PROJECT_ID="$(<${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
@@ -71,10 +59,7 @@ then
 	logger "INFO" "Successfully authenticated with GCP service account"
 fi
 
-# Refs:
-#   https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/blob/master/docs/kubernetes/user-guides/driver-install.md
-#   https://github.com/kubernetes-sigs/gcp-compute-persistent-disk-csi-driver/blob/master/deploy/setup-project.sh
-logger "INFO" "Configure GCP Persistent Disk for Workload Identity Federation"
+logger "INFO" "Cleaning up GCP Persistent Disk Workload Identity Federation configuration"
 
 # Find existing service account created for GCP PD CSI driver by the installer
 CLUSTER_NAME=$(jq -r .clusterName ${SHARED_DIR}/metadata.json)
@@ -123,19 +108,14 @@ if [ -n "${CUSTOM_COMPUTE_SA}" ] && [ "${CUSTOM_COMPUTE_SA}" != "null" ]; then
 	logger "INFO" "Using worker node service account from install-config.yaml: ${WORKER_NODE_SA}"
 fi
 
-# Grant scoped serviceAccountUser role for node service accounts
+# Remove scoped serviceAccountUser role from node service accounts
 SA_USER_ROLE="roles/iam.serviceAccountUser"
-logger "INFO" "Granting ${SA_USER_ROLE} for node service accounts: ${MASTER_NODE_SA}, ${WORKER_NODE_SA}"
-CMD="gcloud iam service-accounts add-iam-policy-binding \"${MASTER_NODE_SA}\" --project=\"${GOOGLE_PROJECT_ID}\" --member=\"serviceAccount:${SERVICE_ACCOUNT_EMAIL}\" --role=\"${SA_USER_ROLE}\" --condition=None"
+logger "INFO" "Removing ${SA_USER_ROLE} from node service accounts: ${MASTER_NODE_SA}, ${WORKER_NODE_SA}"
+CMD="gcloud iam service-accounts remove-iam-policy-binding \"${MASTER_NODE_SA}\" --project=\"${GOOGLE_PROJECT_ID}\" --member=\"serviceAccount:${SERVICE_ACCOUNT_EMAIL}\" --role=\"${SA_USER_ROLE}\" --condition=None"
 backoff "${CMD}"
-CMD="gcloud iam service-accounts add-iam-policy-binding \"${WORKER_NODE_SA}\" --project=\"${GOOGLE_PROJECT_ID}\" --member=\"serviceAccount:${SERVICE_ACCOUNT_EMAIL}\" --role=\"${SA_USER_ROLE}\" --condition=None"
-backoff "${CMD}"
-
-# Remove project-level serviceAccountUser role from the binding created by the installer
-logger "INFO" "Removing ${SA_USER_ROLE} from project-level binding for ${SERVICE_ACCOUNT_EMAIL}"
-CMD="gcloud projects remove-iam-policy-binding \"${GOOGLE_PROJECT_ID}\" --member=\"serviceAccount:${SERVICE_ACCOUNT_EMAIL}\" --role=\"${SA_USER_ROLE}\" --condition=None"
+CMD="gcloud iam service-accounts remove-iam-policy-binding \"${WORKER_NODE_SA}\" --project=\"${GOOGLE_PROJECT_ID}\" --member=\"serviceAccount:${SERVICE_ACCOUNT_EMAIL}\" --role=\"${SA_USER_ROLE}\" --condition=None"
 backoff "${CMD}"
 
-logger "INFO" "IAM roles set successfully"
+logger "INFO" "IAM roles removed successfully"
 
-logger "INFO" "GCP Persistent Disk Workload Identity Federation configuration completed"
+logger "INFO" "GCP Persistent Disk Workload Identity Federation cleanup completed"
