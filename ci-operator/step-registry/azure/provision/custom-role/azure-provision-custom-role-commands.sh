@@ -264,7 +264,7 @@ ${required_permissions}
 """
 
     # New permissions are instroduced when using CAPZ to provision IPI cluster
-    if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "IPI" ]] && (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
+    if [[ "${CLUSTER_TYPE_MIN_PERMISSOIN}" == "IPI" ]] && ( (( ocp_major_version == 4 && ocp_minor_version >= 17 )) || (( ocp_major_version > 4 )) ); then
         # routeTables relevant perssions can be removed once OCPBUGS-37663 is fixed.
         required_permissions="""
 \"Microsoft.Network/routeTables/read\",
@@ -374,7 +374,7 @@ ${required_permissions}
     fi
 
     # optional permissions when installing cluster in existing vnet
-    if [[ -n ${install_config_vnet} ]] && (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
+    if [[ -n ${install_config_vnet} ]] && ( (( ocp_major_version == 4 && ocp_minor_version >= 17 )) || (( ocp_major_version > 4 )) ); then
         required_permissions="""
 \"Microsoft.Network/virtualNetworks/checkIpAddressAvailability/read\",
 ${required_permissions}

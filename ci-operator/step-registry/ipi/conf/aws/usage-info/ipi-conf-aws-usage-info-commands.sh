@@ -55,7 +55,7 @@ ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}
 ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
-if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version >= 11 )) || (( ocp_major_version > 4 )); then
     while read -r TAG VALUE
     do
       printf 'Setting user tag to help cost usage analysis - %s: %s\n' "${TAG}" "${VALUE}"

@@ -64,8 +64,9 @@ fi
 
 no_critical_check_result=0
 #nsg rule 'apiserver_in' check
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ${ocp_minor_version} > 12 )); then
+if (( ocp_major_version == 4 && ocp_minor_version > 12 )) || (( ocp_major_version > 4 )); then
     echo "Checking that nsg rule 'apiserver_in' is not created when cluster is installed in existing vnet"
     nsg_rule_name="apiserver_in"
     nsg_name=$(az network nsg list -g ${RESOURCE_GROUP} --query "[].name" -otsv)

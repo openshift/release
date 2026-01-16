@@ -59,6 +59,7 @@ fi
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
 no_critical_check_result=0
@@ -84,7 +85,7 @@ do
         no_critical_check_result=1
     fi
 
-    if (( ocp_minor_version > 15 )); then
+    if (( ocp_major_version == 4 && ocp_minor_version > 15 )) || (( ocp_major_version > 4 )); then
         cross_tenant_replication=$(echo $line | awk -F' ' '{print $3}')
         if [[ "${cross_tenant_replication}" == "False" ]]; then
             echo "INFO: property allowCrossTenantReplication is False, expected!"

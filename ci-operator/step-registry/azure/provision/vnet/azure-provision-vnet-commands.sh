@@ -39,11 +39,11 @@ function create_disconnected_network() {
     for nsg in $subnet_nsgs; do
         run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyInternet' --priority 1010 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'Internet' --destination-port-ranges '*' --direction Outbound"
         if [[ "${CLUSTER_TYPE}" != "azurestack" ]]; then
-	    if [[ "${ALLOW_AZURE_CLOUD_ACCESS}" == "no" ]] && (( ocp_minor_version >= 17 && ocp_major_version == 4 )); then
-	        run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyAzureCloud' --priority 1009 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
-	    else
+            if [[ "${ALLOW_AZURE_CLOUD_ACCESS}" == "no" ]] && ( (( ocp_major_version == 4 && ocp_minor_version >= 17 )) || (( ocp_major_version > 4 )) ); then
+                run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyAzureCloud' --priority 1009 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
+	        else
                 run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'AllowAzureCloud' --priority 1009 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
-           fi
+            fi
         fi
     done
     return 0

@@ -34,7 +34,7 @@ echo "OCP Version: $ocp_version"
 ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
 ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
-if (( ocp_minor_version <= 13 && ocp_major_version == 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version <= 13 )); then
   echo "Custom SG in 4.13- is not applicable, skip now."
   exit 0
 fi

@@ -85,7 +85,7 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
   echo "OCP version: ${ocp_version}"
   
-  if (( ocp_minor_version <= 13 && ocp_major_version == 4 )); then
+  if (( ocp_major_version == 4 && ocp_minor_version <= 13 )); then
     if ! grep "sts:AssumeRole" ${ingress_cr_file}; then
       echo "WARN: Adding sts:AssumeRole to ingress role"
       sed -i '/      - tag:GetResources/a\ \ \ \ \ \ - sts:AssumeRole' ${ingress_cr_file}

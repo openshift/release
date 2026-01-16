@@ -105,7 +105,7 @@ EOF
 
 # SG group patch
 sg_patch=`mktemp`
-if (( ocp_minor_version >= 16 && ocp_major_version == 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version >= 16 )) || (( ocp_major_version > 4 )); then
   # CAPI
   cat <<EOF > ${sg_patch}
 spec:

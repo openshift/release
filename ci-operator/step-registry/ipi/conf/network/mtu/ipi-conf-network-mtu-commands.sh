@@ -20,7 +20,7 @@ if [[ "${network_type}" == "" ]]; then
   ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
   ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
   rm /tmp/pull-secret
-  if (( ocp_minor_version >= 12 && ocp_major_version >= 4 )); then
+  if (( ocp_major_version == 4 && ocp_minor_version >= 12 )) || (( ocp_major_version > 4 )); then
     network_type="OVNKubernetes"
   else
     network_type="OpenShiftSDN"

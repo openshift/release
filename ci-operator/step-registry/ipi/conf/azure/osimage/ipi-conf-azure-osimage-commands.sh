@@ -45,6 +45,7 @@ rm pull-secret
 popd
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
 ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
 # az should already be there
@@ -116,7 +117,7 @@ yq-go m -x -i "${CONFIG}" "${PATCH}"
 #save worker image urn to ${SHARED_DIR}
 echo "${image}" > "${SHARED_DIR}"/azure_marketplace_image_urn_worker
 
-if [[ ${ocp_minor_version} -ge 14 ]]; then
+if (( ocp_major_version == 4 && ocp_minor_version >= 14 )) || (( ocp_major_version > 4 )); then
   # create/apply a patch to set osImage for control plane instances
   PATCH_MASTER="${SHARED_DIR}/install-config-master-marketimage.yaml.patch"
   cat > "${PATCH_MASTER}" << EOF
