@@ -30,7 +30,7 @@ export OC_HUB_CLUSTER_API_URL
 
 # HUB_CLUSTER_NAME=${BASE_DOMAIN/.cspilp.interop.ccitredhat.com/}
 HUB_CLUSTER_NAME=$(cat $SHARED_DIR/metadata.json |jq -r '.clusterName') 
-export HUB_CLUSTER_NAME
+export HUB_CLUSTER_NAME='local-cluster'
 
 OC_HUB_CLUSTER_PASS=$(cat $SHARED_DIR/kubeadmin-password)
 export OC_HUB_CLUSTER_PASS
@@ -76,8 +76,24 @@ mkdir -p /alabama/.kube
 # Copy Kubeconfig file to the directory where Obs is looking it up
 cp ${SHARED_DIR}/kubeconfig ~/.kube/config
 
+#
+# Remove the ACM Subscription to allow Observability interop tests full control of operators
+#
+OUTPUT=$(oc get subscription.apps.open-cluster-management.io -n policies openshift-plus-sub 2>/dev/null || true)
+if [[ "$OUTPUT" != "" ]]; then
+        oc get subscription.apps.open-cluster-management.io -n policies openshift-plus-sub -o yaml > /tmp/acm-policy-subscription-backup.yaml
+        oc delete subscription.apps.open-cluster-management.io -n policies openshift-plus-sub
+fi
+
 # run the test execution script
 bash +x ./execute_obs_interop_commands.sh || :
+
+#
+# Restore the ACM subscription
+#
+if [[ -f /tmp/acm-policy-subscription-backup.yaml ]]; then
+        oc apply -f /tmp/acm-policy-subscription-backup.yaml
+fi
 
 # Copy the test cases results to an external directory
 cp -r tests/pkg/tests $ARTIFACT_DIR/
