@@ -34,7 +34,7 @@ function leaseLookup () {
   echo "$lookup"
 }
 
-BASE_DOMAIN="${LEASED_RESOURCE}.ci"
+BASE_DOMAIN="phc-cicd.cis.ibm.net"
 CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 

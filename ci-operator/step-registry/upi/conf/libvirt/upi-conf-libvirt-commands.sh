@@ -38,7 +38,7 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]]; then
   exit 1
 fi
 
-BASE_DOMAIN="${LEASED_RESOURCE}.ci"
+BASE_DOMAIN="phc-cicd.cis.ibm.net"
 CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 
 # Default UPI installation
