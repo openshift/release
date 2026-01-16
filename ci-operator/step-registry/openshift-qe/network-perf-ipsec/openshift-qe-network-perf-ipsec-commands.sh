@@ -128,12 +128,22 @@ TAG_OPTION="--branch ${LATEST_TAG}"
 
 echo "Cloning e2e-benchmarking ${LATEST_TAG}..." | tee /tmp/ipsec-verification-artifacts/repo-clone.log
 
+# Try git first, but fall back to curl/wget if it fails
 if command -v git &> /dev/null; then
-    git clone $REPO_URL $TAG_OPTION --depth 1 >> /tmp/ipsec-verification-artifacts/repo-clone.log 2>&1
-    echo "Repository cloned successfully via git"
+    echo "Attempting git clone..." | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
+    if git clone $REPO_URL $TAG_OPTION --depth 1 >> /tmp/ipsec-verification-artifacts/repo-clone.log 2>&1; then
+        echo "Repository cloned successfully via git" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
+    else
+        echo "Git clone failed, trying alternative download methods..." | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
+        GIT_FAILED=true
+    fi
 else
-    echo "Git not available, trying alternative download methods..."
-    
+    echo "Git not available, trying alternative download methods..." | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
+    GIT_FAILED=true
+fi
+
+# If git failed or not available, use curl/wget
+if [ "$GIT_FAILED" = "true" ]; then
     # Try using curl to download and extract the repository
     ARCHIVE_URL="https://github.com/cloud-bulldozer/e2e-benchmarking/archive/refs/tags/${LATEST_TAG}.tar.gz"
     echo "Attempting to download ${ARCHIVE_URL}" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
