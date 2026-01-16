@@ -62,20 +62,6 @@ generate_nmstate_machineconfigs() {
   # Master node nmstate config (plain text, will be base64 encoded)
   if [ -z "${NMS_BREX_ASSET_CONF_MASTER:-}" ]; then
     local master_nmstate_config="interfaces:
-- name: bond0
-  type: bond
-  state: up
-  ipv4:
-    enabled: false
-  link-aggregation:
-    mode: active-backup
-    options:
-      miimon: '100'
-      primary: ${master_bond_port1}
-      primary_reselect: always
-    port:
-    - ${master_bond_port1}
-    - ${master_bond_port2}
 - name: br-ex
   type: ovs-bridge
   state: up
@@ -87,11 +73,11 @@ generate_nmstate_machineconfigs() {
     dhcp: false
   bridge:
     port:
-    - name: bond0
+    - name: ${master_bond_port1}
     - name: br-ex
 - name: br-ex
   type: ovs-interface
-  copy-mac-from: ${master_mac_from}
+  copy-mac-from: ${master_bond_port1}
   state: up
   ipv4:
     enabled: ${ipv4_enabled}
@@ -102,20 +88,6 @@ generate_nmstate_machineconfigs() {
 
     # Worker node nmstate config (plain text, will be base64 encoded)
     local worker_nmstate_config="interfaces:
-- name: bond0
-  type: bond
-  state: up
-  ipv4:
-    enabled: false
-  link-aggregation:
-    mode: active-backup
-    options:
-      miimon: '100'
-      primary: ${master_bond_port1}
-      primary_reselect: always
-    port:
-    - ${worker_bond_port1}
-    - ${worker_bond_port2}
 - name: br-ex
   type: ovs-bridge
   state: up
@@ -127,11 +99,11 @@ generate_nmstate_machineconfigs() {
     dhcp: false
   bridge:
     port:
-    - name: bond0
+    - name: ${master_bond_port1}
     - name: br-ex
 - name: br-ex
   type: ovs-interface
-  copy-mac-from: ${worker_mac_from}
+  copy-mac-from: ${master_bond_port1}
   state: up
   ipv4:
     enabled: ${ipv4_enabled}
@@ -246,9 +218,9 @@ EOF
   cat "${SHARED_DIR}/nmstate-network-config/ostest-master-0.yaml"
 
   echo "------------------ Setting network-config path --------------------"
-  echo "NETWORK_CONFIG_FOLDER=${SHARED_DIR}/nmstate-network-config" >> "${SHARED_DIR}/dev-scripts-additional-config"
+#  echo "NETWORK_CONFIG_FOLDER=${SHARED_DIR}/nmstate-network-config" >> "${SHARED_DIR}/dev-scripts-additional-config"
 }
 
 echo "NETWORK_TYPE=\"OVNKubernetes\"" >> "${SHARED_DIR}/dev-scripts-additional-config"
-echo "BOND_PRIMARY_INTERFACE=true" >> "${SHARED_DIR}/dev-scripts-additional-config"
+#echo "BOND_PRIMARY_INTERFACE=true" >> "${SHARED_DIR}/dev-scripts-additional-config"
 generate_nmstate_machineconfigs
