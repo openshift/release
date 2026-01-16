@@ -8,10 +8,11 @@ images:
 - dockerfile_literal: |
     FROM src
     RUN cat /etc/dnf/dnf.conf || true
+    RUN dnf clean all && dnf update -y
     RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
     RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
     RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
-    RUN dnf install -y azure-cli libicu
+    RUN dnf install -y azure-cli libicu && dnf clean all
     COPY /src /opt/app-root/src/github.com/Azure
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
     USER root
