@@ -549,7 +549,7 @@ echo "OCP Version: $ocp_version"
 ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
 ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
-if (( ocp_minor_version <= 18 && ocp_major_version == 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version <= 18 )); then
     patch_legcy_subnets ${install_dir1}/install-config.yaml ${subnet_1_priv}
     patch_legcy_subnets ${install_dir1}/install-config.yaml ${subnet_1_pub}
     patch_legcy_subnets ${install_dir2}/install-config.yaml ${subnet_2_priv}

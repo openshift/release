@@ -12,8 +12,10 @@ set -o pipefail
 EXIT_CODE=101
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ${ocp_minor_version} < 17 )); then
+
+if (( ocp_major_version == 4 && ocp_minor_version < 17 )); then
     echo "This step only supports to covert cluster into private one in day2 on 4.17+ currently!"
     exit 1
 fi

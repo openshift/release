@@ -55,7 +55,9 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 INFRA_ID=$(jq -r .infraID "${SHARED_DIR}"/metadata.json)
 RESOURCE_GROUP=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.resourceGroupName')
@@ -107,7 +109,7 @@ if [[ "${OUTBOUND_TYPE}" != "Loadbalancer" ]]; then
         echo "${subnets_json_array}" | jq -c '.[]' | while IFS= read -r item; do
             subnet_name=$(echo "${item}" | jq -r '.name')
             subnet_role=$(echo "${item}" | jq -r '.role')
-            if [[ "${subnet_role}" == "control-plane" ]] && (( ocp_minor_version >= 20 )); then
+            if [[ "${subnet_role}" == "control-plane" ]] && ( (( ocp_major_version == 4 && ocp_minor_version >= 20 )) || (( ocp_major_version > 4 )) ); then
                 echo "INFO: starting from 4.20, NAT gateways only attach on worker subnets, skip checking on master subnet!"
                 continue
             fi

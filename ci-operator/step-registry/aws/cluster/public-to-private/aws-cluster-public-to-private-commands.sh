@@ -34,7 +34,7 @@ echo "OCP Version: $ocp_version"
 ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
 ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
-if (( ocp_minor_version <= 11&& ocp_major_version == 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version <= 11 )); then
   echo "CPMS support for AWS was added in 4.12, the following step is not applicable for this OCP version, quit now."
   exit 1
 fi

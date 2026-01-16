@@ -149,8 +149,10 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ocp_minor_version < 11 )); then
+
+if (( ocp_major_version == 4 && ocp_minor_version < 11 )); then
     echo "vmNetworkingType checking is available on 4.11+, skip the check."
     exit 0
 fi

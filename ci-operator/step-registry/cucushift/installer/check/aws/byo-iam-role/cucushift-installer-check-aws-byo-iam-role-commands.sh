@@ -60,6 +60,7 @@ function has_shared_tags() {
 ret=0
 output=$(mktemp)
 
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
 echo "-------------------------------------------------------------"
@@ -144,7 +145,7 @@ if [[ ${expected_control_plane_role} != "" ]]; then
   # check role tag
   # for 4.16 and above, shared tag is attached to BYO-Role, see https://github.com/openshift/installer/pull/8688
   # for 4.15 and below, no tag is attached to BYO-Role
-  if ((ocp_minor_version >= 16)); then
+  if (( ocp_major_version == 4 && ocp_minor_version >= 16 )) || (( ocp_major_version > 4 )); then
     if ! has_shared_tags ${control_plane_role_output}; then
       echo "FAIL: tag check: No kubernetes.io/cluster/${INFRA_ID}:shared was found ${control_plane_role}"
       ret=$((ret + 1))
@@ -190,7 +191,7 @@ if [[ ${expected_compute_role} != "" ]]; then
   # check role tag
   # for 4.16 and above, shared tag is attached to BYO-Role, see https://github.com/openshift/installer/pull/8688
   # for 4.15 and below, no tag is attached to BYO-Role
-  if ((ocp_minor_version >= 16)); then
+  if (( ocp_major_version == 4 && ocp_minor_version >= 16 )) || (( ocp_major_version > 4 )); then
     if ! has_shared_tags ${compute_role_output}; then
       echo "FAIL: tag check: No kubernetes.io/cluster/${INFRA_ID}:shared was found ${compute_role}"
       ret=$((ret + 1))
