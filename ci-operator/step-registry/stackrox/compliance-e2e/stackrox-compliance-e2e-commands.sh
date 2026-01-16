@@ -27,6 +27,11 @@ function InstallYq() {
 }
 
 function MapTestsForComponentReadiness() {
+    # REQUIRED for Component Readiness (CR) compliance: Map test suite names in JUnit XML files.
+    # CR analyzes test results based on XML content and requires suite names to be changed
+    # (e.g., from "validation" to "ACS-lp-interop") for proper association and analysis.
+    # Missing or incorrect mapping results in missing CR dashboard data, indicating issues
+    # like provisioning failures or post-phase problems that prevent proper XML generation.
     typeset resultsFile="${1:-}"
 
     if [[ "${MAP_TESTS}" == "true" && -n "${resultsFile}" ]]; then
@@ -34,7 +39,11 @@ function MapTestsForComponentReadiness() {
             # Use /tmp/bin/yq since InstallYq was already called
             typeset yqCmd="/tmp/bin/yq"
             : "Mapping test suite name in: ${resultsFile}"
-            "${yqCmd}" eval -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' "${resultsFile}" || : "Warning: yq failed for ${resultsFile}"
+            # Try both XML structures: testsuites wrapper or single testsuite
+            # Array notation [] updates ALL test suites in the wrapper, ensuring complete mapping
+            "${yqCmd}" eval -ox -iI0 '.testsuites.testsuite[]."+@name" = "ACS-lp-interop"' "${resultsFile}" \
+                || "${yqCmd}" eval -ox -iI0 '.testsuite."+@name" = "ACS-lp-interop"' "${resultsFile}" \
+                || : "Warning: yq failed to map test suite name for ${resultsFile}" >&2
         fi
     fi
 
@@ -47,24 +56,64 @@ function CleanupCollect() {
     set +e
     
     if [[ "${MAP_TESTS}" == "true" ]]; then
-        InstallYq || : "Warning: yq installation failed, skipping test mapping"
+        InstallYq
 
-        typeset originalResults="${ARTIFACT_DIR}/original_results"
-        mkdir -p "${originalResults}" 2>/dev/null || true
-
-        # Keep a copy of all the original JUnit files
-        cp -r "${ARTIFACT_DIR}"/junit-* "${originalResults}" 2>/dev/null || : "Warning: couldn't copy original files"
-
-        # First, copy all XML files to SHARED_DIR (do this before yq processing)
-        # Process files in a single pass: copy first, then modify with yq
+        # Merge XML files into single file for Data Router Reporter step
+        #
+        # Purpose: Prepare JUnit XML files for Component Readiness (CR) and Data Router
+        # - CR needs test suite names mapped (done above with yq) to analyze test results
+        # - Data Router sends XML files from SHARED_DIR to Report Portal
+        #
+        # How it works:
+        # 1. Files are modified with yq to set test suite name (required for CR)
+        # 2. All XML files are merged into one file using junitparser
+        # 3. Merged file is copied to SHARED_DIR for Data Router Reporter step
+        #
+        # Why merge: Combining multiple XML files into one reduces Kubernetes secret overhead
+        # (each file becomes a secret), improving step transition performance and avoiding filename collisions
         typeset resultFile
+        typeset fileCount=0
+        typeset xmlFiles=()
+        
+        # Process all files with yq and collect file paths for merging
         while IFS= read -r -d '' resultFile; do
-            # Copy file to SHARED_DIR
-            cp -- "${resultFile}" "${SHARED_DIR}/$(basename "${resultFile}")" 2>/dev/null || : "Warning: couldn't copy ${resultFile} to SHARED_DIR"
-            
-            # Process with yq (can be interrupted without losing files)
+            # Process with yq (modifies file in-place in ARTIFACT_DIR to add test suite name)
             MapTestsForComponentReadiness "${resultFile}" 2>/dev/null || true
+            # Basic XML validation: check if file contains testsuite or testsuites element
+            if grep -qE '<(testsuite|testsuites)' "${resultFile}" 2>/dev/null; then
+                xmlFiles+=("${resultFile}")
+                ((fileCount++))
+            else
+                : "Warning: ${resultFile} does not appear to be a valid JUnit XML file, skipping" >&2
+            fi
         done < <(find "${ARTIFACT_DIR}" -type f -iname "*.xml" -print0 2>/dev/null || true)
+        
+        if [[ ${fileCount} -eq 0 ]]; then
+            : "Warning: No XML files found to process for Data Router" >&2
+        else
+            typeset mergedFile="${SHARED_DIR}/junit-compliance-e2e-merged.xml"
+            
+            # Try to use junitparser if available, or install it
+            if ! command -v junitparser >/dev/null 2>&1; then
+                # Try to install junitparser (non-blocking)
+                if command -v pip3 >/dev/null 2>&1 || command -v pip >/dev/null 2>&1; then
+                    : "Installing junitparser for XML merging..."
+                    (pip3 install --user junitparser 2>/dev/null || pip install --user junitparser 2>/dev/null) || true
+                    export PATH="${PATH}:${HOME}/.local/bin"
+                fi
+            fi
+            
+            # Merge files using junitparser
+            if command -v junitparser >/dev/null 2>&1; then
+                if junitparser merge "${xmlFiles[@]}" "${mergedFile}" 2>/dev/null; then
+                    : "Merged ${fileCount} XML file(s) into ${mergedFile} for Data Router Reporter"
+                else
+                    : "Warning: junitparser merge failed" >&2
+                fi
+            else
+                : "Warning: junitparser not available, cannot merge XML files" >&2
+            fi
+        fi
     fi
 
     true
