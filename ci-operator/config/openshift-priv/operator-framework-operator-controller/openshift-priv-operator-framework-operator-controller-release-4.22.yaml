@@ -182,6 +182,22 @@ tests:
       resources:
         requests:
           cpu: 100m
+- as: bindata-check
+  commands: |
+    # currently only focus on qe testdata because all qe cases are sharing the same bindata go file.
+    cd openshift/tests-extension
+    make bindata
+    ret=0 && git diff --quiet pkg/bindata/qe/bindata.go || ret=$?
+    if [ $ret -ne 0 ]; then
+        echo "bindata is not correct updated by your PR, please refer to the following and re-execute \"make bindata\" on your terminal and then update PR"
+        echo "---"
+        git diff pkg/bindata/qe/bindata.go || true
+        echo "---"
+        exit 1
+    fi
+  container:
+    from: src
+  run_if_changed: ^(openshift/tests-extension/test/qe/testdata/)
 - as: e2e-gcp-ovn-upgrade
   steps:
     cluster_profile: gcp
