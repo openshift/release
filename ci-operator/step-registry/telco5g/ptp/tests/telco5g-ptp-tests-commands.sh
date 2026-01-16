@@ -303,6 +303,12 @@ if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
   # release-4.18 consumer image supports event API v1
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:release-4.18"
   TEST_MODES=("dualnicbc" "dualnicbcha" "bc" "oc")
+
+  # DualNICBoundaryClockHA test mode is only supported from 4.16 onwards,
+  # so if the version is less than 4.16, remove it from the list
+  if [[ "$T5CI_VERSION" =~ 4.1[2-5] ]]; then
+    TEST_MODES=("${TEST_MODES[@]/dualnicbcha}")
+  fi
 else
   echo "Version is 4.19 or greater"
   export CONSUMER_IMG="quay.io/redhat-cne/cloud-event-consumer:latest"

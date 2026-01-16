@@ -159,60 +159,13 @@ tests:
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway
       TEST_FILE_NAME: junit.xml
-      TEST_SUITE: Istio Integration pilot
-      XDG_CACHE_HOME: /tmp/cache
+      TEST_SUITE: pilot
+      TEST_SUITE_DESC: Istio Integration pilot
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: integ-pilot-test-run
-      cli: latest
-      commands: |
-        cleanup() {
-          echo "Copying artifacts..."
-          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-
-          # share artifacts with next job step which is uploading results to report portal
-          echo "Copying artifacts to SHARED_DIR..."
-          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
-        }
-        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-ocp.sh \
-          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway'"
-        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6316
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      grace_period: 30m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 3h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-telemetry
   steps:
@@ -225,57 +178,11 @@ tests:
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
       TEST_FILE_NAME: junit.xml
-      TEST_SUITE: Istio Integration telemetry
-      XDG_CACHE_HOME: /tmp/cache
+      TEST_SUITE: telemetry
+      TEST_SUITE_DESC: Istio Integration telemetry
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: integ-telemetry-test-run
-      cli: latest
-      commands: |
-        cleanup() {
-          echo "Copying artifacts..."
-          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-          # share artifacts with next job step which is uploading results to report portal
-          echo "Copying artifacts to SHARED_DIR..."
-          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
-        }
-        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-ocp.sh \
-          telemetry"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      grace_period: 30m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 3h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-security
   steps:
@@ -288,125 +195,30 @@ tests:
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
       TEST_FILE_NAME: junit.xml
-      TEST_SUITE: Istio Integration security
-      XDG_CACHE_HOME: /tmp/cache
+      TEST_SUITE: security
+      TEST_SUITE_DESC: Istio Integration security
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: integ-security-test-run
-      cli: latest
-      commands: |
-        cleanup() {
-          echo "Copying artifacts..."
-          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-          # share artifacts with next job step which is uploading results to report portal
-          echo "Copying artifacts to SHARED_DIR..."
-          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
-        }
-        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-ocp.sh \
-          security"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      grace_period: 30m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 3h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-ambient
   steps:
     cluster_profile: ossm-aws
     env:
+      AMBIENT: "true"
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestTCPRoute|TestTLSRoute|TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy
       TEST_FILE_NAME: junit.xml
-      TEST_SUITE: Istio Integration ambient
-      XDG_CACHE_HOME: /tmp/cache
+      TEST_SUITE: ambient
+      TEST_SUITE_DESC: Istio Integration ambient
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: integ-ambient-test-run
-      cli: latest
-      commands: |
-        cleanup() {
-          echo "Copying artifacts..."
-          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-          # share artifacts with next job step which is uploading results to report portal
-          echo "Copying artifacts to SHARED_DIR..."
-          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
-        }
-        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          export AMBIENT="true" && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-ocp.sh \
-          ambient 'TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestTCPRoute|TestTLSRoute|TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy'"
-          # The following tests require experimental gateway API CRDs which are not available in OCP 4.19 and it's not possible to install them manually
-          # * TestTCPRoute|TestTLSRoute
-          # * TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy
-        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-8725
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      grace_period: 30m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 3h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-helm
   steps:
@@ -418,329 +230,95 @@ tests:
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestAmbientInstall|TestAmbientInstallMultiNamespace|TestCanaryUpgradeFromTwoMinorRelease|TestAmbientStableRevisionLabelsGatewayStatus|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease|TestZtunnelFromPreviousMinorRelease
       TEST_FILE_NAME: junit.xml
-      TEST_SUITE: Istio Integration helm
-      XDG_CACHE_HOME: /tmp/cache
+      TEST_SUITE: helm
+      TEST_SUITE_DESC: Istio Integration helm
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: integ-helm-test-run
-      cli: latest
-      commands: |
-        cleanup() {
-          echo "Copying artifacts..."
-          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-          # share artifacts with next job step which is uploading results to report portal
-          echo "Copying artifacts to SHARED_DIR..."
-          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
-        }
-        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" <<EOF
-          export KUBECONFIG=/work/ci-kubeconfig
-          oc version
-          export ARTIFACT_DIR="${ARTIFACT_DIR}"
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')"
-          export BUILD_WITH_CONTAINER="0"
-          export VARIANT=distroless
-          export GCP_REGISTRIES=" "
-          cd /work
-          entrypoint prow/integ-suite-ocp.sh helm 'TestAmbientInstall|TestAmbientInstallMultiNamespace|TestCanaryUpgradeFromTwoMinorRelease|TestAmbientStableRevisionLabelsGatewayStatus|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease|TestZtunnelFromPreviousMinorRelease'
-        EOF
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      grace_period: 30m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 3h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-sail-pilot
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      CONTROL_PLANE_SOURCE: sail
+      INSTALL_SAIL_OPERATOR: "true"
       INSTALLATION_METHOD: sail
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge|TestCNIRaceRepair|TestValidation|TestWebhook|TestMultiRevision|TestAnalysisWritesStatus|TestLocality|TestPreserveHTTPHeaderCaseConfiguration
       TEST_FILE_NAME: junit.xml
-      TEST_SUITE: Istio Integration pilot
-      XDG_CACHE_HOME: /tmp/cache
+      TEST_SUITE: pilot
+      TEST_SUITE_DESC: Istio Integration pilot
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: integ-sail-pilot-test-run
-      cli: latest
-      commands: |
-        cleanup() {
-          echo "Copying artifacts..."
-          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-          # share artifacts with next job step which is uploading results to report portal
-          echo "Copying artifacts to SHARED_DIR..."
-          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
-        }
-        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          export CONTROL_PLANE_SOURCE=sail && \
-          export INSTALL_SAIL_OPERATOR=true && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-ocp.sh \
-          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge|TestCNIRaceRepair|TestValidation|TestWebhook|TestMultiRevision|TestAnalysisWritesStatus|TestLocality|TestPreserveHTTPHeaderCaseConfiguration'"
-        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-9328
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      grace_period: 30m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 3h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-sail-telemetry
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      CONTROL_PLANE_SOURCE: sail
+      INSTALL_SAIL_OPERATOR: "true"
       INSTALLATION_METHOD: sail
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestDashboard/pilot-dashboard.json|TestProxyTracingOpenTelemetryProvider/grpc_exporter_with_auth|TestGatewayTracing|TestClientTracing|TestServerTracing|TestProxyTracingOpenTelemetryProvider
       TEST_FILE_NAME: junit.xml
-      TEST_SUITE: Istio Integration telemetry
-      XDG_CACHE_HOME: /tmp/cache
+      TEST_SUITE: telemetry
+      TEST_SUITE_DESC: Istio Integration telemetry
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: integ-sail-telemetry-test-run
-      cli: latest
-      commands: |
-        cleanup() {
-          echo "Copying artifacts..."
-          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-          # share artifacts with next job step which is uploading results to report portal
-          echo "Copying artifacts to SHARED_DIR..."
-          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
-        }
-        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          export CONTROL_PLANE_SOURCE=sail && \
-          export INSTALL_SAIL_OPERATOR=true && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-ocp.sh \
-          telemetry 'TestDashboard/pilot-dashboard.json|TestProxyTracingOpenTelemetryProvider/grpc_exporter_with_auth|TestGatewayTracing|TestClientTracing|TestServerTracing|TestProxyTracingOpenTelemetryProvider'"
-        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-10481
-        # Enable the "TestProxyTracingOpenTelemetryProvider" once https://github.com/istio/istio/pull/58494 and https://github.com/istio/istio/pull/58530 merged.
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      grace_period: 30m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 3h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-sail-security
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      CONTROL_PLANE_SOURCE: sail
+      INSTALL_SAIL_OPERATOR: "true"
       INSTALLATION_METHOD: sail
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_SUITES: external_ca|file_mounted_certs|policy_attachment_only
+      SKIPPED_TESTS: TestAuthz_CustomServer|TestGatewayAPIRequestAuthentication|TestMultiMtlsGateway|TestMultiTlsGateway|TestNormalization|TestEgressGatewayTls/Mutual_TLS_origination_from_egress_gateway_to_https_endpoint|TestEgressGatewayTls/SIMPLE_TLS_origination_from_egress_gateway_to_https_endpoint|TestPluggedInCACRL|TestTlsGatewaysWithQUIC|TestMtlsGatewaysWithQUIC
       TEST_FILE_NAME: junit.xml
-      TEST_SUITE: Istio Integration security
-      XDG_CACHE_HOME: /tmp/cache
+      TEST_SUITE: security
+      TEST_SUITE_DESC: Istio Integration security
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: integ-sail-security-test-run
-      cli: latest
-      commands: |
-        cleanup() {
-          echo "Copying artifacts..."
-          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-          # share artifacts with next job step which is uploading results to report portal
-          echo "Copying artifacts to SHARED_DIR..."
-          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
-        }
-        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          export CONTROL_PLANE_SOURCE=sail && \
-          export INSTALL_SAIL_OPERATOR=true && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-ocp.sh \
-          security 'TestAuthz_CustomServer|TestGatewayAPIRequestAuthentication|TestMultiMtlsGateway|TestMultiTlsGateway|TestNormalization|TestEgressGatewayTls/Mutual_TLS_origination_from_egress_gateway_to_https_endpoint|TestEgressGatewayTls/SIMPLE_TLS_origination_from_egress_gateway_to_https_endpoint|TestPluggedInCACRL|TestTlsGatewaysWithQUIC|TestMtlsGatewaysWithQUIC' 'external_ca|file_mounted_certs|policy_attachment_only'"
-          # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-9613
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      grace_period: 30m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 3h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-sail-ambient
   steps:
     cluster_profile: ossm-aws
     env:
+      AMBIENT: "true"
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      CONTROL_PLANE_SOURCE: sail
+      INSTALL_SAIL_OPERATOR: "true"
       INSTALLATION_METHOD: sail
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestAuthorizationGateway|TestTrafficWithEstablishedPodsIfCNIMissing|TestTaintsRemoved|TestTrafficWithCNIRepair|TestTCPRoute|TestTLSRoute|TestWaypointChanges|TestServiceEntryInlinedWorkloadEntry|TestServiceEntrySelectsWorkloadEntry|TestZtunnelRestart|TestZtunnelConfig|TestZtunnelSecureMetrics|TestCrossNamespaceWaypoint|TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy|TestWaypointAsEgressGatewayForWildcardEntries
       TEST_FILE_NAME: junit.xml
-      TEST_SUITE: Istio Integration ambient
-      XDG_CACHE_HOME: /tmp/cache
+      TEST_SUITE: ambient
+      TEST_SUITE_DESC: Istio Integration ambient
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: integ-sail-ambient-test-run
-      cli: latest
-      commands: |
-        cleanup() {
-          echo "Copying artifacts..."
-          oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-          # share artifacts with next job step which is uploading results to report portal
-          echo "Copying artifacts to SHARED_DIR after..."
-          cp "${ARTIFACT_DIR}/junit/"* "${SHARED_DIR}"
-        }
-        trap cleanup EXIT  # Ensure cleanup always runs when the script exits
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          export CONTROL_PLANE_SOURCE=sail && \
-          export INSTALL_SAIL_OPERATOR=true && \
-          export AMBIENT="true" && \
-          export TRUSTED_ZTUNNEL_NAMESPACE="ztunnel" && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-ocp.sh \
-          ambient 'TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestAuthorizationGateway|TestTrafficWithEstablishedPodsIfCNIMissing|TestTaintsRemoved|TestTrafficWithCNIRepair|TestTCPRoute|TestTLSRoute|TestWaypointChanges|TestServiceEntryInlinedWorkloadEntry|TestServiceEntrySelectsWorkloadEntry|TestZtunnelRestart|TestZtunnelConfig|TestZtunnelSecureMetrics|TestCrossNamespaceWaypoint|TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy|TestWaypointAsEgressGatewayForWildcardEntries'"
-          # The following tests require experimental gateway API CRDs which are not available in OCP 4.19 and it's not possible to install them manually
-          # * TestTCPRoute|TestTLSRoute
-          # * TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy
-          # Enable the "TestWaypointAsEgressGatewayForWildcardEntries" test once https://issues.redhat.com/browse/OSSM-11389 is fixed.
-        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-10011
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      grace_period: 30m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 3h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 zz_generated_metadata:
   branch: master

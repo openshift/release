@@ -204,18 +204,16 @@ ORIGINAL_HELM="__ORIGINAL_HELM__"
 # Check if this is an install/upgrade command for cost-onprem specifically
 if [[ "$*" == *"cost-onprem"* ]] && { [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"install"* ]]; }; then
     echo "[helm-wrapper] Detected cost-onprem chart - injecting MinIO storage configuration..."
-    # IMPORTANT: Do NOT set global.storageType=minio as that changes isOpenShift detection
-    # which breaks security contexts (runAsUser: 1000 not allowed on OpenShift)
-    #
+    # IMPORTANT: Do NOT set global.storageType=minio as that breaks OpenShift security contexts
+    # Instead, set odf.endpoint explicitly - the chart should skip NooBaa lookup when endpoint is provided
     # We use a proxy service (minio-storage) in the app namespace that routes to MinIO.
-    # - odf.endpoint = minio-storage (just hostname)
-    # - odf.port = 9000
     echo "[helm-wrapper] Using MinIO host: ${MINIO_HOST:-minio-storage}, port: ${MINIO_PORT:-9000}"
     exec "$ORIGINAL_HELM" "$@" \
         --set "odf.endpoint=${MINIO_HOST:-minio-storage}" \
         --set "odf.port=${MINIO_PORT:-9000}" \
         --set "odf.useSSL=false" \
-        --set "odf.bucket=${MINIO_BUCKET:-ros-data}"
+        --set "odf.bucket=${MINIO_BUCKET:-ros-data}" \
+        --set "odf.skipLookup=true"
 else
     # For all other helm commands (repo add, strimzi install, etc.), pass through unchanged
     exec "$ORIGINAL_HELM" "$@"
@@ -233,6 +231,26 @@ ln -sf "${HELM_WRAPPER}" /tmp/helm
 echo "Helm wrapper installed at /tmp/helm"
 echo "Original helm binary: ${ORIGINAL_HELM}"
 echo "MinIO storage type will be injected for cost-onprem chart only"
+
+# Ensure /tmp is at the front of PATH so our wrapper is found first
+export PATH="/tmp:${PATH}"
+echo "PATH updated: /tmp is now first in PATH"
+echo "helm resolves to: $(command -v helm)"
+
+echo "========== Configuring OpenShift SecurityContextConstraints =========="
+# Grant anyuid SCC to allow pods to run with runAsUser: 1000 when using storageType=minio
+# This is needed because the chart uses Kubernetes-style security contexts with minio
+NAMESPACE="${NAMESPACE:-cost-onprem}"
+echo "Granting anyuid SCC to service accounts in namespace: ${NAMESPACE}"
+
+# Create namespace if it doesn't exist
+oc create namespace "${NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+
+# Grant anyuid SCC to default and cost-onprem service accounts
+oc adm policy add-scc-to-user anyuid -z default -n "${NAMESPACE}" || true
+oc adm policy add-scc-to-user anyuid -z cost-onprem -n "${NAMESPACE}" || true
+
+echo "SecurityContextConstraints configured"
 
 echo "========== Running E2E Tests =========="
 

@@ -51,7 +51,7 @@ def _add_osd_rc_route(gendoc):
             'host': f'{context.rc_app_url}',
             'tls': {
                 'insecureEdgeTerminationPolicy': 'Redirect',
-                'termination': 'Reencrypt' if context.private else 'Edge'
+                'termination': 'reencrypt' if context.private else 'edge'
             },
             'to': {
                 'kind': 'Service',
