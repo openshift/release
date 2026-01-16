@@ -18,7 +18,7 @@ check_e2e_flag() {
   return $?
 }
 
-OCP_IMAGE_LATEST="4.18.0-0-2026-01-16-020919-test-ci-ln-bdwhqjt-latest"
+OCP_IMAGE_LATEST="registry.build10.ci.openshift.org/ci-ln-bdwhqjt/release:latest"
 REQUEST_SERVING_COMPONENT_TEST="${REQUEST_SERVING_COMPONENT_TEST:-}"
 REQUEST_SERVING_COMPONENT_PARAMS=""
 
