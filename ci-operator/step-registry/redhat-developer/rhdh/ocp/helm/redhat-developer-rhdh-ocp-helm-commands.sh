@@ -163,7 +163,7 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
 else
     echo "Waiting for Docker image availability..."
     # Timeout configuration for waiting for Docker image availability
-    MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
+    MAX_WAIT_TIME_SECONDS=$((80*60))    # Maximum wait time: 1 hour 20 minutes
     POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
 
     ELAPSED_TIME=0
