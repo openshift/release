@@ -856,7 +856,7 @@ do
   ret="$?"
   echo "Installer exit with code $ret"
   echo "Debug by Jinyun"
-  sleep 3600
+  sleep 1800
 
   tries=$((tries+1))
 done
