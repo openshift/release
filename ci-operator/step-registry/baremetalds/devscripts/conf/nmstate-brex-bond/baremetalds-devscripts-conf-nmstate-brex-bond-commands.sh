@@ -72,6 +72,9 @@ generate_nmstate_machineconfigs() {
     enabled: false
     dhcp: false
   bridge:
+    allow-extra-patch-ports: true
+    options:
+      mcast-snooping-enable: true
     port:
     - name: ${master_bond_port1}
     - name: br-ex
@@ -98,6 +101,9 @@ generate_nmstate_machineconfigs() {
     enabled: false
     dhcp: false
   bridge:
+    allow-extra-patch-ports: true
+    options:
+      mcast-snooping-enable: true
     port:
     - name: ${master_bond_port1}
     - name: br-ex
