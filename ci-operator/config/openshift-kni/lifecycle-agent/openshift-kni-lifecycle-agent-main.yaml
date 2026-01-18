@@ -157,6 +157,23 @@ tests:
       SEED_IMAGE_TAG_FORMAT: presubmit
       SEED_IMAGE_TAG_PREFIX: ibi
     workflow: openshift-image-based-install
+- as: ipc-e2e-flow
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+  steps:
+    cluster_profile: aws-5
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: lifecycle-agent-operator
+      OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
+      RECERT_IMAGE: pipeline:recert
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-network-configuration
 - as: security
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
