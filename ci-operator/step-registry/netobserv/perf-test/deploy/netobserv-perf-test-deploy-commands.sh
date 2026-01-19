@@ -84,6 +84,8 @@ fi
 opm --help
 NOO_BUNDLE_INFO=$(scripts/build_info.sh)
 
+MODEL=$(oc get flowcollector cluster -o jsonpath='{.spec.deploymentModel}')
+
 # Build metadata JSON conditionally
 LOKI_VERSION_JSON=""
 if [[ -n ${LOKI_RELEASE:-} ]]; then
@@ -95,7 +97,12 @@ if [[ -n ${KAFKA_RELEASE:-} ]]; then
     KAFKA_VERSION_JSON=", \"kafka_version\": \"$KAFKA_RELEASE\""
 fi
 
-export METADATA="{\"release\": \"$NETOBSERV_RELEASE\"${LOKI_VERSION_JSON}${KAFKA_VERSION_JSON}, \"noo_bundle_info\":\"$NOO_BUNDLE_INFO\"}"
+DEPLOYMENT_MODEL_JSON=""
+if [[ -n ${MODEL:-} ]]; then
+    DEPLOYMENT_MODEL_JSON=", \"deployment_model\": \"$MODEL\""
+fi
+
+export METADATA="{\"release\": \"$NETOBSERV_RELEASE\"${LOKI_VERSION_JSON}${KAFKA_VERSION_JSON}${DEPLOYMENT_MODEL_JSON}, \"noo_bundle_info\":\"$NOO_BUNDLE_INFO\"}"
 
 echo "$METADATA" >> "$SHARED_DIR/additional_params.json"
 cp "$SHARED_DIR/additional_params.json" "$ARTIFACT_DIR/additional_params.json"
