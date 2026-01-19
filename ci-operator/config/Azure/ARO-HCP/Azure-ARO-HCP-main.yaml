@@ -89,6 +89,18 @@ images:
         mv prometheus-3.2.1.linux-amd64/promtool /usr/local/bin/promtool && \
         chmod +x /usr/local/bin/promtool && \
         rm -rf prometheus-3.2.1.linux-amd64
+    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
+    RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
+    RUN dnf install -y azure-cli libicu
+    RUN az bicep install
+    # Move bicep to a system-wide location
+    RUN mv /root/.azure/bin/bicep /usr/local/bin/bicep
+    RUN dnf install -y wget
+    RUN curl -sfLo /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.44.1/yq_linux_amd64 && \
+        chmod +x /usr/local/bin/yq
+    # Install Python for grafana tests
+    RUN dnf install -y python3 python3-pip
+    RUN pip3 install black
   from: aro-hcp-e2e-base-image
   inputs:
     src:
@@ -139,14 +151,33 @@ tests:
   steps:
     test:
     - ref: aro-hcp-mega-lint
-- always_run: true
+- as: observability-prometheus
+  run_if_changed: ^observability/(alerts|prometheus)/
+  steps:
+    test:
+    - ref: aro-hcp-observability-prometheus
+- as: observability-grafana
+  run_if_changed: ^observability/grafana/
+  steps:
+    test:
+    - ref: aro-hcp-observability-grafana
+- always_run: false
   as: frontend-simulation
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  optional: true
+  steps:
+    test:
+    - ref: aro-hcp-frontend-run-integration-tests
+- always_run: true
+  as: integration
   capabilities:
   - nested-podman
   nested_podman: true
   steps:
     test:
-    - ref: aro-hcp-frontend-run-simulation-tests
+    - ref: aro-hcp-frontend-run-integration-tests
 - always_run: false
   as: integration-e2e-parallel
   optional: true

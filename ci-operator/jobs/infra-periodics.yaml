@@ -765,6 +765,7 @@ periodics:
         --query=org:openshift
         comments:<2500
         repo:operator-framework/operator-sdk
+        repo:openshift-eng/ai-helpers
         -label:lifecycle/frozen
         -label:tide/merge-blocker
         label:lifecycle/rotten
@@ -856,6 +857,7 @@ periodics:
         --query=org:openshift
         comments:<2500
         repo:operator-framework/operator-sdk
+        repo:openshift-eng/ai-helpers
         -label:tide/merge-blocker
         -label:lifecycle/frozen
         label:lifecycle/stale
@@ -955,6 +957,7 @@ periodics:
         --query=org:openshift
         comments:<2500
         repo:operator-framework/operator-sdk
+        repo:openshift-eng/ai-helpers
         -label:lifecycle/frozen
         -label:lifecycle/stale
         -label:lifecycle/rotten
@@ -1115,7 +1118,7 @@ periodics:
       - --config=core-services/prow/02_config/_release-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260112-782d8a7cf
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260113-898377d8b
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1150,7 +1153,7 @@ periodics:
       - --config=../release/core-services/prow/02_config/_ci-tools-bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260112-782d8a7cf
+      image: us-docker.pkg.dev/k8s-infra-prow/images/generic-autobumper:v20260113-898377d8b
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1492,7 +1495,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260112-782d8a7cf
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260113-898377d8b
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1549,7 +1552,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260112-782d8a7cf
+      image: us-docker.pkg.dev/k8s-infra-prow/images/branchprotector:v20260113-898377d8b
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1640,7 +1643,7 @@ periodics:
           --github-hourly-tokens=600 \
           --github-allowed-burst=600 \
           --allow-repo-archival
-      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260112-782d8a7cf
+      image: us-docker.pkg.dev/k8s-infra-prow/images/peribolos:v20260113-898377d8b
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1709,7 +1712,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260112-782d8a7cf
+      image: us-docker.pkg.dev/k8s-infra-prow/images/config-bootstrapper:v20260113-898377d8b
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2218,7 +2221,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260112-782d8a7cf
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260113-898377d8b
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2250,7 +2253,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260112-782d8a7cf
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260113-898377d8b
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2282,7 +2285,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260112-782d8a7cf
+      image: us-docker.pkg.dev/k8s-infra-prow/images/invitations-accepter:v20260113-898377d8b
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2946,6 +2949,12 @@ periodics:
         --leeway $leeway_percent \
         --google-service-account-credential-file /etc/bigquery/token
 
+        echo "Updating tests data"
+        /usr/bin/job-run-aggregator analyze-historical-data \
+        --output-file ./pkg/test/ginkgo/test_summaries.json \
+        --data-type tests \
+        --google-service-account-credential-file /etc/bigquery/token
+
         mv pr_message.md /var/tmp/
 
         extra_flag=""
@@ -3068,7 +3077,7 @@ periodics:
       kubernetes.io/arch: amd64
     serviceAccountName: mabc-updater
 - agent: kubernetes
-  cluster: build02
+  cluster: app.ci
   cron: '@yearly'
   decorate: true
   labels:

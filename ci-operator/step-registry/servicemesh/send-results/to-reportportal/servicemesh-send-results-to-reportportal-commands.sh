@@ -13,6 +13,15 @@ get_job_url() {
   echo "${job_complete_url}"
 }
 
+ignore_errors() {
+  if [ $? -ne 0 ]
+  then
+    echo "Warning: test results were not uploaded to report portal!!!"
+  fi
+
+  exit 0
+}
+
 # run the upload only if explicitly configured
 if [ "${REPORT_TO_REPORT_PORTAL}" != "true" ]
 then
@@ -90,4 +99,7 @@ export EXTRA_ATTRIBUTES="[{\"key\": \"ocp_cluster_arch\", \"value\": \"${ocp_arc
 
 validate_environment
 set_defaults
+# do not fail whole job on report portal errors
+trap ignore_errors EXIT
 send_results
+
