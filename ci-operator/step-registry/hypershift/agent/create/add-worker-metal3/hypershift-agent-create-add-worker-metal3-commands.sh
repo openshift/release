@@ -17,6 +17,24 @@ fi
 function gather() {
   oc get InfraEnv -n ${AGENT_NAMESPACE} ${CLUSTER_NAME} -o yaml > "${ARTIFACT_DIR}/InfraEnv.yaml"
   oc get BareMetalHost -n ${AGENT_NAMESPACE} -o yaml > "${ARTIFACT_DIR}/extra_baremetalhosts.yaml"
+
+  local match="ip='[^']*\."
+  if [[ ${IP_STACK:-} =~ ^v6$ ]]; then
+    # Use IPv6 address pattern
+    match="ip='[^']*:'"
+  fi
+
+  # Dump the network configuration
+  ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- << 'EOF' > /tmp/net-dump.xml
+/usr/bin/virsh net-dumpxml ostestbm
+EOF
+
+  # Get the list of worker IPs and check the systemd status of each worker
+  while read -r worker_ip; do
+    ssh "${SSHOPTS[@]}" "root@${IP}" bash -sx -- << 'EOF' > "${ARTIFACT_DIR}/worker-${worker_ip}-systemctl-failed.txt"
+ssh core@${worker_ip} systemctl --failed
+EOF
+  done < <(grep extraworker /tmp/net-dump.xml | grep "$match" | sed -n "s/.*ip='\([^']*\)'.*/\1/p")
 }
 
 trap gather EXIT
