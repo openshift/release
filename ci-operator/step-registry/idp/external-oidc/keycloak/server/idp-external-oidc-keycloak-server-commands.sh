@@ -16,23 +16,25 @@ function set_proxy () {
 
 function setup_keycloak () {
     oc create ns keycloak
-    KEYCLOAK_ADMIN_TEST_USER="admin-$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 6 | head -n 1 || true)"
-    KEYCLOAK_ADMIN_TEST_PASSWORD="$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true)"
-    oc process -n keycloak -f https://raw.githubusercontent.com/keycloak/keycloak-quickstarts/latest/openshift/keycloak.yaml \
-        -p KEYCLOAK_ADMIN="$KEYCLOAK_ADMIN_TEST_USER" -p KEYCLOAK_ADMIN_PASSWORD="$KEYCLOAK_ADMIN_TEST_PASSWORD" \
-        -p NAMESPACE=keycloak \
-        | sed -e 's/KEYCLOAK_ADMIN_PASSWORD/KC_BOOTSTRAP_ADMIN_PASSWORD/g' -e 's/KEYCLOAK_ADMIN\b/KC_BOOTSTRAP_ADMIN_USERNAME/g' \
-        | oc create -n keycloak -f -
+    KC_BOOTSTRAP_ADMIN_USERNAME="admin-$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 6 | head -n 1 || true)"
+    KC_BOOTSTRAP_ADMIN_PASSWORD="$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true)"
+    # For the "sed":
+    # 1. For now, the DB pod's data isn't configured persistent. If the DB pod is restarted, the keycloak pod will have problem.
+    # So, we do not use DB in keycloak by removing the KC_DB* env vars. Keycloak pod will use "postStart" for data.
+    # 2. We don't use multiple keycloak pods given no persistent data, otherwise the different keycloak instances will have
+    # inconsistent trust data when issuing id_token, which will cause oc commands on behalf of the logged in keycloak user fail
+    # if the id_token issuing traffic is from keycloak instance 1 while the id_token validation traffic may go to keycloak instance 2
+    curl -sS https://raw.githubusercontent.com/keycloak/keycloak-quickstarts/refs/heads/main/kubernetes/keycloak.yaml \
+        | sed -e "/- name: .*KC_DB/, +1 d" -e "s/replicas: .*/replicas: 1/" | oc create -n keycloak -f -
+    oc delete deployment/postgres -n keycloak --ignore-not-found
+    oc set env sts/keycloak KC_BOOTSTRAP_ADMIN_USERNAME=$KC_BOOTSTRAP_ADMIN_USERNAME KC_BOOTSTRAP_ADMIN_PASSWORD=$KC_BOOTSTRAP_ADMIN_PASSWORD -n keycloak
+
+    oc create route edge keycloak --service=keycloak -n keycloak
     KEYCLOAK_HOST=https://$(oc get -n keycloak route keycloak --template='{{ .spec.host }}')
-
-    # Once https://github.com/keycloak/keycloak-quickstarts/pull/682 merges, change "dc/keycloak" to "deployment/keycloak"
-    # KC_HOSTNAME is needed for keycloak 26.0.0+ ( https://github.com/keycloak/keycloak-quickstarts/issues/641#issuecomment-2659164943 )
-    oc set env -n keycloak dc/keycloak -e KC_HOSTNAME=$KEYCLOAK_HOST
-
     # If the cluster has control plane nodes, schedule the keycloak server onto those nodes where the keycloak
     # server pods are less likely frequently drained/restarted in case worker nodes are spot instances
-    if oc get node -l node-role.kubernetes.io/control-plane | grep -q Ready; then
-        oc patch dc/keycloak -n keycloak -p="
+    if oc get node | grep control-plane > /dev/null; then
+        oc patch sts/keycloak -n keycloak -p="
 spec:
   template:
     spec:
@@ -51,10 +53,10 @@ spec:
     oc create configmap setup-script -n keycloak --from-file=/tmp/.keycloak/client-oc-cli-test.json \
         --from-file=/tmp/.keycloak/client-console-test.json --from-file=/tmp/.keycloak/groupmapper-for-clients.json \
         --from-literal=testusers="$users" --from-file=/tmp/.keycloak/setup-script.sh
-    oc set volumes dc/keycloak -n keycloak --add --type=configmap --configmap-name=setup-script --mount-path=/tmp/.keycloak
+    oc set volumes sts/keycloak -n keycloak --add --type=configmap --configmap-name=setup-script --mount-path=/tmp/.keycloak
 
     # In future, investigate how to use PVC instead of "postStart"
-    oc patch dc/keycloak -n keycloak -p="
+    oc patch sts/keycloak -n keycloak -p="
 spec:
   template:
     spec:
@@ -72,13 +74,26 @@ spec:
 "
 
     echo "Wait the Keycloak server to be running up ..."
-    if ! oc wait dc/keycloak --for=condition=Available -n keycloak --timeout=400s; then
-        oc get po -n keycloak
-        exit 1
-    fi
-    oc get po -n keycloak
+    # Due to above oc set/patch, the pod's revisions might be changing quickly
+    # It is observed that using simple "sleep 2m; oc wait ..." is not enough, after which the pod might still be Running in
+    # an outdated revision and then transit to Terminating again to roll out to the final revision. So using a loop to check
+    sleep 60
+    timeout 10m bash -c 'while true; do
+        if oc wait pod/keycloak-0 --for=condition=Ready -n keycloak --timeout=400s; then
+            oc get po -n keycloak -L controller-revision-hash
+	    R1=$(oc get sts/keycloak -n keycloak -o=jsonpath="{.status.updateRevision}")
+	    R2=$(oc get po/keycloak-0 -n keycloak -o=jsonpath="{.metadata.labels.controller-revision-hash}")
+            if [ "$R2" == "$R1" ]; then
+                break
+	    fi
+            sleep 20
+        fi
+    done
+    ' || {  echo "Timeout waiting the Keycloak server to be running up"; exit 1; }
+
+    oc get po -n keycloak -L controller-revision-hash
     echo "Keycloak setup logs:"
-    oc rsh -n keycloak dc/keycloak cat /tmp/postStart.log |& tee /tmp/postStart.log
+    oc rsh -n keycloak sts/keycloak cat /tmp/postStart.log |& tee /tmp/postStart.log
     if ! grep -q "Keycloak setup done" /tmp/postStart.log; then
         echo "Keycloak setup not done!"
         exit 1
@@ -96,7 +111,7 @@ spec:
     fi
 
     # The tested / supported version will need to be filled in the tested configurations google doc for each OCP new release
-    oc rsh -n keycloak dc/keycloak cat /opt/keycloak/version.txt
+    oc rsh -n keycloak sts/keycloak cat /opt/keycloak/version.txt
 
     ISSUER_URL=$KEYCLOAK_HOST/realms/master
     CONSOLE_CLIENT_ID=console-test
