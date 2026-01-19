@@ -35,8 +35,7 @@ images:
   to: cluster-capi-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.21-priv
+  - name: 4.21-priv
     namespace: ocp-private
 releases:
   initial:
@@ -86,20 +85,20 @@ tests:
     from: src
 - always_run: false
   as: e2e-aws-ovn
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-serial
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   shard_count: 2
   steps:
     cluster_profile: aws-5
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-aws-ovn-techpreview
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: aws-5
     env:
@@ -107,7 +106,7 @@ tests:
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-aws-ovn-techpreview-upgrade
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: aws-2
     env:
@@ -115,7 +114,7 @@ tests:
     workflow: openshift-e2e-aws-upgrade
 - always_run: false
   as: e2e-aws-capi-techpreview
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: aws-5
     env:
@@ -130,10 +129,11 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-gcp-ovn-techpreview
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: gcp
     env:
@@ -141,7 +141,7 @@ tests:
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-gcp-capi-techpreview
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: gcp
     env:
@@ -156,7 +156,7 @@ tests:
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-openstack-ovn-techpreview
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -166,14 +166,14 @@ tests:
     workflow: openshift-e2e-openstack-ipi
 - always_run: false
   as: e2e-openstack-capi-techpreview
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: openstack-vexxhost
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: test
-      commands: hack/e2e-openstack.sh
+      commands: make e2e
       from: src
       resources:
         requests:
@@ -182,7 +182,7 @@ tests:
 - always_run: false
   as: e2e-azure-ovn-techpreview
   optional: true
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: azure4
     env:
@@ -190,7 +190,7 @@ tests:
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-azure-ovn-techpreview-upgrade
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: azure4
     env:
@@ -198,9 +198,9 @@ tests:
     workflow: openshift-e2e-azure-upgrade
 - always_run: false
   as: e2e-azure-capi-techpreview
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     test:
@@ -213,7 +213,7 @@ tests:
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-vsphere-capi-techpreview
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: vsphere-elastic
     env:
@@ -231,7 +231,7 @@ tests:
   capabilities:
   - intranet
   optional: true
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -252,7 +252,7 @@ tests:
 - always_run: false
   as: regression-clusterinfra-aws-ipi-techpreview-capi
   optional: true
-  pipeline_run_if_changed: (^|/)(Makefile|GNUmakefile)(\..*)?$|\.mk$|\.go$|\.sh$|^go\.mod$|^go\.sum$|(^|/)vendor/
+  pipeline_skip_if_only_changed: \.md$|(^|/)docs/|(^|/)LICENSE$|(^|/)manifests-gen/|(^|/)OWNERS$
   steps:
     cluster_profile: aws-2
     env:
@@ -263,7 +263,6 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-regression
     workflow: cucushift-installer-rehearse-aws-ipi
-  timeout: 7h0m0s
 - as: verify-deps
   steps:
     env:

@@ -82,6 +82,10 @@ releases:
     release:
       channel: fast
       version: "4.19"
+  latest-4-20:
+    release:
+      channel: fast
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -226,6 +230,49 @@ tests:
     dependencies:
       DAEMONSET_IMAGE: das-daemonset
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-19
+      OPERATOR_IMAGE: instaslice-operator
+      SCHEDULER_IMAGE: das-scheduler
+      WEBHOOK_IMAGE: das-webhook
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: a2-highgpu-1g
+      COMPUTE_ON_HOST_MAINTENANCE: Terminate
+      COMPUTE_ZONES: '[us-central1-f]'
+      EMULATED_MODE: disabled
+      IMAGE_REGISTRY: pipeline
+      IMAGE_TAG: e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-gcp-zones
+    - ref: ipi-conf-gcp-confidential-computing
+    - ref: openshift-manifests-runc
+    - ref: ovn-conf
+    - chain: ipi-install
+    test:
+    - ref: openshift-instaslice-operator-e2e-bundle-next-setup
+    - as: run-sdk
+      cli: latest
+      commands: |
+        operator-sdk run bundle -n das-operator "$OO_BUNDLE" --timeout 10m0s
+      dependencies:
+      - env: OO_BUNDLE
+        name: das-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-instaslice-operator-e2e-bundle-next-run-e2e
+- always_run: true
+  as: e2e-bundle-4-20-runc
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      DAEMONSET_IMAGE: das-daemonset
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-4-20
       OPERATOR_IMAGE: instaslice-operator
       SCHEDULER_IMAGE: das-scheduler
       WEBHOOK_IMAGE: das-webhook

@@ -257,6 +257,20 @@ if [ -f "${NODE_TUNING_YAML}" ]; then
   cp ${NODE_TUNING_YAML} "${INSTALL_DIR}/manifests"
 fi
 
+# Sets up the chrony machineconfig for the worker nodes
+CHRONY_WORKER_YAML="${SHARED_DIR}/99-chrony-worker.yaml"
+if [ -f "${CHRONY_WORKER_YAML}" ]; then
+  echo "Saving ${CHRONY_WORKER_YAML} to the install directory..."
+  cp ${CHRONY_WORKER_YAML} "${INSTALL_DIR}/manifests"
+fi
+
+# Sets up the chrony machineconfig for the master nodes
+CHRONY_MASTER_YAML="${SHARED_DIR}/99-chrony-master.yaml"
+if [ -f "${CHRONY_MASTER_YAML}" ]; then
+  echo "Saving ${CHRONY_MASTER_YAML} to the install directory..."
+  cp ${CHRONY_MASTER_YAML} "${INSTALL_DIR}/manifests"
+fi
+
 # Check for the etcd on ramdisk yaml config, and save it in the installation directory
 ETCD_RAMDISK_YAML="${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml"
 if [ -f "${ETCD_RAMDISK_YAML}" ]; then

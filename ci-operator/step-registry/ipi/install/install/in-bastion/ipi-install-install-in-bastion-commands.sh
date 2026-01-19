@@ -120,6 +120,9 @@ function prepare_next_steps() {
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
 
+  # capture install duration for post e2e-analysis
+  awk '/Time elapsed per stage:/,/Time elapsed:/' "${dir}/.openshift_install.log" > "${SHARED_DIR}/install-duration.log"
+
   # Delete the ${REMOTE_SECRETS_DIR} as it may contain credential files
   run_ssh_cmd "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "rm -rf ${REMOTE_SECRETS_DIR}"
 }
@@ -187,11 +190,17 @@ azure4|azuremag|azure-arm64)
     ;;
 gcp)
     if [[ -z "${ATTACH_BASTION_SA}" ]]; then
-        GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json
-	run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${GOOGLE_CLOUD_KEYFILE_JSON}" "${REMOTE_SECRETS_DIR}/gce.json"
-	echo "export GOOGLE_CLOUD_KEYFILE_JSON='${REMOTE_SECRETS_DIR}/gce.json'" >> "${REMOTE_ENV_FILE}"
+        if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
+            echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
+            GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
+        else
+            echo "$(date -u --rfc-3339=seconds) - Using the default IAM service account..."
+            GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json
+        fi
+	    run_scp_to_remote "${SSH_PRIV_KEY_PATH}" "${BASTION_SSH_USER}" "${BASTION_IP}" "${GOOGLE_CLOUD_KEYFILE_JSON}" "${REMOTE_SECRETS_DIR}/gce.json"
+	    echo "export GOOGLE_CLOUD_KEYFILE_JSON='${REMOTE_SECRETS_DIR}/gce.json'" >> "${REMOTE_ENV_FILE}"
     else
-	echo "The install on bastion will use the service-account attached to the bastion host, nothing to do"
+	    echo "The install on bastion will use the service-account attached to the bastion host, nothing to do"
     fi
     ;;
 *) >&2 echo "No need to upload any credential files into bastion host for cluster type '${CLUSTER_TYPE}'"

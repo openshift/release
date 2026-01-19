@@ -1,143 +1,144 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    labels:
-      app: prow
-      component: pod-scaler-ui
+kind: Service
+metadata:
+  namespace: ci
+  labels:
+    app: prow
+    component: pod-scaler-ui
+  name: pod-scaler-ui
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: main
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: metrics
+  selector:
+    app: prow
+    component: pod-scaler-ui
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  labels:
+    app: prow
+    component: pod-scaler-ui
+  name: pod-scaler-ui
+  namespace: ci
+spec:
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  port:
+    targetPort: main
+  to:
+    kind: Service
     name: pod-scaler-ui
-  spec:
-    ports:
-    - name: main
-      port: 80
-      protocol: TCP
-      targetPort: main
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: metrics
-    selector:
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pod-scaler-ui
+  namespace: ci
+  labels:
+    app: prow
+    component: pod-scaler-ui
+    prow-app: pod-scaler-ui
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+    scheme: http
+  selector:
+    matchLabels:
       app: prow
       component: pod-scaler-ui
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
-    labels:
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: pod-scaler-ui
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
       app: prow
       component: pod-scaler-ui
-    name: pod-scaler-ui
-    namespace: ci
-  spec:
-    tls:
-      insecureEdgeTerminationPolicy: Redirect
-      termination: edge
-    port:
-      targetPort: main
-    to:
-      kind: Service
-      name: pod-scaler-ui
-- apiVersion: monitoring.coreos.com/v1
-  kind: ServiceMonitor
-  metadata:
-    name: pod-scaler-ui
-    namespace: ci
-    labels:
-      app: prow
-      component: pod-scaler-ui
-      prow-app: pod-scaler-ui
-  spec:
-    endpoints:
-    - interval: 30s
-      port: metrics
-      scheme: http
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: pod-scaler-ui
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: pod-scaler-ui
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-  spec:
-    replicas: 2
-    strategy:
-      type: RollingUpdate
-    selector:
-      matchLabels:
-        app: prow
-        component: pod-scaler-ui
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: pod-scaler-ui
-      spec:
-        affinity:
-          podAntiAffinity:
-            preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                  - key: component
-                    operator: In
-                    values:
-                    - pod-scaler-ui
-                topologyKey: "kubernetes.io/hostname"
-        tolerations:
-        - key: manual-provision
-          operator: Exists
-        containers:
-        - name: pod-scaler-ui
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_pod-scaler_latest
-          imagePullPolicy: Always
-          args:
-          - --loglevel=debug
-          - --mode=consumer.ui
-          - --ui-port=8080
-          - --cache-bucket=origin-ci-resource-usage-data-v2
-          - --gcs-credentials-file=/etc/gcs/service-account.json
-          - --data-dir=/tmp
-          ports:
-          - name: main
-            containerPort: 8080
-          - name: metrics
-            containerPort: 9090
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 600
-          volumeMounts:
-          - name: gcs-credentials
-            mountPath: /etc/gcs
-            readOnly: true
-          - mountPath: /tmp
-            name: tmp
-          resources:
-            requests:
-              memory: "8Gi"
-              cpu: "2"
-        volumes:
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: component
+                  operator: In
+                  values:
+                  - pod-scaler-ui
+              topologyKey: "kubernetes.io/hostname"
+      tolerations:
+      - key: manual-provision
+        operator: Exists
+      containers:
+      - name: pod-scaler-ui
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_pod-scaler_latest
+        imagePullPolicy: Always
+        args:
+        - --loglevel=debug
+        - --mode=consumer.ui
+        - --ui-port=8080
+        - --cache-bucket=origin-ci-resource-usage-data-v2
+        - --gcs-credentials-file=/etc/gcs/service-account.json
+        - --data-dir=/tmp
+        ports:
+        - name: main
+          containerPort: 8080
+        - name: metrics
+          containerPort: 9090
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 600
+        volumeMounts:
         - name: gcs-credentials
-          secret:
-            secretName: gce-sa-credentials-resource-usage-data-publisher
-        - emptyDir: {}
+          mountPath: /etc/gcs
+          readOnly: true
+        - mountPath: /tmp
           name: tmp
+        resources:
+          requests:
+            memory: "8Gi"
+            cpu: "2"
+      volumes:
+      - name: gcs-credentials
+        secret:
+          secretName: gce-sa-credentials-resource-usage-data-publisher
+      - emptyDir: {}
+        name: tmp

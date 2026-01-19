@@ -1,127 +1,126 @@
-kind: List
+---
 apiVersion: v1
-items:
-  - apiVersion: v1
-    kind: Service
+kind: Service
+metadata:
+  name: pipeline-controller
+  namespace: ci
+spec:
+  selector:
+    app: prow
+    component: pipeline-controller
+  ports:
+  - port: 80
+    targetPort: 8888
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: pipeline-controller
+  labels:
+    app: prow
+    component: pipeline-controller
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: prow
+      component: pipeline-controller
+      flavor: apps-auth
+  template:
     metadata:
-      name: pipeline-controller
-      namespace: ci
-    spec:
-      selector:
-        app: prow
-        component: pipeline-controller
-      ports:
-      - port: 80
-        targetPort: 8888
-      type: ClusterIP
-  - apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      namespace: ci
-      name: pipeline-controller
       labels:
         app: prow
         component: pipeline-controller
-      annotations:
-        keel.sh/policy: force
-        keel.sh/matchTag: "true"
-        keel.sh/trigger: poll
-        keel.sh/pollSchedule: "@every 5m"
+        flavor: apps-auth
     spec:
-      replicas: 1
-      revisionHistoryLimit: 2
-      strategy:
-        type: Recreate
-      selector:
-        matchLabels:
-          app: prow
-          component: pipeline-controller
-          flavor: apps-auth
-      template:
-        metadata:
-          labels:
-            app: prow
-            component: pipeline-controller
-            flavor: apps-auth
-        spec:
-          serviceAccountName: pipeline-controller
-          initContainers:
-            - name: git-sync-init
-              command:
-                - /git-sync
-              args:
-                - --repo=https://github.com/openshift/release.git
-                - --ref=master
-                - --root=/tmp/git-sync
-                - --one-time=true
-                - --depth=1
-                - --link=release
-              image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-              volumeMounts:
-                - name: release
-                  mountPath: /tmp/git-sync
-          containers:
-            - name: git-sync
-              command:
-                - /git-sync
-              args:
-                - --repo=https://github.com/openshift/release.git
-                - --ref=master
-                - --period=30s
-                - --root=/tmp/git-sync
-                - --max-failures=3
-                - --link=release
-              image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-              volumeMounts:
-                - name: release
-                  mountPath: /tmp/git-sync
-              resources:
-                requests:
-                  memory: "1Gi"
-                  cpu: "0.5"
-            - name: pipeline-controller
-              image: quay-proxy.ci.openshift.org/openshift/ci:ci_pipeline-controller_latest
-              imagePullPolicy: Always
-              args:
-                - --config-path=/etc/config/config.yaml
-                - --supplemental-prow-config-dir=/etc/config
-                - --job-config-path=/var/repo/release/ci-operator/jobs
-                - --github-token-path=/etc/oauth/oauth
-                - --github-endpoint=http://ghproxy
-                - --github-endpoint=https://api.github.com
-                - --github-graphql-endpoint=http://ghproxy/graphql
-                - --config-file=/var/repo/release/core-services/pipeline-controller/config.yaml
-                - --lgtm-config-file=/var/repo/release/core-services/pipeline-controller/lgtm-config.yaml
-                - --hmac-secret-file=/etc/webhook/hmac.yaml
-                - --endpoint=/
-              resources:
-                requests:
-                  memory: "7.5Gi"
-                  cpu: "600m"
-              ports:
-                - name: http
-                  containerPort: 8888
-              volumeMounts:
-                - name: github-token
-                  mountPath: /etc/oauth
-                  readOnly: true
-                - name: config
-                  mountPath: /etc/config
-                  readOnly: true
-                - name: release
-                  mountPath: /var/repo
-                - name: hmac
-                  mountPath: /etc/webhook
-                  readOnly: true
-          volumes:
-            - name: hmac
-              secret:
-                secretName: github-webhook-credentials
-            - name: github-token
-              secret:
-                secretName: github-credentials-openshift-ci-robot
-            - name: config
-              configMap:
-                name: config
+      serviceAccountName: pipeline-controller
+      initContainers:
+        - name: git-sync-init
+          command:
+            - /git-sync
+          args:
+            - --repo=https://github.com/openshift/release.git
+            - --ref=master
+            - --root=/tmp/git-sync
+            - --one-time=true
+            - --depth=1
+            - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
             - name: release
-              emptyDir: {}
+              mountPath: /tmp/git-sync
+      containers:
+        - name: git-sync
+          command:
+            - /git-sync
+          args:
+            - --repo=https://github.com/openshift/release.git
+            - --ref=master
+            - --period=30s
+            - --root=/tmp/git-sync
+            - --max-failures=3
+            - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          volumeMounts:
+            - name: release
+              mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
+        - name: pipeline-controller
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_pipeline-controller_latest
+          imagePullPolicy: Always
+          args:
+            - --config-path=/etc/config/config.yaml
+            - --supplemental-prow-config-dir=/etc/config
+            - --job-config-path=/var/repo/release/ci-operator/jobs
+            - --github-token-path=/etc/oauth/oauth
+            - --github-endpoint=http://ghproxy
+            - --github-endpoint=https://api.github.com
+            - --github-graphql-endpoint=http://ghproxy/graphql
+            - --config-file=/var/repo/release/core-services/pipeline-controller/config.yaml
+            - --lgtm-config-file=/var/repo/release/core-services/pipeline-controller/lgtm-config.yaml
+            - --hmac-secret-file=/etc/webhook/hmac.yaml
+            - --endpoint=/
+          resources:
+            requests:
+              memory: "7.5Gi"
+              cpu: "600m"
+          ports:
+            - name: http
+              containerPort: 8888
+          volumeMounts:
+            - name: github-token
+              mountPath: /etc/oauth
+              readOnly: true
+            - name: config
+              mountPath: /etc/config
+              readOnly: true
+            - name: release
+              mountPath: /var/repo
+            - name: hmac
+              mountPath: /etc/webhook
+              readOnly: true
+      volumes:
+        - name: hmac
+          secret:
+            secretName: github-webhook-credentials
+        - name: github-token
+          secret:
+            secretName: github-credentials-openshift-ci-robot
+        - name: config
+          configMap:
+            name: config
+        - name: release
+          emptyDir: {}

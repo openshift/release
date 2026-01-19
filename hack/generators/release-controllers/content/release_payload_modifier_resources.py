@@ -18,7 +18,7 @@ def add_release_payload_modifier_rbac(gendoc):
     context = gendoc.context
 
     resources.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'release-payload-modify',

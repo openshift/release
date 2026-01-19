@@ -1,5 +1,5 @@
 #!/bin/bash
-set -o nounset -o errexit -o pipefail
+set -o nounset -o errexit -o
 
 # Variables
 PROBE_NS="openshift-image-registry"               # fallback to operators later if missing
@@ -57,6 +57,45 @@ pin_single_replica_recreate() {
   fi
 }
 
+wait_for_image_registry_stable() {
+  local deadline=$(( "$(date +%s)" + 900 ))
+  local stable_required=10
+  local stable_count=0
+
+  log "Waiting for image-registry ClusterOperator to stop Progressing (need ${stable_required} consecutive False)..."
+
+  while [[ "$(date +%s)" -lt ${deadline} ]]; do
+    must_have_time
+
+    local progressing
+    progressing="$(oc get co image-registry -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}' 2>/dev/null || echo "")"
+
+    if [[ "${progressing}" == "False" ]]; then
+      stable_count=$((stable_count + 1))
+      log "image-registry Progressing=False (${stable_count}/${stable_required} consecutive)"
+      if [[ ${stable_count} -ge ${stable_required} ]]; then
+        log "image-registry ClusterOperator considered stable (Progressing=False for ${stable_required} consecutive checks)."
+        return 0
+      fi
+    else
+      if [[ -n "${progressing}" ]]; then
+        log "image-registry Progressing is '${progressing}' (resetting stable counter)."
+      else
+        log "image-registry Progressing status unavailable (resetting stable counter)."
+      fi
+      stable_count=0
+    fi
+
+    sleep 10
+  done
+
+  # Best-effort only
+  log "image-registry did not stay non-Progressing long enough before timeout (continuing anyway)."
+  return 0
+}
+
+
+wait_for_image_registry_stable
 # Survivor node detection
 SURV="$(oc get nodes -l node-role.kubernetes.io/master \
   -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[?(@.type=="Ready")]}{.status}{"\n"}{end}{end}' \
@@ -65,6 +104,8 @@ SURV="$(oc get nodes -l node-role.kubernetes.io/master \
 log "Survivor: ${SURV}"
 
 # Host SSH setup (optional)
+SKIP_HOST_SSH="${SKIP_HOST_SSH:-0}"
+
 if [[ ! -f "${SHARED_DIR}/packet-conf.sh" ]]; then
   log "packet-conf.sh not found in SHARED_DIR; skipping host SSH actions"
   SKIP_HOST_SSH=1
@@ -76,8 +117,9 @@ fi
 # Degrade master-1 via hypervisor
 if [[ ${SKIP_HOST_SSH} -eq 0 && -n "${IP:-}" ]]; then
   log "Degrading ostest_master_1 via hypervisor @ ${IP}"
-  timeout -s 9 5m ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=20 \
-    root@"${IP}" bash -s << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g' || true
+
+  set +e
+  timeout -s 9 5m ssh "${SSHOPTS[@]}" root@"${IP}" bash -s << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 set -euo pipefail
 
 if ! command -v virsh >/dev/null 2>&1; then
@@ -85,23 +127,11 @@ if ! command -v virsh >/dev/null 2>&1; then
   exit 0
 fi
 
-# Network name intentionally fixed
 NET="ostestbm"
-
 echo "[host] DHCP leases (${NET}):"
 virsh -c qemu:///system net-dhcp-leases "${NET}" || true
 
 MASTER0_IP="$(virsh -c qemu:///system net-dhcp-leases "${NET}" 2>/dev/null | awk '/master-0/ {print $5}' | cut -d/ -f1 | head -n1)"
-
-# pcs actions on master-0 *before* shutting down master-1
-if [[ -n "${MASTER0_IP:-}" ]]; then
-  timeout 90s ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 \
-    core@"${MASTER0_IP}" << 'PCS_EOF' || true
-sudo pcs status || true
-sudo pcs resource debug-stop etcd || true
-sudo pcs resource status || true
-PCS_EOF
-fi
 
 echo "[host] VMs before:"
 virsh -c qemu:///system list --all || true
@@ -120,17 +150,45 @@ st="$(virsh -c qemu:///system domstate ostest_master_1 2>/dev/null || true)"
 
 echo "[host] VMs after:"
 virsh -c qemu:///system list --all || true
+
+# Manual recovery on the surviving node (master-0) WITHOUT disabling stonith.
+# Force-start etcd on the survivor while keeping fencing enabled.
+if [[ -n "${MASTER0_IP:-}" ]]; then
+  echo "[host] Attempting manual recovery on master-0 (${MASTER0_IP}) via pcs debug-stop/debug-start..."
+  timeout 180s ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 \
+    core@"${MASTER0_IP}" << 'PCS_EOF'
+set -euo pipefail
+
+echo "[master-0] pcs status (pre):"
+sudo pcs status || true
+sudo pcs resource status || true
+
+# Break any stuck recovery attempts (best-effort)
+echo "[master-0] debug-stop etcd (best-effort)..."
+sudo pcs resource debug-stop etcd || true
+
+# Force start etcd on survivor with the notify meta env var required by the RA
+echo "[master-0] debug-start etcd with notify meta env var..."
+sudo OCF_RESKEY_CRM_meta_notify_start_resource='etcd' pcs resource debug-start etcd
+
+# Cleanup so pacemaker re-evaluates state cleanly (best-effort)
+sudo pcs resource cleanup etcd || true
+
+echo "[master-0] pcs status (post):"
+sudo pcs status || true
+sudo pcs resource status || true
+PCS_EOF
+fi
 EOF
+  ssh_rc=${PIPESTATUS[0]}
+  set -e
+
+  if [[ ${ssh_rc} -ne 0 ]]; then
+    log "ERROR: Failed to degrade ostest_master_1 via hypervisor (rc=${ssh_rc})"
+    exit ${ssh_rc}
+  fi
 else
   log "Host SSH not attempted (no packet-conf.sh or IP empty)"
-fi
-
-
-# WORKAROUND for OCPBUGS-63312 (keep while bug is unresolved)
-
-# Decide probe namespace (fallback if IR ns missing)
-if ! oc get ns "${PROBE_NS}" >/dev/null 2>&1; then
-  PROBE_NS="openshift-operators"
 fi
 
 probe_pod() {
@@ -198,25 +256,20 @@ else
   }" || true
 
   # Delete any registry pod marooned on NotReady nodes
-  NOT_READY_NODES="$(
-    oc get nodes -o jsonpath='{range .items[?(@.status.conditions[?(@.type=="Ready")].status!="True")]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true
-  )"
-  if [[ -z "${NOT_READY_NODES}" ]]; then
-    NOT_READY_NODES="$(
-      oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[*]}{.type}{"="}{.status}{";"}{end}{"\n"}{end}' \
-      | awk '!/Ready=True/ {print $1}'
-    )"
-  fi
+NOT_READY_NODES="$(
+  oc get nodes \
+    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .status.conditions[*]}{.type}{"="}{.status}{";"}{end}{"\n"}{end}' 2>/dev/null \
+    || echo ""
+)"
 
-  for nn in ${NOT_READY_NODES}; do
-    pod="$(
-      oc -n openshift-image-registry get pod -o jsonpath='{range .items[*]}{.metadata.name} {.spec.nodeName}{"\n"}{end}' 2>/dev/null \
-      | awk -v N="${nn}" '$2==N && $1 ~ /^image-registry-/{print $1;exit}'
-    )"
-    if [[ -n "${pod:-}" ]]; then
-      oc -n openshift-image-registry delete pod "${pod}" --force --grace-period=0 || true
-    fi
-  done
+TMP=""
+while read -r name conds; do
+  if [[ -n "${name}" && "${conds}" != *"Ready=True"* ]]; then
+    TMP+="${name} "
+  fi
+done <<< "${NOT_READY_NODES}"
+
+NOT_READY_NODES="${TMP}"
 
   # Bounded readiness: success when exactly 1 Running registry pod on SURV, none elsewhere
   deadline=$(( $(date +%s) + 1200 ))

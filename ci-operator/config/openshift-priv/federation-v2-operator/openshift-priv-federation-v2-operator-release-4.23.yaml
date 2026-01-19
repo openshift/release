@@ -1,0 +1,49 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: github.com/openshift/federation-v2-operator
+images:
+- dockerfile_path: Dockerfile
+  from: root
+  to: federation-controller
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: vet
+  commands: |
+    make -f Makefile.ci vet
+  container:
+    from: src
+- as: unit
+  commands: |
+    make -f Makefile.ci unit
+  container:
+    from: src
+- as: managed-e2e
+  commands: |
+    make -f Makefile.ci managed-e2e
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: federation-v2-operator

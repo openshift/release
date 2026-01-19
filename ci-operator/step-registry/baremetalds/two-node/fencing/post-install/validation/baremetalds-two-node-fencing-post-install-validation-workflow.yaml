@@ -1,0 +1,24 @@
+workflow:
+  as: baremetalds-two-node-fencing-post-install-validation
+  steps:
+    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
+    cluster_profile: equinix-edge-enablement
+    pre:
+      - chain: baremetalds-ofcir-pre
+    test:
+      - chain: baremetalds-two-node-fencing-post-install
+    post:
+      - chain: baremetalds-ofcir-post
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
+        BMC_DRIVER=redfish
+  documentation: |-
+    Installs a Two Node Fencing (TNF) cluster and runs the post-install chain
+    as the test payload, including the fencing_validation ref that executes
+    fencing_validator and fails the job on validation errors.

@@ -7,10 +7,10 @@ base_images:
     name: 4.22-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+  ocp_builder_rhel-9-golang-1.25-openshift-4.21:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.25-openshift-4.21
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/assisted-installer-agent
@@ -20,13 +20,14 @@ images:
     ocp_4.21_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
   to: agent-installer-node-agent
 promotion:
   to:
-  - name: 4.22-priv
+  - disabled: true
+    name: 4.22-priv
     namespace: ocp-private
 releases:
   latest:
@@ -47,7 +48,6 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-agent-sno-ipv6
   capabilities:
@@ -56,7 +56,6 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-sno-ipv6
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-agent-ha-dualstack
   capabilities:
@@ -69,7 +68,6 @@ tests:
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
         MIRROR_IMAGES=true
     workflow: agent-e2e-generic
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-agent-4control-ipv4
   capabilities:
@@ -81,7 +79,6 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=4CONTROL_IPV4
     workflow: agent-e2e-generic
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-agent-5control-ipv4
   capabilities:
@@ -93,7 +90,6 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4
     workflow: agent-e2e-generic
-  timeout: 6h0m0s
 - as: verify-deps
   steps:
     env:

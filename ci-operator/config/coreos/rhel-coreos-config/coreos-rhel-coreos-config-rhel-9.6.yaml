@@ -1,0 +1,72 @@
+build_root:
+  image_stream_tag:
+    name: coreos-assembler
+    namespace: coreos
+    tag: rhel-9.6
+images:
+- dockerfile_literal: |
+    FROM overridden
+    WORKDIR /src
+    # Tell the build scripts that we have setup a directory for unprivileged build
+    ENV COSA_DIR=/tmp/cosa
+    RUN mkdir -p "${COSA_DIR}"
+    # Copy the source code
+    COPY . .
+    # We need to make sure that root can read / write to the COSA_DIR so that
+    # when this container is actually run, we have permissions to read and
+    # write to the COSA_DIR to allow the Kola tests to run.
+    USER root
+    RUN chgrp -Rf root "${COSA_DIR}" && \
+      chmod -Rf g+w "${COSA_DIR}"
+    # Go back to unprivileged user for COSA
+    USER builder
+    WORKDIR /tmp/cosa
+  from: root
+  to: build-image
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  rhcos-9-build-test-metal:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      ephemeral-storage: 40Gi
+      memory: 3Gi
+  rhcos-9-build-test-qemu:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 2000m
+      devices.kubevirt.io/kvm: "1"
+      ephemeral-storage: 40Gi
+      memory: 3Gi
+tests:
+- as: validate
+  capabilities:
+  - kvm
+  commands: ci/prow-entrypoint.sh validate
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: rhcos-9-build-test-qemu
+  capabilities:
+  - kvm
+  commands: /src/ci/prow-entrypoint.sh rhcos-9-build-test-qemu
+  container:
+    from: build-image
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: rhcos-9-build-test-metal
+  capabilities:
+  - kvm
+  commands: /src/ci/prow-entrypoint.sh rhcos-9-build-test-metal
+  container:
+    from: build-image
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+zz_generated_metadata:
+  branch: rhel-9.6
+  org: coreos
+  repo: rhel-coreos-config

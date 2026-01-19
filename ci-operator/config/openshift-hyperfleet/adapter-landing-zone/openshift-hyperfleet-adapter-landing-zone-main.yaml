@@ -1,0 +1,27 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^charts/
+- as: test-helm
+  commands: |
+    curl -fsSL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz | tar xz
+    export PATH=$PWD/linux-amd64:$PATH
+    make test-helm
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: adapter-landing-zone

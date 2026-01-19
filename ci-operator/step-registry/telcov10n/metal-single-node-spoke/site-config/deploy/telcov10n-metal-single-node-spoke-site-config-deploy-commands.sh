@@ -102,21 +102,14 @@ function clear_partition_disk_table {
       devices_to_wipe="${devices_to_wipe} ${dev}"
     done
   else
-    # Otherwise, check all block devices and find candidates
+    # Otherwise, wipe all non-excluded block devices
+    # Note: We wipe all available devices because vgcreate can detect
+    # partition table signatures that lsblk doesn't show
     for dev in ${all_block_devices}; do
       # Skip if excluded
       echo "${excluded_devices}" | grep -q "^${dev}$" && continue
-
-      # Check if device has partitions or problematic signatures
-      set -x
-      has_partitions=$(oc debug ${node_name} -n default -- chroot /host bash -c \
-        "lsblk -no TYPE ${dev} 2>/dev/null | grep -c part || echo 0" 2>/dev/null || echo 0)
-      set +x
-
-      if [ "${has_partitions}" -gt 0 ]; then
-        echo "Device ${dev} has partitions, adding to wipe list"
-        devices_to_wipe="${devices_to_wipe} ${dev}"
-      fi
+      echo "Device ${dev} is not excluded, adding to wipe list"
+      devices_to_wipe="${devices_to_wipe} ${dev}"
     done
   fi
 
@@ -137,8 +130,9 @@ function clear_partition_disk_table {
      set -x ;
      echo 'Before wiping:' ;
      lsblk --fs ${node_dev} || true ;
-     sfdisk --delete ${node_dev} ;
-     sleep 3 ;
+     sfdisk --delete ${node_dev} || true ;
+     dd if=/dev/zero of=${node_dev} bs=1M count=1 ;
+     sleep 2 ;
      kpartx -d ${node_dev} || true ;
      echo 'After wiping:' ;
      lsblk --fs ${node_dev} || true ;
@@ -147,6 +141,10 @@ function clear_partition_disk_table {
      echo '${node_dev} Wiped'"
     set +x
   done
+
+  echo "----------------------------------------"
+  echo "Cleared partition disk table"
+  echo "----------------------------------------"
 }
 
 function get_storage_class_name {
@@ -178,6 +176,7 @@ EOF
       [ $(( attempts=${attempts} + 1 )) -lt 2 ] || {
         clear_partition_disk_table ;
         oc -n openshift-storage wait lvmcluster/lvmcluster --for=jsonpath='{.status.state}'=Ready --timeout 10m && break ;
+        oc -n openshift-storage get lvmcluster/lvmcluster -oyaml ;
         exit 1 ;
       }
     done
@@ -367,7 +366,7 @@ resources:
 
 configMapGenerator:
   - files:
-    $(add_icsp_cr_if_exists)
+    $(add_idms_cr_if_exists)
 $(generate_extracted_list_of_extra_manifest_paths "sno-extra-manifest")
     name: extra-manifests-cm
     namespace: ${SPOKE_CLUSTER_NAME}
@@ -377,9 +376,9 @@ generatorOptions:
 EOK
 }
 
-function add_icsp_cr_if_exists {
-  [ -f "${SHARED_DIR}/imageContentSourcePolicy.yaml" ] && \
-    echo "- sno-extra-manifest/imageContentSourcePolicy.yaml"
+function add_idms_cr_if_exists {
+  [ -f "${SHARED_DIR}/imageDigestMirrorSet.yaml" ] && \
+    echo "- sno-extra-manifest/imageDigestMirrorSet.yaml"
 }
 
 function generate_ztp_cluster_manifests {
@@ -517,9 +516,9 @@ EOK
 ts="$(date -u +%s%N)"
 extra_manifest_path=\${ztp_repo_dir}/clusters/${SPOKE_CLUSTER_NAME}/sno-extra-manifest/
 echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${extra_manifest_path}/.cluster-image-set-used.\${ts}
-cat <<EO-ICSP >| \${extra_manifest_path}/imageContentSourcePolicy.yaml
-$(cat ${SHARED_DIR}/imageContentSourcePolicy.yaml || echo "---")
-EO-ICSP
+cat <<EO-IDMS >| \${extra_manifest_path}/imageDigestMirrorSet.yaml
+$(cat ${SHARED_DIR}/imageDigestMirrorSet.yaml || echo "---")
+EO-IDMS
 echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${ztp_repo_dir}/site-policies/.cluster-image-set-used.\${ts}
 
 ############## BEGIN of ArgoCD extra manifest extration #####################################################
@@ -712,7 +711,7 @@ function setup-pre-ga-catalog-access {
 
   if [ -f ${SHARED_DIR}/pull-secret-with-pre-ga.json ];then
 
-      echo "************ telcov10n Setup ZTP to use PreGA catalog ************"
+      echo "************ telcov10n Setup ZTP to use PreGA catalog with Konflux build mirrors ************"
 
       cat <<EO-cm | oc apply -f -
 apiVersion: v1
@@ -726,6 +725,46 @@ data:
   registries.conf: |
     unqualified-search-registries = ["registry.access.redhat.com", "docker.io"]
 
+    # Mirror configuration for multicluster-engine images (PreGA/Konflux builds)
+    # Uses quay.io/prega/test/acm-d which has the PreGA mirrored images
+    [[registry]]
+       prefix = ""
+       location = "registry.redhat.io/multicluster-engine"
+       mirror-by-digest-only = true
+
+       [[registry.mirror]]
+       location = "quay.io/prega/test/acm-d"
+       insecure = false
+
+       [[registry.mirror]]
+       location = "brew.registry.redhat.io/rh-osbs/multicluster-engine"
+       insecure = false
+
+    # Mirror configuration for rhacm2 images (PreGA/Konflux builds)
+    [[registry]]
+       prefix = ""
+       location = "registry.redhat.io/rhacm2"
+       mirror-by-digest-only = true
+
+       [[registry.mirror]]
+       location = "quay.io/prega/test/acm-d"
+       insecure = false
+
+       [[registry.mirror]]
+       location = "brew.registry.redhat.io/rh-osbs/rhacm2"
+       insecure = false
+
+    # Mirror configuration for openshift4 images (for dependencies)
+    [[registry]]
+       prefix = ""
+       location = "registry.redhat.io/openshift4"
+       mirror-by-digest-only = true
+
+       [[registry.mirror]]
+       location = "quay.io/prega/test/acm-d"
+       insecure = false
+
+    # Legacy PreGA catalog mirror (for backward compatibility)
     [[registry]]
        prefix = ""
        location = "registry.redhat.io"
@@ -737,6 +776,11 @@ EO-cm
 
     mirror_registry_ref="mirrorRegistryRef:
       name: assisted-installer-mirror-config"
+
+      # Add annotation to allow unrestricted image pulls
+      oc annotate agentserviceconfig agent \
+        "unsupported.agent-install.openshift.io/assisted-service-allow-unrestricted-image-pulls=" \
+        --overwrite 2>/dev/null || true
 
       set -x
       oc -n multicluster-engine get cm assisted-installer-mirror-config -oyaml

@@ -1,8 +1,20 @@
 base_images:
+  bip-orchestrate-vm:
+    name: bip-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
+  ib-orchestrate-vm:
+    name: ib-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
   previous-lca:
     name: "4.15"
     namespace: ocp-kni
     tag: lifecycle-agent-operator-bundle
+  recert:
+    name: recert
+    namespace: edge-infrastructure
+    tag: release-4.16
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -104,18 +116,19 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
       LCA_PULL_REF: lifecycle-agent-operator
       OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
+      RECERT_IMAGE: pipeline:recert
       TARGET_LCA_REF: pipeline:previous-lca
     env:
       OCP_BASE_IMAGE_SOURCE: release
       OCP_BASE_VERSION: "4.16"
       OCP_TARGET_IMAGE_SOURCE: release
       OCP_TARGET_VERSION: "4.15"
-      RECERT_IMAGE: quay.io/edge-infrastructure/recert:release-4.16
       SEED_IMAGE_TAG_FORMAT: release
     workflow: openshift-image-based-upgrade-presubmit
-  timeout: 4h0m0s
 - as: security
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

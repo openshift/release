@@ -101,7 +101,7 @@ tests:
 - as: e2e-metal-sno-live-iso
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
 - always_run: false
   as: e2e-metal-assisted-onprem-4-20
@@ -464,7 +464,6 @@ tests:
         export MASTER_MEMORY=18432
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-ofcir-baremetal
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-metal-assisted-kube-api-late-unbinding-sno-4-20
   capabilities:
@@ -714,9 +713,8 @@ tests:
 - as: e2e-metal-sno-with-worker-live-iso
   run_if_changed: .*bootstrap_in_place.*
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     env:
-      PACKET_PLAN: c3.medium.x86
       TEST_FUNC: test_bip_add_worker
     workflow: baremetalds-sno
 - always_run: false
@@ -867,9 +865,9 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
-        AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
-        CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
-        INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+        AGENT_DOCKER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-agent-ds-main:latest
+        CONTROLLER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-controller-ds-main:latest
+        INSTALLER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-ds-main:latest
         DAY2_CPU_ARCHITECTURE=arm64
         OPENSHIFT_VERSION=4.20-multi
     workflow: assisted-ofcir-baremetal-heterogeneous
@@ -880,9 +878,9 @@ tests:
     env:
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
-        AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
-        CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
-        INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+        AGENT_DOCKER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-agent-ds-main:latest
+        CONTROLLER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-controller-ds-main:latest
+        INSTALLER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-ds-main:latest
         DAY2_CPU_ARCHITECTURE=arm64
         OPENSHIFT_VERSION=4.20-multi
     workflow: assisted-ofcir-baremetal-heterogeneous
@@ -1060,10 +1058,27 @@ tests:
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-dual-stack-primary-ipv6-4-20-periodic
+  as: e2e-metal-assisted-dual-primary-v6-compact-4-20-periodic
   capabilities:
   - intranet
   cron: 30 12 * * 0,2,4
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        IPv4=true
+        IPv6=true
+        PRIMARY_STACK="ipv6"
+        OPENSHIFT_VERSION=4.20
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+      CLUSTERTYPE: assisted_large_el9
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-dual-primary-v6-compact-4-20
+  capabilities:
+  - intranet
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
@@ -1089,8 +1104,6 @@ tests:
         IPv6=true
         PRIMARY_STACK="ipv6"
         OPENSHIFT_VERSION=4.20
-        NUM_WORKERS=0
-        NUM_MASTERS=3
       CLUSTERTYPE: assisted_large_el9
     workflow: assisted-ofcir-baremetal
 - as: e2e-metal-assisted-openshift-ai-4-18-periodic
@@ -1112,6 +1125,28 @@ tests:
         AMD_REQUIRE_GPU=false
       CLUSTERTYPE: assisted_large_el9
       REQUIRED_MEMORY_GIB: "400"
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-vlan-4-20
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.20
+        STATIC_IPS_VLAN=true
+    workflow: assisted-ofcir-baremetal
+- as: e2e-metal-assisted-vlan-4-20-periodic
+  capabilities:
+  - intranet
+  cron: 30 14 * * 0,2,4
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.20
+        STATIC_IPS_VLAN=true
     workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: master

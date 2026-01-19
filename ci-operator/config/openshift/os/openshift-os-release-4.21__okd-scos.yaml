@@ -1,0 +1,63 @@
+base_images:
+  ocp_builder_stream:
+    name: builder
+    namespace: ocp
+    tag: stream10
+  stream-coreos-base:
+    name: stream-coreos-base
+    namespace: coreos
+    tag: "10"
+build_root:
+  image_stream_tag:
+    name: coreos-assembler
+    namespace: coreos
+    tag: latest
+images:
+- build_args:
+  - name: OPENSHIFT_CI
+    value: "1"
+  dockerfile_path: Containerfile
+  inputs:
+    stream-coreos-base:
+      as:
+      - quay.io/openshift-release-dev/ocp-v4.0-art-dev:c9s-coreos
+  to: stream-coreos
+- build_args:
+  - name: OPENSHIFT_CI
+    value: "1"
+  dockerfile_path: extensions/Dockerfile
+  inputs:
+    ocp_builder_stream:
+      as:
+      - registry.access.redhat.com/ubi9/ubi:latest
+    stream-coreos:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos:latest
+  to: stream-coreos-extensions
+promotion:
+  to:
+  - name: scos-4.21
+    namespace: origin
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: scos-4.21
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: os
+  variant: okd-scos

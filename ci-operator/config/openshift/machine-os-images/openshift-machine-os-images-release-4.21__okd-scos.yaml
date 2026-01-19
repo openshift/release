@@ -1,0 +1,63 @@
+base_images:
+  origin_scos-4.21_base-stream9:
+    name: scos-4.21
+    namespace: origin
+    tag: base-stream9
+  origin_scos-4.21_cli:
+    name: scos-4.21
+    namespace: origin
+    tag: cli
+  origin_scos-4.21_installer:
+    name: scos-4.21
+    namespace: origin
+    tag: installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+images:
+- build_args:
+  - name: TAGS
+    value: scos
+  - name: DIRECT_DOWNLOAD
+    value: "true"
+  dockerfile_path: Dockerfile
+  from: origin_scos-4.21_base-stream9
+  inputs:
+    origin_scos-4.21_cli:
+      as:
+      - cli
+      - registry.ci.openshift.org/ocp/4.21:cli
+    origin_scos-4.21_installer:
+      as:
+      - builder
+      - registry.ci.openshift.org/ocp/4.21:installer
+  to: machine-os-images
+promotion:
+  to:
+  - name: scos-4.21
+    namespace: origin
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: scos-4.21
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-aws-ovn
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: machine-os-images
+  variant: okd-scos

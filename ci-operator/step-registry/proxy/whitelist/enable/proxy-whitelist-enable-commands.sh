@@ -60,6 +60,15 @@ function run_scp_to_remote() {
 proxy_host_address=$(head -n 1 "${SHARED_DIR}/bastion_public_address")
 proxy_host_user=$(head -n 1 "${SHARED_DIR}/bastion_ssh_user")
 
+if [[ -n "${ADDITIONAL_WHITELIST_URLS}" ]]; then
+    echo "Adding additional URLs into proxy whitelist..."
+    IFS=', ' read -r -a array <<< "${ADDITIONAL_WHITELIST_URLS}"
+    for url in "${array[@]}"; do
+        cat <<EOF >> ${SHARED_DIR}/proxy_whitelist.txt
+${url}
+EOF
+    done
+fi
 
 # https://docs.openshift.com/container-platform/4.15/installing/install_config/configuring-firewall.html#configuring-firewall
 

@@ -1,0 +1,160 @@
+base_images:
+  base-machine:
+    name: centos
+    namespace: openshift
+    tag: stream9
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: latest
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  ocp_4.21_base-rhel9:
+    name: "4.23"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
+  rhel-coreos-base:
+    name: "4.23"
+    namespace: ocp
+    tag: rhel-coreos
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
+binary_build_commands: make aws-cloud-controller-manager
+build_root:
+  from_repository: true
+canonical_go_repository: k8s.io/cloud-provider-aws
+images:
+- dockerfile_path: Dockerfile.openshift
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.21:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+  to: aws-cloud-controller-manager
+- dockerfile_literal: |
+    # This uses the new rhel-coreos base image
+    # https://github.com/openshift/enhancements/blob/main/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
+    FROM quay.io/centos/centos:stream9 as build
+    # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
+    # in a container https://github.com/coreos/rpm-ostree/issues/4034
+    RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download ecr-credential-provider
+    # See also https://issues.redhat.com/browse/ART-4352
+    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
+    COPY --from=build /*.rpm /
+    # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
+    # use -F rather than -U as we otherwise conflict with the production build in rhel-coreos
+    RUN rpm -Fvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
+  inputs:
+    base-machine-with-rpms:
+      as:
+      - quay.io/centos/centos:stream9
+    rhel-coreos-base:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos
+  to: rhel-coreos
+promotion:
+  to:
+  - additional_images:
+      cloud-provider-aws-rpms: rpms
+    excluded_images:
+    - rhel-coreos
+    name: "4.23"
+    namespace: ocp
+raw_steps:
+- rpm_image_injection_step:
+    from: base-machine
+    to: base-machine-with-rpms
+releases:
+  initial:
+    integration:
+      name: "4.23"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.23"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+rpm_build_commands: openshift-hack/build-rpm.sh 4.20.0
+rpm_build_location: _output/RPMS/x86_64
+test_binary_build_commands: make test
+tests:
+- as: e2e-aws-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-aws-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws-ccm-techpreview
+- always_run: false
+  as: e2e-aws-ovn-cgroupsv2
+  optional: true
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-e2e-aws-cgroupsv2
+- as: e2e-hypershift
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
+- as: regression-clusterinfra-aws-ipi-ccm
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: aws
+    env:
+      E2E_RUN_TAGS: '@ccm'
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: ccm&&!qe-only
+      TEST_SCENARIOS: Cluster_Infrastructure CCM
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
+  optional: true
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift
+  repo: cloud-provider-aws

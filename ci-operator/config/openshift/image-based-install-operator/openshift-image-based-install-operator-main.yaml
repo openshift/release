@@ -1,16 +1,20 @@
 base_images:
+  bip-orchestrate-vm:
+    name: bip-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ib-orchestrate-vm:
+    name: ib-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
   installer:
     name: "4.19"
     namespace: ocp
     tag: installer
-  ocp_4.20_base-rhel9:
-    name: "4.20"
-    namespace: ocp
-    tag: base-rhel9
   ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
@@ -23,9 +27,6 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
     ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
@@ -56,6 +57,7 @@ tests:
   container:
     from: src
   restrict_network_access: false
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
 - as: integration
   cluster_claim:
     architecture: amd64
@@ -65,6 +67,7 @@ tests:
     timeout: 1h0m0s
     version: "4.17"
   restrict_network_access: false
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -84,9 +87,12 @@ tests:
 - as: e2e-ibio
   capabilities:
   - intranet
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet-assisted
     dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
       IMG: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
@@ -100,6 +106,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
       IMG: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
@@ -109,9 +117,12 @@ tests:
   capabilities:
   - intranet
   optional: true
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet-assisted
     dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
       IMG: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
@@ -125,6 +136,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
       IMG: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:

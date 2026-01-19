@@ -20,6 +20,10 @@ vars=(
   CYPRESS_CUSTOM_COO_BUNDLE_IMAGE
   CYPRESS_DT_CONSOLE_IMAGE
   CYPRESS_COO_NAMESPACE
+  CYPRESS_LIGHTSPEED_CONSOLE_IMAGE
+  CYPRESS_LIGHTSPEED_PROVIDER_URL
+  CYPRESS_LIGHTSPEED_PROVIDER_TOKEN
+  CYPRESS_SKIP_TESTS
 )
 
 # Loop through each variable.
@@ -45,6 +49,30 @@ fi
 
 kubeadmin_password=$(cat "${KUBEADMIN_PASSWORD_FILE}")
 echo "Successfully read kubeadmin password from ${KUBEADMIN_PASSWORD_FILE}"
+
+# Read Lightspeed credentials from vault if not already set
+LIGHTSPEED_PROVIDER_TOKEN_FILE="/var/run/vault/dt-secrets/lightspeed-provider-token"
+LIGHTSPEED_PROVIDER_URL_FILE="/var/run/vault/dt-secrets/lightspeed-provider-url"
+
+if [[ -z "${CYPRESS_LIGHTSPEED_PROVIDER_TOKEN:-}" ]]; then
+  if [[ -f "${LIGHTSPEED_PROVIDER_TOKEN_FILE}" ]]; then
+    CYPRESS_LIGHTSPEED_PROVIDER_TOKEN=$(cat "${LIGHTSPEED_PROVIDER_TOKEN_FILE}")
+    export CYPRESS_LIGHTSPEED_PROVIDER_TOKEN
+    echo "Successfully read Lightspeed provider token from ${LIGHTSPEED_PROVIDER_TOKEN_FILE}"
+  else
+    echo "Warning: Lightspeed provider token file ${LIGHTSPEED_PROVIDER_TOKEN_FILE} does not exist"
+  fi
+fi
+
+if [[ -z "${CYPRESS_LIGHTSPEED_PROVIDER_URL:-}" ]]; then
+  if [[ -f "${LIGHTSPEED_PROVIDER_URL_FILE}" ]]; then
+    CYPRESS_LIGHTSPEED_PROVIDER_URL=$(cat "${LIGHTSPEED_PROVIDER_URL_FILE}")
+    export CYPRESS_LIGHTSPEED_PROVIDER_URL
+    echo "Successfully read Lightspeed provider URL from ${LIGHTSPEED_PROVIDER_URL_FILE}"
+  else
+    echo "Warning: Lightspeed provider URL file ${LIGHTSPEED_PROVIDER_URL_FILE} does not exist"
+  fi
+fi
 
 # Set proxy vars.
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -181,5 +209,11 @@ fi
 # Install npm modules
 npm install || true
 
-# Run the Cypress tests.
-npm run test-cypress-console-headless || true
+# Run the Cypress tests with grep filter if CYPRESS_SKIP_TESTS is set
+if [[ -n "${CYPRESS_SKIP_TESTS:-}" ]]; then
+  echo "Running Cypress tests with grep pattern: ${CYPRESS_SKIP_TESTS}"
+  npx cypress run --browser chrome --headless --env grep="${CYPRESS_SKIP_TESTS}",grepOmitFiltered=true || true
+else
+  echo "Running all Cypress tests"
+  npm run test-cypress-console-headless || true
+fi

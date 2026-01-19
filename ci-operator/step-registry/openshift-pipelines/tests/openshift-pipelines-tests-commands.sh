@@ -25,7 +25,7 @@ function mapTestsForComponentReadiness() {
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
             echo "Mapping Test Suite Name To: OpenshiftPipelines-lp-interop"
-            yq eval -px -ox -iI0 '.testsuites.testsuite."+@name" = "OpenshiftPipelines-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+            yq eval -px -ox -iI0 '.testsuites.testsuite[]."+@name" = "OpenshiftPipelines-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
@@ -75,6 +75,8 @@ else #login for ROSA & Hypershift platforms
   eval "$(cat "${SHARED_DIR}/api.login")"
 fi
 
+gauge uninstall xml-report
+gauge install xml-report --version 0.5.3
 echo "Running gauge specs"
 IFS=';' read -r -a specs <<< "$PIPELINES_TEST_SPECS"
 for spec in "${specs[@]}"; do

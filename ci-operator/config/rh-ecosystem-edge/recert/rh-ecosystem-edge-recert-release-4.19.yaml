@@ -3,10 +3,34 @@ base_images:
     name: ocm-2.11
     namespace: edge-infrastructure
     tag: assisted-test-infra
+  bip-orchestrate-vm:
+    name: bip-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ib-orchestrate-vm:
+    name: ib-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
+  installer:
+    name: "4.19"
+    namespace: ocp
+    tag: installer
+  lifecycle-agent-operator-4-19:
+    name: "4.19"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator
+  lifecycle-agent-operator-bundle-4-18:
+    name: "4.18"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
+  lifecycle-agent-operator-bundle-4-19:
+    name: "4.19"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
   tests-private:
     name: tests-private
     namespace: ci
@@ -96,7 +120,6 @@ tests:
     - ref: cucushift-e2e
     - ref: openshift-e2e-test-qe-report
     workflow: openshift-e2e-aws-single-node-recert
-  timeout: 8h0m0s
 - as: e2e-aws-ipi-sno-fips-recert
   cron: '@weekly'
   steps:
@@ -154,6 +177,41 @@ tests:
     - ref: cucushift-e2e
     - ref: openshift-e2e-test-qe-report
     workflow: baremetal-lab-agent-install-pxe
+- as: ibu-e2e-flow
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-19
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-19
+      RECERT_IMAGE: recert
+      TARGET_LCA_REF: pipeline:lifecycle-agent-operator-bundle-4-18
+    env:
+      OCP_BASE_IMAGE_SOURCE: release
+      OCP_BASE_VERSION: "4.19"
+      OCP_TARGET_IMAGE_SOURCE: release
+      OCP_TARGET_VERSION: "4.18"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+    workflow: openshift-image-based-upgrade-presubmit
+- as: ibi-e2e-flow
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-19
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-19
+      RECERT_IMAGE: recert
+    env:
+      OCP_BASE_IMAGE_SOURCE: release
+      OCP_BASE_VERSION: "4.19"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-install
 zz_generated_metadata:
   branch: release-4.19
   org: rh-ecosystem-edge

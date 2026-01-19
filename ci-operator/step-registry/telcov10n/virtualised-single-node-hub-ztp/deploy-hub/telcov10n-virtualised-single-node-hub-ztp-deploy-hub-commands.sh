@@ -76,10 +76,12 @@ function select_vhub_to_use {
 
   echo
   set -x
+  # Initialize the hub pool state from the remote file, or create a new one if it doesn't exist.
+  # Note: pool_limit is zero-padded to 3 digits (e.g., "002") for consistent string comparison.
   hub_pool_state=$(
       timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" cat ${virtualized_hub_pool_fname} || \
       echo '{
-        "pool_limit": "'${virtualised_hub_pool_limit}'",
+        "pool_limit": "'"$(printf '%03d' "${virtualised_hub_pool_limit}")"'",
         "pool": []
       }' | jq -c)
   ret=$(get_hub_id_and_updated_pool ${ts} ${hub_pool_state})
@@ -679,7 +681,7 @@ main
 #       "pool": [
 #         {
 #           "ts": "'${ts}'",
-#           "timeout": "'$(date -u -d "${MAX_HUB_DEPLOYMENT_TIMEOUT}" +%s%N)'"
+#           "timeout": "'$(date -u -d "${MAX_HUB_DEPLOYMENT_TIMEOUT}" +%s%N)'",
 #           "hub_id": "0",
 #           "state": "installing"
 #         }

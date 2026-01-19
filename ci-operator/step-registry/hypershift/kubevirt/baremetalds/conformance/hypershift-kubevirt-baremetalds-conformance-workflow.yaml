@@ -28,6 +28,7 @@ workflow:
     pre:
     - chain: baremetalds-ipi-pre
     - ref: enable-qe-catalogsource
+    - ref: deploy-konflux-operator
     - chain: hypershift-kubevirt-baremetalds-lvm
     - chain: hypershift-kubevirt-baremetalds-metallb
     - chain: hypershift-kubevirt-baremetalds-odf
@@ -37,10 +38,11 @@ workflow:
     - ref: hypershift-kubevirt-baremetalds-proxy
     - ref: hypershift-kubevirt-health-check
     env:
+      KONFLUX_DEPLOY_OPERATORS: "false"
+      KONFLUX_TARGET_OPERATORS: metallb,local-storage
       METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
       LOCAL_STORAGE_OPERATOR_SUB_SOURCE: qe-app-registry
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.15
-      LVM_OPERATOR_SUB_SOURCE: qe-app-registry
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       ETCD_STORAGE_CLASS: lvms-vg1
       TEST_SKIPS: StatefulSet Basic \| StatefulSet Non-retain

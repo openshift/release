@@ -3,29 +3,30 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.21_base-rhel9:
+  ocp_4.22_base-rhel9:
     name: 4.22-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.24-openshift-4.22
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/image-customization-controller
 images:
 - inputs:
-    ocp_4.21_base-rhel9:
+    ocp_4.22_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: machine-image-customization-controller
 promotion:
   to:
-  - name: 4.22-priv
+  - disabled: true
+    name: 4.22-priv
     namespace: ocp-private
 releases:
   initial:
@@ -68,7 +69,6 @@ tests:
     env:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ovn-ipv4
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-serial-ipv4
   capabilities:
   - intranet
@@ -76,7 +76,6 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv4
-  timeout: 5h30m0s
 - as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
@@ -84,7 +83,6 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
-  timeout: 5h0m0s
 - as: e2e-metal-ipi-virtualmedia
   capabilities:
   - intranet
@@ -92,7 +90,6 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
-  timeout: 5h0m0s
 - as: verify-deps
   steps:
     env:

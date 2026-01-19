@@ -3,10 +3,18 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  bip-orchestrate-vm:
+    name: bip-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ib-orchestrate-vm:
+    name: ib-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
   installer:
     name: "4.17"
     namespace: ocp
@@ -56,6 +64,7 @@ tests:
   commands: HOME=/tmp make test
   container:
     from: src
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
 - as: integration
   cluster_claim:
     architecture: amd64
@@ -64,6 +73,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.17"
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -83,9 +93,12 @@ tests:
 - as: e2e-ibio
   capabilities:
   - intranet
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet-assisted
     dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
       IMG: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
@@ -99,6 +112,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
       IMG: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:

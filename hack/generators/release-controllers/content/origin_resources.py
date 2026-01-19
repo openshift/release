@@ -3,7 +3,7 @@ from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volume
 
 def _add_origin_rbac(gendoc):
     gendoc.append_all([{
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'release-controller-modify',
@@ -79,7 +79,7 @@ def _add_origin_resources(gendoc):
                 "host": "origin-release.apps.ci.l2s4.p1.openshiftapps.com",
                 "tls": {
                     "insecureEdgeTerminationPolicy": "Redirect",
-                    "termination": "Edge"
+                    "termination": "edge"
                 },
                 "to": {
                     "kind": "Service",

@@ -23,13 +23,13 @@ CONFIG = {
     },
     'aws-3-quota-slice': {
         'us-east-1': 50,
-        'us-east-2': 35,
+        'us-east-2': 10,
         'us-west-1': 35,
-        'us-west-2': 35,
+        'us-west-2': 25,
     },
     'aws-4-quota-slice': {
         'us-east-1': 50,
-        'us-east-2': 35,
+        'us-east-2': 4,
         'us-west-1': 35,
         'us-west-2': 35,
     },
@@ -40,8 +40,8 @@ CONFIG = {
         'us-west-2': 35,
     },
     'aws-cspi-qe-quota-slice': {
-        'us-east-1': 30,
         'us-east-2': 30,
+        'us-west-2': 30,
     },
     'aws-managed-cspi-qe-quota-slice': {
         'us-east-1': 10,
@@ -170,16 +170,16 @@ CONFIG = {
         'us-west-2': 10,
     },
     'azure4-quota-slice': {
-        'centralus': 33,
-        'eastus': 8,
-        'eastus2': 8,
-        'westus': 8
+        'centralus': 14,
+        'eastus': 14,
+        'eastus2': 14,
+        'westus': 14
     },
     'azure-2-quota-slice': {
         'centralus': 33,
-        'eastus': 8,
-        'eastus2': 8,
-        'westus': 8
+        'eastus': 33,
+        'eastus2': 33,
+        'westus': 33
     },
     'azure-arm64-quota-slice': {
         'centralus': 33,
@@ -243,6 +243,25 @@ CONFIG = {
     'azure-confidential-qe-quota-slice': {
         'eastus': 6,
     },
+    'aro-hcp-int-quota-slice': {
+        'default': 1,
+    },
+    'aro-hcp-stg-quota-slice': {
+        'default': 3,
+    },
+    'aro-hcp-prod-quota-slice': {
+        'default': 7,
+    },
+    'aro-hcp-dev-quota-slice': {
+        'default': 10,
+    },
+    'aro-hcp-test-tenant-quota-slice': {
+        'default': 10,
+    },
+    'aro-hcp-test-msi-containers-dev': {},
+    'aro-hcp-test-msi-containers-int': {},
+    'aro-hcp-test-msi-containers-stg': {},
+    'aro-hcp-test-msi-containers-prod': {},
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },
@@ -254,6 +273,9 @@ CONFIG = {
     },
     'oex-aws-qe-quota-slice': {
         'default': 40,
+    },
+    'hyperfleet-e2e-quota-slice': {
+        'default': 20,
     },
     'equinix-ocp-hcp-quota-slice': {
         'default': 20,
@@ -385,6 +407,9 @@ CONFIG = {
     },
     'hypershift-quota-slice': {
         'default': 50,
+    },
+    'powervc-1-quota-slice': {
+        'default': 4,
     },
     'powervs-1-quota-slice': {
         'mon01': 1,
@@ -599,7 +624,7 @@ CONFIG = {
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
-for i in range(0, 3):
+for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
 for i in range(3):
@@ -658,6 +683,13 @@ for i in range(4):
 
 for i in range(2):
     CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
+
+for i in range(120):
+    CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
+    CONFIG['aro-hcp-test-msi-containers-int']['aro-hcp-test-msi-containers-int-{}'.format(i)] = 1
+    CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
+    CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
+
 
 
 config = {

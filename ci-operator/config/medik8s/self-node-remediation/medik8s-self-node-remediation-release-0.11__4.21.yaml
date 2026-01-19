@@ -1,0 +1,96 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: self-node-remediation-operator
+operator:
+  bundles:
+  - as: self-node-remediation-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/medik8s/self-node-remediation-operator:.*
+    with: pipeline:self-node-remediation-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+test_binary_build_commands: make test
+tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: openshift-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      OPERATOR_NAMESPACE: self-node-remediation
+      OPERATOR_RELEASED_VERSION: 0.10.0
+    test:
+    - as: e2e-install-operator-last-version
+      cli: latest
+      commands: |
+        make create-ns
+        # workaround for OLM pod not running with restricted PSA
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+
+        # OPERATOR_NAMESPACE variable is used by bundle-run and bundle-run-update
+        BUNDLE_IMG=quay.io/medik8s/self-node-remediation-operator-bundle:v"$OPERATOR_RELEASED_VERSION" make bundle-run
+      env:
+      - name: OPERATOR_NAMESPACE
+      - name: OPERATOR_RELEASED_VERSION
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-upgrade-operator-latest
+      cli: latest
+      commands: BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
+      dependencies:
+      - env: OO_BUNDLE
+        name: self-node-remediation-bundle
+      env:
+      - name: OPERATOR_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      cli: latest
+      commands: |
+        export SKIP_LOG_VERIFICATION="true" INSTALL_NAMESPACE="$OPERATOR_NAMESPACE"
+        make e2e-test
+      env:
+      - name: OPERATOR_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-0.11
+  org: medik8s
+  repo: self-node-remediation
+  variant: "4.21"

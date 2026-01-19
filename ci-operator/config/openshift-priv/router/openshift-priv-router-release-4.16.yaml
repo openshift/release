@@ -60,8 +60,9 @@ tests:
   container:
     from: src
 - as: e2e-agnostic
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
@@ -88,6 +89,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-aws-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
@@ -147,6 +149,7 @@ tests:
     - ref: baremetalds-e2e-test
     workflow: baremetalds-e2e
 - as: e2e-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
@@ -169,7 +172,6 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     test:
     - chain: openshift-qe-ingress-perf
-  timeout: 5h0m0s
 - always_run: false
   as: perfscale-aws-fips-ingress-perf
   optional: true
@@ -191,7 +193,6 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     test:
     - chain: openshift-qe-ingress-perf
-  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.16
   org: openshift-priv

@@ -3,25 +3,25 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.19_base-rhel9:
+  ocp_4.20_base-rhel9:
     name: "4.20"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 build_root:
   from_repository: true
 images:
 - dockerfile_path: ./Dockerfile.assisted-service.ocp
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.20_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+      - registry.ci.openshift.org/ocp/4.20:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: agent-installer-api-server
 promotion:
   to:
@@ -54,7 +54,6 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-agent-sno-ipv6
   capabilities:
@@ -63,7 +62,6 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-sno-ipv6
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-agent-ha-dualstack
   capabilities:
@@ -76,7 +74,6 @@ tests:
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
         MIRROR_IMAGES=true
     workflow: agent-e2e-generic
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-agent-4control-ipv4
   capabilities:
@@ -88,7 +85,6 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=4CONTROL_IPV4
     workflow: agent-e2e-generic
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-agent-5control-ipv4
   capabilities:
@@ -100,7 +96,6 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=5CONTROL_IPV4
     workflow: agent-e2e-generic
-  timeout: 6h0m0s
 - as: verify-deps
   steps:
     env:

@@ -12,6 +12,23 @@ then
 fi
 
 
+function add_pullsecret() {
+  local REGISTRY=$1
+  local USERNAME=$2
+  local PASSWORD=$3
+
+  oc extract secret/pull-secret -n openshift-config --keys=.dockerconfigjson --to=/tmp --confirm
+
+  jq --arg reg "$REGISTRY" --arg user "$USERNAME" --arg pass "$PASSWORD" \
+     '.auths[$reg] = {auth: ($user + ":" + $pass | @base64)}' \
+     /tmp/.dockerconfigjson > /tmp/.dockerconfigjson.new
+
+  oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/.dockerconfigjson.new
+
+  rm /tmp/.dockerconfigjson /tmp/.dockerconfigjson.new
+}
+
+
 # Get yq tool
 YQ="/tmp/yq"
 curl -L -o ${YQ} https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
@@ -53,19 +70,32 @@ then
 fi
 
 if [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ]
-  then
-  # Add pullsecret for cnv nightly channel from quay.io/openshift-cnv
-  QUAY_USERNAME=openshift-cnv+openshift_ci
-  QUAY_PASSWORD=$(cat /etc/cnv-nightly-pull-credentials/openshift_cnv_pullsecret)
-  oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
-  QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
-  jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io/openshift-cnv": {"auth":$QUAY_AUTH,"email":""}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
-  mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
-  oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
-  rm /tmp/global-pull-secret.json
+then
+  if [[ "${CNV_PRERELEASE_CATALOG_IMAGE}" == *"brew"* ]]; then
+    # Add brew registry pull secret
+    add_pullsecret "brew.registry.redhat.io" "${BREW_IMAGE_REGISTRY_USERNAME}" "$(cat "${BREW_IMAGE_REGISTRY_TOKEN_PATH}")"
 
-  sleep 5
-  oc wait mcp master worker --for condition=updated --timeout=20m
+    # Deploy IDMS for brew registry
+    cat <<EOF | oc apply -f -
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: brew-idms
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - brew.registry.redhat.io
+    source: registry.redhat.io
+EOF
+  elif [[ "${CNV_PRERELEASE_CATALOG_IMAGE}" == *"quay"* ]]; then
+    # Add quay registry pull secret for cnv nightly channel
+    QUAY_USERNAME=openshift-cnv+openshift_ci
+    QUAY_PASSWORD=$(cat /etc/cnv-nightly-pull-credentials/openshift_cnv_pullsecret)
+    add_pullsecret "quay.io/openshift-cnv" "${QUAY_USERNAME}" "${QUAY_PASSWORD}"
+  fi
+
+  oc wait mcp master worker --for condition=Updating=True --timeout=5m
+  oc wait mcp master worker --for condition=Updated=True --timeout=20m
 
   # Create a catalog source for the pre-release builds
   cat <<EOF | oc apply -f -

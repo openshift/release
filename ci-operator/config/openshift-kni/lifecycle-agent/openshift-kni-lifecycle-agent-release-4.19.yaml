@@ -1,4 +1,12 @@
 base_images:
+  bip-orchestrate-vm:
+    name: bip-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
+  ib-orchestrate-vm:
+    name: ib-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
   installer:
     name: "4.19"
     namespace: ocp
@@ -7,6 +15,10 @@ base_images:
     name: "4.18"
     namespace: ocp-kni
     tag: lifecycle-agent-operator-bundle
+  recert:
+    name: recert
+    namespace: edge-infrastructure
+    tag: release-4.19
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -108,8 +120,11 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
       LCA_PULL_REF: lifecycle-agent-operator
       OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
+      RECERT_IMAGE: pipeline:recert
       TARGET_LCA_REF: pipeline:previous-lca
     env:
       OCP_BASE_IMAGE_SOURCE: release
@@ -118,23 +133,24 @@ tests:
       OCP_TARGET_VERSION: "4.18"
       SEED_IMAGE_TAG_FORMAT: presubmit
     workflow: openshift-image-based-upgrade-presubmit
-  timeout: 4h0m0s
 - as: ibi-e2e-flow
   optional: true
   skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
     cluster_profile: aws-3
     dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
       INSTALLER_PULL_REF: pipeline:installer
       LCA_PULL_REF: lifecycle-agent-operator
       OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
+      RECERT_IMAGE: pipeline:recert
     env:
       OCP_BASE_IMAGE_SOURCE: release
       OCP_BASE_VERSION: "4.19"
       SEED_IMAGE_TAG_FORMAT: presubmit
       SEED_IMAGE_TAG_PREFIX: ibi
     workflow: openshift-image-based-install
-  timeout: 3h0m0s
 - as: security
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

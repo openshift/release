@@ -8,6 +8,241 @@ This directory contains custom slash commands to help developers work with the O
 
 **Purpose**: Search and discover existing step-registry steps, workflows, and chains to reuse in CI configurations.
 
+See detailed documentation below.
+
+---
+
+### `/rehearse-debug-cluster` - Add Debug Reference and Rehearse Changes
+
+**Purpose**: Automated workflow to add wait reference to a test configuration and trigger CI rehearsal.
+
+**Usage**:
+```bash
+/rehearse-debug-cluster <config_name> <release>
+```
+
+**Parameters**:
+- `config_name` (required): Test configuration name (e.g., "baremetalds-ipi-ovn-dualstack-primaryv6-f7")
+- `release` (required): Release version (e.g., "4.21")
+
+**Example**:
+```bash
+/rehearse-debug-cluster baremetalds-ipi-ovn-dualstack-primaryv6-f7 4.21
+```
+
+**What it does**:
+1. Creates a new branch named `debug-cluster-<config_name>`
+2. Finds the target configuration file in `ci-operator/config/openshift/openshift-tests-private/`
+3. Adds `- ref: wait` after the `-chain` line in the test block
+4. Commits, pushes, and creates a PR to openshift/release with title `debug-cluster-<config_name>`
+5. Waits for the openshift-ci-robot REHEARSALNOTIFIER comment
+6. Extracts the test name and posts the `/pj-rehearse` comment to trigger rehearsal
+
+**Output**:
+- PR URL
+- Test name
+- Rehearsal trigger confirmation
+
+This command runs fully automated without prompting between steps.
+
+---
+
+### `/migrate-variant-periodics` - Migrate Periodic Job Configurations
+
+**Purpose**: Migrate OpenShift periodic CI job definitions from one release version to another by copying and transforming YAML configuration files.
+
+**Usage**:
+```bash
+/migrate-variant-periodics <from_release> <to_release> [path] [--skip-existing]
+```
+
+**Parameters**:
+- `from_release` (required): Source release version (e.g., "4.17", "4.18")
+- `to_release` (required): Target release version (e.g., "4.18", "4.19")
+- `path` (optional): Directory path to search for periodic files. Default: ci-operator/config/
+- `skip_existing` (optional): Flag "--skip-existing" to automatically skip existing target files without prompting
+
+**Examples**:
+```bash
+# Migrate all periodic jobs from 4.17 to 4.18
+/migrate-variant-periodics 4.17 4.18
+
+# Migrate specific repository
+/migrate-variant-periodics 4.18 4.19 ci-operator/config/openshift/etcd
+
+# Migrate entire organization
+/migrate-variant-periodics 4.19 4.20 ci-operator/config/openshift
+
+# Migrate with automatic skip of existing files
+/migrate-variant-periodics 4.17 4.18 --skip-existing
+```
+
+**What it does**:
+- Uses the `.claude/scripts/migrate_periodic_file.py` script to automate migration
+- Transforms version references (base images, builder tags, registry paths, release names, branch metadata)
+- Regenerates randomized cron schedules to avoid thundering herd
+- Maintains existing interval schedules
+- Creates new periodic configuration files for the target release
+- Validates YAML structure
+- **Automatically runs `make update`** after migration to regenerate all downstream artifacts (Prow jobs, configs, etc.)
+
+**Implementation**:
+- The command orchestrates the migration workflow and user interactions
+- Actual file transformation is delegated to `.claude/scripts/migrate_periodic_file.py`
+- Ensures consistent transformations across all periodic files
+- Runs `make update` automatically at the end to generate job configs and update all related files
+
+**CRITICAL Security Note**:
+- ⚠️ **NEVER migrates files under `openshift-priv/`** - These are private repositories with special security considerations
+- The command automatically excludes all `ci-operator/config/openshift-priv/` files from migration
+- openshift-priv configurations must be handled separately by authorized personnel
+
+---
+
+### `/find-missing-variant-periodics` - Find Missing Periodic Configurations
+
+**Purpose**: Identify periodic job configurations that exist for one release but are missing for another.
+
+**Usage**:
+```bash
+/find-missing-variant-periodics <from_release> <to_release> [path]
+```
+
+**Parameters**:
+- `from_release` (required): Source release version to search for existing configurations
+- `to_release` (required): Target release version to check for missing configurations
+- `path` (optional): Directory path to search for periodic files. Default: ci-operator/config/
+
+**Examples**:
+```bash
+# Find all missing periodics from 4.17 to 4.18
+/find-missing-variant-periodics 4.17 4.18
+
+# Check specific repository
+/find-missing-variant-periodics 4.18 4.19 ci-operator/config/openshift/cloud-credential-operator
+
+# Check entire organization
+/find-missing-variant-periodics 4.19 4.20 ci-operator/config/openshift
+```
+
+**What it does**:
+- Read-only analysis - doesn't modify any files
+- Identifies which periodic configs exist for one release but are missing for another
+- Provides statistics (total, missing, existing counts and percentages)
+- Suggests next steps for migration
+- Use this before `/migrate-variant-periodics` to understand scope of work
+
+---
+
+### `/effective-env` - Resolve Job Environment Variables
+
+**Purpose**: Resolve and display the effective environment variables for a specific CI job, showing how variables cascade through the job's workflow, chains, and steps with override tracking.
+
+**Usage**:
+```bash
+/effective-env <job_name> [component_name] [version] [filter]
+```
+
+**Parameters**:
+- `job_name` (required): The job name (value in the `as` field in ci-operator/config YAML files)
+- `component_name` (optional): Component name to narrow down job configs. Examples:
+  - `hypershift` → searches openshift/hypershift and openshift-priv/hypershift
+  - `jboss-eap` → searches jboss-eap-qe
+  - `openshift/hypershift` → searches only openshift/hypershift
+  - If not provided, searches all job configs
+- `version` (optional): Version(s) to filter job configs:
+  - Single version: `4.21`
+  - Multiple versions (comma or space-separated): `4.21,4.20` or `4.21 4.20`
+  - If not set, all versions included (may prompt for confirmation if >2 found)
+- `filter` (optional): Case-insensitive filter to show only matching environment variables
+  - Example: `lvm` shows LVM_OPERATOR_SUB_CHANNEL, LVM_CATALOG_SOURCE, etc.
+
+**Examples**:
+```bash
+# Basic usage - show all variables for a job
+/effective-env e2e-kubevirt-metal-ovn hypershift
+
+# Specific version
+/effective-env e2e-kubevirt-metal-ovn hypershift 4.21
+
+# Multiple versions
+/effective-env e2e-kubevirt-metal-ovn hypershift "4.20,4.21"
+
+# With filter - show only METALLB variables
+/effective-env e2e-kubevirt-metal-ovn hypershift 4.21 metallb
+
+# Multiple versions with filter
+/effective-env e2e-kubevirt-metal-ovn hypershift "4.20,4.21" hypershift
+
+```
+
+**What it does**:
+- Finds CI config files matching the job name and component
+- Filters by specified version(s)
+- Resolves environment variables through the entire dependency chain:
+  - Job config overrides (highest priority)
+  - Workflow-level variables
+  - Chain-level variables
+  - Step-level defaults (lowest priority)
+- Displays variables in a formatted table with:
+  - Total and filtered counts
+  - Override warnings (⚠️) for variables that override step defaults
+  - Summary of key overrides with source tracking
+  - Value truncation for readability (>80 chars)
+
+**Output Format**:
+```
+## Job: e2e-kubevirt-metal-ovn (4.21)
+- **Config**: ci-operator/config/openshift/hypershift/openshift-hypershift-release-4.21__periodics.yaml
+- **Workflow**: hypershift-kubevirt-baremetalds-conformance
+
+### Summary
+- Total environment variables: 75
+- Displayed: 4 (filtered by: 'metallb')
+- Overrides: 1
+
+| Variable | Value |
+|----------|-------|
+| ⚠️ METALLB_OPERATOR_SUB_SOURCE (workflow)     | qe-app-registry  |
+| METALLB_OPERATOR_SUB_CHANNEL (step)           | stable           |
+| ... | ... |
+
+### 🔑 Key Overrides
+
+These variables have been overridden from their step defaults:
+
+| Variable | Override Value | Source | Default Value |
+|----------|----------------|--------|---------------|
+| METALLB_OPERATOR_SUB_SOURCE | qe-app-registry | workflow | redhat-operators |
+```
+
+**Why Use It**:
+- **Debugging**: Understand which environment variables are actually used by a job
+- **Override Analysis**: See which variables are overridden from their defaults
+- **Configuration Validation**: Verify environment variable values before running jobs
+- **Impact Assessment**: Compare variables across multiple versions or configs
+- **Operator Configuration**: Quickly find operator subscription channels, catalog sources, etc.
+
+**Implementation**:
+- Uses `.claude/scripts/effective_env.py` to recursively resolve variables
+- Follows OpenShift CI priority rules: config > workflow > chain > step
+- Tracks override sources for transparency
+- Outputs structured JSON for reliable parsing
+
+**Tips**:
+1. **Filter for specific concerns**: Use filters like `catalog`, `channel`, `operator` to narrow results
+2. **Version comparison**: Specify multiple versions to see configuration drift
+3. **Override detection**: Pay attention to ⚠️ warnings - these indicate intentional overrides
+4. **Empty values**: Some variables may have empty defaults and get set at runtime
+
+---
+
+## Step Finder Detailed Documentation
+
+### `/step-finder` - Step Registry Component Discovery
+
+**Purpose**: Search and discover existing step-registry steps, workflows, and chains to reuse in CI configurations.
+
 **Why Use It**: The step-registry contains over 4,400 reusable CI components (2,116 steps, 1,322 workflows, 985 chains). This command helps you find the right component instead of creating duplicates.
 
 #### Usage

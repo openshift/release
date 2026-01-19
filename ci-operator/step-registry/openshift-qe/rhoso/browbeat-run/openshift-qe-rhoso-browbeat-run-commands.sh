@@ -10,7 +10,7 @@ bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
 build_id="${BUILD_ID:-unknown}"
 es_host=$(cat ${CLUSTER_PROFILE_DIR}/elastic_host)
 kubeconfig=$(cat ${CLUSTER_PROFILE_DIR}/kubeconfig)
-config_file="conf/cpt-${WORKLOAD}.yaml"
+config_file="cpt-${WORKLOAD}.yaml"
 
 cat > /tmp/browbeat_run_script.sh <<EOF
 #!/bin/bash
@@ -31,13 +31,16 @@ ssh root@${bastion} "
   export ES_SERVER=\"${es_host}\"
   export KUBECONFIG=\"${kubeconfig}\"
   JOB_START=\\\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
-  cd browbeat
+  rm -rf cpt-browbeat-config
+  git clone https://gitlab.cee.redhat.com/eng/openstack/team/performance-and-scale/cpt-browbeat-configs.git
+  cd cpt-browbeat-configs
   if [ ! -f ${config_file} ]; then
     echo 'Config ${config_file} not found. Set WORKLOAD env var (e.g., WORKLOAD=nova).' >&2
     exit 1
   fi
   echo Using ${config_file}
-  cp -f ${config_file} browbeat-config.yaml
+  cp -f ${config_file} ../browbeat/browbeat-config.yaml
+  cd ../browbeat
   sed -i \"s|cloud_name: .*|cloud_name: cpt-${build_id}|\" browbeat-config.yaml
   sed -i \"s|host: .*|host: ${es_host}|\" browbeat-config.yaml
   source .browbeat-venv/bin/activate

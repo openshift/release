@@ -7,21 +7,25 @@ base_images:
     name: builder
     namespace: stolostron
     tag: go1.24-linux
+  stolostron_builder_go1.25-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.25-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.23-linux
+    tag: go1.25-linux
 images:
 - additional_architectures:
   - arm64
   dockerfile_path: Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.24-linux:
+    stolostron_builder_go1.25-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.25-linux
   to: multicloud-manager
 promotion:
   to:
@@ -77,6 +81,8 @@ tests:
     from: test-bin
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e
+  capabilities:
+  - arm64
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     dependencies:
@@ -156,6 +162,8 @@ tests:
         requests:
           cpu: 100m
 - as: pr-image-mirror
+  capabilities:
+  - arm64
   steps:
     dependencies:
       SOURCE_IMAGE_REF: multicloud-manager
@@ -164,6 +172,8 @@ tests:
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
+  capabilities:
+  - arm64
   postsubmit: true
   steps:
     dependencies:

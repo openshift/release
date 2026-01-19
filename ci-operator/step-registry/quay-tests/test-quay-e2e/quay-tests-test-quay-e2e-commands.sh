@@ -3,7 +3,17 @@
 set -euo pipefail
 
 #Set Kubeconfig:
-cd quay-frontend-tests
+echo "Quay version is ${QUAY_VERSION}"
+QUAY_VERSION_THRESHOLD="3.16"
+if [ "$(printf '%s\n%s' "${QUAY_VERSION_THRESHOLD}" "${QUAY_VERSION}" | sort -V | head -n1)" = "${QUAY_VERSION_THRESHOLD}" ]; then
+    #For Quay versions equal to or higher than 3.16, use the new UI test suite.
+    cd new-ui-tests
+else
+    #For Quay versions lower than 3.16, use the old UI test suite.
+    cd quay-frontend-tests
+fi
+echo "Current testing directory is $(pwd)"
+
 skopeo -v
 oc version
 terraform version
@@ -39,7 +49,7 @@ function mapTestsForComponentReadiness() {
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
             echo "Mapping Test Suite Name To: Quay-lp-interop"
-            /tmp/bin/yq eval -px -ox -iI0 '.testsuites.+@name="Quay-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+            /tmp/bin/yq eval -px -ox -iI0 '.testsuites.testsuite[]."+@name"="Quay-lp-interop"' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
@@ -95,11 +105,15 @@ quay_route=$(oc get quayregistry quay -n quay-enterprise -o jsonpath='{.status.r
 echo "The Quay hostname is $quay_route"
 quay_hostname=${quay_route#*//}
 echo "The Quay hostname is $quay_hostname"
-export CYPRESS_QUAY_ENDPOINT=$quay_hostname
 
-echo "The quay version is ${QUAY_VERSION}"
-export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
+if [ "$(printf '%s\n%s' "${QUAY_VERSION_THRESHOLD}" "${QUAY_VERSION}" | sort -V | head -n1)" = "${QUAY_VERSION_THRESHOLD}" ]; then
+    export CYPRESS_QUAY_ENDPOINT=${quay_hostname}
+    export CYPRESS_QUAY_ENDPOINT_PROTOCOL="https"
+    export CYPRESS_QUAY_PROJECT="quay-enterprise"
+    export CYPRESS_OLD_UI_DISABLED=true
+else
+    export CYPRESS_QUAY_ENDPOINT=${quay_hostname}
+    export CYPRESS_QUAY_VERSION="${QUAY_VERSION}"
+fi
 
 NO_COLOR=1 yarn run smoke || true
-
-

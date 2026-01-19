@@ -30,8 +30,8 @@ function copyArtifacts {
             mv "$file" "$ARTIFACT_DIR"/"$JUNIT_PREFIX""$(basename "$file")"
         fi
     done
-    cp -r ./cypress/videos/* $ARTIFACT_DIR
-    cp -r ./cypress/logs/* $ARTIFACT_DIR
+    cp -r ./cypress/videos/* $ARTIFACT_DIR || true
+    cp -r ./cypress/logs/* $ARTIFACT_DIR || true
 
     if [[ -e "./quay_new_ui_testing_report.xml" ]]; then
         cp -r "./quay_new_ui_testing_report.xml" $ARTIFACT_DIR
@@ -129,8 +129,8 @@ YARN_PATH=$(yarn global bin)
 NEW_PATH="$PATH:${YARN_PATH}"
 export PATH=${NEW_PATH}
 
-#yarn run cypress run --browser firefox --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags=newui+-nopipeline || true
-NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --noprowci' || true
+#NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags='newui --noprowci' || true
+NO_COLOR=1 yarn run cypress run -b chrome --reporter cypress-multi-reporters --reporter-options configFile=reporter-config.json --env grepTags="${NEW_UI_TESTING_COVERAGE}",grepFilterSpecs=true || true 
 
 yarn run jrm  ./quay_new_ui_testing_report.xml ./cypress/results/quay_new_ui_testing_report-* || true
 

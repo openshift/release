@@ -1,6 +1,11 @@
 #!/bin/bash
 echo "Generate HTML reports from JUnit files"
 
+if [[ ! -f "${SHARED_DIR}/gotest-completed" ]]; then
+    echo "Gotests did not complete, skipping html report step"
+    exit 0
+fi
+
 script_url=https://raw.githubusercontent.com/openshift-kni/telco5gci/refs/heads/master/j2html.py
 requirements_url=https://raw.githubusercontent.com/openshift-kni/telco5gci/refs/heads/master/requirements.txt
 

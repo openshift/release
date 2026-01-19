@@ -1,0 +1,149 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  from_repository: true
+images:
+- build_args:
+  - name: COVER
+    value: "true"
+  dockerfile_path: Dockerfile
+  from: base
+  to: cluster-group-upgrades-operator
+- dockerfile_path: Dockerfile.precache
+  from: base
+  to: cluster-group-upgrades-operator-precache
+- dockerfile_path: Dockerfile.recovery
+  from: base
+  to: cluster-group-upgrades-operator-recovery
+- dockerfile_path: bundle.Dockerfile
+  to: cluster-group-upgrades-operator-bundle
+operator:
+  bundles:
+  - dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift-kni/cluster-group-upgrades-operator:.*
+    with: pipeline:cluster-group-upgrades-operator
+promotion:
+  to:
+  - name: "4.21"
+    namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.21"
+      namespace: ocp
+      reference_policy: Local
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: ocp
+      reference_policy: Local
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ci-job
+  commands: |
+    unset VERSION
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
+    make ci-job
+    make coveralls-download
+    export COVERALLS_REPO_TOKEN=$(cat /etc/coveralls/TOKEN)
+    ./bin/coveralls report --job-flag "unit-tests" --build-number=$(git rev-parse HEAD) coverage.out
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/coveralls
+    name: cluster-group-upgrades-operator-coverall
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
+- as: integration
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: aws-telco
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-cluster-group-upgrades
+      OO_PACKAGE: cluster-group-upgrades-operator
+      OO_TARGET_NAMESPACES: '!all'
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch main
+        ci-job-fullname openshift-kni-cluster-group-upgrades-operator-main
+        ci-job-type optional-operators-ci-aws
+        ci-repo-name cluster-group-upgrades-operator
+        ci-org-name openshift-kni
+    pre:
+    - chain: ipi-aws-pre
+    - as: pre
+      cli: latest
+      commands: |
+        KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG
+        cp $(echo "${KUBECONFIG}") /go/src/github.com/openshift-kni/cluster-group-upgrades-operator/kubeconfig
+        make non-kind-deps-update
+        make install-acm-crds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: optional-operators-subscribe
+    test:
+    - as: integration
+      cli: latest
+      commands: |
+        KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        export KUBECONFIG
+        cp $(echo "${KUBECONFIG}") /go/src/github.com/openshift-kni/cluster-group-upgrades-operator/kubeconfig
+        ./hack/add-sidecar-csv.sh
+        sleep 60
+        make complete-kuttl-test
+        ./hack/extract-coverage.sh
+        sed -i 's/\/workspace/\./g' ./runtime-coverage/coverage.out
+        make coveralls-download
+        export COVERALLS_REPO_TOKEN=$(cat /etc/coveralls/TOKEN)
+        ./bin/coveralls report --job-flag "integration-tests" --build-number=$(git rev-parse HEAD) ./runtime-coverage/coverage.out
+      credentials:
+      - collection: ""
+        mount_path: /etc/coveralls
+        name: cluster-group-upgrades-operator-coverall
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: tekton-linting
+  commands: |
+    unset VERSION
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
+    make yamllint
+  container:
+    from: src
+  optional: true
+  run_if_changed: ^(?:.*/)?(?:\.tekton/.*|\.konflux/.*)$
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: cluster-group-upgrades-operator
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift-kni
+  repo: cluster-group-upgrades-operator

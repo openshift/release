@@ -4,6 +4,27 @@ set -e
 set -u
 set -o pipefail
 
+# retry_until_success <retries> <sleep_time> <function_name> [args...]
+# - retries       : max number of attempts
+# - sleep_time    : seconds between attempts
+# - func          : the function to be called or a sub shell call
+function retry_until_success() {
+    local retries="$1"
+    local sleep_time="$2"
+    shift 2   # drop retries and sleep_time
+    for i in $(seq 1 "$retries"); do
+        echo "Attempt $i/$retries: running $*"
+        if "$@"; then
+            echo "Success on attempt $i"
+            return 0
+        fi
+        echo "Failed attempt $i, retrying in $sleep_time seconds..."
+        sleep "$sleep_time"
+    done
+    echo "$* did not succeed after $retries attempts"
+    return 1
+}
+
 function check_node() {
     local node_number ready_number
     node_number=$(oc get node --no-headers | grep -cv STATUS)
@@ -41,7 +62,7 @@ EOT
     oc wait clusterversion/version --for='condition=Available=True' --timeout=15m
 
     echo "Step #2: Make sure every machine is in 'Ready' status"
-    check_node
+    retry_until_success 60 10 check_node
 
     echo "Step #3: Check all pods are in status running or complete"
     check_pod
@@ -113,6 +134,11 @@ rm /tmp/global-pull-secret.json
 
 echo "{\"spec\":{\"pullSecret\":{\"name\":\"$CLUSTER_NAME-pull-secret-new\"}}}" > /tmp/patch.json
 oc patch hostedclusters -n "$HYPERSHIFT_NAMESPACE" "$CLUSTER_NAME" --type=merge -p="$(cat /tmp/patch.json)"
+
+echo "Make sure all nodepools are in healthy status after rolling out"
+oc wait nodepool -n "$HYPERSHIFT_NAMESPACE" --all --for='condition=UpdatingConfig=True' --timeout=15m
+oc wait nodepool -n "$HYPERSHIFT_NAMESPACE" --all --for='condition=UpdatingConfig=False' --timeout=30m
+oc wait nodepool -n "$HYPERSHIFT_NAMESPACE" --all --for='condition=AllNodesHealthy=True' --timeout=30m
 
 echo "check day-2 pull-secret update"
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"

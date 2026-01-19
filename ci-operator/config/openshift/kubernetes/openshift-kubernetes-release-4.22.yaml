@@ -144,6 +144,7 @@ promotion:
   to:
   - additional_images:
       artifacts: artifacts
+    disabled: true
     excluded_images:
     - rhel-coreos
     name: "4.22"
@@ -320,7 +321,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-gcp
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-aws-ovn
@@ -344,7 +345,6 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-serial
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-azure
   optional: true
@@ -386,7 +386,7 @@ tests:
 - as: e2e-azure-ovn-upgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - as: e2e-aws-ovn-downgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
@@ -401,7 +401,6 @@ tests:
   steps:
     cluster_profile: aws-5
     workflow: openshift-e2e-aws-serial
-  timeout: 5h0m0s
 - always_run: false
   as: e2e-aws-csi
   optional: true
@@ -428,6 +427,19 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: k8s-conformance
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: test
+      cli: latest
+      commands: openshift-hack/conformance-k8s.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
@@ -438,7 +450,6 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-  timeout: 5h30m0s
 - always_run: false
   as: e2e-metal-ipi-ovn-dualstack
   capabilities:
@@ -536,7 +547,6 @@ tests:
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
-  timeout: 3h30m0s
 - always_run: false
   as: e2e-external-aws-ccm
   optional: true
@@ -548,7 +558,13 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-external-aws
-  timeout: 6h0m0s
+- as: e2e-aws-hpa
+  cron: 0 5 * * 1
+  steps:
+    cluster_profile: aws-2
+    env:
+      TEST_SUITE: kubernetes/autoscaling/hpa
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

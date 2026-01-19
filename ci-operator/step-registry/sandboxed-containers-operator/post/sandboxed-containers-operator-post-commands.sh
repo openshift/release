@@ -92,6 +92,40 @@ cleanup_aws() {
 	exit 0
 }
 
+# Remove our NSG on ARO+peer-pods (do nothing on plain azure)
+cleanup_azure() {
+	local IS_ARO
+	IS_ARO=$(oc get crd clusters.aro.openshift.io &>/dev/null && echo true || echo false)
+	if [[ "${IS_ARO}" != "true" ]]; then
+		echo "We are not on ARO"
+		return
+	fi
+	if [[ "${ENABLEPEERPODS:-false}" != "true" ]]; then
+		echo "Peer-pods not enabled"
+		return
+	fi
+
+	AZURE_RESOURCE_GROUP=$(oc get infrastructure/cluster -o jsonpath='{.status.platformStatus.azure.resourceGroupName}')
+	AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+	AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
+	AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
+	AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+	az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+
+	# delete kataconfig (to prevent starting new podvms)
+	oc delete kataconfigs.kataconfiguration.openshift.io --all --wait=false || echo "::warning:: Failed to delete kata-config"
+
+	# Delete potentially left-behind VMs
+	az vm list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[?starts_with(name, 'podvm-')].name" --output tsv | xargs -I {} az vm delete --resource-group "${AZURE_RESOURCE_GROUP}" --name {} --yes --force-deletion 1 --no-wait
+	echo "Deletion initiated. Waiting up to 60 seconds for all VMs to be removed..."
+	SECONDS=0
+	while [[ "${SECONDS}" -lt 60 ]] && az vm list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[?starts_with(name, 'podvm-')].name" --output tsv | grep -q .; do
+		sleep 5
+	done
+	[[ "${SECONDS}" -ge 60 ]] && echo "::error:: Failed to delete all vms in 60s" && az vm list --resource-group "${AZURE_RESOURCE_GROUP}" --query "[?starts_with(name, 'podvm-')].name" --output tsv
+	echo "All is cleared"
+}
+
 # First check if PODVM_IMAGE was provided or generated
 if [[ "${PODVM_IMAGE_URL}" ]]; then
   echo "Skipping cleanup, custom PODVM_IMAGE_URL=${PODVM_IMAGE_URL} specified"
@@ -104,6 +138,8 @@ provider="$(oc get infrastructure -n cluster -o json | jq '.items[].status.platf
 case ${provider} in
 	aws)
 		cleanup_aws ;;
+	azure)
+		cleanup_azure ;;
 	*)
 		echo "No post defined for provider ${provider}, skipping cleanup"
 		exit 0;;

@@ -2,20 +2,24 @@ ref:
   as: openshift-observability-ibm-z-cluster-create
   commands: openshift-observability-ibm-z-cluster-create-commands.sh
   credentials:
-  - mount_path: /tmp/vault/ibmcloudz-rhr-creds
-    name: ibmcloudz-rhr-creds
+  - mount_path: /tmp/vault/ibmz-ci-creds
+    name: observability-ibmz-ci-creds
     namespace: test-credentials
-  env:
-  - name: IBM_CLOUD_OPENSHIFT_CHANNEL
-    default: ''
+  # https://github.com/openshift/release/blob/master/core-services/image-mirroring/supplemental-ci-images/mapping_supplemental_ci_images_ocp_on_powervs
   from_image:
-    name: automation-flavors
-    namespace: stackrox
-    tag: ibmcloudz-0.10.8
+    namespace: ocp-on-powervs
+    name: powervs-container-host
+    tag: latest
   resources:
     requests:
       cpu: 2000m
       memory: 4000Mi
+  env:
+  - name: CLUSTER_VERSION
+    default: "4.18.2"
+  - name: PULL_SECRET_FILE
+    default: "/root/ocp-pull-secret.json"
+  - name: CLUSTER_NAME
+    default: "ocp-demo-ci-s390x-418"
   documentation: |-
-    Step to provision a OCP cluster in IBM Z.
-        
+    Step to acquire a OCP cluster on Z in IBM Cloud

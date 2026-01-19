@@ -115,6 +115,7 @@ run_tests() {
   oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
     sh -c "
     export KUBECONFIG=/work/ci-kubeconfig
+    export ENABLE_OVERLAY2_STORAGE_DRIVER=true
     export BUILD_WITH_CONTAINER=\"0\"
     export DOCKER_INSECURE_REGISTRIES=\"default-route-openshift-image-registry.\$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr(\$0, index(\$0,\$2))}')\"
     ${VERSIONS_YAML_CONFIG:-}
@@ -139,11 +140,16 @@ execute_and_collect_artifacts() {
   set +o errexit
   run_tests
   test_rc=$?
-  set -o errexit
   echo "Test run (attempt ${attempt}) completed with exit code ${test_rc}"
 
   echo "Copying artifacts from test pod after attempt ${attempt}..."
   oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+
+  # share artifacts with next job step which is uploading results to report portal
+  echo "Copying artifacts to SHARED_DIR after attempt ${attempt}..."
+  cp "${ARTIFACT_DIR}/"* "${SHARED_DIR}"
+
+  set -o errexit
 
   return ${test_rc}
 }

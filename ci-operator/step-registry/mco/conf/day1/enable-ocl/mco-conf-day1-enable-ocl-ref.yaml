@@ -1,0 +1,49 @@
+ref:
+  as: mco-conf-day1-enable-ocl
+  from: nested-podman
+  cli: latest
+  nested_podman: true
+  commands: mco-conf-day1-enable-ocl-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  credentials:
+  - namespace: test-credentials
+    name: openshift-qe-mco-test-quay-robot-account
+    mount_path: /var/run/vault/mcoqe-robot-account
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  env:
+  - name: MCO_CONF_DAY1_ENABLE_OCL_CONTAINERFILE_CONTENT
+    default: "RUN touch /etc/custom-osimage-test"
+    documentation: |-
+      The content of the Containerfile to build the custom osImage.
+      Do not include the FROM instruction as it will be added automatically.
+      Default is 'RUN touch /etc/custom-osimage-test'.
+  - name: MCO_CONF_DAY1_ENABLE_OCL_TAG
+    default: "custom-osimage-ci"
+    documentation: |-
+      The tag to use for the custom osImage pushed to quay.io/mcoqe/layering.
+      Default is 'custom-osimage-ci'.
+  - name: MCO_CONF_DAY1_ENABLE_OCL_MCPS
+    default: ""
+    documentation: |-
+      Space-separated list of MachineConfigPool names to configure with the pre-built image.
+      If empty, the step will be skipped.
+  - name: MCO_CONF_DAY1_ENABLE_OCL_RENDERED_IMAGE_PUSH_SPEC
+    default: "quay.io/mcoqe/layering:latest"
+    documentation: |-
+      The push spec for rendered images.
+      Default is 'quay.io/mcoqe/layering:latest'.
+  - name: MCO_CONF_DAY1_ENABLE_OCL_IMAGE_EXPIRATION
+    default: "24h"
+    documentation: |-
+      Expiration time for both custom osImage and rendered images in quay.io (quay.expires-after label).
+      Default is '24h'.
+  documentation: |-
+    Builds a custom osImage from the CoreOS base image in the release, pushes it to quay.io/mcoqe/layering,
+    and generates MachineOSConfig manifests with pre-built-image annotation for day1 installation.
+    Creates a secret with mcoqe credentials and MachineOSConfig manifests for each pool in MCO_CONF_DAY1_ENABLE_OCL_MCPS
+    in SHARED_DIR for installation to pick up. This step replaces the need to run separate build-custom-osimage and enable-ocl steps.

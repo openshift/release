@@ -1,0 +1,191 @@
+base_images:
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
+  openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+  operator-sdk:
+    name: "4.23"
+    namespace: origin
+    tag: operator-sdk
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: release
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+canonical_go_repository: github.com/openshift/file-integrity-operator
+images:
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    openshift_release_rhel-9-release-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.22-openshift-4.17
+  to: file-integrity-operator
+operator:
+  bundles:
+  - as: file-integrity-operator-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/file-integrity-operator/file-integrity-operator:1.3.0
+    with: pipeline:file-integrity-operator
+  - pullspec: quay.io/file-integrity-operator/file-integrity-operator:latest
+    with: pipeline:file-integrity-operator
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: go-build
+  commands: make
+  container:
+    from: src
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: e2e-aws
+  skip_if_only_changed: ^(?:\.github|\.tekton)|\.md$|bundle-hack|^(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    cluster_profile: aws-4
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-rosa
+  optional: true
+  steps:
+    cluster_profile: quay-aws
+    env:
+      BYO_OIDC: "true"
+      CHANNEL_GROUP: stable
+      ENABLE_BILLING_ACCOUNT: "yes"
+      OCM_LOGIN_ENV: integration
+      OPENSHIFT_VERSION: "4.15"
+      REGION: us-east-2
+    test:
+    - ref: ipi-install-rbac
+    - as: test-rosa
+      cli: latest
+      commands: oc adm wait-for-stable-cluster --minimum-stable-period 5m --timeout
+        30m; make e2e-rosa
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: rosa-aws-sts-hcp
+- always_run: false
+  as: e2e-bundle-aws
+  optional: true
+  run_if_changed: ^(config|bundle)
+  steps:
+    cluster_profile: aws
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-file-integrity
+        operator-sdk run bundle --security-context-config restricted -n openshift-file-integrity "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-file-integrity deployment file-integrity-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: file-integrity-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test-bundle
+      cli: latest
+      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=openshift-file-integrity
+        TEST_OPERATOR_NAMESPACE=openshift-file-integrity make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-bundle-aws-upgrade
+  optional: true
+  run_if_changed: ^(config|bundle)
+  steps:
+    cluster_profile: aws
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-file-integrity
+        operator-sdk run bundle --security-context-config restricted -n openshift-file-integrity quay.io/file-integrity-operator/file-integrity-operator-bundle:latest
+        oc wait --timeout=10m --for condition=Available -n openshift-file-integrity deployment file-integrity-operator
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: upgrade
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade --security-context-config restricted -n openshift-file-integrity "$OO_BUNDLE"
+        oc wait --timeout=10m --for condition=Available -n openshift-file-integrity deployment file-integrity-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: file-integrity-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: TEST_BUNDLE_INSTALL=1 TEST_WATCH_NAMESPACE=openshift-file-integrity
+        TEST_OPERATOR_NAMESPACE=openshift-file-integrity make e2e
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: file-integrity-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: file-integrity-operator

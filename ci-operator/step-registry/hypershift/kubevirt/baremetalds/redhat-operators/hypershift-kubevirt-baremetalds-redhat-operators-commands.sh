@@ -222,7 +222,13 @@ else
 EOF
 
     for i in $(seq 1 120); do
-        state=$(oc get catalogsources/$name -n openshift-marketplace -o jsonpath='{.status.connectionState.lastObservedState}')
+        echo "Check Catalogsource creating in $i attempts"
+        state=$(oc get catalogsources/$name -n openshift-marketplace -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)
+        if [[ $? -ne 0 || -z "$state" ]]; then
+            echo "error: can't get CatalogSource $name status (retry the $i attempts)"
+            sleep 2
+            continue
+        fi
         echo $state
         if [ "$state" == "READY" ] ; then
             echo "Catalogsource created successfully after waiting $((5*i)) seconds"

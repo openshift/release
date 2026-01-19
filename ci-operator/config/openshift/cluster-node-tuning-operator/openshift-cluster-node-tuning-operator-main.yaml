@@ -7,39 +7,39 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.21_base-rhel9:
-    name: "4.21"
+  ocp_4.22_base-rhel9:
+    name: "4.22"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.24-openshift-4.22
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel9
   inputs:
-    ocp_4.21_base-rhel9:
+    ocp_4.22_base-rhel9:
       as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      - registry.ci.openshift.org/ocp/4.22:base-rhel9
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: cluster-node-tuning-operator
 promotion:
   to:
-  - name: "4.21"
+  - name: "4.22"
     namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -110,7 +110,6 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: hypershift-aws-e2e-cluster
-  timeout: 5h0m0s
 - as: e2e-aws-ovn
   steps:
     cluster_profile: aws-2
@@ -175,7 +174,6 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: ipi-gcp
-  timeout: 5h0m0s
 - as: e2e-gcp-pao-workloadhints
   capabilities:
   - intranet
@@ -192,7 +190,6 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: ipi-gcp
-  timeout: 4h0m0s
 - as: e2e-upgrade
   steps:
     cluster_profile: aws-4
@@ -216,7 +213,6 @@ tests:
       T5CI_VERSION: "4.20"
       TEST_RUN_FEATURES: performance
     workflow: telco5g-cnf
-  timeout: 6h0m0s
 - as: verify-deps
   steps:
     env:

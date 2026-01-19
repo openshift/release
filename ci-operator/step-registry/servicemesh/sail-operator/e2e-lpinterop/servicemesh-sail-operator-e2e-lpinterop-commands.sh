@@ -51,8 +51,8 @@ function mapTestsForComponentReadiness() {
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
             install_yq_if_not_exists
-            echo "Mapping Test Suite Name To: Servicemesh-lp-interop"
-            yq eval -px -ox -iI0 '.testsuites."+@name" = "Servicemesh-lp-interop"' "${results_file}" || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+            echo "Mapping Test Suite Name To: ServiceMesh-lp-interop"
+            yq eval -px -ox -iI0 '.testsuites.testsuite[]."+@name" = "ServiceMesh-lp-interop"' "${results_file}" || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
