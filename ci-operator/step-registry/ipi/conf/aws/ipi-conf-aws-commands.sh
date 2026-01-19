@@ -229,9 +229,8 @@ fi
 if [[ "${CI_NAT_REPLACE:-false}" == 'auto' ]]; then
   # Enable the option for jobs using the shared aws cluster profiles unless they use a different install topology.
   # 4.21 is currently excluded as we approach GA.
-  if [[ "${RELEASE_CONTROLLER_JOB:-false}" == "true" ]]; then
-    # Release controller jobs set RELEASE_CONTROLLER_JOB explicitly to true
-    CI_NAT_REPLACE='false_release_controller_job'
+  if [[ "${JOB_NAME}" == *-4.21-* ]]; then
+    CI_NAT_REPLACE='false_4_21_jobs_are_excluded'
   elif [[ "${CLUSTER_PROFILE_NAME}" != "aws" && ! "${CLUSTER_PROFILE_NAME}" =~ ^aws-[0-9]+$ ]]; then
     CI_NAT_REPLACE='false_CLUSTER_PROFILE_NAME_is_not_a_testplatform_aws_profile'
   elif [[ "${JOB_NAME}" == *'microshift'* || "${JOB_NAME}" == *'hypershift'* || "${JOB_NAME}" == *'vpc'* || "${JOB_NAME}" == *'single-node'* ]]; then
