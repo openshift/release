@@ -550,48 +550,6 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-openshift-platform-compliance-weekly
-  cron: 45 23 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        set -x
-        export CONTENT_DIRECTORY=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e; make install-jq
-        INSTALL_OPERATOR=${INSTALL_OPERATOR:-true}
-        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestPlatformCompliance$ -install-operator=${INSTALL_OPERATOR} -test-type="platform" -content-directory="$CONTENT_DIRECTORY"
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
-- as: e2e-aws-openshift-node-compliance-weekly
-  cron: 45 23 * * 3,6
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BASE_DOMAIN: quay.devcluster.openshift.com
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        set -x
-        export CONTENT_DIRECTORY=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e; make install-jq
-        INSTALL_OPERATOR=${INSTALL_OPERATOR:-true}
-        PATH=$PATH:/tmp/bin go test -v -timeout 240m . -run=^TestNodeCompliance$ -install-operator=${INSTALL_OPERATOR} -test-type="node" -content-directory="$CONTENT_DIRECTORY"
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - as: e2e-aws-openshift-platform-compliance-arm-weekly
   cron: 45 23 * * 3,6
   steps:
