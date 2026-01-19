@@ -41,7 +41,59 @@ tests:
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "3"
     test:
-    - ref: idp-htpasswd
+    - as: setup-htpasswd-idp
+      cli: latest
+      commands: |
+        set -euo pipefail
+        echo "Setting up htpasswd IDP on hosted cluster..."
+        
+        # Create htpasswd file with test users
+        htpass_file=/tmp/users.htpasswd
+        users=""
+        for i in $(seq 1 10); do
+          username="testuser-${i}"
+          password=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true)
+          users+="${username}:${password},"
+          if [ -f "${htpass_file}" ]; then
+            htpasswd -B -b ${htpass_file} "${username}" "${password}"
+          else
+            htpasswd -c -B -b ${htpass_file} "${username}" "${password}"
+          fi
+        done
+        
+        # Get current oauth generation
+        gen=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.metadata.generation}')
+        
+        # Create htpasswd secret
+        oc create secret generic htpass-secret --from-file=htpasswd=${htpass_file} -n openshift-config
+        
+        # Patch OAuth to add htpasswd IDP
+        oc patch oauth/cluster --type=merge -p '{"spec":{"identityProviders":[{"htpasswd":{"fileData":{"name":"htpass-secret"}},"mappingMethod":"claim","name":"htpasswd-provider","type":"HTPasswd"}]}}'
+        
+        # Wait for oauth to roll out (up to 10 minutes)
+        echo "Waiting for OAuth deployment to roll out..."
+        expected_replicas=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.spec.replicas}')
+        for i in $(seq 1 40); do
+          available=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0")
+          new_gen=$(oc get deployment oauth-openshift -n openshift-authentication -o jsonpath='{.metadata.generation}')
+          if [[ "${expected_replicas}" == "${available}" && $((new_gen)) -gt $((gen)) ]]; then
+            echo "OAuth deployment ready"
+            break
+          fi
+          echo "Waiting... (${i}/40)"
+          sleep 15
+        done
+        
+        # Save users to runtime_env for downstream steps
+        users=${users::-1}
+        echo "export USERS=${users}" >> ${SHARED_DIR}/runtime_env
+        echo "htpasswd IDP setup complete"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 15m0s
     - as: e2e-maas-api-openshift
       cli: latest
       commands: ./test/e2e/scripts/prow_run_smoke_test.sh
