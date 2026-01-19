@@ -460,6 +460,58 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-gcp
+- always_run: false
+  as: e2e-aws-kms-plugin
+  optional: true
+  steps:
+    cluster_profile: aws
+    pre:
+    - ref: kms-mock-plugin-deploy
+    test:
+    - as: verify-kms-plugin
+      cli: latest
+      commands: |
+        echo "Verifying mock KMS plugin systemd service..."
+
+        # Read the socket path from SHARED_DIR
+        KMS_SOCKET=$(cat "${SHARED_DIR}/kms-plugin-socket-path")
+        echo "KMS socket path: ${KMS_SOCKET}"
+
+        # Get all control plane nodes
+        CONTROL_PLANE_NODES=$(oc get nodes -l node-role.kubernetes.io/control-plane -o jsonpath='{.items[*].metadata.name}')
+        echo "Control plane nodes: ${CONTROL_PLANE_NODES}"
+
+        # Verify systemd service is running and socket exists on each control plane node
+        for node in ${CONTROL_PLANE_NODES}; do
+          echo ""
+          echo "Checking node: ${node}"
+
+          # Check if setup-softhsm.service completed successfully
+          echo "  Checking setup-softhsm.service status..."
+          oc debug node/${node} -- chroot /host systemctl status setup-softhsm.service --no-pager || true
+
+          # Check if mock-kms-plugin.service is active
+          echo "  Checking mock-kms-plugin.service status..."
+          oc debug node/${node} -- chroot /host systemctl is-active mock-kms-plugin.service
+
+          # Verify socket exists
+          echo "  Verifying socket at ${KMS_SOCKET}..."
+          oc debug node/${node} -- chroot /host test -S ${KMS_SOCKET}
+          echo "  ✓ Socket verified on ${node}"
+
+          # Show recent journal logs
+          echo "  Recent mock-kms-plugin.service logs:"
+          oc debug node/${node} -- chroot /host journalctl -u mock-kms-plugin.service -n 20 --no-pager || true
+        done
+
+        echo ""
+        echo "Mock KMS plugin verification successful!"
+        echo "KMS plugin is running as systemd service on all control plane nodes"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: openshift

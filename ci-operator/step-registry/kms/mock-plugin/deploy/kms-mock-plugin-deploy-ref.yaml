@@ -1,0 +1,28 @@
+ref:
+  as: kms-mock-plugin-deploy
+  from: tools
+  commands: kms-mock-plugin-deploy-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Deploys a mocked KMS v2 plugin on control plane nodes for testing kube-apiserver encryption.
+
+    This step builds the mock KMS plugin from kubernetes/kubernetes (k8s.io/kms/internal/plugins/_mock)
+    and creates a MachineConfig manifest that deploys it as a systemd service on all control plane nodes.
+    The plugin listens on a Unix socket at /var/run/kmsplugin/kms.sock which can be referenced in
+    EncryptionConfiguration resources for testing.
+
+    The approach uses MachineConfigs with systemd units to ensure the KMS plugin is available from
+    early boot, before the kubelet starts. This is the recommended pattern for infrastructure
+    services that the API server depends on.
+
+    The mock plugin provides a simple in-memory encryption provider that implements the
+    KMS v2 API without requiring external KMS infrastructure.
+
+    Usage:
+      - Add this step to your workflow's pre phase (ipi-conf workflow is ideal)
+      - The plugin will be automatically deployed during cluster installation
+      - The plugin will be available at unix:///var/run/kmsplugin/kms.sock on control plane nodes
+      - No cleanup step is needed as the service is part of the node configuration
