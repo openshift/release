@@ -90,6 +90,8 @@ spec:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY_STAGE}/rhel8/postgresql-12
     source: registry.redhat.io/rhel8/postgresql-12
+    - ${MIRROR_PROXY_REGISTRY_STAGE}/rhel9/postgresql-13
+    source: registry.redhat.io/rhel9/postgresql-13
 END
 }
 
