@@ -137,6 +137,7 @@ if [ "$GIT_FAILED" = "true" ]; then
     echo "Attempting to download ${ARCHIVE_URL}" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
     
     if command -v curl &> /dev/null; then
+        cd /tmp
         curl -L -o e2e-benchmarking.tar.gz "$ARCHIVE_URL" 2>&1 | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
         if [ -f e2e-benchmarking.tar.gz ]; then
             tar -xzf e2e-benchmarking.tar.gz 2>&1 | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
@@ -144,6 +145,7 @@ if [ "$GIT_FAILED" = "true" ]; then
             echo "Repository downloaded and extracted via curl" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
         fi
     elif command -v wget &> /dev/null; then
+        cd /tmp
         wget -O e2e-benchmarking.tar.gz "$ARCHIVE_URL" 2>&1 | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
         if [ -f e2e-benchmarking.tar.gz ]; then
             tar -xzf e2e-benchmarking.tar.gz 2>&1 | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
@@ -157,14 +159,14 @@ if [ "$GIT_FAILED" = "true" ]; then
 fi
 
 # Verify repository was downloaded
-if [ ! -d "e2e-benchmarking" ]; then
+if [ ! -d "/tmp/e2e-benchmarking" ]; then
     echo "ERROR: Failed to obtain e2e-benchmarking repository" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
     exit 1
 else
     echo "Repository successfully obtained" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
 fi
 
-cd e2e-benchmarking
+cd /tmp/e2e-benchmarking
 
 # Install requirements if available
 if [ -f requirements.txt ]; then
