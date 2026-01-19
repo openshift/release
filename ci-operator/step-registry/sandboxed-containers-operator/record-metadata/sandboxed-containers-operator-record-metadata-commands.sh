@@ -16,20 +16,15 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 if [[ -n "${CATALOG_SOURCE_IMAGE:-}" ]]; then
     CATALOG_TAG="${CATALOG_SOURCE_IMAGE##*:}"
 
-    # Get build time using Quay.io API (faster than skopeo inspect)
-    # Parse image path: quay.io/namespace/repo:tag -> namespace/repo
-    IMAGE_PATH="${CATALOG_SOURCE_IMAGE#quay.io/}"
-    IMAGE_PATH="${IMAGE_PATH%:*}"
+    # Get build time from image metadata using skopeo inspect
+    SKOPEO_OUTPUT=$(skopeo inspect "docker://${CATALOG_SOURCE_IMAGE}" 2>&1) || true
+    BUILD_TIME=$(echo "${SKOPEO_OUTPUT}" | jq -r '.Labels."build-date" // empty' 2>/dev/null || echo "")
 
-    # Query Quay API for tag info - returns start_ts (Unix timestamp)
-    BUILD_TIME=$(curl -sf "https://quay.io/api/v1/repository/${IMAGE_PATH}/tag/?specificTag=${CATALOG_TAG}" 2>/dev/null | \
-        jq -r '.tags[0].start_ts // empty' 2>/dev/null || echo "")
-
-    # Convert Unix timestamp to ISO 8601 format
-    if [[ -n "${BUILD_TIME}" && "${BUILD_TIME}" != "null" ]]; then
-        BUILD_TIME=$(date -u -d "@${BUILD_TIME}" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "${BUILD_TIME}")
-    else
+    if [[ -z "${BUILD_TIME}" ]]; then
         BUILD_TIME="unknown"
+        echo "WARNING: Failed to get build time for image"
+        echo "  CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}"
+        echo "  skopeo output: ${SKOPEO_OUTPUT}"
     fi
 else
     CATALOG_TAG=""
@@ -60,8 +55,8 @@ CSV_FILE="${ARTIFACT_DIR}/test-metadata.csv"
 
 # Write CSV header and data
 cat > "${CSV_FILE}" <<EOF
-timestamp,catalog_tag,build_time,prow_job_url,cloud_provider,ocp_version,workload_to_test,kata_rpm_version
-${TIMESTAMP},${CATALOG_TAG},${BUILD_TIME},${PROW_JOB_URL},${CLOUD_PROVIDER},${OCP_VERSION},${WORKLOAD_TO_TEST:-kata},${KATA_RPM_VERSION:-}
+timestamp,catalog_tag,build_time,cloud_provider,ocp_version,prow_job_url,workload_to_test,kata_rpm_version
+${TIMESTAMP},${CATALOG_TAG},${BUILD_TIME},${CLOUD_PROVIDER},${OCP_VERSION},${PROW_JOB_URL},${WORKLOAD_TO_TEST:-kata},${KATA_RPM_VERSION:-}
 EOF
 
 echo "Test metadata recorded to ${CSV_FILE}:"
@@ -74,12 +69,12 @@ echo "=========================================="
 echo "Timestamp:            ${TIMESTAMP}"
 echo "Catalog Tag:          ${CATALOG_TAG:-N/A}"
 echo "Build Time:           ${BUILD_TIME:-N/A}"
-echo "Prow Job URL:         ${PROW_JOB_URL:-N/A}"
 echo "Cloud Provider:       ${CLOUD_PROVIDER}"
 echo "OCP Version:          ${OCP_VERSION}"
+echo "Prow Job URL:         ${PROW_JOB_URL:-N/A}"
 echo "Workload To Test:     ${WORKLOAD_TO_TEST:-kata}"
 echo "Kata RPM Version:     ${KATA_RPM_VERSION:-N/A}"
 echo "=========================================="
 echo ""
 echo "CSV line (copy to spreadsheet):"
-echo "${TIMESTAMP},${CATALOG_TAG},${BUILD_TIME},${PROW_JOB_URL},${CLOUD_PROVIDER},${OCP_VERSION},${WORKLOAD_TO_TEST:-kata},${KATA_RPM_VERSION:-}"
+echo "${TIMESTAMP},${CATALOG_TAG},${BUILD_TIME},${CLOUD_PROVIDER},${OCP_VERSION},${PROW_JOB_URL},${WORKLOAD_TO_TEST:-kata},${KATA_RPM_VERSION:-}"
