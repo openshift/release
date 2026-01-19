@@ -1599,7 +1599,7 @@ periodics:
       - |
         set -euo pipefail
 
-        echo "Filtering openshift-priv from org/config.yaml"
+        echo "Filtering openshift-priv and openshift-eng from org/config.yaml"
 
         # Safety check: ensure openshift-priv exists exactly once
         count=$(grep -cE '^  openshift-priv:' org/config.yaml || true)
@@ -1608,10 +1608,19 @@ periodics:
             exit 1
         fi
 
-        # Remove the openshift-priv org block using range deletion
-        # This deletes from "  openshift-priv:" line up to (but not including) the next org
+        # Safety check: ensure openshift-eng exists exactly once
+        count=$(grep -cE '^  openshift-eng:' org/config.yaml || true)
+        if [ "$count" -ne 1 ]; then
+            echo "ERROR: expected exactly one 'openshift-eng:' key, found $count" >&2
+            exit 1
+        fi
+
+        # Remove the openshift-priv and openshift-eng org blocks using range deletion
+        # This deletes from each org's key line up to (but not including) the next org
         sed -E '/^  openshift-priv:/,/^  [a-zA-Z0-9_-]+:/{/^  openshift-priv:/d; /^  [a-zA-Z0-9_-]+:/!d;}' \
-            org/config.yaml > /tmp/stripped-config.yaml
+            org/config.yaml | \
+        sed -E '/^  openshift-eng:/,/^  [a-zA-Z0-9_-]+:/{/^  openshift-eng:/d; /^  [a-zA-Z0-9_-]+:/!d;}' \
+            > /tmp/stripped-config.yaml
 
         # Verify the result is valid
         if ! grep -qE '^orgs:' /tmp/stripped-config.yaml; then
@@ -1624,7 +1633,12 @@ periodics:
             exit 1
         fi
 
-        echo "Successfully removed openshift-priv from configuration"
+        if grep -qE '^  openshift-eng:' /tmp/stripped-config.yaml; then
+            echo "ERROR: openshift-eng still present in output" >&2
+            exit 1
+        fi
+
+        echo "Successfully removed openshift-priv and openshift-eng from configuration"
 
         # Run peribolos with the filtered config
         exec /ko-app/peribolos \
