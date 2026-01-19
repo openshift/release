@@ -25,8 +25,7 @@ function mapTestsForComponentReadiness() {
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
             echo "Mapping Test Suite Name To: ${REPORTPORTAL_CMP}"
-            yq eval -px -ox -iI0 '.testsuites.testsuite[]."+@name"=env(REPORTPORTAL_CMP)' "$results_file" 2>/dev/null || \
-		yq eval -px -ox -iI0 '.testsuites.testsuite."+@name"=env(REPORTPORTAL_CMP)' "$results_file" 
+            yq eval -px -ox -iI0 '.testsuites.testsuite[]."+@name"=env(REPORTPORTAL_CMP)' "$results_file" 2>/dev/null || yq eval -px -ox -iI0 '.testsuites.testsuite."+@name"=env(REPORTPORTAL_CMP)' "$results_file"
         fi
     fi
 }
@@ -47,7 +46,10 @@ function cleanup-collect() {
         mapTestsForComponentReadiness "${result_file}"
 
         # Send junit file to shared dir for Data Router Reporter step
-        cp "${result_file}" "${SHARED_DIR}/" || echo "Warning: couldn't copy ${result_file} to SHARED_DIR" >&2
+        # Skip DR reporting for corrupted file #TODO remove
+        if [[ "${results_file}" != *"3.xml" ]]; then
+          cp "${result_file}" "${SHARED_DIR}/" || echo "Warning: couldn't copy ${result_file} to SHARED_DIR" >&2
+        fi
       done
     fi
 }
