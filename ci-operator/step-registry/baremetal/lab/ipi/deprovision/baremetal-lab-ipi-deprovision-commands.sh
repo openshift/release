@@ -13,7 +13,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 [ -z "${PULL_NUMBER:-}" ] && \
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" \
-    test -f /var/builds/${NAMESPACE}/preserve && \
+    test -f /var/builds/"${NAMESPACE}"/preserve && \
     { echo "The cluster is expected to persist. Skipping deprovisioning..."; exit 0; }
 echo "No request to let the cluster persist detected. Deprovisioning..."
 
@@ -28,8 +28,14 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 if virsh list --all --name | grep -q "${CLUSTER_NAME}"; then
   echo "[INFO] found the bootstrap VM. Destroying it..."
   NAME=$(virsh list --all --name | grep "${CLUSTER_NAME}")
+  POOLNAME=$(virsh pool-list --all --name | grep "${CLUSTER_NAME}")
   virsh destroy "${NAME}"
   virsh undefine "${NAME}" --remove-all-storage --nvram --managed-save --snapshots-metadata --wipe-storage
+  virsh pool-destroy "${POOLNAME}"
+  virsh pool-undefine "${POOLNAME}"
+  # pool-delete fails because of presence of files other than the image file
+  # Deleting with rm instead after undefining the pool
+  rm -fr /var/lib/libvirt/openshift-images/"${POOLNAME}"
 fi
 
 timeout -s 9 2m ssh "${SSHOPTS[@]}" -p "$(sed 's/^[%]\?\([0-9]*\)[%]\?$/\1/' < "${CLUSTER_PROFILE_DIR}/provisioning-host-ssh-port-${architecture}")" "root@${AUX_HOST}" \
