@@ -98,6 +98,13 @@ ssh ${SSH_ARGS} root@${bastion} "
    pip3 install kubernetes
 "
 
+# Discover storage layout on target nodes
+echo "Discovering storage layout on target nodes..."
+for node in $NODES; do
+  echo "=== Storage info for ${node} ==="
+  ssh ${SSH_ARGS} root@${bastion} "ssh root@${node} 'echo \"--- lsblk ---\" && lsblk && echo \"--- vgs ---\" && vgs 2>/dev/null || echo \"No volume groups found\" && echo \"--- pvs ---\" && pvs 2>/dev/null || echo \"No physical volumes found\"'"
+done
+
 # Copy inventory and pull secret to bastion
 scp -q ${SSH_ARGS} /tmp/microshift-inventory root@${bastion}:${microshift_repo}/ansible/${ANSIBLE_INVENTORY}
 set +x
