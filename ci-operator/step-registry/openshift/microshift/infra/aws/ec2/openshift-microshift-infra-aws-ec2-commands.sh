@@ -54,8 +54,7 @@ fi
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION=""
-STACK_TIMESTAMP="$(date +%s)"
-stack_name="${NAMESPACE}-${STACK_TIMESTAMP}"
+stack_name="microshift-$(cat /proc/sys/kernel/random/uuid)"
 cf_tpl_file="${SHARED_DIR}/${NAMESPACE}-cf-tpl.yaml"
 
 curl -o "${cf_tpl_file}" https://raw.githubusercontent.com/openshift/microshift/refs/heads/main/scripts/aws/cf-gen.yaml
