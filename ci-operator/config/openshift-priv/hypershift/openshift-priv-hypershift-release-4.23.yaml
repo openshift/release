@@ -61,6 +61,11 @@ images:
     RUN dnf install -y python3-pip
   from: src
   to: custom-verify-src
+- dockerfile_literal: |
+    FROM base
+    RUN dnf module reset -y nodejs && dnf module enable -y nodejs:20 && dnf install -y python3-pip nodejs npm
+  from: src
+  to: docs-build-src
 promotion:
   to:
   - excluded_images:
@@ -155,8 +160,7 @@ tests:
   run_if_changed: ^docs/
   steps:
     test:
-    - ref: hypershift-docs-build
-    - ref: hypershift-docs-deploy-cloudflare
+    - ref: hypershift-docs-build-and-deploy
     - ref: hypershift-docs-preview-comment
 - as: unit
   commands: make test
