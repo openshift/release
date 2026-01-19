@@ -494,9 +494,9 @@ mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut 
 echo "Getting the proxy setup script"
 cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
 
-export BASTION_FIP
 sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh 
 sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 
+sed -i "s|BASTION_FIP|${BASTION_FIP}|" $HOME/setup_proxy.sh
 chmod 700 $HOME/setup_proxy.sh
 
 echo "Transferring the setup script to Bastion"
