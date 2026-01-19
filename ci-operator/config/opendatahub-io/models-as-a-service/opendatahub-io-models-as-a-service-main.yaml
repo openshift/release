@@ -44,7 +44,22 @@ tests:
     - ref: idp-htpasswd
     - as: e2e-maas-api-openshift
       cli: latest
-      commands: ./test/e2e/scripts/prow_run_smoke_test.sh
+      commands: |-
+        source "${SHARED_DIR}/runtime_env"
+        first_user=$(echo "$USERS" | cut -d',' -f1)
+        IFS=':' read USERNAME PASSWORD <<< "$first_user"
+        API_URL=$(oc whoami --show-server)
+        oc login "$API_URL" --username="$USERNAME" --password="$PASSWORD" --insecure-skip-tls-verify
+        oc whoami
+        echo "=== Checking user type ==="
+        # Check if cluster-admin
+        if oc auth can-i '*' '*' --all-namespaces 2>/dev/null; then
+          echo "User type: CLUSTER-ADMIN"
+        else
+          echo "User type: NON-ADMIN"
+        fi
+        export USERNAME PASSWORD
+        ./test/e2e/scripts/prow_run_smoke_test.sh
       dependencies:
       - env: MAAS_API_IMAGE
         name: maas-api
