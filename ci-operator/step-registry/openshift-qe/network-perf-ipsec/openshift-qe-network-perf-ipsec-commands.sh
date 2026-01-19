@@ -121,12 +121,10 @@ ES_USERNAME=$(cat /secret/username 2>/dev/null || echo "no-username")
 
 export ES_PASSWORD ES_USERNAME
 
-# Clone e2e-benchmarking repository
-REPO_URL=https://github.com/cloud-bulldozer/e2e-benchmarking
+# Download e2e-benchmarking repository
 LATEST_TAG=$(curl -s https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest | jq -r .tag_name 2>/dev/null || echo "v2.7.1")
-TAG_OPTION="--branch ${LATEST_TAG}"
 
-echo "Cloning e2e-benchmarking ${LATEST_TAG}..." | tee /tmp/ipsec-verification-artifacts/repo-clone.log
+echo "Downloading e2e-benchmarking ${LATEST_TAG}..." | tee /tmp/ipsec-verification-artifacts/repo-clone.log
 
 # Skip git entirely and use curl/wget for more reliability in CI environment
 echo "Using direct download method for better CI compatibility..." | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
