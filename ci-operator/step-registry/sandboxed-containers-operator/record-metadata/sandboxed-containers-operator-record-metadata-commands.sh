@@ -8,6 +8,44 @@ echo "=========================================="
 echo "Sandboxed Containers Operator - Record Test Metadata"
 echo "=========================================="
 
+# Verify ARTIFACT_DIR is set and exists
+if [[ -z "${ARTIFACT_DIR:-}" ]]; then
+    echo "ERROR: ARTIFACT_DIR is not set"
+    exit 1
+fi
+
+if [[ ! -d "${ARTIFACT_DIR}" ]]; then
+    echo "WARNING: ARTIFACT_DIR does not exist, creating: ${ARTIFACT_DIR}"
+    mkdir -p "${ARTIFACT_DIR}"
+fi
+
+# Log file for debugging
+LOG_FILE="${ARTIFACT_DIR}/build-log.txt"
+echo "Starting record-metadata step at $(date -u)" | tee "${LOG_FILE}"
+
+# Check for required tools
+echo "Checking required tools..." | tee -a "${LOG_FILE}"
+for tool in curl jq oc; do
+    if command -v "${tool}" &>/dev/null; then
+        echo "  ${tool}: available" | tee -a "${LOG_FILE}"
+    else
+        echo "  ${tool}: NOT FOUND" | tee -a "${LOG_FILE}"
+    fi
+done
+
+# Log environment variables (for debugging)
+echo "" | tee -a "${LOG_FILE}"
+echo "Environment variables:" | tee -a "${LOG_FILE}"
+echo "  CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE:-<not set>}" | tee -a "${LOG_FILE}"
+echo "  WORKLOAD_TO_TEST: ${WORKLOAD_TO_TEST:-<not set>}" | tee -a "${LOG_FILE}"
+echo "  KATA_RPM_VERSION: ${KATA_RPM_VERSION:-<not set>}" | tee -a "${LOG_FILE}"
+echo "  CLUSTER_TYPE: ${CLUSTER_TYPE:-<not set>}" | tee -a "${LOG_FILE}"
+echo "  KUBECONFIG: ${KUBECONFIG:-<not set>}" | tee -a "${LOG_FILE}"
+echo "  PROW_JOB_ID: ${PROW_JOB_ID:-<not set>}" | tee -a "${LOG_FILE}"
+echo "  JOB_NAME: ${JOB_NAME:-<not set>}" | tee -a "${LOG_FILE}"
+echo "  BUILD_ID: ${BUILD_ID:-<not set>}" | tee -a "${LOG_FILE}"
+echo "" | tee -a "${LOG_FILE}"
+
 # Generate timestamp
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -16,10 +54,13 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 if [[ -n "${CATALOG_SOURCE_IMAGE:-}" ]]; then
     CATALOG_TAG="${CATALOG_SOURCE_IMAGE##*:}"
 
-    # Check if curl is available
+    # Check if curl and jq are available
     if ! command -v curl &>/dev/null; then
-        BUILD_TIME="unknown"
-        echo "WARNING: curl is not available, cannot query Quay API for build time" | tee -a "${ARTIFACT_DIR}/build-log.txt"
+        BUILD_TIME="cannot be found"
+        echo "WARNING: curl is not available, cannot query Quay API for build time" | tee -a "${LOG_FILE}"
+    elif ! command -v jq &>/dev/null; then
+        BUILD_TIME="cannot be found"
+        echo "WARNING: jq is not available, cannot parse Quay API response" | tee -a "${LOG_FILE}"
     else
         # Get build time using Quay.io API
         # Parse image path: quay.io/namespace/repo:tag -> namespace/repo
@@ -50,11 +91,11 @@ if [[ -n "${CATALOG_SOURCE_IMAGE:-}" ]]; then
         done
 
         if [[ -z "${BUILD_TIME}" ]]; then
-            BUILD_TIME="unknown"
-            echo "WARNING: Failed to get build time for image" | tee -a "${ARTIFACT_DIR}/build-log.txt"
-            echo "  CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}" | tee -a "${ARTIFACT_DIR}/build-log.txt"
-            echo "  CATALOG_TAG: ${CATALOG_TAG}" | tee -a "${ARTIFACT_DIR}/build-log.txt"
-            echo "  IMAGE_PATH: ${IMAGE_PATH}" | tee -a "${ARTIFACT_DIR}/build-log.txt"
+            BUILD_TIME="cannot be found"
+            echo "WARNING: Failed to get build time for image" | tee -a "${LOG_FILE}"
+            echo "  CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}" | tee -a "${LOG_FILE}"
+            echo "  CATALOG_TAG: ${CATALOG_TAG}" | tee -a "${LOG_FILE}"
+            echo "  IMAGE_PATH: ${IMAGE_PATH}" | tee -a "${LOG_FILE}"
         fi
     fi
 else
