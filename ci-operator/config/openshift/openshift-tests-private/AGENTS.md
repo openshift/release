@@ -9,10 +9,25 @@ Prow CI configuration files are located in `ci-operator/config/openshift/openshi
 ## Folder Structure Overview
 ```
 openshift-tests-private/
+├── AGENTS.md
+├── .claude
+│   ├── agents
+│   │   ├── create_cpou_upgrade_jobs.md
+│   │   ├── create_rollback_upgrade_jobs.md
+│   │   ├── create_yz_stream_upgrade_jobs.md
+│   │   └── OWNERS
+│   ├── OWNERS
+│   ├── scripts
+│   │   ├── create_cpou_upgrade_jobs.sh
+│   │   ├── create_rollback_upgrades.sh
+│   │   ├── create_stream_upgrades.sh
+│   │   ├── get_prior_minor_version.sh
+│   │   ├── OWNERS
+│   │   └── validate-cpou-version.sh
+│   └── settings.local.json
 ├── tools/                          # Contains additional scripts for maintaining configuration files
 │   ├── OWNERS                      # The tools folder's reviewers and approvers for github commit
 │   ├── update-cron-entries.py      # Use this script to update all the job cron settings
-│   ├── add_CPOU_upgrade_jobs.py
 │   ├── add_missed_upgrade_jobs.py
 │   ├── generate-cron-entry.sh
 │   ├── get_missed_upgrade_jobs.py
@@ -24,6 +39,46 @@ openshift-tests-private/
 └── openshift-openshift-tests-private-release-<VERSION>__<CPU_ARCH>-rollback-<IMAGE_STREAM>.yaml
 └── openshift-openshift-tests-private-release-<VERSION>__<CPU_ARCH>-<IMAGE_STREAM>.yaml
 ```
+
+Note: periodic configuration files are not job configuration file, we don't care about them when we creating new job configuration files.
+
+## Sub-Agents
+
+The `.claude/agents/` directory contains specialized sub-agents for automating common CI configuration tasks:
+
+### create_cpou_upgrade_jobs
+**Purpose**: Creates CPOU (Control Plane Only Update) upgrade configuration files for new OpenShift releases.
+
+**When to use**:
+- Setting up CPOU upgrade jobs for a new even-numbered OpenShift version
+- CPOU upgrades are only supported for even minor versions (4.16, 4.18, 4.20, 4.22, etc.)
+
+**Key features**:
+- Validates target version is even-numbered (CPOU requirement)
+- Automatically calculates version progression (e.g., 4.18 → 4.19 → 4.20)
+- Copies and updates configuration from previous CPOU version
+- Updates all version references in base_images, releases, and metadata
+- Ensures proper frequency (f28) for all CPOU jobs
+
+**Usage**: Invoke the agent with the target version number (e.g., "Create CPOU upgrade jobs for 4.22")
+
+### create_rollback_upgrade_jobs
+**Purpose**: Creates rollback (downgrade) upgrade configuration files for new OpenShift releases.
+
+**When to use**:
+- Setting up rollback upgrade jobs for a new OpenShift version
+- Rollback upgrades test downgrading to previous patch versions (e.g., 4.20.2 → 4.20.1)
+
+**Usage**: Invoke the agent with the target version number (e.g., "Create rollback upgrade jobs for 4.22")
+
+### create_yz_stream_upgrade_jobs
+**Purpose**: Creates Y stream and Z stream upgrade configuration files for new OpenShift releases.
+
+**When to use**:
+- Setting up Y stream upgrades (minor version upgrades, e.g., 4.20 → 4.21)
+- Setting up Z stream upgrades (patch upgrades, e.g., 4.20.1 → 4.20.2)
+
+**Usage**: Invoke the agent with the target version number (e.g., "Create Y and Z stream upgrade jobs for 4.22")
 
 ## Glossary
 
@@ -74,7 +129,7 @@ openshift-tests-private/
 
 ### 5. CPOU Upgrade
 - CPOU is an abbreviation for Control Plane Only update.
-- OpenShift only supports two consecutive even version CPOU upgrade, for example: upgrade from 4.12 to 4.13 to 4.14.
+- OpenShift only supports two consecutive even-numbered minor version CPOU upgrade, for example: upgrade from 4.12 to 4.13 to 4.14.
 
 ### 6. Rollback Upgrade
 - Rollback upgrade is similar to Z stream upgrade but it is a downgrade, e.g., downgrade from 4.20.2 to 4.20.1
