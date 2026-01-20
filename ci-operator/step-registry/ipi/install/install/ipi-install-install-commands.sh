@@ -722,6 +722,13 @@ if test "${ret}" -ne 0 ; then
 fi
 set -o errexit
 
+# Copy manifests to SHARED_DIR for post-manifest validation steps
+# This allows steps that run after ipi-install-install to access manifests
+if [ -d "${dir}/openshift" ]; then
+  mkdir -p "${SHARED_DIR}/installer/openshift"
+  cp -r "${dir}/openshift"/* "${SHARED_DIR}/installer/openshift/" || true
+fi
+
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
 azure4|azure-arm64)

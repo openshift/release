@@ -10,10 +10,15 @@ set -o pipefail
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
-INSTALL_DIR="/tmp/installer"
-
-if [ ! -d "$INSTALL_DIR" ]; then
-  echo "Error: Installation directory does not exist: $INSTALL_DIR"
+# Try to find installer directory
+# First check SHARED_DIR (manifests copied from ipi-install-install step)
+# Then check /tmp/installer (if running in the same pod)
+if [ -d "${SHARED_DIR}/installer" ]; then
+  INSTALL_DIR="${SHARED_DIR}/installer"
+elif [ -d "/tmp/installer" ]; then
+  INSTALL_DIR="/tmp/installer"
+else
+  echo "Error: Installation directory not found in ${SHARED_DIR}/installer or /tmp/installer"
   exit 1
 fi
 
@@ -53,7 +58,7 @@ for file in $MAPI_FILES; do
     master_count=${#capi_zones[@]}
     mapi_index=0
     for zone in $zones; do
-      if [ "$zone" != "null" ] && [ -n "$zone" ] && [ $mapi_index -lt $master_count ]; then
+      if [ "$zone" != "null" ] && [ -n "$zone" ] && [ $mapi_index -lt "$master_count" ]; then
         mapi_zones+=("$zone")
         mapi_index=$((mapi_index + 1))
       fi
