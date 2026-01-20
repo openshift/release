@@ -62,53 +62,35 @@ spec:
           type: RuntimeDefault
       containers:
       - name: ipecho-server
-        image: quay.io/openshift/origin-network-tools:latest
-        command: ["/bin/bash", "-c"]
+        image: python:3.9-alpine
+        command: ["python3", "-c"]
         args:
         - |
-          cat > /tmp/ipecho-server.py << 'PYEOF'
-          #!/usr/bin/env python3
           import socket
           import json
-          from http.server import HTTPServer, BaseHTTPRequestHandler
-          from urllib.parse import urlparse, parse_qs
           import datetime
+          from http.server import HTTPServer, BaseHTTPRequestHandler
           
           class IPEchoHandler(BaseHTTPRequestHandler):
               def do_GET(self):
-                  # Get client IP (source IP before NAT)
                   client_ip = self.client_address[0]
-                  
-                  # Parse request path for additional info
-                  parsed = urlparse(self.path)
-                  query_params = parse_qs(parsed.query)
-                  
-                  # Prepare response
                   response_data = {
                       "source_ip": client_ip,
                       "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
                       "method": self.command,
                       "path": self.path,
-                      "headers": dict(self.headers),
                       "server_hostname": socket.gethostname()
                   }
                   
-                  # Add query parameters if present
-                  if query_params:
-                      response_data["query_params"] = query_params
-                  
-                  # Set response headers
                   self.send_response(200)
                   self.send_header('Content-type', 'application/json')
                   self.send_header('Access-Control-Allow-Origin', '*')
                   self.end_headers()
                   
-                  # Send JSON response
                   response_json = json.dumps(response_data, indent=2)
                   self.wfile.write(response_json.encode('utf-8'))
               
               def log_message(self, format, *args):
-                  # Custom log format showing client IP
                   print(f"[{datetime.datetime.utcnow().isoformat()}Z] {self.client_address[0]} - {format % args}")
           
           if __name__ == '__main__':
@@ -116,10 +98,17 @@ spec:
               server = HTTPServer(('0.0.0.0', port), IPEchoHandler)
               print(f"Internal IP Echo Service starting on port {port}")
               print(f"Reports actual source IPs before NAT translation")
-              server.serve_forever()
-          PYEOF
+              try:
+                  server.serve_forever()
+              except KeyboardInterrupt:
+                  print("Server stopped")
           
-          python3 /tmp/ipecho-server.py
+          # Start the server
+          port = 8080
+          server = HTTPServer(('0.0.0.0', port), IPEchoHandler)
+          print(f"Internal IP Echo Service starting on port {port}")
+          print(f"Reports actual source IPs before NAT translation")
+          server.serve_forever()
         ports:
         - containerPort: 8080
           protocol: TCP
@@ -169,10 +158,53 @@ EOF
 
 log_info "Waiting for internal IP echo service to be ready..."
 
-# First wait for deployment to be available
-if oc wait --for=condition=available deployment/internal-ipecho -n egress-ip-validation --timeout=120s; then
+# Check deployment status before waiting
+log_info "Checking deployment status..."
+oc get deployment internal-ipecho -n egress-ip-validation -o wide || true
+oc describe deployment internal-ipecho -n egress-ip-validation || true
+
+# Check replica sets
+log_info "Checking replica sets..."
+oc get rs -n egress-ip-validation -l app=internal-ipecho || true
+oc describe rs -n egress-ip-validation -l app=internal-ipecho || true
+
+# Check if pods are being created
+log_info "Checking pod status..."
+oc get pods -n egress-ip-validation -l app=internal-ipecho -o wide || true
+
+# Get individual pod details
+for pod in $(oc get pods -n egress-ip-validation -l app=internal-ipecho -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo ""); do
+    if [[ -n "$pod" ]]; then
+        log_info "Describing pod: $pod"
+        oc describe pod "$pod" -n egress-ip-validation || true
+        
+        log_info "Getting pod logs for: $pod"
+        oc logs "$pod" -n egress-ip-validation --tail=50 || true
+        
+        log_info "Getting previous pod logs for: $pod (if exists)"
+        oc logs "$pod" -n egress-ip-validation --previous --tail=50 2>/dev/null || log_info "No previous logs for $pod"
+    fi
+done
+
+# Check events for debugging
+log_info "Checking namespace events..."
+oc get events -n egress-ip-validation --sort-by='.lastTimestamp' || true
+
+# First wait for deployment to be available with shorter timeout for debugging
+log_info "Waiting for deployment to become available (60s timeout for debugging)..."
+if oc wait --for=condition=available deployment/internal-ipecho -n egress-ip-validation --timeout=60s; then
     log_info "✅ Internal IP echo deployment is available"
 else
+    log_error "❌ Internal IP echo deployment failed to become available within 60s"
+    
+    # Additional debugging if deployment fails
+    log_error "Final deployment status:"
+    oc get deployment internal-ipecho -n egress-ip-validation -o yaml || true
+    log_error "Final pod status:"
+    oc get pods -n egress-ip-validation -l app=internal-ipecho -o yaml || true
+    log_error "Recent events:"
+    oc get events -n egress-ip-validation --sort-by='.lastTimestamp' --field-selector type=Warning || true
+    
     error_exit "Internal IP echo deployment failed to become available"
 fi
 
