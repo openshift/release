@@ -230,21 +230,116 @@ else
     echo "Cluster permissions: limited (may affect operator installation)" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 fi
 
-# Run the network performance test with enhanced logging
-if [ -f "run.py" ]; then
-    echo "Running Python test script..."
-    python3 -u ./run.py > /tmp/ipsec-verification-artifacts/netperf-output.log 2>&1 &
-    NETPERF_PID=$!
-elif [ -f "run.sh" ]; then
-    echo "Running shell test script..."
-    # Run with verbose output and capture both stdout and stderr
-    bash -x ./run.sh > /tmp/ipsec-verification-artifacts/netperf-output.log 2>&1 &
-    NETPERF_PID=$!
-else
-    echo "ERROR: No run script found"
-    ls -la | tee /tmp/ipsec-verification-artifacts/test-start.log
-    exit 1
-fi
+# Use direct netperf implementation instead of complex benchmark operator
+echo "=== Running Direct Netperf IPSec Verification ===" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+
+# Create netperf server pod
+cat > /tmp/netperf-server.yaml << 'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netperf-server
+  labels:
+    app: netperf-server
+spec:
+  containers:
+  - name: netperf-server
+    image: registry.access.redhat.com/ubi9/ubi:latest
+    command:
+    - /bin/bash
+    - -c
+    - |
+      dnf install -y netperf
+      echo "Starting netserver..."
+      netserver -D -p 12865
+      echo "Netserver started on port 12865"
+      while true; do sleep 30; done
+    ports:
+    - containerPort: 12865
+  restartPolicy: Never
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: netperf-server-svc
+spec:
+  selector:
+    app: netperf-server
+  ports:
+  - port: 12865
+    targetPort: 12865
+EOF
+
+# Create netperf client pod
+cat > /tmp/netperf-client.yaml << 'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netperf-client
+  labels:
+    app: netperf-client
+spec:
+  containers:
+  - name: netperf-client
+    image: registry.access.redhat.com/ubi9/ubi:latest
+    command:
+    - /bin/bash
+    - -c
+    - |
+      dnf install -y netperf
+      echo "Netperf client ready"
+      while true; do sleep 30; done
+  restartPolicy: Never
+EOF
+
+# Deploy netperf pods
+echo "Deploying netperf server and client pods..." | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+oc apply -f /tmp/netperf-server.yaml -f /tmp/netperf-client.yaml > /tmp/ipsec-verification-artifacts/netperf-deployment.log 2>&1
+
+# Wait for pods to be ready
+echo "Waiting for netperf pods to be ready..." | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+sleep 10
+
+for i in {1..30}; do
+    SERVER_READY=$(oc get pod netperf-server -o jsonpath='{.status.phase}' 2>/dev/null)
+    CLIENT_READY=$(oc get pod netperf-client -o jsonpath='{.status.phase}' 2>/dev/null)
+    
+    if [ "$SERVER_READY" = "Running" ] && [ "$CLIENT_READY" = "Running" ]; then
+        echo "Netperf pods ready after ${i}0 seconds" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+        break
+    fi
+    echo "Waiting for pods... server: $SERVER_READY, client: $CLIENT_READY (attempt $i)" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+    sleep 10
+done
+
+# Get server IP for testing
+SERVER_IP=$(oc get pod netperf-server -o jsonpath='{.status.podIP}' 2>/dev/null)
+echo "Netperf server IP: $SERVER_IP" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+
+# Run netperf tests in background
+echo "Starting netperf performance tests..." | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+(
+    echo "Starting netperf tests at $(date)"
+    echo "Server IP: $SERVER_IP"
+    
+    if [ ! -z "$SERVER_IP" ]; then
+        # Run multiple netperf tests to generate traffic for IPSec verification
+        echo "=== TCP_STREAM Test ==="
+        oc exec netperf-client -- netperf -H $SERVER_IP -p 12865 -l 60 -t TCP_STREAM || echo "TCP_STREAM test failed"
+        
+        echo "=== TCP_RR Test ==="
+        oc exec netperf-client -- netperf -H $SERVER_IP -p 12865 -l 30 -t TCP_RR || echo "TCP_RR test failed"
+        
+        echo "=== UDP_STREAM Test ==="
+        oc exec netperf-client -- netperf -H $SERVER_IP -p 12865 -l 30 -t UDP_STREAM || echo "UDP_STREAM test failed"
+        
+        echo "Netperf tests completed at $(date)"
+    else
+        echo "ERROR: Could not get server IP"
+        exit 1
+    fi
+) > /tmp/ipsec-verification-artifacts/netperf-output.log 2>&1 &
+NETPERF_PID=$!
 
 echo "NetPerf test started, PID: $NETPERF_PID"
 
@@ -255,32 +350,34 @@ sleep 30  # Give test time to start
 for i in {1..10}; do
     echo "--- Progress check $i at $(date) ---" | tee -a /tmp/ipsec-verification-artifacts/progress.log
     
-    # Check for netperf pods
-    oc get pods | grep netperf | head -5 | tee -a /tmp/ipsec-verification-artifacts/progress.log || echo "No netperf pods yet"
+    # Check for our direct netperf pods
+    oc get pods | grep "netperf-" | head -5 | tee -a /tmp/ipsec-verification-artifacts/progress.log || echo "No netperf pods yet"
     
     # If we have netperf pods and a worker node, capture their specific traffic
     if [ "$WORKER_NODE" != "no-worker-found" ]; then
-        NETPERF_PODS=$(oc get pods --no-headers | grep netperf | awk '{print $1}' | head -2)
-        if [ ! -z "$NETPERF_PODS" ]; then
-            echo "Found netperf pods, capturing traffic..." | tee -a /tmp/ipsec-verification-artifacts/progress.log
-            POD1=$(echo "$NETPERF_PODS" | head -1)
-            POD2=$(echo "$NETPERF_PODS" | tail -1)
+        # Check for our specific netperf pods
+        SERVER_STATUS=$(oc get pod netperf-server -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        CLIENT_STATUS=$(oc get pod netperf-client -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        
+        if [ "$SERVER_STATUS" = "Running" ] && [ "$CLIENT_STATUS" = "Running" ]; then
+            echo "Found running netperf pods, capturing traffic..." | tee -a /tmp/ipsec-verification-artifacts/progress.log
             
-            if [ "$POD1" != "$POD2" ]; then
-                POD1_IP=$(oc get pod $POD1 -o jsonpath='{.status.podIP}' 2>/dev/null || echo "")
-                POD2_IP=$(oc get pod $POD2 -o jsonpath='{.status.podIP}' 2>/dev/null || echo "")
+            SERVER_IP=$(oc get pod netperf-server -o jsonpath='{.status.podIP}' 2>/dev/null || echo "")
+            CLIENT_IP=$(oc get pod netperf-client -o jsonpath='{.status.podIP}' 2>/dev/null || echo "")
+            
+            if [ ! -z "$SERVER_IP" ] && [ ! -z "$CLIENT_IP" ]; then
+                echo "Netperf Pod IPs: client=$CLIENT_IP <-> server=$SERVER_IP" | tee -a /tmp/ipsec-verification-artifacts/progress.log
                 
-                if [ ! -z "$POD1_IP" ] && [ ! -z "$POD2_IP" ]; then
-                    echo "Pod IPs: $POD1_IP <-> $POD2_IP" | tee -a /tmp/ipsec-verification-artifacts/progress.log
-                    
-                    # Quick pod-to-pod traffic capture
-                    timeout 30 oc debug node/$WORKER_NODE -- chroot /host tcpdump -i any -c 10 -w /tmp/pod-traffic-$i.pcap "host $POD1_IP and host $POD2_IP" > /tmp/ipsec-verification-logs/pod-capture-$i.log 2>&1 &
-                    
-                    # Test connectivity
-                    oc exec $POD1 -- ping -c 3 $POD2_IP >> /tmp/ipsec-verification-artifacts/progress.log 2>&1 || echo "Ping test failed"
-                fi
+                # Quick pod-to-pod traffic capture specifically for netperf traffic
+                timeout 30 oc debug node/$WORKER_NODE -- chroot /host tcpdump -i any -c 20 -w /tmp/netperf-traffic-$i.pcap "host $SERVER_IP and host $CLIENT_IP" > /tmp/ipsec-verification-logs/netperf-capture-$i.log 2>&1 &
+                
+                # Test connectivity between netperf pods
+                echo "Testing connectivity between netperf pods..." | tee -a /tmp/ipsec-verification-artifacts/progress.log
+                oc exec netperf-client -- ping -c 3 $SERVER_IP >> /tmp/ipsec-verification-artifacts/progress.log 2>&1 || echo "Ping test failed"
             fi
             break  # Found pods, no need to keep checking
+        else
+            echo "Netperf pod status: server=$SERVER_STATUS, client=$CLIENT_STATUS" | tee -a /tmp/ipsec-verification-artifacts/progress.log
         fi
     fi
     
@@ -348,17 +445,17 @@ cat > /tmp/ipsec-verification-artifacts/ENCRYPTION-ANALYSIS.md << EOF
 **IPSec Pods:** $IPSEC_POD_COUNT running
 
 ## Test Execution
-- Network performance test completed with exit code: ${NETPERF_EXIT_CODE:-0}
+- Direct netperf test completed with exit code: ${NETPERF_EXIT_CODE:-0}
 - Packet captures collected during test execution
 - IPSec status and configuration logged
 
 ## Critical Evidence Files
 - \`esp-packets.pcap\` - ESP encrypted traffic (if present, IPSec is working)
 - \`general-traffic.pcap\` - General network traffic for comparison
-- \`pod-traffic-*.pcap\` - Specific pod-to-pod communication
+- \`netperf-traffic-*.pcap\` - Specific netperf pod-to-pod communication
 - \`final-ipsec-status.log\` - IPSec daemon status and tunnels
 - \`final-ipsec-traffic.log\` - IPSec traffic statistics
-- \`netperf-output.log\` - Performance test results
+- \`netperf-output.log\` - Direct netperf test results (TCP_STREAM, TCP_RR, UDP_STREAM)
 
 ## Analysis Instructions for Dev Team
 1. **Check for ESP packets:** If ESP protocol packets are found in captures, IPSec encryption is working
