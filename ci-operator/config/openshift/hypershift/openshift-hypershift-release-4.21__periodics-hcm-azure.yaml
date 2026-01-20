@@ -1,0 +1,59 @@
+base_images:
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+external_images:
+  hypershift-operator:
+    name: rhtap-hypershift-operator
+    namespace: acm-d
+    registry: quay.io
+    tag: latest
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.21"
+  initial-minor:
+    release:
+      channel: fast
+      version: "4.20"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aks
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: hypershift
+    env:
+      AUTH_THROUGH_CERTS: "true"
+    workflow: hypershift-azure-aks-e2e
+- as: e2e-aks-upgrade-minor
+  cron: 0 5 * * *
+  steps:
+    cluster_profile: hypershift
+    dependencies:
+      OCP_IMAGE_PREVIOUS: release:initial-minor
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      CI_TESTS_RUN: ^TestUpgradeControlPlane$
+    workflow: hypershift-azure-aks-e2e
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: hypershift
+  variant: periodics-hcm-azure
