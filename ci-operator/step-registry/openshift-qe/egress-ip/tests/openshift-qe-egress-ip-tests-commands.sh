@@ -139,15 +139,15 @@ validate_post_disruption() {
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: egress-test-temp
+  name: egress-ip-test
   labels:
-    egress: egress-ip-test
+    kubernetes.io/metadata.name: egress-ip-test
 ---
 apiVersion: v1
 kind: Pod
 metadata:
   name: traffic-test-pod
-  namespace: egress-test-temp
+  namespace: egress-ip-test
   labels:
     app: "egress-test-app"
     egress-enabled: "true"
@@ -174,29 +174,29 @@ spec:
 EOF
         
         # Wait for pod readiness
-        if oc wait --for=condition=Ready pod/traffic-test-pod -n egress-test-temp --timeout=60s; then
+        if oc wait --for=condition=Ready pod/traffic-test-pod -n egress-ip-test --timeout=60s; then
             log_info "🌐 Starting comprehensive network connectivity tests..."
             
             # Network diagnostic tests
             log_info "📍 Pod network interface information:"
-            oc exec -n egress-test-temp traffic-test-pod -- ip addr show || true
+            oc exec -n egress-ip-test traffic-test-pod -- ip addr show || true
             
             log_info "📍 Pod routing table:"
-            oc exec -n egress-test-temp traffic-test-pod -- ip route show || true
+            oc exec -n egress-ip-test traffic-test-pod -- ip route show || true
             
             # Test connectivity to various endpoints with detailed logging
             log_info "🏓 Testing network connectivity with ping tests..."
             
             # Ping Google DNS (external connectivity test)
             log_info "📡 Ping test to Google DNS (8.8.8.8):"
-            oc exec -n egress-test-temp traffic-test-pod -- ping -c 3 8.8.8.8 2>&1 | tee -a "$ARTIFACT_DIR/ping_tests.log" || log_warning "⚠️  Google DNS ping failed"
+            oc exec -n egress-ip-test traffic-test-pod -- ping -c 3 8.8.8.8 2>&1 | tee -a "$ARTIFACT_DIR/ping_tests.log" || log_warning "⚠️  Google DNS ping failed"
             
             # Ping httpbin.org (primary test service)
             log_info "📡 Ping test to httpbin.org:"
-            httpbin_ip=$(oc exec -n egress-test-temp traffic-test-pod -- nslookup httpbin.org 2>/dev/null | grep "Address:" | tail -1 | awk '{print $2}' || echo "")
+            httpbin_ip=$(oc exec -n egress-ip-test traffic-test-pod -- nslookup httpbin.org 2>/dev/null | grep "Address:" | tail -1 | awk '{print $2}' || echo "")
             if [[ -n "$httpbin_ip" ]]; then
                 log_info "🎯 httpbin.org resolves to: $httpbin_ip"
-                oc exec -n egress-test-temp traffic-test-pod -- ping -c 3 "$httpbin_ip" 2>&1 | tee -a "$ARTIFACT_DIR/ping_tests.log" || log_warning "⚠️  httpbin.org ping failed"
+                oc exec -n egress-ip-test traffic-test-pod -- ping -c 3 "$httpbin_ip" 2>&1 | tee -a "$ARTIFACT_DIR/ping_tests.log" || log_warning "⚠️  httpbin.org ping failed"
             fi
             
             # Test inter-cluster connectivity (ping other egress IPs if they exist)
@@ -206,7 +206,7 @@ EOF
                 for other_eip in $egress_ips; do
                     if [[ "$other_eip" != "$eip_address" ]]; then
                         log_info "📡 Ping test to other egress IP $other_eip:"
-                        oc exec -n egress-test-temp traffic-test-pod -- ping -c 2 "$other_eip" 2>&1 | tee -a "$ARTIFACT_DIR/ping_tests.log" || log_info "ℹ️  Inter-EIP ping to $other_eip: not directly reachable (expected for egress IPs)"
+                        oc exec -n egress-ip-test traffic-test-pod -- ping -c 2 "$other_eip" 2>&1 | tee -a "$ARTIFACT_DIR/ping_tests.log" || log_info "ℹ️  Inter-EIP ping to $other_eip: not directly reachable (expected for egress IPs)"
                     fi
                 done
             fi
@@ -228,7 +228,7 @@ EOF
             # 1. Test egress IP enabled pod - validate ACTUAL SOURCE IP
             log_info "📡 Testing egress IP enabled pod SOURCE IP validation"
             local egress_response
-            egress_response=$(oc exec -n egress-test-temp traffic-test-pod -- timeout 30 curl -s "$internal_echo_url" 2>/dev/null || echo "")
+            egress_response=$(oc exec -n egress-ip-test traffic-test-pod -- timeout 30 curl -s "$internal_echo_url" 2>/dev/null || echo "")
             log_info "📥 Egress IP pod response: '$egress_response'"
             
             # Extract source IP from JSON response
@@ -255,7 +255,7 @@ EOF
                 # Secondary validation: Test external connectivity works
                 log_info "🌐 Secondary validation: Testing external connectivity..."
                 local external_test_response
-                external_test_response=$(oc exec -n egress-test-temp traffic-test-pod -- timeout 15 curl -s -o /dev/null -w "%{http_code}" "$IPECHO_SERVICE_URL" 2>/dev/null || echo "000")
+                external_test_response=$(oc exec -n egress-ip-test traffic-test-pod -- timeout 15 curl -s -o /dev/null -w "%{http_code}" "$IPECHO_SERVICE_URL" 2>/dev/null || echo "000")
                 
                 if [[ "$external_test_response" == "200" ]]; then
                     log_success "✅ EXTERNAL CONNECTIVITY VALIDATION PASSED: External services reachable"
