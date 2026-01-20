@@ -10,6 +10,12 @@ ls
 function cerberus_cleanup() {
 
   curl_status=$(curl -X GET http://0.0.0.0:8080 2>/dev/null || cat /tmp/cerberus_status 2>/dev/null)
+
+  curl -X GET http://0.0.0.0:8080/history 2>/dev/null >> /tmp/cerberus_history.json
+
+  cp -r /tmp/cerberus_history.json "${SHARED_DIR}/cerberus_history.json"
+  cp -r /tmp/cerberus_history.json ${ARTIFACT_DIR}/cerberus/cerberus_history.json
+
   echo "killing cerberus observer"
   kill ${cerberus_pid}
 
@@ -45,9 +51,12 @@ function cerberus_cleanup() {
   fi
 
   replaced_str=$(echo $curl_status | sed "s/True/0/g" | sed "s/False/1/g" )
+
   exit $((replaced_str))
 }
 trap cerberus_cleanup EXIT SIGTERM SIGINT
+
+mkdir history
 
 while [ ! -f "${KUBECONFIG}" ]; do
   sleep 10
@@ -57,10 +66,14 @@ printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
 echo "kubeconfig loc $KUBECONFIG"
 
 export CERBERUS_KUBECONFIG=$KUBECONFIG
-export CERBERUS_WATCH_NAMESPACES="[^.*$]"
-export CERBERUS_IGNORE_PODS="[^installer*,^kube-burner*,^redhat-operators*,^certified-operators*,^collect-profiles*,^loki*,^go*]"
 
 mkdir -p ${ARTIFACT_DIR}/cerberus
+
+if [[ -n $WAIT_EXPRESSION ]]; then
+  while [[ $(eval "${WAIT_EXPRESSION}") -eq 0 ]]; do
+    sleep 10
+  done
+fi
 
 cerberus_logs=${ARTIFACT_DIR}/cerberus/cerberus_prow_logs.out
 
@@ -68,9 +81,9 @@ cerberus_logs=${ARTIFACT_DIR}/cerberus/cerberus_prow_logs.out
 cerberus_pid="$!"
 
 jobs
-
 jobs -p
 while [[ -z $(cat $cerberus_logs | grep "signal=terminated") ]]; do 
   sleep 10
   date
 done
+
