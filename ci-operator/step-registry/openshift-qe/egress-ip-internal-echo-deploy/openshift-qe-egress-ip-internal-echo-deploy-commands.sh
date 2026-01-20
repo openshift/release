@@ -233,7 +233,7 @@ spec:
       type: RuntimeDefault
   containers:
   - name: curl-test
-    image: python:3.9-alpine
+    image: quay.io/openshift/origin-network-tools:latest
     command: ["/bin/sleep", "60"]
     securityContext:
       allowPrivilegeEscalation: false
