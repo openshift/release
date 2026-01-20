@@ -3,9 +3,56 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -x
 
 echo "Installing MetalLB"
+
+# Detect environment and configure IP range accordingly
+METALLB_IP_START=""
+METALLB_IP_END=""
+ENVIRONMENT="unknown"
+
+# Check if this is a vSphere static IP environment
+if [[ -f "${SHARED_DIR}/subnets.json" ]]; then
+  ENVIRONMENT="vsphere-static"
+  echo "Detected vSphere static IP environment"
+
+  # Get subnets configuration
+  SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+
+  # Extract MetalLB IP range from indices #40-49 (10 IPs for MetalLB)
+  # IP allocation in vSphere static clusters:
+  # - #0-1: Network/Gateway (reserved)
+  # - #2-3: API/Ingress VIPs
+  # - #4-10: Bootstrap + Control-plane + Compute nodes
+  # - #11-23: Available for other uses
+  # - #24-31: IPAM pool for dynamic machines (/29)
+  # - #32-39: Available
+  # - #40-49: MetalLB IP pool (10 IPs)
+  echo "Extracting MetalLB IP addresses from vSphere subnet (indices #40-49)..."
+
+  # Calculate IPs from machineNetworkCidr (vsphere-elastic format)
+  machine_network_cidr=$(jq -r '.spec.machineNetworkCidr' "${SUBNETS_CONFIG}")
+  METALLB_IP_START=$(python3 -c "import ipaddress;print(ipaddress.IPv4Network('${machine_network_cidr}')[40])")
+  METALLB_IP_END=$(python3 -c "import ipaddress;print(ipaddress.IPv4Network('${machine_network_cidr}')[49])")
+
+  if [[ -z "${METALLB_IP_START}" ]] || [[ -z "${METALLB_IP_END}" ]] || [[ "${METALLB_IP_START}" == "null" ]] || [[ "${METALLB_IP_END}" == "null" ]]; then
+      echo "ERROR: Failed to extract MetalLB IP range from subnets.json"
+      echo "Machine network CIDR: ${machine_network_cidr}"
+      echo "Attempting to read subnets.json:"
+      cat "${SUBNETS_CONFIG}" || echo "Failed to read subnets.json"
+      exit 1
+  fi
+
+  echo "MetalLB IP range from vSphere subnet: ${METALLB_IP_START}-${METALLB_IP_END}"
+
+else
+  # Default to baremetalds hardcoded IP range
+  ENVIRONMENT="baremetalds"
+  echo "Detected baremetalds environment (or default)"
+  METALLB_IP_START="192.168.111.30"
+  METALLB_IP_END="192.168.111.39"
+  echo "Using hardcoded MetalLB IP range: ${METALLB_IP_START}-${METALLB_IP_END}"
+fi
 
 # Check if metallb-operator package exists in catalogs
 echo "Checking for metallb-operator package in available catalogs..."
@@ -93,10 +140,8 @@ spec:
   source: redhat-operators
   sourceNamespace: openshift-marketplace
 EOF
-fi
 
-# Wait for MetalLB operator to be ready (only for OLM installation)
-if [[ "${PACKAGE_EXISTS}" == "true" ]]; then
+  # Wait for MetalLB operator to be ready
   RETRIES=30
   CSV=
   for i in $(seq "${RETRIES}") max; do
@@ -159,10 +204,10 @@ EOF
   oc wait --for=condition=Available --timeout=5m -n metallb-system metallb/metallb
 fi
 
-# Use hardcoded IP range for MetalLB
-echo "Configuring MetalLB with hardcoded IP range..."
+# Configure MetalLB with environment-specific IP range
+echo "Configuring MetalLB with IP range ${METALLB_IP_START}-${METALLB_IP_END} (${ENVIRONMENT})..."
 
-# Create IPAddressPool with hardcoded IP range
+# Create IPAddressPool
 cat <<EOF | oc apply -f -
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
@@ -172,10 +217,10 @@ metadata:
 spec:
   autoAssign: true
   addresses:
-  - 192.168.111.30-192.168.111.39
+  - ${METALLB_IP_START}-${METALLB_IP_END}
 EOF
 
-echo "Created IPAddressPool with hardcoded IP range 192.168.111.30-192.168.111.39"
+echo "Created IPAddressPool with IP range ${METALLB_IP_START}-${METALLB_IP_END}"
 
 # Create L2Advertisement
 oc create -f - <<EOF
@@ -200,3 +245,5 @@ oc get ipaddresspool -n metallb-system
 oc get l2advertisement -n metallb-system
 
 echo "MetalLB configuration completed successfully"
+echo "Environment: ${ENVIRONMENT}"
+echo "MetalLB IP pool: ${METALLB_IP_START}-${METALLB_IP_END}"
