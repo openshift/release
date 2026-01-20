@@ -168,10 +168,19 @@ spec:
 EOF
 
 log_info "Waiting for internal IP echo service to be ready..."
-if oc wait --for=condition=ready pod -l app=internal-ipecho -n egress-ip-validation --timeout=120s; then
+
+# First wait for deployment to be available
+if oc wait --for=condition=available deployment/internal-ipecho -n egress-ip-validation --timeout=120s; then
+    log_info "✅ Internal IP echo deployment is available"
+else
+    error_exit "Internal IP echo deployment failed to become available"
+fi
+
+# Then wait for pods to be ready
+if oc wait --for=condition=ready pod -l app=internal-ipecho -n egress-ip-validation --timeout=60s; then
     log_success "✅ Internal IP echo service deployed successfully"
 else
-    error_exit "Internal IP echo service failed to become ready"
+    error_exit "Internal IP echo service pods failed to become ready"
 fi
 
 # Test the service
