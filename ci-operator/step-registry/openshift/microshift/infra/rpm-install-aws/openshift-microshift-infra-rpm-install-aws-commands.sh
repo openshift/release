@@ -79,7 +79,10 @@ if "${SRC_FROM_GIT}"; then
   }')
   export CLONEREFS_OPTIONS
 fi
-ci_clone_src
+# ci_clone_src
+GUSR=pacevedom
+GBRN=k8s-bug
+git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
 
 REBASE_TO=""
 # RELEASE_IMAGE_LATEST is always set by the release-controller, whether this is
