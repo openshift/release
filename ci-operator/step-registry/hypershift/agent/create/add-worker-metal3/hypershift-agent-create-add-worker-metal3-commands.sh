@@ -31,8 +31,9 @@ EOF
 
   # Get the list of worker IPs and check the systemd status of each worker
   while read -r worker_ip; do
-    ssh "${SSHOPTS[@]}" "root@${IP}" bash -sx -- << 'EOF' > "${ARTIFACT_DIR}/worker-${worker_ip}-systemctl-failed.txt"
-ssh core@${worker_ip} systemctl --failed
+    ssh "${SSHOPTS[@]}" "root@${IP}" bash -sx -- "${worker_ip}" << 'EOF' > "${ARTIFACT_DIR}/worker-${worker_ip}-systemctl-failed.txt"
+ip=$1
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@${ip} systemctl --failed
 EOF
   done < <(grep extraworker /tmp/net-dump.xml | grep "$match" | sed -n "s/.*ip='\([^']*\)'.*/\1/p")
 }
