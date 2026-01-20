@@ -25,7 +25,7 @@ echo "Starting record-metadata step at $(date -u)" | tee "${LOG_FILE}"
 
 # Check for required tools
 echo "Checking required tools..." | tee -a "${LOG_FILE}"
-for tool in curl jq oc; do
+for tool in curl oc; do
     if command -v "${tool}" &>/dev/null; then
         echo "  ${tool}: available" | tee -a "${LOG_FILE}"
     else
@@ -54,13 +54,10 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 if [[ -n "${CATALOG_SOURCE_IMAGE:-}" ]]; then
     CATALOG_TAG="${CATALOG_SOURCE_IMAGE##*:}"
 
-    # Check if curl and jq are available
+    # Check if curl is available
     if ! command -v curl &>/dev/null; then
         BUILD_TIME="cannot be found"
         echo "WARNING: curl is not available, cannot query Quay API for build time" | tee -a "${LOG_FILE}"
-    elif ! command -v jq &>/dev/null; then
-        BUILD_TIME="cannot be found"
-        echo "WARNING: jq is not available, cannot parse Quay API response" | tee -a "${LOG_FILE}"
     else
         # Get build time using Quay.io API
         # Parse image path: quay.io/namespace/repo:tag -> namespace/repo
@@ -68,6 +65,7 @@ if [[ -n "${CATALOG_SOURCE_IMAGE:-}" ]]; then
         IMAGE_PATH="${IMAGE_PATH%:*}"
 
         # Search through tag pages to find the matching tag and get last_modified
+        # Using grep/sed instead of jq for parsing JSON
         BUILD_TIME=""
         for page in 1 2 3 4 5; do
             API_OUTPUT=$(curl -sf "https://quay.io/api/v1/repository/${IMAGE_PATH}/tag/?limit=100&page=${page}" 2>&1) || true
@@ -75,17 +73,23 @@ if [[ -n "${CATALOG_SOURCE_IMAGE:-}" ]]; then
                 break
             fi
 
-            # Find the tag and get its last_modified timestamp
-            BUILD_TIME=$(echo "${API_OUTPUT}" | jq -r --arg tag "${CATALOG_TAG}" \
-                '.tags[] | select(.name == $tag) | .last_modified // empty' 2>/dev/null || echo "")
-
-            if [[ -n "${BUILD_TIME}" ]]; then
-                break
+            # Find the tag entry and extract last_modified using grep/sed
+            # The JSON format is: {"name": "tag", ..., "last_modified": "Mon, 19 Jan 2026 13:19:23 -0000", ...}
+            # We search for the tag name and then extract the last_modified from that entry
+            if echo "${API_OUTPUT}" | grep -q "\"name\": *\"${CATALOG_TAG}\""; then
+                # Extract the JSON object containing this tag and get last_modified
+                # This uses sed to find the section with our tag and extract last_modified
+                BUILD_TIME=$(echo "${API_OUTPUT}" | \
+                    grep -o "{[^}]*\"name\": *\"${CATALOG_TAG}\"[^}]*}" | \
+                    head -1 | \
+                    sed -n 's/.*"last_modified": *"\([^"]*\)".*/\1/p')
+                if [[ -n "${BUILD_TIME}" ]]; then
+                    break
+                fi
             fi
 
             # Check if there are more pages
-            HAS_MORE=$(echo "${API_OUTPUT}" | jq -r '.has_additional // false' 2>/dev/null)
-            if [[ "${HAS_MORE}" != "true" ]]; then
+            if ! echo "${API_OUTPUT}" | grep -q '"has_additional": *true'; then
                 break
             fi
         done
