@@ -214,14 +214,31 @@ echo "WORKLOAD: $WORKLOAD" | tee -a /tmp/ipsec-verification-artifacts/test-start
 echo "UUID: $UUID" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 echo "CLUSTER_NAME: $CLUSTER_NAME" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 
-# Run the network performance test
+# Check cluster prerequisites before running test
+echo "=== Checking Cluster Prerequisites ===" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+WORKER_COUNT=$(oc get nodes --no-headers | grep worker | wc -l)
+echo "Worker node count: $WORKER_COUNT" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+if [ "$WORKER_COUNT" -lt 2 ]; then
+    echo "WARNING: Network-perf test requires at least 2 worker nodes, found: $WORKER_COUNT" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+fi
+
+# Check if we have cluster-admin permissions
+oc auth can-i '*' '*' > /tmp/ipsec-verification-artifacts/permissions-check.log 2>&1
+if [ $? -eq 0 ]; then
+    echo "Cluster permissions: cluster-admin (OK)" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+else
+    echo "Cluster permissions: limited (may affect operator installation)" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+fi
+
+# Run the network performance test with enhanced logging
 if [ -f "run.py" ]; then
     echo "Running Python test script..."
     python3 -u ./run.py > /tmp/ipsec-verification-artifacts/netperf-output.log 2>&1 &
     NETPERF_PID=$!
 elif [ -f "run.sh" ]; then
     echo "Running shell test script..."
-    bash ./run.sh > /tmp/ipsec-verification-artifacts/netperf-output.log 2>&1 &
+    # Run with verbose output and capture both stdout and stderr
+    bash -x ./run.sh > /tmp/ipsec-verification-artifacts/netperf-output.log 2>&1 &
     NETPERF_PID=$!
 else
     echo "ERROR: No run script found"
@@ -281,6 +298,27 @@ echo "=== Waiting for Test Completion ==="
 wait $NETPERF_PID 2>/dev/null || NETPERF_EXIT_CODE=$?
 echo "NetPerf test completed with exit code: ${NETPERF_EXIT_CODE:-0}" | tee /tmp/ipsec-verification-artifacts/test-completion.log
 echo "Test completion time: $(date)" | tee -a /tmp/ipsec-verification-artifacts/test-completion.log
+
+# If test failed, capture additional debugging information
+if [ "${NETPERF_EXIT_CODE:-0}" -ne 0 ]; then
+    echo "=== Test Failed - Collecting Debug Information ===" | tee -a /tmp/ipsec-verification-artifacts/test-completion.log
+    
+    # Check for benchmark operator
+    echo "Checking benchmark operator status..." | tee -a /tmp/ipsec-verification-artifacts/test-completion.log
+    oc get namespaces | grep benchmark > /tmp/ipsec-verification-artifacts/benchmark-namespace.log 2>&1 || echo "No benchmark namespace found"
+    oc get pods -A | grep benchmark > /tmp/ipsec-verification-artifacts/benchmark-pods.log 2>&1 || echo "No benchmark pods found"
+    
+    # Check for any created CRDs
+    echo "Checking for benchmark CRDs..." | tee -a /tmp/ipsec-verification-artifacts/test-completion.log
+    oc get crd | grep benchmark > /tmp/ipsec-verification-artifacts/benchmark-crds.log 2>&1 || echo "No benchmark CRDs found"
+    
+    # Capture last 50 lines of test output for immediate debugging
+    echo "Last 50 lines of test output:" | tee -a /tmp/ipsec-verification-artifacts/test-completion.log
+    tail -50 /tmp/ipsec-verification-artifacts/netperf-output.log | tee -a /tmp/ipsec-verification-artifacts/test-completion.log 2>/dev/null || echo "No test output captured"
+    
+    # Check if any benchmark-related resources were created
+    oc get benchmarks -A > /tmp/ipsec-verification-artifacts/benchmarks.log 2>&1 || echo "No benchmark resources found"
+fi
 
 # Stop packet captures
 if [ "$WORKER_NODE" != "no-worker-found" ]; then
