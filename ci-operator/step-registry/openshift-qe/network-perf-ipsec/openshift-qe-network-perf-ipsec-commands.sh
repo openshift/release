@@ -202,8 +202,12 @@ ls -la | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 
 # Set required environment variables for network-perf test
 export WORKLOAD=${WORKLOAD:-"pod2pod"}  # Use pod2pod for comprehensive IPSec testing
-export UUID=$(uuidgen || echo "ipsec-test-$(date +%s)")
-export CLUSTER_NAME=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}' 2>/dev/null || echo "unknown-cluster")
+
+UUID=$(uuidgen || echo "ipsec-test-$(date +%s)")
+export UUID
+
+CLUSTER_NAME=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}' 2>/dev/null || echo "unknown-cluster")
+export CLUSTER_NAME
 
 echo "=== Network Performance Test Configuration ===" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 echo "WORKLOAD: $WORKLOAD" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
