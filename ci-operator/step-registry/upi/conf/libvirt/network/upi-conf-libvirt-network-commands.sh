@@ -34,8 +34,8 @@ function leaseLookup () {
   echo "$lookup"
 }
 
-BASE_DOMAIN="${LEASED_RESOURCE}.ci"
-CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+BASE_DOMAIN="phc-cicd.cis.ibm.net"
+CLUSTER_NAME="${LEASED_RESOURCE}"
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
 echo "Creating the libvirt network.xml file..."
