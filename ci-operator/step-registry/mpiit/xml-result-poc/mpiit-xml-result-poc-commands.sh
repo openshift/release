@@ -15,14 +15,13 @@ function install_yq_if_not_exists() {
         mkdir -p /tmp/bin
         export PATH=$PATH:/tmp/bin/
         curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+         -o /tmp/bin/yq && chmod +x /tmp/bin/yq && touch junit_tmp.xml && chmod +w junit_tmp.xml
     fi
 }
 
 function generateResultFile() {
     results_file="${1}"
 
-    echo "Generating a test suite with the CNV deployment result (Fail/Success): ${results_file}"
     yq eval -n --output-format=xml -I0 '
       .testsuite = {
         "+@name": "MY-lp-interop",
