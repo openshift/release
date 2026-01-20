@@ -16,15 +16,46 @@ TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 if [[ -n "${CATALOG_SOURCE_IMAGE:-}" ]]; then
     CATALOG_TAG="${CATALOG_SOURCE_IMAGE##*:}"
 
-    # Get build time from image metadata using skopeo inspect
-    SKOPEO_OUTPUT=$(skopeo inspect "docker://${CATALOG_SOURCE_IMAGE}" 2>&1) || true
-    BUILD_TIME=$(echo "${SKOPEO_OUTPUT}" | jq -r '.Labels."build-date" // empty' 2>/dev/null || echo "")
-
-    if [[ -z "${BUILD_TIME}" ]]; then
+    # Check if curl is available
+    if ! command -v curl &>/dev/null; then
         BUILD_TIME="unknown"
-        echo "WARNING: Failed to get build time for image"
-        echo "  CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}"
-        echo "  skopeo output: ${SKOPEO_OUTPUT}"
+        echo "WARNING: curl is not available, cannot query Quay API for build time" | tee -a "${ARTIFACT_DIR}/build-log.txt"
+    else
+        # Get build time using Quay.io API
+        # Parse image path: quay.io/namespace/repo:tag -> namespace/repo
+        IMAGE_PATH="${CATALOG_SOURCE_IMAGE#quay.io/}"
+        IMAGE_PATH="${IMAGE_PATH%:*}"
+
+        # Search through tag pages to find the matching tag and get last_modified
+        BUILD_TIME=""
+        for page in 1 2 3 4 5; do
+            API_OUTPUT=$(curl -sf "https://quay.io/api/v1/repository/${IMAGE_PATH}/tag/?limit=100&page=${page}" 2>&1) || true
+            if [[ -z "${API_OUTPUT}" ]]; then
+                break
+            fi
+
+            # Find the tag and get its last_modified timestamp
+            BUILD_TIME=$(echo "${API_OUTPUT}" | jq -r --arg tag "${CATALOG_TAG}" \
+                '.tags[] | select(.name == $tag) | .last_modified // empty' 2>/dev/null || echo "")
+
+            if [[ -n "${BUILD_TIME}" ]]; then
+                break
+            fi
+
+            # Check if there are more pages
+            HAS_MORE=$(echo "${API_OUTPUT}" | jq -r '.has_additional // false' 2>/dev/null)
+            if [[ "${HAS_MORE}" != "true" ]]; then
+                break
+            fi
+        done
+
+        if [[ -z "${BUILD_TIME}" ]]; then
+            BUILD_TIME="unknown"
+            echo "WARNING: Failed to get build time for image" | tee -a "${ARTIFACT_DIR}/build-log.txt"
+            echo "  CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE}" | tee -a "${ARTIFACT_DIR}/build-log.txt"
+            echo "  CATALOG_TAG: ${CATALOG_TAG}" | tee -a "${ARTIFACT_DIR}/build-log.txt"
+            echo "  IMAGE_PATH: ${IMAGE_PATH}" | tee -a "${ARTIFACT_DIR}/build-log.txt"
+        fi
     fi
 else
     CATALOG_TAG=""
