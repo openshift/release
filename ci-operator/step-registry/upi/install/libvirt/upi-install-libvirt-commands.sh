@@ -62,7 +62,7 @@ echo "Extracting openshift-install from the payload..."
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
   --command=openshift-install --to="${INSTALL_DIR}"
 
-CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+CLUSTER_NAME="${LEASED_RESOURCE}"
 OCPINSTALL="${INSTALL_DIR}/openshift-install"
 # All virsh commands need to be run on the hypervisor
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
