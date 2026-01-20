@@ -15,6 +15,14 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.20"
   upi-installer:
     name: "4.20"
     namespace: ocp
@@ -62,12 +70,10 @@ tests:
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
-    allow_skip_on_success: true
     cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      USER_PROVISIONED_DNS: "no"
-    workflow: cucushift-installer-rehearse-azure-ipi-private-custom-dns
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-cluster
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
