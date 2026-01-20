@@ -1,0 +1,155 @@
+base_images:
+  ansible:
+    name: "4.20"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.20"
+  tools:
+    name: "4.20"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  arm64-intermediate:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  arm64-latest:
+    release:
+      architecture: arm64
+      channel: fast
+      version: "4.20"
+  arm64-target:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.20"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: azure-ipi-without-identity-mini-perm-f28
+  cron: 14 13 26 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE},${RELEASE_IMAGE_ARM64_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE
+        name: release:arm64-intermediate
+      - env: RELEASE_IMAGE_ARM64_TARGET
+        name: release:arm64-target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: cucushift-installer-rehearse-azure-ipi-without-identity
+- as: baremetalds-ipi-ovn-ipv4-f28
+  capabilities:
+  - intranet
+  cron: 52 20 18 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ARCHITECTURE: arm64
+      NVME_DEVICE: /dev/nvme1n1
+      PACKET_METRO: dc
+      PACKET_PLAN: c3.large.arm64
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE},${RELEASE_IMAGE_ARM64_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE
+        name: release:arm64-intermediate
+      - env: RELEASE_IMAGE_ARM64_TARGET
+        name: release:arm64-target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-equinix
+- as: gcp-ipi-proxy-private-mini-perm-f28
+  cron: 21 9 28 * *
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      OCP_ARCH: arm64
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_ARM64_INTERMEDIATE},${RELEASE_IMAGE_ARM64_TARGET}"
+        > ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_ARM64_INTERMEDIATE
+        name: release:arm64-intermediate
+      - env: RELEASE_IMAGE_ARM64_TARGET
+        name: release:arm64-target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-cpou
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
+zz_generated_metadata:
+  branch: release-4.22
+  org: openshift
+  repo: openshift-tests-private
+  variant: arm64-nightly-4.22-cpou-upgrade-from-4.20
