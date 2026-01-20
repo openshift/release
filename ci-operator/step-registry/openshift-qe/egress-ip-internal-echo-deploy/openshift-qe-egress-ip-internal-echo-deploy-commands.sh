@@ -115,7 +115,6 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
-          runAsUser: 1001
           capabilities:
             drop:
             - ALL
@@ -230,17 +229,15 @@ metadata:
 spec:
   securityContext:
     runAsNonRoot: true
-    runAsUser: 1001
     seccompProfile:
       type: RuntimeDefault
   containers:
   - name: curl-test
-    image: quay.io/openshift/origin-network-tools:latest
+    image: python:3.9-alpine
     command: ["/bin/sleep", "60"]
     securityContext:
       allowPrivilegeEscalation: false
       runAsNonRoot: true
-      runAsUser: 1001
       capabilities:
         drop:
         - ALL
