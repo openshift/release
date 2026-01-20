@@ -3,6 +3,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export TESTCASES="[]"
 
 function install_yq_if_not_exists() {
     # Install yq manually if not found in image
@@ -19,13 +20,29 @@ function install_yq_if_not_exists() {
     fi
 }
 
+function add_testcase() {
+    local test_name="$1"
+    local test_passed="$2"
+
+    if [[ "$test_passed" == "false" ]]; then
+        TESTCASES=$(echo "$TESTCASES" | yq -o=json '. += [{"name": "'"$test_name"'", "failure": {"message": "Failed step"}}]')
+        # trigger cleanup with failure exit status
+        exit 1
+    else
+        TESTCASES=$(echo "$TESTCASES" | yq -o=json '. += [{"name": "'"$test_name"'"}]')
+    fi
+}
+
+
 install_yq_if_not_exists
+add_testcase "my-poc" "true"
 
 yq eval -n --output-format=xml -I0 '
 	.testsuite = {
 	"+@name": "MY-lp-interop",
 	"+@tests": 1,
-	"+@failures": 0
+	"+@failures": 0,
+	"testcase": env(TESTCASES)
 	}
 ' > /tmp/junit.xml
 
