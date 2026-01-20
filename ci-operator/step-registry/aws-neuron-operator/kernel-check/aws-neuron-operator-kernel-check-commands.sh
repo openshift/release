@@ -9,6 +9,8 @@ echo "=== AWS Neuron Kernel Version Check ==="
 DTK_JSON_URL="https://raw.githubusercontent.com/awslabs/kmod-with-kmm-for-ai-chips-on-aws/main/driver-toolkit/driver-toolkit.json"
 OCP_VERSION="${OPENSHIFT_VERSION:-4.20}"
 
+echo "Checking kernel changes for OCP version: ${OCP_VERSION}"
+
 # Fetch driver-toolkit.json
 echo "Fetching driver-toolkit.json..."
 if ! curl -sL "${DTK_JSON_URL}" -o /tmp/driver-toolkit.json; then
