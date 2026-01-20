@@ -53,12 +53,19 @@ fi
 echo "=== Running make targets ==="
 echo "=== Running undeploy-integration ==="
 echo "--------------------------------"
+
+echo "=== Starting thanos proxy ==="
+echo "--------------------------------"
+make proxy &
+
 make undeploy-integration
 echo "=== Running deploy-integration ==="
 echo "--------------------------------"
+
 make deploy-integration
 echo "=== Running test-integration ==="
 echo "--------------------------------"
+
 make test-integration
 
 echo "=== Deployment successful ==="
