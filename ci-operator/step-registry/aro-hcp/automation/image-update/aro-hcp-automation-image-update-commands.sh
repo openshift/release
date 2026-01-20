@@ -27,7 +27,8 @@ trap 'set +o xtrace' DEBUG
 VERBOSITY=${VERBOSITY:-1}
 
 # Internal variables (not configurable via ref.yaml)
-readonly IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.txt"
+readonly IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.md"
+readonly IMAGE_UPDATER_OUTPUT_FORMAT="markdown"
 
 # Logging functions with timestamps and severity levels
 log() { echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] ${*}"; }
@@ -136,9 +137,9 @@ debug "azure: authentication configured successfully (credentials redacted)"
 # Image Updater: Build and run the image-updater tool
 info "image: fetching the latest image digests for all components"
 if [[ ${VERBOSITY-0} -ge 2 ]]; then
-  VERBOSITY=1 make image-updater update | tee "${IMAGE_UPDATER_OUTPUT}"
+  VERBOSITY=1 make image-updater OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
 else
-  VERBOSITY=0 make image-updater update > "${IMAGE_UPDATER_OUTPUT}"
+  VERBOSITY=0 make image-updater OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
 fi
 
 # Check if there are any changes from image updates
@@ -156,16 +157,17 @@ git commit --all --quiet --message "chore: execute image-updater for all compone
 info "acm: rendering ACM helm-charts"
 run make -C acm helm-charts
 
+# Render helm chart
+debug "acm: running yaml formatting and updating helm fixtures"
+run make yamlfmt
+run make update-helm-fixtures
+
 # Check if helm chart rendering produced changes
 if [[ $(git status --porcelain) != "" ]]; then
-  debug "acm: running yaml formatting and updating helm fixtures"
-  run make yamlfmt
-  run make update-helm-fixtures
-
   info "git: committing rendered helm charts"
   git commit --all --quiet --message "chore: render ACM helm-charts"
 else
-  info "acm: no changes to helm charts"
+  info "acm: no changes after helm chart rendering and formatting"
 fi
 
 # Configuration: Materialize final configuration
