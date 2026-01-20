@@ -79,11 +79,13 @@ if [[ -n "${CATALOG_SOURCE_IMAGE:-}" ]]; then
             if echo "${API_OUTPUT}" | grep -q "\"name\": *\"${CATALOG_TAG}\""; then
                 # Extract the JSON object containing this tag and get last_modified
                 # This uses sed to find the section with our tag and extract last_modified
-                BUILD_TIME=$(echo "${API_OUTPUT}" | \
+                RAW_BUILD_TIME=$(echo "${API_OUTPUT}" | \
                     grep -o "{[^}]*\"name\": *\"${CATALOG_TAG}\"[^}]*}" | \
                     head -1 | \
                     sed -n 's/.*"last_modified": *"\([^"]*\)".*/\1/p')
-                if [[ -n "${BUILD_TIME}" ]]; then
+                if [[ -n "${RAW_BUILD_TIME}" ]]; then
+                    # Convert from "Mon, 19 Jan 2026 13:19:23 -0000" to ISO 8601 format
+                    BUILD_TIME=$(date -u -d "${RAW_BUILD_TIME}" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "${RAW_BUILD_TIME}")
                     break
                 fi
             fi
