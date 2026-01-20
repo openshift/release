@@ -22,4 +22,6 @@ export DATAROUTER_METADATA_URL="https://raw.githubusercontent.com/CSPI-QE/cspi-u
 
 sleep 1h
 
+export REPORTPORTAL_LAUNCH_ATTRIBUTES='[{"key": "attr", "value": "${my_job_parameter}"}]'
+
 reportToDataRouter

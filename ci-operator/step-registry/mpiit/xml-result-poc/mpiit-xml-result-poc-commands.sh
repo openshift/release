@@ -19,20 +19,15 @@ function install_yq_if_not_exists() {
     fi
 }
 
-function generateResultFile() {
-    results_file="${1}"
-
-    yq eval -n --output-format=xml -I0 '
-      .testsuite = {
-        "+@name": "MY-lp-interop",
-        "+@tests": 1,
-        "+@failures": 0,
-      }
-    ' > $results_file
-}
-
 install_yq_if_not_exists
-generateResultFile /tmp/junit.xml
+
+yq eval -n --output-format=xml -I0 '
+	.testsuite = {
+	"+@name": "MY-lp-interop",
+	"+@tests": 1,
+	"+@failures": 0
+	}
+' > /tmp/junit.xml
 
 # Send junit file to shared dir for Data Router Reporter step
 cp /tmp/junit.xml "${SHARED_DIR}"
