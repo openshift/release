@@ -20,4 +20,6 @@ export REPORTPORTAL_LAUNCH_NAME="lp-interop-${OCP_VERSION}"
 
 export DATAROUTER_METADATA_URL="https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/data-router/${OCP_VERSION}/metadata.json"
 
+sleep 1h
+
 reportToDataRouter
