@@ -25,11 +25,9 @@ function add_testcase() {
     local test_passed="$2"
 
     if [[ "$test_passed" == "false" ]]; then
-        TESTCASES=$(echo "$TESTCASES" | yq -o=json '. += [{"name": "'"$test_name"'", "failure": {"message": "Failed step"}}]')
-        # trigger cleanup with failure exit status
-        exit 1
+        TESTCASES=$(echo "$TESTCASES" | yq -o=json '. += [{"+@name": "'"$test_name"'", "failure": {"message": "Failed step"}}]')
     else
-        TESTCASES=$(echo "$TESTCASES" | yq -o=json '. += [{"name": "'"$test_name"'"}]')
+        TESTCASES=$(echo "$TESTCASES" | yq -o=json '. += [{"+@name": "'"$test_name"'"}]')
     fi
 }
 
