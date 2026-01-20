@@ -1,0 +1,33 @@
+workflow:
+  as: pqc-compliance
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      PQC_CIPHER: "X25519MLKEM768"
+      PQC_MIN_TLS_VERSION: "VersionTLS13"
+    pre:
+      - chain: ipi-conf-aws
+      - chain: ipi-install
+      - chain: pqc-conf
+    test:
+      - ref: tls-scanner-run
+    post:
+      - chain: gather-core-dump
+      - chain: ipi-deprovision
+  documentation: |-
+    The OpenShift PQC Compliance workflow provisions an AWS cluster, configures it with
+    post-quantum cryptography (PQC) cipher suites across all major TLS endpoints (API
+    Server, Ingress Controller, and Kubelet), and validates compliance using the tls-scanner
+    tool.
+
+    The workflow performs the following steps:
+    1. Provision an AWS cluster using standard IPI
+    2. Configure API Server with X25519MLKEM768 cipher suite
+    3. Configure Ingress Controller with X25519MLKEM768 cipher suite
+    4. Configure Kubelet with X25519MLKEM768 cipher suite (targets worker MCP)
+    5. Run tls-scanner to validate all open ports use PQC-compliant ciphers
+    6. Gather diagnostics and deprovision cluster
+
+    The workflow fails if tls-scanner detects any non-PQC-compliant ports, providing
+    visibility into which OpenShift components are not yet compliant with post-quantum
+    cryptography requirements.

@@ -1,0 +1,28 @@
+chain:
+  as: pqc-conf
+  steps:
+  - ref: pqc-conf-apiserver
+  - ref: pqc-conf-ingress
+  - ref: pqc-conf-kubelet
+  env:
+  - name: PQC_CIPHER
+    default: "X25519MLKEM768"
+    documentation: |-
+      Post-quantum cryptography cipher suite to configure for API Server, Ingress Controller, and Kubelet.
+  - name: PQC_MIN_TLS_VERSION
+    default: "VersionTLS13"
+    documentation: |-
+      Minimum TLS version to configure for API Server, Ingress Controller, and Kubelet.
+  - name: PQC_KUBELET_MCP
+    default: "worker"
+    documentation: |-
+      Machine Config Pool to target for Kubelet configuration (default: worker).
+  documentation: |-
+    This chain configures an OpenShift cluster with post-quantum cryptography (PQC)
+    cipher suites across all major TLS endpoints. It sequentially configures:
+    1. API Server with Custom TLS Security Profile
+    2. Ingress Controller with Custom TLS Security Profile
+    3. Kubelet with Custom TLS Security Profile via KubeletConfig
+
+    All components are configured to use the X25519MLKEM768 cipher suite with TLS 1.3.
+    The chain waits for each component to stabilize before proceeding to the next.

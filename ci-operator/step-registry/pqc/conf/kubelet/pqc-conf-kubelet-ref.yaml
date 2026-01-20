@@ -1,0 +1,31 @@
+ref:
+  as: pqc-conf-kubelet
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: pqc-conf-kubelet-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: PQC_CIPHER
+      default: "X25519MLKEM768"
+      documentation: |-
+        Post-quantum cryptography cipher suite to configure for the Kubelet.
+    - name: PQC_MIN_TLS_VERSION
+      default: "VersionTLS13"
+      documentation: |-
+        Minimum TLS version to configure for the Kubelet.
+    - name: PQC_KUBELET_MCP
+      default: "worker"
+      documentation: |-
+        Machine Config Pool to target for Kubelet configuration (default: worker).
+  documentation: |-
+    Configures the cluster's Kubelet with a Custom TLS Security Profile using
+    post-quantum cryptography (PQC) cipher suites. This step creates a KubeletConfig
+    resource targeting the specified Machine Config Pool (default: worker) to use
+    the specified PQC cipher (default: X25519MLKEM768) with TLS 1.3. The step then
+    waits for the Machine Config Pool to complete its rollout and validates the
+    configuration was applied correctly.
