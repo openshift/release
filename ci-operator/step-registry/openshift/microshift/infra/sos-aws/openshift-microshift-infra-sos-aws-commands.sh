@@ -157,3 +157,4 @@ ssh "${INSTANCE_PREFIX}" <<'EOF'
   fi
 EOF
 scp "${INSTANCE_PREFIX}":/tmp/sosreport-* "${ARTIFACT_DIR}" || true
+ssh "${INSTANCE_PREFIX}" 'sudo journalctl --no-pager' > "${ARTIFACT_DIR}/journal.log" || true
