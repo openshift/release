@@ -3129,10 +3129,10 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
-- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-netobserv
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-virt-netobserv
   capabilities:
   - intranet
-  cron: 43 12 12 * *
+  cron: 26 10 8 * *
   steps:
     cluster_profile: equinix-ocp-metal-qe
     env:
@@ -3143,7 +3143,27 @@ tests:
         NETWORK_TYPE=OVNKubernetes
       TEST_FILTERS: Network_Observability
       TEST_IMPORTANCE: .*
-      TEST_SCENARIOS: with VMs|53844
+      TEST_SCENARIOS: with VMs
+      TEST_TIMEOUT: "55"
+    test:
+    - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-ipv6-netobserv
+  capabilities:
+  - intranet
+  cron: 26 10 8 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: "53844"
       TEST_TIMEOUT: "55"
     test:
     - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
