@@ -125,6 +125,8 @@ ssh ${SSH_ARGS} root@${bastion} "
        -e "install_microshift=${INSTALL_MICROSHIFT}" \
        -e "manage_repos=${MANAGE_REPOS}" \
        -e "prometheus_logging=${PROMETHEUS_LOGGING}" \
+       -e "vg_name=${VG_NAME}" \
+       -e "lvm_disk=${LVM_DISK}" \
        -v | tee /tmp/ansible-microshift-deploy-$(date +%s)
    else
      echo 'ERROR: Ansible playbook ${ANSIBLE_PLAYBOOK} not found'
