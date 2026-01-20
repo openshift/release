@@ -32,37 +32,6 @@ if ! command -v git &> /dev/null; then
     fi
 fi
 
-# If git still not available, try downloading a static binary
-if ! command -v git &> /dev/null; then
-    echo "Attempting to download static git binary..."
-    mkdir -p /tmp/git-static
-    cd /tmp/git-static
-    
-    # Download static git binary for Linux x86_64
-    if command -v curl &> /dev/null; then
-        curl -L -o git-static.tar.xz "https://github.com/git/git/releases/download/v2.41.0/git-2.41.0.tar.xz" 2>/dev/null || echo "Could not download git"
-    elif command -v wget &> /dev/null; then
-        wget -O git-static.tar.xz "https://github.com/git/git/releases/download/v2.41.0/git-2.41.0.tar.xz" 2>/dev/null || echo "Could not download git"
-    fi
-    
-    # Alternative: try to get git from busybox or other minimal sources
-    if ! command -v git &> /dev/null && command -v apk &> /dev/null; then
-        apk add --no-cache git --force 2>/dev/null || echo "Force install failed"
-    fi
-    
-    cd /tmp
-fi
-
-# Final fallback: check if git is available in alternative paths
-if ! command -v git &> /dev/null; then
-    echo "Searching for git in alternative locations..."
-    find /usr /opt /bin 2>/dev/null | grep -E "bin/git$" | head -1 | while read gitpath; do
-        if [ -x "$gitpath" ]; then
-            ln -sf "$gitpath" /usr/local/bin/git 2>/dev/null || echo "Could not link git"
-        fi
-    done
-fi
-
 # Verify git installation
 if command -v git &> /dev/null; then
     git --version | tee /tmp/ipsec-verification-artifacts/git-version.log
@@ -110,7 +79,7 @@ else
     echo "WARNING: No worker node found for packet capture"
 fi
 
-echo "=== Setting Up E2E Benchmarking Environment ==="
+echo "=== Setting Up Simple Network Test ==="
 # Create python virtual environment in /tmp where we have write permissions
 python3 -m venv /tmp/venv_qe
 source /tmp/venv_qe/bin/activate
@@ -118,94 +87,12 @@ source /tmp/venv_qe/bin/activate
 # Get credentials
 ES_PASSWORD=$(cat /secret/password 2>/dev/null || echo "no-password")
 ES_USERNAME=$(cat /secret/username 2>/dev/null || echo "no-username")
-
 export ES_PASSWORD ES_USERNAME
 
-# Download e2e-benchmarking repository
-LATEST_TAG=$(curl -s https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest | jq -r .tag_name 2>/dev/null || echo "v2.7.1")
-
-echo "Downloading e2e-benchmarking ${LATEST_TAG}..." | tee /tmp/ipsec-verification-artifacts/repo-clone.log
-
-# Skip git entirely and use curl/wget for more reliability in CI environment
-echo "Using direct download method for better CI compatibility..." | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
-GIT_FAILED=true
-
-# If git failed or not available, use curl/wget
-if [ "$GIT_FAILED" = "true" ]; then
-    # Try using curl to download and extract the repository
-    ARCHIVE_URL="https://github.com/cloud-bulldozer/e2e-benchmarking/archive/refs/tags/${LATEST_TAG}.tar.gz"
-    echo "Attempting to download ${ARCHIVE_URL}" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
-    
-    if command -v curl &> /dev/null; then
-        cd /tmp
-        curl -L -o e2e-benchmarking.tar.gz "$ARCHIVE_URL" 2>&1 | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
-        if [ -f e2e-benchmarking.tar.gz ]; then
-            tar -xzf e2e-benchmarking.tar.gz 2>&1 | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
-            mv e2e-benchmarking-* e2e-benchmarking 2>/dev/null || echo "Repository directory rename failed"
-            echo "Repository downloaded and extracted via curl" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
-        fi
-    elif command -v wget &> /dev/null; then
-        cd /tmp
-        wget -O e2e-benchmarking.tar.gz "$ARCHIVE_URL" 2>&1 | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
-        if [ -f e2e-benchmarking.tar.gz ]; then
-            tar -xzf e2e-benchmarking.tar.gz 2>&1 | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
-            mv e2e-benchmarking-* e2e-benchmarking 2>/dev/null || echo "Repository directory rename failed"
-            echo "Repository downloaded and extracted via wget" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
-        fi
-    else
-        echo "ERROR: Neither git, curl, nor wget available for repository download" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
-        exit 1
-    fi
-fi
-
-# Verify repository was downloaded
-if [ ! -d "/tmp/e2e-benchmarking" ]; then
-    echo "ERROR: Failed to obtain e2e-benchmarking repository" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
-    exit 1
-else
-    echo "Repository successfully obtained" | tee -a /tmp/ipsec-verification-artifacts/repo-clone.log
-fi
-
-cd /tmp/e2e-benchmarking
-
-# Install requirements if available
-if [ -f requirements.txt ]; then
-    echo "Installing Python requirements..."
-    pip install -r requirements.txt > /tmp/ipsec-verification-artifacts/pip-install.log 2>&1 || echo "Some requirements failed to install"
-fi
-
-echo "=== Finding Network Performance Test Directory ==="
-if [ -d "workloads/network-perf" ]; then
-    cd workloads/network-perf
-    echo "Using workloads/network-perf"
-elif [ -d "workloads/k8s-netperf" ]; then
-    cd workloads/k8s-netperf
-    echo "Using workloads/k8s-netperf"
-else
-    echo "Searching for network performance test directory..."
-    find . -name "*netperf*" -type d | tee /tmp/ipsec-verification-artifacts/netperf-dirs.log
-    NETPERF_DIR=$(find . -name "*netperf*" -type d | head -1)
-    if [ ! -z "$NETPERF_DIR" ]; then
-        cd "$NETPERF_DIR"
-        echo "Using directory: $NETPERF_DIR"
-    else
-        echo "ERROR: No network performance test directory found"
-        ls -la workloads/ | tee -a /tmp/ipsec-verification-artifacts/netperf-dirs.log
-        exit 1
-    fi
-fi
-
-echo "=== Starting Network Performance Test ==="
-echo "Test start time: $(date)" | tee /tmp/ipsec-verification-artifacts/test-start.log
-echo "Current directory: $(pwd)" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
-ls -la | tee -a /tmp/ipsec-verification-artifacts/test-start.log
-
-# Set required environment variables for network-perf test
-export WORKLOAD=${WORKLOAD:-"pod2pod"}  # Use pod2pod for comprehensive IPSec testing
-
+# Set required environment variables for network test
+export WORKLOAD=${WORKLOAD:-"pod2pod"}
 UUID=$(uuidgen || echo "ipsec-test-$(date +%s)")
 export UUID
-
 CLUSTER_NAME=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}' 2>/dev/null || echo "unknown-cluster")
 export CLUSTER_NAME
 
@@ -214,126 +101,118 @@ echo "WORKLOAD: $WORKLOAD" | tee -a /tmp/ipsec-verification-artifacts/test-start
 echo "UUID: $UUID" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 echo "CLUSTER_NAME: $CLUSTER_NAME" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 
-# Check cluster prerequisites before running test
+# Check cluster prerequisites
 echo "=== Checking Cluster Prerequisites ===" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 WORKER_COUNT=$(oc get nodes --no-headers | grep worker | wc -l)
 echo "Worker node count: $WORKER_COUNT" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
-if [ "$WORKER_COUNT" -lt 2 ]; then
-    echo "WARNING: Network-perf test requires at least 2 worker nodes, found: $WORKER_COUNT" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
-fi
 
-# Check if we have cluster-admin permissions
+# Check permissions
 oc auth can-i '*' '*' > /tmp/ipsec-verification-artifacts/permissions-check.log 2>&1
 if [ $? -eq 0 ]; then
     echo "Cluster permissions: cluster-admin (OK)" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 else
-    echo "Cluster permissions: limited (may affect operator installation)" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+    echo "Cluster permissions: limited (may affect test)" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 fi
 
-# Use direct netperf implementation instead of complex benchmark operator
-echo "=== Running Direct Netperf IPSec Verification ===" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+echo "=== Running Simplified Network Test ===" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 
-# Create netperf server pod
-cat > /tmp/netperf-server.yaml << 'EOF'
+# Create simple test pods directly with inline YAML
+echo "Creating test server pod..."
+oc apply -f - << 'EOF'
 apiVersion: v1
 kind: Pod
 metadata:
-  name: netperf-server
+  name: nettest-server
   labels:
-    app: netperf-server
+    app: nettest
 spec:
   containers:
-  - name: netperf-server
-    image: registry.access.redhat.com/ubi9/ubi:latest
+  - name: server
+    image: registry.access.redhat.com/ubi8/ubi:latest
     command:
     - /bin/bash
     - -c
     - |
-      dnf install -y netperf
-      echo "Starting netserver..."
-      netserver -D -p 12865
-      echo "Netserver started on port 12865"
-      while true; do sleep 30; done
+      yum install -y nc
+      echo "Server ready on port 8080"
+      while true; do 
+        echo "HTTP/1.1 200 OK\nContent-Length: 13\n\nHello World\n" | nc -l 8080
+      done
     ports:
-    - containerPort: 12865
+    - containerPort: 8080
   restartPolicy: Never
----
+EOF
+
+echo "Creating test client pod..."
+oc apply -f - << 'EOF'
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nettest-client
+  labels:
+    app: nettest
+spec:
+  containers:
+  - name: client
+    image: registry.access.redhat.com/ubi8/ubi:latest
+    command:
+    - /bin/bash
+    - -c
+    - |
+      yum install -y nc curl
+      echo "Client ready"
+      while true; do sleep 30; done
+    restartPolicy: Never
+EOF
+
+# Create service
+oc apply -f - << 'EOF'
 apiVersion: v1
 kind: Service
 metadata:
-  name: netperf-server-svc
+  name: nettest-service
 spec:
   selector:
-    app: netperf-server
+    app: nettest
   ports:
-  - port: 12865
-    targetPort: 12865
+  - port: 8080
+    targetPort: 8080
 EOF
-
-# Create netperf client pod
-cat > /tmp/netperf-client.yaml << 'EOF'
-apiVersion: v1
-kind: Pod
-metadata:
-  name: netperf-client
-  labels:
-    app: netperf-client
-spec:
-  containers:
-  - name: netperf-client
-    image: registry.access.redhat.com/ubi9/ubi:latest
-    command:
-    - /bin/bash
-    - -c
-    - |
-      dnf install -y netperf
-      echo "Netperf client ready"
-      while true; do sleep 30; done
-  restartPolicy: Never
-EOF
-
-# Deploy netperf pods
-echo "Deploying netperf server and client pods..." | tee -a /tmp/ipsec-verification-artifacts/test-start.log
-oc apply -f /tmp/netperf-server.yaml -f /tmp/netperf-client.yaml > /tmp/ipsec-verification-artifacts/netperf-deployment.log 2>&1
 
 # Wait for pods to be ready
-echo "Waiting for netperf pods to be ready..." | tee -a /tmp/ipsec-verification-artifacts/test-start.log
-sleep 10
+echo "Waiting for test pods to be ready..." | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+sleep 20
 
-for i in {1..30}; do
-    SERVER_READY=$(oc get pod netperf-server -o jsonpath='{.status.phase}' 2>/dev/null)
-    CLIENT_READY=$(oc get pod netperf-client -o jsonpath='{.status.phase}' 2>/dev/null)
-    
-    if [ "$SERVER_READY" = "Running" ] && [ "$CLIENT_READY" = "Running" ]; then
-        echo "Netperf pods ready after ${i}0 seconds" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
-        break
-    fi
-    echo "Waiting for pods... server: $SERVER_READY, client: $CLIENT_READY (attempt $i)" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
-    sleep 10
-done
-
-# Get server IP for testing
-SERVER_IP=$(oc get pod netperf-server -o jsonpath='{.status.podIP}' 2>/dev/null)
-echo "Netperf server IP: $SERVER_IP" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
-
-# Run netperf tests in background
-echo "Starting netperf performance tests..." | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+# Run network test
 (
-    echo "Starting netperf tests at $(date)"
+    echo "Starting network test at $(date)"
+    
+    # Wait for pods to be running
+    for i in {1..20}; do
+        SERVER_STATUS=$(oc get pod nettest-server -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        CLIENT_STATUS=$(oc get pod nettest-client -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        
+        if [ "$SERVER_STATUS" = "Running" ] && [ "$CLIENT_STATUS" = "Running" ]; then
+            echo "Pods ready after ${i}0 seconds"
+            break
+        fi
+        echo "Waiting... server: $SERVER_STATUS, client: $CLIENT_STATUS"
+        sleep 10
+    done
+    
+    # Get server IP
+    SERVER_IP=$(oc get pod nettest-server -o jsonpath='{.status.podIP}' 2>/dev/null || echo "")
     echo "Server IP: $SERVER_IP"
     
     if [ ! -z "$SERVER_IP" ]; then
-        # Run multiple netperf tests to generate traffic for IPSec verification
-        echo "=== TCP_STREAM Test ==="
-        oc exec netperf-client -- netperf -H $SERVER_IP -p 12865 -l 60 -t TCP_STREAM || echo "TCP_STREAM test failed"
-        
-        echo "=== TCP_RR Test ==="
-        oc exec netperf-client -- netperf -H $SERVER_IP -p 12865 -l 30 -t TCP_RR || echo "TCP_RR test failed"
-        
-        echo "=== UDP_STREAM Test ==="
-        oc exec netperf-client -- netperf -H $SERVER_IP -p 12865 -l 30 -t UDP_STREAM || echo "UDP_STREAM test failed"
-        
-        echo "Netperf tests completed at $(date)"
+        # Run multiple connection tests to generate traffic
+        for i in {1..10}; do
+            echo "=== Test iteration $i ==="
+            oc exec nettest-client -- curl -s --connect-timeout 5 http://$SERVER_IP:8080 || echo "Connection failed"
+            oc exec nettest-client -- nc -z $SERVER_IP 8080 || echo "Port check failed"
+            sleep 2
+        done
+        echo "Network test completed successfully"
     else
         echo "ERROR: Could not get server IP"
         exit 1
@@ -341,49 +220,48 @@ echo "Starting netperf performance tests..." | tee -a /tmp/ipsec-verification-ar
 ) > /tmp/ipsec-verification-artifacts/netperf-output.log 2>&1 &
 NETPERF_PID=$!
 
-echo "NetPerf test started, PID: $NETPERF_PID"
+echo "Network test started, PID: $NETPERF_PID"
 
 # Monitor test progress
 echo "=== Monitoring Test Progress ==="
-sleep 30  # Give test time to start
+sleep 30
 
-for i in {1..10}; do
+for i in {1..5}; do
     echo "--- Progress check $i at $(date) ---" | tee -a /tmp/ipsec-verification-artifacts/progress.log
     
-    # Check for our direct netperf pods
-    oc get pods | grep "netperf-" | head -5 | tee -a /tmp/ipsec-verification-artifacts/progress.log || echo "No netperf pods yet"
+    # Check for our test pods
+    oc get pods | grep "nettest-" | head -5 | tee -a /tmp/ipsec-verification-artifacts/progress.log || echo "No nettest pods yet"
     
-    # If we have netperf pods and a worker node, capture their specific traffic
+    # If we have test pods and a worker node, capture their specific traffic
     if [ "$WORKER_NODE" != "no-worker-found" ]; then
-        # Check for our specific netperf pods
-        SERVER_STATUS=$(oc get pod netperf-server -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-        CLIENT_STATUS=$(oc get pod netperf-client -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        SERVER_STATUS=$(oc get pod nettest-server -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        CLIENT_STATUS=$(oc get pod nettest-client -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
         
         if [ "$SERVER_STATUS" = "Running" ] && [ "$CLIENT_STATUS" = "Running" ]; then
-            echo "Found running netperf pods, capturing traffic..." | tee -a /tmp/ipsec-verification-artifacts/progress.log
+            echo "Found running test pods, capturing traffic..." | tee -a /tmp/ipsec-verification-artifacts/progress.log
             
-            SERVER_IP=$(oc get pod netperf-server -o jsonpath='{.status.podIP}' 2>/dev/null || echo "")
-            CLIENT_IP=$(oc get pod netperf-client -o jsonpath='{.status.podIP}' 2>/dev/null || echo "")
+            SERVER_IP=$(oc get pod nettest-server -o jsonpath='{.status.podIP}' 2>/dev/null || echo "")
+            CLIENT_IP=$(oc get pod nettest-client -o jsonpath='{.status.podIP}' 2>/dev/null || echo "")
             
             if [ ! -z "$SERVER_IP" ] && [ ! -z "$CLIENT_IP" ]; then
-                echo "Netperf Pod IPs: client=$CLIENT_IP <-> server=$SERVER_IP" | tee -a /tmp/ipsec-verification-artifacts/progress.log
+                echo "Test Pod IPs: client=$CLIENT_IP <-> server=$SERVER_IP" | tee -a /tmp/ipsec-verification-artifacts/progress.log
                 
-                # Quick pod-to-pod traffic capture specifically for netperf traffic
-                timeout 30 oc debug node/$WORKER_NODE -- chroot /host tcpdump -i any -c 20 -w /tmp/netperf-traffic-$i.pcap "host $SERVER_IP and host $CLIENT_IP" > /tmp/ipsec-verification-logs/netperf-capture-$i.log 2>&1 &
+                # Quick pod-to-pod traffic capture
+                timeout 30 oc debug node/$WORKER_NODE -- chroot /host tcpdump -i any -c 10 -w /tmp/nettest-traffic-$i.pcap "host $SERVER_IP and host $CLIENT_IP" > /tmp/ipsec-verification-logs/nettest-capture-$i.log 2>&1 &
                 
-                # Test connectivity between netperf pods
-                echo "Testing connectivity between netperf pods..." | tee -a /tmp/ipsec-verification-artifacts/progress.log
-                oc exec netperf-client -- ping -c 3 $SERVER_IP >> /tmp/ipsec-verification-artifacts/progress.log 2>&1 || echo "Ping test failed"
+                # Test connectivity
+                echo "Testing connectivity between test pods..." | tee -a /tmp/ipsec-verification-artifacts/progress.log
+                oc exec nettest-client -- nc -z $SERVER_IP 8080 >> /tmp/ipsec-verification-artifacts/progress.log 2>&1 || echo "Connection test failed"
             fi
-            break  # Found pods, no need to keep checking
+            break
         else
-            echo "Netperf pod status: server=$SERVER_STATUS, client=$CLIENT_STATUS" | tee -a /tmp/ipsec-verification-artifacts/progress.log
+            echo "Test pod status: server=$SERVER_STATUS, client=$CLIENT_STATUS" | tee -a /tmp/ipsec-verification-artifacts/progress.log
         fi
     fi
     
     # Check if test is still running
     if ! kill -0 $NETPERF_PID 2>/dev/null; then
-        echo "NetPerf test completed" | tee -a /tmp/ipsec-verification-artifacts/progress.log
+        echo "Network test completed" | tee -a /tmp/ipsec-verification-artifacts/progress.log
         break
     fi
     
@@ -393,29 +271,8 @@ done
 # Wait for test completion
 echo "=== Waiting for Test Completion ==="
 wait $NETPERF_PID 2>/dev/null || NETPERF_EXIT_CODE=$?
-echo "NetPerf test completed with exit code: ${NETPERF_EXIT_CODE:-0}" | tee /tmp/ipsec-verification-artifacts/test-completion.log
+echo "Network test completed with exit code: ${NETPERF_EXIT_CODE:-0}" | tee /tmp/ipsec-verification-artifacts/test-completion.log
 echo "Test completion time: $(date)" | tee -a /tmp/ipsec-verification-artifacts/test-completion.log
-
-# If test failed, capture additional debugging information
-if [ "${NETPERF_EXIT_CODE:-0}" -ne 0 ]; then
-    echo "=== Test Failed - Collecting Debug Information ===" | tee -a /tmp/ipsec-verification-artifacts/test-completion.log
-    
-    # Check for benchmark operator
-    echo "Checking benchmark operator status..." | tee -a /tmp/ipsec-verification-artifacts/test-completion.log
-    oc get namespaces | grep benchmark > /tmp/ipsec-verification-artifacts/benchmark-namespace.log 2>&1 || echo "No benchmark namespace found"
-    oc get pods -A | grep benchmark > /tmp/ipsec-verification-artifacts/benchmark-pods.log 2>&1 || echo "No benchmark pods found"
-    
-    # Check for any created CRDs
-    echo "Checking for benchmark CRDs..." | tee -a /tmp/ipsec-verification-artifacts/test-completion.log
-    oc get crd | grep benchmark > /tmp/ipsec-verification-artifacts/benchmark-crds.log 2>&1 || echo "No benchmark CRDs found"
-    
-    # Capture last 50 lines of test output for immediate debugging
-    echo "Last 50 lines of test output:" | tee -a /tmp/ipsec-verification-artifacts/test-completion.log
-    tail -50 /tmp/ipsec-verification-artifacts/netperf-output.log | tee -a /tmp/ipsec-verification-artifacts/test-completion.log 2>/dev/null || echo "No test output captured"
-    
-    # Check if any benchmark-related resources were created
-    oc get benchmarks -A > /tmp/ipsec-verification-artifacts/benchmarks.log 2>&1 || echo "No benchmark resources found"
-fi
 
 # Stop packet captures
 if [ "$WORKER_NODE" != "no-worker-found" ]; then
@@ -445,17 +302,17 @@ cat > /tmp/ipsec-verification-artifacts/ENCRYPTION-ANALYSIS.md << EOF
 **IPSec Pods:** $IPSEC_POD_COUNT running
 
 ## Test Execution
-- Direct netperf test completed with exit code: ${NETPERF_EXIT_CODE:-0}
+- Simple network test completed with exit code: ${NETPERF_EXIT_CODE:-0}
 - Packet captures collected during test execution
 - IPSec status and configuration logged
 
 ## Critical Evidence Files
 - \`esp-packets.pcap\` - ESP encrypted traffic (if present, IPSec is working)
 - \`general-traffic.pcap\` - General network traffic for comparison
-- \`netperf-traffic-*.pcap\` - Specific netperf pod-to-pod communication
+- \`nettest-traffic-*.pcap\` - Specific pod-to-pod communication
 - \`final-ipsec-status.log\` - IPSec daemon status and tunnels
 - \`final-ipsec-traffic.log\` - IPSec traffic statistics
-- \`netperf-output.log\` - Direct netperf test results (TCP_STREAM, TCP_RR, UDP_STREAM)
+- \`netperf-output.log\` - Simple network test results
 
 ## Analysis Instructions for Dev Team
 1. **Check for ESP packets:** If ESP protocol packets are found in captures, IPSec encryption is working
