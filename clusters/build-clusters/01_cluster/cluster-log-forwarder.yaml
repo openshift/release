@@ -15,34 +15,33 @@ spec:
     tolerations:
     - key: node-role.kubernetes.io/infra
       operator: Exists
+  filters:
+  - name: parse-json
+    type: parse
   inputs:
-  - name: ci-service-pod-logs
-    type: application
-    application:
+  - application:
+      includes:
+      - namespace: ci
       selector:
         matchExpressions:
         - key: created-by-prow
           operator: DoesNotExist # We don't want to store the logs for test jobs
         - key: created-by-ci
           operator: DoesNotExist # We don't want to store the logs for ci-operator pods
-      includes:
-      - namespace: ci
+    name: ci-service-pod-logs
+    type: application
+  managementState: Managed
   outputs:
   - name: splunk-receiver
-    type: splunk
     splunk:
-      url: https://splunk-hec.redhat.com
       authentication:
         token:
           key: hecToken
           secretName: splunk-receiver-token
-  - name: cloudwatch-receiver
-    type: cloudwatch
-    cloudwatch:
-      region: us-east-1
-      groupName: 'build01-9hdwj.{.log_type||"logs"}'
+      url: https://splunk-hec.redhat.com
+    type: splunk
+  - cloudwatch:
       authentication:
-        type: awsAccessKey
         awsAccessKey:
           keyId:
             key: aws_access_key_id
@@ -50,30 +49,32 @@ spec:
           keySecret:
             key: aws_secret_access_key
             secretName: cloudwatch-receiver-token
-  filters:
-  - name: parse-json
-    type: parse
+        type: awsAccessKey
+      groupName: 'build01-9hdwj.{.log_type||"logs"}'
+      region: us-east-1
+    name: cloudwatch-receiver
+    type: cloudwatch
   pipelines:
-  - name: app-ci-pod-logs
+  - filterRefs:
+    - parse-json
     inputRefs:
     - ci-service-pod-logs
+    name: app-ci-pod-logs
     outputRefs:
     - cloudwatch-receiver
-    filterRefs:
-    - parse-json
-  - name: container-logs
-    inputRefs:
+  - inputRefs:
     - application
+    name: container-logs
     outputRefs:
     - splunk-receiver
-  - name: infra-logs
-    inputRefs:
+  - inputRefs:
     - infrastructure
+    name: infra-logs
     outputRefs:
     - splunk-receiver
-  - name: audit-logs
-    inputRefs:
+  - inputRefs:
     - audit
+    name: audit-logs
     outputRefs:
     - splunk-receiver
   serviceAccount:
