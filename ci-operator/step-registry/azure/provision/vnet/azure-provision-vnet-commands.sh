@@ -135,7 +135,11 @@ elif [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
 
     if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
         cp "${CLUSTER_PROFILE_DIR}/ca.pem" /tmp/ca.pem
-        cat /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
+        cert_file="/usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem"
+        if ! ls ${cert_file}; then
+            cert_file="/go/src/github.com/openshift/installer/azure-cli/lib64/python*/site-packages/certifi/cacert.pem"
+        fi
+        cat ${cert_file} >> /tmp/ca.pem
         export REQUESTS_CA_BUNDLE=/tmp/ca.pem
     fi
     az cloud register \
