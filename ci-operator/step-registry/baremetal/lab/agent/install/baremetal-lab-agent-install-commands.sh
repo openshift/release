@@ -57,10 +57,13 @@ PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 INSTALL_DIR="${INSTALL_DIR:-/tmp/installer}"
 mkdir -p "${INSTALL_DIR}"
 
-echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+#echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+#oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+#   --command=openshift-install --to=/tmp
+oc adm release extract -a "$PULL_SECRET_PATH" registry.ci.openshift.org/rhcos-devel/ocp-4.21-10.1:4.21.0-rc.2-x86_64 \
    --command=openshift-install --to=/tmp
 
+/tmp/openshift-install version
 # We change the payload image to the one in the mirror registry only when the mirroring happens.
 # For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
 # To avoid additional params in the workflows definition, we check the existence of the mirror patch file.
@@ -260,3 +263,7 @@ touch  "${SHARED_DIR}/success"
 
 echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
 oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
+
+echo "wait for testing"
+sleep 45m
+
