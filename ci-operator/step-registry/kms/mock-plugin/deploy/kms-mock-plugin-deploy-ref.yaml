@@ -1,0 +1,35 @@
+ref:
+  as: kms-mock-plugin-deploy
+  from: cli
+  commands: kms-mock-plugin-deploy-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: KMS_VERSION
+    default: "v2"
+    documentation: |-
+      KMS API version to use: "v1" or "v2" (default: "v2").
+      KMSv1 is deprecated but still supported for testing legacy configurations.
+      KMSv2 is the recommended version (GA in Kubernetes 1.27+).
+  documentation: |-
+    Deploys a mock KMS plugin (v1 or v2) as a DaemonSet on control plane nodes for testing kube-apiserver encryption.
+
+    This step deploys the mock KMS plugin from kubernetes/kubernetes (k8s.io/kms/internal/plugins/_mock)
+    as a DaemonSet on all control plane nodes. The plugin listens on a Unix socket at
+    /var/run/kmsplugin/socket.sock which can be referenced in APIServer encryption configuration.
+
+    The DaemonSet approach is platform-agnostic, fast, and doesn't require node reboots.
+    The plugin provides a simple in-memory encryption provider that implements the KMS API
+    without requiring external KMS infrastructure.
+
+    Environment Variables:
+      - KMS_VERSION: Set to "v1" or "v2" to control which KMS API version to use (default: "v2")
+
+    Usage:
+      - Add this step to your workflow's pre phase after cluster installation
+      - The plugin will be deployed as a DaemonSet on control plane nodes
+      - Socket path will be saved to ${SHARED_DIR}/kms-plugin-socket-path
+      - KMS version will be saved to ${SHARED_DIR}/kms-plugin-version
+      - Use kms-mock-plugin-cleanup in the post phase to clean up resources

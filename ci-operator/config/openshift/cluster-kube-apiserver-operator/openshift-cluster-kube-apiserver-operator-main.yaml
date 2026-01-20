@@ -148,6 +148,21 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
+- always_run: false
+  as: e2e-aws-operator-encryption-kms
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption/kms
+    post:
+    - ref: kms-mock-plugin-cleanup
+    test:
+    - chain: kms-mock-plugin-provision
+    - ref: kms-mock-plugin-verify
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 - as: e2e-aws-ovn-upgrade
   steps:
     cluster_profile: aws-2

@@ -1,0 +1,33 @@
+chain:
+  as: kms-mock-plugin-provision
+  steps:
+  - ref: kms-mock-plugin-deploy
+  - ref: kms-mock-plugin-configure
+  documentation: |-
+    Provisions the mock KMS plugin and configures kube-apiserver encryption.
+
+    This chain combines the deploy and configure steps:
+    1. Deploys the mock KMS plugin as a DaemonSet on control plane nodes
+    2. Configures kube-apiserver to use KMS encryption (v1 or v2)
+
+    Use kms-mock-plugin-cleanup in the post phase to clean up resources.
+
+    Example usage with OTE (recommended):
+      env:
+        TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption/kms
+      test:
+      - chain: kms-mock-plugin-provision
+      - ref: openshift-e2e-test
+      post:
+      - ref: kms-mock-plugin-cleanup
+
+    Example usage with custom commands:
+      test:
+      - chain: kms-mock-plugin-provision
+      - as: run-tests
+        commands: |
+          # Run your custom test commands here
+          go test ./test/e2e-encryption-kms/...
+        from: src
+      post:
+      - ref: kms-mock-plugin-cleanup

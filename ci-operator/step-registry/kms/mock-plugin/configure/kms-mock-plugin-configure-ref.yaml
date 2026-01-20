@@ -1,0 +1,27 @@
+ref:
+  as: kms-mock-plugin-configure
+  from: cli
+  commands: kms-mock-plugin-configure-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Configures kube-apiserver to use KMS encryption (v1 or v2) with the mock KMS plugin.
+
+    This step enables encryption at rest for Kubernetes secrets using the mock KMS plugin
+    deployed by kms-mock-plugin-deploy. It automatically detects the KMS version deployed
+    and configures the appropriate EncryptionConfiguration (v1 or v2).
+
+    Prerequisites:
+      - Cluster must be installed and accessible
+      - kms-mock-plugin-deploy step must have been run first
+      - ${SHARED_DIR}/kms-plugin-socket-path must exist
+      - ${SHARED_DIR}/kms-plugin-version must exist
+
+    The step will:
+      1. Read the KMS socket path and version from SHARED_DIR
+      2. Generate appropriate EncryptionConfiguration for KMSv1 or KMSv2
+      3. Configure APIServer to use KMS encryption
+      4. Wait for encryption migration to complete (up to 30 minutes)
+      5. Verify encryption status on kube-apiserver operator
