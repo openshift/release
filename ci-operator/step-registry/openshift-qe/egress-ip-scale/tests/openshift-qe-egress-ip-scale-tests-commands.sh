@@ -185,7 +185,7 @@ EOF
         log_info "📤 Testing ACTUAL SOURCE IP for $eip_name..."
         
         # Check if internal echo service is available
-        local internal_echo_url=""
+        internal_echo_url=""
         if [[ -f "$SHARED_DIR/internal-ipecho-url" ]]; then
             internal_echo_url=$(cat "$SHARED_DIR/internal-ipecho-url" 2>/dev/null || echo "")
         else

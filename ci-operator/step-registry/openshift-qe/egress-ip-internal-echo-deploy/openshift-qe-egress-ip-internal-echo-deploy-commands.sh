@@ -10,10 +10,8 @@ set -o pipefail
 echo "Deploying Internal IP Echo Service for Egress IP Validation"
 echo "============================================================"
 
-# Configuration
-ECHO_NAMESPACE="egress-ip-validation"
-ECHO_SERVICE_NAME="internal-ipecho"
-ECHO_PORT="8080"
+# Configuration variables used in script
+# Note: These are used directly in the YAML manifests below
 
 # Logging functions  
 log_info() { echo -e "\033[0;34m[INFO]\033[0m [$(date +'%Y-%m-%d %H:%M:%S')] $1"; }
