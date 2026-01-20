@@ -387,7 +387,6 @@ echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
-echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
 
 # Add APPLIANCE_IMAGE only for appliance e2e tests
 if [ "${AGENT_E2E_TEST_BOOT_MODE}" == "DISKIMAGE" ];
