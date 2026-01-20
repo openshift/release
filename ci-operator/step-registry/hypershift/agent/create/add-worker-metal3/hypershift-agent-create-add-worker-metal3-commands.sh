@@ -64,7 +64,7 @@ spec:
           "name": "NetworkManager-wait-online.service",
           "dropins": [{
             "name": "timeout.conf",
-            "contents": "[Service]\nEnvironment=NM_ONLINE_TIMEOUT=180\n"
+            "contents": "[Service]\nEnvironment=NM_ONLINE_TIMEOUT=600\n"
           }]
         }]
       }
