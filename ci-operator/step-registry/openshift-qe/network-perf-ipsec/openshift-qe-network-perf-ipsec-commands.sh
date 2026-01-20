@@ -200,6 +200,16 @@ echo "Test start time: $(date)" | tee /tmp/ipsec-verification-artifacts/test-sta
 echo "Current directory: $(pwd)" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 ls -la | tee -a /tmp/ipsec-verification-artifacts/test-start.log
 
+# Set required environment variables for network-perf test
+export WORKLOAD=${WORKLOAD:-"pod2pod"}  # Use pod2pod for comprehensive IPSec testing
+export UUID=$(uuidgen || echo "ipsec-test-$(date +%s)")
+export CLUSTER_NAME=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}' 2>/dev/null || echo "unknown-cluster")
+
+echo "=== Network Performance Test Configuration ===" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+echo "WORKLOAD: $WORKLOAD" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+echo "UUID: $UUID" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+echo "CLUSTER_NAME: $CLUSTER_NAME" | tee -a /tmp/ipsec-verification-artifacts/test-start.log
+
 # Run the network performance test
 if [ -f "run.py" ]; then
     echo "Running Python test script..."
