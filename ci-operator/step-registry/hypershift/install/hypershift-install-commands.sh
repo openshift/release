@@ -90,6 +90,8 @@ if [ "${CLOUD_PROVIDER}" == "Azure" ]; then
   --external-dns-provider=azure \
   --external-dns-credentials=/etc/hypershift-aks-e2e-dns-credentials/credentials.json \
   --external-dns-domain-filter="${AZURE_EXTERNAL_DNS_DOMAIN}" \
+  --scale-from-zero-provider azure \
+  --scale-from-zero-creds=/etc/hypershift-aks-e2e-dns-credentials/credentials.json \
   --platform-monitoring=All \
   --enable-ci-debug-output \
   --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
