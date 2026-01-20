@@ -340,6 +340,11 @@ fi
 
 systemctl start sysstat
 
+# Install kcli
+# ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519 -q
+# ls ~/.ssh/*.pub
+curl -s https://raw.githubusercontent.com/karmab/kcli/main/install.sh | bash
+
 mkdir -p /tmp/artifacts
 
 mkdir dev-scripts
@@ -438,6 +443,10 @@ echo 'export KUBECONFIG=\$(ls /root/dev-scripts/ocp/*/auth/kubeconfig)' >> /root
 set +e
 timeout -s 9 130m make ${DEVSCRIPTS_TARGET}
 rv=\$?
+
+# Create test VM with kcli (libvirt is now running from dev-scripts)
+# echo "create test VM with kcli"
+# kcli create vm -i fedora42 ovn-kubernetes-e2e-0 --wait -P cmds=['dnf install -y docker','systemctl enable --now docker']
 
 # squid needs to be restarted after network changes
 podman restart --time 1 external-squid || true
