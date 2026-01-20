@@ -48,6 +48,118 @@ if ! oc cluster-info &> /dev/null; then
     error_exit "Cannot connect to OpenShift cluster. Please check your kubeconfig."
 fi
 
+# Deploy internal IP echo service for source IP validation
+log_info "==============================="
+log_info "STEP 1: Deploy Internal IP Echo Service"
+log_info "==============================="
+log_info "Deploying internal IP echo service for accurate source IP validation..."
+
+# Check if internal echo service is already deployed
+if oc get namespace egress-ip-validation &>/dev/null; then
+    log_info "Internal IP echo service namespace already exists, checking service status..."
+    if oc get service internal-ipecho -n egress-ip-validation &>/dev/null; then
+        log_success "✅ Internal IP echo service already deployed"
+        SERVICE_URL="http://internal-ipecho.egress-ip-validation.svc.cluster.local/"
+        echo "$SERVICE_URL" > "$SHARED_DIR/internal-ipecho-url"
+    fi
+else
+    log_info "Deploying new internal IP echo service..."
+    
+    # Create namespace
+    oc create namespace egress-ip-validation
+    
+    # Deploy the service (using the same code from the dedicated step)
+    cat << 'EOF' | oc apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: internal-ipecho
+  namespace: egress-ip-validation
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: internal-ipecho
+  template:
+    metadata:
+      labels:
+        app: internal-ipecho
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: ipecho-server
+        image: quay.io/openshift/origin-network-tools:latest
+        command: ["/bin/bash", "-c"]
+        args:
+        - |
+          cat > /tmp/ipecho-server.py << 'PYEOF'
+          #!/usr/bin/env python3
+          import socket
+          import json
+          from http.server import HTTPServer, BaseHTTPRequestHandler
+          from urllib.parse import urlparse, parse_qs
+          import datetime
+          
+          class IPEchoHandler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  client_ip = self.client_address[0]
+                  response_data = {
+                      "source_ip": client_ip,
+                      "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                      "method": self.command,
+                      "path": self.path
+                  }
+                  self.send_response(200)
+                  self.send_header('Content-type', 'application/json')
+                  self.end_headers()
+                  response_json = json.dumps(response_data, indent=2)
+                  self.wfile.write(response_json.encode('utf-8'))
+          
+          if __name__ == '__main__':
+              server = HTTPServer(('0.0.0.0', 8080), IPEchoHandler)
+              print("Internal IP Echo Service starting on port 8080")
+              server.serve_forever()
+          PYEOF
+          
+          python3 /tmp/ipecho-server.py
+        ports:
+        - containerPort: 8080
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          capabilities:
+            drop:
+            - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: internal-ipecho
+  namespace: egress-ip-validation
+spec:
+  selector:
+    app: internal-ipecho
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: ClusterIP
+EOF
+    
+    # Wait for service to be ready
+    if oc wait --for=condition=ready pod -l app=internal-ipecho -n egress-ip-validation --timeout=120s; then
+        SERVICE_URL="http://internal-ipecho.egress-ip-validation.svc.cluster.local/"
+        echo "$SERVICE_URL" > "$SHARED_DIR/internal-ipecho-url"
+        log_success "✅ Internal IP echo service deployed successfully"
+        log_info "Service URL: $SERVICE_URL"
+    else
+        error_exit "Internal IP echo service failed to become ready"
+    fi
+fi
+
 # Get cluster nodes and validate scale
 log_info "Validating cluster scale requirements..."
 mapfile -t worker_nodes < <(oc get nodes -l node-role.kubernetes.io/worker= --no-headers -o custom-columns=":metadata.name" | head -n "$EGRESS_NODES_COUNT")

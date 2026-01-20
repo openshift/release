@@ -181,16 +181,38 @@ EOF
         log_info "🏓 Ping test for $eip_name to Google DNS:"
         oc exec -n "$namespace_name" scale-traffic-test -- ping -c 2 8.8.8.8 2>&1 | tee -a "$ARTIFACT_DIR/scale_ping_tests.log" || log_warning "⚠️  Ping failed for $eip_name"
         
-        # HTTP request to verify egress IP
-        log_info "📤 Testing HTTP traffic for $eip_name..."
-        actual_ip=$(oc exec -n "$namespace_name" scale-traffic-test -- timeout 30 curl -s https://httpbin.org/ip 2>/dev/null | jq -r '.origin' 2>/dev/null | cut -d',' -f1 | tr -d ' ' || echo "")
+        # CRITICAL: ACTUAL SOURCE IP VALIDATION using internal service
+        log_info "📤 Testing ACTUAL SOURCE IP for $eip_name..."
         
-        if [[ "$actual_ip" == "$eip_address" ]]; then
-            log_success "✅ SCALE TRAFFIC VALIDATION PASSED for $eip_name: External service sees $eip_address"
-            traffic_validation_results+=("$eip_name:PASS:$eip_address")
+        # Check if internal echo service is available
+        local internal_echo_url=""
+        if [[ -f "$SHARED_DIR/internal-ipecho-url" ]]; then
+            internal_echo_url=$(cat "$SHARED_DIR/internal-ipecho-url" 2>/dev/null || echo "")
         else
-            log_warning "⚠️  SCALE TRAFFIC VALIDATION WARNING for $eip_name: Expected $eip_address, got '$actual_ip'"
-            traffic_validation_results+=("$eip_name:WARNING:$actual_ip")
+            log_error "❌ Internal IP echo service URL not found for scale testing"
+            traffic_validation_results+=("$eip_name:FAIL:no_internal_service")
+            continue
+        fi
+        
+        # Test actual source IP against internal service
+        scale_response=$(oc exec -n "$namespace_name" scale-traffic-test -- timeout 30 curl -s "$internal_echo_url" 2>/dev/null || echo "")
+        
+        # Extract source IP from JSON response
+        actual_source_ip=$(echo "$scale_response" | grep -o '"source_ip"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+        
+        if [[ -n "$actual_source_ip" && "$actual_source_ip" != "127.0.0.1" ]]; then
+            # CRITICAL VALIDATION: Check if source IP matches expected egress IP
+            if [[ "$actual_source_ip" == "$eip_address" ]]; then
+                log_success "✅ SCALE SOURCE IP VALIDATION PASSED for $eip_name: Source IP ($actual_source_ip) matches egress IP ($eip_address)"
+                traffic_validation_results+=("$eip_name:PASS:$actual_source_ip")
+            else
+                log_error "❌ SCALE SOURCE IP VALIDATION FAILED for $eip_name: Source IP ($actual_source_ip) does NOT match egress IP ($eip_address)"
+                traffic_validation_results+=("$eip_name:FAIL:$actual_source_ip")
+            fi
+        else
+            log_error "❌ SCALE SOURCE IP VALIDATION FAILED for $eip_name: Invalid or missing source IP in response"
+            log_error "🔍 Response: $scale_response"
+            traffic_validation_results+=("$eip_name:FAIL:invalid_response")
         fi
     else
         log_warning "⚠️  Scale traffic test pod not ready for $eip_name"

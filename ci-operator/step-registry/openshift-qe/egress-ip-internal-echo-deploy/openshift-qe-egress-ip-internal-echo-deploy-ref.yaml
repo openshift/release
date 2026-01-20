@@ -1,0 +1,39 @@
+ref:
+  as: openshift-qe-egress-ip-internal-echo-deploy
+  from_image:
+    namespace: origin
+    name: cli
+    tag: latest
+  commands: openshift-qe-egress-ip-internal-echo-deploy-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: SHARED_DIR
+    default: ""
+  documentation: |-
+    Deploy Internal IP Echo Service for Egress IP Source Validation
+    
+    This step deploys a Python-based HTTP server inside the cluster that reports the
+    actual source IP addresses it receives, before NAT translation occurs. This enables
+    validation that traffic is actually flowing through the configured egress IP addresses.
+    
+    Key features:
+    - Returns source IP in JSON format with timestamp and metadata
+    - Runs as a ClusterIP service accessible from within the cluster
+    - Works in private cloud environments without external dependencies
+    - Enables true source IP validation for egress IP testing
+    
+    The service saves its URL to SHARED_DIR/internal-ipecho-url for use by other test steps.
+    
+    Example response:
+    {
+      "source_ip": "10.0.0.10",
+      "timestamp": "2026-01-16T10:30:00Z", 
+      "method": "GET",
+      "server_hostname": "internal-ipecho-pod"
+    }
+    
+    This is a critical component for validating that egress IP traffic flows correctly
+    and that source IP validation works in private cloud environments.

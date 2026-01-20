@@ -211,24 +211,59 @@ EOF
                 done
             fi
             
-            # FUNCTIONAL EGRESS IP VALIDATION using external service
-            log_info "🎯 Testing actual egress IP traffic flow with functional validation..."
+            # CRITICAL: ACTUAL SOURCE IP VALIDATION using internal service
+            log_info "🎯 Testing actual egress IP source validation with internal service..."
             
-            # 1. Test egress IP enabled pod - validate external connectivity
-            log_info "📡 Testing egress IP enabled pod external connectivity"
+            # Check if internal echo service is available
+            local internal_echo_url=""
+            if [[ -f "$SHARED_DIR/internal-ipecho-url" ]]; then
+                internal_echo_url=$(cat "$SHARED_DIR/internal-ipecho-url" 2>/dev/null || echo "")
+                log_info "📡 Using internal IP echo service: $internal_echo_url"
+            else
+                log_error "❌ Internal IP echo service URL not found"
+                echo "post_disruption,source_ip_validation,FAIL,no_internal_service" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                return 1
+            fi
+            
+            # 1. Test egress IP enabled pod - validate ACTUAL SOURCE IP
+            log_info "📡 Testing egress IP enabled pod SOURCE IP validation"
             local egress_response
-            egress_response=$(oc exec -n egress-test-temp traffic-test-pod -- timeout 30 curl -s "$IPECHO_SERVICE_URL" 2>/dev/null || echo "")
+            egress_response=$(oc exec -n egress-test-temp traffic-test-pod -- timeout 30 curl -s "$internal_echo_url" 2>/dev/null || echo "")
             log_info "📥 Egress IP pod response: '$egress_response'"
             
-            # Clean and validate the response  
-            local clean_egress_response
-            clean_egress_response=$(echo "$egress_response" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
+            # Extract source IP from JSON response
+            local actual_source_ip
+            actual_source_ip=$(echo "$egress_response" | grep -o '"source_ip"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
             
-            if [[ -n "$clean_egress_response" && "$clean_egress_response" != "127.0.0.1" ]]; then
-                log_success "✅ EGRESS IP CONNECTIVITY VALIDATION PASSED: Pod has external connectivity via $clean_egress_response"
-                log_info "📝 Note: External service sees AWS public IP ($clean_egress_response), not internal egress IP ($eip_address)"
-                log_info "📝 This is expected behavior - egress traffic flows: Pod → Egress IP → NAT Gateway → Internet"
-                echo "post_disruption,connectivity_validation,PASS,$clean_egress_response" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+            if [[ -n "$actual_source_ip" && "$actual_source_ip" != "127.0.0.1" ]]; then
+                # CRITICAL VALIDATION: Check if source IP matches expected egress IP
+                if [[ "$actual_source_ip" == "$eip_address" ]]; then
+                    log_success "✅ EGRESS IP SOURCE VALIDATION PASSED: Source IP ($actual_source_ip) matches expected egress IP ($eip_address)"
+                    echo "post_disruption,source_ip_validation,PASS,$actual_source_ip" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                else
+                    log_error "❌ EGRESS IP SOURCE VALIDATION FAILED: Source IP ($actual_source_ip) does NOT match expected egress IP ($eip_address)"
+                    echo "post_disruption,source_ip_validation,FAIL,$actual_source_ip" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                    
+                    # This is a critical failure - egress IP is not working correctly
+                    log_error "🔍 Debug info:"
+                    log_error "  - Expected egress IP: $eip_address"
+                    log_error "  - Actual source IP: $actual_source_ip"
+                    log_error "  - Internal service response: $egress_response"
+                    return 1
+                fi
+                
+                # Secondary validation: Test external connectivity works
+                log_info "🌐 Secondary validation: Testing external connectivity..."
+                local external_test_response
+                external_test_response=$(oc exec -n egress-test-temp traffic-test-pod -- timeout 15 curl -s -o /dev/null -w "%{http_code}" "$IPECHO_SERVICE_URL" 2>/dev/null || echo "000")
+                
+                if [[ "$external_test_response" == "200" ]]; then
+                    log_success "✅ EXTERNAL CONNECTIVITY VALIDATION PASSED: External services reachable"
+                    echo "post_disruption,connectivity_validation,PASS,http_$external_test_response" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                else
+                    log_warning "⚠️  EXTERNAL CONNECTIVITY VALIDATION FAILED: External services unreachable (HTTP $external_test_response)"
+                    echo "post_disruption,connectivity_validation,FAIL,http_$external_test_response" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                fi
                 
                 # Additional internal validation of egress IP assignment
                 log_info "🔍 Validating internal egress IP configuration..."
@@ -245,15 +280,15 @@ EOF
                     echo "post_disruption,internal_validation,FAIL,$current_eip_status" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
                 fi
             else
-                log_error "❌ EGRESS IP CONNECTIVITY VALIDATION FAILED: No valid external response"
-                echo "post_disruption,connectivity_validation,FAIL,$clean_egress_response" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                log_error "❌ EGRESS IP SOURCE VALIDATION FAILED: No valid source IP in response"
+                echo "post_disruption,source_ip_validation,FAIL,invalid_response" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
                 
                 # Debug information
-                log_info "🔍 Debug info:"
-                log_info "  - Raw response: '$egress_response'"
-                log_info "  - ipecho service URL: $IPECHO_SERVICE_URL"
-                log_info "  - Expected: Valid external IP response"
-                log_info "  - Actual response IP: '$clean_egress_response'"
+                log_error "🔍 Debug info:"
+                log_error "  - Raw response: '$egress_response'"
+                log_error "  - Internal echo service URL: $internal_echo_url"
+                log_error "  - Expected: Valid JSON with source_ip field"
+                log_error "  - Actual source IP: '$actual_source_ip'"
                 
                 return 1
             fi
@@ -298,21 +333,44 @@ CONTROL_EOF
             
             # Wait for control pod
             if oc wait --for=condition=Ready pod/control-test-pod -n egress-control-test --timeout=60s; then
+                # Test control pod source IP - should NOT be egress IP
+                log_info "📡 Testing control pod SOURCE IP validation (should NOT use egress IP)"
                 local control_response
-                control_response=$(oc exec -n egress-control-test control-test-pod -- timeout 30 curl -s "$IPECHO_SERVICE_URL" 2>/dev/null || echo "")
+                control_response=$(oc exec -n egress-control-test control-test-pod -- timeout 30 curl -s "$internal_echo_url" 2>/dev/null || echo "")
                 log_info "📥 Control pod response: '$control_response'"
                 
-                local clean_control_response
-                clean_control_response=$(echo "$control_response" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
+                # Extract source IP from JSON response
+                local control_source_ip
+                control_source_ip=$(echo "$control_response" | grep -o '"source_ip"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
                 
-                if [[ -n "$clean_control_response" && "$clean_control_response" != "127.0.0.1" ]]; then
-                    log_success "✅ CONTROL VALIDATION PASSED: Non-egress pod has external connectivity via $clean_control_response"
-                    log_info "📝 Note: Both egress and non-egress pods see same AWS public IP externally"
-                    log_info "📝 This is expected - egress IP affects internal routing, not external NAT translation"
-                    echo "post_disruption,control_validation,PASS,$clean_control_response" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                if [[ -n "$control_source_ip" && "$control_source_ip" != "127.0.0.1" ]]; then
+                    # CRITICAL: Control pod should NOT use egress IP
+                    if [[ "$control_source_ip" != "$eip_address" ]]; then
+                        log_success "✅ CONTROL SOURCE VALIDATION PASSED: Control pod source IP ($control_source_ip) does NOT use egress IP ($eip_address)"
+                        log_info "📝 Note: Control pod correctly uses different source IP, confirming egress IP isolation"
+                        echo "post_disruption,control_source_validation,PASS,$control_source_ip" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                    else
+                        log_error "❌ CONTROL SOURCE VALIDATION FAILED: Control pod incorrectly uses egress IP ($control_source_ip)"
+                        log_error "🔍 This indicates egress IP is not properly isolated to designated namespaces"
+                        echo "post_disruption,control_source_validation,FAIL,$control_source_ip" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                        return 1
+                    fi
+                    
+                    # Secondary: Test external connectivity
+                    log_info "🌐 Testing control pod external connectivity..."
+                    local control_external_test
+                    control_external_test=$(oc exec -n egress-control-test control-test-pod -- timeout 15 curl -s -o /dev/null -w "%{http_code}" "$IPECHO_SERVICE_URL" 2>/dev/null || echo "000")
+                    
+                    if [[ "$control_external_test" == "200" ]]; then
+                        log_success "✅ CONTROL CONNECTIVITY VALIDATION PASSED: Control pod has external connectivity"
+                        echo "post_disruption,control_connectivity,PASS,http_$control_external_test" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                    else
+                        log_warning "⚠️  CONTROL CONNECTIVITY VALIDATION FAILED: Control pod cannot reach external services (HTTP $control_external_test)"
+                        echo "post_disruption,control_connectivity,FAIL,http_$control_external_test" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                    fi
                 else
-                    log_error "❌ CONTROL VALIDATION FAILED: Non-egress pod has no external connectivity"
-                    echo "post_disruption,control_validation,FAIL,$clean_control_response" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
+                    log_error "❌ CONTROL SOURCE VALIDATION FAILED: No valid source IP in control pod response"
+                    echo "post_disruption,control_source_validation,FAIL,invalid_response" >> "$ARTIFACT_DIR/pod_disruption_metrics.csv"
                 fi
                 
                 # Cleanup control resources
