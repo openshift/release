@@ -27,7 +27,7 @@ resources:
       cpu: 200m
       memory: 500Mi
 tests:
-- as: quay-acs-violations-check-quay310
+- as: quay-acs-violations-check-quay312
   cron: 0 20 24 * *
   steps:
     cluster_profile: aws-quay-qe
@@ -37,10 +37,10 @@ tests:
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.8xlarge
       ODF_OPERATOR_CHANNEL: stable-4.14
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-10-v4-14@sha256:27f8252129525326e7b73030cee93bee0ba389e1026880089ebb14e50f065887
-      QUAY_OPERATOR_CHANNEL: stable-3.10
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-12-v4-14@sha256:4a401e4b814fd145ed30b522950155777ba7396c6ca3d1b11dbc13bb32b4c321
+      QUAY_OPERATOR_CHANNEL: stable-3.12
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
-      QUAY_VERSION: 3.10.17
+      QUAY_VERSION: 3.12.14
     test:
     - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-resource-provisioning-storage-odf
@@ -50,7 +50,7 @@ tests:
     - ref: quay-tests-test-quay-api
     - ref: quay-tests-test-quay-e2e
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: quay-e2e-tests-quay310-ocp414-virtual-builder
+- as: quay-e2e-tests-quay312-ocp414-virtual-builder
   cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
@@ -58,11 +58,11 @@ tests:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.8xlarge
       ODF_OPERATOR_CHANNEL: stable-4.14
-      QUAY_BUILDER_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-10@sha256:907dd22eb16925813711a70a3d0df30963a3d1d0c060ca9b4f071ec101f14b87
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-10-v4-14@sha256:27f8252129525326e7b73030cee93bee0ba389e1026880089ebb14e50f065887
-      QUAY_OPERATOR_CHANNEL: stable-3.10
+      QUAY_BUILDER_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-12@sha256:f928285aca9c989e5a665a70daa5d040025e9125887c2210aef8d35fe7ffea7a
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-12-v4-14@sha256:4a401e4b814fd145ed30b522950155777ba7396c6ca3d1b11dbc13bb32b4c321
+      QUAY_OPERATOR_CHANNEL: stable-3.12
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
-      QUAY_VERSION: 3.10.17
+      QUAY_VERSION: 3.12.14
     test:
     - ref: quay-tests-enable-quay-catalogsource
     - ref: quay-tests-resource-provisioning-storage-odf
@@ -73,6 +73,88 @@ tests:
     - ref: quay-tests-test-quay-api
     - ref: quay-tests-test-quay-e2e
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay312-ocp414-operator-test-singlens
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "8"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.14
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-12-v4-14@sha256:4a401e4b814fd145ed30b522950155777ba7396c6ca3d1b11dbc13bb32b4c321
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_OPERATOR_TESTCASE: Quay-High|Quay-Medium
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-resource-provisioning-aws-unmanaged-component
+    - ref: quay-tests-test-quay-operator
+    workflow: quay-tests-cucushift-installer-rehearse-aws-ipi-operator
+  timeout: 8h0m0s
+- as: quay-e2e-tests-quay312-ocp414-lp-interop
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CSO_CHANNEL: stable-3.12
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "enable-*", "failure_type": "all", "classification": "Other", "jira_project": "PROJQUAY", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "quay-tests-deploy-*", "failure_type": "all", "classification":  "Quay deployment", "jira_project": "PROJQUAY", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "quay-tests-*", "failure_type": "all", "classification":  "Test Failure", "jira_project": "PROJQUAY", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","self-managed-lp","quay-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      QBO_CHANNEL: stable-3.12
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_VERSION: 3.12.14
+      USER_TAGS: |
+        scenario quay
+    test:
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: firewatch-cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay312-ocp414-lp-interop-fips
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CSO_CHANNEL: stable-3.12
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "enable-*", "failure_type": "all", "classification": "Other", "jira_project": "PROJQUAY", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "quay-tests-deploy-*", "failure_type": "all", "classification":  "Quay deployment", "jira_project": "PROJQUAY", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "quay-tests-*", "failure_type": "all", "classification":  "Test Failure", "jira_project": "PROJQUAY", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.14-lp","self-managed-lp","fips","quay-lp"]'
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      QBO_CHANNEL: stable-3.12
+      QUAY_OPERATOR_CHANNEL: stable-3.12
+      QUAY_VERSION: 3.12.14
+      USER_TAGS: |
+        scenario quay
+    test:
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: firewatch-cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay
