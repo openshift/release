@@ -520,6 +520,7 @@ export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.
 export http_proxy=http://${BASTION_FIP}:3128/
 export https_proxy=http://${BASTION_FIP}:3128/
 export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+alias oc='oc --insecure-skip-tls-verify=true'
 EOF
 
 # Sourcing the proxy settings for the next steps
