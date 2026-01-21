@@ -521,7 +521,7 @@ export http_proxy=http://${BASTION_FIP}:3128/
 export https_proxy=http://${BASTION_FIP}:3128/
 export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 oc() {
-    command oc --insecure-skip-tls-verify=true "$@"
+    $HOME/.tmp/bin/oc --insecure-skip-tls-verify=true "$@"
 }
 export -f oc
 EOF
