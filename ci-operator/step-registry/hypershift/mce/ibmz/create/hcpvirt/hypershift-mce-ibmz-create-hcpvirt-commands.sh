@@ -485,6 +485,18 @@ fi
 
 echo "$(date) Successfully completed the Hosted cluster creation with type Kubevirt"
 
+#Patching hcp kubeconfig
+HCP_KUBE=$(
+  oc --kubeconfig="$HOSTED_KUBECONFIG" config view \
+    -o jsonpath='{.clusters[0].name}'
+)
+
+oc --kubeconfig="$HOSTED_KUBECONFIG" config set-cluster "$HCP_KUBE" \
+  --certificate-authority=
+
+oc --kubeconfig="$HOSTED_KUBECONFIG" config set-cluster "$HCP_KUBE" \
+  --insecure-skip-tls-verify=true
+
 # Downloading the script to set proxy server
 echo "Downloading the setup script for proxy"
 
@@ -527,10 +539,6 @@ export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.
 export http_proxy=http://${BASTION_FIP}:3128/
 export https_proxy=http://${BASTION_FIP}:3128/
 export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
-oc() {
-    /usr/bin/oc --insecure-skip-tls-verify=true "$@"
-}
-export -f oc
 EOF
 
 # Sourcing the proxy settings for the next steps
