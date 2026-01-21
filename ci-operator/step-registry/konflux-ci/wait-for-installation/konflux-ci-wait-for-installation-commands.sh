@@ -7,8 +7,8 @@ set -o pipefail
 echo "Waiting for Konflux installation to be ready..."
 
 # Wait for the Konflux CR to have Ready condition
-# Timeout: 360 seconds (6 minutes) as specified in KFLUXVNGD-624
-if ! oc wait --for=condition=Ready=True konflux konflux --timeout=360s; then
+# Timeout: 10 minutes as per konflux-ci/konflux-ci operator documentation
+if ! oc wait --for=condition=Ready=True konflux konflux --timeout=10m; then
     echo "ERROR: Konflux installation did not become ready within timeout"
     echo "Current Konflux CR status:"
     oc get konflux konflux -o yaml || true
