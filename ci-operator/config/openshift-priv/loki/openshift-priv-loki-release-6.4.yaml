@@ -1,12 +1,16 @@
 base_images:
   base:
-    name: 4.17-priv
+    name: 4.19-priv
     namespace: ocp-private
     tag: base-rhel9
+  go_builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.21
   loki:
     name: loki
     namespace: logging
-    tag: v3.4.3
+    tag: v3.5.7
   lokistack-gateway:
     name: mirror-5.y
     namespace: logging
@@ -19,14 +23,26 @@ build_root:
   image_stream_tag:
     name: builder-priv
     namespace: ocp-private
-    tag: rhel-9-golang-1.24-openshift-4.20
+    tag: rhel-9-golang-1.24-openshift-4.21
   use_build_cache: true
 canonical_go_repository: github.com/openshift/loki
 images:
 - context_dir: operator
   dockerfile_path: Dockerfile
   from: base
+  inputs:
+    go_builder:
+      as:
+      - golang:1.24.4
   to: loki-operator
+- dockerfile_literal: |
+    FROM registry.redhat.io/ubi9/go-toolset:latest
+    COPY . /go/src/github.com/openshift/loki
+  inputs:
+    base:
+      as:
+      - registry.redhat.io/ubi9/go-toolset:latest
+  to: loki-operator-src
 operator:
   bundles:
   - as: loki-operator-bundle
@@ -46,13 +62,13 @@ promotion:
   - additional_images:
       loki-operator-bundle: loki-operator-bundle
     disabled: true
-    name: "6.1"
+    name: "6.4"
     namespace: logging
 releases:
   latest:
     release:
       channel: stable
-      version: "4.16"
+      version: "4.19"
 resources:
   '*':
     requests:
@@ -119,7 +135,7 @@ tests:
     owner: obs-logging
     product: ocp
     timeout: 1h0m0s
-    version: "4.16"
+    version: "4.19"
   steps:
     dependencies:
       OO_INDEX: ci-index-loki-operator-bundle
@@ -139,6 +155,6 @@ tests:
           cpu: 100m
     workflow: optional-operators-ci-generic-claim
 zz_generated_metadata:
-  branch: release-6.1
+  branch: release-6.4
   org: openshift-priv
   repo: loki
