@@ -82,6 +82,7 @@ function annotate() {
 for release in ${releases[@]}; do
 	annotate "origin" "${release}" "okd-${release}.json"
 	annotate "origin" "scos-${release}" "okd-scos-${release}.json"
+
 	annotate "ocp" "${release}" "ocp-${release}-ci.json"
 	annotate "ocp" "${release}-art-latest" "ocp-${release}.json"
 	annotate "ocp" "${release}-konflux-art-latest" "konflux-ocp-${release}.json"
@@ -99,9 +100,12 @@ for release in ${releases[@]}; do
 
 done
 
+# OKD 4.y-stable release streams
 annotate "origin" "release" "okd-4.y-stable.json"
 annotate "origin" "release-scos" "okd-scos-4.y-stable.json"
 annotate "origin" "release-scos-next" "okd-scos-4.y-next.json"
+
+# 4.y-stable release streams
 annotate "ocp" "release" "ocp-4.y-stable.json"
 annotate "ocp" "konflux-release" "ocp-4.y-konflux.json"
 annotate "ocp-s390x" "release-s390x" "ocp-4.y-stable-s390x.json"
@@ -110,11 +114,11 @@ annotate "ocp-arm64" "release-arm64" "ocp-4.y-stable-arm64.json"
 annotate "ocp-multi" "release-multi" "ocp-4.y-stable-multi.json"
 
 # 5.y-stable release streams
-annotate "ocp" "5-stable" "ocp-5.y-stable.json"
-annotate "ocp-s390x" "5-stable-s390x" "ocp-5.y-stable-s390x.json"
-annotate "ocp-ppc64le" "5-stable-ppc64le" "ocp-5.y-stable-ppc64le.json"
-annotate "ocp-arm64" "5-stable-arm64" "ocp-5.y-stable-arm64.json"
-annotate "ocp-multi" "5-stable-multi" "ocp-5.y-stable-multi.json"
+annotate "ocp" "release-5" "ocp-5.y-stable.json"
+annotate "ocp-s390x" "release-5-s390x" "ocp-5.y-stable-s390x.json"
+annotate "ocp-ppc64le" "release-5-ppc64le" "ocp-5.y-stable-ppc64le.json"
+annotate "ocp-arm64" "release-5-arm64" "ocp-5.y-stable-arm64.json"
+annotate "ocp-multi" "release-5-multi" "ocp-5.y-stable-multi.json"
 
 # 4-dev-preview release streams
 annotate "ocp" "4-dev-preview" "ocp-4-dev-preview.json"
