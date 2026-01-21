@@ -1,0 +1,142 @@
+base_images:
+  metrics-linter:
+    name: prom-metrics-linter
+    namespace: ci
+    tag: v0.0.2
+build_root:
+  project_image:
+    dockerfile_path: ci-builder/Dockerfile
+images:
+- dockerfile_literal: |
+    FROM src
+    COPY prom-metrics-linter /usr/bin/prom-metrics-linter
+    RUN dnf install -y jq && dnf clean all
+  from: src
+  inputs:
+    metrics-linter:
+      paths:
+      - destination_dir: .
+        source_path: /prom-metrics-linter
+  to: ssp-metrics-linter
+- dockerfile_path: Dockerfile
+  to: ssp-operator-container
+- dockerfile_path: validator.Dockerfile
+  to: template-validator-container
+releases:
+  initial:
+    integration:
+      name: "4.19"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.19"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unittests
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
+  steps:
+    cluster_profile: gcp-virtualization
+    test:
+    - as: unittests
+      commands: export GOFLAGS= && make unittest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: metrics-linter
+      commands: export GOFLAGS= && make lint-metrics
+      from: ssp-metrics-linter
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e-functests
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-functests
+      cli: latest
+      commands: |
+        export GOFLAGS=
+        ./automation/e2e-functests/run.sh
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      env:
+      - default: release-v0.25
+        name: CI_BRANCH
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: e2e-upgrade-functests
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-upgrade-functests
+      cli: latest
+      commands: |
+        export GOFLAGS=
+        ./automation/e2e-upgrade-functests/run.sh
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      env:
+      - default: release-v0.25
+        name: CI_BRANCH
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: e2e-single-node-functests
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
+  steps:
+    cluster_profile: gcp-virtualization
+    test:
+    - as: e2e-single-node-functests
+      cli: latest
+      commands: |
+        export TOPOLOGY_MODE=SingleReplica
+        export GOFLAGS=
+        ./automation/e2e-functests/run.sh
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      env:
+      - default: release-v0.25
+        name: CI_BRANCH
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp-single-node
+zz_generated_metadata:
+  branch: release-v0.25
+  org: kubevirt
+  repo: ssp-operator
