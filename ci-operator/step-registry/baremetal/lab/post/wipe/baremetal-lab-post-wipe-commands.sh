@@ -69,7 +69,7 @@ check_power_status() {
     -U "$bmc_user" -P "$bmc_pass" power status > /dev/null 2>&1
 }
 
-function check_ilo() {
+function check_bmc() {
   echo "Checking if #${host} BMC is reset successfully..."
 
   start_time=$(date +%s)
@@ -93,20 +93,23 @@ function check_ilo() {
   done
 }
 
-function ilo_reset() {
+function bmc_reset() {
   local bmc_forwarded_port="${1}"
   local bmc_user="${2}"
   local bmc_pass="${3}"
+  local vendor="${4}"
   local host="${bmc_forwarded_port##1[0-9]}"
   host="${host##0}"
   TIMEOUT_SECONDS=180
   POLL_INTERVAL=10
+  temp="warm"
+  [ "${vendor}" = "dell" ] && temp="cold"
   echo "$(date): Reseting BMC of host #$host"
-  ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" -U "$bmc_user" -P "$bmc_pass" mc reset warm
+  ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" -U "$bmc_user" -P "$bmc_pass" mc reset "$temp"
 
   echo -e "Waiting for #${host} BMC to reset..\n"
   sleep 200
-  check_ilo
+  check_bmc
 }
 
 function reset_host() {
@@ -172,9 +175,9 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "Error while unmarshalling hosts entries"
     exit 1
   fi
-  if [ "${ipxe_via_vmedia}" == "true" ]; then
-    echo -e "Host #${host} needs an ilo reset to workaround bootup and install crash issues"
-    ilo_reset "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" &
+  if [ "${ipxe_via_vmedia}" == "true" ] || [ -z "${pdu_uri}" ]; then
+    echo -e "Host #${host} needs a bmc reset to workaround bootup and install crash issues"
+    bmc_reset "${bmc_forwarded_port}" "${bmc_user}" "${bmc_pass}" "${vendor}" &
   fi
 done
 wait
