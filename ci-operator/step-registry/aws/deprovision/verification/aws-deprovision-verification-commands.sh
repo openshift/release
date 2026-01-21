@@ -60,6 +60,10 @@ function verify_arn_exists() {
                     aws ec2 describe-volumes --region "$check_region" --volume-ids "$resource_id" --filters "Name=status,Values=available,in-use" &>/dev/null
                     return $?
                     ;;
+                snapshot)
+                    aws ec2 describe-snapshots --region "$check_region" --snapshot-ids "$resource_id" &>/dev/null
+                    return $?
+                    ;;
                 security-group)
                     aws ec2 describe-security-groups --region "$check_region" --group-ids "$resource_id" &>/dev/null
                     return $?
