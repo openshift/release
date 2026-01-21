@@ -243,8 +243,7 @@ done
 # Combine all results into a single TAGGED_RESOURCES variable
 # Merge ResourceTagMappingList arrays from all responses and remove duplicates by ResourceARN
 if [[ ${#TAGGED_RESOURCES_LIST[@]} -gt 0 ]]; then
-    TAGGED_RESOURCES=$(jq -n --argjson results "$(printf '%s\n' "${TAGGED_RESOURCES_LIST[@]}" | jq -s '.')" \
-        '{ResourceTagMappingList: ($results | map(.ResourceTagMappingList) | flatten | unique_by(.ResourceARN))}')
+    TAGGED_RESOURCES=$(printf '%s\n' "${TAGGED_RESOURCES_LIST[@]}" | jq -s '{ResourceTagMappingList: (map(.ResourceTagMappingList) | flatten | unique_by(.ResourceARN))}')
 else
     TAGGED_RESOURCES='{"ResourceTagMappingList":[]}'
 fi
@@ -254,7 +253,7 @@ fi
 run_command "aws iam list-users --query 'Users[?starts_with(UserName, \`$CLUSTER_NAME\`)].Arn'" "IAM_USERS"
 
 # Combine tagged resources and IAM users into a single array of ARNs
-LEAKED_ARNS=$(jq -n --argjson tagged "$TAGGED_RESOURCES" --argjson iam "$IAM_USERS" '$tagged.ResourceTagMappingList | map(.ResourceARN) + $iam')
+LEAKED_ARNS=$(printf '%s\n' "$TAGGED_RESOURCES" "$IAM_USERS" | jq -s '((.[0].ResourceTagMappingList // []) | map(.ResourceARN)) + (.[1] // [])')
 
 echo "Confirming that the ARNs we discovered have not actually been deleted..."
 VERIFIED_ARNS=()
