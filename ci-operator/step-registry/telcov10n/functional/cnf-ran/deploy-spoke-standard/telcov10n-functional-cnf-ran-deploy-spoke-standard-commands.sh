@@ -4,6 +4,10 @@ set -o pipefail
 
 echo "Deploying spoke standard cluster: ${SPOKE_CLUSTER:-kni-qe-100}"
 
+# Save spoke cluster name for subsequent steps
+echo "${SPOKE_CLUSTER}" > "${SHARED_DIR}/spoke_cluster"
+echo "Saved spoke cluster name to ${SHARED_DIR}/spoke_cluster"
+
 process_inventory() {
     local directory="$1"
     local dest_file="$2"
