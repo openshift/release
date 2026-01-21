@@ -79,6 +79,7 @@ function upload_metrics(){
 }
 
 upload_metrics
+sleep 5
 if [[ $upload_metrics_rc -gt 0 ]]; then
     echo "Metrics uploading to ES failed!!!"
 fi
