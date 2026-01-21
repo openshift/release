@@ -16,15 +16,24 @@ else
     exit 1
 fi
 
-# Load SSH key for bastion access
-BASTION_SSH_KEY="$SHARED_DIR/bastion_ssh_key"
+# Load SSH key for bastion access (use cluster profile SSH key)
+BASTION_SSH_KEY="$CLUSTER_PROFILE_DIR/ssh-privatekey"
 if [[ ! -f "$BASTION_SSH_KEY" ]]; then
-    echo "ERROR: Bastion SSH key not found at $BASTION_SSH_KEY"
+    echo "ERROR: Cluster profile SSH key not found at $BASTION_SSH_KEY"
     exit 1
 fi
 
 # Set proper permissions on SSH key
 chmod 600 "$BASTION_SSH_KEY"
+
+# Get the correct SSH user for the bastion host
+if [[ -f "$SHARED_DIR/bastion_ssh_user" ]]; then
+    BASTION_SSH_USER=$(cat "$SHARED_DIR/bastion_ssh_user")
+    echo "Using SSH user: $BASTION_SSH_USER"
+else
+    echo "WARNING: bastion_ssh_user not found, defaulting to 'core'"
+    BASTION_SSH_USER="core"
+fi
 
 echo "Setting up external IP echo service on bastion host..."
 
@@ -83,16 +92,16 @@ if __name__ == '__main__':
 EOF
 
 # Create systemd service file for the IP echo service
-cat > /tmp/ipecho.service << 'EOF'
+cat > /tmp/ipecho.service << EOF
 [Unit]
 Description=IP Echo Service for Egress IP Testing
 After=network.target
 
 [Service]
 Type=simple
-User=ec2-user
-WorkingDirectory=/home/ec2-user
-ExecStart=/usr/bin/python3 /home/ec2-user/ipecho_service.py
+User=$BASTION_SSH_USER
+WorkingDirectory=/home/$BASTION_SSH_USER
+ExecStart=/usr/bin/python3 /home/$BASTION_SSH_USER/ipecho_service.py
 Restart=always
 RestartSec=3
 
@@ -104,15 +113,15 @@ echo "Deploying service to bastion host via SSH..."
 
 # Copy service files to bastion host
 scp -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no \
-    /tmp/ipecho_service.py ec2-user@"$BASTION_PUBLIC_IP":/home/ec2-user/
+    /tmp/ipecho_service.py "$BASTION_SSH_USER"@"$BASTION_PUBLIC_IP":/home/"$BASTION_SSH_USER"/
 
 scp -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no \
-    /tmp/ipecho.service ec2-user@"$BASTION_PUBLIC_IP":/tmp/
+    /tmp/ipecho.service "$BASTION_SSH_USER"@"$BASTION_PUBLIC_IP":/tmp/
 
 # Install and start the service on bastion host
-ssh -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no ec2-user@"$BASTION_PUBLIC_IP" << 'REMOTE_SCRIPT'
+ssh -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no "$BASTION_SSH_USER"@"$BASTION_PUBLIC_IP" << 'REMOTE_SCRIPT'
 # Make the Python script executable
-chmod +x /home/ec2-user/ipecho_service.py
+chmod +x /home/${USER}/ipecho_service.py
 
 # Install the systemd service
 sudo cp /tmp/ipecho.service /etc/systemd/system/
