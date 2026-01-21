@@ -341,8 +341,8 @@ fi
 systemctl start sysstat
 
 # Install kcli
-# ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519 -q
-# ls ~/.ssh/*.pub
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/id_ed25519 -q
+ls ~/.ssh/*.pub
 curl -s https://raw.githubusercontent.com/karmab/kcli/main/install.sh | bash
 
 mkdir -p /tmp/artifacts
