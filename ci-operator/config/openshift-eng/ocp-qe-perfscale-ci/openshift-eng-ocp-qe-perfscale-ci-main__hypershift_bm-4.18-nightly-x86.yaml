@@ -36,7 +36,6 @@ resources:
       memory: 200Mi
 tests:
 - as: control-plane-6nodes
-  cron: 0 2 9,16 * *
   steps:
     allow_skip_on_success: true
     cluster_profile: equinix-ocp-hcp
@@ -56,10 +55,34 @@ tests:
         EXTRA_WORKER_MEMORY=16384
       ES_SECRETS_PATH: /prod-secret
       LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       MCE_VERSION: "2.8"
       PPROF: "false"
     test:
     - chain: openshift-qe-control-plane
+    workflow: openshift-qe-installer-hypershift-mce-agent-metal3
+- as: ovs-timeout-stress-test
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=3
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=40960
+        NETWORK_TYPE=OVNKubernetes
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=100G
+        NUM_EXTRA_WORKERS=6
+        EXTRA_WORKER_VCPU=4
+        EXTRA_WORKER_MEMORY=16384
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+    test:
+    - ref: openshift-qe-ovs-timeout-validation
     workflow: openshift-qe-installer-hypershift-mce-agent-metal3
 zz_generated_metadata:
   branch: main
