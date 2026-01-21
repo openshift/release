@@ -17,13 +17,15 @@ else
 fi
 
 # Load SSH key for bastion access (use cluster profile SSH key)
-BASTION_SSH_KEY="$CLUSTER_PROFILE_DIR/ssh-privatekey"
-if [[ ! -f "$BASTION_SSH_KEY" ]]; then
-    echo "ERROR: Cluster profile SSH key not found at $BASTION_SSH_KEY"
+CLUSTER_SSH_KEY="$CLUSTER_PROFILE_DIR/ssh-privatekey"
+if [[ ! -f "$CLUSTER_SSH_KEY" ]]; then
+    echo "ERROR: Cluster profile SSH key not found at $CLUSTER_SSH_KEY"
     exit 1
 fi
 
-# Set proper permissions on SSH key
+# Copy SSH key to writable location and set proper permissions
+BASTION_SSH_KEY="/tmp/bastion_ssh_key"
+cp "$CLUSTER_SSH_KEY" "$BASTION_SSH_KEY"
 chmod 600 "$BASTION_SSH_KEY"
 
 # Get the correct SSH user for the bastion host
