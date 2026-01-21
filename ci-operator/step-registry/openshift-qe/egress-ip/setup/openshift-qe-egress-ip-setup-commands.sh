@@ -33,6 +33,7 @@ fi
 TEST_NAMESPACE=${TEST_NAMESPACE:-"egress-ip-test"}
 echo "Creating test namespace: $TEST_NAMESPACE"
 oc create namespace "$TEST_NAMESPACE" || true
+oc label namespace "$TEST_NAMESPACE" egress-ip=enabled --overwrite
 
 if [[ $RUNNING_CNI == "OVNKubernetes" ]]; then
     echo "Configuring OVNKubernetes egress IP"
@@ -86,7 +87,7 @@ spec:
   - "${egress_ip}"
   namespaceSelector:
     matchLabels:
-      kubernetes.io/metadata.name: "${TEST_NAMESPACE}"
+      egress-ip: enabled
   # Cloud-bulldozer compatible configuration
   nodeSelector:
     matchLabels:
@@ -115,6 +116,21 @@ EOF
     
     echo "EgressIP configuration completed successfully"
     echo "Egress IP: $egress_ip assigned to node: $assigned_node"
+    
+    # DEBUG: Comprehensive EgressIP configuration verification
+    echo "🔍 DEBUG: EgressIP Configuration Details:"
+    echo "----------------------------------------"
+    oc get egressip egress-ip-test -o yaml || true
+    echo ""
+    echo "🔍 DEBUG: Namespace labels verification:"
+    oc get namespace $TEST_NAMESPACE --show-labels || true
+    echo ""
+    echo "🔍 DEBUG: Node egress-assignable labels:"
+    oc get nodes --show-labels | grep egress-assignable || true
+    echo ""
+    echo "🔍 DEBUG: EgressIP resource status:"
+    oc describe egressip egress-ip-test || true
+    echo "----------------------------------------"
     
     # Save configuration for validation steps (cloud-bulldozer + chaos testing compatible)
     echo "$egress_ip" > "$SHARED_DIR/egress-ip"
@@ -254,7 +270,7 @@ EOF
         oc create namespace "$TRAFFIC_NAMESPACE" || true
         
         # Label the traffic namespace to use egress IP (cloud-bulldozer pattern)
-        oc label namespace "$TRAFFIC_NAMESPACE" kubernetes.io/metadata.name="$TEST_NAMESPACE" --overwrite
+        oc label namespace "$TRAFFIC_NAMESPACE" egress-ip=enabled --overwrite
         
         echo "Creating traffic generators in project $project_num/$NUM_PROJECTS..."
         

@@ -225,6 +225,20 @@ EOF
                 return 1
             fi
             
+            # DEBUG: Pre-validation state verification
+            log_info "🔍 DEBUG: Pre-validation EgressIP state verification:"
+            log_info "Current EgressIP status:"
+            oc describe egressip "$EIP_NAME" || true
+            log_info "Test pod details:"
+            oc get pod traffic-test-pod -n egress-ip-test -o wide || true
+            log_info "Namespace verification:"
+            oc get namespace egress-ip-test --show-labels || true
+            log_info "Pod network details:"
+            oc exec -n egress-ip-test traffic-test-pod -- ip addr show eth0 || true
+            log_info "Pod routing table:"
+            oc exec -n egress-ip-test traffic-test-pod -- ip route show || true
+            log_info "========================================="
+            
             # 1. Test egress IP enabled pod - validate ACTUAL SOURCE IP
             log_info "📡 Testing egress IP enabled pod SOURCE IP validation"
             local egress_response
@@ -249,6 +263,63 @@ EOF
                     log_error "  - Expected egress IP: $eip_address"
                     log_error "  - Actual source IP: $actual_source_ip"
                     log_error "  - Internal service response: $egress_response"
+                    
+                    # DEBUG: Provide manual investigation time for egress IP issues
+                    log_error "🛠️  EGRESS IP DEBUG MODE: Pausing for manual investigation..."
+                    log_error "📍 Cluster remains available for debugging for 40 minutes"
+                    
+                    # Enhanced debugging: Capture current system state
+                    log_error "🔍 ENHANCED DEBUG: Capturing comprehensive system state..."
+                    log_error "EgressIP detailed status:"
+                    oc get egressip -A -o yaml || true
+                    log_error "OVN EgressIP objects:"
+                    oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node -o wide || true
+                    
+                    # Get the OVN pod on the egress node for detailed debugging
+                    local egress_node_name
+                    egress_node_name=$(oc get egressip "$EIP_NAME" -o jsonpath='{.status.items[0].node}' 2>/dev/null || echo "")
+                    if [[ -n "$egress_node_name" ]]; then
+                        local ovn_pod_name
+                        ovn_pod_name=$(oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node --field-selector spec.nodeName="$egress_node_name" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+                        if [[ -n "$ovn_pod_name" ]]; then
+                            log_error "OVN pod on egress node ($egress_node_name): $ovn_pod_name"
+                            log_error "OVN northbound database EgressIP entries:"
+                            oc exec -n openshift-ovn-kubernetes "$ovn_pod_name" -- ovn-nbctl show | grep -A10 -B10 "$eip_address" || true
+                        fi
+                    fi
+                    log_error "Node network configuration:"
+                    oc get nodes -o custom-columns=NAME:.metadata.name,INTERNAL-IP:.status.addresses[0].address,EGRESS-ASSIGNABLE:.metadata.labels.k8s\.ovn\.org/egress-assignable || true
+                    log_error "Pod to node assignment:"
+                    oc get pods -n egress-ip-test -o wide || true
+                    log_error "EgressIP events:"
+                    oc get events --field-selector involvedObject.name=$EIP_NAME --sort-by=.lastTimestamp || true
+                    
+                    log_error "🔧 Useful manual debug commands:"
+                    log_error "   # Basic status checks:"
+                    log_error "   oc get egressip -A"
+                    log_error "   oc describe egressip $EIP_NAME"
+                    log_error "   oc get pods -n egress-ip-test -o wide"
+                    log_error "   oc get namespace egress-ip-test --show-labels"
+                    log_error "   # Test traffic:"
+                    log_error "   oc exec -n egress-ip-test traffic-test-pod -- curl -s http://internal-ipecho.egress-ip-validation.svc.cluster.local/"
+                    log_error "   # OVN debugging:"
+                    log_error "   # Get OVN pod on egress node: oc get pods -n openshift-ovn-kubernetes -l app=ovnkube-node --field-selector spec.nodeName=\$(oc get egressip $EIP_NAME -o jsonpath='{.status.items[0].node}')"
+                    if [[ -n "$egress_node_name" && -n "$ovn_pod_name" ]]; then
+                        log_error "   oc exec -n openshift-ovn-kubernetes $ovn_pod_name -- ovn-nbctl show | grep -A10 -B10 $eip_address"
+                        log_error "   oc logs -n openshift-ovn-kubernetes $ovn_pod_name | grep -i egress"
+                    else
+                        log_error "   oc exec -n openshift-ovn-kubernetes <OVN_POD_NAME> -- ovn-nbctl show | grep -A10 -B10 $eip_address"
+                        log_error "   oc logs -n openshift-ovn-kubernetes <OVN_POD_NAME> | grep -i egress"
+                    fi
+                    log_error "   # Network debugging:"
+                    log_error "   oc exec -n egress-ip-test traffic-test-pod -- ip route show"
+                    log_error "   oc exec -n egress-ip-test traffic-test-pod -- ip addr show"
+                    log_error "⏱️  Sleeping for 2400 seconds (40 minutes) for manual debugging..."
+                    
+                    # Sleep for 40 minutes to allow manual debugging
+                    sleep 2400
+                    
+                    log_error "⏰ Debug time expired. Failing test as egress IP validation failed."
                     return 1
                 fi
                 
