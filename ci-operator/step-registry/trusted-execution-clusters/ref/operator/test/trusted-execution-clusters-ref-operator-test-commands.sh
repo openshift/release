@@ -253,6 +253,26 @@ fi
 
 echo "[SUCCESS] KubeVirt installed"
 
+echo "[INFO] Installing virtctl CLI..."
+KUBEVIRT_VERSION=$(kubectl get kubevirt.kubevirt.io/kubevirt -n kubevirt -o jsonpath="{.status.observedKubeVirtVersion}" 2>/dev/null || echo "v1.1.1")
+echo "[INFO] Detected KubeVirt version: ${KUBEVIRT_VERSION}"
+
+VIRTCTL_URL="https://github.com/kubevirt/kubevirt/releases/download/${KUBEVIRT_VERSION}/virtctl-${KUBEVIRT_VERSION}-linux-amd64"
+if ! curl -L -o /tmp/virtctl "${VIRTCTL_URL}"; then
+  echo "[ERROR] Failed to download virtctl from ${VIRTCTL_URL}"
+  exit 1
+fi
+
+chmod +x /tmp/virtctl
+${SUDO} mv /tmp/virtctl /usr/local/bin/virtctl
+
+if virtctl version --client; then
+  echo "[SUCCESS] virtctl installed successfully"
+else
+  echo "[ERROR] virtctl installation verification failed"
+  exit 1
+fi
+
 echo "[INFO] Installing additional dependencies for Rust build..."
 if ! sudo dnf install -y gcc-c++ openssl-devel pkg-config; then
   echo "[ERROR] Failed to install build dependencies"
