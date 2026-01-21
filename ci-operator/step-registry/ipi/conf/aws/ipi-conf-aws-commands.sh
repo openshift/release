@@ -257,6 +257,7 @@ platform:
       expirationDate: ${expiration_date}
       clusterName: ${NAMESPACE}-${UNIQUE_HASH}
       ci-nat-replace: "${CI_NAT_REPLACE:-false}"
+      ci-nat-delete: "${CI_NAT_REPLACE:-false}"
 controlPlane:
   architecture: ${CONTROL_ARCH}
   name: master
