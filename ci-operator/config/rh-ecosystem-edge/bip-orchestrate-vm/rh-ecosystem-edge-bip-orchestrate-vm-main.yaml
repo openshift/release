@@ -52,7 +52,6 @@ resources:
       memory: 200Mi
 tests:
 - as: ibu-e2e-flow
-  optional: true
   skip_if_only_changed: ^(?:LICENSE$|.*\.md$)
   steps:
     cluster_profile: aws
@@ -71,7 +70,6 @@ tests:
       SEED_IMAGE_TAG_FORMAT: presubmit
     workflow: openshift-image-based-upgrade-presubmit
 - as: ibi-e2e-flow
-  optional: true
   skip_if_only_changed: ^(?:LICENSE$|.*\.md$)
   steps:
     cluster_profile: aws-5
@@ -88,6 +86,23 @@ tests:
       SEED_IMAGE_TAG_FORMAT: presubmit
       SEED_IMAGE_TAG_PREFIX: ibi
     workflow: openshift-image-based-install
+- as: ipc-e2e-flow
+  skip_if_only_changed: ^(?:LICENSE$|.*\.md$)
+  steps:
+    cluster_profile: aws-5
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: pipeline:recert
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-network-configuration
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
