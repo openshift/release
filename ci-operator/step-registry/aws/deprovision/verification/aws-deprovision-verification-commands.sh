@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -239,6 +240,8 @@ done
 # Combine all results into a single TAGGED_RESOURCES variable
 # Merge ResourceTagMappingList arrays from all responses and remove duplicates by ResourceARN
 if [[ ${#TAGGED_RESOURCES_LIST[@]} -gt 0 ]]; then
+    echo JSAF resource list
+    echo ${TAGGED_RESOURCES_LIST[@]}
     TAGGED_RESOURCES=$(jq -n --argjson results "$(printf '%s\n' "${TAGGED_RESOURCES_LIST[@]}" | jq -s '.')" \
         '{ResourceTagMappingList: ($results | map(.ResourceTagMappingList) | flatten | unique_by(.ResourceARN))}')
 else
