@@ -152,19 +152,22 @@ CHURN=false
 ES_SERVER=""
 CONFIG_EOF
     
-    # Use external ipecho service for proper egress IP validation
-    echo "Setting up external ipecho service for cloud-bulldozer compatible validation..."
-    echo "Cloud-bulldozer methodology: Using external ipecho service to validate egress IP with $CURRENT_WORKER_COUNT worker scaling"
+    # Use external bastion ipecho service for proper egress IP validation
+    echo "Setting up external bastion ipecho service for egress IP validation..."
+    echo "Using bastion-hosted IP echo service to validate egress IP with $CURRENT_WORKER_COUNT worker scaling"
     
-    # Use a well-known external IP echo service
-    # This is similar to cloud-bulldozer's approach of testing against external services
-    EXTERNAL_IPECHO_URL="https://httpbin.org/ip"
+    # Check if bastion echo service is available
+    if [[ -f "$SHARED_DIR/egress-bastion-echo-url" ]]; then
+        EXTERNAL_IPECHO_URL=$(cat "$SHARED_DIR/egress-bastion-echo-url")
+        echo "✅ Using bastion-hosted IP echo service: $EXTERNAL_IPECHO_URL"
+    else
+        echo "⚠️ Bastion echo service not found, falling back to httpbin.org"
+        EXTERNAL_IPECHO_URL="https://httpbin.org/ip"
+    fi
     
-    # Store the expected egress IP for health check validation
-    # The chaos framework will check if httpbin.org/ip is reachable
-    # Our test scripts will validate the actual content/functionality
+    # Store the external service URL for health check validation
     echo "$EXTERNAL_IPECHO_URL" > "$SHARED_DIR/egress-health-check-url"
-    echo "Using external IP echo service: $EXTERNAL_IPECHO_URL"
+    echo "External IP echo service configured: $EXTERNAL_IPECHO_URL"
     
     # Store the expected external IP (AWS NAT public IP) for validation
     # This helps validate that egress IP pods reach external services consistently
