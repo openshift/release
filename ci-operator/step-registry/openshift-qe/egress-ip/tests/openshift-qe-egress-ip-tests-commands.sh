@@ -410,7 +410,7 @@ EOF
                 # Debug information
                 log_error "🔍 Debug info:"
                 log_error "  - Raw response: '$egress_response'"
-                log_error "  - Internal echo service URL: $internal_echo_url"
+                log_error "  - External bastion echo service URL: $external_echo_url"
                 log_error "  - Expected: Valid JSON with source_ip field"
                 log_error "  - Actual source IP: '$actual_source_ip'"
                 
@@ -460,7 +460,7 @@ CONTROL_EOF
                 # Test control pod source IP - should NOT be egress IP
                 log_info "📡 Testing control pod SOURCE IP validation (should NOT use egress IP)"
                 local control_response
-                control_response=$(oc exec -n egress-control-test control-test-pod -- timeout 30 curl -s "$internal_echo_url" 2>/dev/null || echo "")
+                control_response=$(oc exec -n egress-control-test control-test-pod -- timeout 30 curl -s "$external_echo_url" 2>/dev/null || echo "")
                 log_info "📥 Control pod response: '$control_response'"
                 
                 # Extract source IP from JSON response
