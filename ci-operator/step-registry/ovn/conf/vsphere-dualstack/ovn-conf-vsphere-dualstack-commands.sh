@@ -73,3 +73,17 @@ if [[ "${IP_FAMILIES}" == "DualStackIPv6Primary" ]]; then
   /tmp/yq e --inplace '.networking.clusterNetwork = (.networking.clusterNetwork | reverse)' "${SHARED_DIR}/install-config.yaml"
   /tmp/yq e --inplace '.networking.serviceNetwork = (.networking.serviceNetwork | reverse)' "${SHARED_DIR}/install-config.yaml"
 fi
+
+echo "=========================================="
+echo "=== DUAL-STACK IPv6-PRIMARY DIAGNOSTICS ==="
+echo "=========================================="
+echo "IP_FAMILIES: ${IP_FAMILIES:-not set}"
+echo ""
+echo "IPv4 API VIP: ${API_VIP}"
+echo "IPv6 API VIP: ${IPV6_API_VIP}"
+echo "IPv4 Ingress VIP: ${INGRESS_VIP}"
+echo "IPv6 Ingress VIP: ${IPV6_INGRESS_VIP}"
+echo ""
+echo "=== Final install-config.yaml ==="
+cat ${SHARED_DIR}/install-config.yaml
+echo "=========================================="
