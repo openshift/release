@@ -222,6 +222,18 @@ metadata:
   name: ipecho-connectivity-test
   namespace: $TEST_NAMESPACE
 spec:
+  # CRITICAL: Schedule test pod on egress IP assigned node for proper routing
+  nodeSelector:
+    kubernetes.io/hostname: "$assigned_node"
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+            - "$assigned_node"
   securityContext:
     runAsNonRoot: true
     seccompProfile:
@@ -291,6 +303,18 @@ metadata:
     cloud-bulldozer: "true"
     project: "project-$project_num"
 spec:
+  # CRITICAL: Schedule pods on egress IP assigned node for proper routing
+  nodeSelector:
+    kubernetes.io/hostname: "$assigned_node"
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/hostname
+            operator: In
+            values:
+            - "$assigned_node"
   securityContext:
     runAsNonRoot: true
     seccompProfile:
