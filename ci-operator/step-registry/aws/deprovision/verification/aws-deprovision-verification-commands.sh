@@ -60,6 +60,10 @@ function verify_arn_exists() {
                     aws ec2 describe-volumes --region "$check_region" --volume-ids "$resource_id" --filters "Name=status,Values=available,in-use" &>/dev/null
                     return $?
                     ;;
+                snapshot)
+                    aws ec2 describe-snapshots --region "$check_region" --snapshot-ids "$resource_id" &>/dev/null
+                    return $?
+                    ;;
                 security-group)
                     aws ec2 describe-security-groups --region "$check_region" --group-ids "$resource_id" &>/dev/null
                     return $?
@@ -239,8 +243,7 @@ done
 # Combine all results into a single TAGGED_RESOURCES variable
 # Merge ResourceTagMappingList arrays from all responses and remove duplicates by ResourceARN
 if [[ ${#TAGGED_RESOURCES_LIST[@]} -gt 0 ]]; then
-    TAGGED_RESOURCES=$(jq -n --argjson results "$(printf '%s\n' "${TAGGED_RESOURCES_LIST[@]}" | jq -s '.')" \
-        '{ResourceTagMappingList: ($results | map(.ResourceTagMappingList) | flatten | unique_by(.ResourceARN))}')
+    TAGGED_RESOURCES=$(printf '%s\n' "${TAGGED_RESOURCES_LIST[@]}" | jq -s '{ResourceTagMappingList: (map(.ResourceTagMappingList) | flatten | unique_by(.ResourceARN))}')
 else
     TAGGED_RESOURCES='{"ResourceTagMappingList":[]}'
 fi
@@ -250,7 +253,7 @@ fi
 run_command "aws iam list-users --query 'Users[?starts_with(UserName, \`$CLUSTER_NAME\`)].Arn'" "IAM_USERS"
 
 # Combine tagged resources and IAM users into a single array of ARNs
-LEAKED_ARNS=$(jq -n --argjson tagged "$TAGGED_RESOURCES" --argjson iam "$IAM_USERS" '$tagged.ResourceTagMappingList | map(.ResourceARN) + $iam')
+LEAKED_ARNS=$(printf '%s\n' "$TAGGED_RESOURCES" "$IAM_USERS" | jq -s '((.[0].ResourceTagMappingList // []) | map(.ResourceARN)) + (.[1] // [])')
 
 echo "Confirming that the ARNs we discovered have not actually been deleted..."
 VERIFIED_ARNS=()
@@ -290,21 +293,53 @@ DNS_RECORD_COUNT=$(echo "${DNS_RECORDS:-[]}" | jq 'length')
 
 TOTAL_LEAKED=$((RESOURCE_COUNT + DNS_RECORD_COUNT))
 
+function xmlescape() {
+  echo -n "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'"'"'/\&#39;/g'
+}
+
+function generate_failure_report() {
+    echo "Found $TOTAL_LEAKED leaked resources ($RESOURCE_COUNT ARNs, $DNS_RECORD_COUNT DNS records)"
+    if [[ "$RESOURCE_COUNT" -gt 0 ]]; then
+        echo "Leaked ARNs:"
+        echo "$LEAKED_ARNS" | jq -r '.[]'
+    fi
+    if [[ "$DNS_RECORD_COUNT" -gt 0 ]]; then
+        echo "Leaked DNS Records:"
+        echo "$DNS_RECORDS" | jq -r '.[] | .Name' | sed 's/\\052/*/g'
+    fi
+}
+
+function createDeprovisionJunit() {
+    local testcase_xml
+    local failures=0
+    if [[ "$TOTAL_LEAKED" -gt 0 ]]; then
+        failures=$((failures+1))
+        local failure_message="Found $TOTAL_LEAKED leaked resources"
+        local failure_output
+        failure_output=$(generate_failure_report)
+        testcase_xml=$(cat <<INNER_EOF
+  <testcase name="destroy should succeed">
+    <failure message="${failure_message}">$( xmlescape "${failure_output}" )</failure>
+  </testcase>
+INNER_EOF
+)
+    else
+        testcase_xml='  <testcase name="destroy should succeed"/>'
+    fi
+
+    cat >"${ARTIFACT_DIR}/junit_deprovision.xml" <<EOF
+<testsuite name="cluster install" tests="1" failures="${failures}">
+${testcase_xml}
+</testsuite>
+EOF
+}
+
+createDeprovisionJunit
+
 if [[ "$TOTAL_LEAKED" -gt 0 ]]; then
     echo "" >&2
-    echo "Test Failed: Found $TOTAL_LEAKED leaked resources ($RESOURCE_COUNT ARNs, $DNS_RECORD_COUNT DNS records)" >&2
-
-    if [[ "$RESOURCE_COUNT" -gt 0 ]]; then
-        echo "Leaked ARNs:" >&2
-        echo "$LEAKED_ARNS" | jq -r '.[]' >&2
-    fi
-
-    if [[ "$DNS_RECORD_COUNT" -gt 0 ]]; then
-        echo "" >&2
-        echo "Leaked DNS Records:" >&2
-        echo "$DNS_RECORDS" | jq -r '.[] | .Name' | sed 's/\\052/*/g' >&2
-    fi
-
+    echo "Test Failed:" >&2
+    generate_failure_report >&2
     exit 1
 else
     echo "No leaked resources found"
