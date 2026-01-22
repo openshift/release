@@ -71,6 +71,13 @@ else
   extra_flags+="--render > /tmp/hc.yaml "
 fi
 
+# Remove default from virtualization SC for odf and set cepg-rbd as default sc
+oc annotate --overwrite sc ocs-storagecluster-ceph-rbd-virtualization \
+  storageclass.kubernetes.io/is-default-class='false'
+
+oc annotate --overwrite sc ocs-storagecluster-ceph-rbd \
+  storageclass.kubernetes.io/is-default-class='true'
+
 ${HYPERSHIFT_CLI_NAME} create cluster kubevirt \
     --name ${HC_NAME} \
     --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
