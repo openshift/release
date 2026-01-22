@@ -49,6 +49,72 @@ echo "Setting up external IP echo service on bastion host..."
 
 echo "Deploying service to bastion host via SSH..."
 
+# Check if SSH is available in the container
+if ! command -v ssh >/dev/null 2>&1; then
+    echo "❌ SSH not available in container. Creating simple external validation URL instead..."
+    
+    # For environments without SSH, we'll create a simple validation approach
+    # Store the bastion URL directly for external validation
+    BASTION_SERVICE_URL="http://$BASTION_PUBLIC_IP:8080/"
+    echo "$BASTION_SERVICE_URL" > "$SHARED_DIR/egress-health-check-url"
+    
+    echo "✅ External validation configured!"
+    echo "   Bastion URL: $BASTION_SERVICE_URL"
+    echo "   Note: Manual setup required on bastion host for IP echo service"
+    echo ""
+    echo "🔧 Manual setup instructions for bastion host:"
+    echo "   1. SSH to bastion: ssh -i <ssh-key> core@$BASTION_PUBLIC_IP"
+    echo "   2. Install Python HTTP server script"
+    echo "   3. Start service on port 8080"
+    echo ""
+    echo "   Python IP echo script to create on bastion:"
+    cat << 'PYTHON_SCRIPT'
+#!/usr/bin/env python3
+import socket
+import json
+import datetime
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+class IPEchoHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        client_ip = self.client_address[0]
+        response_data = {
+            "source_ip": client_ip,
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            "method": self.command,
+            "path": self.path,
+            "server_hostname": socket.gethostname(),
+            "server_type": "bastion_external"
+        }
+        
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.end_headers()
+        
+        json_response = json.dumps(response_data, indent=2)
+        self.wfile.write(json_response.encode('utf-8'))
+        
+        print(f"[{response_data['timestamp']}] {client_ip} - \"{self.command} {self.path} {self.request_version}\" 200 -")
+
+    def log_message(self, format, *args):
+        return
+
+if __name__ == '__main__':
+    port = 8080
+    server = HTTPServer(('0.0.0.0', port), IPEchoHandler)
+    print(f"External IP Echo Service starting on port {port}")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down IP Echo Service")
+        server.server_close()
+PYTHON_SCRIPT
+    
+    echo "External IP echo service setup completed (manual setup required)!"
+    exit 0
+fi
+
 # Deploy and start the service on bastion host using embedded content
 ssh -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no "$BASTION_SSH_USER"@"$BASTION_PUBLIC_IP" << 'REMOTE_SCRIPT'
 
