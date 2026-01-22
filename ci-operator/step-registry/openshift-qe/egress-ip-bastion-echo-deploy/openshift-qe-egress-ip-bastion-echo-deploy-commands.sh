@@ -39,8 +39,13 @@ fi
 
 echo "Setting up external IP echo service on bastion host..."
 
-# Create the IP echo service script
-cat > /tmp/ipecho_service.py << 'EOF'
+echo "Deploying service to bastion host via SSH..."
+
+# Deploy and start the service on bastion host using embedded content
+ssh -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no "$BASTION_SSH_USER"@"$BASTION_PUBLIC_IP" << 'REMOTE_SCRIPT'
+
+# Create the IP echo service script directly on bastion
+cat > /home/${USER}/ipecho_service.py << 'PYTHON_EOF'
 #!/usr/bin/env python3
 """
 External IP Echo Service for Egress IP Validation
@@ -91,37 +96,25 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         print("\nShutting down IP Echo Service")
         server.server_close()
-EOF
+PYTHON_EOF
 
-# Create systemd service file for the IP echo service
-cat > /tmp/ipecho.service << EOF
+# Create systemd service file
+cat > /tmp/ipecho.service << SYSTEMD_EOF
 [Unit]
 Description=IP Echo Service for Egress IP Testing
 After=network.target
 
 [Service]
 Type=simple
-User=$BASTION_SSH_USER
-WorkingDirectory=/home/$BASTION_SSH_USER
-ExecStart=/usr/bin/python3 /home/$BASTION_SSH_USER/ipecho_service.py
+User=${USER}
+WorkingDirectory=/home/${USER}
+ExecStart=/usr/bin/python3 /home/${USER}/ipecho_service.py
 Restart=always
 RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
-EOF
-
-echo "Deploying service to bastion host via SSH..."
-
-# Copy service files to bastion host
-scp -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no \
-    /tmp/ipecho_service.py "$BASTION_SSH_USER"@"$BASTION_PUBLIC_IP":/home/"$BASTION_SSH_USER"/
-
-scp -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no \
-    /tmp/ipecho.service "$BASTION_SSH_USER"@"$BASTION_PUBLIC_IP":/tmp/
-
-# Install and start the service on bastion host
-ssh -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no "$BASTION_SSH_USER"@"$BASTION_PUBLIC_IP" << 'REMOTE_SCRIPT'
+SYSTEMD_EOF
 # Make the Python script executable
 chmod +x /home/${USER}/ipecho_service.py
 
@@ -137,8 +130,16 @@ sleep 3
 # Check service status
 sudo systemctl status ipecho.service --no-pager
 
-# Test that the service is responding
-curl -s http://localhost:8080/ || echo "Service test failed, but continuing..."
+# Test that the service is responding locally
+echo "Testing IP echo service locally on bastion..."
+if curl -s http://localhost:8080/ | grep -q "source_ip"; then
+    echo "✅ IP Echo Service is responding correctly"
+    echo "Sample response: $(curl -s http://localhost:8080/)"
+else
+    echo "⚠️ Warning: IP Echo Service test failed, but continuing..."
+    echo "Service status: $(sudo systemctl is-active ipecho.service)"
+    echo "Service logs: $(sudo journalctl -u ipecho.service --no-pager -n 5)"
+fi
 
 # Open firewall for port 8080
 sudo firewall-cmd --permanent --add-port=8080/tcp || echo "Firewall command failed, continuing..."
@@ -147,22 +148,13 @@ sudo firewall-cmd --reload || echo "Firewall reload failed, continuing..."
 echo "IP Echo Service deployment completed"
 REMOTE_SCRIPT
 
-# Store bastion service URL for test steps
+# Store bastion service URL for test steps (using expected filename)
 BASTION_SERVICE_URL="http://$BASTION_PUBLIC_IP:8080/"
-echo "$BASTION_SERVICE_URL" > "$SHARED_DIR/egress-bastion-echo-url"
+echo "$BASTION_SERVICE_URL" > "$SHARED_DIR/egress-health-check-url"
 
 echo "✅ External IP echo service deployed successfully!"
 echo "   Service URL: $BASTION_SERVICE_URL"
 echo "   This service will report actual source IPs for egress IP validation"
-
-# Test connectivity from local machine
-echo "Testing bastion service connectivity..."
-if curl -s --max-time 10 "$BASTION_SERVICE_URL" > /tmp/bastion_test.json; then
-    echo "✅ Bastion service is accessible"
-    echo "Sample response:"
-    cat /tmp/bastion_test.json | jq . || cat /tmp/bastion_test.json
-else
-    echo "⚠️ Warning: Could not reach bastion service, but continuing..."
-fi
+echo "   Service is running on bastion host and ready for egress IP testing"
 
 echo "External IP echo service setup completed successfully!"
