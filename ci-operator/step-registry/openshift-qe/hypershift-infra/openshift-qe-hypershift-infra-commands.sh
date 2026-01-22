@@ -47,9 +47,33 @@ function checkForInfraReady() {
 function rebalanceInfra() {
     if [[ $1 == "prometheus-k8s" ]] ; then
         log "$(date) - Initiate migration of prometheus componenets to infra nodepools"
-        oc get pods -n openshift-monitoring -o wide | grep prometheus-k8s
+
+        log "$(date) - Waiting for prometheus-k8s statefulset to be available"
+        RETRIES=18
+        while ! oc get sts prometheus-k8s -n openshift-monitoring &>/dev/null; do
+            if (( RETRIES == 0 )); then
+                log "$(date) - Timed out waiting for prometheus-k8s statefulset after 180s"
+                exit 1
+            fi
+            log "$(date) - StatefulSet prometheus-k8s not found, retrying in 10s ($RETRIES retries left)"
+            sleep 10
+            RETRIES=$((RETRIES - 1))
+        done
         oc get sts prometheus-k8s -n openshift-monitoring
-        
+
+        log "$(date) - Waiting for prometheus-k8s pods to be running"
+        RETRIES=18
+        while ! oc get pods -n openshift-monitoring -o wide | grep -q prometheus-k8s; do
+            if (( RETRIES == 0 )); then
+                log "$(date) - Timed out waiting for prometheus-k8s pods after 180s"
+                exit 1
+            fi
+            log "$(date) - No prometheus-k8s pods found, retrying in 10s ($RETRIES retries left)"
+            sleep 10
+            RETRIES=$((RETRIES - 1))
+        done
+        oc get pods -n openshift-monitoring -o wide | grep prometheus-k8s
+
         log "$(date) - Restart stateful set pods"
         echo "rollout restart -n openshift-monitoring statefulset/prometheus-k8s"
         oc rollout restart -n openshift-monitoring statefulset/prometheus-k8s 
