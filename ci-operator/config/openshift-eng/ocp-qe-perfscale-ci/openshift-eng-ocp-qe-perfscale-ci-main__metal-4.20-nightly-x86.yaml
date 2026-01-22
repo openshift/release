@@ -1,0 +1,58 @@
+base_images:
+  cerberus:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: udn-bgp
+  capabilities:
+  - intranet
+  cron: 0 5 * * 3
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    env:
+      INFRA: "false"
+      NETWORK_WORKLOAD: udn-bgp
+      NUM_NODES: "9"
+      NUM_WORKER_NODES: "24"
+      PUBLIC_VLAN: "false"
+      STARTING_NODE: "1"
+      TYPE: vmno
+    post:
+    - ref: openshift-qe-installer-bm-day2-network-workloads-post
+    test:
+    - ref: openshift-qe-installer-bm-ping
+    - ref: openshift-qe-installer-bm-poweroff
+    - ref: openshift-qe-installer-bm-foreman
+    - ref: openshift-qe-installer-bm-prereqs
+    - ref: openshift-qe-installer-bm-deploy
+    - ref: openshift-qe-cluster-health
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-network-workloads
+    - ref: openshift-qe-udn-bgp
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: metal-4.20-nightly-x86
