@@ -135,11 +135,17 @@ export AZURE_TENANT_ID
 debug "azure: authentication configured successfully (credentials redacted)"
 
 # Image Updater: Build and run the image-updater tool
+info "image: building the image-updater binary"
+if ! make image-updater-build; then
+  error "image: failed to build image-updater binary"
+fi
+debug "image: image-updater binary built successfully"
+
 info "image: fetching the latest image digests for all components"
 if [[ ${VERBOSITY-0} -ge 2 ]]; then
-  VERBOSITY=1 make image-updater OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
+  VERBOSITY=1 make image-updater-update OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
 else
-  VERBOSITY=0 make image-updater OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
+  VERBOSITY=0 make image-updater-update OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
 fi
 
 # Check if there are any changes from image updates
