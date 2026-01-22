@@ -141,13 +141,14 @@ debug "go: vendor directory synchronized successfully"
 
 # Image Updater: Build and run the image-updater tool
 info "image: fetching the latest image digests for all components"
+cd tooling/image-updater/
+run make build
 if [[ ${VERBOSITY-0} -ge 2 ]]; then
-  run make yamlfmt
-  VERBOSITY=1 make image-updater OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
+  VERBOSITY=1 make update OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
 else
-  run make yamlfmt
-  VERBOSITY=0 make image-updater OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
+  VERBOSITY=0 make update OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
 fi
+cd ../..
 
 # Check if there are any changes from image updates
 if [[ $(git status --porcelain) == "" ]]; then
