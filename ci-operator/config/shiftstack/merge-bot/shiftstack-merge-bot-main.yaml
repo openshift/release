@@ -35,9 +35,41 @@ tests:
     test:
     - as: cluster-api-provider-openstack-main
       commands: |
-        merge-bot --source https://github.com/kubernetes-sigs/cluster-api-provider-openstack:release-0.13 \
+        merge-bot --source https://github.com/kubernetes-sigs/cluster-api-provider-openstack:release-0.14 \
                   --dest openshift/cluster-api-provider-openstack:main \
                   --merge shiftstack/cluster-api-provider-openstack:merge-bot-main \
+                  --update-go-modules \
+                  --run-make \
+                  --bot-name shiftstack-merge-bot \
+                  --bot-email shiftstack-merge-bot@redhat.com \
+                  --github-app-key /secrets/merge-bot/github_private_key \
+                  --github-cloner-key /secrets/merge-bot/github_cloner_private_key \
+                  --slack-webhook /secrets/slack-hooks/forum-shiftstack
+      credentials:
+      - collection: ""
+        mount_path: /secrets/merge-bot
+        name: shiftstack-merge-bot
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secrets/slack-hooks
+        name: shiftstack-slack-hooks
+        namespace: test-credentials
+      from: merge-bot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: cluster-api-provider-openstack-4-21
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api-provider-openstack-4-21
+      commands: |
+        merge-bot --source https://github.com/kubernetes-sigs/cluster-api-provider-openstack:release-0.13 \
+                  --dest openshift/cluster-api-provider-openstack:release-4.21 \
+                  --merge shiftstack/cluster-api-provider-openstack:merge-bot-release-4.21 \
                   --update-go-modules \
                   --run-make \
                   --bot-name shiftstack-merge-bot \
@@ -230,6 +262,37 @@ tests:
         merge-bot --source https://github.com/kubernetes/cloud-provider-openstack:release-1.34 \
                   --dest openshift/cloud-provider-openstack:main \
                   --merge shiftstack/cloud-provider-openstack:merge-bot-main \
+                  --update-go-modules \
+                  --bot-name shiftstack-merge-bot \
+                  --bot-email shiftstack-merge-bot@redhat.com \
+                  --github-app-key /secrets/merge-bot/github_private_key \
+                  --github-cloner-key /secrets/merge-bot/github_cloner_private_key \
+                  --slack-webhook /secrets/slack-hooks/forum-shiftstack
+      credentials:
+      - collection: ""
+        mount_path: /secrets/merge-bot
+        name: shiftstack-merge-bot
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secrets/slack-hooks
+        name: shiftstack-slack-hooks
+        namespace: test-credentials
+      from: merge-bot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: cloud-provider-openstack-4-21
+  cron: 0 12 * * Mon,Thu
+  steps:
+    test:
+    - as: cloud-provider-openstack-4-21
+      commands: |
+        merge-bot --source https://github.com/kubernetes/cloud-provider-openstack:release-1.34 \
+                  --dest openshift/cloud-provider-openstack:release-4.21 \
+                  --merge shiftstack/cloud-provider-openstack:merge-bot-release-4.21 \
                   --update-go-modules \
                   --bot-name shiftstack-merge-bot \
                   --bot-email shiftstack-merge-bot@redhat.com \
