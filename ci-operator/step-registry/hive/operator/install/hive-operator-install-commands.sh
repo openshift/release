@@ -210,7 +210,17 @@ spec:
     - PreserveOnDelete
 EOF
 
-# Wait for HiveConfig to be processed
+# Wait for Hive CRDs to be established
+echo "Waiting for Hive CRDs to be established..."
+oc wait --for condition=established --timeout=5m \
+  crd/clusterimagesets.hive.openshift.io \
+  crd/clusterdeployments.hive.openshift.io \
+  crd/machinepools.hive.openshift.io || {
+    echo "Warning: Some CRDs may not be available yet"
+    oc get crds | grep hive
+  }
+
+# Wait for Hive controllers to start
 echo "Waiting for Hive controllers to start..."
 sleep 30
 
