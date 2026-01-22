@@ -4,13 +4,21 @@ set -o pipefail
 
 echo "=== Windows BYOH Cleanup ==="
 
-# Use same unique suffix logic as provision step to find correct instances
-# Use last 3 chars of PROW_JOB_ID to match provision step naming (Azure VM name limit: 15 chars)
-# Fallback to "winc" if PROW_JOB_ID is not available (shouldn't happen in Prow)
-UNIQUE_SUFFIX="${PROW_JOB_ID:-}"  # Get PROW_JOB_ID or empty string (works with nounset)
-UNIQUE_SUFFIX="${UNIQUE_SUFFIX: -3}"  # Get last 3 chars if non-empty
-UNIQUE_SUFFIX="${UNIQUE_SUFFIX:-winc}"  # Fallback to "winc" if empty or too short
-export BYOH_INSTANCE_NAME="${BYOH_INSTANCE_NAME:-byoh-${UNIQUE_SUFFIX}}"
+# Debug: Print environment variables
+echo "DEBUG: SHARED_DIR=${SHARED_DIR}"
+echo "DEBUG: CLUSTER_PROFILE_DIR=${CLUSTER_PROFILE_DIR}"
+echo "DEBUG: ARTIFACT_DIR=${ARTIFACT_DIR:-not set}"
+
+# Read instance name saved by provision step
+if [[ -f "${SHARED_DIR}/byoh_instance_name.txt" ]]; then
+    BYOH_INSTANCE_NAME=$(cat "${SHARED_DIR}/byoh_instance_name.txt")
+    echo "Read instance name from provision step: ${BYOH_INSTANCE_NAME}"
+else
+    # Fallback to default if file doesn't exist (shouldn't happen in normal flow)
+    BYOH_INSTANCE_NAME="${BYOH_INSTANCE_NAME:-byoh-winc}"
+    echo "WARNING: Instance name file not found, using default: ${BYOH_INSTANCE_NAME}"
+fi
+export BYOH_INSTANCE_NAME
 export BYOH_NUM_WORKERS="${BYOH_NUM_WORKERS:-2}"
 export BYOH_WINDOWS_VERSION="${BYOH_WINDOWS_VERSION:-2022}"
 export BYOH_TMP_DIR="${SHARED_DIR}/terraform_byoh/"
