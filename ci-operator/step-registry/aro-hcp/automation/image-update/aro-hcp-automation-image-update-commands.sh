@@ -134,6 +134,11 @@ export AZURE_TENANT_ID
 
 debug "azure: authentication configured successfully (credentials redacted)"
 
+# Go: Sync vendor directory to resolve module inconsistencies
+info "go: syncing vendor directory with go.work modules"
+run go work vendor
+debug "go: vendor directory synchronized successfully"
+
 # Image Updater: Build and run the image-updater tool
 info "image: fetching the latest image digests for all components"
 if [[ ${VERBOSITY-0} -ge 2 ]]; then
