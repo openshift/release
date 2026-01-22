@@ -16,7 +16,12 @@ then
     exit 1
 fi
 
+if [[ -f "${SHARED_DIR}/kubeconfig" ]];
+then
+   export TEST_KUBECONFIG="${SHARED_DIR}/kubeconfig"
+fi
+
 export REPORT_DIR="${ARTIFACT_DIR}"
 
-/osde2e provision --configs "${CONFIGS}" \
---secret-locations "${SECRET_LOCATIONS}" 
+/osde2e krkn-ai --configs "${CONFIGS}" \
+--secret-locations "${SECRET_LOCATIONS}"

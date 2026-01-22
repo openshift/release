@@ -27,28 +27,15 @@ tests:
   skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|(.*\.md)|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - always_run: false
   as: hypershift-pr-check
-  commands: |
-    export GOFLAGS=""
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="hypershift"
-    export CHANNEL="stable"
-    export SKIP_MUST_GATHER="true"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-credentials"
-
-    go mod tidy
-    make build
-
-    out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    from: src
-  run_if_changed: ^(pkg\/common\/|pkg\/e2e\/)$
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-hypershift-credentials
-    name: osde2e-hypershift-credentials
+  run_if_changed: ^(pkg/.*)$
+  steps:
+    env:
+      CONFIGS: hypershift
+      SECRET_LOCATIONS: /usr/local/osde2e-common,/usr/local/osde2e-hypershift-credentials,/usr/local/osde2e-credentials
+      SKIP_DESTROY_CLUSTER: "true"
+      SKIP_MUST_GATHER: "true"
+    test:
+    - chain: osde2e
 - as: rosa-stage-e2e-byo-vpc-proxy-install
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"

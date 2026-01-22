@@ -67,16 +67,13 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-osde2e-main-hypershift-pr-check
     rerun_command: /test hypershift-pr-check
-    run_if_changed: ^(pkg\/common\/|pkg\/e2e\/)$
+    run_if_changed: ^(pkg\/common\/|pkg\/e2e\/|pkg\/krknai\/|cmd\/osde2e\/test\/|cmd\/osde2e\/krknai\/)$
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/osde2e-common
-        - --secret-dir=/secrets/osde2e-credentials
-        - --secret-dir=/secrets/osde2e-hypershift-credentials
         - --target=hypershift-pr-check
         command:
         - ci-operator
@@ -93,15 +90,6 @@ presubmits:
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
-        - mountPath: /secrets/osde2e-common
-          name: osde2e-common
-          readOnly: true
-        - mountPath: /secrets/osde2e-credentials
-          name: osde2e-credentials
-          readOnly: true
-        - mountPath: /secrets/osde2e-hypershift-credentials
-          name: osde2e-hypershift-credentials
-          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -113,15 +101,6 @@ presubmits:
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
-      - name: osde2e-common
-        secret:
-          secretName: osde2e-common
-      - name: osde2e-credentials
-        secret:
-          secretName: osde2e-credentials
-      - name: osde2e-hypershift-credentials
-        secret:
-          secretName: osde2e-hypershift-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
