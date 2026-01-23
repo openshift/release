@@ -20,34 +20,90 @@ debug_on_failure() {
         echo "################################################################"
         echo "     DEBUG: Script failed with exit code ${exit_code}"
         echo "################################################################"
-        
-        # 1. Check OLM / Operator Subscription Status
-        echo -e "Checking OLM Status (Subscriptions, InstallPlans, CSVs)..."
-        oc get subscription,installplan,clusterserviceversion -n openshift-operators || true
+
+        # 1. Detailed OLM / Operator Subscription
+        echo -e "=== OLM SUBSCRIPTION ANALYSIS ==="
+
+        echo -e "\n>> Subscription Status:"
+        if oc get subscription sailoperator -n openshift-operators -o yaml 2>/dev/null; then
+            echo -e "\n>> Subscription Events:"
+            oc get events -n openshift-operators --sort-by='.lastTimestamp' || true
+        else
+            echo "Subscription 'sailoperator' not found"
+        fi
+
+        echo -e "\n>> InstallPlan Details:"
+        oc get installplan -n openshift-operators -o wide || true
+
+        # Get detailed InstallPlan status
+        local installplans
+        installplans=$(oc get installplan -n openshift-operators --no-headers -o custom-columns=":metadata.name" 2>/dev/null || true)
+        for ip in $installplans; do
+            if [[ -n "$ip" ]]; then
+                echo -e "\n>> InstallPlan: $ip Status:"
+                oc describe installplan "$ip" -n openshift-operators || true
+            fi
+        done
+
+        echo -e "\n>> CSV (ClusterServiceVersion) Details:"
+        oc get csv -n openshift-operators -o wide || true
+
+        # Get detailed CSV status
+        local csvs
+        csvs=$(oc get csv -n openshift-operators --no-headers -o custom-columns=":metadata.name" 2>/dev/null | grep -i sail || true)
+        for csv in $csvs; do
+            if [[ -n "$csv" ]]; then
+                echo -e "\n>> CSV: $csv Status:"
+                oc describe csv "$csv" -n openshift-operators || true
+            fi
+        done
+
+        echo -e "\n>> All Deployments in openshift-operators:"
+        oc get deployments -n openshift-operators -o wide || true
+
+        echo -e "\n>> All Resources related to sailoperator:"
+        oc get all -n openshift-operators -l operators.coreos.com/sailoperator.openshift-operators || true
+
+        echo -e "\n>> Operator Hub / CatalogSource Status:"
+        oc get catalogsource community-operators -n openshift-marketplace -o yaml || echo "Could not get community-operators catalogsource"
+
+        echo -e "\n>> Package Manifest for sailoperator:"
+        oc get packagemanifest sailoperator -o yaml || echo "Could not get sailoperator packagemanifest"
 
         # 2. Iterate through relevant namespaces
-        local namespaces=("openshift-operators" "istio-system" "istio-cni" "ztunnel")
+        echo -e "\n=== NAMESPACE ANALYSIS ==="
+        local namespaces=("openshift-operators" "openshift-marketplace" "istio-system" "istio-cni" "ztunnel")
         for ns in "${namespaces[@]}"; do
             local ns_check_output
             if ns_check_output=$(oc get ns "$ns" 2>&1); then
                 echo -e "\n--- [DEBUG] Namespace: $ns ---"
-                
+
                 echo ">> Pod Status:"
-                oc get pods -n "$ns" || true
-                
-                echo ">> Recent Events (Sorted by Time):"
-                oc get events -n "$ns" --sort-by='.lastTimestamp' | tail -n 15 || true
-                
+                oc get pods -n "$ns" -o wide || true
+
+                echo ">> Recent Events (Sorted by Time, last 20):"
+                oc get events -n "$ns" --sort-by='.lastTimestamp' | tail -n 20 || true
+
                 # Identify, describe and get logs from all the pods in the namespace
                 local pods
-                pods=$(oc get pods -n "$ns" --no-headers | awk '{print $2}' || true)
-                
+                pods=$(oc get pods -n "$ns" --no-headers -o custom-columns=":metadata.name" 2>/dev/null || true)
+
                 for pod in $pods; do
-                    echo -e "\n>> [DEBUG] Describing failing pod: $pod"
-                    oc describe pod "$pod" -n "$ns" || true
-                    echo ">> [DEBUG] Logs for $pod (last 50 lines):"
-                    oc logs "$pod" -n "$ns" --all-containers --tail=50 || echo "Could not retrieve logs."
+                    if [[ -n "$pod" ]]; then
+                        echo -e "\n>> [DEBUG] Describing pod: $pod"
+                        oc describe pod "$pod" -n "$ns" || true
+                        echo ">> [DEBUG] Logs for $pod (last 100 lines):"
+                        oc logs "$pod" -n "$ns" --all-containers --tail=100 --previous=false || echo "Could not retrieve current logs."
+                        echo ">> [DEBUG] Previous logs for $pod (if any):"
+                        oc logs "$pod" -n "$ns" --all-containers --tail=50 --previous=true 2>/dev/null || echo "No previous logs."
+                    fi
                 done
+
+                # Check for any operator-related resources
+                if [[ "$ns" == "openshift-operators" ]]; then
+                    echo -e "\n>> Operator Resources in $ns:"
+                    oc get all,configmap,secret -n "$ns" | grep -i sail || echo "No sail-related resources found"
+                fi
             else
                 echo -e "\n--- [DEBUG] Namespace: $ns (NOT FOUND) ---"
                 echo ">> Namespace check failed: $ns_check_output"
@@ -55,9 +111,21 @@ debug_on_failure() {
         done
 
         # 3. Check Istio Custom Resources
-        echo -e "\n>> [DEBUG] Global Istio Resources State:"
-        oc get istio,istiocni,ztunnel -A -o yaml || true
-        
+        echo -e "\n=== ISTIO RESOURCES ANALYSIS ==="
+        echo -e ">> Global Istio Resources State:"
+        oc get istio,istiocni,ztunnel -A -o yaml 2>/dev/null || echo "No Istio custom resources found (expected if operator hasn't deployed yet)"
+
+        # 4. Check cluster-wide operator status
+        echo -e "\n=== CLUSTER OPERATOR STATUS ==="
+        echo -e ">> Cluster Operators:"
+        oc get co | grep -E "(NAME|operator-lifecycle-manager|marketplace)" || true
+
+        echo -e "\n>> OLM Operator Pods:"
+        oc get pods -n openshift-operator-lifecycle-manager || true
+
+        echo -e "\n>> Marketplace Operator Pods:"
+        oc get pods -n openshift-marketplace | grep -E "(NAME|catalog|packageserver)" || true
+
         echo -e "\n################################################################"
     fi
 }
@@ -82,12 +150,37 @@ retry_command() {
 
         echo "Waiting for ${description}... (attempt ${attempt}/${max_attempts})"
 
+        # Provide intermediate status on every 5th attempt
+        if [ $((attempt % 5)) -eq 0 ]; then
+            echo "  >> Progress check at attempt $attempt:"
+            case "$description" in
+                *"InstallPlan"*)
+                    echo "  >> Current InstallPlans:" && oc get installplan -n openshift-operators --no-headers 2>/dev/null || echo "  >> No InstallPlans found"
+                    ;;
+                *"CSV"*)
+                    echo "  >> Current CSVs:" && oc get csv -n openshift-operators --no-headers 2>/dev/null || echo "  >> No CSVs found"
+                    ;;
+                *"deployment"*)
+                    echo "  >> Current Deployments:" && oc get deployments -n openshift-operators --no-headers 2>/dev/null || echo "  >> No Deployments found"
+                    echo "  >> Operator pods:" && oc get pods -n openshift-operators --no-headers 2>/dev/null || echo "  >> No pods found"
+                    ;;
+                *"istiod"*)
+                    echo "  >> Istio pods:" && oc get pods -n istio-system --no-headers 2>/dev/null || echo "  >> No istio-system pods found"
+                    ;;
+                *)
+                    echo "  >> Checking current state..."
+                    eval "$command_to_run" 2>&1 || echo "  >> Command still failing"
+                    ;;
+            esac
+        fi
+
         if [ "$attempt" -eq "$max_attempts" ]; then
             echo "ERROR: ${description} did not become available after $max_attempts attempts."
+            echo "Final command output:"
             eval "$command_to_run" || true
             return 1
         fi
-        
+
         sleep "$sleep_duration"
         attempt=$((attempt + 1))
     done
@@ -114,7 +207,47 @@ echo "Applying subscription file for sail-operator"
 oc apply -f sail-operator-subscription.yaml
 
 echo "Awaiting sail-operator deployment (KUBECONFIG=${KUBECONFIG:-'not set'})"
-retry_command "oc wait --for=condition=Available=True --timeout=5s deployment/sail-operator -n openshift-operators" "sail-operator deployment"
+
+# First, wait for the subscription to create an InstallPlan
+echo "Step 1: Waiting for InstallPlan creation..."
+retry_command "oc get installplan -n openshift-operators --no-headers | grep -q sailoperator" "InstallPlan creation for sailoperator"
+
+# Check InstallPlan status
+echo "Step 2: Waiting for InstallPlan approval and completion..."
+retry_command "oc get installplan -n openshift-operators -o jsonpath='{.items[?(@.spec.clusterServiceVersionNames[*]==\"sailoperator*\")].status.phase}' | grep -q Installed" "InstallPlan completion"
+
+# Wait for CSV to be created and ready
+echo "Step 3: Waiting for ClusterServiceVersion (CSV) to be ready..."
+retry_command "oc get csv -n openshift-operators --no-headers | grep sailoperator | grep -q Succeeded" "CSV to be ready"
+
+# Now wait for the actual deployment - get the actual deployment name from the CSV
+echo "Step 4: Identifying and waiting for operator deployment..."
+OPERATOR_DEPLOYMENT=""
+attempt=1
+while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
+    # Get deployment name from CSV
+    OPERATOR_DEPLOYMENT=$(oc get csv -n openshift-operators -o jsonpath='{.items[?(@.metadata.name=~"sailoperator.*")].spec.install.spec.deployments[0].name}' 2>/dev/null || true)
+
+    if [ -n "$OPERATOR_DEPLOYMENT" ]; then
+        echo "Found operator deployment: $OPERATOR_DEPLOYMENT"
+        break
+    fi
+
+    echo "Waiting for deployment name from CSV... (attempt ${attempt}/${MAX_ATTEMPTS})"
+    if [ "$attempt" -eq "$MAX_ATTEMPTS" ]; then
+        echo "ERROR: Could not determine operator deployment name from CSV"
+        echo "Available deployments in openshift-operators:"
+        oc get deployments -n openshift-operators || true
+        exit 1
+    fi
+
+    sleep "$SLEEP_DURATION"
+    attempt=$((attempt + 1))
+done
+
+# Now wait for the actual deployment to be ready
+echo "Step 5: Waiting for deployment $OPERATOR_DEPLOYMENT to be available..."
+retry_command "oc wait --for=condition=Available=True --timeout=5s deployment/$OPERATOR_DEPLOYMENT -n openshift-operators" "$OPERATOR_DEPLOYMENT deployment"
 
 # Install the Istio control plane
 if [ "${ISTIO_CONTROL_PLANE_MODE}" == "ambient" ]; then
