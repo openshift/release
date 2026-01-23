@@ -46,14 +46,17 @@ fi
 # Initialize a variable to keep track of errors
 any_errors=false
 
-# Set the operator args required for tests execution.
+# Set the operator environment variables required for tests execution.
 OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--enable-go-instrumentation\", \"--openshift-create-dashboard=true\", \"--enable-nginx-instrumentation=true\", \"--enable-cr-metrics=true\", \"--create-sm-operator-metrics=true\", \"--feature-gates=operator.networkpolicy,operand.networkpolicy\"]}]"
+oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p '[
+  {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_TARGET_ALLOCATOR","value":"'"${TARGETALLOCATOR_IMG}"'"}},
+  {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_OPERATOR_OPAMP_BRIDGE","value":"'"${OPERATOROPAMPBRIDGE_IMG}"'"}}
+]'
 sleep 60
-if oc -n opentelemetry-operator describe csv --selector=operators.coreos.com/opentelemetry-operator.opentelemetry-operator= | tail -n 1 | grep -qi "InstallSucceeded"; then
-    echo "CSV updated successfully, continuing script execution..."
+if oc -n opentelemetry-operator get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
+    echo "Operator deployment updated successfully, continuing script execution..."
 else
-    echo "Operator CSV update failed, exiting with error."
+    echo "Operator deployment update failed, exiting with error."
     exit 1
 fi
 
@@ -94,14 +97,17 @@ chainsaw test \
 tests/e2e-prometheuscr \
 tests/e2e-sidecar || any_errors=true
 
-# Set the operator args required for tests execution.
+# Set the operator environment variables for metadata filters tests.
 OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--enable-go-instrumentation\", \"--openshift-create-dashboard=true\", \"--enable-nginx-instrumentation=true\", \"--enable-cr-metrics=true\", \"--create-sm-operator-metrics=true\", \"--annotations-filter=.*filter.out\", \"--annotations-filter=config.*.gke.io.*\", \"--labels-filter=.*filter.out\", \"--feature-gates=operator.networkpolicy,operand.networkpolicy\"]}]"
+oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p '[
+  {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"ANNOTATIONS_FILTER","value":".*filter.out,config.*.gke.io.*"}},
+  {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"LABELS_FILTER","value":".*filter.out"}}
+]'
 sleep 60
-if oc -n opentelemetry-operator describe csv --selector=operators.coreos.com/opentelemetry-operator.opentelemetry-operator= | tail -n 1 | grep -qi "InstallSucceeded"; then
-    echo "CSV updated successfully, continuing script execution..."
+if oc -n opentelemetry-operator get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
+    echo "Operator deployment updated successfully for metadata filters, continuing script execution..."
 else
-    echo "Operator CSV update failed, exiting with error."
+    echo "Operator deployment update for metadata filters failed, exiting with error."
     exit 1
 fi
 
@@ -114,14 +120,20 @@ chainsaw test \
 --test-dir \
 tests/e2e-metadata-filters || any_errors=true
 
-# Set the operator args with instrumentation images for e2e-instrumentation tests.
+# Set the operator environment variables with instrumentation images for e2e-instrumentation tests.
 OTEL_CSV_NAME=$(oc get csv -n opentelemetry-operator | grep "opentelemetry-operator" | awk '{print $1}')
-oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p "[{\"op\":\"replace\",\"path\":\"/spec/install/spec/deployments/0/spec/template/spec/containers/0/args\",\"value\":[\"--metrics-addr=127.0.0.1:8080\", \"--enable-leader-election\", \"--zap-log-level=info\", \"--zap-time-encoding=rfc3339nano\", \"--target-allocator-image=${TARGETALLOCATOR_IMG}\", \"--operator-opamp-bridge-image=${OPERATOROPAMPBRIDGE_IMG}\", \"--auto-instrumentation-nodejs-image=${INSTRUMENTATION_NODEJS_IMG}\", \"--auto-instrumentation-python-image=${INSTRUMENTATION_PYTHON_IMG}\", \"--auto-instrumentation-dotnet-image=${INSTRUMENTATION_DOTNET_IMG}\", \"--auto-instrumentation-apache-httpd-image=${INSTRUMENTATION_APACHE_HTTPD_IMG}\", \"--enable-go-instrumentation\", \"--openshift-create-dashboard=true\", \"--enable-nginx-instrumentation=true\", \"--enable-cr-metrics=true\", \"--create-sm-operator-metrics=true\", \"--feature-gates=operator.networkpolicy,operand.networkpolicy\"]}]"
+oc -n opentelemetry-operator patch csv $OTEL_CSV_NAME --type=json -p '[
+  {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_AUTO_INSTRUMENTATION_JAVA","value":"'"${INSTRUMENTATION_JAVA_IMG}"'"}},
+  {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_AUTO_INSTRUMENTATION_NODEJS","value":"'"${INSTRUMENTATION_NODEJS_IMG}"'"}},
+  {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_AUTO_INSTRUMENTATION_PYTHON","value":"'"${INSTRUMENTATION_PYTHON_IMG}"'"}},
+  {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_AUTO_INSTRUMENTATION_DOTNET","value":"'"${INSTRUMENTATION_DOTNET_IMG}"'"}},
+  {"op":"add","path":"/spec/install/spec/deployments/0/spec/template/spec/containers/0/env/-","value":{"name":"RELATED_IMAGE_AUTO_INSTRUMENTATION_APACHE_HTTPD","value":"'"${INSTRUMENTATION_APACHE_HTTPD_IMG}"'"}}
+]'
 sleep 60
-if oc -n opentelemetry-operator describe csv --selector=operators.coreos.com/opentelemetry-operator.opentelemetry-operator= | tail -n 1 | grep -qi "InstallSucceeded"; then
-    echo "CSV updated successfully with instrumentation images, continuing script execution..."
+if oc -n opentelemetry-operator get deployment opentelemetry-operator-controller-manager -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' | grep -q "True"; then
+    echo "Operator deployment updated successfully with instrumentation images, continuing script execution..."
 else
-    echo "Operator CSV update with instrumentation images failed, exiting with error."
+    echo "Operator deployment update with instrumentation images failed, exiting with error."
     exit 1
 fi
 
