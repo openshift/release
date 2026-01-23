@@ -858,7 +858,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-private-cco-manual-security-token-service
-- as: aws-ipi-proxy-sts-mini-perm-amd-f28-destructive
+- as: aws-ipi-https-proxy-sts-mini-perm-amd-f28-destructive
   cron: 51 18 15 * *
   steps:
     cluster_profile: aws-qe
@@ -866,11 +866,12 @@ tests:
       AWS_CCOCTL_USE_MINIMAL_PERMISSIONS: "yes"
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.devcluster.openshift.com
+      ENABLE_HTTPS_PROXY: "yes"
       EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
-- as: aws-ipi-proxy-sts-mini-perm-arm-f7
+- as: aws-ipi-https-proxy-sts-mini-perm-arm-f7
   cron: 33 11 1,8,15,24 * *
   steps:
     cluster_profile: aws-qe
@@ -880,6 +881,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_HTTPS_PROXY: "yes"
       EXTRACT_MANIFEST_INCLUDED: "true"
       OCP_ARCH: arm64
     test:
@@ -2789,8 +2791,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-upi-private-xpn-ingress-glb
-- as: ibmcloud-ovn-multi-ppc64le-f28
-  cron: 23 21 3 * *
+- as: ibmcloud-ovn-multi-ppc64le-f999
+  cron: 8 22 29 2 *
   steps:
     cluster_profile: ibmcloud-multi-ppc64le
     env:
@@ -2862,6 +2864,44 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-cert-rotation
     workflow: baremetal-lab-ipi
+- as: baremetal-ipi-ovn-ipv4-vmedia-multi-arch-day2-amd-f28
+  capabilities:
+  - intranet
+  cron: 37 14 7 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKERS: "1"
+      ADDITIONAL_WORKERS_DAY2: "true"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "1"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media
+- as: baremetal-ipi-ovn-ipv4-vmedia-multi-arch-amd-f28
+  capabilities:
+  - intranet
+  cron: 15 13 23 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKERS: "2"
+      ADDITIONAL_WORKERS_DAY2: "false"
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

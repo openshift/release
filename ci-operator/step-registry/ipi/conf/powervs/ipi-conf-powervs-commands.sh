@@ -83,6 +83,12 @@ if [[ -n "${CLUSTER_NAME_MODIFIER}" ]]; then
     "lon06-powervs-7-quota-slice-3")
       CLUSTER_NAME="p-lon06-3-${CLUSTER_NAME_MODIFIER}"
     ;;
+    "fran-powervs-8-quota-slice-0")
+      CLUSTER_NAME="p-fran-0-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "fran-powervs-8-quota-slice-1")
+      CLUSTER_NAME="p-fran-1-${CLUSTER_NAME_MODIFIER}"
+    ;;
     "mad02-powervs-5-quota-slice-0")
       CLUSTER_NAME="p-mad02-0-${CLUSTER_NAME_MODIFIER}"
     ;;

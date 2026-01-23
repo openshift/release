@@ -3,14 +3,14 @@ base_images:
     name: "4.18"
     namespace: ocp
     tag: base-rhel9
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
   ocp_builder_rhel-9-golang-1.23-openshift-4.18:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.23-openshift-4.18
-  operator-sdk:
-    name: "4.18"
-    namespace: origin
-    tag: operator-sdk
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -33,10 +33,10 @@ operator:
 releases:
   latest:
     candidate:
-      architecture: amd64
+      architecture: multi
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -60,21 +60,24 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.18"
-  optional: true
+    version: "4.20"
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
+    dependencies:
+      OO_BUNDLE: zero-trust-workload-identity-manager-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: zero-trust-workload-identity-manager
+      OO_SECURITY_CONTEXT: restricted
     test:
     - as: install
       cli: latest
       commands: |
-        oc create namespace zero-trust-workload-identity-manager
-        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n zero-trust-workload-identity-manager "$OO_BUNDLE" --verbose
-        oc wait --for condition=Available -n zero-trust-workload-identity-manager deployment zero-trust-workload-identity-manager-controller-manager
+        oc -n zero-trust-workload-identity-manager rollout status deployment zero-trust-workload-identity-manager-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: zero-trust-workload-identity-manager-bundle
-      from: operator-sdk
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -85,7 +88,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: generic-claim
+    workflow: optional-operators-ci-operator-sdk-generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift

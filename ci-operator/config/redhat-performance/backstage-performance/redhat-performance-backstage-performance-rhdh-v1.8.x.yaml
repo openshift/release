@@ -1,0 +1,408 @@
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/ubi
+      RUN yum install -y openssl git
+images:
+- dockerfile_literal: |-
+    FROM src
+    SHELL ["/bin/bash", "-c"]
+    ENV BACKSTAGE_PERFORMANCE_BASE_BRANCH=main
+    RUN yum install -y python3.12 python3.12-pip make gettext bc skopeo
+    RUN alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 10
+    RUN alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 20
+    RUN alternatives --set python3 /usr/bin/python3.12
+    RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /usr/local/bin/jq
+    RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.40.5/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+    RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
+    RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && helm version
+    RUN curl -Lso /usr/local/bin/kn-workflow https://developers.redhat.com/content-gateway/file/pub/cgw/serverless-logic/1.36.0/kn-workflow-linux-amd64 && chmod +x /usr/local/bin/kn-workflow
+  from: src
+  to: backstage-performance-runner
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: search-catalog
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 1h0m0s
+      SCENARIO: search-catalog
+      SPAWN_RATE: "100"
+      USE_PR_BRANCH: "true"
+      USERS: "10000"
+      WORKERS: "100"
+    workflow: redhat-performance-backstage-performance
+- always_run: false
+  as: list-catalog
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 1h0m0s
+      SCENARIO: list-catalog
+      SPAWN_RATE: "100"
+      USE_PR_BRANCH: "true"
+      USERS: "10000"
+      WORKERS: "100"
+    workflow: redhat-performance-backstage-performance
+- always_run: false
+  as: list-catalog-empty
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 1h0m0s
+      PRE_LOAD_DB: "false"
+      SCENARIO: list-catalog
+      SPAWN_RATE: "100"
+      USE_PR_BRANCH: "true"
+      USERS: "10000"
+      WORKERS: "100"
+    workflow: redhat-performance-backstage-performance
+- always_run: false
+  as: mvp
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      API_COUNT: "2500"
+      BACKSTAGE_USER_COUNT: "1000"
+      COMPONENT_COUNT: "2500"
+      DURATION: 10m
+      GROUP_COUNT: "250"
+      PRE_LOAD_DB: "true"
+      RHDH_DB_REPLICAS: "1"
+      RHDH_DB_STORAGE: 1Gi
+      RHDH_DEPLOYMENT_REPLICAS: "1"
+      RHDH_KEYCLOAK_REPLICAS: "1"
+      SCENARIO: mvp
+      SPAWN_RATE: "40"
+      USE_PR_BRANCH: "true"
+      USERS: "200"
+      WORKERS: "40"
+    workflow: redhat-performance-backstage-performance
+- always_run: false
+  as: mvp-helm
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      API_COUNT: "2500"
+      BACKSTAGE_USER_COUNT: "1000"
+      COMPONENT_COUNT: "2500"
+      DURATION: 10m
+      GROUP_COUNT: "250"
+      PRE_LOAD_DB: "true"
+      RHDH_DB_REPLICAS: "1"
+      RHDH_DB_STORAGE: 1Gi
+      RHDH_DEPLOYMENT_REPLICAS: "1"
+      RHDH_INSTALL_METHOD: helm
+      RHDH_KEYCLOAK_REPLICAS: "1"
+      SCENARIO: mvp
+      SPAWN_RATE: "40"
+      USE_PR_BRANCH: "true"
+      USERS: "200"
+      WORKERS: "40"
+    workflow: redhat-performance-backstage-performance
+- always_run: false
+  as: mvp-profile
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      API_COUNT: "2500"
+      BACKSTAGE_USER_COUNT: "1000"
+      COMPONENT_COUNT: "2500"
+      DURATION: 10m
+      ENABLE_PROFILING: "true"
+      ENABLE_RBAC: "true"
+      GROUP_COUNT: "250"
+      PRE_LOAD_DB: "true"
+      RHDH_DB_REPLICAS: "1"
+      RHDH_DB_STORAGE: 1Gi
+      RHDH_DEPLOYMENT_REPLICAS: "1"
+      RHDH_INSTALL_METHOD: helm
+      RHDH_KEYCLOAK_REPLICAS: "1"
+      SCENARIO: mvp
+      SPAWN_RATE: "40"
+      USE_PR_BRANCH: "true"
+      USERS: "200"
+      WORKERS: "40"
+    workflow: redhat-performance-backstage-performance
+- always_run: false
+  as: mvp-olm
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      API_COUNT: "2500"
+      BACKSTAGE_USER_COUNT: "1000"
+      COMPONENT_COUNT: "2500"
+      DURATION: 10m
+      GROUP_COUNT: "250"
+      PRE_LOAD_DB: "true"
+      RHDH_DB_REPLICAS: "1"
+      RHDH_DB_STORAGE: 1Gi
+      RHDH_DEPLOYMENT_REPLICAS: "1"
+      RHDH_INSTALL_METHOD: olm
+      RHDH_KEYCLOAK_REPLICAS: "1"
+      SCENARIO: mvp
+      SPAWN_RATE: "40"
+      USE_PR_BRANCH: "true"
+      USERS: "200"
+      WORKERS: "40"
+    workflow: redhat-performance-backstage-performance
+- always_run: false
+  as: mvp-scalability
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 5m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: 1:1 200:40
+      SCALE_BS_USERS_GROUPS: 1:1 10000:2500
+      SCALE_CATALOG_SIZES: 1:1 10000:5000
+      SCALE_CPU_REQUESTS_LIMITS: ':'
+      SCALE_DB_STORAGES: 2Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: ':'
+      SCALE_REPLICAS: "1:1"
+      SCALE_WORKERS: "40"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+- always_run: false
+  as: mvp-resources-scalability-cpu250m
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 10m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: "200:40"
+      SCALE_BS_USERS_GROUPS: 10000:2500
+      SCALE_CATALOG_SIZES: 2000:2000
+      SCALE_CPU_REQUESTS_LIMITS: 250m:250m
+      SCALE_DB_STORAGES: 1Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: 256Mi:256Mi 512Mi:512Mi 1Gi:1Gi 2Gi:2Gi
+      SCALE_REPLICAS: "1:1"
+      SCALE_WORKERS: "40"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+- always_run: false
+  as: mvp-resources-scalability-cpu500m
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 10m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: "200:40"
+      SCALE_BS_USERS_GROUPS: 10000:2500
+      SCALE_CATALOG_SIZES: 2000:2000
+      SCALE_CPU_REQUESTS_LIMITS: 500m:500m
+      SCALE_DB_STORAGES: 1Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: 256Mi:256Mi 512Mi:512Mi 1Gi:1Gi 2Gi:2Gi
+      SCALE_REPLICAS: "1:1"
+      SCALE_WORKERS: "40"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+- always_run: false
+  as: mvp-resources-scalability-cpu1000m
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 10m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: "200:40"
+      SCALE_BS_USERS_GROUPS: 10000:2500
+      SCALE_CATALOG_SIZES: 2000:2000
+      SCALE_CPU_REQUESTS_LIMITS: 1000m:1000m
+      SCALE_DB_STORAGES: 1Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: 256Mi:256Mi 512Mi:512Mi 1Gi:1Gi 2Gi:2Gi
+      SCALE_REPLICAS: "1:1"
+      SCALE_WORKERS: "40"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+- always_run: false
+  as: mvp-resources-scalability-cpu2000m
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 10m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: "200:40"
+      SCALE_BS_USERS_GROUPS: 10000:2500
+      SCALE_CATALOG_SIZES: 2000:2000
+      SCALE_CPU_REQUESTS_LIMITS: 2000m:2000m
+      SCALE_DB_STORAGES: 1Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: 256Mi:256Mi 512Mi:512Mi 1Gi:1Gi 2Gi:2Gi
+      SCALE_REPLICAS: "1:1"
+      SCALE_WORKERS: "40"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+- always_run: false
+  as: search-catalog-scalability
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 5m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: 1:1 200:40
+      SCALE_BS_USERS_GROUPS: 1:1 15000:5000
+      SCALE_CATALOG_SIZES: 1:1 10000:10000
+      SCALE_DB_STORAGES: 1Gi 2Gi
+      SCALE_REPLICAS: "1:1"
+      SCALE_WORKERS: "5"
+      SCENARIO: search-catalog
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "true"
+    workflow: redhat-performance-backstage-performance-scalability
+- always_run: false
+  as: list-catalog-scalability
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 5m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: 1:1 200:40
+      SCALE_BS_USERS_GROUPS: 1:1 15000:5000
+      SCALE_CATALOG_SIZES: 1:1 10000:10000
+      SCALE_DB_STORAGES: 1Gi 2Gi
+      SCALE_REPLICAS: "1:1"
+      SCALE_WORKERS: "5"
+      SCENARIO: list-catalog
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+- always_run: false
+  as: mvp-catalog-size-api-scalability
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 15m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: "100:5"
+      SCALE_BS_USERS_GROUPS: 10000:2000
+      SCALE_CATALOG_SIZES: 1:1 2500:1 5000:1 6000:1 7000:1 8000:1 9000:1 10000:1
+      SCALE_CPU_REQUESTS_LIMITS: ':'
+      SCALE_DB_STORAGES: 1Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: ':'
+      SCALE_REPLICAS: "1:1"
+      SCALE_WORKERS: "20"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+- always_run: false
+  as: mvp-catalog-size-component-scalability
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 15m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: "100:5"
+      SCALE_BS_USERS_GROUPS: 10000:2000
+      SCALE_CATALOG_SIZES: 1:1 1:2500 1:5000 1:6000 1:7000 1:8000 1:9000 1:10000
+      SCALE_CPU_REQUESTS_LIMITS: ':'
+      SCALE_DB_STORAGES: 1Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: ':'
+      SCALE_REPLICAS: "1:1"
+      SCALE_WORKERS: "20"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+- always_run: false
+  as: mvp-catalog-size-api-scalability-20g
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 15m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: "100:5"
+      SCALE_BS_USERS_GROUPS: 10000:2000
+      SCALE_CATALOG_SIZES: 1:1 10000:1 25000:1 50000:1 75000:1 100000:1
+      SCALE_CPU_REQUESTS_LIMITS: ':'
+      SCALE_DB_STORAGES: 20Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: ':'
+      SCALE_REPLICAS: "1:1"
+      SCALE_WORKERS: "20"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+- always_run: false
+  as: mvp-catalog-size-component-scalability-20g
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 15m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: "100:5"
+      SCALE_BS_USERS_GROUPS: 10000:2000
+      SCALE_CATALOG_SIZES: 1:1 1:10000 1:25000 1:50000 1:75000 1:100000
+      SCALE_CPU_REQUESTS_LIMITS: ':'
+      SCALE_DB_STORAGES: 20Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: ':'
+      SCALE_REPLICAS: "1:1"
+      SCALE_WORKERS: "20"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+- always_run: false
+  as: mvp-rhdh-horizontal-scalability-1to5
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 10m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: "200:40"
+      SCALE_BS_USERS_GROUPS: 10000:2500
+      SCALE_CATALOG_SIZES: 2500:2500
+      SCALE_CPU_REQUESTS_LIMITS: ':'
+      SCALE_DB_STORAGES: 2Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: ':'
+      SCALE_REPLICAS: 1:1 2:2 3:3 4:4 5:5
+      SCALE_WORKERS: "40"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+- always_run: false
+  as: mvp-rhdh-horizontal-scalability-6to10
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      DURATION: 10m
+      PRE_LOAD_DB: "true"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: "200:40"
+      SCALE_BS_USERS_GROUPS: 10000:2500
+      SCALE_CATALOG_SIZES: 2500:2500
+      SCALE_CPU_REQUESTS_LIMITS: ':'
+      SCALE_DB_STORAGES: 2Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: ':'
+      SCALE_REPLICAS: 6:6 7:7 8:8 9:9 10:10
+      SCALE_WORKERS: "40"
+      SCENARIO: mvp
+      USE_PR_BRANCH: "true"
+      WAIT_FOR_SEARCH_INDEX: "false"
+    workflow: redhat-performance-backstage-performance-scalability
+zz_generated_metadata:
+  branch: rhdh-v1.8.x
+  org: redhat-performance
+  repo: backstage-performance

@@ -61,7 +61,8 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 
 | Variable                   | Default Value            | Description                                                                 | Validation               |
 | -------------------------- | ------------------------ | --------------------------------------------------------------------------- | ------------------------ |
-| `OCP_VERSION`              | `4.19`                   | OpenShift Container Platform version                                        | Format: X.Y (e.g., 4.19) |
+| `OCP_VERSION`              | `4.19`                   | OpenShift Container Platform version. Supports `X.Y` (latest), `X.Y.Z` (specific), or `X.Y.Z-rc.N`/`X.Y.Z-ec.N` (candidate). If a specific version doesn't exist, error out |
+| `OCP_CHANNEL`              | `fast`                   | OCP release channel. Default is `fast` because it contains all versions that could become `stable`.  Further explanation below | `stable`, `fast`, `candidate`, or `eus` |
 | `AWS_REGION_OVERRIDE`      | `us-east-2`              | AWS region for testing                                                      | Any valid AWS region     |
 | `CUSTOM_AZURE_REGION`      | `eastus`                 | Azure region for testing                                                    | Any valid Azure region   |
 | `OSC_CATALOG_TAG`          | derived latest           | Can be overridden.  Also sets EXPECTED_OSC_VERSION                          | repo tag                 |
@@ -84,6 +85,19 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 
 #### GA (Production) Mode
 - Uses `redhat-operators` catalog source with GA images
+
+### OCP Release Channels
+
+The `OCP_CHANNEL` variable determines which OpenShift release channel to use. Each channel provides different balances of stability, recency, and release types.
+
+#### Channel Comparison
+
+| Channel | Stability | Recency | Pre-Release | Use Case |
+|---------|-----------|---------|-------------|----------|
+| `candidate` |  Lowest |  Newest |  Yes (RC/EC) | Pre-release testing |
+| `fast` |  High | Recent | No | **Default** - has all versions except `candidate` |
+| `stable` |  Highest |  Delayed |  No | version tested for upgrades |
+| `eus` |  Highest |  Selected |  No | Long-term support |
 
 ### Advanced Configuration Examples
 
