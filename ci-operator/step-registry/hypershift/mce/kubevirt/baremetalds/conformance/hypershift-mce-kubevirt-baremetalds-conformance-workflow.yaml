@@ -22,12 +22,12 @@ workflow:
     - ref: hypershift-mce-dump
     - chain: gather-core-dump
     - chain: hypershift-mce-kubevirt-destroy
-    - chain: baremetalds-ipi-post
+    - chain: baremetalds-ofcir-post
     test:
     - chain: hypershift-conformance
     pre:
     - ref: baremetalds-devscripts-conf-extranetwork
-    - chain: baremetalds-ipi-pre
+    - chain: baremetalds-ofcir-pre
     - ref: enable-qe-catalogsource
     - ref: deploy-konflux-operator
     - chain: hypershift-kubevirt-baremetalds-lvm
@@ -39,6 +39,7 @@ workflow:
     - ref: hypershift-kubevirt-baremetalds-proxy
     - ref: hypershift-kubevirt-health-check
     env:
+      CLUSTERTYPE: host_384gb_el9
       TEST_SKIPS: etcd leader changes are not excessive \| StatefulSet Basic \| StatefulSet Non-retain
       KONFLUX_DEPLOY_OPERATORS: "false"
       KONFLUX_TARGET_OPERATORS: metallb,local-storage
@@ -48,7 +49,6 @@ workflow:
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       ETCD_STORAGE_CLASS: lvms-vg1
       LOCAL_STORAGE_OPERATOR_SUB_SOURCE: qe-app-registry
-      PACKET_OS: rocky_9
       EXTRA_NETWORK_CONFIG: |
         EXTRA_NETWORK_NAMES="nmstate1 nmstate2"
         NMSTATE1_NETWORK_SUBNET_V4="192.168.221.0/24"

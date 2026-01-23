@@ -94,7 +94,8 @@ EOF
     add_pullsecret "quay.io/openshift-cnv" "${QUAY_USERNAME}" "${QUAY_PASSWORD}"
   fi
 
-  oc wait mcp master worker --for condition=Updating=True --timeout=5m
+  # Wait for MCPs to reach stable state after pull secret change
+  # MCPs may already be updated or may need to update - just ensure they're stable
   oc wait mcp master worker --for condition=Updated=True --timeout=20m
 
   # Create a catalog source for the pre-release builds

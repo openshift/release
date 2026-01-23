@@ -22,11 +22,11 @@ workflow:
     - chain: hypershift-dump
     - chain: gather-core-dump
     - chain: hypershift-kubevirt-destroy
-    - chain: baremetalds-ipi-post
+    - chain: baremetalds-ofcir-post
     test:
     - chain: hypershift-conformance
     pre:
-    - chain: baremetalds-ipi-pre
+    - chain: baremetalds-ofcir-pre
     - ref: enable-qe-catalogsource
     - ref: deploy-konflux-operator
     - chain: hypershift-kubevirt-baremetalds-lvm
@@ -40,13 +40,13 @@ workflow:
     env:
       KONFLUX_DEPLOY_OPERATORS: "false"
       KONFLUX_TARGET_OPERATORS: metallb,local-storage
+      CLUSTERTYPE: host_384gb_el9
       METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
       LOCAL_STORAGE_OPERATOR_SUB_SOURCE: qe-app-registry
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
       ETCD_STORAGE_CLASS: lvms-vg1
       TEST_SKIPS: StatefulSet Basic \| StatefulSet Non-retain
-      PACKET_OS: rocky_9
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
@@ -54,6 +54,8 @@ workflow:
         NUM_MASTERS=3
         MASTER_VCPU=16
         MASTER_MEMORY=81920
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=16384
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST="vda vdb"
         VM_EXTRADISKS_SIZE=250G
