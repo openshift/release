@@ -7,13 +7,7 @@ set -o pipefail
 echo "Deploying external IP echo service on bastion host for egress IP validation"
 echo "============================================================================="
 
-echo "🐛 DEBUG MODE: Sleeping for 35 minutes to allow manual debugging/testing"
-echo "   - Cluster should be ready for manual testing"
-echo "   - Bastion host will be available for manual setup"
-echo "   - Use this time to validate cluster state and test steps manually"
-echo "   - Time started: $(date)"
-echo "   - Will resume at: $(date -d '+35 minutes')"
-sleep 2100  # 35 minutes
+# Script now runs automatically without debug sleep
 
 # Load bastion host information
 if [[ -f "$SHARED_DIR/bastion_public_address" ]]; then
