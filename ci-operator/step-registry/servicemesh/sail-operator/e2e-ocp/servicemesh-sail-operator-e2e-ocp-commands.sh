@@ -97,7 +97,11 @@ run_tests() {
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
-    /bin/bash -c '${E2E_COMMAND}'
+    echo '--- Executing E2E Command ---'
+    echo 'Command: ${E2E_COMMAND:-make test.e2e.ocp}'
+    echo '--- Running on CI Environment: ' \${CI:-}' ---'
+    echo '--- Pull Request Number: ' \${PR_NUMBER:-}' ---'
+    entrypoint ${E2E_COMMAND:-make test.e2e.ocp}
     "
 }
 
