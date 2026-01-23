@@ -93,6 +93,45 @@ for cmd in "${required_tools[@]}"; do
 done
 debug "precheck: all required tools are present"
 
+# Skopeo: Configure container policy
+debug "skopeo: configuring container policy"
+mkdir -p /etc/containers
+cat > /etc/containers/policy.json <<'EOF'
+{
+    "default": [
+        {
+            "type": "insecureAcceptAnything"
+        }
+    ],
+    "transports": {
+        "docker": {
+            "registry.access.redhat.com": [
+                {
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPaths": ["/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release", "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-beta"]
+                }
+            ],
+            "registry.redhat.io": [
+                {
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPaths": ["/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release", "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-beta"]
+                }
+            ]
+        },
+        "docker-daemon": {
+            "": [
+                {
+                    "type": "insecureAcceptAnything"
+                }
+            ]
+        }
+    }
+}
+EOF
+debug "skopeo: container policy configured"
+
 # Configuration: Load GitHub token from file
 debug "cfg: loading GitHub token"
 if [[ ! -f "${GITHUB_TOKEN_PATH}" ]]; then
