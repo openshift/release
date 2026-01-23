@@ -22,6 +22,7 @@ EOF
 # Clean up any existing namespace
 oc delete ns netperf --wait=true --ignore-not-found=true
 
+
 # Create and configure the namespace for the workload
 oc create ns netperf
 if [[ ${SERVICE_MESH} == "sidecar" ]]; then
