@@ -89,6 +89,10 @@ tests:
     - as: test
       commands: |
         source "${SHARED_DIR}/packet-conf.sh"
+        # POC fix: strip resourceVersion/uid/creationTimestamp from secret before applying
+        # The error "object has been modified" is an optimistic concurrency error caused by
+        # these metadata fields being copied from the source secret
+        ssh "${SSHOPTS[@]}" "root@${IP}" "sed -i 's#oc apply -f -#sed -e \"/^  resourceVersion:/d\" -e \"/^  uid:/d\" -e \"/^  creationTimestamp:/d\" | oc apply -f -#g' /root/dev-scripts/setup_capi_e2e.sh"
         ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts && make capi_e2e"
       from: dev-scripts
       resources:
