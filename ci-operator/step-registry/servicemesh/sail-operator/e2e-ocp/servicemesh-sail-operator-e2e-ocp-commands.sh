@@ -97,7 +97,7 @@ run_tests() {
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
-    entrypoint ${E2E_COMMAND}
+    /bin/bash -c '${E2E_COMMAND}'
     "
 }
 
