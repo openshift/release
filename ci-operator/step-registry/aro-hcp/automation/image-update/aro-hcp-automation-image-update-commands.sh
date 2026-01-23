@@ -93,10 +93,11 @@ for cmd in "${required_tools[@]}"; do
 done
 debug "precheck: all required tools are present"
 
-# Skopeo: Configure container policy
+# Skopeo: Configure container policy (must be before any skopeo usage)
 debug "skopeo: configuring container policy"
-mkdir -p /etc/containers
-cat > /etc/containers/policy.json <<'EOF'
+readonly POLICY_DIR="${HOME:-/tmp}/.config/containers"
+mkdir -p "${POLICY_DIR}"
+cat > "${POLICY_DIR}/policy.json" <<'EOF'
 {
     "default": [
         {
@@ -130,7 +131,7 @@ cat > /etc/containers/policy.json <<'EOF'
     }
 }
 EOF
-debug "skopeo: container policy configured"
+debug "skopeo: policy configured at ${POLICY_DIR}/policy.json"
 
 # Configuration: Load GitHub token from file
 debug "cfg: loading GitHub token"
