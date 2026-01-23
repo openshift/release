@@ -14,6 +14,9 @@ fi
 
 CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json | jq -r '.metadata.version' | cut -d '.' -f 1,2)
 
+mirror_registry_host=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+MIRROR_PROXY_REGISTRY_STAGE=${mirror_registry_host//5000/6003}
+
 function registry_config() {
   src_image=${1}
   mirrored_image=${2}
@@ -73,6 +76,41 @@ $( [ "${DISCONNECTED}" = "true" ] && echo \
 END
 }
 
+# See https://issues.redhat.com/browse/OCPQE-31328
+# Specific images need to be pulled from stage registry as they're no longer available in Brew.
+function deploy_image_digest_mirror_set() {
+  oc apply -f - <<END
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: mirror-config-agentserviceconfig
+  namespace: ${ASSISTED_NAMESPACE}
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_STAGE}/rhel8/postgresql-12
+    source: registry.redhat.io/rhel8/postgresql-12
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_STAGE}/rhel9/postgresql-13
+    source: registry.redhat.io/rhel9/postgresql-13
+END
+}
+
+function set_cluster_auth_stage() {
+  local registry_creds
+
+  echo "Setting cluster authentication for stage proxy registry"
+  oc extract secret/pull-secret -n openshift-config --confirm --to /tmp
+
+  registry_creds=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
+
+  jq --argjson a "{\"${MIRROR_PROXY_REGISTRY_STAGE}\": {\"auth\": \"$registry_creds\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+
+  oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/new-dockerconfigjson
+
+  echo "Proxy registry authentication configured"
+}
+
 function deploy_mirror_config_map() {
   if [ "${DISCONNECTED}" = "true" ]; then
     oc get configmap -n openshift-config user-ca-bundle -o json | \
@@ -94,7 +132,7 @@ $( [ "${DISCONNECTED}" = "true" ] && cat /tmp/ca-bundle-crt)
 
     # Check if ImageDigestMirrorSet exists and has items
     $(if [[ $(oc get ImageDigestMirrorSet -o name 2>/dev/null | wc -l) -gt 0 ]]; then
-      echo "$(oc get imagedigestmirrorset -o json | jq -rc '.items[].spec.mirrors[] | [.mirror, .source]')" | \
+      echo "$(oc get imagedigestmirrorset -o json | jq -rc '.items[].spec.imageDigestMirrors[] | [.mirrors[0], .source]')" | \
         while read row; do
           row=$(echo ${row} | tr -d '[]"');
           source=$(echo ${row} | cut -d',' -f2);
@@ -162,6 +200,11 @@ EOF
     mirror_rhcos_image="${MIRROR_BASE_URL}/$(echo ${OS_IMAGES} | jq -r ".[$i].url" | cut -d / -f 4-)"
     OS_IMAGES=$(echo ${OS_IMAGES} | jq ".[$i].url=\"${mirror_rhcos_image}\"")
   done
+fi
+
+if [ "${DISCONNECTED}" = "true" ]; then
+  set_cluster_auth_stage
+  deploy_image_digest_mirror_set
 fi
 
 deploy_mirror_config_map

@@ -43,6 +43,19 @@ metadata:
   name: ${CLUSTER_NAME}
   namespace: ${AGENT_NAMESPACE}
 spec:
+  ignitionConfigOverride: |
+    {
+      "ignition": {"version": "3.2.0"},
+      "systemd": {
+        "units": [{
+          "name": "NetworkManager-wait-online.service",
+          "dropins": [{
+            "name": "timeout.conf",
+            "contents": "[Service]\nEnvironment=NM_ONLINE_TIMEOUT=180\n"
+          }]
+        }]
+      }
+    }
   cpuArchitecture: x86_64
   pullSecretRef:
     name: pull-secret
