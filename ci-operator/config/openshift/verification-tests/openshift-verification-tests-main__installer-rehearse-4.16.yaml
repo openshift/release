@@ -24,6 +24,12 @@ base_images:
     namespace: ci
     tag: latest
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.16"
   latest:
     candidate:
       product: ocp
@@ -46,17 +52,18 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      COMPUTE_NODE_REPLICAS: "2"
-      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      REGISTER_MIRROR_REGISTRY_DNS: "yes"
+      RESTRICTED_NETWORK: "yes"
       SLEEP_DURATION: 10m
     post:
     - ref: cucushift-installer-wait
-    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    - ref: gcp-deprovision-bastionhost
+    - ref: gcp-deprovision-vpc
     pre:
-    - chain: cucushift-installer-rehearse-gcp-ipi-xpn-minimal-permission-provision
+    - ref: gcp-provision-vpc
+    - ref: ignition-bastionhost
+    - ref: gcp-provision-bastionhost
 - as: installer-rehearse-aws
   cron: '@yearly'
   steps:
