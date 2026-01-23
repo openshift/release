@@ -11,6 +11,8 @@ source "${SHARED_DIR}/packet-conf.sh"
 echo "export INSTALLER_PULL_REF=${INSTALLER_PULL_REF}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
 echo "export SEED_IMAGE=${SEED_IMAGE}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
 echo "export SEED_IMAGE_TAG=${SEED_IMAGE_TAG}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
+echo "export IB_ORCHESTRATE_VM_REF=${IB_ORCHESTRATE_VM_REF}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
+echo "export BIP_ORCHESTRATE_VM_REF=${BIP_ORCHESTRATE_VM_REF}" | ssh "${SSHOPTS[@]}" "root@${IP}" "cat >> /root/env.sh"
 
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF"
 
@@ -29,15 +31,38 @@ source network.sh
 export IBI_BHC=$(cat ${EXTRA_BAREMETALHOSTS_FILE} | jq '.[0].driver_info.address')
 export IBI_UUID=$(echo ${IBI_BHC##*/} | sed -E 's/\"//g')
 
-REPO_DIR="/home/ib-orchestrate-vm"
-if [ ! -d "${REPO_DIR}" ]; then
-  mkdir -p "${REPO_DIR}"
+podman pull "${IB_ORCHESTRATE_VM_REF}"
+IB_ORCHESTRATE_VM_SRC_PATH=$(podman inspect \
+  --format '{{ .Config.WorkingDir }}' \
+  "${IB_ORCHESTRATE_VM_REF}")
+IB_CTR_ID="$(podman create "${IB_ORCHESTRATE_VM_REF}")"
+mkdir -p /home/ib-orchestrate-vm
+podman cp "${IB_CTR_ID}:${IB_ORCHESTRATE_VM_SRC_PATH}/." "/home/ib-orchestrate-vm/"
+podman rm -f "${IB_CTR_ID}"
 
-  echo "### clone ib-orchestrate-vm..."
-  git clone https://github.com/rh-ecosystem-edge/ib-orchestrate-vm.git "${REPO_DIR}"
+podman pull "${BIP_ORCHESTRATE_VM_REF}"
+BIP_ORCHESTRATE_VM_SRC_PATH=$(podman inspect \
+  --format '{{ .Config.WorkingDir }}' \
+  "${BIP_ORCHESTRATE_VM_REF}")
+BIP_CTR_ID="$(podman create "${BIP_ORCHESTRATE_VM_REF}")"
+mkdir -p /home/ib-orchestrate-vm/bip-orchestrate-vm
+podman cp "${BIP_CTR_ID}:${BIP_ORCHESTRATE_VM_SRC_PATH}" "/home/ib-orchestrate-vm/bip-orchestrate-vm/"
+podman rm -f "${BIP_CTR_ID}"
+
+cd /home/ib-orchestrate-vm
+
+# bip-orchestrate-vm is already vendored into the ib-orchestrate-vm image; 
+# ensure the Makefile target doesn't try to reclone it. 
+# we add a dummy target to the Makefile to skip the clone. 
+# last target wins in case of duplicates.
+if [ -f "Makefile" ]; then
+  cat >> "Makefile" <<'EOF_MAKE'
+
+.PHONY: bip-orchestrate-vm
+bip-orchestrate-vm:
+	@echo "Skipping bip-orchestrate-vm clone; content is expected to be vendored in the ib-orchestrate-vm image."
+EOF_MAKE
 fi
-
-cd "${REPO_DIR}"
 
 sudo dnf -y install runc crun gcc-c++ zip nmstate nc
 

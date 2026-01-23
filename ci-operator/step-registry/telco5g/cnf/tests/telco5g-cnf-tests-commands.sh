@@ -276,6 +276,46 @@ sriov "Configure rdma namespace"
 sriov "Switchdev create switchdev policies on supported devices"
 
 EOF
+
+if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
+    cat <<EOF >>"${SKIP_TESTS_FILE}"
+# HYPERSHIFT-SPECIFIC SKIPTESTS
+# tests that require machineconfigs
+# TESTNAME
+sriov "SCTP integration Test Connectivity"
+
+# tests that require machineconfigs
+# TESTNAME
+sriov "NUMA node alignment"
+
+EOF
+fi
+}
+
+function create_tests_temp_skip_list_22 {
+# List of temporarly skipped tests for 4.22
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+# tests that are very slow
+# TESTNAME
+sriov "should run pod without RDMA"
+
+# tests that are very slow
+# TESTNAME
+sriov "Configure rdma namespace"
+
+# Known bug
+# https://issues.redhat.com/browse/RHEL-86883
+sriov "Switchdev create switchdev policies on supported devices"
+
+EOF
+
 if [[ "$HYPERSHIFT_ENVIRONMENT" == "true" ]]; then
     cat <<EOF >>"${SKIP_TESTS_FILE}"
 # HYPERSHIFT-SPECIFIC SKIPTESTS
@@ -520,9 +560,9 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.21" ]]; then
+if [[ "$T5CI_VERSION" == "4.22" ]]; then
     export CNF_BRANCH="master"
-    export CNF_TESTS_IMAGE="cnf-tests:4.20"
+    export CNF_TESTS_IMAGE="cnf-tests:4.21"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
     # TARGET_RELEASE is used by cnf-features-deploy. If not set, it defaults to the main branch
@@ -568,7 +608,7 @@ if [[ "$CNF_BRANCH" == *"4."* ]]; then
     skip_function_name="create_tests_temp_skip_list_${function_version}"
 else
     # In case of master branch
-    skip_function_name=create_tests_temp_skip_list_21
+    skip_function_name=create_tests_temp_skip_list_22
 fi
 if declare -f "$skip_function_name" > /dev/null; then
     echo "Executing $skip_function_name for skipping tests"

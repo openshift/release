@@ -15,7 +15,7 @@ az account set --subscription "${SUBSCRIPTION_ID}"
 cmd="./test/aro-hcp-tests cleanup resource-groups --expired"
 
 if [ -n "${CLEANUP_MODE}" ]; then
-  cmd="${cmd} --env-type ${CLEANUP_MODE}"
+  cmd="${cmd} --mode ${CLEANUP_MODE}"
 fi
 
 if [ -n "${INCLUDE_LOCATION}" ]; then

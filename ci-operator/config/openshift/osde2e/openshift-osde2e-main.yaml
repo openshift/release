@@ -24,8 +24,9 @@ tests:
     make check
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
-- as: hypershift-pr-check
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|(.*\.md)|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+- always_run: false
+  as: hypershift-pr-check
   commands: |
     export GOFLAGS=""
     export REPORT_DIR="$ARTIFACT_DIR"
@@ -40,6 +41,7 @@ tests:
     out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
   container:
     from: src
+  run_if_changed: ^(pkg\/common\/|pkg\/e2e\/)$
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
@@ -47,7 +49,6 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-hypershift-credentials
     name: osde2e-hypershift-credentials
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: rosa-stage-e2e-byo-vpc-proxy-install
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
