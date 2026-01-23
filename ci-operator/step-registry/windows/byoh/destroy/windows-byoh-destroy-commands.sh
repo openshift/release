@@ -39,14 +39,17 @@ export BYOH_INSTANCE_NAME
 export BYOH_NUM_WORKERS="${BYOH_NUM_WORKERS:-2}"
 export BYOH_WINDOWS_VERSION="${BYOH_WINDOWS_VERSION:-2022}"
 
-# Extract terraform state from SHARED_DIR tarball
-if [[ -f "${SHARED_DIR}/terraform_byoh_state.tar.gz" ]]; then
-    echo "Extracting terraform state from ${SHARED_DIR}/terraform_byoh_state.tar.gz..."
-    tar -xzf "${SHARED_DIR}/terraform_byoh_state.tar.gz" -C "${ARTIFACT_DIR}"
-    echo "✓ Terraform state extracted to ${ARTIFACT_DIR}/terraform_byoh/"
+# Extract terraform state + config from SHARED_DIR tarball
+PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}" | tr '[:upper:]' '[:lower:]')
+if [[ -f "${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar" ]]; then
+    echo "Extracting terraform files from ${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar..."
+    mkdir -p "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}"
+    tar -xf "${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar" -C "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}"
+    echo "✓ Terraform files extracted to ${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}/"
+    ls -lh "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}/"
 else
-    echo "ERROR: Terraform state tarball not found at ${SHARED_DIR}/terraform_byoh_state.tar.gz"
-    echo "Destroy step requires terraform state created by provision step"
+    echo "ERROR: Terraform tarball not found at ${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar"
+    echo "Destroy step requires terraform files created by provision step"
     exit 1
 fi
 
@@ -104,6 +107,16 @@ else
     echo "Provision step should have created this file in ARTIFACT_DIR"
     exit 1
 fi
+
+# Initialize Terraform providers before destroy
+# Destroy runs in new container so .terraform/ doesn't exist
+echo "Initializing Terraform providers..."
+cd "${BYOH_TMP_DIR}${PLATFORM}" || exit 1
+rm -rf .terraform || true
+terraform init -input=false -no-color
+echo "✓ Terraform initialized"
+
+cd "${WORK_DIR}" || exit 1
 
 # Destroy Windows nodes using Terraform
 # NOTE: Must pass same arguments as provision step to find correct terraform state directory

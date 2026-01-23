@@ -187,14 +187,16 @@ done
 
 echo "✓ Instance information exported for WMCO BYOH tests"
 
-# Save terraform state to SHARED_DIR for destroy step
-# SHARED_DIR shares files, not subfolders - use tarball
-echo "Saving terraform state to SHARED_DIR for destroy step..."
-if [[ -d "${ARTIFACT_DIR}/terraform_byoh" ]]; then
-    tar -czf "${SHARED_DIR}/terraform_byoh_state.tar.gz" -C "${ARTIFACT_DIR}" terraform_byoh/
-    echo "✓ Terraform state saved to ${SHARED_DIR}/terraform_byoh_state.tar.gz"
+# Save terraform state + config to SHARED_DIR for destroy step
+# Tar directory excluding .terraform/ (providers) to avoid 3MB Secret limit
+echo "Saving terraform state and config to SHARED_DIR for destroy step..."
+PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}" | tr '[:upper:]' '[:lower:]')
+if [[ -d "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}" ]]; then
+    tar -cf "${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar" -C "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}" --exclude='.terraform' .
+    echo "✓ Terraform files saved to ${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar"
+    ls -lh "${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar"
 else
-    echo "WARNING: Terraform state directory not found at ${ARTIFACT_DIR}/terraform_byoh/"
+    echo "WARNING: Terraform directory not found at ${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}/"
 fi
 
 echo "=== Windows BYOH Provisioning Complete ==="
