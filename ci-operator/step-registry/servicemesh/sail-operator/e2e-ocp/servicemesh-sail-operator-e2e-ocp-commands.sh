@@ -93,9 +93,7 @@ run_tests() {
   oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
     sh -c "
     export KUBECONFIG=/work/ci-kubeconfig
-    export ENABLE_OVERLAY2_STORAGE_DRIVER=true
     export BUILD_WITH_CONTAINER=\"0\"
-    export DOCKER_INSECURE_REGISTRIES=\"default-route-openshift-image-registry.\$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr(\$0, index(\$0,\$2))}')\"
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
@@ -144,11 +142,11 @@ has_junit_reports() {
 # --- Execution ---
 
 # Step 1: Login to quay.io using provided credentials
-if [ -f /tmp/secrets/quay-sail/username ] && [ -f /tmp/secrets/quay-sail/password ]; then
+if [ -f /tmp/secrets/username ] && [ -f /tmp/secrets/password ]; then
     echo "Logging into quay.io registry..."
-    QUAY_USERNAME=$(cat /tmp/secrets/quay-sail/username)
-    QUAY_PASSWORD=$(cat /tmp/secrets/quay-sail/password)
-    podman login -u="${QUAY_USERNAME}" -p="${QUAY_PASSWORD}" quay.io
+    QUAY_USERNAME=$(cat /tmp/secrets/username)
+    QUAY_PASSWORD=$(cat /tmp/secrets/password)
+    docker login -u="${QUAY_USERNAME}" -p="${QUAY_PASSWORD}" quay.io
 else
     echo "Quay.io credentials not found. Exit with failure."
     exit 1 
