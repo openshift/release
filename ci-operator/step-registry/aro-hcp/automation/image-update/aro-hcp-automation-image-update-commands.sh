@@ -143,6 +143,9 @@ if [[ $(git status --porcelain) == "" ]]; then
   info "image: no new digests found for any component images"
   notify "⚠️ Image digest updater job completed but no new digests found for any component images. Please check prow at ${PROW_JOB_URL}"
   exit 0
+else 
+  info "image: new digests found for some component images"
+  if [[ ${VERBOSITY-0} -ge 1 ]]; then cat ${IMAGE_UPDATER_OUTPUT}; echo; fi
 fi
 
 # Git: Commit updated image digests
