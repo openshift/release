@@ -1,0 +1,82 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: "3.2"
+  use_build_cache: true
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: cargo-build
+  steps:
+    test:
+    - as: build
+      cli: latest
+      commands: |
+        ./ossm/ci/pre-submit.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 1h0m0s
+  timeout: 1h30m0s
+- as: cargo-build-and-push
+  postsubmit: true
+  steps:
+    test:
+    - as: build-and-push
+      cli: latest
+      commands: |
+        GOOGLE_APPLICATION_CREDENTIALS='/maistra-secrets/service-account.json' ./ossm/ci/post-submit.sh
+      credentials:
+      - collection: ""
+        mount_path: /maistra-secrets
+        name: gcs-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 1h0m0s
+  timeout: 2h0m0s
+- as: update-istio
+  commands: |
+    # load test-infra automator.sh script
+    export ISTIO_ZTUNNEL_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/ztunnel"
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    ./tools/automator.sh \
+      -o openshift-service-mesh \
+      -r istio \
+      -f /creds-github/token \
+      "-c bin/update_ztunnel.sh ${PULL_BASE_SHA}" \
+      '-t [release-1.27] Automator: Update ztunnel' \
+      -m bump-ztunnel-1.27 \
+      -b release-1.27
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: ossm-github-simple-job
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: release-1.27
+  org: openshift-service-mesh
+  repo: ztunnel
