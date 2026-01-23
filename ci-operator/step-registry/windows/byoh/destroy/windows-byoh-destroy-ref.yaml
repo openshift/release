@@ -12,7 +12,7 @@ ref:
   env:
     - name: BYOH_INSTANCE_NAME
       default: ""
-      documentation: "Base name for Windows instances (read from SHARED_DIR, fallback to byoh-winc if unavailable)"
+      documentation: "Base name for Windows instances (read from ARTIFACT_DIR, fallback to byoh-winc if unavailable)"
     - name: BYOH_NUM_WORKERS
       default: "2"
       documentation: "Number of Windows workers to destroy"
@@ -21,14 +21,8 @@ ref:
 
     This step:
     1. Uses pre-built terraform-windows-provisioner image (ci/terraform-windows-provisioner:latest)
-    2. Accesses Terraform state from ${SHARED_DIR}/terraform_byoh/ (created by provision step)
-    3. Runs byoh.sh destroy to clean up resources
+    2. Accesses Terraform state from ${ARTIFACT_DIR}/terraform_byoh/ (created by provision step)
+    3. Runs byoh.sh destroy to clean up resources using Terraform
 
-    Fallback mechanism (if Terraform state unavailable):
-    - GCP: gcloud compute instances delete
-    - AWS: aws ec2 terminate-instances
-    - Azure: az vm delete
-
-    This prevents orphaned instances that could block cluster network deletion.
-
-    The container image includes all necessary tools (terraform, cloud CLIs, byoh.sh).
+    Note: ARTIFACT_DIR is used for terraform state persistence because SHARED_DIR points to
+    the cluster-profile secret mount which is not shared between steps.
