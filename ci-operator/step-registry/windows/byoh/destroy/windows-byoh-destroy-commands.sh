@@ -9,9 +9,9 @@ echo "DEBUG: SHARED_DIR=${SHARED_DIR}"
 echo "DEBUG: CLUSTER_PROFILE_DIR=${CLUSTER_PROFILE_DIR}"
 echo "DEBUG: ARTIFACT_DIR=${ARTIFACT_DIR:-not set}"
 
-# Read instance name saved by provision step
-if [[ -f "${SHARED_DIR}/byoh_instance_name.txt" ]]; then
-    BYOH_INSTANCE_NAME=$(cat "${SHARED_DIR}/byoh_instance_name.txt")
+# Read instance name saved by provision step (from ARTIFACT_DIR, not SHARED_DIR)
+if [[ -f "${ARTIFACT_DIR}/byoh_instance_name.txt" ]]; then
+    BYOH_INSTANCE_NAME=$(cat "${ARTIFACT_DIR}/byoh_instance_name.txt")
     echo "Read instance name from provision step: ${BYOH_INSTANCE_NAME}"
 else
     # Fallback to default if file doesn't exist (shouldn't happen in normal flow)
@@ -21,7 +21,8 @@ fi
 export BYOH_INSTANCE_NAME
 export BYOH_NUM_WORKERS="${BYOH_NUM_WORKERS:-2}"
 export BYOH_WINDOWS_VERSION="${BYOH_WINDOWS_VERSION:-2022}"
-export BYOH_TMP_DIR="${SHARED_DIR}/terraform_byoh/"
+# Use ARTIFACT_DIR for terraform state (SHARED_DIR is wrong - it's the cluster-profile secret mount)
+export BYOH_TMP_DIR="${ARTIFACT_DIR}/terraform_byoh/"
 
 # Extract SSH public key from cluster profile (required by byoh.sh even for destroy)
 if [[ -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]]; then
