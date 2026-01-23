@@ -92,7 +92,7 @@ fi
 
 # Store bastion service URL for test steps - use PRIVATE IP for internal cluster access
 BASTION_SERVICE_URL="http://$BASTION_PRIVATE_IP:9095/"
-echo "$BASTION_SERVICE_URL" > "$SHARED_DIR/egress-health-check-url"
+echo "$BASTION_SERVICE_URL" > "$SHARED_DIR/egress-bastion-echo-url"
 
 # Also save both public and private IPs for reference
 echo "$BASTION_PUBLIC_IP" > "$SHARED_DIR/bastion_public_ip"
