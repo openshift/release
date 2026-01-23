@@ -30,62 +30,114 @@ echo "🔧 Configuring AWS security group to allow traffic on port $ECHO_SERVICE
 
 # Get bastion instance ID from its public IP
 BASTION_INSTANCE_ID=$(aws ec2 describe-instances \
-    --filters "Name=ip-address,Values=$BASTION_PUBLIC_IP" \
+    --filters "Name=public-ip-address,Values=$BASTION_PUBLIC_IP" \
     --query 'Reservations[*].Instances[*].InstanceId' \
     --output text 2>/dev/null || echo "")
 
 if [[ -z "$BASTION_INSTANCE_ID" ]]; then
-    echo "❌ Could not find bastion instance ID from public IP: $BASTION_PUBLIC_IP"
-    exit 1
+    echo "⚠️ Could not find bastion instance ID using public IP: $BASTION_PUBLIC_IP"
+    echo "🔍 Trying alternative lookup methods..."
+    
+    # Try to find instance by private IP if available
+    if [[ -f "$SHARED_DIR/bastion_private_address" ]]; then
+        BASTION_PRIVATE_IP_ALT=$(cat "$SHARED_DIR/bastion_private_address")
+        echo "🔍 Trying lookup by private IP: $BASTION_PRIVATE_IP_ALT"
+        BASTION_INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=private-ip-address,Values=$BASTION_PRIVATE_IP_ALT" \
+            --query 'Reservations[*].Instances[*].InstanceId' \
+            --output text 2>/dev/null || echo "")
+    fi
+    
+    # Try to find by hostname if the public IP is a hostname
+    if [[ -z "$BASTION_INSTANCE_ID" && "$BASTION_PUBLIC_IP" == *amazonaws.com ]]; then
+        echo "🔍 Trying lookup by public DNS name: $BASTION_PUBLIC_IP"
+        BASTION_INSTANCE_ID=$(aws ec2 describe-instances \
+            --filters "Name=public-dns-name,Values=$BASTION_PUBLIC_IP" \
+            --query 'Reservations[*].Instances[*].InstanceId' \
+            --output text 2>/dev/null || echo "")
+    fi
+    
+    if [[ -z "$BASTION_INSTANCE_ID" ]]; then
+        echo "❌ Could not find bastion instance ID using any method"
+        echo "🔧 Attempting to proceed without security group modification..."
+        echo "⚠️ Note: You may need to manually open port 9095 in the bastion security group"
+        SKIP_SECURITY_GROUP=true
+    else
+        echo "✅ Found bastion instance using alternative lookup: $BASTION_INSTANCE_ID"
+    fi
 fi
 
-echo "📍 Found bastion instance ID: $BASTION_INSTANCE_ID"
-
-# Get security group ID from bastion instance
-SECURITY_GROUP_ID=$(aws ec2 describe-instances \
-    --instance-ids "$BASTION_INSTANCE_ID" \
-    --query 'Reservations[*].Instances[*].SecurityGroups[0].GroupId' \
-    --output text 2>/dev/null || echo "")
-
-if [[ -z "$SECURITY_GROUP_ID" ]]; then
-    echo "❌ Could not find security group ID for bastion instance: $BASTION_INSTANCE_ID"
-    exit 1
+if [[ -n "$BASTION_INSTANCE_ID" ]]; then
+    echo "📍 Found bastion instance ID: $BASTION_INSTANCE_ID"
 fi
 
-echo "🔒 Found bastion security group ID: $SECURITY_GROUP_ID"
+# Get security group ID from bastion instance (if we have instance ID)
+if [[ -n "$BASTION_INSTANCE_ID" && "$SKIP_SECURITY_GROUP" != "true" ]]; then
+    SECURITY_GROUP_ID=$(aws ec2 describe-instances \
+        --instance-ids "$BASTION_INSTANCE_ID" \
+        --query 'Reservations[*].Instances[*].SecurityGroups[0].GroupId' \
+        --output text 2>/dev/null || echo "")
 
-# Check if port is already open
-PORT_OPEN=$(aws ec2 describe-security-groups \
-    --group-ids "$SECURITY_GROUP_ID" \
-    --query "SecurityGroups[0].IpPermissions[?FromPort<=\`$ECHO_SERVICE_PORT\`&&ToPort>=\`$ECHO_SERVICE_PORT\`&&IpProtocol==\`tcp\`]" \
-    --output text 2>/dev/null || echo "")
-
-if [[ -n "$PORT_OPEN" ]]; then
-    echo "✅ Port $ECHO_SERVICE_PORT already open in security group $SECURITY_GROUP_ID"
+    if [[ -z "$SECURITY_GROUP_ID" ]]; then
+        echo "⚠️ Could not find security group ID for bastion instance: $BASTION_INSTANCE_ID"
+        echo "🔧 Proceeding without security group modification..."
+        SKIP_SECURITY_GROUP=true
+    else
+        echo "🔒 Found bastion security group ID: $SECURITY_GROUP_ID"
+    fi
 else
-    echo "🔧 Opening port $ECHO_SERVICE_PORT in security group $SECURITY_GROUP_ID..."
-    
-    # Add security group rule to allow traffic on echo service port (matches official OpenShift tests)
-    aws ec2 authorize-security-group-ingress \
-        --group-id "$SECURITY_GROUP_ID" \
-        --protocol tcp \
-        --port "$ECHO_SERVICE_PORT" \
-        --cidr 0.0.0.0/0 2>/dev/null || {
-        echo "⚠️  Failed to add security group rule (may already exist)"
-    }
-    
-    echo "✅ Security group rule added for port $ECHO_SERVICE_PORT"
+    echo "⏭️ Skipping security group configuration (instance lookup failed)"
+    SKIP_SECURITY_GROUP=true
+fi
+
+# Configure security group only if we have the necessary information
+if [[ "$SKIP_SECURITY_GROUP" != "true" && -n "$SECURITY_GROUP_ID" ]]; then
+    # Check if port is already open
+    PORT_OPEN=$(aws ec2 describe-security-groups \
+        --group-ids "$SECURITY_GROUP_ID" \
+        --query "SecurityGroups[0].IpPermissions[?FromPort<=\`$ECHO_SERVICE_PORT\`&&ToPort>=\`$ECHO_SERVICE_PORT\`&&IpProtocol==\`tcp\`]" \
+        --output text 2>/dev/null || echo "")
+
+    if [[ -n "$PORT_OPEN" ]]; then
+        echo "✅ Port $ECHO_SERVICE_PORT already open in security group $SECURITY_GROUP_ID"
+    else
+        echo "🔧 Opening port $ECHO_SERVICE_PORT in security group $SECURITY_GROUP_ID..."
+        
+        # Add security group rule to allow traffic on echo service port (matches official OpenShift tests)
+        aws ec2 authorize-security-group-ingress \
+            --group-id "$SECURITY_GROUP_ID" \
+            --protocol tcp \
+            --port "$ECHO_SERVICE_PORT" \
+            --cidr 0.0.0.0/0 2>/dev/null || {
+            echo "⚠️  Failed to add security group rule (may already exist)"
+        }
+        
+        echo "✅ Security group rule added for port $ECHO_SERVICE_PORT"
+    fi
+else
+    echo "⏭️ Skipping security group configuration - manual setup may be required"
+    echo "   To manually open port $ECHO_SERVICE_PORT, run:"
+    echo "   aws ec2 authorize-security-group-ingress --group-id <GROUP_ID> --protocol tcp --port $ECHO_SERVICE_PORT --cidr 0.0.0.0/0"
 fi
 
 # Get bastion private IP for internal cluster access (following official pattern)
-BASTION_PRIVATE_IP=$(aws ec2 describe-instances \
-    --instance-ids "$BASTION_INSTANCE_ID" \
-    --query 'Reservations[*].Instances[*].PrivateIpAddress' \
-    --output text 2>/dev/null || echo "")
+if [[ -n "$BASTION_INSTANCE_ID" ]]; then
+    BASTION_PRIVATE_IP=$(aws ec2 describe-instances \
+        --instance-ids "$BASTION_INSTANCE_ID" \
+        --query 'Reservations[*].Instances[*].PrivateIpAddress' \
+        --output text 2>/dev/null || echo "")
+fi
+
+# Fallback: check if private IP is available from shared directory
+if [[ -z "$BASTION_PRIVATE_IP" && -f "$SHARED_DIR/bastion_private_address" ]]; then
+    echo "🔄 Using private IP from shared directory as fallback..."
+    BASTION_PRIVATE_IP=$(cat "$SHARED_DIR/bastion_private_address")
+fi
 
 if [[ -z "$BASTION_PRIVATE_IP" ]]; then
-    echo "❌ Could not find bastion private IP for instance: $BASTION_INSTANCE_ID"
-    exit 1
+    echo "⚠️ Could not find bastion private IP - using public IP as fallback"
+    echo "   This may cause connectivity issues for internal cluster access"
+    BASTION_PRIVATE_IP="$BASTION_PUBLIC_IP"
 fi
 
 echo "🔗 Found bastion private IP: $BASTION_PRIVATE_IP"
@@ -252,12 +304,13 @@ echo "   curl http://$BASTION_PUBLIC_IP:9095/ (from external)"
 echo "   curl $BASTION_SERVICE_URL (from cluster pods)"
 echo ""
 echo "📊 DEBUG: Configuration Summary"
-echo "   Bastion Instance ID: $BASTION_INSTANCE_ID"
-echo "   Bastion Security Group: $SECURITY_GROUP_ID"
+echo "   Bastion Instance ID: ${BASTION_INSTANCE_ID:-'Not found'}"
+echo "   Bastion Security Group: ${SECURITY_GROUP_ID:-'Not configured'}"
 echo "   Bastion Public IP: $BASTION_PUBLIC_IP"
 echo "   Bastion Private IP: $BASTION_PRIVATE_IP"
 echo "   Service Port: $ECHO_SERVICE_PORT (9095)"
 echo "   Service Container: quay.io/openshifttest/ip-echo:1.2.0"
 echo "   Internal URL for cluster: $BASTION_SERVICE_URL"
+echo "   Security Group Configured: $([[ "$SKIP_SECURITY_GROUP" != "true" ]] && echo "Yes" || echo "No - Manual setup required")"
 
 echo "External IP echo service setup completed successfully!"
