@@ -47,8 +47,8 @@ if [[ $LEASED_RESOURCE =~ "nutanix-qe" ]]; then
     pe_uuid=$(echo "${clusters_json}" | jq ".entities[] | select (.spec.resources.network.external_ip == \"${prism_element_host}\") | .metadata.uuid" | head -n 1)
     pe_name=$(echo "${clusters_json}" | jq ".entities[] | select (.spec.resources.network.external_ip == \"${prism_element_host}\") | .spec.name" | head -n 1)
 else
-    pe_uuid=$(echo "${clusters_json}" | jq '.entities[] | select (.spec.name != "Unnamed") | .metadata.uuid' | head -n 1)
-    pe_name=$(echo "${clusters_json}" | jq -r '.entities[] | select (.spec.name != "Unnamed") | .spec.name' | head -n 1)
+    pe_uuid=$(echo "${clusters_json}" | jq '.entities[] | select (.spec.name != "Unnamed" and .spec.name != "Prism Central CI LTS2") | .metadata.uuid' | head -n 1)
+    pe_name=$(echo "${clusters_json}" | jq -r '.entities[] | select (.spec.name != "Unnamed" and .spec.name != "Prism Central CI LTS2") | .spec.name' | head -n 1)
 fi
 
 
