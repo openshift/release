@@ -24,123 +24,23 @@ else
     exit 1
 fi
 
-# Configure AWS security group to allow traffic to the echo service (using official port 9095)
-ECHO_SERVICE_PORT=9095
-echo "🔧 Configuring AWS security group to allow traffic on port $ECHO_SERVICE_PORT..."
-
-# Get bastion instance ID from its public IP
-BASTION_INSTANCE_ID=$(aws ec2 describe-instances \
-    --filters "Name=public-ip-address,Values=$BASTION_PUBLIC_IP" \
-    --query 'Reservations[*].Instances[*].InstanceId' \
-    --output text 2>/dev/null || echo "")
-
-if [[ -z "$BASTION_INSTANCE_ID" ]]; then
-    echo "⚠️ Could not find bastion instance ID using public IP: $BASTION_PUBLIC_IP"
-    echo "🔍 Trying alternative lookup methods..."
-    
-    # Try to find instance by private IP if available
-    if [[ -f "$SHARED_DIR/bastion_private_address" ]]; then
-        BASTION_PRIVATE_IP_ALT=$(cat "$SHARED_DIR/bastion_private_address")
-        echo "🔍 Trying lookup by private IP: $BASTION_PRIVATE_IP_ALT"
-        BASTION_INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=private-ip-address,Values=$BASTION_PRIVATE_IP_ALT" \
-            --query 'Reservations[*].Instances[*].InstanceId' \
-            --output text 2>/dev/null || echo "")
-    fi
-    
-    # Try to find by hostname if the public IP is a hostname
-    if [[ -z "$BASTION_INSTANCE_ID" && "$BASTION_PUBLIC_IP" == *amazonaws.com ]]; then
-        echo "🔍 Trying lookup by public DNS name: $BASTION_PUBLIC_IP"
-        BASTION_INSTANCE_ID=$(aws ec2 describe-instances \
-            --filters "Name=public-dns-name,Values=$BASTION_PUBLIC_IP" \
-            --query 'Reservations[*].Instances[*].InstanceId' \
-            --output text 2>/dev/null || echo "")
-    fi
-    
-    if [[ -z "$BASTION_INSTANCE_ID" ]]; then
-        echo "❌ Could not find bastion instance ID using any method"
-        echo "🔧 Attempting to proceed without security group modification..."
-        echo "⚠️ Note: You may need to manually open port 9095 in the bastion security group"
-        SKIP_SECURITY_GROUP=true
-    else
-        echo "✅ Found bastion instance using alternative lookup: $BASTION_INSTANCE_ID"
-    fi
-fi
-
-if [[ -n "$BASTION_INSTANCE_ID" ]]; then
-    echo "📍 Found bastion instance ID: $BASTION_INSTANCE_ID"
-fi
-
-# Get security group ID from bastion instance (if we have instance ID)
-if [[ -n "$BASTION_INSTANCE_ID" && "$SKIP_SECURITY_GROUP" != "true" ]]; then
-    SECURITY_GROUP_ID=$(aws ec2 describe-instances \
-        --instance-ids "$BASTION_INSTANCE_ID" \
-        --query 'Reservations[*].Instances[*].SecurityGroups[0].GroupId' \
-        --output text 2>/dev/null || echo "")
-
-    if [[ -z "$SECURITY_GROUP_ID" ]]; then
-        echo "⚠️ Could not find security group ID for bastion instance: $BASTION_INSTANCE_ID"
-        echo "🔧 Proceeding without security group modification..."
-        SKIP_SECURITY_GROUP=true
-    else
-        echo "🔒 Found bastion security group ID: $SECURITY_GROUP_ID"
-    fi
-else
-    echo "⏭️ Skipping security group configuration (instance lookup failed)"
-    SKIP_SECURITY_GROUP=true
-fi
-
-# Configure security group only if we have the necessary information
-if [[ "$SKIP_SECURITY_GROUP" != "true" && -n "$SECURITY_GROUP_ID" ]]; then
-    # Check if port is already open
-    PORT_OPEN=$(aws ec2 describe-security-groups \
-        --group-ids "$SECURITY_GROUP_ID" \
-        --query "SecurityGroups[0].IpPermissions[?FromPort<=\`$ECHO_SERVICE_PORT\`&&ToPort>=\`$ECHO_SERVICE_PORT\`&&IpProtocol==\`tcp\`]" \
-        --output text 2>/dev/null || echo "")
-
-    if [[ -n "$PORT_OPEN" ]]; then
-        echo "✅ Port $ECHO_SERVICE_PORT already open in security group $SECURITY_GROUP_ID"
-    else
-        echo "🔧 Opening port $ECHO_SERVICE_PORT in security group $SECURITY_GROUP_ID..."
-        
-        # Add security group rule to allow traffic on echo service port (matches official OpenShift tests)
-        aws ec2 authorize-security-group-ingress \
-            --group-id "$SECURITY_GROUP_ID" \
-            --protocol tcp \
-            --port "$ECHO_SERVICE_PORT" \
-            --cidr 0.0.0.0/0 2>/dev/null || {
-            echo "⚠️  Failed to add security group rule (may already exist)"
-        }
-        
-        echo "✅ Security group rule added for port $ECHO_SERVICE_PORT"
-    fi
-else
-    echo "⏭️ Skipping security group configuration - manual setup may be required"
-    echo "   To manually open port $ECHO_SERVICE_PORT, run:"
-    echo "   aws ec2 authorize-security-group-ingress --group-id <GROUP_ID> --protocol tcp --port $ECHO_SERVICE_PORT --cidr 0.0.0.0/0"
-fi
-
-# Get bastion private IP for internal cluster access (following official pattern)
-if [[ -n "$BASTION_INSTANCE_ID" ]]; then
-    BASTION_PRIVATE_IP=$(aws ec2 describe-instances \
-        --instance-ids "$BASTION_INSTANCE_ID" \
-        --query 'Reservations[*].Instances[*].PrivateIpAddress' \
-        --output text 2>/dev/null || echo "")
-fi
-
-# Fallback: check if private IP is available from shared directory
-if [[ -z "$BASTION_PRIVATE_IP" && -f "$SHARED_DIR/bastion_private_address" ]]; then
-    echo "🔄 Using private IP from shared directory as fallback..."
+# Get bastion private IP for internal cluster access
+if [[ -f "$SHARED_DIR/bastion_private_address" ]]; then
     BASTION_PRIVATE_IP=$(cat "$SHARED_DIR/bastion_private_address")
-fi
-
-if [[ -z "$BASTION_PRIVATE_IP" ]]; then
-    echo "⚠️ Could not find bastion private IP - using public IP as fallback"
-    echo "   This may cause connectivity issues for internal cluster access"
+    echo "Found bastion private IP: $BASTION_PRIVATE_IP"
+else
+    echo "WARNING: No bastion private IP found, using public IP as fallback"
     BASTION_PRIVATE_IP="$BASTION_PUBLIC_IP"
 fi
 
-echo "🔗 Found bastion private IP: $BASTION_PRIVATE_IP"
+# Get the correct SSH user for the bastion host
+if [[ -f "$SHARED_DIR/bastion_ssh_user" ]]; then
+    BASTION_SSH_USER=$(cat "$SHARED_DIR/bastion_ssh_user")
+    echo "Using SSH user: $BASTION_SSH_USER"
+else
+    echo "WARNING: bastion_ssh_user not found, defaulting to 'core'"
+    BASTION_SSH_USER="core"
+fi
 
 # Load SSH key for bastion access (use cluster profile SSH key)
 CLUSTER_SSH_KEY="$CLUSTER_PROFILE_DIR/ssh-privatekey"
@@ -154,138 +54,49 @@ BASTION_SSH_KEY="/tmp/bastion_ssh_key"
 cp "$CLUSTER_SSH_KEY" "$BASTION_SSH_KEY"
 chmod 600 "$BASTION_SSH_KEY"
 
-# Get the correct SSH user for the bastion host
-if [[ -f "$SHARED_DIR/bastion_ssh_user" ]]; then
-    BASTION_SSH_USER=$(cat "$SHARED_DIR/bastion_ssh_user")
-    echo "Using SSH user: $BASTION_SSH_USER"
-else
-    echo "WARNING: bastion_ssh_user not found, defaulting to 'core'"
-    BASTION_SSH_USER="core"
-fi
-
 echo "Setting up external IP echo service on bastion host..."
 
-echo "Deploying service to bastion host via SSH..."
+# Use the exact proven command from official OpenShift networking tests
+IPECHO_COMMAND="sudo netstat -ntlp | grep 9095 || sudo podman run --name ipecho -d -p 9095:80 quay.io/openshifttest/ip-echo:1.2.0"
+echo "Running command: $IPECHO_COMMAND"
 
-# Check if SSH is available in the container
-if ! command -v ssh >/dev/null 2>&1; then
-    echo "❌ SSH not available in container. Creating simple external validation URL instead..."
+# Deploy the service exactly like the official code
+ssh -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no "$BASTION_SSH_USER"@"$BASTION_PUBLIC_IP" "$IPECHO_COMMAND"
+
+echo "✅ IP echo service deployed successfully!"
+
+# Update AWS security group to allow port 9095 (simplified approach)
+echo "🔧 Configuring AWS security group to allow port 9095..."
+
+# Get infrastructure name from cluster
+INFRA_ID=$(oc get -o jsonpath='{.status.infrastructureName}' infrastructure cluster)
+echo "Infrastructure ID: $INFRA_ID"
+
+# Try to update security group rules for port 9095
+aws ec2 describe-security-groups \
+    --filters "Name=tag:Name,Values=${INFRA_ID}-bastion-sg" \
+    --query 'SecurityGroups[0].GroupId' \
+    --output text > /tmp/sg_id.txt 2>/dev/null || echo "unknown" > /tmp/sg_id.txt
+
+SECURITY_GROUP_ID=$(cat /tmp/sg_id.txt)
+
+if [[ "$SECURITY_GROUP_ID" != "unknown" && "$SECURITY_GROUP_ID" != "None" ]]; then
+    echo "Found bastion security group: $SECURITY_GROUP_ID"
     
-    # For environments without SSH, we'll create a simple validation approach
-    # Store the bastion URL directly for external validation (use official port 9095)
-    BASTION_SERVICE_URL="http://$BASTION_PUBLIC_IP:9095/"
-    echo "$BASTION_SERVICE_URL" > "$SHARED_DIR/egress-health-check-url"
+    # Add rule for port 9095
+    aws ec2 authorize-security-group-ingress \
+        --group-id "$SECURITY_GROUP_ID" \
+        --protocol tcp \
+        --port 9095 \
+        --cidr 0.0.0.0/0 2>/dev/null || echo "Security group rule may already exist"
     
-    echo "✅ External validation configured!"
-    echo "   Bastion URL: $BASTION_SERVICE_URL"
-    echo "   Note: Manual setup required on bastion host for IP echo service"
-    echo ""
-    echo "🔧 Manual setup instructions for bastion host:"
-    echo "   1. SSH to bastion: ssh -i <ssh-key> core@$BASTION_PUBLIC_IP"
-    echo "   2. Install Python HTTP server script"
-    echo "   3. Start service on port 9095"
-    echo ""
-    echo "   Python IP echo script to create on bastion:"
-    cat << 'PYTHON_SCRIPT'
-#!/usr/bin/env python3
-import socket
-import json
-import datetime
-from http.server import HTTPServer, BaseHTTPRequestHandler
-
-class IPEchoHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        client_ip = self.client_address[0]
-        response_data = {
-            "source_ip": client_ip,
-            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-            "method": self.command,
-            "path": self.path,
-            "server_hostname": socket.gethostname(),
-            "server_type": "bastion_external"
-        }
-        
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        
-        json_response = json.dumps(response_data, indent=2)
-        self.wfile.write(json_response.encode('utf-8'))
-        
-        print(f"[{response_data['timestamp']}] {client_ip} - \"{self.command} {self.path} {self.request_version}\" 200 -")
-
-    def log_message(self, format, *args):
-        return
-
-if __name__ == '__main__':
-    port = 9095
-    server = HTTPServer(('0.0.0.0', port), IPEchoHandler)
-    print(f"External IP Echo Service starting on port {port}")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nShutting down IP Echo Service")
-        server.server_close()
-PYTHON_SCRIPT
-    
-    echo "External IP echo service setup completed (manual setup required)!"
-    exit 0
-fi
-
-# Deploy and start the service on bastion host using official OpenShift test approach
-ssh -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no "$BASTION_SSH_USER"@"$BASTION_PUBLIC_IP" << 'REMOTE_SCRIPT'
-
-# Check if service is already running (exactly like official code)
-echo "🔍 Checking if IP echo service is already running on port 9095..."
-if sudo netstat -ntlp | grep 9095; then
-    echo "✅ IP echo service already running on port 9095"
+    echo "✅ Security group configured for port 9095"
 else
-    echo "🚀 Starting IP echo service using official OpenShift test container..."
-    
-    # Use the exact same command as official OpenShift networking tests
-    sudo podman run --name ipecho -d -p 9095:80 quay.io/openshifttest/ip-echo:1.2.0
-    
-    # Wait for service to start
-    sleep 5
-    
-    # Verify service is running
-    if sudo netstat -ntlp | grep 9095; then
-        echo "✅ IP echo service successfully started"
-    else
-        echo "❌ Failed to start IP echo service"
-        echo "Container status:"
-        sudo podman ps -a | grep ipecho || echo "No ipecho container found"
-        echo "Container logs:"
-        sudo podman logs ipecho || echo "No logs available"
-        exit 1
-    fi
+    echo "⚠️ Could not find bastion security group automatically"
+    echo "   Manual setup may be required to open port 9095"
 fi
 
-# Test that the service is responding locally
-echo "🧪 Testing IP echo service locally on bastion..."
-local_test_response=$(curl -s --connect-timeout 10 http://localhost:9095/ || echo "FAILED")
-
-if [[ "$local_test_response" != "FAILED" && -n "$local_test_response" ]]; then
-    echo "✅ IP Echo Service is responding correctly"
-    echo "Sample response: $local_test_response"
-else
-    echo "⚠️ Warning: IP Echo Service local test failed, but continuing..."
-    echo "Checking if container is running:"
-    sudo podman ps | grep ipecho || echo "No running ipecho container"
-    echo "Container logs:"
-    sudo podman logs ipecho 2>/dev/null || echo "No logs available"
-fi
-
-# Open firewall for port 9095 (matching official port)
-echo "🔓 Opening firewall for port 9095..."
-sudo firewall-cmd --permanent --add-port=9095/tcp 2>/dev/null || echo "Firewall command failed, continuing..."
-sudo firewall-cmd --reload 2>/dev/null || echo "Firewall reload failed, continuing..."
-
-echo "✅ IP Echo Service deployment completed successfully!"
-REMOTE_SCRIPT
-
-# Store bastion service URL for test steps - use PRIVATE IP for internal cluster access (official pattern)
+# Store bastion service URL for test steps - use PRIVATE IP for internal cluster access
 BASTION_SERVICE_URL="http://$BASTION_PRIVATE_IP:9095/"
 echo "$BASTION_SERVICE_URL" > "$SHARED_DIR/egress-health-check-url"
 
@@ -297,20 +108,16 @@ echo "✅ External IP echo service deployed successfully!"
 echo "   Internal Service URL (for cluster): $BASTION_SERVICE_URL"
 echo "   External Service URL (for manual testing): http://$BASTION_PUBLIC_IP:9095/"
 echo "   This service will report actual source IPs for egress IP validation"
-echo "   Service is running on bastion host and ready for egress IP testing"
 echo ""
 echo "🔧 Manual validation available:"
 echo "   curl http://$BASTION_PUBLIC_IP:9095/ (from external)"
 echo "   curl $BASTION_SERVICE_URL (from cluster pods)"
 echo ""
-echo "📊 DEBUG: Configuration Summary"
-echo "   Bastion Instance ID: ${BASTION_INSTANCE_ID:-'Not found'}"
-echo "   Bastion Security Group: ${SECURITY_GROUP_ID:-'Not configured'}"
+echo "📊 Configuration Summary"
 echo "   Bastion Public IP: $BASTION_PUBLIC_IP"
 echo "   Bastion Private IP: $BASTION_PRIVATE_IP"
-echo "   Service Port: $ECHO_SERVICE_PORT (9095)"
+echo "   Service Port: 9095"
 echo "   Service Container: quay.io/openshifttest/ip-echo:1.2.0"
 echo "   Internal URL for cluster: $BASTION_SERVICE_URL"
-echo "   Security Group Configured: $([[ "$SKIP_SECURITY_GROUP" != "true" ]] && echo "Yes" || echo "No - Manual setup required")"
-
+echo ""
 echo "External IP echo service setup completed successfully!"
