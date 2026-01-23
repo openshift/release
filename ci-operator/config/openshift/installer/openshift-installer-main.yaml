@@ -364,8 +364,9 @@ tests:
   container:
     from: yamllint
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
-- as: e2e-aws-ovn
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(baremetal|libvirt|openstack))|(^cluster-api/providers/([^a]|a[^w]|aw[^s]).*/)|(/agent/)
+- always_run: false
+  as: e2e-aws-ovn
+  pipeline_skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(baremetal|libvirt|openstack))|(^cluster-api/providers/([^a]|a[^w]|aw[^s]).*/)|(/agent/)
   steps:
     cluster_profile: aws-4
     env:
@@ -580,8 +581,9 @@ tests:
     - chain: ipi-install
     test:
     - ref: openshift-e2e-test
-- as: e2e-gcp-ovn
-  run_if_changed: (gcp|google)
+- always_run: false
+  as: e2e-gcp-ovn
+  pipeline_run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
@@ -649,8 +651,9 @@ tests:
     - ref: ipi-conf-azure-default
     - chain: azure-provision-service-principal-minimal-permission
     - chain: ipi-install
-- as: e2e-azure-ovn
-  run_if_changed: azure
+- always_run: false
+  as: e2e-azure-ovn
+  pipeline_run_if_changed: azure
   steps:
     cluster_profile: azure-2
     env:
@@ -725,13 +728,15 @@ tests:
   steps:
     cluster_profile: aws-3
     workflow: openshift-upgrade-aws-latestinstaller
-- as: e2e-aws-ovn-upi
-  run_if_changed: ^(upi/aws/.*)|^(images/installer/Dockerfile\.upi.*)
+- always_run: false
+  as: e2e-aws-ovn-upi
+  pipeline_run_if_changed: ^(upi/aws/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws-upi
-- as: e2e-gcp-ovn-upi
-  run_if_changed: ^(upi/gcp/.*)|^(images/installer/Dockerfile\.upi.*)
+- always_run: false
+  as: e2e-gcp-ovn-upi
+  pipeline_run_if_changed: ^(upi/gcp/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upi
@@ -814,10 +819,11 @@ tests:
         NETWORK_TYPE=OVNKubernetes
         HOSTS_SWAP_DEFINITION=true
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
   capabilities:
   - intranet
-  run_if_changed: (baremetal|metal3|ironic)
+  pipeline_run_if_changed: (baremetal|metal3|ironic)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -847,8 +853,9 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
-- as: e2e-openstack-ovn
-  run_if_changed: openstack|(^data/.*/rhcos\.json)
+- always_run: false
+  as: e2e-openstack-ovn
+  pipeline_run_if_changed: openstack|(^data/.*/rhcos\.json)
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -941,8 +948,9 @@ tests:
   steps:
     cluster_profile: openstack-vexxhost
     workflow: openshift-manifests-openstack
-- as: e2e-vsphere-ovn
-  run_if_changed: vsphere
+- always_run: false
+  as: e2e-vsphere-ovn
+  pipeline_run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere
@@ -1010,8 +1018,9 @@ tests:
       DISK_SETUP: "true"
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
-- as: e2e-vsphere-ovn-upi
-  run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
+- always_run: false
+  as: e2e-vsphere-ovn-upi
+  pipeline_run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-upi
@@ -1184,10 +1193,11 @@ tests:
       resources:
         requests:
           cpu: 100m
-- as: e2e-agent-compact-ipv4
+- always_run: false
+  as: e2e-agent-compact-ipv4
   capabilities:
   - intranet
-  run_if_changed: ^(cmd|pkg|data).*/agent/
+  pipeline_run_if_changed: ^(cmd|pkg|data).*/agent/
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
