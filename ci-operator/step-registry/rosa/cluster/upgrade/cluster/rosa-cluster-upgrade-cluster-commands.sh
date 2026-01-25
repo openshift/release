@@ -249,8 +249,26 @@ function upgrade_machinepool_to () {
 # check if the nodes are Ready status
 function check_node() {
     local node_number ready_number
-    node_number=$(oc get node --no-headers | grep -cv STATUS)
-    ready_number=$(oc get node --no-headers | awk '$2 == "Ready"' | wc -l)
+    local max_retries=3
+    local retry_count=0
+    local node_output=""
+
+    while (( retry_count < max_retries )); do
+        node_output=$(oc get node --no-headers 2>&1) && break
+        ((retry_count++))
+        if (( retry_count < max_retries )); then
+            log "Transient failure getting nodes (attempt $retry_count of $max_retries), retrying in 30s..."
+            sleep 30
+        fi
+    done
+
+    if (( retry_count >= max_retries )); then
+        log "Failed to get nodes after $max_retries attempts: $node_output"
+        return 1
+    fi
+
+    node_number=$(echo "$node_output" | grep -cv STATUS)
+    ready_number=$(echo "$node_output" | awk '$2 == "Ready"' | wc -l)
     if (( node_number == ready_number )); then
         echo "All nodes status Ready"
         return 0
@@ -264,7 +282,24 @@ function check_node() {
 function check_worker_node_not_changed() {
   check_node
   # ensure the worker node UIDs are not changed
-  current_uids=$(oc get nodes -o jsonpath='{.items[*].metadata.uid}')
+  local max_retries=3
+  local retry_count=0
+  local current_uids=""
+
+  while (( retry_count < max_retries )); do
+      current_uids=$(oc get nodes -o jsonpath='{.items[*].metadata.uid}' 2>&1) && break
+      ((retry_count++))
+      if (( retry_count < max_retries )); then
+          log "Transient failure getting node UIDs (attempt $retry_count of $max_retries), retrying in 30s..."
+          sleep 30
+      fi
+  done
+
+  if (( retry_count >= max_retries )); then
+      log "Failed to get node UIDs after $max_retries attempts: $current_uids"
+      return 1
+  fi
+
   IFS=' ' read -r -a current_array <<< "$current_uids"
   sorted_current_uids=$(printf "%s\n" "${current_array[@]}" | sort | tr '\n' ' ')
 
