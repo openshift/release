@@ -75,7 +75,11 @@ fi
 export EXTRA_FLAGS
 export ADDITIONAL_PARAMS
 
-./run.sh
+if [[ "${BEST_EFFORT:-false}" == "true" ]]; then
+    ./run.sh || true
+else
+    ./run.sh
+fi
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
