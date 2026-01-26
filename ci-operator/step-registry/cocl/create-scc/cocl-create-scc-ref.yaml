@@ -1,0 +1,55 @@
+ref:
+  as: cocl-create-scc
+  from_image:
+    namespace: ocp
+    name: "4.21"
+    tag: cli
+  commands: cocl-create-scc-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: OPERATOR_NAMESPACE
+    default: "openshift-cocl-operator"
+    documentation: Namespace where the COCL operator will be installed
+  documentation: |-
+    Create SecurityContextConstraints (SCC) for the Confidential Clusters (COCL) operator.
+
+    This step is required before installing the COCL operator on OpenShift. The SCC defines
+    security constraints for the operator's service account and workloads.
+
+    Operations performed:
+    1. Ensures the operator namespace exists
+    2. Creates a SecurityContextConstraints resource with:
+       - Name: <namespace>-trusted-cluster-scc
+       - Service account: system:serviceaccount:<namespace>:trusted-cluster-operator
+       - Security constraints appropriate for the operator workloads
+    3. Verifies the SCC was created successfully
+
+    Prerequisites:
+    - Cluster-admin privileges (required to create SCC resources)
+    - OpenShift cluster (SCC is OpenShift-specific)
+
+    The SCC configuration:
+    - Disallows privileged operations (no host access, no privilege escalation)
+    - Allows RunAsAny for user/group context
+    - Requires MustRunAs for SELinux context
+    - Drops all Linux capabilities
+    - Allows standard volume types (configMap, secret, emptyDir, etc.)
+
+    Environment Variables:
+    - OPERATOR_NAMESPACE: Namespace for operator installation (default: openshift-cocl-operator)
+
+    Usage in CI configuration:
+    ```yaml
+    test:
+    - ref: cocl-enable-konflux-catalogsource
+    - ref: cocl-create-scc              # Create SCC before operator install
+    - ref: install-operators            # Install operator via OLM
+    - ref: cocl-operator-e2e-tests      # Run E2E tests
+    ```
+
+    Exit Codes:
+    - 0: SCC created successfully
+    - 1: Failed to create SCC or verification failed

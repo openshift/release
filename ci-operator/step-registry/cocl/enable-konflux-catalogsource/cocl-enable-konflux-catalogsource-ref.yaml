@@ -1,0 +1,85 @@
+ref:
+  as: cocl-enable-konflux-catalogsource
+  from_image:
+    namespace: ocp
+    name: "4.21"
+    tag: cli
+  commands: cocl-enable-konflux-catalogsource-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  - namespace: test-credentials
+    name: cocl-operator-secrets
+    mount_path: /var/run/vault/cocl-secrets
+  env:
+  - name: CATALOG_SOURCE_NAME
+    default: "cocl-operator-catalogsource"
+    documentation: Name of the CatalogSource to create for confidential cluster operator
+  - name: COCL_OPERATOR_BRANCH
+    default: "main"
+    documentation: Branch of confidential cluster operator repo to fetch ImageDigestMirrorSet from
+  - name: MULTISTAGE_PARAM_OVERRIDE_COCL_FBC_INDEX_IMAGE
+    default: ""
+    documentation: |-
+      Override for the COCL operator FBC index image.
+
+      If not set, the image is automatically determined:
+      - For Konflux PRs: Uses PR-specific tag (on-pr-<revision>)
+        Example: quay.io/redhat-user-workloads/cocl-operator-tenant/confidential-cluster-operator-fbc:on-pr-abc123
+      - For post-merge or manual testing: Uses :latest tag
+        Example: quay.io/redhat-user-workloads/cocl-operator-tenant/confidential-cluster-operator-fbc:latest
+
+      Can be manually overridden via Gangway API:
+      "pod_spec_options": {
+        "envs": {
+          "MULTISTAGE_PARAM_OVERRIDE_COCL_FBC_INDEX_IMAGE": "quay.io/redhat-user-workloads/cocl-operator-tenant/confidential-cluster-operator-fbc@sha256:..."
+        }
+      }
+  documentation: |-
+    Enable the confidential cluster operator's Konflux catalog source for OCP 4.21 dev preview testing.
+
+    This step performs the following operations:
+    1. Auto-detects PR context and determines appropriate FBC image tag (on-pr-<revision> or :latest)
+    2. Updates cluster global pull secret with Konflux registry credentials
+    3. Applies ImageDigestMirrorSet (IDMS) from operator repo to mirror production registry paths to Konflux workspace
+    4. Ensures openshift-marketplace namespace exists
+    5. Waits for Konflux FBC image to be available (up to 25 minutes)
+    6. Creates CatalogSource pointing to the FBC index image
+    7. Waits for CatalogSource to reach READY state
+
+    Prerequisites:
+    - Cluster must have network access to quay.io/redhat-user-workloads and github.com
+    - Vault credentials must be configured in test-credentials namespace
+    - Operator FBC image must be built in Konflux
+    - IDMS file must exist in operator repo at .tekton/images-mirror-set.yaml
+
+    The IDMS is fetched from:
+    https://raw.githubusercontent.com/confidential-clusters/operator/refs/heads/{COCL_OPERATOR_BRANCH}/.tekton/images-mirror-set.yaml
+
+    This ensures the image mirror configuration is maintained in the operator repo (single source of truth).
+
+    Environment Variables:
+    - CATALOG_SOURCE_NAME: Name of CatalogSource (default: cocl-operator-catalogsource)
+    - COCL_OPERATOR_BRANCH: Branch to fetch IDMS from (default: main)
+    - MULTISTAGE_PARAM_OVERRIDE_COCL_FBC_INDEX_IMAGE: Override FBC image (optional)
+
+    Outputs:
+    - CatalogSource ready in openshift-marketplace namespace
+    - IDMS applied cluster-wide for image mirroring
+    - Pull secret updated for Konflux registry access
+
+    Usage in CI configuration:
+    ```yaml
+    test:
+    - ref: cocl-enable-konflux-catalogsource
+    - ref: install-operators  # With OPERATORS env pointing to cocl-operator-catalogsource
+    ```
+
+    Exit Codes:
+    - 0: CatalogSource created and ready successfully
+    - 1: Failed to update credentials, apply IDMS, or CatalogSource not ready
