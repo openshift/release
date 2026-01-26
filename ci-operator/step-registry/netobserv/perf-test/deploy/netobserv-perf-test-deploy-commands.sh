@@ -52,12 +52,8 @@ if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]] || [[ ${LOKI_OPERATOR:-} 
     PARAMETERS+=" LokiEnable=false"
 fi
 
-if [[ ${DEPLOYMENT_MODEL:-} == "Kafka" ]]; then
-    PARAMETERS+=" KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS}"
-fi
-
-if [[ ${DEPLOYMENT_MODEL:-} == "Service" ]]; then
-    PARAMETERS+=" FLPConsumerReplicas=${FLP_CONSUMER_REPLICAS}"
+if [[ ${FLP_CONSUMER_REPLICAS:-} ]]; then
+    PARAMETERS+=" KafkaConsumerReplicas=${FLP_CONSUMER_REPLICAS}"
 fi
 
 createFlowCollector ${PARAMETERS}
