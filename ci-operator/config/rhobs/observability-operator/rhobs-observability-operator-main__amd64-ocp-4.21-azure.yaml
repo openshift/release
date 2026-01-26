@@ -33,16 +33,19 @@ tests:
     env:
       BASE_DOMAIN: observability.azure.devcluster.openshift.com
       CYPRESS_COO_NAMESPACE: coo
+      MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE: quay.io/redhat-user-workloads/cluster-observabilit-tenant/cluster-observability-operator/coo-fbc-v4-21@sha256:ab0cab17ddff8e1d514c98da8f39c62873620097c83a7c91cdbc5a8507e6d665
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"},
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
             {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
-            {"name": "lightspeed-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-lightspeed", "target_namespaces": "openshift-lightspeed", "operator_group": "openshift-lightspeed"}
         ]
     test:
     - ref: rhobs-konflux-catalogsource
-    - ref: install-operators
+    - ref: rhobs-acm-patch-node
+    - chain: acm-install
+    - ref: wait
+    - ref: rhobs-acm-setup-observability
     - ref: distributed-tracing-tests-tracing-ui-integration
     - ref: rhobs-obo-test-harness
     workflow: cucushift-installer-rehearse-azure-ipi
