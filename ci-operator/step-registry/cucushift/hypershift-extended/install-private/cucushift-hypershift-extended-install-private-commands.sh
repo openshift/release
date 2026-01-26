@@ -4,6 +4,7 @@ set -u
 
 # Get HO image and Hypershift CLI
 HCP_CLI="bin/hypershift"
+HYPERSHIFT_RELEASE_LATEST="quay.io/rh-ee-xiuwang/hypershift-operator:pr-7575"
 OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
 if [[ $HO_MULTI == "true" ]]; then
   OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
