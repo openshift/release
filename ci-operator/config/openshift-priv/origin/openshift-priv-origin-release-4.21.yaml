@@ -16,7 +16,7 @@ base_images:
     namespace: hypershift
     tag: latest
   ocp_4.16_base-rhel9:
-    name: 4.21-priv
+    name: 4.16-priv
     namespace: ocp-private
     tag: base-rhel9
   ocp_builder_rhel-9-golang-1.22-openshift-4.17:
@@ -39,9 +39,6 @@ images:
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: tools
   inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
     ocp_builder_rhel-9-golang-1.24-openshift-4.21:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
@@ -129,7 +126,7 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -177,7 +174,7 @@ tests:
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     observers:
       enable:
       - observers-resource-watch
@@ -186,7 +183,7 @@ tests:
   as: e2e-azure-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -198,7 +195,7 @@ tests:
   as: e2e-agnostic-ovn-cmd
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       TEST_SUITE: openshift/test-cmd
     observers:
@@ -268,7 +265,7 @@ tests:
 - always_run: false
   as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     observers:
       enable:
       - observers-resource-watch
@@ -277,7 +274,7 @@ tests:
   as: e2e-gcp-ovn-rt-upgrade
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     observers:
       enable:
       - observers-resource-watch
@@ -683,7 +680,7 @@ tests:
   as: e2e-azure-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-e2e-azure-etcd-scaling
 - always_run: false
   as: e2e-vsphere-ovn-etcd-scaling
@@ -691,17 +688,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
-- always_run: false
-  as: e2e-vsphere-ovn-dualstack-primaryv6
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      IP_FAMILIES: DualStackIPv6Primary
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-vsphere-ovn-dualstack
 - always_run: false
   as: e2e-aws-etcd-recovery
   optional: true
@@ -722,7 +708,7 @@ tests:
   as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -746,7 +732,7 @@ tests:
   as: e2e-gcp-ovn-usernamespace
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/usernamespace

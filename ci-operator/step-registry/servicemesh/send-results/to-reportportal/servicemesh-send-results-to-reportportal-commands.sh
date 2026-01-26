@@ -13,6 +13,15 @@ get_job_url() {
   echo "${job_complete_url}"
 }
 
+ignore_errors() {
+  if [ $? -ne 0 ]
+  then
+    echo "Warning: test results were not uploaded to report portal!!!"
+  fi
+
+  exit 0
+}
+
 # run the upload only if explicitly configured
 if [ "${REPORT_TO_REPORT_PORTAL}" != "true" ]
 then
@@ -79,9 +88,9 @@ export DATA_ROUTER_URL="https://datarouter.ccitredhat.com"
 
 # upload results to report portal
 export VERBOSE=true
-export TESTRUN_NAME="${TEST_SUITE} test run"
+export TESTRUN_NAME="${TEST_SUITE_DESC} test run"
 JOB_URL=$(get_job_url)
-export TESTRUN_DESCRIPTION="Automated ${TEST_SUITE} test run ${JOB_URL}"
+export TESTRUN_DESCRIPTION="Automated ${TEST_SUITE_DESC} test run ${JOB_URL}"
 # we have to use SHARED_DIR to be able to get results generated in the previous test step
 export TEST_RESULTS_DIR="${SHARED_DIR}"
 export PRODUCT_VERSION="${product_version}"
@@ -90,4 +99,7 @@ export EXTRA_ATTRIBUTES="[{\"key\": \"ocp_cluster_arch\", \"value\": \"${ocp_arc
 
 validate_environment
 set_defaults
+# do not fail whole job on report portal errors
+trap ignore_errors EXIT
 send_results
+

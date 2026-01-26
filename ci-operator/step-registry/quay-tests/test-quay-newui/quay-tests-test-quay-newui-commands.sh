@@ -30,8 +30,8 @@ function copyArtifacts {
             mv "$file" "$ARTIFACT_DIR"/"$JUNIT_PREFIX""$(basename "$file")"
         fi
     done
-    cp -r ./cypress/videos/* $ARTIFACT_DIR
-    cp -r ./cypress/logs/* $ARTIFACT_DIR
+    cp -r ./cypress/videos/* $ARTIFACT_DIR || true
+    cp -r ./cypress/logs/* $ARTIFACT_DIR || true
 
     if [[ -e "./quay_new_ui_testing_report.xml" ]]; then
         cp -r "./quay_new_ui_testing_report.xml" $ARTIFACT_DIR

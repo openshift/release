@@ -1,0 +1,43 @@
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+releases:
+  initial:
+    integration:
+      name: "4.20"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 250Mi
+tests:
+- as: e2e
+  steps:
+    cluster_profile: devsandboxci-aws
+    env:
+      BASE_DOMAIN: devsandboxci.devcluster.openshift.com
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      credentials:
+      - collection: ""
+        mount_path: /usr/local/sandbox-secrets
+        name: sandbox-devsso
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: "3"
+          memory: 250Mi
+    workflow: codeready-toolchain-aws
+zz_generated_metadata:
+  branch: master
+  org: codeready-toolchain
+  repo: devsandbox-dashboard

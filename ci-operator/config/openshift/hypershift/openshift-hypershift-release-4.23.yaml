@@ -60,6 +60,11 @@ images:
     RUN dnf install -y python3-pip
   from: src
   to: custom-verify-src
+- dockerfile_literal: |
+    FROM base
+    RUN dnf module reset -y nodejs && dnf module enable -y nodejs:20 && dnf install -y python3-pip nodejs npm
+  from: src
+  to: docs-build-src
 promotion:
   to:
   - excluded_images:
@@ -149,6 +154,13 @@ tests:
   container:
     from: custom-verify-src
   timeout: 1h0m0s
+- as: docs-preview
+  optional: true
+  run_if_changed: ^docs/
+  steps:
+    test:
+    - ref: hypershift-docs-build-and-deploy
+    - ref: hypershift-docs-preview-comment
 - as: unit
   commands: make test
   container:
@@ -312,7 +324,7 @@ tests:
   as: e2e-kubevirt-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D16as_v5
@@ -338,6 +350,8 @@ tests:
     workflow: hypershift-aws-conformance
 - always_run: false
   as: e2e-kubevirt-metal-conformance
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-hcp

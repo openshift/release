@@ -569,23 +569,6 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
-- as: metal3-agent-hypershift-arm-nodepool-guest-f28
-  capabilities:
-  - intranet
-  cron: 56 23 14 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:multi-latest
-      NODEPOOL_RELEASE_IMAGE_LATEST: release:multi-latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: arm64
-      AGENTSERVICECONFIG_CPU_ARCHITECTURE: arm64
-      EXTRA_ARGS: --arch=arm64
-      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
-      MCE_VERSION: "2.8"
-    workflow: hypershift-mce-agent-metal3-conformance-baremetal-lab
 - as: aws-ipi-ovn-hypershift-fips-guest-openldap-f14
   cron: 6 4 15,29 * *
   steps:
@@ -1791,6 +1774,25 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce
+- as: baremetalds-hypershift-agent-mce-lab-arm-mgmt-f28
+  capabilities:
+  - intranet
+  cron: 56 23 14 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:multi-latest
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: arm64
+      AGENTSERVICECONFIG_CPU_ARCHITECTURE: arm64
+      EXTRA_ARGS: --arch=arm64
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.18
+      MCE_VERSION: "2.8"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-lab
 - as: baremetalds-ipi-ovn-lvms-f14
   capabilities:
   - intranet
@@ -2256,7 +2258,6 @@ tests:
     env:
       CATALOG_SOURCE_NAME: compliance-operator
       FILTERS_ADDITIONAL: ""
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-18@sha256:bb4fe05ebd91d8d8da29b262ab55f5817edaccfae5e9c9f888cc36ae78ac9944
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;~Disruptive&
       TEST_PARALLEL: "1"
       TEST_SCENARIOS: Compliance_Operator
@@ -2275,8 +2276,7 @@ tests:
       CATALOG_SOURCE_NAME: compliance-operator
       E2E_RUN_TAGS: '@complianceoperator'
       FILTERS_ADDITIONAL: ""
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/compliance-operator-fbc-4-18@sha256:bb4fe05ebd91d8d8da29b262ab55f5817edaccfae5e9c9f888cc36ae78ac9944
-      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
+      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&;~DEPRECATED&;Disruptive&
       TEST_SCENARIOS: Compliance_Operator
       TEST_TIMEOUT: "60"
     test:
@@ -2293,7 +2293,6 @@ tests:
     env:
       E2E_RUN_TAGS: '@fio'
       FILTERS_ADDITIONAL: ""
-      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/file-integrity-operator-fbc-4-18:latest
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: File_Integrity_Operator
@@ -2314,7 +2313,7 @@ tests:
       FILTERS_ADDITIONAL: ""
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Security_Profiles_Operator
+      TEST_SCENARIOS: Security_Profiles_Operator|Node_Audit_Logging
     test:
     - ref: file-integrity-konflux-catalogsource
     - ref: openshift-extended-test
@@ -2430,8 +2429,8 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
-- as: ibmcloud-ipi-ovn-mtu-migrate-f28
-  cron: 2 22 10 * *
+- as: ibmcloud-ipi-ovn-mtu-migrate-f999
+  cron: 8 18 29 2 *
   steps:
     cluster_profile: ibmcloud-qe
     test:

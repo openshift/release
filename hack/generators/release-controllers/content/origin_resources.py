@@ -79,7 +79,7 @@ def _add_origin_resources(gendoc):
                 "host": "origin-release.apps.ci.l2s4.p1.openshiftapps.com",
                 "tls": {
                     "insecureEdgeTerminationPolicy": "Redirect",
-                    "termination": "Edge"
+                    "termination": "edge"
                 },
                 "to": {
                     "kind": "Service",

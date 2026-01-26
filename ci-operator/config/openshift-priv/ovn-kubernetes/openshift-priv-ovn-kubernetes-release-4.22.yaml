@@ -11,14 +11,14 @@ base_images:
     name: 4.22-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
+  ocp_builder_rhel-8-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.21
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    tag: rhel-8-golang-1.24-openshift-4.22
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+    tag: rhel-9-golang-1.24-openshift-4.22
   tests-private:
     name: tests-private
     namespace: ci
@@ -39,19 +39,19 @@ images:
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
+    ocp_builder_rhel-8-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.22
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: ovn-kubernetes-microshift
 promotion:
   to:
@@ -191,7 +191,7 @@ tests:
   as: e2e-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-ovn
@@ -228,7 +228,7 @@ tests:
     workflow: openshift-upgrade-aws-ovn
 - as: e2e-azure-ovn-upgrade
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       EXTRA_MG_ARGS: --host-network
       FAIL_ON_CORE_DUMP: "true"
@@ -314,11 +314,9 @@ tests:
 - as: unit
   commands: |
     cd go-controller
-    PKGS=$(go list -mod vendor -f '{{if len .TestGoFiles}} {{.ImportPath}} {{end}}' ${PKGS:-./cmd/... ./pkg/... ./hybrid-overlay/...} | xargs)
-    # these packages need running as a container for TestNewClientset
-    PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util/batching"/ }
-    PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util"/ }
-    PKGS=$PKGS make test NOROOT=TRUE
+    unset KUBERNETES_SERVICE_HOST # Unit tests expect non-K8s-pod environment; unset to match upstream CI behavior
+    unset KUBERNETES_SERVICE_PORT
+    make test NOROOT=TRUE
   container:
     from: src
 - as: lint
@@ -443,7 +441,7 @@ tests:
   as: e2e-azure-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       EXTRA_MG_ARGS: --host-network
       FEATURE_SET: TechPreviewNoUpgrade
@@ -635,9 +633,13 @@ tests:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false
+      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      GC: "false"
+      GC_METRICS: "false"
       ITERATION_MULTIPLIER_ENV: "6"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
+      PPROF: "false"
       PROFILE_TYPE: both
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "501"
@@ -659,8 +661,12 @@ tests:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false
+      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      GC: "false"
+      GC_METRICS: "false"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
+      PPROF: "false"
       PROFILE_TYPE: both
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "501"
@@ -683,10 +689,15 @@ tests:
       CLUSTER_NETWORK_CIDR: 20.0.0.0/8
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false --gc=false  --timeout=8h
+      EXTRA_FLAGS: --churn-duration=20m --service-latency --timeout=8h
+      GC: "false"
+      GC_METRICS: "false"
       ITERATION_MULTIPLIER_ENV: "6"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
+      PPROF: "false"
       PROFILE_TYPE: both
+      SERVICE_NETWORK_CIDR: 172.0.0.0/12
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "750"
       ZONES_COUNT: "6"
@@ -711,9 +722,14 @@ tests:
       CLUSTER_NETWORK_CIDR: 20.0.0.0/8
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false --gc=false
+      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      GC: "false"
+      GC_METRICS: "false"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
+      PPROF: "false"
       PROFILE_TYPE: both
+      SERVICE_NETWORK_CIDR: 172.0.0.0/12
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "750"
       ZONES_COUNT: "6"
