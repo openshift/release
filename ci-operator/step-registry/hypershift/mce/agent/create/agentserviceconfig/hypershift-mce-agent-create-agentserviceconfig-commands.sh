@@ -162,6 +162,30 @@ if [ "${DISCONNECTED}" = "true" ]; then
   result=$(ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "$CLUSTER_VERSION" << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 CLUSTER_VERSION="${1}"
 
+# Workaround for https://issues.redhat.com/browse/OCPBUGS-74263
+function mirror_capi_specific_release() {
+
+  # Use oc adm release mirror which preserves digests in the target registry
+  # Same as the one defined in support/backwardcompat/backwardcompat.go in openshift/hypershift
+  if [[ "${CLUSTER_VERSION}" == "4.22" ]]; then
+    oc adm release mirror \
+      --insecure=true --keep-manifest-list=true \
+      -a ${PULL_SECRET_FILE}  \
+      --from quay.io/openshift-release-dev/ocp-release@sha256:7f183e9b5610a2c9f9aabfd5906b418adfbe659f441b019933426a19bf6a5962 \
+      --to ${LOCAL_REGISTRY_DNS_NAME}:${LOCAL_REGISTRY_PORT}/localimages/local-release-image
+  fi
+
+  # Might need to be udpated in the future when a backport is merged for
+  # https://github.com/openshift/hypershift/pull/7575
+  if [[ "${CLUSTER_VERSION}" == "4.21" ]]; then
+    oc adm release mirror \
+      --insecure=true --keep-manifest-list=true \
+      -a ${PULL_SECRET_FILE}  \
+      --from quay.io/openshift-release-dev/ocp-release@sha256:1f2c28ac126453a3b9e83b349822b9f1fb7662973a212f936b90fdc40e06eb58 \
+      --to ${LOCAL_REGISTRY_DNS_NAME}:${LOCAL_REGISTRY_PORT}/localimages/local-release-image
+  fi
+}
+
 function mirror_file() {
   remote_url="${1}"
   httpd_path="${2}"
@@ -183,6 +207,8 @@ set -xeo pipefail
 cd /root/dev-scripts
 source common.sh
 source network.sh
+
+mirror_capi_specific_release
 
 OS_IMAGES=$(jq --arg CLUSTER_VERSION "${CLUSTER_VERSION}" '[.[] | select(.openshift_version == $CLUSTER_VERSION)]' /root/default_os_images.json)
 MIRROR_BASE_URL="http://$(wrap_if_ipv6 ${PROVISIONING_HOST_IP})/images"
