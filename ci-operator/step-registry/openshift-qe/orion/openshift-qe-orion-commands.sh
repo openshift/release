@@ -84,6 +84,7 @@ esac
 export ES_SERVER
 
 pip install .
+<<<<<<< HEAD
 
 # Print Orion version
 orion_version=$(orion --version 2>&1)
@@ -95,6 +96,11 @@ else
 fi
 
 EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
+=======
+echo ${ORION_EXTRA_FLAGS}
+EXTRA_FLAGS=${ORION_EXTRA_FLAGS}
+EXTRA_FLAGS+=" --lookback ${LOOKBACK}d --hunter-analyze"
+>>>>>>> 4f8f262a9a7 (Test)
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
     EXTRA_FLAGS+=" --output-format junit --save-output-path=junit.xml"
