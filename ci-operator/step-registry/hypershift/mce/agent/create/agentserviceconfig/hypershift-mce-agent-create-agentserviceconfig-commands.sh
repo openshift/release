@@ -14,8 +14,6 @@ fi
 
 CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json | jq -r '.metadata.version' | cut -d '.' -f 1,2)
 
-mirror_registry_host=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
-MIRROR_PROXY_REGISTRY_STAGE=${mirror_registry_host//5000/6003}
 
 function registry_config() {
   src_image=${1}
@@ -79,6 +77,8 @@ END
 # See https://issues.redhat.com/browse/OCPQE-31328
 # Specific images need to be pulled from stage registry as they're no longer available in Brew.
 function deploy_image_digest_mirror_set() {
+  mirror_registry_host=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+  MIRROR_PROXY_REGISTRY_STAGE=${mirror_registry_host//5000/6003}
   oc apply -f - <<END
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
