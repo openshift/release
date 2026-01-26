@@ -1,27 +1,41 @@
 base_images:
-  aro-hcp-e2e-base-image:
-    name: aro-hcp-e2e-base
-    namespace: rh_ee_ves
-    tag: v1.0
   prcreator:
     name: prcreator
     namespace: ci
     tag: latest
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-e2e-base-ci
 images:
 - dockerfile_literal: |
-    FROM aro-hcp-e2e-base-image
-    RUN dnf install -y skopeo jq
-    RUN curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq &&\
-        chmod +x /usr/local/bin/yq
+    FROM src
+    # Prcreator
     ADD prcreator /usr/bin/prcreator
+    # Skopeo
+    RUN curl -sqL https://github.com/lework/skopeo-binary/releases/download/v1.21.0/skopeo-linux-amd64 -o /usr/local/bin/skopeo && \
+        chmod +x /usr/local/bin/skopeo && \
+        mkdir -p /etc/containers && \
+        echo '{"default":[{"type":"insecureAcceptAnything"}]}' > /etc/containers/policy.json
+    # ARO-HCP
     COPY /src /opt/app-root/src/github.com/Azure
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-  from: aro-hcp-e2e-base-image
+    ENV GOFLAGS='-mod=readonly'
+    ENV GOPATH=/opt/app-root
+    ENV GOCACHE=/opt/app-root/.cache
+    RUN mkdir -p $GOPATH/bin && \
+        make install-tools && \
+        make -C tooling/image-updater build && \
+        make -C tooling/templatize templatize && \
+        make -C tooling/yamlwrap && \
+        make all-tidy && \
+        go work vendor
+    # Ensure all tools are in PATH
+    ENV PATH="/usr/local/bin:$GOPATH/bin:$PATH"
+    # Ensure all files are writable
+    RUN chmod -R a+w /opt/app-root
+  from: src
   inputs:
     prcreator:
       paths:
@@ -41,6 +55,8 @@ tests:
 - as: image-updater-tooling
   cron: 0 2,14 * * 1-5
   steps:
+    env:
+      VERBOSITY: "0"
     test:
     - ref: aro-hcp-automation-image-update
 zz_generated_metadata:
