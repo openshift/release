@@ -93,6 +93,46 @@ for cmd in "${required_tools[@]}"; do
 done
 debug "precheck: all required tools are present"
 
+# Skopeo: Configure container policy (must be before any skopeo usage)
+debug "skopeo: configuring container policy"
+readonly POLICY_DIR="${HOME:-/tmp}/.config/containers"
+mkdir -p "${POLICY_DIR}"
+cat > "${POLICY_DIR}/policy.json" <<'EOF'
+{
+    "default": [
+        {
+            "type": "insecureAcceptAnything"
+        }
+    ],
+    "transports": {
+        "docker": {
+            "registry.access.redhat.com": [
+                {
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPaths": ["/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release", "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-beta"]
+                }
+            ],
+            "registry.redhat.io": [
+                {
+                    "type": "signedBy",
+                    "keyType": "GPGKeys",
+                    "keyPaths": ["/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release", "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-beta"]
+                }
+            ]
+        },
+        "docker-daemon": {
+            "": [
+                {
+                    "type": "insecureAcceptAnything"
+                }
+            ]
+        }
+    }
+}
+EOF
+debug "skopeo: policy configured at ${POLICY_DIR}/policy.json"
+
 # Configuration: Load GitHub token from file
 debug "cfg: loading GitHub token"
 if [[ ! -f "${GITHUB_TOKEN_PATH}" ]]; then
@@ -134,13 +174,21 @@ export AZURE_TENANT_ID
 
 debug "azure: authentication configured successfully (credentials redacted)"
 
+# Go: Sync vendor directory to resolve module inconsistencies
+info "go: syncing vendor directory with go.work modules"
+run go work vendor
+debug "go: vendor directory synchronized successfully"
+
 # Image Updater: Build and run the image-updater tool
 info "image: fetching the latest image digests for all components"
+cd tooling/image-updater/
+run make build
 if [[ ${VERBOSITY-0} -ge 2 ]]; then
-  VERBOSITY=1 make image-updater OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
+  VERBOSITY=1 make update OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
 else
-  VERBOSITY=0 make image-updater OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
+  VERBOSITY=0 make update OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
 fi
+cd ../..
 
 # Check if there are any changes from image updates
 if [[ $(git status --porcelain) == "" ]]; then
