@@ -209,7 +209,16 @@ tests:
     test:
     - as: e2e-raw
       cli: latest
-      commands: ./test/scripts/openshift-ci/run-e2e-tests.sh raw 2 raw
+      commands: |-
+        # Run regular raw tests
+        ./test/scripts/openshift-ci/run-e2e-tests.sh raw 2 raw
+        # Patch config for ClusterIP None (headless services)
+        oc patch configmaps -n kserve inferenceservice-config \
+          --patch '{"data":{"service":"{\"serviceClusterIPNone\": true}"}}'
+        # Wait for controller to pick up config change
+        sleep 5
+        # Run rawcipn tests
+        ./test/scripts/openshift-ci/run-e2e-tests.sh rawcipn 1 raw
       dependencies:
       - env: KSERVE_CONTROLLER_IMAGE
         name: kserve-controller
