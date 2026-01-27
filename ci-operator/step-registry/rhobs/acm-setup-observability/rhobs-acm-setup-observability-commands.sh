@@ -84,5 +84,6 @@ EOF
 # Step 3: Wait for MinIO and MCO components to be ready
 echo "[INFO] Waiting for MinIO and MCO components to become ready..."
 oc wait --for=condition=Available --timeout=5m Deployment/minio -n open-cluster-management-observability
-oc wait --for=condition=Ready --timeout=5m pod -l app=multicluster-observability-rbac-query-proxy -n open-cluster-management-observability
+oc wait --for=condition=Ready pod -l alertmanager=observability,app=multicluster-observability-alertmanager -n open-cluster-management-observability --timeout=5m
+oc wait --for=condition=Ready pod -l app=rbac-query-proxy -n open-cluster-management-observability --timeout=5m
 echo "[SUCCESS] ACM Observability is fully ready."
