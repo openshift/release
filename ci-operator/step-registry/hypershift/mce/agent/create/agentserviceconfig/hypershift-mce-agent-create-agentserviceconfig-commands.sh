@@ -14,9 +14,6 @@ fi
 
 CLUSTER_VERSION=$(oc adm release info "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" --output=json | jq -r '.metadata.version' | cut -d '.' -f 1,2)
 
-mirror_registry_host=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
-MIRROR_PROXY_REGISTRY_STAGE=${mirror_registry_host//5000/6003}
-
 function registry_config() {
   src_image=${1}
   mirrored_image=${2}
@@ -79,6 +76,7 @@ END
 # See https://issues.redhat.com/browse/OCPQE-31328
 # Specific images need to be pulled from stage registry as they're no longer available in Brew.
 function deploy_image_digest_mirror_set() {
+  local mirror=${1:?mirror is required}
   oc apply -f - <<END
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
@@ -88,15 +86,16 @@ metadata:
 spec:
   imageDigestMirrors:
   - mirrors:
-    - ${MIRROR_PROXY_REGISTRY_STAGE}/rhel8/postgresql-12
+    - ${mirror}/rhel8/postgresql-12
     source: registry.redhat.io/rhel8/postgresql-12
   - mirrors:
-    - ${MIRROR_PROXY_REGISTRY_STAGE}/rhel9/postgresql-13
+    - ${mirror}/rhel9/postgresql-13
     source: registry.redhat.io/rhel9/postgresql-13
 END
 }
 
 function set_cluster_auth_stage() {
+  local mirror=${1:?mirror is required}
   local registry_creds
 
   echo "Setting cluster authentication for stage proxy registry"
@@ -104,7 +103,7 @@ function set_cluster_auth_stage() {
 
   registry_creds=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 
-  jq --argjson a "{\"${MIRROR_PROXY_REGISTRY_STAGE}\": {\"auth\": \"$registry_creds\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+  jq --argjson a "{\"${mirror}\": {\"auth\": \"$registry_creds\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
 
   oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/new-dockerconfigjson
 
@@ -203,8 +202,14 @@ EOF
 fi
 
 if [ "${DISCONNECTED}" = "true" ]; then
-  set_cluster_auth_stage
-  deploy_image_digest_mirror_set
+  if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
+    echo "Mirror registry URL file not found"
+    exit 1
+  fi
+  mirror_registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+  mirror_registry_stage_url="${mirror_registry_url//5000/6003}"
+  set_cluster_auth_stage "${mirror_registry_stage_url}"
+  deploy_image_digest_mirror_set "${mirror_registry_stage_url}"
 fi
 
 deploy_mirror_config_map
