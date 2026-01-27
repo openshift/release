@@ -211,11 +211,14 @@ check_cert_issuer "$OAUTH_ROUTE_HOSTNAME" 443 "Let's Encrypt"
     # Check if external-dns is enabled
     # When external-dns is enabled, the custom kubeconfig needs port 443 instead of 6443
     # Workaround for https://issues.redhat.com/browse/OCPBUGS-72258
-    if [[ -n "${HYPERSHIFT_EXTERNAL_DNS_DOMAIN:-}" ]]; then
-        echo "Applying port replacement: 6443 → 443 (workaround for OCPBUGS-72258)"
-        CUSTOM_KUBECONFIG_CONTENT="$(echo "$CUSTOM_KUBECONFIG_CONTENT" | sed 's/:6443/:443/g')"
-    else
-        echo "External DNS not enabled, no port replacement needed"
+    # Todo: need remove after OCPBUGS-72258 backport to 4.19, 4.20, 4.21
+    if [[ $HYPERSHIFT_EXTERNAL_DNS_ENABLED == "true" ]]; then
+        if echo "$CUSTOM_KUBECONFIG_CONTENT" | grep -q ':6443'; then
+            echo "Applying custom kubeconfig port replacement: 6443 → 443 (workaround for OCPBUGS-72258)"
+            CUSTOM_KUBECONFIG_CONTENT="$(echo "$CUSTOM_KUBECONFIG_CONTENT" | sed 's/:6443/:443/g')"
+        elif echo "$CUSTOM_KUBECONFIG_CONTENT" | grep -q ':443'; then
+            echo "Coustom kubeconfig api port is already set to 443."
+        fi
     fi
 
     # Write modified kubeconfig to all required locations
