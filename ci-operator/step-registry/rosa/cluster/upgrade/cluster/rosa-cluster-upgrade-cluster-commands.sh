@@ -257,31 +257,24 @@ function check_node() {
     while (( retry_count < max_retries )); do
         node_output=$(oc get node --no-headers 2>&1) || rc=$?
         if [[ $rc -eq 0 ]]; then
-            break
+            node_number=$(echo "$node_output" | wc -l)
+            ready_number=$(echo "$node_output" | awk '$2 == "Ready"' | wc -l)
+            if (( node_number == ready_number )); then
+                echo "All nodes status Ready"
+                return 0
+            fi
         fi
         rc=0
         ((retry_count++))
         if (( retry_count < max_retries )); then
-            log "Transient failure getting nodes (attempt $retry_count of $max_retries), retrying in 30s..."
+            log "Not all nodes Ready or transient API failure (attempt $retry_count of $max_retries), retrying in 30s..."
             sleep 30
         fi
     done
 
-    if (( retry_count >= max_retries )); then
-        log "Failed to get nodes after $max_retries attempts: $node_output"
-        return 1
-    fi
-
-    node_number=$(echo "$node_output" | grep -cv STATUS || true)
-    ready_number=$(echo "$node_output" | awk '$2 == "Ready"' | wc -l)
-    if (( node_number == ready_number )); then
-        echo "All nodes status Ready"
-        return 0
-    else
-        echo "Find Not Ready worker nodes, node recreated"
-        oc get no || true
-        exit 1
-    fi
+    log "Failed: Not all nodes in Ready state after $max_retries attempts"
+    oc get no || true
+    return 1
 }
 
 function check_worker_node_not_changed() {
