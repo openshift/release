@@ -3,13 +3,37 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: ocp-gs-baremetal-layered-product-interop-419
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules": [{"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_additional_labels": ["4.19-lp","gs-baremetal-lp","biweekly-trigger-lp"]}]
+        }
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      JSON_TRIGGER_LIST: gs-baremetal-layered-product-interop-419
+    post:
+    - ref: firewatch-report-issues
+    test:
+    - ref: trigger-jobs
+- as: ocp-gs-baremetal-lp-watcher-bot-message-419
+  cron: 0 12 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      WATCHER_BOT_JOB_FILE: gs-baremetal-layered-product-interop-419
+      WATCHER_BOT_JOB_GROUP_NAME: OCP Goldman Sachs Bare-Metal Tests
+    test:
+    - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
 - as: opp-interop-jobs-trigger
   cron: 0 20 * * 0
   steps:
@@ -34,51 +58,27 @@ tests:
       WATCHER_BOT_JOB_GROUP_NAME: OPP Layered Product Scenarios
     test:
     - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
-- as: ocp-self-managed-layered-product-interop-420
+- as: ocp-self-managed-layered-product-interop-421-fips
   cron: 0 6 * * 1
   steps:
     cluster_profile: aws-cspi-qe
     env:
       FIREWATCH_CONFIG: |
         {
-          "failure_rules": [{"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_additional_labels": ["4.20-lp","self-managed-lp","weekly-trigger-lp"]}]
+          "failure_rules": [{"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_additional_labels": ["4.21-lp","self-managed-lp","fips","weekly-trigger-lp"]}]
         }
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      JSON_TRIGGER_LIST: self-managed-lp-interop-jobs-420
+      JSON_TRIGGER_LIST: self-managed-lp-interop-jobs-421-fips
     post:
     - ref: firewatch-report-issues
     test:
     - ref: trigger-jobs
-- as: ocp-self-managed-lp-watcher-bot-message-420
+- as: ocp-self-managed-lp-watcher-bot-message-421-fips
   cron: 0 14 * * 1
   steps:
     cluster_profile: aws-cspi-qe
     env:
-      WATCHER_BOT_JOB_FILE: self-managed-lp-interop-jobs-420
-      WATCHER_BOT_JOB_GROUP_NAME: OCP Self Managed Layered Product Scenarios
-    test:
-    - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
-- as: ocp-self-managed-layered-product-interop-420-fips
-  cron: 0 6 * * 1
-  steps:
-    cluster_profile: aws-cspi-qe
-    env:
-      FIREWATCH_CONFIG: |
-        {
-          "failure_rules": [{"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_additional_labels": ["4.20-lp","self-managed-lp","fips","weekly-trigger-lp"]}]
-        }
-      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      JSON_TRIGGER_LIST: self-managed-lp-interop-jobs-420-fips
-    post:
-    - ref: firewatch-report-issues
-    test:
-    - ref: trigger-jobs
-- as: ocp-self-managed-lp-watcher-bot-message-420-fips
-  cron: 0 14 * * 1
-  steps:
-    cluster_profile: aws-cspi-qe
-    env:
-      WATCHER_BOT_JOB_FILE: self-managed-lp-interop-jobs-420-fips
+      WATCHER_BOT_JOB_FILE: self-managed-lp-interop-jobs-421-fips
       WATCHER_BOT_JOB_GROUP_NAME: OCP Self Managed Layered Product Scenarios - FIPS
     test:
     - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
