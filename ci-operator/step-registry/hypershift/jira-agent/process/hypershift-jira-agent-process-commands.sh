@@ -208,7 +208,7 @@ while IFS= read -r line; do
 
   # Additional context for fork-based workflow
   # Git push uses fork token (configured via credential helper), gh CLI uses upstream token (GITHUB_TOKEN env var)
-  FORK_CONTEXT="IMPORTANT: You are working in a fork (hypershift-community/hypershift). Git push is pre-configured to work with the fork. After pushing the branch, you MUST create the PR by running: gh pr create --repo openshift/hypershift --head hypershift-community:<branch-name> --no-maintainer-edit --draft --title '<title>' --body '<body>'. The gh CLI is authenticated to openshift/hypershift. Do NOT skip PR creation - this is a required step. SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
+  FORK_CONTEXT="IMPORTANT: You are working in a fork (hypershift-community/hypershift). Git push is pre-configured to work with the fork. After pushing the branch, you MUST create the PR by running: gh pr create --repo openshift/hypershift --head hypershift-community:<branch-name> --no-maintainer-edit --draft --title '<title>' --body '<body>'. The PR body MUST end with the following disclaimer on its own line: 'Always review AI generated responses prior to use.' The gh CLI is authenticated to openshift/hypershift. Do NOT skip PR creation - this is a required step. SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
 
   set +e  # Don't exit on error for individual issues
   echo "Starting Claude processing with streaming output..."
@@ -230,6 +230,13 @@ while IFS= read -r line; do
     echo "✅ Successfully processed $ISSUE_KEY"
     if [ -n "$PR_URL" ]; then
       echo "   PR: $PR_URL"
+      # Add /auto-cc comment to assign reviewers
+      echo "   Adding /auto-cc comment to assign reviewers..."
+      if gh pr comment "$PR_URL" --body "/auto-cc"; then
+        echo "   /auto-cc comment added successfully"
+      else
+        echo "   Warning: Failed to add /auto-cc comment"
+      fi
     else
       echo "   Note: No PR URL found in output. Claude may have encountered an issue creating the PR."
     fi
