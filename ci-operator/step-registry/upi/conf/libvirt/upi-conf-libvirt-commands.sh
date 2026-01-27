@@ -82,6 +82,13 @@ fips: true
 EOF
 fi
 
+if [ -n "${FEATURE_SET}" ]; then
+        echo "Adding 'featureSet: ...' to install-config.yaml"
+        cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+featureSet: ${FEATURE_SET}
+EOF
+fi
+
 if [ ${NODE_TUNING} = "true" ]; then
   echo "Saving node tuning yaml config..."
   cat >> ${SHARED_DIR}/99-sysctl-worker.yaml << EOF
