@@ -20,8 +20,8 @@ yarn install
 
 # Determine which Cypress spec to use based on Quay version
 CYPRESS_SPEC="cypress/e2e/quay_api_testing_all.cy.js"
-if [[ "${QUAY_VERSION}" == "3.16" ]]; then
-    echo "Using new UI spec for Quay version 3.16"
+if [[ "${QUAY_VERSION}" == "3.16" || "${QUAY_VERSION}" == "3.17" ]]; then
+    echo "Using new UI spec for Quay version ${QUAY_VERSION}"
     CYPRESS_SPEC="cypress/e2e/quay_api_testing_all_new_ui.cy.js"
 else
     echo "Using standard spec for Quay version ${QUAY_VERSION}"
