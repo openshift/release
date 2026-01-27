@@ -111,14 +111,12 @@ cat > "${SINGLE_TEST_TASKS}" <<-EOF
           register: pulled_image
           changed_when: false
 
-        - name: "Prepare static test-list (unless suite)"
-          when: test_type != 'suite'
+        - name: "Prepare static test-list for extensive and custom"
+          when: test_type == 'extensive' or test_type == 'custom'
           ansible.builtin.copy:
             dest: "{{ test_list_file }}"
             content: >-
-              {%- if test_type == 'minimal' -%}
-              {{ minimal_test_list }}
-              {%- elif test_type == 'extensive' -%}
+              {%- if test_type == 'extensive' -%}
               {{ extensive_test_list }}
               {%- else -%}
               {{ custom_test_list }}
@@ -129,8 +127,18 @@ cat > "${SINGLE_TEST_TASKS}" <<-EOF
           ansible.builtin.fail:
             msg: "CUSTOM_TEST_LIST must be set when TEST_TYPE=custom"
 
+        - name: "Determine test suite for dynamic discovery"
+          when: test_type == 'suite' or test_type == 'minimal'
+          ansible.builtin.set_fact:
+            effective_test_suite: >-
+              {%- if test_type == 'minimal' -%}
+              kubernetes/conformance/parallel/minimal
+              {%- else -%}
+              {{ test_suite }}
+              {%- endif -%}
+
         - name: "Generate suite list via dry-run"
-          when: test_type == 'suite'
+          when: test_type == 'suite' or test_type == 'minimal'
           ansible.builtin.command:
             cmd: >
               podman run --network host --rm -i
@@ -138,13 +146,13 @@ cat > "${SINGLE_TEST_TASKS}" <<-EOF
                 -e KUBECONFIG={{ kubeconfig_file }}
                 -v {{ kubeconfig_file }}:{{ kubeconfig_file }}
                 {{ openshift_tests_image }}
-                openshift-tests run {{ test_suite }}
+                openshift-tests run {{ effective_test_suite }}
                 --dry-run
                 --provider "{\"type\":\"{{ test_provider }}\"}"
           register: suite_list
 
         - name: "Write suite list to test-list"
-          when: test_type == 'suite'
+          when: test_type == 'suite' or test_type == 'minimal'
           ansible.builtin.copy:
             dest: "{{ test_list_file }}"
             content: "{{ suite_list.stdout }}"
@@ -183,6 +191,7 @@ cat > "${SINGLE_TEST_TASKS}" <<-EOF
               openshift-tests run \
                 -o "{{ remote_artifact_dir_run }}/e2e.log" \
                 --junit-dir "{{ remote_artifact_dir_run }}/reports" \
+                --provider "{\"type\":\"{{ test_provider }}\"}" \
                 --file {{ filtered_list_file }}
           register: test_result
           failed_when: >
