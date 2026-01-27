@@ -15,6 +15,7 @@ function update_pull_secret () {
     cat /var/run/quay-qe-konflux-auth/quay-v3-14-pull > "${temp_dir}"/quay-v3-14-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-15-pull > "${temp_dir}"/quay-v3-15-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-16-pull > "${temp_dir}"/quay-v3-16-pull.json
+    cat /var/run/quay-qe-konflux-auth/quay-v3-17-pull > "${temp_dir}"/quay-v3-17-pull.json
 
     oc get secret/pull-secret -n openshift-config \
       --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${temp_dir}"/global_pull_secret.json
@@ -28,6 +29,7 @@ function update_pull_secret () {
       "${temp_dir}"/quay-v3-14-pull.json \
       "${temp_dir}"/quay-v3-15-pull.json \
       "${temp_dir}"/quay-v3-16-pull.json \
+      "${temp_dir}"/quay-v3-17-pull.json \
       > "${temp_dir}"/merged_pull_secret.json
 
     oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${temp_dir}"/merged_pull_secret.json
