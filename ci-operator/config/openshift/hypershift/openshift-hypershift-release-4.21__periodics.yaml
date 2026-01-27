@@ -274,6 +274,52 @@ tests:
       CI_TESTS_RUN: TestExternalOIDC
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
     workflow: hypershift-azure-aks-external-oidc
+- as: e2e-aws-conformance-calico
+  minimum_interval: 168h
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance-calico
+- as: e2e-aws-conformance-calico-private
+  minimum_interval: 168h
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
+      TEST_ARGS: --disable-monitor=apiserver-incluster-availability,service-type-load-balancer-availability
+      TEST_SKIPS: The default cluster RBAC policy should have correct RBAC rules\|
+        Cluster scoped load balancer healthcheck port and path should be 10256/healthz\|
+        Prometheus \[apigroup:image.openshift.io\] when installed on the cluster should
+        provide named network metrics\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with UDP\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling \[apigroup:apps.openshift.io\]\[apigroup:route.openshift.io\]
+        should work with TCP (when fully idled)\| Unidling with Deployments \[apigroup:route.openshift.io\]
+        should work with UDP\|pod should not start for sysctls not on whitelist \[apigroup:k8s.cni.cncf.io\]
+        net.ipv4.conf.IFNAME.arp_filter\| pod should not start for sysctls not on
+        whitelist \[apigroup:k8s.cni.cncf.io\] net.ipv4.conf.all.send_redirects\|
+        sysctl allowlist update should start a pod with custom sysctl only when the
+        sysctl is added to whitelist\|Ensure HTTPRoute object is created
+    test:
+    - chain: hypershift-conformance
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-guest-calico
+- as: e2e-kubevirt-metal-conformance-calico
+  capabilities:
+  - intranet
+  minimum_interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
+      KONFLUX_DEPLOY_SUBSCRIPTION: "false"
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: local-storage-konflux
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.21
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.19
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-19
+      REDHAT_OPERATORS_INDEX_TAG: v4.19
+    workflow: hypershift-kubevirt-baremetalds-conformance-calico
 - as: e2e-azure-aks-external-oidc-techpreview
   cron: 0 20 9,18,25 * *
   steps:
