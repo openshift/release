@@ -249,13 +249,21 @@ function upgrade_machinepool_to () {
 # check if the nodes are Ready status
 function check_node() {
     local node_number ready_number
-    local max_retries=10
+    local max_retries=20
     local retry_count=0
     local node_output=""
     local rc=0
 
     while (( retry_count < max_retries )); do
-        node_output=$(oc get node --no-headers 2>&1) || rc=$?
+        set +e
+        node_output=$(oc get node --no-headers 2>&1)
+        rc=$?
+        set -e
+
+        if [[ $rc -ne 0 ]]; then
+            log "API unreachable (exit code $rc): $node_output"
+        fi
+
         if [[ $rc -eq 0 ]]; then
             node_number=$(echo "$node_output" | wc -l)
             ready_number=$(echo "$node_output" | awk '$2 == "Ready"' | wc -l)
@@ -264,8 +272,7 @@ function check_node() {
                 return 0
             fi
         fi
-        rc=0
-        ((retry_count++))
+        ((++retry_count))
         if (( retry_count < max_retries )); then
             log "Not all nodes Ready or transient API failure (attempt $retry_count of $max_retries), retrying in 30s..."
             sleep 30
@@ -280,18 +287,22 @@ function check_node() {
 function check_worker_node_not_changed() {
   check_node
   # ensure the worker node UIDs are not changed
-  local max_retries=10
+  local max_retries=20
   local retry_count=0
   local current_uids=""
   local rc=0
 
   while (( retry_count < max_retries )); do
-      current_uids=$(oc get nodes -o jsonpath='{.items[*].metadata.uid}' 2>&1) || rc=$?
+      set +e
+      current_uids=$(oc get nodes -o jsonpath='{.items[*].metadata.uid}' 2>&1)
+      rc=$?
+      set -e
+
       if [[ $rc -eq 0 ]]; then
           break
       fi
-      rc=0
-      ((retry_count++))
+      log "API unreachable while getting node UIDs (exit code $rc): $current_uids"
+      ((++retry_count))
       if (( retry_count < max_retries )); then
           log "Transient failure getting node UIDs (attempt $retry_count of $max_retries), retrying in 30s..."
           sleep 30
