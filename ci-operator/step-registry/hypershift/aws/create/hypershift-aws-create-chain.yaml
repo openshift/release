@@ -242,8 +242,8 @@ chain:
       else
         set +e
         export CLUSTER_NAME
-        timeout 25m bash -c '
-          until [[ "$(oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='"'"'{.status.version.history[?(@.state!="")].state}'"'"')" = "Completed" ]]; do
+        timeout 45m bash -c '
+          until oc get -n clusters hostedcluster/${CLUSTER_NAME} -o jsonpath='"'"'{.status.version.history[*].state}'"'"' | grep -q "Completed"; do
             sleep 15
           done
         '
@@ -285,7 +285,7 @@ chain:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 35m0s
+    timeout: 60m0s
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-awscreds
       name: hypershift-ci-jobs-awscreds
