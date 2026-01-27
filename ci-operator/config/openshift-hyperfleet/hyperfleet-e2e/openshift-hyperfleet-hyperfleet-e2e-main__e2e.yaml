@@ -3,6 +3,39 @@ build_root:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.25-openshift-4.22
+images:
+- dockerfile_literal: |
+   ARG BASE_IMAGE=registry.access.redhat.com/ubi9/go-toolset
+   FROM golang:1.25 AS builder
+   WORKDIR /build
+   RUN apt-get update && apt-get install -y --no-install-recommends make curl && rm -rf /var/lib/apt/lists/*
+   RUN mkdir -p /build/bin && \
+    curl -fsSL "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    -o /build/bin/kubectl
+   
+   COPY . .
+   ARG GIT_COMMIT=unknown
+   RUN make build GIT_COMMIT=${GIT_COMMIT}
+   
+   RUN chmod +x  /build/bin/* 
+
+   FROM ${BASE_IMAGE}
+   USER root
+   RUN dnf -y install jq gettext && dnf clean all
+
+   WORKDIR /app
+   COPY --from=builder /build/bin/* /usr/local/bin/
+   COPY --from=builder /build/testdata /app/testdata
+   COPY --from=builder /build/configs /app/configs
+
+   ENTRYPOINT ["/usr/local/bin/hyperfleet-e2e"]
+   CMD ["test", "--help"]
+
+   LABEL name="hyperfleet-e2e" \
+       vendor="Red Hat" \
+       summary="HyperFleet E2E Testing Framework" \
+       description="End to end testing for HyperFleet cluster lifecycle management"
+  to: hyperfleet-e2e
 resources:
   '*':
     limits:
@@ -12,12 +45,14 @@ resources:
       memory: 200Mi
 tests:
 - as: hyperfleet-e2e-cluster-nightly
-  cron: 30 02 * * *
+  cron: 30 9 * * *
   steps:
     env:
-      NAME_PREFIX: hyperfleet-e2e
+      # Same with hyperfleet-chart deployment step
+      GKE_CLUSTER_NAME: hyperfleet-dev-prow
+      NAMESPACE_NAME: prow-hyperfleet
     test:
-    - ref: openshift-hyperfleet-e2e-cluster
+    - ref: openshift-hyperfleet-e2e
 zz_generated_metadata:
   branch: main
   org: openshift-hyperfleet
