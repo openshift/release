@@ -40,7 +40,7 @@ EOF
 latest_catsrc_image_tag() {
     local api_url="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc/tag/"
     local page=1
-    local max_pages=60 # safety limit, typically exits much earlier
+    local max_pages=20 # safety limit, typically exits much earlier
 
     while [ "$page" -le "$max_pages" ]; do
         local resp
@@ -97,6 +97,10 @@ if [[ "$TEST_RELEASE_TYPE" == "Pre-GA" ]]; then
   fi
 
   create_catsrc "${CATALOG_SOURCE_NAME}" "${CATALOG_SOURCE_IMAGE}"
+
+  # Save resolved CATALOG_SOURCE_IMAGE for subsequent steps
+  echo "CATALOG_SOURCE_IMAGE=${CATALOG_SOURCE_IMAGE}" > "${SHARED_DIR}/catalog-source-image.env"
+  echo "Saved resolved CATALOG_SOURCE_IMAGE to ${SHARED_DIR}/catalog-source-image.env"
 else
   if [[ -n "$CATALOG_SOURCE_IMAGE" ]]; then
     echo "CATALOG_SOURCE_IMAGE can only be used when TEST_RELEASE_TYPE==Pre-GA ($CATALOG_SOURCE_IMAGE)"
