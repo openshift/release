@@ -619,6 +619,10 @@ CONFIG = {
     'metal-redhat-gs-quota-slice': {
         'default': 1,
     },
+    'rosa-regional-platform-int-quota-slice': {
+        'us-east-1': 15,
+        'us-east-2': 15,
+    },
 }
 
 for i in range(2,7):
