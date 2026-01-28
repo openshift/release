@@ -15,6 +15,45 @@ tests:
   commands: ./test/execute-prow-job.sh
   container:
     from: src
+# - as: provision-regional-daily
+#   cron: 0 7 * * *
+#   steps:
+#     cluster_profile: rosa-regional-platform-int
+#     test:
+#     - as: provision-regional
+#       commands: make provision-regional
+#       from: src
+#       resources:
+#         requests:
+#           cpu: 100m
+#           memory: 200Mi
+- as: provision-management
+  optional: true
+  steps:
+    cluster_profile: rosa-regional-platform-int
+    test:
+    - as: provision-management
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+
+        # Install Terraform
+        TERRAFORM_VERSION="1.10.4"
+        curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
+        unzip -q /tmp/terraform.zip -d /tmp
+        mv /tmp/terraform /usr/local/bin/terraform
+        chmod +x /usr/local/bin/terraform
+
+        # Verify installation
+        terraform version
+
+        # Run e2e tests
+        make provision-management
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift-online
