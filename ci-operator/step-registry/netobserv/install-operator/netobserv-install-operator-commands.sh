@@ -14,8 +14,8 @@ metadata:
 spec:
   agent:
     ebpf:
-      cacheActiveTimeout: 5s
-      cacheMaxFlows: 100000
+      cacheActiveTimeout: 10s
+      cacheMaxFlows: 120000
       features: []
       sampling: 1
     type: eBPF
