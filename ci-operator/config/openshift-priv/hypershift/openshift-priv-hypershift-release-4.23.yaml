@@ -19,14 +19,14 @@ base_images:
     name: 4.23-priv
     namespace: ocp-private
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
+  ocp_builder_rhel-9-golang-1.25-openshift-4.22:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
-  openshift_release_rhel-9-release-golang-1.24-openshift-4.22:
+    tag: rhel-9-golang-1.25-openshift-4.22
+  openshift_release_rhel-9-release-golang-1.25-openshift-4.22:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.22
+    tag: rhel-9-release-golang-1.25-openshift-4.22
   openstack-cinder-csi-driver-operator-test:
     name: 4.23-priv
     namespace: ocp-private
@@ -37,30 +37,35 @@ build_root:
 canonical_go_repository: github.com/openshift/hypershift
 images:
 - inputs:
-    openshift_release_rhel-9-release-golang-1.24-openshift-4.22:
+    openshift_release_rhel-9-release-golang-1.25-openshift-4.22:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.22
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.25-openshift-4.22
   to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
   inputs:
     ocp_4.22_base-rhel9:
       as:
       - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
+    ocp_builder_rhel-9-golang-1.25-openshift-4.22:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
   to: hypershift
 - dockerfile_path: Dockerfile.e2e
   inputs:
-    openshift_release_rhel-9-release-golang-1.24-openshift-4.22:
+    openshift_release_rhel-9-release-golang-1.25-openshift-4.22:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.22
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.25-openshift-4.22
   to: hypershift-tests
 - dockerfile_literal: |
     FROM base
     RUN dnf install -y python3-pip
   from: src
   to: custom-verify-src
+- dockerfile_literal: |
+    FROM base
+    RUN dnf module reset -y nodejs && dnf module enable -y nodejs:20 && dnf install -y python3-pip nodejs npm
+  from: src
+  to: docs-build-src
 promotion:
   to:
   - excluded_images:
@@ -150,6 +155,13 @@ tests:
   container:
     from: custom-verify-src
   timeout: 1h0m0s
+- as: docs-preview
+  optional: true
+  run_if_changed: ^docs/
+  steps:
+    test:
+    - ref: hypershift-docs-build-and-deploy
+    - ref: hypershift-docs-preview-comment
 - as: unit
   commands: make test
   container:
@@ -339,6 +351,8 @@ tests:
     workflow: hypershift-aws-conformance
 - always_run: false
   as: e2e-kubevirt-metal-conformance
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-hcp

@@ -68,17 +68,33 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- as: verify
+  commands: make -C openshift verify
+  container:
+    from: src
 - always_run: false
   as: e2e-metal3-capi-techpreview
   capabilities:
   - intranet
-  optional: true
   steps:
     cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BMO_WATCH_ALL_NAMESPACES="true"
+        NUM_EXTRA_WORKERS=1
+        EXTRA_WORKERS_NAMESPACE=openshift-cluster-api
+        FEATURE_SET=TechPreviewNoUpgrade
+        ENABLE_CAPI_E2E="true"
     test:
     - as: test
-      commands: make capi_e2e
-      from: src
+      commands: |
+        source "${SHARED_DIR}/packet-conf.sh"
+        # POC fix: strip resourceVersion/uid/creationTimestamp from secret before applying
+        # The error "object has been modified" is an optimistic concurrency error caused by
+        # these metadata fields being copied from the source secret
+        ssh "${SSHOPTS[@]}" "root@${IP}" "sed -i 's#oc apply -f -#sed -e \"/^  resourceVersion:/d\" -e \"/^  uid:/d\" -e \"/^  creationTimestamp:/d\" | oc apply -f -#g' /root/dev-scripts/setup_capi_e2e.sh"
+        ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts && make capi_e2e"
+      from: dev-scripts
       resources:
         requests:
           cpu: 100m

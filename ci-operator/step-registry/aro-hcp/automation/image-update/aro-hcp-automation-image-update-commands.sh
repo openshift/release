@@ -27,7 +27,8 @@ trap 'set +o xtrace' DEBUG
 VERBOSITY=${VERBOSITY:-1}
 
 # Internal variables (not configurable via ref.yaml)
-readonly IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.txt"
+readonly IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.md"
+readonly IMAGE_UPDATER_OUTPUT_FORMAT="markdown"
 
 # Logging functions with timestamps and severity levels
 log() { echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] ${*}"; }
@@ -135,17 +136,16 @@ debug "azure: authentication configured successfully (credentials redacted)"
 
 # Image Updater: Build and run the image-updater tool
 info "image: fetching the latest image digests for all components"
-if [[ ${VERBOSITY-0} -ge 2 ]]; then
-  VERBOSITY=1 make image-updater update | tee "${IMAGE_UPDATER_OUTPUT}"
-else
-  VERBOSITY=0 make image-updater update > "${IMAGE_UPDATER_OUTPUT}"
-fi
+make image-updater OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
 
 # Check if there are any changes from image updates
 if [[ $(git status --porcelain) == "" ]]; then
   info "image: no new digests found for any component images"
   notify "⚠️ Image digest updater job completed but no new digests found for any component images. Please check prow at ${PROW_JOB_URL}"
   exit 0
+else 
+  info "image: new digests found for some component images"
+  if [[ ${VERBOSITY-0} -ge 1 ]]; then cat ${IMAGE_UPDATER_OUTPUT}; echo; fi
 fi
 
 # Git: Commit updated image digests

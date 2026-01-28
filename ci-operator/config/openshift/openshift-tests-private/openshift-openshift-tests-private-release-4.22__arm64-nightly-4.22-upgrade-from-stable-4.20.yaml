@@ -1,0 +1,136 @@
+base_images:
+  ansible:
+    name: "4.20"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
+  tools:
+    name: "4.20"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  arm64-latest:
+    release:
+      architecture: arm64
+      channel: fast
+      version: "4.20"
+  arm64-target:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+  custom:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  intermediate:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.20"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: baremetal-sno-ipv4-disk-etcd-encryption-f28
+  capabilities:
+  - intranet
+  cron: 5 18 7 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_DISK_ENCRYPTION: "true"
+      ENABLE_ETCD_ENCRYPTION: "true"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      masters: "1"
+      workers: "0"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE421},${RELEASE_IMAGE_TARGET}" >
+        ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE421
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:arm64-target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-chainupgrade
+    workflow: baremetal-lab-sno
+- as: baremetal-upi-ovn-dualstack-fips-lgw-f28
+  capabilities:
+  - intranet
+  cron: 31 16 15 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_LOCAL_GATEWAY_MODE: "true"
+      FIPS_ENABLED: "true"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - as: set-upgrade-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE421},${RELEASE_IMAGE_TARGET}" >
+        ${SHARED_DIR}/upgrade-edge
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE421
+        name: release:intermediate
+      - env: RELEASE_IMAGE_TARGET
+        name: release:arm64-target
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - chain: openshift-upgrade-qe-test-chainupgrade
+    workflow: baremetal-lab-upi-dual-stack
+zz_generated_metadata:
+  branch: release-4.22
+  org: openshift
+  repo: openshift-tests-private
+  variant: arm64-nightly-4.22-upgrade-from-stable-4.20
