@@ -99,7 +99,11 @@ tests:
     dependencies:
       OO_BUNDLE: opendatahub-operator-bundle
     env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: openshift-operators
+      OO_INSTALL_TIMEOUT_MINUTES: "30"
     test:
     - as: e2e
       cli: latest
@@ -111,17 +115,18 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: optional-operators-ci-operator-sdk-gcp
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: opendatahub-operator-rhoai-e2e
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: gcp-opendatahub
+    cluster_profile: aws-opendatahub
     dependencies:
       OO_BUNDLE: opendatahub-operator-rhoai-bundle
     env:
-      COMPUTE_NODE_TYPE: n2-standard-8
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      COMPUTE_NODE_TYPE: m6a.2xlarge
       OO_INSTALL_NAMESPACE: redhat-ods-operator
     test:
     - as: e2e
@@ -134,7 +139,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: optional-operators-ci-operator-sdk-gcp
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: opendatahub-operator-e2e-hypershift
   optional: true
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
