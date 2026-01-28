@@ -148,6 +148,25 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-operator-encryption-kms
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
 - as: e2e-aws-ovn-upgrade
   steps:
     cluster_profile: aws-2

@@ -1,0 +1,59 @@
+base_images:
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.20"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: loaded-upgrade-420to421-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: vsphere-connected-2
+    env:
+      GC: "false"
+      ITERATION_MULTIPLIER_ENV: "9"
+      MAX_UNAVAILABLE_WORKER: "3"
+      OPENSHIFT_INFRA_NODE_CPU_CORE_PER_SOCKET_COUNT: "2"
+      OPENSHIFT_INFRA_NODE_CPU_COUNT: "16"
+      OPENSHIFT_INFRA_NODE_MEMORY_SIZE: "65536"
+      OPENSHIFT_INFRA_NODE_VOLUME_SIZE: "120"
+      SET_ENV_BY_PLATFORM: custom
+      WORKER_REPLICA_COUNT: "24"
+    post:
+    - ref: openshift-qe-kube-burner-index
+    test:
+    - chain: openshift-qe-upgrade-max-unavailable
+    - ref: workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    - chain: openshift-upgrade-qe-sanity
+    workflow: openshift-qe-installer-vsphere-ipi-ovn
+zz_generated_metadata:
+  branch: main_vsphere-4.21-nightly-x86-loaded-upgrade-from-4.20
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
