@@ -152,22 +152,22 @@ CHURN=false
 ES_SERVER=""
 CONFIG_EOF
     
-    # Use external bastion ipecho service for proper egress IP validation
-    echo "Setting up external bastion ipecho service for egress IP validation..."
-    echo "Using bastion-hosted IP echo service to validate egress IP with $CURRENT_WORKER_COUNT worker scaling"
+    # Use external bastion agnhost service for proper egress IP validation
+    echo "Setting up external bastion agnhost service for egress IP validation..."
+    echo "Using bastion-hosted agnhost service to validate egress IP with $CURRENT_WORKER_COUNT worker scaling"
     
-    # Check if bastion echo service is available
+    # Check if bastion agnhost service is available
     if [[ -f "$SHARED_DIR/egress-bastion-echo-url" ]]; then
         EXTERNAL_IPECHO_URL=$(cat "$SHARED_DIR/egress-bastion-echo-url")
-        echo "✅ Using bastion-hosted IP echo service: $EXTERNAL_IPECHO_URL"
+        echo "✅ Using bastion-hosted agnhost service: $EXTERNAL_IPECHO_URL"
     else
-        echo "⚠️ Bastion echo service not found, falling back to httpbin.org"
+        echo "⚠️ Bastion agnhost service not found, falling back to httpbin.org"
         EXTERNAL_IPECHO_URL="https://httpbin.org/ip"
     fi
     
     # Store the external service URL for health check validation
     echo "$EXTERNAL_IPECHO_URL" > "$SHARED_DIR/egress-health-check-url"
-    echo "External IP echo service configured: $EXTERNAL_IPECHO_URL"
+    echo "External agnhost service configured: $EXTERNAL_IPECHO_URL"
     
     # Store the expected external IP (AWS NAT public IP) for validation
     # This helps validate that egress IP pods reach external services consistently
@@ -212,14 +212,14 @@ EOF
     # Cleanup
     oc delete job baseline-ip-check >/dev/null 2>&1 || true
     
-    # Verify external service is accessible
-    echo "Verifying external ipecho service accessibility..."
+    # Verify external agnhost service is accessible
+    echo "Verifying external agnhost service accessibility..."
     # Create a test pod to verify connectivity
     cat << EOF | oc apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
-  name: ipecho-connectivity-test
+  name: agnhost-connectivity-test
   namespace: $TEST_NAMESPACE
 spec:
   # CRITICAL: Schedule test pod on egress IP assigned node for proper routing
@@ -254,21 +254,22 @@ spec:
 EOF
 
     # Wait for test pod and verify connectivity
-    if oc wait --for=condition=Ready pod/ipecho-connectivity-test -n "$TEST_NAMESPACE" --timeout=60s; then
-        echo "Testing connectivity to external ipecho service..."
-        test_response=$(oc exec -n "$TEST_NAMESPACE" ipecho-connectivity-test -- timeout 10 curl -s "$EXTERNAL_IPECHO_URL" 2>/dev/null || echo "")
-        if [[ -n "$test_response" ]]; then
-            echo "✅ External ipecho service is accessible"
+    if oc wait --for=condition=Ready pod/agnhost-connectivity-test -n "$TEST_NAMESPACE" --timeout=60s; then
+        echo "Testing connectivity to external agnhost service..."
+        # agnhost /clientip endpoint returns plain text source IP
+        test_response=$(oc exec -n "$TEST_NAMESPACE" agnhost-connectivity-test -- timeout 10 curl -s "$EXTERNAL_IPECHO_URL" 2>/dev/null || echo "")
+        if [[ -n "$test_response" && "$test_response" != *"error"* ]]; then
+            echo "✅ External agnhost service is accessible"
             echo "Sample response: $test_response"
         else
-            echo "⚠️ Warning: External ipecho service test failed, but continuing..."
+            echo "⚠️ Warning: External agnhost service test failed, but continuing..."
         fi
     else
         echo "⚠️ Warning: Test pod not ready, but continuing with external service..."
     fi
     
     # Cleanup test pod
-    oc delete pod ipecho-connectivity-test -n "$TEST_NAMESPACE" --ignore-not-found=true
+    oc delete pod agnhost-connectivity-test -n "$TEST_NAMESPACE" --ignore-not-found=true
     
     # Deploy cloud-bulldozer style traffic generators and test projects
     echo "Deploying cloud-bulldozer traffic generators for egress IP testing..."
@@ -329,9 +330,10 @@ spec:
       # Cloud-bulldozer style continuous traffic generation
       echo "Starting cloud-bulldozer style traffic generation..."
       while true; do
-        # HTTP traffic to external ipecho service (egress1.sh pattern)
+        # HTTP traffic to external agnhost service (egress1.sh pattern)
+        # agnhost /clientip endpoint returns plain text source IP
         curl -s "$EXTERNAL_IPECHO_URL" > /tmp/egress_response.log 2>&1 || true
-        echo "Traffic generated at \$(date)" >> /tmp/traffic.log
+        echo "Traffic generated at \$(date): \$(cat /tmp/egress_response.log 2>/dev/null | head -c 50)" >> /tmp/traffic.log
         
         # High frequency ping tests (ovn-pod-stress-test.sh pattern)  
         ping -c 10 -i 0.1 8.8.8.8 > /tmp/ping.log 2>&1 || true

@@ -48,18 +48,19 @@ BASTION_SSH_KEY="/tmp/bastion_ssh_key"
 cp "$CLUSTER_SSH_KEY" "$BASTION_SSH_KEY"
 chmod 600 "$BASTION_SSH_KEY"
 
-echo "Setting up external IP echo service on bastion host..."
+echo "Setting up external agnhost service on bastion host..."
 
-# Use the exact proven command from official OpenShift networking tests
-IPECHO_COMMAND="sudo netstat -ntlp | grep 9095 || sudo podman run --name ipecho -d -p 9095:80 quay.io/openshifttest/ip-echo:1.2.0"
-echo "Running command: $IPECHO_COMMAND"
+# Use agnhost with netexec on port 9095 (now open in security groups)
+# This provides /clientip endpoint for direct source IP validation
+AGNHOST_COMMAND="sudo netstat -ntlp | grep 9095 || sudo podman run -d --name external-agnhost -p 9095:8080 registry.k8s.io/e2e-test-images/agnhost:2.40 netexec --http-port=8080"
+echo "Running command: $AGNHOST_COMMAND"
 
-# Deploy the service exactly like the official code
-ssh -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no "$BASTION_SSH_USER"@"$BASTION_PUBLIC_IP" "$IPECHO_COMMAND"
+# Deploy the agnhost service
+ssh -i "$BASTION_SSH_KEY" -o StrictHostKeyChecking=no "$BASTION_SSH_USER"@"$BASTION_PUBLIC_IP" "$AGNHOST_COMMAND"
 
-echo "✅ IP echo service deployed successfully!"
+echo "✅ agnhost service deployed successfully!"
 
-# Update AWS security group to allow port 9095 (simplified approach)
+# Update AWS security group to allow port 9095 for agnhost service
 echo "🔧 Configuring AWS security group to allow port 9095..."
 
 # Get infrastructure name from cluster
@@ -91,27 +92,29 @@ else
 fi
 
 # Store bastion service URL for test steps - use PRIVATE IP for internal cluster access
-BASTION_SERVICE_URL="http://$BASTION_PRIVATE_IP:9095/"
+# agnhost provides /clientip endpoint for direct source IP validation
+BASTION_SERVICE_URL="http://$BASTION_PRIVATE_IP:9095/clientip"
 echo "$BASTION_SERVICE_URL" > "$SHARED_DIR/egress-bastion-echo-url"
 
 # Also save both public and private IPs for reference
 echo "$BASTION_PUBLIC_IP" > "$SHARED_DIR/bastion_public_ip"
 echo "$BASTION_PRIVATE_IP" > "$SHARED_DIR/bastion_private_ip"
 
-echo "✅ External IP echo service deployed successfully!"
+echo "✅ External agnhost service deployed successfully!"
 echo "   Internal Service URL (for cluster): $BASTION_SERVICE_URL"
-echo "   External Service URL (for manual testing): http://$BASTION_PUBLIC_IP:9095/"
+echo "   External Service URL (for manual testing): http://$BASTION_PUBLIC_IP:9095/clientip"
 echo "   This service will report actual source IPs for egress IP validation"
 echo ""
 echo "🔧 Manual validation available:"
-echo "   curl http://$BASTION_PUBLIC_IP:9095/ (from external)"
+echo "   curl http://$BASTION_PUBLIC_IP:9095/clientip (from external)"
 echo "   curl $BASTION_SERVICE_URL (from cluster pods)"
 echo ""
 echo "📊 Configuration Summary"
 echo "   Bastion Public IP: $BASTION_PUBLIC_IP"
 echo "   Bastion Private IP: $BASTION_PRIVATE_IP"
 echo "   Service Port: 9095"
-echo "   Service Container: quay.io/openshifttest/ip-echo:1.2.0"
+echo "   Service Container: registry.k8s.io/e2e-test-images/agnhost:2.40"
+echo "   Endpoint: /clientip (returns source IP)"
 echo "   Internal URL for cluster: $BASTION_SERVICE_URL"
 echo ""
-echo "External IP echo service setup completed successfully!"
+echo "External agnhost service setup completed successfully!"

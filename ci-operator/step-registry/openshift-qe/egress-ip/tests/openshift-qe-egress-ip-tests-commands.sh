@@ -290,13 +290,18 @@ EOF
             egress_response=$(oc exec -n egress-ip-test traffic-test-pod -- timeout 30 curl -s "$external_echo_url" 2>/dev/null || echo "")
             log_info "📥 Egress IP pod response: '$egress_response'"
             
-            # Extract source IP from JSON response (external services will show NAT IP in AWS)
-            # Handle both "source_ip" (our bastion service) and "origin" (httpbin.org) field names
+            # Extract source IP from agnhost response (plain text format)
+            # agnhost /clientip endpoint returns plain text like "10.0.48.201:port"
             local actual_source_ip
-            actual_source_ip=$(echo "$egress_response" | grep -o '"source_ip"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+            actual_source_ip=$(echo "$egress_response" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+' | head -n1 || echo "")
+            
+            # Fallback to JSON parsing for httpbin.org and other JSON services
             if [[ -z "$actual_source_ip" ]]; then
-                # Fallback to "origin" field for httpbin.org and similar services
-                actual_source_ip=$(echo "$egress_response" | grep -o '"origin"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+                actual_source_ip=$(echo "$egress_response" | grep -o '"source_ip"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+                if [[ -z "$actual_source_ip" ]]; then
+                    # Fallback to "origin" field for httpbin.org and similar services
+                    actual_source_ip=$(echo "$egress_response" | grep -o '"origin"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+                fi
             fi
             
             if [[ -n "$actual_source_ip" && "$actual_source_ip" != "127.0.0.1" ]]; then
@@ -382,10 +387,15 @@ EOF
                 local non_egress_response
                 non_egress_response=$(oc exec -n default non-egress-test-pod -- timeout 30 curl -s "$external_echo_url" 2>/dev/null || echo "")
                 local non_egress_ip
-                non_egress_ip=$(echo "$non_egress_response" | grep -o '"source_ip"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+                # Handle agnhost plain text response format first
+                non_egress_ip=$(echo "$non_egress_response" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+' | head -n1 || echo "")
                 if [[ -z "$non_egress_ip" ]]; then
-                    # Fallback to "origin" field for httpbin.org and similar services
-                    non_egress_ip=$(echo "$non_egress_response" | grep -o '"origin"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+                    # Fallback to JSON parsing for httpbin.org and other JSON services
+                    non_egress_ip=$(echo "$non_egress_response" | grep -o '"source_ip"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+                    if [[ -z "$non_egress_ip" ]]; then
+                        # Fallback to "origin" field for httpbin.org and similar services
+                        non_egress_ip=$(echo "$non_egress_response" | grep -o '"origin"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+                    fi
                 fi
                 
                 log_info "📍 Non-egress namespace sees external IP: $non_egress_ip"
@@ -550,12 +560,17 @@ CONTROL_EOF
                 control_response=$(oc exec -n egress-control-test control-test-pod -- timeout 30 curl -s "$external_echo_url" 2>/dev/null || echo "")
                 log_info "📥 Control pod response: '$control_response'"
                 
-                # Extract source IP from JSON response
+                # Extract source IP from agnhost response (plain text format)
                 local control_source_ip
-                control_source_ip=$(echo "$control_response" | grep -o '"source_ip"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+                # Handle agnhost plain text response format first
+                control_source_ip=$(echo "$control_response" | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+\.[0-9]\+' | head -n1 || echo "")
                 if [[ -z "$control_source_ip" ]]; then
-                    # Fallback to "origin" field for httpbin.org and similar services
-                    control_source_ip=$(echo "$control_response" | grep -o '"origin"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+                    # Fallback to JSON parsing for httpbin.org and other JSON services
+                    control_source_ip=$(echo "$control_response" | grep -o '"source_ip"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+                    if [[ -z "$control_source_ip" ]]; then
+                        # Fallback to "origin" field for httpbin.org and similar services
+                        control_source_ip=$(echo "$control_response" | grep -o '"origin"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4 || echo "")
+                    fi
                 fi
                 
                 if [[ -n "$control_source_ip" && "$control_source_ip" != "127.0.0.1" ]]; then
