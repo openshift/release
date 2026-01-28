@@ -35,12 +35,12 @@ chain:
 
       function mirror_test_images() {
         echo "### Mirroring test images"
-      
+
         DEVSCRIPTS_TEST_IMAGE_REPO=${DS_REGISTRY}/localimages/local-test-image
 
         openshift-tests images --to-repository ${DEVSCRIPTS_TEST_IMAGE_REPO} | grep ${DEVSCRIPTS_TEST_IMAGE_REPO} > /tmp/mirror
         scp "${SSHOPTS[@]}" /tmp/mirror "root@${IP}:/tmp/mirror"
-      
+
         # shellcheck disable=SC2087
         ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
       oc image mirror -f /tmp/mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json
@@ -121,7 +121,7 @@ chain:
           ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
           export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
           ;;
-      azure4|azure) 
+      azure4|azure)
           REGION="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/region}' nodes)"
           ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
           export TEST_PROVIDER="{\"type\":\"azure\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\"}"
@@ -197,7 +197,15 @@ chain:
           fi
 
           echo "Skipping tests:"
-          echo "${TESTS}" | grep -vxFf /tmp/tests || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
+          echo "${TESTS}" | grep -vxFf /tmp/tests || {
+            exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS";
+            if [[ "${IGNORE_EMPTY_TEST_SKIPS:-false}" == "true" ]]; then
+                echo "Ignoring empty test skips by setting IGNORE_EMPTY_TEST_SKIPS=true"
+            else
+                echo "Returning exit code $exit_code"
+                return $exit_code;
+            fi
+          }
           TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
       fi
 
@@ -205,9 +213,9 @@ chain:
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit" 2>&1 | tee /tmp/openshift-tests.log
-      
+
       exit_code=${PIPESTATUS[0]}
-                
+
       # If this line is shown in the openshift-tests output, all of the conformance test cases passed,
       # but the monitor test has failed. Currently we're ignoring MonitorTest failures until we resolve:
       # https://issues.redhat.com/browse/CNV-33717
@@ -216,7 +224,7 @@ chain:
         echo "overriding Monitor Test Failure"
         exit_code=0
       fi
-      
+
       exit ${exit_code}
 
     credentials:
@@ -285,6 +293,10 @@ chain:
     - name: HOSTED_CP
       default: ""
       documentation: Execute against a ROSA hosted control plane
+    - name: IGNORE_EMPTY_TEST_SKIPS
+      default: "false"
+      documentation: |-
+        If set to true, the job will ignore empty test skips and return a non-zero exit code.
     resources:
       requests:
         cpu: "3"
