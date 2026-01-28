@@ -22,7 +22,7 @@ help:
 
 all:  core services
 
-check: check-core check-services check-boskos check-labels check-cluster-profiles
+check: check-core check-services check-boskos check-labels check-cluster-profiles check-yaml-indentation
 	@echo "Service config check: PASS"
 
 check-boskos:
@@ -36,6 +36,10 @@ check-labels: python-help
 check-cluster-profiles: python-help
 	python3 hack/validate-cluster-profiles-config.py ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
 	@echo "Cluster profiles config check: PASS"
+
+check-yaml-indentation: python-help
+	hack/validate-yaml-indentation.sh .
+	@echo "YAML indentation check: PASS"
 
 check-core:
 	core-services/_hack/validate-core-services.sh core-services
