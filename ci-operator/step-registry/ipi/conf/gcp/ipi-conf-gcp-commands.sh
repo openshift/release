@@ -61,6 +61,26 @@ if [[ -z "${COMPUTE_NODE_TYPE}" ]]; then
   fi
 fi
 
+# Get standard zones from the region (excluding AI zones) and randomize selection
+# This prevents control plane nodes from being placed in AI zones when zones aren't explicitly set
+function get_zones_from_region() {
+  local zone_count=${1:-3}
+  # Get all zones from the region, filtering out AI zones and randomizing
+  mapfile -t AVAILABILITY_ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)' 2>/dev/null | grep -v '\-ai[0-9]' | shuf)
+  
+  # Take the first zone_count zones
+  local zones=("${AVAILABILITY_ZONES[@]:0:${zone_count}}")
+  # Format as YAML array: [zone1, zone2, zone3]
+  local zones_str="["
+  for i in "${!zones[@]}"; do
+    if [[ $i -gt 0 ]]; then
+      zones_str+=", "
+    fi
+    zones_str+="${zones[$i]}"
+  done
+  zones_str+="]"
+  echo "${zones_str}"
+}
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
@@ -86,6 +106,43 @@ compute:
     gcp:
       type: ${COMPUTE_NODE_TYPE}
 EOF
+
+# Set zones for control plane and compute in regions with AI zones to avoid AI zones
+# AI zones (e.g., us-central1-ai1a, us-south1-ai1b) are optimized for GPU/AI machine types
+# and should not be used for standard machine types like control plane nodes
+if [[ "${GCP_REGION}" == "us-central1" ]] || [[ "${GCP_REGION}" == "us-south1" ]]; then
+  export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
+  GOOGLE_PROJECT_ID=$(jq -r .project_id ${GCP_SHARED_CREDENTIALS_FILE} 2>/dev/null || echo "")
+  if [[ -n "${GOOGLE_PROJECT_ID}" ]]; then
+    sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE} 2>/dev/null || echo "")
+    if [[ -n "${sa_email}" ]] && ! gcloud auth list 2>/dev/null | grep -qE "\*\s+${sa_email}"; then
+      gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}" 2>/dev/null || true
+      gcloud config set project "${GOOGLE_PROJECT_ID}" 2>/dev/null || true
+    fi
+    
+    # Get zones for control plane (3 zones for HA)
+    CONTROL_PLANE_ZONES_STR=$(get_zones_from_region 3)
+    # Get zones for compute (same zones for consistency)
+    COMPUTE_ZONES_STR="${CONTROL_PLANE_ZONES_STR}"
+    
+    # Apply zones via patch if we got valid zones
+    if [[ -n "${CONTROL_PLANE_ZONES_STR}" ]] && [[ "${CONTROL_PLANE_ZONES_STR}" != "[]" ]]; then
+      PATCH="${SHARED_DIR}/install-config-zones.yaml.patch"
+      cat > "${PATCH}" << ZONESPATCH
+controlPlane:
+  platform:
+    gcp:
+      zones: ${CONTROL_PLANE_ZONES_STR}
+compute:
+- platform:
+    gcp:
+      zones: ${COMPUTE_ZONES_STR}
+ZONESPATCH
+      yq-go m -x -i "${CONFIG}" "${PATCH}"
+      rm "${PATCH}"
+    fi
+  fi
+fi
 
 if [ ${RT_ENABLED} = "true" ]; then
 	cat > "${SHARED_DIR}/manifest_mc-kernel-rt.yml" << EOF
