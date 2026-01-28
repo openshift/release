@@ -10,7 +10,7 @@ function mapTestsForComponentReadiness() {
         results_file="${1}"
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
-            install_yq_if_not_exists
+            # yq is installed within the container of openshift-cnv/cnv-ci/
             echo "Mapping Test Suite Name To: CNV-lp-interop"
             yq eval -px -ox -iI0 '.testsuite."+@name" = "CNV-lp-interop"' $results_file
         fi
