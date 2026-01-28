@@ -216,6 +216,7 @@ while IFS= read -r line; do
     --system-prompt "$SKILL_CONTENT" \
     --allowedTools "Bash Read Write Edit Grep Glob WebFetch" \
     --max-turns 100 \
+    --model "$CLAUDE_MODEL" \
     --verbose \
     --output-format stream-json \
     2>&1 | tee "/tmp/claude-${ISSUE_KEY}-output.json")
