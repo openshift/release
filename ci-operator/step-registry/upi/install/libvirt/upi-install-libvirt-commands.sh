@@ -240,7 +240,7 @@ else
     date
     # Upload the rhcos image to the source volume
     echo "Uploading rhcos image to source volume..."
-    ${VIRSH} vol-upload \
+    ${VIRSH} -k 60 -K 5 vol-upload \
       --vol ${VOLUME_NAME} \
       --pool ${POOL_NAME} \
       ${INSTALL_DIR}/${VOLUME_NAME}
