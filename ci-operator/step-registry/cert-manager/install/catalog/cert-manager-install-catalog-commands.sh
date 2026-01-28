@@ -1,8 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
-set -u
-set -o pipefail
+set -euo pipefail
 
 function timestamp() {
     date -u --rfc-3339=seconds
@@ -28,7 +26,7 @@ function configure_cluster_pull_secret () {
     stage_registry_path="/var/run/vault/mirror-registry/registry_stage.json"
     stage_auth_user=$(jq -r '.user' $stage_registry_path)
     stage_auth_password=$(jq -r '.password' $stage_registry_path)
-    stage_registry_auth=$(echo -n " " "$stage_auth_user":"$stage_auth_password" | base64 -w 0)
+    stage_registry_auth=$(echo -n "$stage_auth_user:$stage_auth_password" | base64 -w 0)
 
     echo "Updating the image pull secret with the auth config..."
     oc extract secret/pull-secret -n openshift-config --confirm --to /tmp
@@ -46,11 +44,11 @@ function wait_for_state() {
 
     echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to exist..."
     for _ in {1..30}; do
-        oc get ${object} --selector="${selector}" -n=${namespace} |& grep -ivE "(no resources found|not found)" && break || sleep 5
+        oc get "${object}" --selector="${selector}" -n="${namespace}" |& grep -ivE "(no resources found|not found)" && break || sleep 5
     done
 
     echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to become '${state}'..."
-    oc wait --for=${state} --timeout=${timeout} ${object} --selector="${selector}" -n="${namespace}"
+    oc wait --for="${state}" --timeout="${timeout}" "${object}" --selector="${selector}" -n="${namespace}"
     return $?
 }
 
@@ -86,16 +84,16 @@ function configure_host_pull_secret () {
     redhat_registry_path="/var/run/vault/mirror-registry/registry_redhat.json"
     redhat_auth_user=$(jq -r '.user' $redhat_registry_path)
     redhat_auth_password=$(jq -r '.password' $redhat_registry_path)
-    redhat_registry_auth=$(echo -n " " "$redhat_auth_user":"$redhat_auth_password" | base64 -w 0)
+    redhat_registry_auth=$(echo -n "$redhat_auth_user:$redhat_auth_password" | base64 -w 0)
 
     stage_registry_path="/var/run/vault/mirror-registry/registry_stage.json"
     stage_auth_user=$(jq -r '.user' $stage_registry_path)
     stage_auth_password=$(jq -r '.password' $stage_registry_path)
-    stage_registry_auth=$(echo -n " " "$stage_auth_user":"$stage_auth_password" | base64 -w 0)
+    stage_registry_auth=$(echo -n "$stage_auth_user:$stage_auth_password" | base64 -w 0)
 
     mirror_registry_path="/var/run/vault/mirror-registry/registry_creds"
     mirror_registry_auth=$(head -n 1 "$mirror_registry_path" | base64 -w 0)
-    
+
     echo "Appending the pull secrets to Podman auth configuration file '${XDG_RUNTIME_DIR}/containers/auth.json'..."
     oc extract secret/pull-secret -n openshift-config --confirm --to ${TMP_DIR}
     jq --argjson a "{\"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$mirror_registry_auth\"}}" '.auths |= . + $a' "${TMP_DIR}/.dockerconfigjson" > ${XDG_RUNTIME_DIR}/containers/auth.json
