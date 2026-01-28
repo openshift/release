@@ -10,7 +10,7 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Build hydrophone (latest version, avoid SHARED_DIR secret size limit)
+# Build hydrophone (latest version)
 echo "Building hydrophone..."
 export GOFLAGS=""
 go install sigs.k8s.io/hydrophone@latest
