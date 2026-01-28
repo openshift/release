@@ -257,6 +257,7 @@ else
       --format qcow2 \
       --capacity ${VOLUME_CAPACITY} || echo "Volume ${VOLUME_NAME} already exists, proceed without creation"
 
+    date
     # Upload the rhcos image to the source volume
     echo "Uploading rhcos image to source volume..."
     ${VIRSH} -k 60 -K 5 vol-upload \
@@ -264,6 +265,7 @@ else
       --pool ${POOL_NAME} \
       ${INSTALL_DIR}/${VOLUME_NAME}
   fi
+  date
 
   # Generate manifests for cluster modifications
   echo "Generating manifests..."
@@ -506,6 +508,7 @@ if [ "$INSTALLER_TYPE" == "agent" ]; then
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/id_rsa
     chmod 600 ~/.ssh/id_rsa
   fi
+  sleep 30m
   restart_nodes &
   ${OCPINSTALL} --dir "${INSTALL_DIR}" agent wait-for bootstrap-complete --log-level=debug &
 else
