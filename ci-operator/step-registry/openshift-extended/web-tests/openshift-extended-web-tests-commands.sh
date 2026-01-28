@@ -31,6 +31,9 @@ else
   elif [[ "$E2E_RUN_TAGS" =~ @level0 ]]; then
     echo "only run level0 scenarios"
     ./console-test-frontend.sh --tags @level0 || true
+  elif [[ "$E2E_RUN_TAGS" =~ @hypershift-bm-ui ]]; then
+    echo "only run hypershift-bm-ui scenarios"
+    ./console-test-frontend.sh --tags @hypershift-bm-ui || true
   elif [[ "X${E2E_RUN_TAGS}X" == 'XNetwork_ObservabilityX' ]]; then
     # not using --grepTags here since cypress in 4.12 doesn't have that plugin
     echo "Running Network_Observability tests"
