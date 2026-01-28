@@ -46,31 +46,23 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:\.tekton|\.github)|\.md$|^(?:\.gitignore|OWNERS|LICENSE)$
-- as: integration-test
+- always_run: false
+  as: integration-test
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 15m0s
-    version: "4.12"
+    version: "4.16"
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     test:
     - as: test
       cli: latest
       commands: |
-        echo $PULL_NUMBER
-        ## Temporary CI run blocker by PR title,
-        ## only PR with title containing `run-int-test` will continue to run integration tests
-        if curl -s "https://api.github.com/repos/openshift/aws-account-operator/pulls/${PULL_NUMBER}" | grep -ioPq '"title":\s*"\K[^,"]*run-int-test';
-            then
-                echo -e "\nStarting Integration Test\n"
-                make prow-ci-entrypoint
-            else
-                echo -e "\nSkipped Integration Test\n"
-        fi
+        echo -e "\nStarting Integration Test\n"
+        make prow-ci-entrypoint
       credentials:
       - collection: ""
         mount_path: /tmp/secret/aao-aws-creds
@@ -78,8 +70,12 @@ tests:
         namespace: test-credentials
       from: src
       resources:
+        limits:
+          memory: 4Gi
         requests:
-          cpu: 100m
+          cpu: 500m
+          memory: 2Gi
+      timeout: 2h0m0s
     workflow: generic-claim
 zz_generated_metadata:
   branch: master

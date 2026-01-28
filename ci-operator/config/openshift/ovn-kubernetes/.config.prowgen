@@ -4,10 +4,26 @@ slack_reporter:
   - success
   - failure
   - error
-  report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
-      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
-      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs> :warning: {{end}}'
+  - triggered
+  report_template: |-
+      {{- $link := "" }}
+      {{- $ref := "" }}
+      {{- if .Spec.Refs.Pulls }}
+        {{- $pull := index .Spec.Refs.Pulls 0 }}
+        {{- $link = $pull.Link }}
+        {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+      {{- else }}
+        {{- $link = .Spec.Refs.BaseLink }}
+        {{- $ref = .Spec.Refs.BaseRef }}
+      {{- end }}
+
+      {{- if eq .Status.State "success" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{- else if eq .Status.State "triggered" -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+      {{- else -}}
+        :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+      {{- end -}}
   job_names:
   - ovncore-perfscale-aws-ovn-large-node-density-cni
   - ovncore-perfscale-aws-ovn-large-cluster-density-v2

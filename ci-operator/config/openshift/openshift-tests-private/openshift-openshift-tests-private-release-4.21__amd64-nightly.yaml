@@ -2118,6 +2118,7 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
+      HYPERSHIFT_DYNAMIC_DNS: hypershift-kas-dns.qe1.azure.devcluster.openshift.com
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
       TEST_TIMEOUT: "30"
     test:
@@ -2257,6 +2258,22 @@ tests:
     test:
     - ref: cucushift-hypershift-extended-health-check
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: aws-ipi-f7-longduration-workload
+  cron: 1 4 1,8,15,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6i.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.xlarge
+      OCP_ARCH: amd64
+      OVERRIDE_OC_MIRROR: "true"
+      TEST_SCENARIOS: Workloads ocmirror
+      TEST_TIMEOUT: "600"
+    test:
+    - ref: idp-htpasswd
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: azure-ipi-private-fips-f28-disasterrecovery
   cron: 35 19 25 * *
   steps:
@@ -2493,7 +2510,7 @@ tests:
       FILTERS_ADDITIONAL: ""
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
+      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&;~DEPRECATED&;Disruptive&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Compliance_Operator
       TEST_TIMEOUT: "60"
@@ -2537,7 +2554,7 @@ tests:
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Security_Profiles_Operator
+      TEST_SCENARIOS: Security_Profiles_Operator|Node_Audit_Logging
     test:
     - ref: file-integrity-konflux-catalogsource
     - ref: openshift-extended-test
@@ -3148,8 +3165,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-gcp-upi
-- as: ibmcloud-ipi-dedicatedhost-dynamic-f28
-  cron: 56 1 8 * *
+- as: ibmcloud-ipi-dedicatedhost-dynamic-f999
+  cron: 8 21 29 2 *
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -3215,8 +3232,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
-- as: ibmcloud-ipi-ovn-mtu-migrate-f28
-  cron: 44 11 11 * *
+- as: ibmcloud-ipi-ovn-mtu-migrate-f999
+  cron: 8 21 29 2 *
   steps:
     cluster_profile: ibmcloud-qe
     test:

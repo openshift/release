@@ -109,8 +109,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.18"
-  minimum_interval: 96h
-  presubmit: true
+  cron: '@daily'
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -121,7 +120,7 @@ tests:
     test:
     - chain: kueue-operator-test-e2e
 - as: test-e2e-4-19-arm64
-  minimum_interval: 96h
+  cron: '@daily'
   steps:
     cluster_profile: aws
     dependencies:
@@ -145,8 +144,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.19"
-  minimum_interval: 96h
-  presubmit: true
+  cron: '@daily'
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-main
@@ -157,7 +155,7 @@ tests:
     test:
     - chain: kueue-operator-test-e2e
 - as: test-e2e-4-19-fips
-  minimum_interval: 96h
+  cron: '@daily'
   steps:
     cluster_profile: aws
     env:
@@ -172,7 +170,7 @@ tests:
     - chain: kueue-operator-test-e2e
     workflow: ipi-aws
 - as: test-e2e-4-19-hypershift
-  minimum_interval: 96h
+  cron: '@daily'
   steps:
     cluster_profile: aws-2
     env:
@@ -190,7 +188,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.20"
-  minimum_interval: 96h
+  cron: '@daily'
   presubmit: true
   steps:
     env:
@@ -209,7 +207,45 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.20"
-  minimum_interval: 96h
+  cron: '@daily'
+  presubmit: true
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-upstream
+- as: test-e2e-downstream-4-21
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  cron: '@daily'
+  presubmit: true
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-main
+      OPERAND_COMPONENT: kueue-operand-main
+      OPERATOR_COMPONENT: kueue-operator-main
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-downstream
+- as: test-e2e-upstream-4-21
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  cron: '@daily'
   presubmit: true
   steps:
     env:
@@ -258,7 +294,7 @@ tests:
 - as: test-e2e-disconnected
   capabilities:
   - arm64
-  minimum_interval: 96h
+  cron: '@daily'
   steps:
     cluster_profile: gcp
     env:

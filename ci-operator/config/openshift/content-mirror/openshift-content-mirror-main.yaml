@@ -1,0 +1,42 @@
+base_images:
+  ci_origin-release_golang-1.23:
+    name: origin-release
+    namespace: ci
+    tag: golang-1.23
+  os:
+    name: centos
+    namespace: openshift
+    tag: stream9
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.20
+images:
+- dockerfile_path: Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/content-mirror/content-mirror
+    ci_origin-release_golang-1.23:
+      as:
+      - registry.ci.openshift.org/ci/origin-release:golang-1.23
+  to: content-mirror
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: content-mirror

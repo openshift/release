@@ -72,7 +72,18 @@ function update_global_auth () {
   reg_brew_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
   reg_brew_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
   brew_registry_auth=`echo -n "${reg_brew_user}:${reg_brew_password}" | base64 -w 0`
-  jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"},\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
+  
+  # Merge konflux operator art image share credentials if available
+  konflux_dockerconfig="/var/run/vault/deploy-konflux-operator-art-image-share/.dockerconfigjson"
+  if [[ -f "${konflux_dockerconfig}" ]]; then
+    echo "Merging konflux operator art image share credentials..."
+    # Extract auths from konflux dockerconfig and merge with other auths
+    konflux_auths=$(cat "${konflux_dockerconfig}" | jq -r '.auths')
+    jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"},\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}}" --argjson konflux "$konflux_auths" '.auths |= . + $a + $konflux' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
+  else
+    echo "Konflux credentials not found at ${konflux_dockerconfig}, skipping..."
+    jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"${brew_registry_auth}\"},\"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\"},\"quay.io/openshifttest\": {\"auth\": \"${openshifttest_registry_auth}\"},\"registry.stage.redhat.io\": {\"auth\": \"$stage_registry_auth\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > ${new_dockerconfig}
+  fi
 
  # run_command "cat ${new_dockerconfig} | jq"
 
