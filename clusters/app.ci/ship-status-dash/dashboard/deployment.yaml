@@ -113,6 +113,8 @@ spec:
           - "--port=8080"
           - "--hmac-secret-file=/etc/secrets/hmac-secret/hmac"
           - "--cors-origin=https://ship-status.ci.openshift.org"
+          - "--slack-base-url=https://ship-status.ci.openshift.org/"
+          - "--slack-workspace-url=https://redhat-internal.slack.com/"
         ports:
           - containerPort: 8080
             protocol: TCP
@@ -122,6 +124,12 @@ spec:
               secretKeyRef:
                 name: postgres
                 key: dsn
+          - name: SLACK_BOT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                #TODO(sgoeddel): replace with custom SHIP Status bot when available
+                name: slack-credentials-dptp-bot
+                key: oauth_token
         volumeMounts:
           - name: release
             mountPath: /var/repo
