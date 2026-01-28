@@ -16,6 +16,8 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
+which podman >/dev/null 2>&1 && echo "Podman installed" || echo "Podman NOT installed"
+
 # Starting in 4.21, we will aggressively retry test failures only in
 # presubmits to determine if a failure is a flake or legitimate. This is
 # to reduce the number of retests on PR's.
