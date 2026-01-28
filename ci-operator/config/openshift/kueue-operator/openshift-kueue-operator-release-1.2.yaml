@@ -151,7 +151,6 @@ tests:
     timeout: 1h0m0s
     version: "4.19"
   cron: '@daily'
-  presubmit: true
   steps:
     env:
       BUNDLE_COMPONENT: kueue-bundle-1-2
@@ -266,6 +265,25 @@ tests:
           cpu: 300m
           memory: 500Mi
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
+- as: test-e2e-4-21
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  cron: '@daily'
+  presubmit: true
+  steps:
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-1-2
+      OPERAND_COMPONENT: kueue-operand-1-2
+      OPERATOR_COMPONENT: kueue-operator-1-2
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e
 zz_generated_metadata:
   branch: release-1.2
   org: openshift
