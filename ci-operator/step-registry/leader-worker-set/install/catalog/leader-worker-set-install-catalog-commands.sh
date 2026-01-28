@@ -1,8 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
-set -u
-set -o pipefail
+set -euo pipefail
 
 function timestamp() {
     date -u --rfc-3339=seconds
@@ -28,7 +26,7 @@ function configure_cluster_pull_secret () {
     stage_registry_path="/var/run/vault/mirror-registry/registry_stage.json"
     stage_auth_user=$(jq -r '.user' $stage_registry_path)
     stage_auth_password=$(jq -r '.password' $stage_registry_path)
-    stage_registry_auth=$(echo -n " " "$stage_auth_user":"$stage_auth_password" | base64 -w 0)
+    stage_registry_auth=$(echo -n "$stage_auth_user:$stage_auth_password" | base64 -w 0)
 
     echo "Updating the image pull secret with the auth config..."
     oc extract secret/pull-secret -n openshift-config --confirm --to /tmp
@@ -46,11 +44,11 @@ function wait_for_state() {
 
     echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to exist..."
     for _ in {1..30}; do
-        oc get ${object} --selector="${selector}" -n=${namespace} |& grep -ivE "(no resources found|not found)" && break || sleep 5
+        oc get "${object}" --selector="${selector}" -n="${namespace}" |& grep -ivE "(no resources found|not found)" && break || sleep 5
     done
 
     echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to become '${state}'..."
-    oc wait --for=${state} --timeout=${timeout} ${object} --selector="${selector}" -n="${namespace}"
+    oc wait --for="${state}" --timeout="${timeout}" "${object}" --selector="${selector}" -n="${namespace}"
     return $?
 }
 
@@ -86,12 +84,12 @@ function configure_host_pull_secret () {
     redhat_registry_path="/var/run/vault/mirror-registry/registry_redhat.json"
     redhat_auth_user=$(jq -r '.user' $redhat_registry_path)
     redhat_auth_password=$(jq -r '.password' $redhat_registry_path)
-    redhat_registry_auth=$(echo -n " " "$redhat_auth_user":"$redhat_auth_password" | base64 -w 0)
+    redhat_registry_auth=$(echo -n "$redhat_auth_user:$redhat_auth_password" | base64 -w 0)
 
     stage_registry_path="/var/run/vault/mirror-registry/registry_stage.json"
     stage_auth_user=$(jq -r '.user' $stage_registry_path)
     stage_auth_password=$(jq -r '.password' $stage_registry_path)
-    stage_registry_auth=$(echo -n " " "$stage_auth_user":"$stage_auth_password" | base64 -w 0)
+    stage_registry_auth=$(echo -n "$stage_auth_user:$stage_auth_password" | base64 -w 0)
 
     mirror_registry_path="/var/run/vault/mirror-registry/registry_creds"
     mirror_registry_auth=$(head -n 1 "$mirror_registry_path" | base64 -w 0)
@@ -114,7 +112,7 @@ function install_oc_mirror () {
 
 # Applicable for 'disconnected' env
 function mirror_catalog_and_operator() {
-    echo "[$(timestamp)] Creaing ImageSetConfiguration for catalog and operator related images..."
+    echo "[$(timestamp)] Creating ImageSetConfiguration for catalog and operator related images..."
     cat > ${TMP_DIR}/imageset.yaml << EOF
 apiVersion: mirror.openshift.io/v2alpha1
 kind: ImageSetConfiguration
@@ -134,16 +132,16 @@ EOF
     if [ -f "${OC_MIRROR_OUTPUT_DIR}/idms-oc-mirror.yaml" ] ; then
         echo "[$(timestamp)] Replacing the generated idms name with the ENV var '$IDMS_NAME'..."
         run_command "./yq eval '.metadata.name = \"$IDMS_NAME\"' -i ${OC_MIRROR_OUTPUT_DIR}/idms-*.yaml"
-    else 
-        echo "No idms file found. Skipping replase ..."
+    else
+        echo "No idms file found. Skipping replace ..."
     fi
-    
-    
+
+
     if [ -f "${OC_MIRROR_OUTPUT_DIR}/itms-oc-mirror.yaml" ] ; then
         echo "[$(timestamp)] Replacing the generated itms name with the ENV var '$ITMS_NAME'..."
         run_command "./yq eval '.metadata.name = \"$ITMS_NAME\"' -i ${OC_MIRROR_OUTPUT_DIR}/itms-*.yaml"
-    else 
-        echo "No itms file found. Skipping replase ..."
+    else
+        echo "No itms file found. Skipping replace ..."
     fi
 
     echo "[$(timestamp)] Checking and applying the generated resource files..."
