@@ -250,7 +250,7 @@ CONFIG = {
         'default': 3,
     },
     'aro-hcp-prod-quota-slice': {
-        'default': 7,
+        'default': 2,
     },
     'aro-hcp-dev-quota-slice': {
         'default': 10,
