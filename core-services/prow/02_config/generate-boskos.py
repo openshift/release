@@ -691,7 +691,7 @@ for i in range(4):
 for i in range(4):
     CONFIG['powervs-7-quota-slice']['lon06-powervs-7-quota-slice-{}'.format(i)] = 1
 
-for i in range(2):
+for i in range(4):
     CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
 
 for i in range(90):
