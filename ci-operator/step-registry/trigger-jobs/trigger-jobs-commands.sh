@@ -49,16 +49,16 @@ if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
 fi
 
 # GS Bare-Metal tests: only run self-managed GS baremetal tests on even-numbered weeks.
-if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
-        $JSON_TRIGGER_LIST == *"$gs_baremetal_string"* &&
+if [[  $JSON_TRIGGER_LIST == *"$gs_baremetal_string"* &&
+        $JSON_TRIGGER_LIST != *"${self_managed_string}"* &&
         $JSON_TRIGGER_LIST != *"$fips_string"* &&
         $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
   # Check if the week number is even
     if [ $((WEEK_NUM % 2)) -eq 0 ]; then
-      echo "Triggering GS Bare-Metal testing because it is an even-numbered week."
+      echo "Triggering GS Bare-Metal testing because it is an even-numbered week (Week $WEEK_NUM)"
       echo "Continue..."
     else
-      echo "Not triggering GS Bare-Metal testing because it is an odd-numbered week."
+      echo "Not triggering GS Bare-Metal testing because it is an odd-numbered week (Week $WEEK_NUM)."
     exit 0
   fi
 fi
