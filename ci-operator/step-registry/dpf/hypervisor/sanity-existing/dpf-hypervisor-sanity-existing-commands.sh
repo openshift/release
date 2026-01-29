@@ -4,7 +4,7 @@ set -euo pipefail
 # Sanity test on EXISTING cluster - no provisioning
 # Uses kubeconfig and sanity-env from Vault
 
-REMOTE_HOST="${REMOTE_HOST:-nvd-srv-45.nvidia.eng.rdu2.dc.redhat.com}"
+REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
 BUILD_ID="${BUILD_ID:-$(date +%Y%m%d-%H%M%S)}"
 
 echo "=== DPF Sanity Test on Existing Cluster ==="
@@ -32,10 +32,9 @@ SANITY_DIR="/tmp/dpf-sanity-${BUILD_ID}"
 echo "Creating working directory: ${SANITY_DIR}"
 ${SSH} "mkdir -p ${SANITY_DIR}"
 
-# Copy repository to hypervisor (tar + ssh, rsync not available)
+# Copy repository to hypervisor using git archive (only tracked files)
 echo "Copying repository to hypervisor..."
-tar czf - --exclude='.git' --exclude='logs' --exclude='*.log' . | \
-    ${SSH} "tar xzf - -C ${SANITY_DIR}"
+git archive --format=tar HEAD | ${SSH} "tar xf - -C ${SANITY_DIR}"
 
 # Decode and copy kubeconfig from Vault
 echo "Setting up kubeconfig..."
