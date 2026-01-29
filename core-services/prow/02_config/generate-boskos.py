@@ -636,6 +636,8 @@ for i in range(2,7):
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
+del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-0']
+del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
 
 for i in range(3):
     for j in range(4):
