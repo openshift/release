@@ -25,11 +25,4 @@ sed -i '/server: https:\/\/127.0.0.1:6443/a\    insecure-skip-tls-verify: true' 
 ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -L 6443:192.168.122.253:6443 root@${REMOTE_HOST} -N -f
 sleep 5
 export KUBECONFIG=/tmp/kubeconfig
-export ECO_TEST_FEATURES=nfd
-export ECO_TEST_LABELS=NFD
-export ECO_TEST_VERBOSE='true'
-export ECO_VERBOSE_LEVEL=90
-export ECO_HWACCEL_NFD_SUBSCRIPTION_NAME="nfd"
-export ECO_HWACCEL_NFD_CATALOG_SOURCE="redhat-operators"
-export ECO_HWACCEL_NFD_CPU_FLAGS_HELPER_IMAGE="quay.io/rh_ee_ggordani/cpuinfo:release-4.16"
 ./scripts/test-runner.sh
