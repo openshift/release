@@ -7,6 +7,7 @@
 5. [`periodic-openshift-release-fast-forward`](#periodic-openshift-release-fast-forward)
 6. [`periodic-check-gh-automation`](#periodic-check-gh-automation)
 7. [`periodic-openshift-release-private-org-sync`](#periodic-openshift-release-private-org-sync)
+8. [`periodic-ipi-deprovision-gcp`](#periodic-ipi-deprovision-gcp)
 
 ## `branch-ci-openshift-release-master-release-controller-annotate`
 
@@ -326,3 +327,50 @@ Th job is trying to find a cluster pool image for a version range that does not 
 #### Resolution
 
 Create a PR similar to this one: https://github.com/openshift/release/pull/65517
+
+## `periodic-ipi-deprovision-gcp`
+
+This job runs periodically to clean up leftover GCP resources from CI jobs. There are multiple variants of this job:
+- `periodic-ipi-deprovision-gcp`
+- `periodic-ipi-deprovision-gcp-2`
+- `periodic-ipi-deprovision-gcp-3`
+
+#### Useful Links
+
+- [Recent executions on Deck (gcp)](https://prow.ci.openshift.org/?job=periodic-ipi-deprovision-gcp)
+- [Recent executions on Deck (gcp-2)](https://prow.ci.openshift.org/?job=periodic-ipi-deprovision-gcp-2)
+- [Recent executions on Deck (gcp-3)](https://prow.ci.openshift.org/?job=periodic-ipi-deprovision-gcp-3)
+- [infra-build-farm-periodics.yaml (ProwJob configuration)](https://github.com/openshift/release/blob/master/ci-operator/jobs/infra-build-farm-periodics.yaml)
+- [GCP Console](https://console.cloud.google.com)
+
+### Deprovision failed on specific cluster namespace
+
+#### Symptom
+
+The job logs show a message like:
+```
+Deprovision failed on the following clusters:
+ci-op-stc5342j-c1497
+```
+
+Example: https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ipi-deprovision-gcp/2016438082579992576
+
+#### Culprit
+
+When a GCP deprovision job fails and specifies which namespace (similar to the example above), the VPC network 
+is usually the only resource that causes such an issue. This happens if any related resources were removed unexpectedly. 
+It occurs rarely but when it does, the VPC network is typically the blocking resource preventing full deprovision.
+
+#### Resolution
+
+1. Navigate to the [GCP Console](https://console.cloud.google.com)
+2. Select the appropriate GCP project (one of our CI projects)
+3. Go to **VPC Network** → **VPC Networks** in the menu
+4. Find the VPC network associated with the failed cluster namespace (e.g., search for `ci-op-stc5342j-c1497`)
+5. Check if the VPC is empty before deleting:
+   - Click on the VPC network to view its details
+   - The VPC is usually empty, but sometimes contains empty subnets
+   - If there are subnets, check if they contain any instances
+   - If the subnets are empty (no instances), it's usually safe to delete them first
+   - Delete any empty subnets, then delete the VPC network
+6. The next deprovision job run should complete successfully and clear the rest of the resources
