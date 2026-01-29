@@ -16,6 +16,7 @@ platform:
   gcp:
     endpoint:
       name: ${gcp_custom_endpoint}
+      clusterUseOnly: ${CUSTOM_ENDPOINT_FOR_CLUSTER_OPERATORS_ONLY}
 EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
