@@ -892,9 +892,18 @@ function check_upgrade_status() {
         fi
     done
     if [[ ${wait_upgrade} -le 0 ]]; then
+	echo "MODIFIED SCRIPT"
+
         echo -e "Upgrade checking timeout at $(date "+%F %T")\n"
         end_time=$(date "+%s")
         echo -e "Eclipsed Time: $(( ($end_time - $start_time) / 60 ))m\n"
+
+        echo "WAITING FOR DEBUG..."
+        while [ ! -f "/tmp/continue" ]
+        do
+            sleep 10
+        done
+
         check_failed_operator
         return 1
     fi
@@ -1271,4 +1280,11 @@ for target in "${TARGET_RELEASES[@]}"; do
         run_upgrade_e2e "${index}" &>> "${test_log_dir}/4.${TARGET_MINOR_VERSION}-e2e-log.txt" || true
 	echo "End e2e test..."
     fi
+done
+
+
+echo "WAITING FOR DEBUG..."
+while [ ! -f "/tmp/continue" ]
+do
+    sleep 10
 done
