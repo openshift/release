@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail -x
+set -euo pipefail
 
 echo HyperShift CLI version
 /usr/bin/hypershift version
@@ -245,6 +245,8 @@ bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} > $
 
 # Data for cluster bot.
 # The kubeadmin-password secret is reconciled only after the kas is available so we will wait up to 5 minutes for it to become available
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x # Always disable tracing due to below lines printing protected stuff, in case this script happens to enable tracing again in future
 echo "Retrieving kubeadmin password"
 for _ in {1..50}; do
   kubeadmin_pwd=`oc get secret --namespace=clusters ${CLUSTER_NAME}-kubeadmin-password --template='{{.data.password}}' | base64 -d` || true
@@ -256,6 +258,7 @@ for _ in {1..50}; do
     break
   fi
 done
+$WAS_TRACING && set -x
 
 if [[ ! -f ${SHARED_DIR}/kubeadmin-password ]]; then
   echo "Failed to get kubeadmin password for the cluster"
@@ -274,5 +277,8 @@ until \
 done
 
 # Data for cluster bot.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x # Always disable tracing due to below lines printing cluster urls, in case this script happens to enable tracing again in future
 echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+$WAS_TRACING && set -x
 KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "created-at=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
