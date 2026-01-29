@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: golang-1.18
 images:
 - dockerfile_path: Containerfile
   to: dpf-ci
@@ -15,16 +15,25 @@ resources:
       memory: 1Gi
 tests:
 - as: validate
+  capabilities:
+  - intranet
   commands: make ci-validate
   container:
     from: dpf-ci
+  restrict_network_access: false
   timeout: 15m0s
 - as: sanity
+  capabilities:
+  - intranet
+  restrict_network_access: false
   steps:
     test:
     - ref: dpf-hypervisor-sanity-existing
   timeout: 1h0m0s
 - as: e2e
+  capabilities:
+  - intranet
+  restrict_network_access: false
   steps:
     workflow: dpf-hypervisor-e2e
   timeout: 8h0m0s
