@@ -1123,7 +1123,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260113-898377d8b
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260128-95b2a3412
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -2017,30 +2017,37 @@ presubmits:
             cpu: 10m
     trigger: (?m)^/test( | .* )sync-rover-groups,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/yamllint
     decorate: true
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-yamllint
     rerun_command: /test yamllint
+    run_if_changed: ^.*\.(yaml|yml)$
     spec:
       containers:
       - args:
-        - --strict
-        - -d
-        - '{extends: default, rules: {indentation: disable, document-start: disable,
-          comments: disable, line-length: disable}}'
         - clusters
         - core-services
         - OWNERS_ALIASES
         command:
-        - yamllint
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_yamllint_latest
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          # Run our comprehensive YAML validation (includes indentation, syntax, structure)
+          export GIT_DIFF=1
+          hack/validate-yaml-indentation.sh . --use-yamllint
+          # Also run yamllint on specific directories for additional checks (if available)
+          if command -v yamllint &> /dev/null; then
+            yamllint --strict -d '{extends: default, rules: {indentation: disable, document-start: disable, comments: disable, line-length: disable}}' clusters core-services OWNERS_ALIASES
+          fi
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:
