@@ -1,0 +1,37 @@
+ref:
+  as: hypershift-jira-agent-setup
+  from: claude-ai-helpers
+  commands: hypershift-jira-agent-setup-commands.sh
+  env:
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+    documentation: |-
+      Enable Vertex AI for Claude Code.
+  - name: CLOUD_ML_REGION
+    default: "us-east5"
+    documentation: |-
+      Google Cloud region for Vertex AI.
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+    documentation: |-
+      Google Cloud project ID for Vertex AI authentication.
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/claude-prow"
+    documentation: |-
+      Path to the Google Cloud service account JSON key file for Vertex AI authentication.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  documentation: |-
+    Setup step for the HyperShift Jira agent periodic job.
+    This step:
+    - Clones the HyperShift repository
+    - Configures git credentials for creating commits
+    - Sets up GitHub CLI authentication
+    - Verifies Claude Code CLI is available
+    - Uses Vertex AI for Claude authentication via GCP service account
