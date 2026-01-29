@@ -367,5 +367,10 @@ It occurs rarely but when it does, the VPC network is typically the blocking res
 2. Select the appropriate GCP project (one of our CI projects)
 3. Go to **VPC Network** → **VPC Networks** in the menu
 4. Find the VPC network associated with the failed cluster namespace (e.g., search for `ci-op-stc5342j-c1497`)
-5. Manually delete the VPC network
+5. Check if the VPC is empty before deleting:
+   - Click on the VPC network to view its details
+   - The VPC is usually empty, but sometimes contains empty subnets
+   - If there are subnets, check if they contain any instances
+   - If the subnets are empty (no instances), it's usually safe to delete them first
+   - Delete any empty subnets, then delete the VPC network
 6. The next deprovision job run should complete successfully and clear the rest of the resources
