@@ -31,7 +31,11 @@ spec:
   hugepages:
     defaultHugepagesSize: 1G
     pages:
-    - count: ${HUGEPAGES_COUNT}
+    - count: ${HUGEPAGES_COUNT_NUMA0}
+      node: 0
+      size: 1G
+    - count: ${HUGEPAGES_COUNT_NUMA1}
+      node: 1
       size: 1G
   machineConfigPoolSelector:
     pools.operator.machineconfiguration.openshift.io/worker: ''
