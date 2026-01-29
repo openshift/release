@@ -2,7 +2,7 @@
 set -e
 set -o pipefail
 
-echo "Deploying spoke standard cluster: ${SPOKE_CLUSTER}"
+echo "Deploying compact spoke cluster: ${SPOKE_CLUSTER}"
 
 process_inventory() {
     local directory="$1"
@@ -78,7 +78,7 @@ export ANSIBLE_CONFIG=/tmp/ansible.cfg
 
 cd /eco-ci-cd
 
-echo "Running ZTP deployment for spoke cluster: ${SPOKE_CLUSTER}"
+echo "Running ZTP deployment for compact spoke cluster: ${SPOKE_CLUSTER}"
 ansible-playbook -i inventories/ocp-deployment/build-inventory.py \
      playbooks/ran/deploy-spoke-ztp.yml \
      -e ansible_remote_tmp=/tmp/.ansible/tmp \
@@ -88,3 +88,4 @@ ansible-playbook -i inventories/ocp-deployment/build-inventory.py \
                    masters_secret_name=${MASTERS_SECRET_NAME} \
                    ocp_version=${VERSION} \
                    ztp_git_repo_url=${ZTP_GIT_REPO}"
+
