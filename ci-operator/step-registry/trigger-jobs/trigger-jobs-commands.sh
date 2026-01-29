@@ -9,34 +9,56 @@ WEEKLY_JOBS="$SECRETS_DIR/$JSON_TRIGGER_LIST"
 URL="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
 #Get the day of the month
 month_day=$(date +%-d)
+# Get the current ISO week number (1-53)
+WEEK_NUM=$(date +\%V)
 
-# additional checks for self-managed fips and non-fips testing
+
+# additional checks for self-managed fips, non-fips, and gs-baremetal testing
 self_managed_string='self-managed-lp-interop-jobs'
 zstream_string='zstream'
 fips_string='fips'
+gs_baremetal_string='gs_baremetal'
 
-# only run self-managed fips if date <= 7 and non-fips scenarios if date > 7 .
+# Non-FIPS: run self-managed non-fips scenarios if date > 7.
 echo "Checking to see if it is a test day for ${JSON_TRIGGER_LIST}"
 if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
         $JSON_TRIGGER_LIST != *"$fips_string"* &&
-        $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
+        $JSON_TRIGGER_LIST != *"$zstream_string"* && 
+        $JSON_TRIGGER_LIST != *"$gs_baremetal_string"* ]]; then
         if (( $month_day > 7 )); then
     echo "Triggering jobs because it's a Monday not in the first week of the month."
     echo "Continue..."
   else
-    echo "We do not run self-managed scenarios on first week of the month"
+    echo "We do not run non-FIPS self-managed scenarios on first week of the month"
     exit 0
   fi
 fi
 
+# FIPS: only run self-managed fips scenarios if date <= 7.
 if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
         $JSON_TRIGGER_LIST == *"$fips_string"* &&
-        $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
+        $JSON_TRIGGER_LIST != *"$zstream_string"* && 
+        $JSON_TRIGGER_LIST != *"$gs_baremetal_string"* ]]; then
   if (( $month_day <= 7 )); then
     echo "Triggering jobs because it's the first Monday of the month."
     echo "Continue..."
   else
     echo "We do not run self-managed fips scenarios past the first Monday of the month"
+    exit 0
+  fi
+fi
+
+# GS Bare-Metal tests: only run self-managed GS baremetal tests on even-numbered weeks.
+if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
+        $JSON_TRIGGER_LIST == *"$gs_baremetal_string"* &&
+        $JSON_TRIGGER_LIST != *"$fips_string"* &&
+        $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
+  # Check if the week number is even
+    if [ $((WEEK_NUM % 2)) -eq 0 ]; then
+      echo "Triggering GS Bare-Metal testing because it is an even-numbered week."
+      echo "Continue..."
+    else
+      echo "Not triggering GS Bare-Metal testing because it is an odd-numbered week."
     exit 0
   fi
 fi
