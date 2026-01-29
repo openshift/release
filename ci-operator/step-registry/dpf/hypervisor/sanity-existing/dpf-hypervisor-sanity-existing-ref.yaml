@@ -1,0 +1,35 @@
+ref:
+  as: dpf-hypervisor-sanity-existing
+  commands: dpf-hypervisor-sanity-existing-commands.sh
+  credentials:
+  - mount_path: /var/run/dpf-ci
+    name: dpf-ci
+    namespace: test-credentials
+  documentation: |-
+    Run DPF sanity tests on an EXISTING cluster without provisioning.
+
+    This step:
+    1. Sets up SSH access to hypervisor
+    2. Copies kubeconfig from Vault (existing cluster)
+    3. Uses sanity-env from Vault for configuration
+    4. Runs 'make run-dpf-sanity'
+    5. Cleans up temporary files
+
+    Use this for quick validation on doca8 or other existing clusters.
+    Does NOT create or destroy any cluster resources.
+
+    Required Vault secrets:
+    - private-key: SSH key for hypervisor
+    - kubeconfig: Base64 kubeconfig for existing cluster
+    - sanity-env: Base64 env file with CLUSTER_NAME, etc.
+
+    Expected duration: 15-30 minutes
+  env:
+  - default: nvd-srv-45.nvidia.eng.rdu2.dc.redhat.com
+    name: REMOTE_HOST
+  from: dpf-ci
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 1h0m0s
