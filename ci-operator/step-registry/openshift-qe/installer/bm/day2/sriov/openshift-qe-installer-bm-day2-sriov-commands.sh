@@ -7,6 +7,9 @@ cat /etc/os-release
 
 SRIOV_NUM_VFS=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".sriov_num_vfs")
 SRIOV_PF_NAME=$(cat ${CLUSTER_PROFILE_DIR}/sriov_pf_name)
+SRIOV_KERNEL_VFS_RANGE=$(cat ${CLUSTER_PROFILE_DIR}/sriov_kernel_vfs_range)
+SRIOV_DPDK_VFS_RANGE=$(cat ${CLUSTER_PROFILE_DIR}/sriov_dpdk_vfs_range)
+
 
 oc config view
 oc projects
@@ -70,82 +73,40 @@ EOF
 
 sleep 180
 
-# Create the SRIOV network policy for CUSTOMCNF
+# Create the SRIOV network policy for Kernel and DPDK VFs
 
 cat << EOF| oc apply -f -
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
 metadata:
-  name: server-vfs-policy-worker-customcnf
+  name: ${SRIOV_POLICY_NAME_KERNEL_VFS}
   namespace: openshift-sriov-network-operator
 spec:
   deviceType: netdevice
   nicSelector:
     pfNames:
-     - ${SRIOV_PF_NAME}
+     - ${SRIOV_PF_NAME}#{KERNEL_VFS_RANGE}
   mtu: ${SRIOV_MTU}
   nodeSelector:
-    ${SRIOV_NODE_SELECTOR_WORKER_CUSTOMCNF}: ""
+    ${SRIOV_NODE_SELECTOR}: ""
   numVfs: ${SRIOV_NUM_VFS}
-  resourceName: servervfs
+  resourceName: ${SRIOV_RESOURCE_NAME_KERNEL_VFS}
 EOF
 
-# Create the SRIOV network policy for WORKER-DPDK
 cat << EOF| oc apply -f -
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
 metadata:
-  name: dpdk-vfs-policy-worker-dpdk
+  name: ${SRIOV_POLICY_NAME_DPDK_VFS}
   namespace: openshift-sriov-network-operator
 spec:
   deviceType: vfio-pci
   nicSelector:
     pfNames:
-     - ${SRIOV_PF_NAME}#0-63
+     - ${SRIOV_PF_NAME}#{DPDK_VFS_RANGE}
   mtu: ${SRIOV_MTU}
   nodeSelector:
-    ${SRIOV_NODE_SELECTOR_WORKER_DPDK}: ""
+    ${SRIOV_NODE_SELECTOR}: ""
   numVfs: ${SRIOV_NUM_VFS}
-  resourceName: dpdkvfs
+  resourceName: ${SRIOV_RESOURCE_NAME_DPDK_VFS}
 EOF
-
-cat << EOF| oc apply -f -
-apiVersion: sriovnetwork.openshift.io/v1
-kind: SriovNetworkNodePolicy
-metadata:
-  name: server-vfs-policy-worker-dpdk
-  namespace: openshift-sriov-network-operator
-spec:
-  deviceType: netdevice
-  nicSelector:
-    pfNames:
-     - ${SRIOV_PF_NAME}#64-127
-  mtu: ${SRIOV_MTU}
-  nodeSelector:
-    ${SRIOV_NODE_SELECTOR_WORKER_DPDK}: ""
-  numVfs: ${SRIOV_NUM_VFS}
-  resourceName: servervfs
-EOF
-
-# Create the SRIOV network policy for WORKER-METALLB
-
-cat << EOF| oc apply -f -
-apiVersion: sriovnetwork.openshift.io/v1
-kind: SriovNetworkNodePolicy
-metadata:
-  name: server-vfs-policy-worker-metallb
-  namespace: openshift-sriov-network-operator
-spec:
-  deviceType: netdevice
-  nicSelector:
-    pfNames:
-     - ${SRIOV_PF_NAME}
-  mtu: ${SRIOV_MTU}
-  nodeSelector:
-    ${SRIOV_NODE_SELECTOR_WORKER_METALLB}: ""
-  numVfs: ${SRIOV_NUM_VFS}
-  resourceName: servervfs
-EOF
-
-
-

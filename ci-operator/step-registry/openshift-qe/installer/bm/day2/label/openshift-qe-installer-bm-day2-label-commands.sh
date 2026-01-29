@@ -34,7 +34,7 @@ if [ ${TELCO} == "true" ]; then
   # Distribution: 10% nodes get label1, 25% get label2, 65% get label3
   if [ -n "${LABEL}" ]; then
     # Get all worker nodes
-    WORKER_NODES=($(oc get node -oname -l node-role.kubernetes.io/worker | grep -oP "^node/\K.*"))
+    readarray -t WORKER_NODES < <(oc get node -oname -l node-role.kubernetes.io/worker | grep -oP "^node/\K.*")
     TOTAL_NODES=${#WORKER_NODES[@]}
     
     if [ ${TOTAL_NODES} -eq 0 ]; then
