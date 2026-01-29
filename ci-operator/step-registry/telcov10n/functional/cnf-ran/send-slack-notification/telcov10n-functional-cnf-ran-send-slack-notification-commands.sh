@@ -9,7 +9,7 @@ if [ "$JOB_TYPE" = "presubmit" ]; then
 fi
 
 SCRIPTS_FOLDER="/eco-ci-cd/scripts/ran"
-PYTHON_SCRIPT="send-ran-report-notification.py"
+PYTHON_SCRIPT="send-ran-slack-notification.py"
 WEBHOOK_URL_FILE=/var/run/slack-webhook-url/url
 
 if [[ ! -f "$WEBHOOK_URL_FILE" ]]; then
