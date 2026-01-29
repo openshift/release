@@ -70,21 +70,82 @@ EOF
 
 sleep 180
 
-# Create the SRIOV network policy
+# Create the SRIOV network policy for CUSTOMCNF
+
 cat << EOF| oc apply -f -
 apiVersion: sriovnetwork.openshift.io/v1
 kind: SriovNetworkNodePolicy
 metadata:
-  name: ${SRIOV_POLICY_NAME}
+  name: server-vfs-policy-worker-customcnf
   namespace: openshift-sriov-network-operator
 spec:
-  deviceType: ${SRIOV_DEVICE_TYPE}
+  deviceType: netdevice
   nicSelector:
     pfNames:
      - ${SRIOV_PF_NAME}
   mtu: ${SRIOV_MTU}
   nodeSelector:
-    ${SRIOV_NODE_SELECTOR}: ""
+    ${SRIOV_NODE_SELECTOR_WORKER_CUSTOMCNF}: ""
   numVfs: ${SRIOV_NUM_VFS}
-  resourceName: ${SRIOV_RESOURCE_NAME}
+  resourceName: servervfs
 EOF
+
+# Create the SRIOV network policy for WORKER-DPDK
+cat << EOF| oc apply -f -
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: dpdk-vfs-policy-worker-dpdk
+  namespace: openshift-sriov-network-operator
+spec:
+  deviceType: vfio-pci
+  nicSelector:
+    pfNames:
+     - ${SRIOV_PF_NAME}#0-63
+  mtu: ${SRIOV_MTU}
+  nodeSelector:
+    ${SRIOV_NODE_SELECTOR_WORKER_DPDK}: ""
+  numVfs: ${SRIOV_NUM_VFS}
+  resourceName: dpdkvfs
+EOF
+
+cat << EOF| oc apply -f -
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: server-vfs-policy-worker-dpdk
+  namespace: openshift-sriov-network-operator
+spec:
+  deviceType: netdevice
+  nicSelector:
+    pfNames:
+     - ${SRIOV_PF_NAME}#64-127
+  mtu: ${SRIOV_MTU}
+  nodeSelector:
+    ${SRIOV_NODE_SELECTOR_WORKER_DPDK}: ""
+  numVfs: ${SRIOV_NUM_VFS}
+  resourceName: servervfs
+EOF
+
+# Create the SRIOV network policy for WORKER-METALLB
+
+cat << EOF| oc apply -f -
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: server-vfs-policy-worker-metallb
+  namespace: openshift-sriov-network-operator
+spec:
+  deviceType: netdevice
+  nicSelector:
+    pfNames:
+     - ${SRIOV_PF_NAME}
+  mtu: ${SRIOV_MTU}
+  nodeSelector:
+    ${SRIOV_NODE_SELECTOR_WORKER_METALLB}: ""
+  numVfs: ${SRIOV_NUM_VFS}
+  resourceName: servervfs
+EOF
+
+
+
