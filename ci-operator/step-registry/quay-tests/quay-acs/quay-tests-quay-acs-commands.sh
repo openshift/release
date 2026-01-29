@@ -241,4 +241,5 @@ function deploy_acs_operator_default_setting() {
    echo "ACS violations scan start..."  
    deploy_acs_operator_default_setting || true
    echo "Quay image violations scanning with ACS is done successfully"
+   sleep 3600
 
