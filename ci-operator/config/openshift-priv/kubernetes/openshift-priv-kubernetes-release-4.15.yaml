@@ -27,30 +27,6 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: oc-rpms
-  ocp_4.15_base-rhel9:
-    name: "4.15"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_4.15_tools:
-    name: "4.15"
-    namespace: ocp
-    tag: tools
-  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.15
-  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
-  openshift_origin-v4.0_machine-os-content:
-    name: origin-v4.0
-    namespace: openshift
-    tag: machine-os-content
-  rhcos-devel_rhel-coreos_latest:
-    name: rhel-coreos
-    namespace: rhcos-devel
-    tag: latest
   tools:
     name: 4.15-priv
     namespace: ocp-private
@@ -61,31 +37,14 @@ build_root:
 canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
-  inputs:
-    ocp_4.15_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
-  inputs:
-    ocp_4.15_tools:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:tools
-    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
   inputs:
     base-machine-with-rpms:
       as:
       - centos:stream9
-    openshift_origin-v4.0_machine-os-content:
-      as:
-      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
   to: machine-os-content
 - dockerfile_literal: |
     # This uses the new rhel-coreos base image
@@ -103,19 +62,9 @@ images:
     base-machine-with-rpms:
       as:
       - quay.io/centos/centos:stream9
-    rhcos-devel_rhel-coreos_latest:
-      as:
-      - registry.ci.openshift.org/rhcos-devel/rhel-coreos
   to: rhel-coreos
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
-  inputs:
-    ocp_4.15_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: pod
 promotion:
   to:
