@@ -108,7 +108,7 @@ done
 # Copy inventory and pull secret to bastion
 scp -q ${SSH_ARGS} /tmp/microshift-inventory root@${bastion}:${microshift_repo}/ansible/${ANSIBLE_INVENTORY}
 set +x
-scp -q ${SSH_ARGS} ${CLUSTER_PROFILE_DIR}/pull_secret root@${bastion}:${microshift_repo}/pull_secret.txt
+scp -q ${SSH_ARGS} ${CLUSTER_PROFILE_DIR}/pull_secret root@${bastion}:${microshift_repo}/ansible/roles/install-microshift/files/pull-secret.txt
 set -x
 
 # Run ansible playbook
