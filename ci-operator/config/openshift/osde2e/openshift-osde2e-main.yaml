@@ -29,10 +29,8 @@ tests:
   as: hypershift-pr-check
   commands: |
     # Check if there are changes in pkg/ or cmd/ directories
-    if ! git diff --name-only origin/main...HEAD | grep -qE '^(pkg/|cmd/)'; then
-      echo "No changes detected in pkg/ or cmd/ directories. Skipping test."
-      exit 0
-    fi
+    if ! (git diff --name-only ${PULL_BASE_SHA} $(git merge-base FETCH_HEAD main) | grep -qE '^(pkg/|cmd/)'); then
+    echo "No changes detected in pkg/ or cmd/ directories. Skipping test." && exit 0; fi
 
     export GOFLAGS=""
     export REPORT_DIR="$ARTIFACT_DIR"

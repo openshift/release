@@ -3,6 +3,10 @@ base_images:
     name: ib-orchestrate-vm
     namespace: edge-infrastructure
     tag: latest
+  image-based-install-operator:
+    name: "2.12"
+    namespace: stolostron
+    tag: image-based-install-operator
   installer:
     name: "4.22"
     namespace: ocp
@@ -103,6 +107,21 @@ tests:
       SEED_IMAGE_TAG_FORMAT: presubmit
       SEED_IMAGE_TAG_PREFIX: ibi
     workflow: openshift-image-based-network-configuration
+- as: e2e-ibio
+  capabilities:
+  - intranet
+  skip_if_only_changed: ^(?:LICENSE$|.*\.md$)
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      IMG: pipeline:image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      CLUSTERTYPE: assisted_medium_el9
+      SEED_IMAGE_TAG: "4.22"
+    workflow: image-based-install-operator-ofcir
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
