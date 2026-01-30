@@ -65,6 +65,7 @@ spec:
       /usr/local/bin/tls-scanner ${SCANNER_ARGS} \
         --json-file /results/results.json \
         --csv-file /results/results.csv \
+        --junit-file /results/junit_tls_scan.xml \
         --log-file /results/scan.log 2>&1 | tee /results/output.log
       echo "Scan complete. Exit code: \$?"
       # Keep pod alive for artifact collection
@@ -104,6 +105,12 @@ oc logs pod/tls-scanner -n "${NAMESPACE}" || true
 
 echo "Copying artifacts (container still alive in sleep phase)..."
 oc cp "${NAMESPACE}/tls-scanner:/results/." "${SCANNER_ARTIFACT_DIR}/" || echo "Warning: Failed to copy some artifacts"
+
+# Copy JUnit XML to root artifact dir for Spyglass (pattern: artifacts/junit*.xml)
+if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
+    cp "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" "${ARTIFACT_DIR}/junit_tls_scan.xml"
+    echo "JUnit results copied to ${ARTIFACT_DIR}/junit_tls_scan.xml for Spyglass"
+fi
 
 # Wait for pod to complete
 oc wait --for=jsonpath='{.status.phase}'=Succeeded pod/tls-scanner -n "${NAMESPACE}" --timeout=4h || {
