@@ -1,136 +1,77 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+set -euxo pipefail; shopt -s inherit_errexit extglob
 
-SECRETS_DIR=/run/secrets/ci.openshift.io/cluster-profile
-GANGWAY_API_TOKEN=$(cat $SECRETS_DIR/gangway-api-token)
-WEEKLY_JOBS="$SECRETS_DIR/$JSON_TRIGGER_LIST"
+# 1. Variables & Safety Checks
+SECRETS_DIR="/run/secrets/ci.openshift.io/cluster-profile"
 URL="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
+GANGWAY_API_TOKEN=$(cat "$SECRETS_DIR/gangway-api-token")
+
+# Validate JSON_TRIGGER_LIST is set
+: "${JSON_TRIGGER_LIST:?Environment variable JSON_TRIGGER_LIST is required.}"
+WEEKLY_JOBS="$SECRETS_DIR/$JSON_TRIGGER_LIST"
+
 #Get the day of the month
 month_day=$(date +%-d)
 # Get the current ISO week number (1-53)
-WEEK_NUM=$(date +\%V)
+week_num=$(date +%V)
 
+# 2. Logic Gate: Determine if we should run today
+echo "Checking execution rules for: $JSON_TRIGGER_LIST"
 
-# additional checks for self-managed fips, non-fips, and gs-baremetal testing
-self_managed_string='self-managed-lp-interop-jobs'
-zstream_string='zstream'
-fips_string='fips'
-gs_baremetal_string='gs_baremetal'
+# Helper: Check if trigger list contains a string
+has() { [[ "$JSON_TRIGGER_LIST" == *"$1"* ]]; }
 
-# Non-FIPS: run self-managed non-fips scenarios if date > 7.
-echo "Checking to see if it is a test day for ${JSON_TRIGGER_LIST}"
-if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
-        $JSON_TRIGGER_LIST != *"$fips_string"* &&
-        $JSON_TRIGGER_LIST != *"$zstream_string"* && 
-        $JSON_TRIGGER_LIST != *"$gs_baremetal_string"* ]]; then
-        if (( $month_day > 7 )); then
-    echo "Triggering jobs because it's a Monday not in the first week of the month."
-    echo "Continue..."
-  else
-    echo "We do not run non-FIPS self-managed scenarios on first week of the month"
-    exit 0
-  fi
-fi
-
-# FIPS: only run self-managed fips scenarios if date <= 7.
-if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
-        $JSON_TRIGGER_LIST == *"$fips_string"* &&
-        $JSON_TRIGGER_LIST != *"$zstream_string"* && 
-        $JSON_TRIGGER_LIST != *"$gs_baremetal_string"* ]]; then
-  if (( $month_day <= 7 )); then
-    echo "Triggering jobs because it's the first Monday of the month."
-    echo "Continue..."
-  else
-    echo "We do not run self-managed fips scenarios past the first Monday of the month"
-    exit 0
-  fi
-fi
-
-# GS Bare-Metal tests: only run self-managed GS baremetal tests on even-numbered weeks.
-if [[  $JSON_TRIGGER_LIST == *"$gs_baremetal_string"* &&
-        $JSON_TRIGGER_LIST != *"${self_managed_string}"* &&
-        $JSON_TRIGGER_LIST != *"$fips_string"* &&
-        $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
-  # Check if the week number is even
-    if [ $((WEEK_NUM % 2)) -eq 0 ]; then
-      echo "Triggering GS Bare-Metal testing because it is an even-numbered week (Week $WEEK_NUM)"
-      echo "Continue..."
+if has "self-managed-lp-interop-jobs" && ! has "zstream" && ! has "gs_baremetal"; then
+    # FIPS scenarios triggering logic 
+    if has "fips"; then
+        (( month_day > 7 )) && { echo "Not running FIPS scenarios past the first Monday of the month. Exiting."; exit 0; }
     else
-      echo "Not triggering GS Bare-Metal testing because it is an odd-numbered week (Week $WEEK_NUM)."
-    exit 0
-  fi
-fi
-
-echo "# Printing the jobs-to-trigger JSON:"
-jq -c '.[]' "$WEEKLY_JOBS"
-echo ""
-
-retry_interval=60  # 60 seconds = 1 minute
-failed_jobs=""
-
-if [[ "$JOB_NAME" == *"rehearse"* ]]; then
-  echo "Job name contains 'rehearse'. Exiting with status 0."
-  exit 0
-fi
-
-if [ "$SKIP_HEALTH_CHECK" = "false" ]; then
-
-  echo "# Test to make sure gangway api is up and running."
-  max_retries=60
-
-  for ((retry_count=1; retry_count<=$max_retries; retry_count++)); do
-    response=$(curl -s -X GET -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${GANGWAY_API_TOKEN}" "${URL}/v1/executions/${PROW_JOB_ID}" -w "%{http_code}\n" -o /dev/null)
-
-    if [ "$response" -eq 200 ]; then
-      echo "Endpoint is up and returning HTTP status code 200 (OK)."
-      break  # Exit the loop if successful response received
-    else
-      echo "Endpoint is not available or returned an error (HTTP status code $response). Retrying..."
+        (( month_day <= 7 )) && { echo "Triggering FIPS scenarios in the first week of the month." }
     fi
-
-    # Sleep for the specified interval before the next retry
-    sleep $retry_interval
-  done
-
-  if [ "$response" -ne 200 ]; then
-    echo "Endpoint is still not available after $max_retries retries. Aborting."
-    exit 1
-  fi
+ # GS Baremetal scenarios triggering logic     
+elif has "gs_baremetal" && ! has "self-managed-lp-interop-jobs" && ! has "zstream" && ! has "fips"; then
+    (( week_num % 2 != 0 )) && { echo "GS Baremetal only runs on even weeks. Exiting."; exit 0; }
 fi
 
-max_retries=3
+# 3. Early Exit for Rehearsals
+[[ "${JOB_NAME:-}" == *"rehearse"* ]] && { echo "Job name contains 'rehearse'. Exiting."; exit 0; }
 
-echo ""
-echo "# Loop through the trigger weekly jobs file using jq and issue a command for each job where 'active' is true"
-jq -r '.[] | select(.active == true) | .job_name' "$WEEKLY_JOBS" | while IFS= read -r job; do
-  echo "Issuing trigger for active job: $job"
-  for ((retry_count=1; retry_count<=$max_retries; retry_count++)); do
-    response=$(curl -s -X POST -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${GANGWAY_API_TOKEN}" "${URL}/v1/executions/$job" -w "%{http_code}\n" -o /dev/null)
-    
-    if [ "$response" -eq 200 ]; then
-      echo "Trigger returned a 200 status code"
-      break  # Exit the loop if successful response received
-    else
-      echo "We did not get a 200 status code from the job trigger. Retrying..."
+# 4. API Caller Function (Handles Retries)
+call_api() {
+    local method=$1 path=$2 max_retries=$3
+    for ((i=1; i<=max_retries; i++)); do
+        local code=$(curl -s -X "$method" -d '{"job_execution_type": "1"}' \
+            -H "Authorization: Bearer $GANGWAY_API_TOKEN" \
+            "$URL/v1/executions/${PROW_JOB_ID}" -w "%{http_code}" -o /dev/null)
+        [[ "$code" == "200" ]] && return 0
+        echo "Attempt $i: Received $code. Retrying in 60s..."
+        sleep 60
+    done
+    return 1
+}
+
+# 5. Health Check
+if [[ "${SKIP_HEALTH_CHECK:-false}" == "false" ]]; then
+    echo "# Checking Gangway API Health..."
+    call_api GET "$PROW_JOB_ID" 60 || { echo "Health check failed."; exit 1; }
+fi
+
+# 6. Trigger Jobs
+echo "# Triggering active jobs from $JSON_TRIGGER_LIST"
+failed_jobs=()
+
+for job in $(jq -r '.[] | select(.active == true) | .job_name' "$WEEKLY_JOBS"); do
+    echo "Processing: $job"
+    if ! call_api POST "$job" 3; then
+        echo "FAILED: $job"
+        failed_jobs+=("$job")
     fi
-
-    # Sleep for the specified interval before the next retry
-    sleep $retry_interval
-  done
-
-  if [ "$response" -ne 200 ]; then
-    echo "Trigger for active job: $job FAILED, a manual re-run is needed for $job"
-    failed_jobs+="$job "  # Concatenate the job to the string of failed jobs
-  fi
-
 done
 
-# Print the list of failed jobs after the loop completes
-if [ -n "$failed_jobs" ]; then
-  echo "The following jobs failed to trigger and need manual re-run:"
-  echo "$failed_jobs"
+# 7. Print the list of failed jobs after the loop completes
+if (( ${#failed_jobs[@]} > 0 )); then
+    echo "The following jobs failed to trigger and should be retriggered: ${failed_jobs[*]}"
+    exit 1
 else
-  echo "No jobs failed to be triggered."
+    echo "All jobs triggered successfully."
 fi
