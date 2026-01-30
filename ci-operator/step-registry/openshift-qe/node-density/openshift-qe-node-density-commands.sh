@@ -17,10 +17,7 @@ fi
 
 oc config view
 oc projects
-python --version
 pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
 
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 
