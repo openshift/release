@@ -1,0 +1,29 @@
+ref:
+  as: openshift-qe-egress-ip-target-discovery
+  from_image:
+    namespace: ocp
+    name: "4.21"
+    tag: cli
+  commands: openshift-qe-egress-ip-target-discovery-commands.sh
+  env:
+  - name: EIP_NAME
+    default: "egress-ip-test"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: >-
+    This step discovers egress IP assignments and prepares targeted chaos testing configuration.
+    
+    It identifies:
+    - Which nodes are currently assigned egress IPs
+    - Which OVN pods are running on those nodes
+    - Which nodes are eligible for egress IP migration
+    
+    The step generates targeting configuration files that enable subsequent chaos steps
+    to specifically target infrastructure that is actually handling egress IP traffic,
+    rather than performing generic cluster-wide disruption.
+    
+    Output artifacts:
+    - egress_ip_targets.env: Environment variables for targeted chaos
+    - egress_ip_targets.json: JSON summary for programmatic consumption

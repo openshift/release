@@ -1,0 +1,26 @@
+ref:
+  as: openshift-qe-egress-ip-targeted-chaos-pod
+  from_image:
+    namespace: ocp
+    name: "4.21"
+    tag: cli
+  commands: openshift-qe-egress-ip-targeted-chaos-pod-commands.sh
+  env:
+  - name: TARGET_NAMESPACE
+    default: "openshift-ovn-kubernetes"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: >-
+    This step executes targeted pod disruption specifically on the OVN pod
+    that is handling egress IP traffic on the assigned node.
+    
+    Unlike generic pod chaos that targets random pods, this step:
+    - Targets the specific ovnkube-node pod on the egress IP assigned node
+    - Validates proper replacement pod recovery
+    - Monitors egress IP assignment changes
+    - Measures recovery time and OVN state consistency
+    
+    This ensures that the chaos testing actually exercises the infrastructure
+    responsible for egress IP functionality rather than unrelated components.
