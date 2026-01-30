@@ -28,25 +28,48 @@
 # The pruner manages preservation of release payload component images through
 # cooperation with the release controller.
 #
-# Release Controller Responsibilities:
-# 1. When creating a release payload, the release controller pushes a tag with the pattern:
-#    rc_payload__{payload_version}
-#    Example: rc_payload__4.4.0-0.nightly-s390x-2021-03-16-171946
+# Historically, the release controller has mirrored CI (and nightly) payloads to quay.io/openshift-release-dev/dev-release
+# which is a public repository to make release controller created payloads available via quay.io. CI payloads pointed to images on
+# registry.ci.openshift.org. With the move to QCI, CI payloads will begin to refer to images
+# in via quay-proxy.openshift.ci.org .  As soon as this occurs, it is possible for the pruner to remove
+# the QCI component images well before the CI payload has been pruned from the release controller. This means
+# something like an upgrade job attempting to use a CI payload may try to install it and for referenced
+# component images to be missing in QCI.
+# To address this, the release controller will continue to mirror to quay.io/openshift-release-dev/dev-release,
+# but it will also mirror the same release payloads to QCI for informational purposes so that the pruner
+# can avoid pruning components that are still referenced by extant CI payloads.
+# Only the release controller knows when these CI payloads are no longer needed. When that occurs,
+# it will create another informational tag in QCI that informs the pruner that it is safe to
+# remove preservation tags for component images. Once those tags are removed, assuming the normal
+# prune & app.ci istag tags no longer refer to a digest, the component should be garbage collected.
 #
-# 2. When the release controller wants to remove a payload, it pushes a removal request tag:
-#    remove__rc_payload__{payload_version}
-#    Example: remove__rc_payload__4.4.0-0.nightly-s390x-2021-03-16-171946
+# Release Controller Responsibilities:
+# 1. When creating a release payload, the release controller mirrors the release payload
+#    to its normal location in quay.io/openshift-release-dev/dev-release:{payload_version}
+#
+# 2. If it is a CI payload, it will also mirror the release payload to a tag with the
+#    pattern: quay.io/openshift/ci:rc_payload__{payload_version}
+#    Example: rc_payload__4.22.0-0.ci-2026-01-30-070825
+#
+# 3. When the release controller wants to remove a payload, it pushes a removal request tag:
+#    remove__rc_payload__{payload_version} . The content of this manifest is not important --
+#    only the name of the tag is important.
+#    Example: remove__rc_payload__4.22.0-0.ci-2026-01-30-070825
+#
+# Note: Pushing these tags to QCI is only required for CI payloads. Nightly payloads
+# are pushed to quay.io/openshift-release-dev/dev-release but reference ART
+# created component images permanently stored in quay.io/openshift-release-dev/ocp-v4.0-art-dev .
 #
 # Pruner Responsibilities:
 # 1. During tag iteration, the pruner discovers all rc_payload__ tags pushed by the release
-#    controller and checks if they have a corresponding __preserved marker tag.
+#    controller into QCI and checks if they have a corresponding __preserved marker tag.
 #
-# 2. For unpreserved payloads (those without a preserved__ marker), the pruner:
+# 2. For new payloads in QCI (those without a preserved__ marker yet), the pruner:
 #    a. Runs 'oc adm release info' to extract component image references from the payload
 #    b. Creates preservation tags for each component from quay.io/openshift/ci:
 #       rc_payload__{payload_version}__component__{component_name}
-#    c. After successfully preserving all components, creates a marker tag:
-#       preserved__rc_payload__{payload_version}
+#    c. After successfully creating a tag for each component image, it creates a marker tag:
+#       preserved__rc_payload__{payload_version} for the release payload.
 #    This marker prevents re-processing the same payload on subsequent pruner runs.
 #
 # 3. When a remove__rc_payload__ tag is found, the pruner:
@@ -212,6 +235,9 @@ def get_release_component_images(payload_pullspec: str) -> List[Dict[str, str]]:
     components = []
 
     try:
+        # Note that this logic will not work for multiarch release payloads.
+        # For that, we would need to get image info for all architectures.
+        # Here, we assume a single manifest.
         cmd = ["oc", "adm", "release", "info", "--output=json", payload_pullspec]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=300)
 
