@@ -7,18 +7,6 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.21_base-rhel9:
-    name: 4.21-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.21
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
   tests-private:
     name: tests-private
     namespace: ci
@@ -31,27 +19,12 @@ build_root:
 canonical_go_repository: github.com/openshift/ovn-kubernetes
 images:
 - dockerfile_path: Dockerfile.base
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
   to: ovn-kubernetes-base
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: ovn-kubernetes-microshift
 promotion:
   to:
@@ -310,7 +283,7 @@ tests:
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
 - as: e2e-aws-ovn-hypershift
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: unit
   commands: |
@@ -636,9 +609,13 @@ tests:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false
+      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      GC: "false"
+      GC_METRICS: "false"
       ITERATION_MULTIPLIER_ENV: "6"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
+      PPROF: "false"
       PROFILE_TYPE: both
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "501"
@@ -660,8 +637,12 @@ tests:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false
+      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      GC: "false"
+      GC_METRICS: "false"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
+      PPROF: "false"
       PROFILE_TYPE: both
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "501"
@@ -684,10 +665,15 @@ tests:
       CLUSTER_NETWORK_CIDR: 20.0.0.0/8
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false --gc=false  --timeout=8h
+      EXTRA_FLAGS: --churn-duration=20m --service-latency --timeout=8h
+      GC: "false"
+      GC_METRICS: "false"
       ITERATION_MULTIPLIER_ENV: "6"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
+      PPROF: "false"
       PROFILE_TYPE: both
+      SERVICE_NETWORK_CIDR: 172.0.0.0/12
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "750"
       ZONES_COUNT: "6"
@@ -712,9 +698,14 @@ tests:
       CLUSTER_NETWORK_CIDR: 20.0.0.0/8
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false --gc=false
+      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      GC: "false"
+      GC_METRICS: "false"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
+      PPROF: "false"
       PROFILE_TYPE: both
+      SERVICE_NETWORK_CIDR: 172.0.0.0/12
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "750"
       ZONES_COUNT: "6"

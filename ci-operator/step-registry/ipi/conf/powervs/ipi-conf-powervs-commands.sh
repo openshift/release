@@ -89,6 +89,12 @@ if [[ -n "${CLUSTER_NAME_MODIFIER}" ]]; then
     "fran-powervs-8-quota-slice-1")
       CLUSTER_NAME="p-fran-1-${CLUSTER_NAME_MODIFIER}"
     ;;
+    "fran-powervs-8-quota-slice-2")
+      CLUSTER_NAME="p-fran-2-${CLUSTER_NAME_MODIFIER}"
+    ;;
+    "fran-powervs-8-quota-slice-3")
+      CLUSTER_NAME="p-fran-3-${CLUSTER_NAME_MODIFIER}"
+    ;;
     "mad02-powervs-5-quota-slice-0")
       CLUSTER_NAME="p-mad02-0-${CLUSTER_NAME_MODIFIER}"
     ;;
@@ -138,6 +144,18 @@ case "${LEASED_RESOURCE}" in
    ;;
    "fran-powervs-8-quota-slice-1")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_FRAN-1")
+      POWERVS_REGION=eu-de
+      POWERVS_ZONE=eu-de-2
+      VPCREGION=eu-de
+   ;;
+   "fran-powervs-8-quota-slice-2")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_FRAN-2")
+      POWERVS_REGION=eu-de
+      POWERVS_ZONE=eu-de-1
+      VPCREGION=eu-de
+   ;;
+   "fran-powervs-8-quota-slice-3")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_FRAN-3")
       POWERVS_REGION=eu-de
       POWERVS_ZONE=eu-de-2
       VPCREGION=eu-de
