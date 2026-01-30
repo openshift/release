@@ -10,19 +10,47 @@ debug() {
   oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
 }
 
-support_np_skew() {
+render_and_modify_manifests() {
   local extra_flags=""
+  local needs_render=false
+
+  # Check if we need to render (for np skew or loadbalancer)
   if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
-    curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+    needs_render=true
+  fi
+
+  if [[ "${USE_LOADBALANCER_FOR_KAS:-false}" == "true" ]]; then
+    needs_render=true
+  fi
+
+  if [[ "$needs_render" == "true" ]]; then
+    # Download yq if not already available
+    if [[ ! -f /tmp/yq ]]; then
+      curl -L https://github.com/mikefarah/yq/releases/download/v4.50.1/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+    fi
+
+    # Determine render flags based on MCE version
     # >= 2.7: "--render-sensitive --render", else: "--render"
     if [[ "$(printf '%s\n' "2.7" "$MCE_VERSION" | sort -V | head -n1)" == "2.7" ]]; then
       extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
     else
       extra_flags+="--render > /tmp/hc.yaml "
     fi
-    extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
+
+    # Apply NodePool skew if needed
+    if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
+      extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
+    fi
+
+    # Apply LoadBalancer service publishing strategy if needed
+    if [[ "${USE_LOADBALANCER_FOR_KAS:-false}" == "true" ]]; then
+      extra_flags+="&& /tmp/yq e -i '(select(.kind == \"HostedCluster\").spec.services[] | select(.service == \"APIServer\").servicePublishingStrategy.type) = \"LoadBalancer\"' /tmp/hc.yaml "
+      extra_flags+="&& /tmp/yq e -i 'del(select(.kind == \"HostedCluster\").spec.services[] | select(.service == \"APIServer\").servicePublishingStrategy.nodePort)' /tmp/hc.yaml "
+    fi
+
     extra_flags+="&& oc apply -f /tmp/hc.yaml"
   fi
+
   echo "$extra_flags"
 }
 
@@ -116,7 +144,7 @@ eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
   --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
   --ssh-key=${SHARED_DIR}/id_rsa.pub \
-  --release-image ${RELEASE_IMAGE} $(support_np_skew)"
+  --release-image ${RELEASE_IMAGE} $(render_and_modify_manifests)"
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
