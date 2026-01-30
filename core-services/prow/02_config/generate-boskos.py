@@ -253,7 +253,7 @@ CONFIG = {
         'default': 2,
     },
     'aro-hcp-dev-quota-slice': {
-        'default': 10,
+        'default': 15,
     },
     'aro-hcp-test-tenant-quota-slice': {
         'default': 10,
@@ -695,7 +695,7 @@ for i in range(4):
 for i in range(4):
     CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
 
-for i in range(90):
+for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-int']['aro-hcp-test-msi-containers-int-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
