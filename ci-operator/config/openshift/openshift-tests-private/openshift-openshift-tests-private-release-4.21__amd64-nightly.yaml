@@ -2797,9 +2797,26 @@ tests:
       CONTROL_PLANE_ON_HOST_MAINTENANCE: Terminate
       FIPS_ENABLED: "true"
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      ON_HOST_MAINTENANCE: Terminate
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    - ref: send-results-to-reportportal
+    pre:
+    - ref: gcp-provision-minimal-permission
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-gcp
+    - ref: ipi-conf-gcp-control-plane-node-type
+    - ref: ipi-conf-gcp-confidential-computing
+    - ref: storage-conf-storageclass-pre-set-default-gcp-hyperdisk
+    - chain: ipi-install
+    - ref: enable-qe-catalogsource
+    - ref: cucushift-installer-check-gcp-machine-type
+    - ref: cucushift-installer-check-gcp-confidential-computing
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-reportportal-marker
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
 - as: gcp-ipi-confidential-secureboot-mini-perm-f14
   cron: 38 15 11,27 * *
   steps:
