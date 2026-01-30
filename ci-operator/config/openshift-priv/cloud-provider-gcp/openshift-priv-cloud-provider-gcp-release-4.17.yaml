@@ -7,6 +7,18 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
+  ocp_4.17_base-rhel9:
+    name: "4.17"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-openshift-4.17
+  rhcos-devel_rhel-coreos_latest:
+    name: rhel-coreos
+    namespace: rhcos-devel
+    tag: latest
   tests-private:
     name: tests-private
     namespace: ci
@@ -17,6 +29,13 @@ build_root:
 canonical_go_repository: k8s.io/cloud-provider-gcp
 images:
 - dockerfile_path: openshift-hack/images/Dockerfile.openshift
+  inputs:
+    ocp_4.17_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.17:base-rhel9
+    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: gcp-cloud-controller-manager
 - dockerfile_literal: |
     # This uses the new rhel-coreos base image
@@ -35,6 +54,9 @@ images:
     base-machine-with-rpms:
       as:
       - quay.io/centos/centos:stream9
+    rhcos-devel_rhel-coreos_latest:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos
   to: rhel-coreos
 promotion:
   to:
