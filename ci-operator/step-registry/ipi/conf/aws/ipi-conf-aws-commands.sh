@@ -224,14 +224,9 @@ else
 fi
 
 # See if we can use NAT instances as a cost reduction method.
-# OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY is set to false by the release controller (i.e. do not use NAT instances
-# release controller jobs.
 if [[ "${CI_NAT_REPLACE:-false}" == 'auto' ]]; then
   # Enable the option for jobs using the shared aws cluster profiles unless they use a different install topology.
-  # 4.21 is currently excluded as we approach GA.
-  if [[ "${JOB_NAME}" == *-4.21-* ]]; then
-    CI_NAT_REPLACE='false_4_21_jobs_are_excluded'
-  elif [[ "${CLUSTER_PROFILE_NAME}" != "aws" && ! "${CLUSTER_PROFILE_NAME}" =~ ^aws-[0-9]+$ ]]; then
+  if [[ "${CLUSTER_PROFILE_NAME}" != "aws" && ! "${CLUSTER_PROFILE_NAME}" =~ ^aws-[0-9]+$ ]]; then
     CI_NAT_REPLACE='false_CLUSTER_PROFILE_NAME_is_not_a_testplatform_aws_profile'
   elif [[ "${JOB_NAME}" == *'microshift'* || "${JOB_NAME}" == *'hypershift'* || "${JOB_NAME}" == *'vpc'* || "${JOB_NAME}" == *'single-node'* ]]; then
     CI_NAT_REPLACE='false_job_uses_non_standalone_install_topology'
