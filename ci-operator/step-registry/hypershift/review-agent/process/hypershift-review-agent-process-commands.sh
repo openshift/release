@@ -165,17 +165,23 @@ def _parse_simple_yaml_aliases(content: str) -> dict[str, list[str]]:
 
 
 @lru_cache(maxsize=1)
-def get_owners_and_aliases() -> tuple[set[str], set[str]]:
-    """Fetch and parse OWNERS and OWNERS_ALIASES from hypershift repo.
+def get_all_authorized_users() -> set[str]:
+    """Build a set of all authorized users.
 
-    Returns tuple of (approvers set, reviewers set).
+    Collects into one set:
+    1. Approved bots
+    2. All usernames from all aliases in OWNERS_ALIASES
+    3. Any direct usernames in OWNERS (both simple and filters-based formats)
+
     Uses lru_cache to only fetch once per run.
     """
-    approvers: set[str] = set()
-    reviewers: set[str] = set()
+    authorized: set[str] = set()
     aliases: dict[str, list[str]] = {}
 
-    # Fetch OWNERS_ALIASES first (aliases can be referenced in OWNERS)
+    # 1. Add approved bots
+    authorized.update(APPROVED_BOTS)
+
+    # 2. Fetch OWNERS_ALIASES - collect ALL users from ALL aliases
     try:
         result = subprocess.run(
             ["gh", "api", "-H", "Accept: application/vnd.github.raw",
@@ -190,10 +196,14 @@ def get_owners_and_aliases() -> tuple[set[str], set[str]]:
                 aliases = aliases_data["aliases"]
         else:
             aliases = _parse_simple_yaml_aliases(result.stdout)
+
+        # Add all users from all aliases
+        for alias_name, members in aliases.items():
+            authorized.update(members)
     except Exception as e:
         print(f"Warning: Failed to fetch OWNERS_ALIASES: {e}", file=sys.stderr)
 
-    # Fetch OWNERS file
+    # 3. Fetch OWNERS - collect any direct usernames (not alias references)
     try:
         result = subprocess.run(
             ["gh", "api", "-H", "Accept: application/vnd.github.raw",
@@ -205,53 +215,42 @@ def get_owners_and_aliases() -> tuple[set[str], set[str]]:
         if HAS_YAML:
             owners_data = yaml.safe_load(result.stdout)
             if owners_data:
-                # Expand approvers (may include alias references)
-                for entry in owners_data.get("approvers", []):
-                    if entry in aliases:
-                        approvers.update(aliases[entry])
-                    else:
-                        approvers.add(entry)
+                # Helper to add entries (skip if it's an alias reference)
+                def add_entries(entries: list):
+                    for entry in entries:
+                        if entry not in aliases:  # Direct username, not an alias
+                            authorized.add(entry)
 
-                # Expand reviewers (may include alias references)
-                for entry in owners_data.get("reviewers", []):
-                    if entry in aliases:
-                        reviewers.update(aliases[entry])
-                    else:
-                        reviewers.add(entry)
+                # Simple format: top-level approvers/reviewers
+                add_entries(owners_data.get("approvers", []))
+                add_entries(owners_data.get("reviewers", []))
+
+                # Filters-based format: nested under filters
+                if "filters" in owners_data:
+                    for pattern, config in owners_data["filters"].items():
+                        if isinstance(config, dict):
+                            add_entries(config.get("approvers", []))
+                            add_entries(config.get("reviewers", []))
         else:
-            # Fallback parsing
+            # Fallback parsing (simple format only - filters format requires YAML)
             for entry in _parse_simple_yaml_list(result.stdout, "approvers"):
-                if entry in aliases:
-                    approvers.update(aliases[entry])
-                else:
-                    approvers.add(entry)
+                if entry not in aliases:
+                    authorized.add(entry)
             for entry in _parse_simple_yaml_list(result.stdout, "reviewers"):
-                if entry in aliases:
-                    reviewers.update(aliases[entry])
-                else:
-                    reviewers.add(entry)
+                if entry not in aliases:
+                    authorized.add(entry)
     except Exception as e:
         print(f"Warning: Failed to fetch OWNERS: {e}", file=sys.stderr)
 
-    return approvers, reviewers
-
-
-def is_in_owners_file(login: str) -> bool:
-    """Check if user is in OWNERS or OWNERS_ALIASES."""
-    approvers, reviewers = get_owners_and_aliases()
-    login_lower = login.lower()
-    # GitHub usernames are case-insensitive, so check lowercase
-    return (login_lower in {a.lower() for a in approvers} or
-            login_lower in {r.lower() for r in reviewers})
+    return authorized
 
 
 def is_authorized_author(login: str) -> bool:
     """Check if author is authorized to trigger review agent responses.
 
     Authorized authors are:
-    1. Approved bots (coderabbitai)
-    2. Members of the openshift GitHub organization
-    3. People listed in the OWNERS file (approvers or reviewers)
+    1. Users in the combined set (approved bots + OWNERS + OWNERS_ALIASES)
+    2. Members of the openshift GitHub organization (fallback)
     """
     if not login:
         return False
@@ -260,19 +259,14 @@ def is_authorized_author(login: str) -> bool:
     if login in _auth_cache:
         return _auth_cache[login]
 
-    # 1. Check approved bots first (no API call needed)
-    if login in APPROVED_BOTS or login.lower() in {b.lower() for b in APPROVED_BOTS}:
+    # 1. Check combined set (bots + OWNERS + OWNERS_ALIASES)
+    authorized_users = get_all_authorized_users()
+    if login.lower() in {u.lower() for u in authorized_users}:
         _auth_cache[login] = True
-        print(f"  Author '{login}' authorized: approved bot", file=sys.stderr)
+        print(f"  Author '{login}' authorized: in approved bots/OWNERS/OWNERS_ALIASES", file=sys.stderr)
         return True
 
-    # 2. Check OWNERS file (cached after first call)
-    if is_in_owners_file(login):
-        _auth_cache[login] = True
-        print(f"  Author '{login}' authorized: in OWNERS file", file=sys.stderr)
-        return True
-
-    # 3. Check openshift org membership
+    # 2. Fallback: check openshift org membership
     if is_openshift_org_member(login):
         _auth_cache[login] = True
         print(f"  Author '{login}' authorized: openshift org member", file=sys.stderr)
