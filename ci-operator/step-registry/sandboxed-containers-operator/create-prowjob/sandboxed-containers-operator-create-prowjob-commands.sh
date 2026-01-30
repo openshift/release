@@ -16,44 +16,6 @@ set -o pipefail
 GANGWAY_API_ENDPOINT="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions"
 ARO_CLUSTER_VERSION="${ARO_CLUSTER_VERSION:-4.17}"
 
-# Function to get latest OSC catalog tag
-get_latest_osc_catalog_tag() {
-    local apiurl="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
-    local page=1
-    local max_pages=20
-    local test_pattern="^[0-9]+\.[0-9]+(\.[0-9]+)?-[0-9]+$"
-    local latest_tag=""
-
-    while [[ ${page} -le ${max_pages} ]]; do
-        local resp
-        if ! resp=$(curl -sf "${apiurl}/tag/?limit=100&page=${page}"); then
-            break
-        fi
-
-        if ! jq -e '.tags | length > 0' <<< "${resp}" >/dev/null; then
-            break
-        fi
-
-        latest_tag=$(echo "${resp}" | \
-            jq -r --arg test_string "${test_pattern}" \
-            '.tags[]? | select(.name | test($test_string)) | "\(.start_ts) \(.name)"' | \
-            sort -nr | head -n1 | awk '{print $2}')
-
-        if [[ -n "${latest_tag}" ]]; then
-            break
-        fi
-
-        ((page++))
-    done
-
-    if [[ -z "${latest_tag}" ]]; then
-        echo "  ERROR: No matching OSC catalog tag found, using default fallback"
-        latest_tag="latest"
-    fi
-
-    echo "${latest_tag}"
-}
-
 get_expected_version() {
     # Extract expected version from catalog tag
     # If catalog tag is in X.Y.Z-[0-9]+ format, returns X.Y.Z portion
@@ -238,13 +200,10 @@ validate_and_set_defaults() {
 
     # Set catalog source variables based on TEST_RELEASE_TYPE
     if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-      # OSC Catalog Configuration - get latest or use provided
-      if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
-          OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
-
-      else
-          echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
-      fi
+      # OSC Catalog Configuration - always use :latest tag
+      # The env-cm step will resolve the actual latest tag at runtime
+      OSC_CATALOG_TAG="${OSC_CATALOG_TAG:-latest}"
+      echo "Using OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
 
       # Extract expected OSC version from catalog tag if it matches X.Y.Z-[0-9]+ format
       extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
@@ -292,7 +251,7 @@ show_usage() {
     echo "  MUST_GATHER_ON_FAILURE_ONLY    - Must-gather on failure only: true or false (default: true)"
     echo "  AWS_REGION_OVERRIDE            - AWS region (default: us-east-2)"
     echo "  CUSTOM_AZURE_REGION            - Azure region (default: eastus)"
-    echo "  OSC_CATALOG_TAG                - OSC catalog tag (auto-detected if not provided)"
+    echo "  OSC_CATALOG_TAG                - OSC catalog tag (default: latest, resolved at runtime by env-cm step)"
     echo "  TRUSTEE_URL                    - Trustee URL (default: empty)"
     echo "  INITDATA                       - Initdata from Trustee(default: empty) The gzipped and base64 encoded initdata.toml file from Trustee"
 }
