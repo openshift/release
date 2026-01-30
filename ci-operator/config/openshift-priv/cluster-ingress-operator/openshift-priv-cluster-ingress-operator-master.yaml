@@ -62,12 +62,12 @@ tests:
 - as: e2e-hypershift
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-ovn-hypershift-conformance
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -131,6 +131,20 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: e2e-vsphere-static-metallb-operator-gwapi
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: make TEST=TestGatewayAPI test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ingress-vsphere-static-metallb
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
@@ -196,6 +210,20 @@ tests:
     - ref: ingress-baremetalds-metallb-gatewayapi-conformance-test
     workflow: ingress-baremetalds-metallb
 - always_run: false
+  as: e2e-vsphere-static-metallb-gatewayapi-conformance
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: make gatewayapi-conformance
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ingress-vsphere-static-metallb
+- always_run: false
   as: e2e-aws-ovn-techpreview
   optional: true
   steps:
@@ -254,7 +282,7 @@ tests:
 - as: hypershift-e2e-aks
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"

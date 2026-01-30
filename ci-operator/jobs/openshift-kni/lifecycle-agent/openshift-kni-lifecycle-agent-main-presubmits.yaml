@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build06
     context: ci/prow/ci-index-lifecycle-agent-operator-bundle-pipeline
     decorate: true
     labels:
@@ -58,7 +58,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build06
     context: ci/prow/ci-job
     decorate: true
     labels:
@@ -118,7 +118,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build06
     context: ci/prow/ibi-e2e-flow
     decorate: true
     labels:
@@ -192,7 +192,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build06
     context: ci/prow/ibu-e2e-flow
     decorate: true
     labels:
@@ -266,7 +266,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build06
     context: ci/prow/images
     decorate: true
     labels:
@@ -319,7 +319,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build06
     context: ci/prow/integration
     decorate: true
     labels:
@@ -392,7 +392,80 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build06
+    context: ci/prow/ipc-e2e-flow
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-5
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-kni-lifecycle-agent-main-ipc-e2e-flow
+    rerun_command: /test ipc-e2e-flow
+    skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=ipc-e2e-flow
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ipc-e2e-flow,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build06
     context: ci/prow/markdownlint
     decorate: true
     labels:
@@ -446,7 +519,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build06
     context: ci/prow/security
     decorate: true
     labels:

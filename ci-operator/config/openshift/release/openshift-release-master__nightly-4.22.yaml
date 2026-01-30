@@ -488,6 +488,13 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-upgrade-workers
+- as: e2e-metal-ovn-two-node-arbiter-upgrade-day-2-workers
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-arbiter-upgrade-day-2-workers
 - as: e2e-metal-ovn-two-node-arbiter-techpreview
   capabilities:
   - intranet
@@ -527,7 +534,7 @@ tests:
         FEATURE_SET="TechPreviewNoUpgrade"
         BMC_DRIVER=redfish
     workflow: baremetalds-two-node-fencing-techpreview
-- as: e2e-metal-ovn-two-node-fencing-etcd-certrotation
+- as: e2e-metal-ovn-two-node-fencing-etcd-certrotation-techpreview
   capabilities:
   - intranet
   cron: '@daily'
@@ -536,7 +543,7 @@ tests:
     env:
       TEST_SUITE: openshift/etcd/certrotation
     workflow: baremetalds-two-node-fencing-techpreview
-- as: e2e-metal-ovn-two-node-fencing
+- as: e2e-metal-ovn-two-node-fencing-techpreview
   capabilities:
   - intranet
   cron: '@daily'
@@ -691,7 +698,7 @@ tests:
         operator is installed\|\[sig-etcd]\[apigroup:config\.openshift\.io]\[OCPFeatureGate:DualReplica]
         Two Node with Fencing should have podman etcd containers running on each node
     workflow: baremetalds-two-node-fencing
-- as: e2e-metal-ovn-two-node-fencing-serial
+- as: e2e-metal-ovn-two-node-fencing-serial-techpreview
   capabilities:
   - intranet
   cron: 0 */6 * * *
@@ -701,7 +708,7 @@ tests:
       TEST_SUITE: openshift/conformance/serial
     workflow: baremetalds-two-node-fencing
   timeout: 5h0m0s
-- as: e2e-metal-ovn-two-node-fencing-upgrade
+- as: e2e-metal-ovn-two-node-fencing-upgrade-techpreview
   capabilities:
   - intranet
   cron: '@daily'
@@ -722,7 +729,7 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     env:
-      TEST_ARGS: --disable-monitor=etcd-log-analyzer,legacy-cvo-invariants,legacy-etcd-invariants,node-lifecycle
+      TEST_ARGS: --disable-monitor=etcd-log-analyzer,legacy-cvo-invariants,legacy-etcd-invariants,node-lifecycle,oc-adm-upgrade-status
         --cluster-stability=Disruptive
       TEST_SUITE: openshift/two-node
     workflow: baremetalds-two-node-fencing-techpreview
@@ -733,7 +740,7 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
-- as: e2e-metal-ovn-two-node-fencing-extended
+- as: e2e-metal-ovn-two-node-fencing-extended-techpreview
   capabilities:
   - intranet
   cron: 0 4 * * *
@@ -914,8 +921,12 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
-      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
-        on the same node
+      ENABLE_VSPHERE_FILESHARE_TESTS: "true"
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster
+      TEST_SKIPS: 'Testpattern: Dynamic PV (xfs).*multiVolume.*should concurrently
+        access the single volume from pods on different node\|Testpattern: Dynamic
+        PV (block volmode).*multiVolume.*should concurrently access the single volume
+        from pods on different node'
     observers:
       enable:
       - observers-resource-watch
@@ -926,9 +937,12 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      ENABLE_VSPHERE_FILESHARE_TESTS: "true"
       POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
-      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
-        on the same node
+      TEST_SKIPS: 'Testpattern: Dynamic PV (xfs).*multiVolume.*should concurrently
+        access the single volume from pods on different node\|Testpattern: Dynamic
+        PV (block volmode).*multiVolume.*should concurrently access the single volume
+        from pods on different node'
     observers:
       enable:
       - observers-resource-watch
@@ -2229,6 +2243,51 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-cert-rotation-short-azure
+- as: e2e-azure-ovn-rhcos10-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: azure4
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-rhcos10
+- as: e2e-aws-ovn-single-node-rhcos10-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-rhcos10
+- as: e2e-metal-ipi-ovn-ipv4-rhcos10-techpreview
+  capabilities:
+  - intranet
+  interval: 12h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        FEATURE_SET=TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: baremetalds-e2e-ovn-ipv4-rhcos10
+- as: e2e-gcp-ovn-rt-rhcos10-techpreview
+  interval: 12h
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+      FEATURE_SET: TechPreviewNoUpgrade
+      RT_ENABLED: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-ovn-rt-rhcos10
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -1,0 +1,59 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: .
+  name: app-cluster-build05
+  namespace: openshift-gitops
+spec:
+  destination:
+    name: build05
+    namespace: openshift-gitops
+  project: default
+  source:
+    directory:
+      exclude: '{OWNERS,*.md}'
+      include: '{*.yaml,*.yml}'
+      recurse: true
+    path: clusters/build-clusters/build05/
+    repoURL: https://github.com/liangxia/release.git
+    targetRevision: argocd
+  sources:
+    - directory:
+        exclude: '{OWNERS,*.md}'
+        include: '{*.yaml,*.yml}'
+        recurse: true
+      path: clusters/build-clusters/build05/
+      repoURL: https://github.com/liangxia/release.git
+      targetRevision: argocd
+    - directory:
+        exclude: '{OWNERS,*.md}'
+        include: '{*.yaml,*.yml}'
+        recurse: true
+      path: clusters/build-clusters/common_except_app.ci/
+      repoURL: https://github.com/liangxia/release.git
+      targetRevision: argocd
+    - directory:
+        exclude: '{OWNERS,*.md}'
+        include: '{*.yaml,*.yml}'
+        recurse: true
+      path: clusters/build-clusters/common_except_hosted/
+      repoURL: https://github.com/liangxia/release.git
+      targetRevision: argocd
+    - directory:
+        exclude: '{OWNERS,*.md}'
+        include: '{*.yaml,*.yml}'
+        recurse: true
+      path: clusters/build-clusters/coredns/
+      repoURL: https://github.com/liangxia/release.git
+      targetRevision: argocd
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+      - CreateNamespace=true
+      - PruneLast=true
+      - ServerSideApply=true

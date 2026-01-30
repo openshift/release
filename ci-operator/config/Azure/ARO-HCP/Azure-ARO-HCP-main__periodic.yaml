@@ -1,24 +1,15 @@
 binary_build_commands: GO_COMPLIANCE_INFO=0 make build
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-e2e-base-ci
 images:
 - dockerfile_literal: |
     FROM src
-    RUN cat /etc/dnf/dnf.conf || true
-    RUN dnf clean all && dnf update -y
-    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
-    RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
-    RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
-    RUN dnf install -y azure-cli libicu && dnf clean all
+    USER root
     COPY /src /opt/app-root/src/github.com/Azure
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-    USER root
-    RUN az bicep install
-    RUN mkdir -p /usr/local/bin
-    RUN az aks install-cli --install-location /usr/local/bin/kubectl --kubelogin-install-location /usr/local/bin/kubelogin
     RUN export GOPATH=/opt/app-root && \
         mkdir -p $GOPATH/bin && \
         export GOFLAGS='-mod=readonly' && \
@@ -91,6 +82,11 @@ tests:
     env:
       ARO_HCP_SUITE_NAME: integration/parallel
       LOCATION: uksouth
+      POOLED_IDENTITIES: "true"
+    leases:
+    - count: 20
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-int
     workflow: aro-hcp-e2e
 - as: stage-e2e-parallel
   cron: 0 2 * * *

@@ -2,18 +2,61 @@
 set -e
 set -o pipefail
 
+process_inventory() {
+    local directory="$1"
+    local dest_file="$2"
+
+    if [ -z "$directory" ]; then
+        echo "Usage: process_inventory <directory> <dest_file>"
+        return 1
+    fi
+
+    if [ ! -d "$directory" ]; then
+        echo "Error: '$directory' is not a valid directory"
+        return 1
+    fi
+
+    find "$directory" -type f | while IFS= read -r filename; do
+        if [[ $filename == *"secretsync-vault-source-path"* ]]; then
+          continue
+        fi
+        local content
+        content=$(cat "$filename")
+        local varname
+        varname=$(basename "${filename}")
+        # Check if content has newlines - if so, use literal block scalar (|)
+        if [[ "$content" == *$'\n'* ]]; then
+          echo "${varname}: |"
+          # Indent each line with 2 spaces for YAML block scalar
+          echo "$content" | sed 's/^/  /'
+        else
+          echo "${varname}": \'"${content}"\'
+        fi
+    done > "${dest_file}"
+
+    echo "Processing complete. Check \"${dest_file}\""
+}
 
 echo "Create group_vars directory"
-mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
+mkdir -p /eco-ci-cd/inventories/ocp-deployment/group_vars
 
-echo "Copy group inventory files"
-cp ${SHARED_DIR}/all /eco-ci-cd/inventories/ocp-deployment/group_vars/all
-cp ${SHARED_DIR}/bastions /eco-ci-cd/inventories/ocp-deployment/group_vars/bastions
+echo "Process common group variables (all, bastions)"
+find /var/group_variables/common/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
+    echo "Process group inventory file: ${dir}"
+    process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
+done
+
+# DEBUG: Show generated bastions file to verify certificate format
+echo "=== DEBUG: Contents of group_vars/bastions (first 20 lines) ==="
+head -20 /eco-ci-cd/inventories/ocp-deployment/group_vars/bastions || echo "File not found"
+echo "=== DEBUG: Checking if gitlab_ca_certificate has newlines ==="
+grep -A 5 "gitlab_ca_certificate" /eco-ci-cd/inventories/ocp-deployment/group_vars/bastions | head -10 || echo "Not found"
+echo "=== END DEBUG ==="
 
 echo "Create host_vars directory"
-mkdir /eco-ci-cd/inventories/ocp-deployment/host_vars
+mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
 
-echo "Copy host inventory files"
+echo "Copy host inventory files from SHARED_DIR (populated by hub-deploy step)"
 cp ${SHARED_DIR}/bastion /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
 cp ${SHARED_DIR}/master0 /eco-ci-cd/inventories/ocp-deployment/host_vars/master0
 
@@ -31,7 +74,7 @@ KUBECONFIG_PATH="/home/telcov10n/project/generated/kni-qe-99/auth/kubeconfig"
 # Extract and configure SSH key for Ansible to connect to masters
 echo "Set up SSH key configuration for Ansible"
 PROJECT_DIR="/tmp"
-grep ansible_ssh_private_key -A 100 "${SHARED_DIR}/all" | sed 's/ansible_ssh_private_key: //g' | sed "s/'//g" > "${PROJECT_DIR}/ansible_ssh_key"
+cat /var/group_variables/common/all/ansible_ssh_private_key > "${PROJECT_DIR}/ansible_ssh_key"
 chmod 600 "${PROJECT_DIR}/ansible_ssh_key"
 export ANSIBLE_PRIVATE_KEY_FILE="${PROJECT_DIR}/ansible_ssh_key"
 echo "SSH key configured at: ${ANSIBLE_PRIVATE_KEY_FILE}"

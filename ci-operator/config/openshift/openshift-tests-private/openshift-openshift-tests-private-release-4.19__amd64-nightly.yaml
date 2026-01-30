@@ -2133,7 +2133,7 @@ tests:
       FILTERS_ADDITIONAL: ""
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Security_Profiles_Operator
+      TEST_SCENARIOS: Security_Profiles_Operator|Node_Audit_Logging
     test:
     - ref: file-integrity-konflux-catalogsource
     - ref: openshift-extended-test
@@ -2330,9 +2330,26 @@ tests:
       CONTROL_PLANE_ON_HOST_MAINTENANCE: Terminate
       FIPS_ENABLED: "true"
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      ON_HOST_MAINTENANCE: Terminate
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    - ref: send-results-to-reportportal
+    pre:
+    - ref: gcp-provision-minimal-permission
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-gcp
+    - ref: ipi-conf-gcp-control-plane-node-type
+    - ref: ipi-conf-gcp-confidential-computing
+    - ref: storage-conf-storageclass-pre-set-default-gcp-hyperdisk
+    - chain: ipi-install
+    - ref: enable-qe-catalogsource
+    - ref: cucushift-installer-check-gcp-machine-type
+    - ref: cucushift-installer-check-gcp-confidential-computing
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-reportportal-marker
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
 - as: gcp-ipi-confidential-secureboot-mini-perm-f14
   cron: 41 3 6,22 * *
   steps:
@@ -2610,8 +2627,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-gcp-upi
-- as: ibmcloud-ipi-dedicatedhost-dynamic-f28
-  cron: 35 21 23 * *
+- as: ibmcloud-ipi-dedicatedhost-dynamic-f999
+  cron: 8 19 29 2 *
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -2677,8 +2694,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
-- as: ibmcloud-ipi-ovn-mtu-migrate-f28
-  cron: 27 6 11 * *
+- as: ibmcloud-ipi-ovn-mtu-migrate-f999
+  cron: 8 19 29 2 *
   steps:
     cluster_profile: ibmcloud-qe
     test:

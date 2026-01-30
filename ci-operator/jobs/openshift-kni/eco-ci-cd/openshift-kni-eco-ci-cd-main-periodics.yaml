@@ -1069,7 +1069,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 0 20 * * 5
+  cron: 0 0 31 2 *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -1669,6 +1669,70 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=cnf-network-functional-tests
       - --variant=cnf-network-phase2-4.21
+      command:
+      - ci-operator
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 0 0 31 2 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift-kni
+    repo: eco-ci-cd
+  labels:
+    capability/intranet: intranet
+    ci-operator.openshift.io/variant: cnf-ran-standard-4.19-cleanup
+    ci.openshift.io/generator: prowgen
+    job-release: "4.19"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kni-eco-ci-cd-main-cnf-ran-standard-4.19-cleanup-cnf-ran-cleanup
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=cnf-ran-cleanup
+      - --variant=cnf-ran-standard-4.19-cleanup
       command:
       - ci-operator
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
