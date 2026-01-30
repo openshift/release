@@ -204,6 +204,14 @@ function verify_arn_exists() {
 
 echo "Using AWS region: $REGION"
 
+# for special regions, need to explict set the default region to work with some global API, e.g: iam
+if [[ "${CLUSTER_TYPE:-}" == "aws-usgov" ]]; then
+    export AWS_DEFAULT_REGION="$REGION"
+elif [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+    SOURCE_REGION=$(jq -r ".\"${LEASED_RESOURCE}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
+    export AWS_DEFAULT_REGION="${SOURCE_REGION}"
+fi
+
 # Get tag filters and cluster name from metadata.json in order to query for cluster resources
 # Extract each tag filter into an array
 readarray -t TAG_FILTERS_ARRAY < <(jq -r '.aws.identifier[] | to_entries[] | "--tag-filters Key=\"\(.key)\",Values=\"\(.value)\""' "$METADATA_FILE")
