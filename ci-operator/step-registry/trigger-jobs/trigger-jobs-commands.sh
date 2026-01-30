@@ -26,9 +26,9 @@ if has "self-managed-lp-interop-jobs" && ! has "zstream" && ! has "gs_baremetal"
     if has "fips"; then
         (( month_day > 7 )) && { echo "Not running FIPS scenarios past the first Monday of the month. Exiting."; exit 0; }
     else
-        (( month_day <= 7 )) && { echo "Triggering FIPS scenarios in the first week of the month." }
+        (( month_day <= 7 )) && { echo "Triggering FIPS scenarios in the first week of the month."; }
     fi
- # GS Baremetal scenarios triggering logic     
+# GS Baremetal scenarios triggering logic
 elif has "gs_baremetal" && ! has "self-managed-lp-interop-jobs" && ! has "zstream" && ! has "fips"; then
     (( week_num % 2 != 0 )) && { echo "GS Baremetal only runs on even weeks. Exiting."; exit 0; }
 fi
@@ -38,9 +38,10 @@ fi
 
 # 4. API Caller Function (Handles Retries)
 call_api() {
-    local method=$1 path=$2 max_retries=$3
+    local code
+    local method=$1 max_retries=$2
     for ((i=1; i<=max_retries; i++)); do
-        local code=$(curl -s -X "$method" -d '{"job_execution_type": "1"}' \
+        code=$(curl -s -X "$method" -d '{"job_execution_type": "1"}' \
             -H "Authorization: Bearer $GANGWAY_API_TOKEN" \
             "$URL/v1/executions/${PROW_JOB_ID}" -w "%{http_code}" -o /dev/null)
         [[ "$code" == "200" ]] && return 0
