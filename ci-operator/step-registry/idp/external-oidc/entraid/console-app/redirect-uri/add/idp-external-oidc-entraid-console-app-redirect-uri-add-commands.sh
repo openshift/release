@@ -26,6 +26,7 @@ else
   echo "This is ocp standalone cluster, getting console URL..."
 fi
 
+set +x # The url etc. can be protected info that needs to avoid beings printed
 CONSOLE_HOST="$(oc --kubeconfig="$KUBECONFIG" get route console -n openshift-console -o=jsonpath='{.spec.host}')"
 CONSOLE_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-console/client-id)"
 CONSOLE_CALLBACK_URI="https://${CONSOLE_HOST}/auth/callback"
@@ -35,14 +36,12 @@ LOCK_ACCOUNT_NAME="$(</var/run/hypershift-azure-lock-blob/account-name)"
 LOCK_BLOB_NAME="$(</var/run/hypershift-azure-lock-blob/blob-name)"
 LOCK_CONTAINER_NAME="$(</var/run/hypershift-azure-lock-blob/container-name)"
 
-set +x
 LOCK_ACCOUNT_KEY="$(az storage account keys list --account-name "$LOCK_ACCOUNT_NAME" --query "[0].value" -o tsv)"
 
 while ! az storage blob lease acquire --container-name "$LOCK_CONTAINER_NAME" --blob-name "$LOCK_BLOB_NAME" --account-name "$LOCK_ACCOUNT_NAME" --account-key "$LOCK_ACCOUNT_KEY" --lease-duration 15; do
     echo "Waiting for lease"
     sleep 60
 done
-set -x
 
 eval "az ad app update --id $CONSOLE_CLIENT_ID --web-redirect-uris $CONSOLE_REDIRECT_URIS $CONSOLE_CALLBACK_URI"
 az ad app show --id "$CONSOLE_CLIENT_ID" --query 'web.redirectUris' -o tsv

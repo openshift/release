@@ -86,7 +86,14 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
-
+[ -f "$SHARED_DIR"/external-oidc-user.kubeconfig ] && echo "$SHARED_DIR/external-oidc-user.kubeconfig exists" || echo "$SHARED_DIR/external-oidc-user.kubeconfig doesn't exist!"
+timeout 60m bash -c 'while true; do
+    if [ -f "/tmp/continue-test" ] && [ "$(< /tmp/continue-test)" == "stop debugging" ]; then
+        break
+    fi
+    sleep 5
+done
+'
 if [ -f "${SHARED_DIR}/runtime_env" ]; then
     source "${SHARED_DIR}/runtime_env"
 fi

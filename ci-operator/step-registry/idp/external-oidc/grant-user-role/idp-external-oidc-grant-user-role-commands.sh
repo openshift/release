@@ -80,3 +80,18 @@ oc get co
 echo "Switching to the $non_ext_oidc_context context"
 oc config use-context "$non_ext_oidc_context"
 oc whoami
+
+echo "shared dir: $SHARED_DIR"
+echo "id: $(id)"
+echo "~/.kube dir is: $(dirname ~/.kube/.)" 
+ls -l $KUBECONFIG
+[ -f ~/.kube/config ] && echo "~/.kube/config exists and current-context is $(oc config get-contexts --kubeconfig ~/.kube/config)" && cp ~/.kube/config "$SHARED_DIR/debug-purpose-home-kube-config"
+[ -d ~/.kube/cache/oc ] && echo "Cache dir content:" && ls ~/.kube/cache/oc || echo "Fails to check ~/.kube/cache/oc"
+cp $KUBECONFIG "$SHARED_DIR/debug-purpose-kubeconfig"
+timeout 60m bash -c 'while true; do
+    if [ -f "/tmp/continue-test" ] && [ "$(< /tmp/continue-test)" == "stop debugging" ]; then
+        break
+    fi
+    sleep 5
+done
+'
