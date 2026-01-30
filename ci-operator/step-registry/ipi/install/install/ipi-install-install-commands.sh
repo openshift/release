@@ -144,6 +144,7 @@ Cannot create more than .* for this subscription|\
 The request is being throttled as the limit has been reached|\
 SkuNotAvailable|\
 Exceeded limit .* for zone|\
+ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS|\
 Operation could not be completed as it results in exceeding approved .* quota|\
 A quota has been reached for project|\
 LimitExceeded.*exceed quota" ${ARTIFACT_DIR} > "${SHARED_DIR}/install_infrastructure_failure.log" || true
