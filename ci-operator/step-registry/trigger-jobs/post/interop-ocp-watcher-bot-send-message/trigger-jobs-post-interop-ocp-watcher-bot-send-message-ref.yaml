@@ -1,0 +1,46 @@
+ref:
+  as: trigger-jobs-post-interop-ocp-watcher-bot-send-message
+  from_image:
+    namespace: cspi-qe
+    name: interop-ocp-watcher-bot
+    tag: main
+  commands: trigger-jobs-post-interop-ocp-watcher-bot-send-message-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: cspi-interop-watcher-bot-secrets
+      mount_path: /tmp/bot_secrets
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: JT__TRIG_JOB_LIST
+    documentation: |-
+      See documentation of this Env. Var. under the `trigger-jobs` Step.
+
+      JSON Schema for `postTaskPars`:
+      ```json
+      {
+        "execTaskFlag": "<file-name-to-indicate-the-post-task-should-be-run>"   # File name only, no directory.
+      }
+      ```
+  - name: JT__POST_TASK_EXEC_FLGS
+    documentation: |-
+      See documentation of this Env. Var. under the `trigger-jobs` Step.
+  - name: JT__POST__WB__MENTIONED_GROUP_ID_SECRET_NAME
+    documentation: |-
+      Name of secret used to hold the user group ID that should be mentioned.
+    default: ocpci-lp-team-group-id
+  - name: JT__POST__WB__WEBHOOK_URL_SECRET_NAME
+    documentation: |-
+      Name of the secret used to hold the webhook URL that should be used to send the message.
+    default: prod-webhook-url
+  - name: JT__POST__WB__JOB_GROUP_NAME
+    documentation: |-
+      Group name to use in the message that is sent. Essentially used to differentiate between different OCP deployment
+      types.
+  documentation: |-
+    Post task Step used to send messages about triggered Jobs via the interop-ocp-watcher-bot.
+    This Step collects job information from the `trigger-jobs` Step and sends notifications through a webhook.
+
+    See https://github.com/CSPI-QE/interop-ocp-watcher-bot for more information about the watcher bot.

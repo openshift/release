@@ -6,16 +6,81 @@ ref:
     tag: latest
   commands: trigger-jobs-commands.sh
   env:
-  - name: JSON_TRIGGER_LIST
-    documentation: |-
-      Name of the JSON secret stored in your cluster profile secrets that hold the jobs active status for triggering.
-  - name: SKIP_HEALTH_CHECK
+  - name: JT__SKIP_HC
     default: "true"
     documentation: |-
-      Skip the health check of the Gangway API prior to attempting to trigger jobs.
+      Skip the health check of the Gangway API prior to attempting to trigger Jobs.
+  - name: JT__TRIG_JOB_LIST
+    documentation: |-
+      Name of the file under `${CLUSTER_PROFILE_DIR}/` containing JSON data structure of Job list to be triggered.
+      Each element contains information on the name of the CI Operator Step used to check the triggering condition and
+      the related parameters, the list of CI Operator Jobs to be triggered along with the Job Type and the triggering
+      status.
+
+      JSON Schema:
+      ```json
+      [
+        {
+          "trigCond": [                                                         # Optional.
+            {
+              "trigCondFlgs": <ci-operator-step-trigger-condition-execution-flags>,
+              "trigCondStep": "<ci-operator-step-to-check-trigger-condition>",
+              "trigCondPars": {<object-of-parameters-for-trigger-condition-step>}
+            },
+            ...
+          ],
+          "jobList": [
+            {
+              "jobType": <[periodic]>,                                          # Optional.
+              "jobName": "<ci-operator-job-name-to-be-triggered>",
+              "active": <true|false>                                            # Set to `false` to disable the Job.
+            },
+            ...
+          ],
+          "postTask": [                                                         # Optional.
+            {
+              "postTaskFlgs": <ci-operator-step-post-task-execution-flags>,
+              "postTaskStep": "<ci-operator-step-for-post-task>",
+              "postTaskPars": {<object-of-parameters-for-post-task-step>}
+            },
+            ...
+          ]
+        },
+        ...
+      ]
+      ```
+      The `trigCondPars` structure depends on the context of `trigCondStep`.
+
+      Legacy JSON Schema (deprecated):
+      ```json
+      [
+        {
+          "job_name": "<ci-operator-periodic-job-name-to-be-triggered>",
+          "active": <true|false>
+        },
+        ...
+      ]
+      ```
+  - name: JT__TRIG_COND_EXEC_FLGS
+    documentation: |-
+      Execution Flags to determine whether a trigger condition is evaluated.
+      Trigger condition runs when `(trigCondFlgs && JT__TRIG_COND_EXEC_FLGS)` is evaluated to non-0.
+  - name: JT__SKIP_TRIG_MAIN_JOBS
+    default: "0"
+    documentation: |-
+      If non-zero, the triggering of the main Job List will be skipped.
+  - name: JT__POST_TASK_EXEC_FLGS
+    documentation: |-
+      Execution Flags to determine whether a post task is executed.
+      Post task runs when `(postTaskFlgs && JT__POST_TASK_EXEC_FLGS)` is evaluated to non-0.
+  - name: JT__GW__API_TOKEN
+    default: "gangway-api-token"
+    documentation: |-
+      Name of the file under `${CLUSTER_PROFILE_DIR}/` containing Gangway API Token.
   resources:
     requests:
       cpu: 10m
       memory: 100Mi
   documentation: |-
-    Triggers active testing scenarios based on JSON secret in the same location of your cluster_profile secrets. See README for more info.
+    Triggers active testing scenarios based on JSON file under `${CLUSTER_PROFILE_DIR}/`.
+    See `README.md` for more info.
