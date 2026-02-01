@@ -41,6 +41,7 @@ export TARGET_LCA_REF="${TARGET_LCA_REF}"
 export RELEASE_IMAGE="${TARGET_IMAGE}"
 export LCA_OPERATOR_BUNDLE_IMAGE="${OO_BUNDLE}"
 export SEED_VERSION="${SEED_VERSION}"
+export IP_STACK="${IP_STACK}"
 export UPGRADE_TIMEOUT="60m"
 export REGISTRY_AUTH_FILE="${PULL_SECRET_FILE}"
 # Default capacity is 140GB and disk pressure is observed, which leads to pods
