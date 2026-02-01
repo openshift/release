@@ -1,12 +1,26 @@
 #!/bin/bash
 set -euo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-#Save exit code for must-gather to generate junit
-trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
-#Save stacks events
-trap 'save_stack_events_to_artifacts' EXIT TERM INT
-trap 'prepare_next_steps' EXIT TERM INT
+teardown() {
+    local exit_code=$?
+
+    #Save exit code for must-gather to generate junit
+    echo "$exit_code" > "${SHARED_DIR}/install-status.txt"
+
+    #Save stacks events for debugging
+    save_stack_events_to_artifacts
+
+    prepare_next_steps
+
+    jobs -p | xargs -r kill 2>/dev/null
+    wait 2>/dev/null
+
+    exit $exit_code
+}
+
+trap teardown EXIT
+trap 'exit 130' INT   # 130 = 128 + 2 (SIGINT)
+trap 'exit 143' TERM  # 143 = 128 + 15 (SIGTERM)
 
 # The oc binary is placed in the shared-tmp by the test container and we want to use
 # that oc for all actions.
@@ -79,14 +93,20 @@ function gather_bootstrap_and_fail() {
     openshift-install --dir=${INSTALL_DIR} gather bootstrap --key "${SSH_PRIV_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
   fi
 
+  if [[ -n "${PROXY_INSTANCE_ID}" ]]; then
+    aws ec2 get-console-output --instance-id ${PROXY_INSTANCE_ID} --output text > "${ARTIFACT_DIR}/proxy-instance-console-output.log" || true
+  fi
+
   return 1
 }
 
 function save_stack_events_to_artifacts()
 {
   set +o errexit
+  echo "saving stack events to artifacts dir..."
   while read -r stack_name
   do
+    echo "processing $stack_name ..."
     aws --region ${AWS_REGION} cloudformation describe-stack-events --stack-name ${stack_name} --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.json"
   done < "${NEW_STACKS}"
   set -o errexit
@@ -145,7 +165,8 @@ MACHINE_CIDR=10.0.0.0/16
 
 echo "install-config.yaml"
 echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
+# hide proxy credential and some other sensitive info
+cat ${SHARED_DIR}/install-config.yaml | sed -E 's#(https?://[^:@/]+):[^:@/]+@#\1:XXX@#g' | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
 
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
@@ -201,8 +222,14 @@ echo ${S3_BUCKET_URI} > ${SHARED_DIR}/s3_bucket_uri
 
 # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
 # For now this is just a placeholder...
+ZONES_COUNT=3
+MAX_ZONES_COUNT=$(aws ec2 describe-availability-zones --filter Name=state,Values=available Name=zone-type,Values=availability-zone | jq '.AvailabilityZones | length')
+if (( ZONES_COUNT > MAX_ZONES_COUNT )); then
+  ZONES_COUNT=$MAX_ZONES_COUNT
+fi
+
 cf_params_vpc=${ARTIFACT_DIR}/cf_params_vpc.json
-add_param_to_json AvailabilityZoneCount 3 "${cf_params_vpc}"
+add_param_to_json AvailabilityZoneCount "${ZONES_COUNT}" "${cf_params_vpc}"
 cat "${cf_params_vpc}"
 
 echo "${VPC_STACK_NAME}" >> "${NEW_STACKS}"
@@ -222,6 +249,13 @@ PRIVATE_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PrivateS
 PRIVATE_SUBNET_0="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f1)"
 PRIVATE_SUBNET_1="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f2)"
 PRIVATE_SUBNET_2="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f3)"
+# when available zone < 3, some subnets would not be created, in that cases, always use the 1st subnet
+if [[ -z "$PRIVATE_SUBNET_1" ]]; then
+    PRIVATE_SUBNET_1=${PRIVATE_SUBNET_0}
+fi
+if [[ -z "$PRIVATE_SUBNET_2" ]]; then
+    PRIVATE_SUBNET_2=${PRIVATE_SUBNET_0}
+fi
 PUBLIC_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PublicSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
 
 # Adapt step aws-provision-tags-for-byo-vpc, which is required by Ingress operator testing.
@@ -287,13 +321,35 @@ MASTER_INSTANCE_PROFILE="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.Output
 WORKER_SECURITY_GROUP="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.OutputKey == "WorkerSecurityGroupId").OutputValue')"
 WORKER_INSTANCE_PROFILE="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.OutputKey == "WorkerInstanceProfile").OutputValue')"
 
-if [[ -d "${SHARED_DIR}/CA" ]]; then
+export PROXY_INSTANCE_ID=""
+if [[ -f "${SHARED_DIR}/proxy.ign" ]] && [[ -f "${SHARED_DIR}/04_cluster_proxy.yaml" ]]; then
   # host proxy ignition on s3
   S3_PROXY_URI="${S3_BUCKET_URI}/proxy.ign"
   aws s3 cp ${SHARED_DIR}/proxy.ign "$S3_PROXY_URI"
 
   PROXY_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/proxy.ign"
   export PROXY_URI
+
+  # To launch proxy server stably without ignition and ami compatibility issue, use a fixed version of coreos image + workable ignition in instance user data
+  # E.g:
+  # 4.18 AMI + 2.1.0 ignition would lead instance bootup faild with "failed to fetch config: unsupported config version"
+  # so using 4.18 AMI + 3.0.0 ignition
+  #bastion_image_list_url="https://builds.coreos.fedoraproject.org/streams/stable.json"
+  bastion_image_list_url="https://raw.githubusercontent.com/openshift/installer/release-4.18/data/data/coreos/rhcos.json"
+  if ! curl -sSLf --retry 3 --connect-timeout 30 --max-time 60 -o /tmp/bastion-image.json "${bastion_image_list_url}"; then
+      echo "ERROR: Failed to download RHCOS image list from ${bastion_image_list_url}" >&2
+      exit 1
+  fi
+  if ! jq empty /tmp/bastion-image.json &>/dev/null; then
+      echo "ERROR: Downloaded file is not valid JSON" >&2
+      exit 1
+  fi
+  ami_id=$(jq -r --arg r ${AWS_REGION} '.architectures.x86_64.images.aws.regions[$r].image // ""' /tmp/bastion-image.json)
+  if [[ ${ami_id} == "" ]]; then
+      echo "Bastion host AMI was NOT found in region ${AWS_REGION}, exit now." && exit 1
+  fi
+
+  echo -e "Proxy AMI ID in ${AWS_REGION}: $ami_id"
 
   echo "${PROXY_STACK_NAME}" >> "${NEW_STACKS}"
   aws cloudformation create-stack \
@@ -303,7 +359,7 @@ if [[ -d "${SHARED_DIR}/CA" ]]; then
     --capabilities CAPABILITY_NAMED_IAM \
     --parameters \
       ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
-      ParameterKey=RhcosAmi,ParameterValue="${RHCOS_AMI}" \
+      ParameterKey=RhcosAmi,ParameterValue="${ami_id}" \
       ParameterKey=PrivateHostedZoneId,ParameterValue="${PRIVATE_HOSTED_ZONE}" \
       ParameterKey=PrivateHostedZoneName,ParameterValue="${CLUSTER_NAME}.${base_domain}" \
       ParameterKey=ClusterName,ParameterValue="${CLUSTER_NAME}" \
@@ -321,14 +377,15 @@ if [[ -d "${SHARED_DIR}/CA" ]]; then
   aws cloudformation wait stack-create-complete --stack-name "${PROXY_STACK_NAME}" &
   wait "$!"
 
+  PROXY_INSTANCE_ID="$(aws cloudformation describe-stacks --stack-name "${PROXY_STACK_NAME}" \
+    --query 'Stacks[].Outputs[?OutputKey == `ProxyInstanceId`].OutputValue' --output text)"
+  echo "Instance ${PROXY_INSTANCE_ID}"
+
   PROXY_IP="$(aws cloudformation describe-stacks --stack-name "${PROXY_STACK_NAME}" \
     --query 'Stacks[].Outputs[?OutputKey == `ProxyPublicIp`].OutputValue' --output text)"
 
-  PROXY_URL=$(cat ${SHARED_DIR}/PROXY_URL)
-  TLS_PROXY_URL=$(cat ${SHARED_DIR}/TLS_PROXY_URL)
-
-  echo "Proxy is available at ${PROXY_URL}"
-  echo "TLS Proxy is available at ${TLS_PROXY_URL}"
+  echo "Proxy is saved in ${SHARED_DIR}/http_proxy_url"
+  echo "TLS Proxy is saved in ${SHARED_DIR}/https_proxy_url"
 
   echo ${PROXY_IP} > ${INSTALL_DIR}/proxyip
 fi
@@ -457,6 +514,8 @@ wait "$!"
 
 aws cloudformation wait stack-delete-complete --stack-name "${BOOTSTRAP_STACK_NAME}" &
 wait "$!"
+
+sed -i "/^${BOOTSTRAP_STACK_NAME}$/d" "$NEW_STACKS"
 
 function approve_csrs() {
   oc version --client

@@ -21,6 +21,13 @@ chain:
     - name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
       default: ""
       documentation: "Specifies the external DNS domain. If left empty, external DNS is assumed to be disabled."
+    - name: HYPERSHIFT_DYNAMIC_DNS
+      default: ""
+      documentation: |-
+        Set custom DNS name for kube-apiserver. Must be a pre-existing DNS record in Azure DNS.
+        Example: 'hypershift-kas-dns.qe1.azure.devcluster.openshift.com'
+        The DNS record will be automatically updated to point to the cluster's Route after creation.
+        Leave empty to disable custom KAS DNS.
     - name: ENABLE_ICSP
       default: "false"
       documentation: "If true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
@@ -140,7 +147,7 @@ chain:
 
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
-      
+
       RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
       
       AZURE_CREDS=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
@@ -296,6 +303,12 @@ chain:
       
       if [[ -n $HYPERSHIFT_NETWORK_TYPE ]]; then
         EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE}"
+      fi
+
+      # Add --kas-dns-name flag when HYPERSHIFT_DYNAMIC_DNS is set
+      # This enables dynamic external DNS name management and auto-generated custom kubeconfig
+      if [[ -n $HYPERSHIFT_DYNAMIC_DNS ]]; then
+        EXTRA_ARGS+=" --kas-dns-name=${HYPERSHIFT_DYNAMIC_DNS}"
       fi
 
       if [[ -n $HYPERSHIFT_AZURE_DIAGNOSTICS_STORAGE_ACCOUNT_TYPE ]]; then

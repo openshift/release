@@ -4,19 +4,12 @@ build_root:
       FROM registry.ci.openshift.org/ocp/ubi-python-311:9
       USER 0
       RUN dnf install -y podman
-images:
-- dockerfile_path: Containerfile
-  to: lightspeed-stack
-promotion:
-  to:
-  - namespace: lcore-test
-    tag: latest
 releases:
   latest:
     release:
       architecture: multi
       channel: stable
-      version: "4.19"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -31,10 +24,11 @@ tests:
     cloud: aws
     labels:
       region: us-east-2
+      variant: gpu
     owner: obs
     product: ocp
     timeout: 1h0m0s
-    version: "4.19"
+    version: "4.20"
   cron: 10 4 * * *
   steps:
     allow_skip_on_success: true
@@ -43,10 +37,10 @@ tests:
     test:
     - as: e2e
       cli: latest
-      commands: "REPO_URL=\"https://github.com/lightspeed-core/lightspeed-stack.git\"\n\necho
+      commands: "REPO_URL=\"https://github.com/lightspeed-core/lightspeed-stack.git\"\necho
         \"===== Cloning lightspeed-stack repo =====\"\ngit clone \"$REPO_URL\"\ncd
-        lightspeed-stack/tests/e2e-prow/rhoai\n\nchmod +x pipeline.sh\n./pipeline.sh
-        \       \n"
+        lightspeed-stack\ncd tests/e2e-prow/rhoai\n\nchmod +x pipeline.sh\n./pipeline.sh
+        \    \n"
       credentials:
       - collection: ""
         mount_path: /var/run/huggingface
@@ -57,16 +51,13 @@ tests:
         name: vllm-api-key
         namespace: test-credentials
       - collection: ""
-        mount_path: /var/run/robot-username
-        name: robot-username-quay
+        mount_path: /var/run/quay-aipcc-name
+        name: lcore-quay-name
         namespace: test-credentials
       - collection: ""
-        mount_path: /var/run/robot-password
-        name: robot-password-quay
+        mount_path: /var/run/quay-aipcc-password
+        name: lcore-quay-password
         namespace: test-credentials
-      dependencies:
-      - env: LCORE_IMAGE
-        name: lightspeed-stack
       from: src
       resources:
         requests:

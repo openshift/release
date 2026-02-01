@@ -1,0 +1,35 @@
+workflow:
+  as: baremetalds-two-node-arbiter-upgrade-day-2-workers
+  steps:
+    pre:
+      - chain: baremetalds-ofcir-pre
+      - ref: baremetalds-two-node-arbiter-add-workers
+    test:
+      - chain: baremetalds-ipi-test
+    post:
+      - chain: baremetalds-ofcir-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        MASTER_VCPU=4
+        NUM_ARBITERS=1
+        ARBITER_DISK=50
+        ARBITER_MEMORY=16384
+        ARBITER_VCPU=2
+        NUM_WORKERS=0
+        NUM_EXTRA_WORKERS=2
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=32768
+        EXTRA_WORKER_DISK=100
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+  documentation: |-
+    This workflow executes a Two Node with Arbiter (TNA) cluster installation,
+    adds workers as a day-2 operation using pre-created extra worker VMs, then
+    performs an upgrade test.

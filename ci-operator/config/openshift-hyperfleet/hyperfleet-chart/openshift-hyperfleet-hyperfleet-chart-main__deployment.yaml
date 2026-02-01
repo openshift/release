@@ -13,6 +13,11 @@ images:
     && chmod +x get_helm.sh \
     && ./get_helm.sh \
     && rm get_helm.sh
+    RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+      && chmod 755 kubectl && mv kubectl /usr/local/bin/
+    RUN yum -y install --setopt=skip_missing_names_on_install=False \
+    jq \
+    gettext && yum clean all
   from: src
   inputs:
     src:
@@ -29,8 +34,14 @@ resources:
       memory: 200Mi
 tests:
 - as: hyperfleet-chart-deployment-nightly
-  cron: 30 01 * * *
+  cron: 30 8 * * *
   steps:
+    env:
+      CLUSTER_DLQ_TOPIC_NAME: prow-hyperfleet-clusters-dlq
+      CLUSTER_TOPIC_NAME: prow-hyperfleet-clusters
+      GKE_CLUSTER_NAME: hyperfleet-dev-prow
+      NAMESPACE_NAME: prow-hyperfleet
+      RELEASE_NAME: hyperfleet
     test:
     - ref: openshift-hyperfleet-chart-deployment
 zz_generated_metadata:
