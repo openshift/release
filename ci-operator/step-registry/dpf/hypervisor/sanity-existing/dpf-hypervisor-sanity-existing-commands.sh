@@ -7,9 +7,16 @@ set -euo pipefail
 REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
 BUILD_ID="${BUILD_ID:-$(date +%Y%m%d-%H%M%S)}"
 
+# CI environment variables for repo/PR info
+REPO_OWNER="${REPO_OWNER:-rh-ecosystem-edge}"
+REPO_NAME="${REPO_NAME:-openshift-dpf}"
+PULL_NUMBER="${PULL_NUMBER:-}"
+
 echo "=== DPF Sanity Test on Existing Cluster ==="
 echo "Remote host: ${REMOTE_HOST}"
 echo "Build ID: ${BUILD_ID}"
+echo "Repository: ${REPO_OWNER}/${REPO_NAME}"
+[[ -n "${PULL_NUMBER}" ]] && echo "Pull Request: #${PULL_NUMBER}"
 
 # Setup SSH
 echo "Setting up SSH..."
@@ -32,9 +39,20 @@ SANITY_DIR="/tmp/dpf-sanity-${BUILD_ID}"
 echo "Creating working directory: ${SANITY_DIR}"
 ${SSH} "mkdir -p ${SANITY_DIR}"
 
-# Copy repository to hypervisor using git archive (only tracked files)
-echo "Copying repository to hypervisor..."
-git archive --format=tar HEAD | ${SSH} "tar xf - -C ${SANITY_DIR}"
+# Clone repository on hypervisor
+echo "Cloning repository on hypervisor..."
+REPO_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
+
+if [[ -n "${PULL_NUMBER}" ]]; then
+    # For PR builds, clone and checkout the PR ref
+    ${SSH} "cd ${SANITY_DIR} && git clone ${REPO_URL} repo && cd repo && git fetch origin pull/${PULL_NUMBER}/head:pr && git checkout pr"
+else
+    # For branch builds, just clone
+    ${SSH} "cd ${SANITY_DIR} && git clone ${REPO_URL} repo"
+fi
+
+# Update SANITY_DIR to point to the cloned repo
+SANITY_DIR="${SANITY_DIR}/repo"
 
 # Decode and copy kubeconfig from Vault
 echo "Setting up kubeconfig..."
@@ -82,9 +100,9 @@ fi
 mkdir -p ${ARTIFACT_DIR}/sanity-results
 ${SCP} root@${REMOTE_HOST}:${SANITY_LOG} ${ARTIFACT_DIR}/sanity-results/ || echo "Could not retrieve log"
 
-# Cleanup
+# Cleanup (remove parent directory which contains the cloned repo)
 echo "Cleaning up..."
-${SSH} "rm -rf ${SANITY_DIR}"
+${SSH} "rm -rf /tmp/dpf-sanity-${BUILD_ID}"
 
 if [[ ${TEST_RESULT} -eq 0 ]]; then
     echo "=== Sanity Test Completed Successfully ==="
