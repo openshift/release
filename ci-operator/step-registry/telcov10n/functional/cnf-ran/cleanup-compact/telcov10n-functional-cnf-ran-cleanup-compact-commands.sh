@@ -2,6 +2,12 @@
 set -e
 set -o pipefail
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 
 process_inventory() {
