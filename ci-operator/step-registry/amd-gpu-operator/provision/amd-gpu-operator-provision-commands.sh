@@ -1,8 +1,5 @@
 #!/bin/bash
-set -euo pipefail
-
-# Enable debug tracing
-set -x
+set -euox pipefail
 
 # Setup SSH key (add trailing newline if missing - Vault sync strips it)
 cat /var/run/amd-ci/id_rsa > /tmp/id_rsa
