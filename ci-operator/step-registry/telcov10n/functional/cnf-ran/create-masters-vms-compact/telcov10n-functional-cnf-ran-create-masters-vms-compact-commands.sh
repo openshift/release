@@ -1,6 +1,13 @@
 #!/bin/bash
 set -e
 set -o pipefail
+
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 MOUNTED_HOST_INVENTORY="/var/host_variables"
 
 echo "Creating master VMs for compact spoke cluster: ${SPOKE_CLUSTER}"
