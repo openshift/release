@@ -83,6 +83,7 @@ export OPENSHIFT_INSTALLER_BIN="/usr/bin/openshift-install"
 export IBI_INSTALLATION_DISK="/dev/sda"
 export IBI_VM_NAME=$(virsh --connect=${LIBVIRT_DEFAULT_URI} domname ${IBI_UUID})
 export LIBVIRT_IMAGE_PATH=/home/libvirt-images
+export IBI_DHCP=true
 if [ ! -d "${LIBVIRT_IMAGE_PATH}" ]; then
   mkdir -p "${LIBVIRT_IMAGE_PATH}"
 fi
