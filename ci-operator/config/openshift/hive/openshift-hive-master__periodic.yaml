@@ -1,3 +1,8 @@
+base_images:
+  openstack-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: openstack-installer
 binary_build_commands: GO_COMPLIANCE_INFO=0 make build
 build_root:
   image_stream_tag:
@@ -164,6 +169,36 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: e2e-openstack-weekly
+  cron: 10 23 * * 0
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      HIVE_OSP_RESOURCE: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
+        export API_FLOATING_IP=$(<"${SHARED_DIR}/HIVE_FIP_API")
+        export INGRESS_FLOATING_IP=$(<"${SHARED_DIR}/HIVE_FIP_INGRESS")
+        export EXTERNAL_NETWORK=$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")
+        export COMPUTE_FLAVOR=$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")
+        export CONTROLPLANE_FLAVOR=$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")
+
+        GO_COMPLIANCE_INFO=0 CLOUD=openstack make test-e2e
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-openstack
 zz_generated_metadata:
   branch: master
   org: openshift
