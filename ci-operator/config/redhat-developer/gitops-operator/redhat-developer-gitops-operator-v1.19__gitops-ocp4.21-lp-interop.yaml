@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.21"
     namespace: ocp
     tag: cli
 build_root:
@@ -27,38 +27,37 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: redhat-openshift-gitops-interop-aws
+- as: redhat-openshift-gitops-interop-aws-fips
   cron: 0 23 31 2 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIPS_ENABLED: "true"
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
             [
-              {"step": "gitops-operator-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "gitops-operator-tests", "failure_type": "test_failure", "classification": "Test Failure", "group": {"name": "lp-tests", "priority": 1}, "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+              {"step": "gitops-operator-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 2}, "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "gitops-operator-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "GITOPS", "group": {"name": "lp-tests", "priority": 2}, "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.21-lp","self-managed-lp","gitops-lp"]'
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.21-lp","self-managed-lp","gitops-lp","fips"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: vab@redhat.com
-      FIREWATCH_DEFAULT_JIRA_PROJECT: GITOPS
-      MAP_TESTS: "true"
-      OCP_VERSION: "4.21"
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       OPERATORS: |
         [
             {"name": "openshift-gitops-operator", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-gitops-operator", "target_namespaces": "", "operator_group": "global-operators"}
         ]
-      REPORTPORTAL_CMP: Gitops-lp-interop
       USER_TAGS: |
         scenario gitops
     test:
     - ref: install-operators
     - ref: gitops-operator-tests
-    workflow: firewatch-ipi-aws-cr
+    workflow: firewatch-ipi-aws
 zz_generated_metadata:
-  branch: v1.18
+  branch: v1.19
   org: redhat-developer
   repo: gitops-operator
-  variant: gitops-ocp-4.21-lp-interop-cr
+  variant: gitops-ocp4.21-lp-interop
