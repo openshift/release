@@ -9,6 +9,18 @@ echo "Kernel-Level Isolation Validation"
 echo "=========================================="
 echo ""
 
+# Install oc CLI if not available
+if ! command -v oc &> /dev/null; then
+    echo "Installing oc CLI..."
+    cd /tmp
+    curl -sL https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest/openshift-client-linux.tar.gz | tar xzf -
+    chmod +x oc kubectl
+    export PATH="/tmp:${PATH}"
+    echo "oc CLI installed successfully"
+    oc version --client || true
+    echo ""
+fi
+
 # Function to get kernel version from a node
 get_kernel_version() {
     local kubeconfig=$1
