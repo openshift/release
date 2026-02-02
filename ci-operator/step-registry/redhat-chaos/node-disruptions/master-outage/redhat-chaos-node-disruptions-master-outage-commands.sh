@@ -1,8 +1,16 @@
 #!/bin/bash
 set -o errexit
 
-console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
-export HEALTH_CHECK_URL=https://$console_url
+# Use egress IP health check if available, fallback to console
+if [[ -f "$SHARED_DIR/egress-health-check-url" ]]; then
+    HEALTH_CHECK_URL=$(cat "$SHARED_DIR/egress-health-check-url")
+    export HEALTH_CHECK_URL
+    echo "Using egress IP health check URL for chaos monitoring: $HEALTH_CHECK_URL"
+else
+    console_url=$(oc get routes -n openshift-console console -o jsonpath='{.spec.host}')
+    export HEALTH_CHECK_URL=https://$console_url
+    echo "Using console health check URL: $HEALTH_CHECK_URL"
+fi
 set -o nounset
 set -o pipefail
 set -x

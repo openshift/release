@@ -1,0 +1,75 @@
+chain:
+  as: openshift-qe-egress-ip
+  steps:
+  - ref: openshift-qe-egress-ip-setup
+  - ref: openshift-qe-egress-ip-internal-echo-deploy
+  - ref: redhat-chaos-pod-scenarios-custom
+  - ref: redhat-chaos-node-disruptions-worker-outage
+  - ref: openshift-qe-egress-ip-tests
+  env:
+  # Pod disruption chaos step environment variables
+  - name: TARGET_NAMESPACE
+    default: "openshift-ovn-kubernetes"
+  - name: POD_LABEL
+    default: "app=ovnkube-node"
+  - name: DISRUPTION_COUNT
+    default: "3"
+  - name: EXPECTED_POD_COUNT
+    default: "3"
+  - name: KILL_TIMEOUT
+    default: "120"
+  - name: EXPECTED_RECOVERY_TIME
+    default: "90"
+  
+  # Node disruption chaos step environment variables
+  - name: ACTION
+    default: "node_reboot_scenario"
+  - name: LABEL_SELECTOR
+    default: "node-role.kubernetes.io/worker="
+  - name: RUNS
+    default: "1"
+  - name: NODE_OUTAGE_TIMEOUT
+    default: "120"
+
+  # Disable telemetry to prevent IndexError bugs
+  - name: ENABLE_ALERTS
+    default: "False"
+  - name: CHECK_CRITICAL_ALERTS
+    default: "False"
+  - name: WAIT_DURATION
+    default: "60"
+  - name: TELEMETRY_ENABLED
+    default: "False"
+  - name: TELEMETRY_PROMETHEUS_BACKUP
+    default: "False"
+  - name: TELEMETRY_FULL_PROMETHEUS_BACKUP
+    default: "False"
+  - name: TELEMETRY_LOGS_BACKUP
+    default: "False"
+  - name: TELEMETRY_EVENTS_BACKUP
+    default: "False"
+  - name: CAPTURE_METRICS
+    default: "False"
+  - name: ENABLE_ES
+    default: "False"
+  - name: JUNIT_TESTCASE
+    default: '[Egress-IP] OVN pod disruption resilience test'
+  documentation: >-
+    Executes comprehensive OpenShift QE egress IP test suite using cloud-bulldozer methodology 
+    integrated with chaos engineering validation framework.
+    
+    This chain orchestrates:
+    1. Infrastructure setup using cloud-bulldozer kube-burner egressip workload methodology
+       - Uses worker node count scaling (ITERATIONS=${worker_count})
+       - Applies cloud-bulldozer proven node selection and EgressIP configuration
+       - Deploys external ipecho service for functional validation
+    2. Chaos engineering pod disruption using krkn framework (targets ovnkube-node pods)
+    3. Chaos engineering node reboot using krkn framework (targets worker nodes)  
+    4. Functional validation using real traffic flow testing with external ipecho service
+    
+    The test suite combines cloud-bulldozer's proven egressip workload setup with advanced
+    chaos engineering capabilities. It validates actual egress IP functionality by testing 
+    real traffic flow rather than just checking implementation details. Uses external ipecho 
+    service on jump host to verify that pods in egress IP namespaces actually use the designated 
+    egress IP address for outbound traffic, providing true end-to-end functional validation 
+    with enterprise-grade chaos testing.

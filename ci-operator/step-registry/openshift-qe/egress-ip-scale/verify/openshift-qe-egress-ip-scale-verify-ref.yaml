@@ -1,0 +1,44 @@
+ref:
+  as: openshift-qe-egress-ip-scale-verify
+  from_image:
+    namespace: ocp
+    name: "4.21"
+    tag: cli
+  commands: openshift-qe-egress-ip-scale-verify-commands.sh
+  resources:
+    requests:
+      cpu: 200m
+      memory: 500Mi
+  env:
+  - name: EGRESS_IP_COUNT
+    default: "5"
+    documentation: "Number of egress IPs to validate"
+  - name: MIN_SUCCESS_RATE
+    default: "75"
+    documentation: "Minimum percentage of egress IPs that should be functional"
+  - name: HEALTH_CHECK_URLS
+    default: "https://httpbin.org/ip,https://ifconfig.me/ip,https://api.ipify.org"
+    documentation: "Comma-separated list of URLs for egress IP validation"
+  - name: URL_WATCH_ENABLED
+    default: "True"
+    documentation: "Enable URL health check monitoring during validation"
+  - name: HEALTH_CHECK_TIMEOUT
+    default: "30"
+    documentation: "Timeout in seconds for individual health check requests"
+  - name: VALIDATION_TIMEOUT
+    default: "300"
+    documentation: "Timeout in seconds for validation checks"
+  - name: RECOVERY_WAIT_TIME
+    default: "60"
+    documentation: "Time to wait for recovery before validation"
+  documentation: >-
+    Validates egress IP functionality between chaos scenarios.
+    
+    This validation step runs between each chaos scenario to ensure:
+    1. Egress IPs are properly assigned to nodes
+    2. Test workloads can reach external services using egress IPs
+    3. Network connectivity is functional
+    4. OVN components are healthy
+    
+    The validation ensures system stability before proceeding to the next
+    chaos scenario, providing early detection of issues and recovery verification.
