@@ -86,6 +86,31 @@ if ! git merge "upstream/${DEFAULT_BRANCH}"; then
   CONFLICT=true
 fi
 
+echo "🔧 Syncing openshift/go.mod with upstream dependencies…"
+pushd openshift > /dev/null
+if go mod tidy; then
+  popd > /dev/null
+  # Check if there are any changes to commit
+  if ! git diff --quiet openshift/go.mod openshift/go.sum; then
+    echo "   📝 Changes detected in openshift/go.mod, committing…"
+    git add openshift/go.mod openshift/go.sum
+    git commit -m "sync openshift/go.mod with upstream dependencies
+
+- go mod tidy
+
+Automated sync after downstream merge to keep openshift/go.mod
+in sync with transitive dependencies from go-controller and test/e2e."
+    echo "   ✅ openshift/go.mod synced successfully"
+    GO_MOD_SYNCED=true
+  else
+    echo "   ℹ️  No changes needed in openshift/go.mod"
+  fi
+else
+  popd > /dev/null
+  echo "   ⚠️  go mod tidy failed in openshift/"
+  GO_MOD_FAILED=true
+fi
+
 echo "📤 Pushing branch to origin…"
 git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${DOWNSTREAM_REPO}"
 git push origin "$BRANCH"
@@ -93,8 +118,11 @@ git push origin "$BRANCH"
 echo "✏️  Opening Pull Request…"
 PR_TITLE="NO-JIRA: DownStream Merge [$(date +%m-%d-%Y)]"
 PR_BODY="Automated merge of upstream/${DEFAULT_BRANCH} → ${DEFAULT_BRANCH}."
-# Make it a draft if we detected conflicts (keeps Prow from auto-running presubmits).
-DRAFT=$( [[ "${CONFLICT:-false}" == "true" ]] && echo true || echo false )
+if [[ "${GO_MOD_SYNCED:-false}" == "true" ]]; then
+  PR_BODY="${PR_BODY}"$'\n\n'"**Note:** This PR includes an automated sync of \`openshift/go.mod\` with upstream dependencies (\`go mod tidy\`)."
+fi
+# Make it a draft if we detected conflicts or go mod failures (keeps Prow from auto-running presubmits).
+DRAFT=$( [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" ]] && echo true || echo false )
 # Build the PR JSON $PAYLOAD
 PAYLOAD=$(
   jq -nc \
@@ -121,20 +149,34 @@ if [[ -z "$PR_NUM" || "$PR_NUM" == "null" ]]; then
 fi
 echo "🔖 Opened PR #${PR_NUM}"
 
-if [[ "${CONFLICT:-false}" == "true" ]]; then
-  echo "🚨 Prepending MERGE CONFLICT! and holding PR #${PR_NUM}"
-  NEW_TITLE="MERGE CONFLICT! ${PR_TITLE}"
+if [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" ]]; then
+  # Build the title prefix and hold reason based on what failed
+  if [[ "${CONFLICT:-false}" == "true" && "${GO_MOD_FAILED:-false}" == "true" ]]; then
+    echo "🚨 Merge conflict AND go.mod sync failed, holding PR #${PR_NUM}"
+    TITLE_PREFIX="MERGE CONFLICT + GO MOD FAILED!"
+    HOLD_REASON="/hold\nMerge conflict detected AND go.mod sync failed in openshift/.\n\nPlease resolve merge conflicts first, then run:\n  cd openshift && go mod tidy"
+  elif [[ "${CONFLICT:-false}" == "true" ]]; then
+    echo "🚨 Prepending MERGE CONFLICT! and holding PR #${PR_NUM}"
+    TITLE_PREFIX="MERGE CONFLICT!"
+    HOLD_REASON="/hold\nneeds conflict resolution"
+  else
+    echo "🚨 go.mod sync failed, holding PR #${PR_NUM}"
+    TITLE_PREFIX="GO MOD SYNC FAILED!"
+    HOLD_REASON="/hold\nFailed to sync openshift/go.mod with upstream dependencies.\n\nThe \`go mod tidy\` command failed in openshift/.\n\nThis likely means upstream introduced dependency changes that conflict with downstream-specific dependencies. Please manually run:\n  cd openshift && go mod tidy\n\nand resolve any issues."
+  fi
+
+  NEW_TITLE="${TITLE_PREFIX} ${PR_TITLE}"
   curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X PATCH -d "{\"title\":\"${NEW_TITLE}\"}" \
     "https://api.github.com/repos/${DOWNSTREAM_REPO}/pulls/${PR_NUM}"
-  curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST -d '{"body":"/hold\nneeds conflict resolution"}' \
+  curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST -d "{\"body\":\"${HOLD_REASON}\"}" \
     "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
   echo "⚠️  PR #${PR_NUM} held for manual resolution"
   exit 1
- else
-   echo "💬 Posting /ok-to-test and payload commands…"
-   curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST \
-        -d "{\"body\":\"/ok-to-test\n/payload ${RELEASE} ci blocking\n/payload ${RELEASE} nightly blocking\"}" \
-        "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
+else
+  echo "💬 Posting /ok-to-test and payload commands…"
+  curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST \
+       -d "{\"body\":\"/ok-to-test\n/payload ${RELEASE} ci blocking\n/payload ${RELEASE} nightly blocking\"}" \
+       "https://api.github.com/repos/${DOWNSTREAM_REPO}/issues/${PR_NUM}/comments"
 fi
 
 echo "✅ Merge succeeded; PR #${PR_NUM} created."
