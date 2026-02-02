@@ -4,6 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Check if a custom redhat-operators CatalogSource was created and use it
+if [[ -f "${SHARED_DIR}/redhat_operators_catalog_source_name" ]]; then
+  CUSTOM_CATALOG_SOURCE=$(cat "${SHARED_DIR}/redhat_operators_catalog_source_name")
+  echo "Found custom CatalogSource name: ${CUSTOM_CATALOG_SOURCE}"
+  LOCAL_STORAGE_OPERATOR_SUB_SOURCE="${CUSTOM_CATALOG_SOURCE}"
+  
+  # Local Storage uses "stable" channel, not version-specific, so we keep it as is
+  echo "Local Storage uses 'stable' channel, keeping it unchanged"
+fi
+
 if [[ -z "${LOCAL_STORAGE_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
   echo "ERROR: INSTALL_NAMESPACE is not defined"
   exit 1
