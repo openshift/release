@@ -1,0 +1,30 @@
+chain:
+  as: kueue-operator-test-e2e-upstream-disruptive
+  steps:
+  - ref: kueue-operator-image-env-setup
+  - ref: cert-manager-install-operator
+  - as: run-sdk
+    commands: |
+      source "${SHARED_DIR}/env"
+      echo "Using Bundle Image: ${BUNDLE_IMAGE}"
+      operator-sdk run bundle --timeout=10m -n openshift-kueue-operator "$BUNDLE_IMAGE" --security-context-config=restricted
+    from: operator-sdk
+    resources:
+      requests:
+        cpu: 200m
+        memory: 300Mi
+  - ref: kueue-operator-image-patch
+  - chain: jobset-install
+  - chain: leader-worker-set-install
+  - as: e2e-kueue-upstream-disruptive
+    cli: latest
+    commands: |
+      source "${SHARED_DIR}/env"
+      make test-e2e-disruptive
+    from: kueue-operator-src
+    resources:
+      requests:
+        cpu: "4"
+        memory: "4Gi"
+  documentation: |-
+    This chain runs the upstream disruptive e2e test suite for The Kueue operator.
