@@ -7,10 +7,20 @@ set -euo pipefail
 REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
 BUILD_ID="${BUILD_ID:-$(date +%Y%m%d-%H%M%S)}"
 
-# CI environment variables for repo/PR info
-REPO_OWNER="${REPO_OWNER:-rh-ecosystem-edge}"
-REPO_NAME="${REPO_NAME:-openshift-dpf}"
-PULL_NUMBER="${PULL_NUMBER:-}"
+# Determine if this is a rehearsal (release repo PR) or actual openshift-dpf PR
+CI_REPO_NAME="${REPO_NAME:-}"
+if [[ "${CI_REPO_NAME}" == "release" ]]; then
+    # Rehearsal - clone main branch of openshift-dpf
+    REPO_OWNER="rh-ecosystem-edge"
+    REPO_NAME="openshift-dpf"
+    PULL_NUMBER=""
+    echo "Detected rehearsal mode - will clone main branch"
+else
+    # Actual openshift-dpf PR - use CI environment variables
+    REPO_OWNER="${REPO_OWNER:-rh-ecosystem-edge}"
+    REPO_NAME="${REPO_NAME:-openshift-dpf}"
+    PULL_NUMBER="${PULL_NUMBER:-}"
+fi
 
 echo "=== DPF Sanity Test on Existing Cluster ==="
 echo "Remote host: ${REMOTE_HOST}"
