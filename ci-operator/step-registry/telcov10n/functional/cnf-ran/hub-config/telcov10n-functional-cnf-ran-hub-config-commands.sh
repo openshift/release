@@ -2,6 +2,12 @@
 set -e
 set -o pipefail
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 process_inventory() {
     local directory="$1"
     local dest_file="$2"
@@ -45,13 +51,6 @@ find /var/group_variables/common/ -mindepth 1 -type d 2>/dev/null | while read -
     echo "Process group inventory file: ${dir}"
     process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
 done
-
-# DEBUG: Show generated bastions file to verify certificate format
-echo "=== DEBUG: Contents of group_vars/bastions (first 20 lines) ==="
-head -20 /eco-ci-cd/inventories/ocp-deployment/group_vars/bastions || echo "File not found"
-echo "=== DEBUG: Checking if gitlab_ca_certificate has newlines ==="
-grep -A 5 "gitlab_ca_certificate" /eco-ci-cd/inventories/ocp-deployment/group_vars/bastions | head -10 || echo "Not found"
-echo "=== END DEBUG ==="
 
 echo "Create host_vars directory"
 mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
