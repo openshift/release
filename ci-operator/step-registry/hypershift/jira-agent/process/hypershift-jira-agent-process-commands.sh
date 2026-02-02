@@ -108,15 +108,15 @@ echo "GitHub App tokens configured successfully"
 MAX_ISSUES=${JIRA_AGENT_MAX_ISSUES:-1}
 echo "Configuration: MAX_ISSUES=$MAX_ISSUES"
 
-# Load Jira API token for adding labels after processing
+# Load Jira API token (required for searching restricted issues and adding labels)
 JIRA_TOKEN_FILE="/var/run/claude-code-service-account/jira-pat"
 if [ -f "$JIRA_TOKEN_FILE" ]; then
   JIRA_TOKEN=$(cat "$JIRA_TOKEN_FILE")
   echo "Jira API token loaded from jira-pat"
 else
-  echo "Warning: Jira API token not found at $JIRA_TOKEN_FILE"
-  echo "Labels will not be added to processed issues"
-  JIRA_TOKEN=""
+  echo "ERROR: Jira API token required for searching restricted issues"
+  echo "Token not found at $JIRA_TOKEN_FILE"
+  exit 1
 fi
 
 # Function to transition a Jira issue to a target status
@@ -160,9 +160,11 @@ set_assignee() {
 }
 
 # Query Jira for issues (excluding already processed ones via label)
+# Authentication is required to see issues with restricted visibility
 echo "Querying Jira for issues..."
 ISSUES=$(curl -s "https://issues.redhat.com/rest/api/2/search" \
   -G \
+  -H "Authorization: Bearer $JIRA_TOKEN" \
   --data-urlencode 'jql=project in (OCPBUGS, CNTRLPLANE) AND resolution = Unresolved AND status in (New, "To Do") AND labels = issue-for-agent AND labels != agent-processed' \
   --data-urlencode 'fields=key,summary' \
   --data-urlencode "maxResults=$MAX_ISSUES" \
