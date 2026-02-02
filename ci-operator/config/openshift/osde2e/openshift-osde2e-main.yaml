@@ -29,10 +29,8 @@ tests:
   as: hypershift-pr-check
   commands: |
     # Check if there are changes in pkg/ or cmd/ directories
-    if ! (git diff --name-only ${PULL_BASE_SHA} $(git merge-base FETCH_HEAD main)  | grep -qE '^(pkg/|cmd/)'); then  \
-      echo "No changes detected in pkg/ or cmd/ directories. Skipping test."   \
-      exit 0   \
-    fi  \
+    if ! (git diff --name-only ${PULL_BASE_SHA} $(git merge-base FETCH_HEAD main) | grep -qE '^(pkg/|cmd/)'); then
+    echo "No changes detected in pkg/ or cmd/ directories. Skipping test." && exit 0; fi
 
     export GOFLAGS=""
     export REPORT_DIR="$ARTIFACT_DIR"
@@ -55,11 +53,7 @@ tests:
         exit 1
     fi
     echo "Running krknai commands"
-    export DRY_RUN="TRUE"
-    out/osde2e krkn-ai --configs "${CONFIGS}" --secret-locations "${SECRET_LOCATIONS}" --cluster-id "$(cat "${SHARED_DIR}/cluster-id")"
-    echo "Cleaning up"
-    export SKIP_DESTROY_CLUSTER="false"
-    out/osde2e cleanup --configs "${CONFIGS}" --secret-locations "${SECRET_LOCATIONS}" --cluster-id "$(cat "${SHARED_DIR}/cluster-id")"
+    DRY_RUN=true SKIP_DESTROY_CLUSTER=false out/osde2e krkn-ai --configs "${CONFIGS}" --secret-locations "${SECRET_LOCATIONS}" --cluster-id "$(cat "${SHARED_DIR}/cluster-id")"
     echo "Finished osde2e pr checks on ROSA hypershift."
   container:
     from: src

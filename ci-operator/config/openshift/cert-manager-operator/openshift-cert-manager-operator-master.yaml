@@ -7,27 +7,19 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.39.2
-  ocp_builder_rhel-9-golang-1.25-openshift-4.21:
-    name: builder
+  upi-installer:
+    name: "4.20"
     namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.21
+    tag: upi-installer
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/ci/Dockerfile
   from: base-rhel9
-  inputs:
-    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
   to: cert-manager-operator
 - dockerfile_path: images/ci/operand.Dockerfile
   from: base-rhel9
-  inputs:
-    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
   to: cert-manager
 operator:
   bundles:
@@ -163,6 +155,28 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-aws-proxy
+- always_run: false
+  as: e2e-operator-aws-upi-proxy
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-upi-proxy
 - always_run: false
   as: e2e-operator-aws-sts
   optional: true
