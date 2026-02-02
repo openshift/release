@@ -21,7 +21,7 @@ else
   echo "Using internal OpenShift registry: ${FINAL_REGISTRY_URL}/${FULL_REPO}"
 fi
 
-# Create kmm-image-config ConfigMap in Fusion Access namespace
+# Create kmm-image-config ConfigMap in IBM Fusion Access namespace
 echo ""
 echo "Creating kmm-image-config in ${FA__NAMESPACE}..."
 cat <<EOF | oc apply -f -

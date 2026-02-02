@@ -22,6 +22,7 @@ openshift-tests-private/
 ├── openshift-openshift-tests-private-release-<TARGET_VERSION>__<CPU_ARCH>-<IMAGE_STREAM>-<TARGET_VERSION>-upgrade-from-<IMAGE_STREAM>-<INITIAL_VERSION>.yaml
 ├── openshift-openshift-tests-private-release-<TARGET_VERSION>__<CPU_ARCH>-<IMAGE_STREAM>-<TARGET_VERSION>-cpou-upgrade-from-<INITIAL_VERSION>.yaml
 └── openshift-openshift-tests-private-release-<VERSION>__<CPU_ARCH>-rollback-<IMAGE_STREAM>.yaml
+└── openshift-openshift-tests-private-release-<VERSION>__<CPU_ARCH>-<IMAGE_STREAM>.yaml
 ```
 
 ## Glossary
@@ -39,35 +40,54 @@ openshift-tests-private/
 - **CPOU**: Control Plane Only update
 - **TP**: TechPreview features
 
+## E2E File Conventions
+
+### 1. E2E File Definition
+- E2E file names are in `openshift-openshift-tests-private-release-<VERSION>__<CPU_ARCH>-<IMAGE_STREAM>.yaml` format
+
+### 2. To Multi-Arch Jobs
+- To multi-arch jobs are used to test if the conversion from AMD64 or ARM64 architecture to multi-architecture succeeds
+- The job name contains `to-multiarch`, for example: aws-ipi-ovn-ipsec-to-multiarch-f7
+
+### Filename Examples
+- openshift-openshift-tests-private-release-4.21__amd64-nightly.yaml
+- openshift-openshift-tests-private-release-4.21__amd64-stable.yaml
+
 ## Upgrade File Conventions
 
 ### 1. Upgrade File Definition
-- Y stream upgrade files, Z stream upgrade files and Chain upgrade files' name contain `upgrade`
-- CPOU upgrade file's name contains `cpou` and `upgrade`
-- Rollback upgrade file's name contains `rollback`
+- Y stream upgrade files, Z stream upgrade files, and Chain upgrade file names contain `upgrade`
+- CPOU upgrade file names contain `cpou` and `upgrade`
+- Rollback upgrade file names contain `rollback`
 
 ### 2. Target Version
 - The first version behind `openshift-openshift-tests-private-release-` in the upgrade file name is the target version
 - All jobs in an upgrade file are used to test the target OpenShift version
 
-### 3. CPOU Upgrade
-- CPOU is an abbreviation for Control Plane Only update.
-- OpenShift only supports two consecutive even version CPOU upgrade, for example: upgrade from 4.12 to 4.13 to 4.14.
+### 3. Canary Upgrade
+- A canary update is an update strategy where worker node updates are performed in discrete, sequential stages instead of updating all worker nodes at the same time.
+- Right now, we only implement canary upgrades as special Y stream upgrades
+- Canary upgrade job names contain `canary`
 
 ### 4. Chain Upgrade
 - Chain upgrades are a special type of upgrades where the initial version is two or more levels lower than the target version.
 
-### 5. Y Stream Upgrade
+### 5. CPOU Upgrade
+- CPOU is an abbreviation for Control Plane Only update.
+- OpenShift only supports two consecutive even version CPOU upgrade, for example: upgrade from 4.12 to 4.13 to 4.14.
+
+### 6. Rollback Upgrade
+- Rollback upgrade is similar to Z stream upgrade but it is a downgrade, e.g., downgrade from 4.20.2 to 4.20.1
+- The rollback upgrade's target version must be in the upgrade history, which means only historical versions can be downgraded to.
+
+### 7. Y Stream Upgrade
 - Y Stream Upgrade is the upgrade that upgrades from one level lower version to the target version, e.g. upgrade from 4.20.1 to 4.21.1
 
-### 6. Z Stream Upgrade
+### 8. Z Stream Upgrade
 - Z Stream Upgrade also known as Patch upgrade where the initial version and target version have the same minor version, e.g. upgrade from 4.20.1 to 4.20.2
 
-### 7. Rollback Upgrade
-- Rollback upgrade is similar to Z stream upgrade but it is a downgrade, e.g. downgrade from 4.20.2 to 4.20.1
-- The rollback upgrade's target version must be in the upgrade history, that means only the history versions can be downgraded to.
 
-### 8. Upgrade Jobs
+### 9. Upgrade Jobs
 - Upgrade jobs are defined as the `tests` items in an upgrade file
 - Job name: the value of the root level `as` defines a job name
 - Platform: each job must run on a platform, the first keyword in a job name specifies the platform
@@ -125,8 +145,8 @@ When maintaining upgrade test jobs, follow these strategic guidelines to ensure 
     - TP jobs are **only supported for z-stream upgrades**
 
 7. **Architecture-sensitive Features**
-    - For those profiles which include features that are affected by architecture, we copy them on all architectures
-    - The architecture sensitive features include storage (aws efs, gcp filestore-csi, bm LSO), mco, and cluster infrastructure
+    - For profiles that include features affected by architecture, we copy them to all architectures
+    - Architecture-sensitive features include storage (aws efs, gcp filestore-csi, bm LSO), mco, and cluster infrastructure
 
 ### Requirements for Chain Upgrade Jobs
 
@@ -137,6 +157,7 @@ When maintaining upgrade test jobs, follow these strategic guidelines to ensure 
    - Chain upgrade paths must cover all platforms: AWS, Azure, Baremetal, GCP, IBMCloud, Nutanix, vSphere
    - Chain upgrade jobs must cover all key features: sdn (4.15 and earlier; 4.14 default is OVN), sno, ovn, ipsec, ipv4, ipv6, dual-stack, fips, proxy, capability, sts, mixarch
    - Chain upgrade jobs must cover all CPU architectures: amd64, arm64, multiarch
+   - Each selected profile should have at least one key feature
 
 3. **EOL (End of Life) version handling**
    - Only keep one more release for EOL versions
@@ -149,9 +170,22 @@ When maintaining upgrade test jobs, follow these strategic guidelines to ensure 
 5. **Customer usage-driven coverage**
    - No need to cover versions not actively used by customers
 
+6. **Not Applicable Features**
+   Do not choose profiles containing below features for Chain upgrade jobs:
+   - agent
+   - disc
+   - gpu
+   - hypershift
+   - longduration
+   - longrun
+   - rosa
+   - to-multiarch
+   - tp
+   - winc
+
 ### Images in base_images
-We run jobs in containers, to set up a container we can put images in base_images in a configuration file.
-There are some common images, we need to use special versions for them. 
+We run jobs in containers. To set up a container, we can put images in base_images in a configuration file.
+There are some common images for which we need to use special versions. 
 
 1. **ansible, cli, tools images**
    - For target versions **earlier than 4.6**: Use **target version** for ansible, cli, tools
@@ -187,16 +221,16 @@ base_images:
 ```
 
 ### Versions in zz_generated_metadata
-1. the `branch` always use target version
+1. The `branch` always uses the target version
 2. `variant` is in format <CPU_ARCH>-<IMAGE_STREAM>-<TARGET_VERSION>-upgrade-from-<IMAGE_STREAM>-<INITIAL_VERSION>
 
 ### Verify Changes
 After making any changes, we should perform the following steps to ensure that all changes are correct:
 
-1. **Update JOB Frequency**
-  - Run `update-cron-entries.py` script to update cron settings against job frequency
+1. **Update Job Frequency**
+  - Run the `update-cron-entries.py` script to update cron settings based on job frequency
 
-2. **RUN MAKE COMMAND**
+2. **Run Make Commands**
   - Always run `make update` commands to ensure configurations are valid:
 
 ### Quick Command Reference

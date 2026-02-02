@@ -19,7 +19,7 @@ if [[ -z "${METALLB_OPERATOR_SUB_CHANNEL}" ]]; then
   exit 1
 fi
 
-echo "Installing ${METALLB_OPERATOR_SUB_PACKAGE} from ${METALLB_OPERATOR_SUB_CHANNEL} into ${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}"
+echo "Installing ${METALLB_OPERATOR_SUB_PACKAGE} from channel: ${METALLB_OPERATOR_SUB_CHANNEL} in source: ${METALLB_OPERATOR_SUB_SOURCE} into ${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}"
 
 # create the install namespace
 oc apply -f - <<EOF

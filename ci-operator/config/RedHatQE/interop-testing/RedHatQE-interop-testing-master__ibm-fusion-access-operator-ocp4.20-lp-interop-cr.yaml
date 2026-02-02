@@ -1,0 +1,74 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+images:
+- dockerfile_literal: |
+    FROM icr.io/cpopen/ibm-spectrum-scale-must-gather:v5.2.3.1
+  to: ibm-must-gather
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: ibm-fusion-access-operator-cr-ocp420
+  cron: 0 3,15 * * *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.2xlarge
+      CUSTOM_SECURITY_GROUP_PORTS: 12345,1191,60000-61000
+      CUSTOM_SECURITY_GROUP_PROTOCOLS: tcp,udp
+      CUSTOM_SECURITY_GROUP_SOURCES: ""
+      FIPS_ENABLED: "false"
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp", "self-managed-lp", "ibm-fusion-access-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mbaldess@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FUSION_ACCESS_NAMESPACE: ibm-fusion-access
+      FUSION_ACCESS_STORAGE_SCALE_VERSION: v5.2.3.1
+      KMM_REGISTRY_ORG: ""
+      KMM_REGISTRY_REPO: gpfs-compat-kmod
+      KMM_REGISTRY_URL: ""
+      OCP_VERSION: "4.20"
+      REPORTPORTAL_CMP: ibm-fusion-access-operator-lp-interop
+      STORAGE_SCALE_CLIENT_CPU: "2"
+      STORAGE_SCALE_CLIENT_MEMORY: 4Gi
+      STORAGE_SCALE_CLUSTER_NAME: ibm-spectrum-scale
+      STORAGE_SCALE_STORAGE_CPU: "2"
+      STORAGE_SCALE_STORAGE_MEMORY: 8Gi
+      USER_TAGS: |
+        scenario ibm-fusion-access
+    post:
+    - ref: interop-tests-ibm-fusion-access-custom-ibm-must-gather
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - chain: interop-tests-ibm-fusion-access-environment-setup-chain
+    - chain: interop-tests-ibm-fusion-access-ebs-integration-chain
+    - ref: interop-tests-ibm-fusion-access-verify-cluster
+    workflow: firewatch-ipi-aws-cr
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: ibm-fusion-access-operator-ocp4.20-lp-interop-cr

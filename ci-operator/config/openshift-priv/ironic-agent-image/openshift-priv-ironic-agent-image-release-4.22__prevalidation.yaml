@@ -1,0 +1,88 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.22_base-rhel9:
+    name: 4.22-priv
+    namespace: ocp-private
+    tag: base-rhel9
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/ironic-agent-image
+images:
+- dockerfile_path: Dockerfile.ocp
+  from: prevalidation-base
+  to: ironic-agent
+promotion:
+  to:
+  - disabled: true
+    name: 4.22-priv
+    namespace: ocp-private
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      #NOTE(elfosardo): use ironic repos, cause we're special
+      curl http://base-4-22-rhel-9-ironic-prevalidation.ocp.svc > /etc/yum.repos.art/ci/base-4-22-rhel-9-ironic-prevalidation.repo
+    from: ocp_4.22_base-rhel9
+    to: prevalidation-base
+releases:
+  initial:
+    integration:
+      name: 4.22-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.22-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-ipi-bm-prevalidation
+  capabilities:
+  - intranet
+  run_if_changed: .*packages-list.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: baremetal
+    workflow: baremetalds-e2e-ovn-ipv4
+- as: e2e-metal-ipi-serial-ipv4-prevalidation
+  capabilities:
+  - intranet
+  run_if_changed: .*packages-list.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ovn-ipv4
+- as: e2e-metal-ipi-virtualmedia-prevalidation
+  capabilities:
+  - intranet
+  run_if_changed: .*packages-list.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+- as: e2e-metal-ipi-ovn-ipv6-prevalidation
+  capabilities:
+  - intranet
+  run_if_changed: .*packages-list.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack-prevalidation
+  capabilities:
+  - intranet
+  optional: true
+  run_if_changed: .*packages-list.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
+zz_generated_metadata:
+  branch: release-4.22
+  org: openshift-priv
+  repo: ironic-agent-image
+  variant: prevalidation

@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.4.6"
+	TAG="v0.6.2"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
 	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
@@ -33,9 +33,9 @@ function install_required_tools() {
 	fi
 
 	mkdir -p ${HOME}/.config/openstack/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/clouds.yaml ${HOME}/.config/openstack/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/clouds.yaml ${HOME}/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/ocp-ci-ca.pem ${HOME}/
+	cp ${SECRETS_DIR}/clouds.yaml ${HOME}/.config/openstack/
+	cp ${SECRETS_DIR}/clouds.yaml ${HOME}/
+	cp ${SECRETS_DIR}/ocp-ci-ca.pem ${HOME}/
 
 	which PowerVC-Tool
 	which jq
@@ -50,6 +50,14 @@ function install_required_tools() {
 echo "ARCH=${ARCH}"
 echo "BRANCH=${BRANCH}"
 echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
+
+export SECRETS_DIR=/var/run/powervc-ipi-cicd-secrets/powervc-creds
+if [ ! -d "${SECRETS_DIR}" ]
+then
+	echo "Error: ${SECRETS_DIR} directory does not exist!"
+	exit 1
+fi
+ls -l ${SECRETS_DIR}/ || true
 
 if [[ -z "${LEASED_RESOURCE}" ]]
 then
@@ -73,8 +81,6 @@ else
 	CLUSTER_NAME="p-${LEASED_RESOURCE}"
 fi
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
-
-ls -l /var/run/powervc-ipi-cicd-secrets/powervc-creds/ || true
 
 install_required_tools
 
@@ -122,9 +128,10 @@ FLAVOR: ${FLAVOR}
 LEASED_RESOURCE: ${LEASED_RESOURCE}
 NETWORK_NAME: ${NETWORK_NAME}
 RHCOS_IMAGE_NAME: ${RHCOS_IMAGE_NAME}
+SERVER_IP: ${SERVER_IP}
 EOF
 
-#POWERVC_USER_ID=$(cat "/var/run/powervc-ipi-cicd-secrets/powervc-creds/POWERVC_USER_ID")
+#POWERVC_USER_ID=$(cat "${SECRETS_DIR}/POWERVC_USER_ID")
 
 # Workaround for this error as clouds.yaml is also here
 #   NewServiceClient returns error unable to load clouds.yaml: no clouds.yml file found: file does not exist
@@ -146,7 +153,7 @@ openstack \
 openstack \
 	--os-cloud=${CLOUD} \
 	keypair create \
-	--public-key "${CLUSTER_PROFILE_DIR}/ssh-publickey" \
+	--public-key "${SECRETS_DIR}/ssh-publickey" \
 	"${CLUSTER_NAME}-key"
 
 echo "Running PowerVC-Tool create-bastion..."
@@ -166,6 +173,7 @@ PowerVC-Tool \
 	--sshKeyName "${CLUSTER_NAME}-key" \
 	--domainName "${BASE_DOMAIN}" \
 	--enableHAProxy false \
+	--serverIP "${SERVER_IP}" \
 	--shouldDebug true
 RC=$?
 if [ ${RC} -gt 0 ]

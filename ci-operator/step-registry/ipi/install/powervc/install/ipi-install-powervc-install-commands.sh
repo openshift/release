@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.4.6"
+	TAG="v0.6.2"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
 	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
@@ -82,9 +82,9 @@ function install_required_tools() {
 	done
 
 	mkdir -p ${HOME}/.config/openstack/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/clouds.yaml ${HOME}/.config/openstack/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/clouds.yaml ${HOME}/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/ocp-ci-ca.pem ${HOME}/
+	cp ${SECRETS_DIR}/clouds.yaml ${HOME}/.config/openstack/
+	cp ${SECRETS_DIR}/clouds.yaml ${HOME}/
+	cp ${SECRETS_DIR}/ocp-ci-ca.pem ${HOME}/
 
 	which PowerVC-Tool
 	which jq
@@ -250,9 +250,9 @@ function dump_resources() {
 			--cisInstanceCRN "${CRN}" \
 			--metadata "${DIR}/metadata.json" \
 			--bastionUsername "cloud-user" \
-			--bastionRsa "${SSH_PRIV_KEY_PATH}" \
+			--bastionRsa "${SSH_PRIV_KEY_FILE}" \
 			--kubeconfig "${DIR}/auth/kubeconfig" \
-			--shouldDebug true
+			--shouldDebug false
 	else
 		echo "Could not find ${DIR}/metadata.json for watch-create"
 	fi
@@ -274,8 +274,16 @@ export DIR
 mkdir -p "${DIR}"
 cp "${SHARED_DIR}/install-config.yaml" "${DIR}/"
 
-IBMCLOUD_API_KEY=$(cat "/var/run/powervc-ipi-cicd-secrets/powervc-creds/IBMCLOUD_API_KEY")
-#POWERVC_USER_ID=$(cat "/var/run/powervc-ipi-cicd-secrets/powervc-creds/POWERVC_USER_ID")
+export SECRETS_DIR=/var/run/powervc-ipi-cicd-secrets/powervc-creds
+if [ ! -d "${SECRETS_DIR}" ]
+then
+	echo "Error: ${SECRETS_DIR} directory does not exist!"
+	exit 1
+fi
+ls -l ${SECRETS_DIR}/ || true
+
+IBMCLOUD_API_KEY=$(cat "${SECRETS_DIR}/IBMCLOUD_API_KEY")
+#POWERVC_USER_ID=$(cat "${SECRETS_DIR}/POWERVC_USER_ID")
 
 install_required_tools
 
@@ -288,6 +296,7 @@ COMPUTE_NODE_TYPE=$(yq-v4 eval '.COMPUTE_NODE_TYPE' "${SHARED_DIR}/powervc-conf.
 FLAVOR=$(yq-v4 eval '.FLAVOR' "${SHARED_DIR}/powervc-conf.yaml")
 LEASED_RESOURCE=$(yq-v4 eval '.LEASED_RESOURCE' "${SHARED_DIR}/powervc-conf.yaml")
 NETWORK_NAME=$(yq-v4 eval '.NETWORK_NAME' "${SHARED_DIR}/powervc-conf.yaml")
+SERVER_IP=$(yq-v4 eval '.SERVER_IP' "${SHARED_DIR}/powervc-conf.yaml")
 
 export IBMCLOUD_API_KEY
 export ARCH
@@ -300,7 +309,7 @@ export FLAVOR
 export LEASED_RESOURCE
 export NETWORK_NAME
 
-export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+export SSH_PRIV_KEY_FILE=${SECRETS_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 #export POWERVC_USER_ID
@@ -324,7 +333,7 @@ destroy_resources
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
 mkdir -p ~/.ssh
-cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
+cp "${CLUSTER_PROFILE_DIR}/*" ~/.ssh/
 
 date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
@@ -367,7 +376,7 @@ then
 	PowerVC-Tool \
 		send-metadata \
 		--createMetadata "${DIR}/metadata.json" \
-		--serverIP "10.130.41.245" \
+		--serverIP "${SERVER_IP}" \
 		--shouldDebug true
 
 	INFRAID=$(jq -r .infraID "${DIR}/metadata.json")

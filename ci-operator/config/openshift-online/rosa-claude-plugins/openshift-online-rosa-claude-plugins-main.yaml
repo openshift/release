@@ -1,0 +1,40 @@
+base_images:
+  ubi-python:
+    name: ubi-python-311
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.18
+images:
+- dockerfile_literal: |
+    FROM ubi-python
+    COPY . /workspace/
+    WORKDIR /workspace
+    RUN pip install -r /workspace/rosa-claude-plugins/requirements.txt
+  from: ubi-python
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-online/rosa-claude-plugins
+  to: python-runner
+resources:
+  '*':
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: validate-marketplace
+  commands: python3 /workspace/rosa-claude-plugins/validate_marketplace.py
+  container:
+    from: python-runner
+  optional: true
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-claude-plugins

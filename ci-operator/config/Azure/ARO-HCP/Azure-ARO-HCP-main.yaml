@@ -6,9 +6,9 @@ base_images:
 binary_build_commands: make -C backend backend
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-e2e-base-ci
 images:
 - dockerfile_literal: |
     FROM nested-podman
@@ -31,22 +31,65 @@ images:
       - destination_dir: src
         source_path: /go/src/github.com/Azure/ARO-HCP
   to: nested-podman-src
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: backend/Dockerfile
+  from: src
+  to: aro-hcp-backend
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: frontend/Dockerfile
+  from: src
+  to: aro-hcp-frontend
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: admin/Dockerfile
+  from: src
+  to: aro-hcp-admin-api
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: sessiongate/Dockerfile
+  from: src
+  to: aro-hcp-sessiongate
 - dockerfile_literal: |
     FROM src
-    RUN cat /etc/dnf/dnf.conf || true
-    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
-    RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
-    RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
-    RUN dnf install -y azure-cli libicu
     USER root
-    RUN mkdir -p /usr/local/bin
-    RUN az bicep install && mv /root/.azure/bin/bicep /usr/local/bin
-    RUN az aks install-cli --install-location /usr/local/bin/kubectl --kubelogin-install-location /usr/local/bin/kubelogin
-    RUN export GOFLAGS='-mod=readonly' && \
-        make install-tools && \
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    ENV GOBIN="/usr/local/bin"
+    ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
+    # Install Python for grafana tests
+    RUN dnf install -y python3 && curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3
+    RUN pip3 install black
+    ENV GOFLAGS='-mod=readonly'
+    RUN make install-tools && \
         make -C tooling/templatize templatize && \
         make -C test/ aro-hcp-tests prow-job-executor
-    ENV PATH="/usr/local/bin:$PATH"
+    RUN mkdir -p "$(go env GOROOT)" && chmod -R 777 "$(go env GOROOT)"
+    RUN mkdir -p "$(go env GOPATH)" && chmod -R 777 "$(go env GOPATH)"
+    RUN mkdir -p "$(go env GOCACHE)" && chmod -R 777 "$(go env GOCACHE)"
+    RUN mkdir -p "$(go env GOBIN)" && chmod -R 777 "$(go env GOBIN)"
+    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
   from: src
   inputs:
     src:
@@ -64,24 +107,58 @@ resources:
     limits:
       memory: 4Gi
     requests:
-      cpu: "8"
+      cpu: "3"
       memory: 4Gi
   aro-hcp-e2e-tools:
     limits:
+      cpu: "8"
       memory: 10Gi
     requests:
       cpu: "8"
-      memory: 8Gi
+      memory: 10Gi
 test_binary_build_commands: make test-compile
 tests:
-- always_run: true
-  as: frontend-simulation
+- as: test-unit
+  steps:
+    test:
+    - ref: aro-hcp-test-unit
+- as: verify
+  steps:
+    test:
+    - ref: aro-hcp-verify
+- as: lint
+  steps:
+    test:
+    - ref: aro-hcp-lint
+- as: config-change-detection
+  steps:
+    test:
+    - ref: aro-hcp-config-change-detection
+- as: mega-linter
   capabilities:
   - nested-podman
   nested_podman: true
   steps:
     test:
-    - ref: aro-hcp-frontend-run-simulation-tests
+    - ref: aro-hcp-mega-lint
+- as: observability-prometheus
+  run_if_changed: ^observability/(alerts|prometheus)/
+  steps:
+    test:
+    - ref: aro-hcp-observability-prometheus
+- as: observability-grafana
+  run_if_changed: ^observability/grafana/
+  steps:
+    test:
+    - ref: aro-hcp-observability-grafana
+- always_run: true
+  as: integration
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  steps:
+    test:
+    - ref: aro-hcp-frontend-run-integration-tests
 - always_run: false
   as: integration-e2e-parallel
   optional: true
@@ -90,6 +167,11 @@ tests:
     env:
       ARO_HCP_SUITE_NAME: integration/parallel
       LOCATION: uksouth
+      POOLED_IDENTITIES: "true"
+    leases:
+    - count: 20
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-int
     workflow: aro-hcp-e2e
 - always_run: false
   as: stage-e2e-parallel
@@ -111,8 +193,7 @@ tests:
     workflow: aro-hcp-e2e
 - always_run: true
   as: e2e-parallel
-  optional: true
-  skip_if_only_changed: ^(?:action\.yml|AGENTS\.md|CLAUDE\.md|CODEOWNERS|CONTRIBUTING\.md|\.bingo/|\.cursor/|demo/|\.devcontainer/|docs/|\.editorconfig|GEMINI\.md|generate-repo\.sh|generate-tag\.sh|get-digest\.sh|get-tag-sha\.sh|\.gitattributes|\.gitguardian\.yaml|\.github/|\.gitignore|\.gitleaks\.toml|\.golangci\.yml|hack/|LICENSE|\.mega-linter\.yml|README\.md|SECURITY\.md|svc-deploy\.sh|\.vscode/|\.yamlfmt\.yaml|\.yamllint\.yml)$|\.md$
+  skip_if_only_changed: ^(?:action\.yml|AGENTS\.md|CLAUDE\.md|CODEOWNERS|CONTRIBUTING\.md|\.bingo/|\.cursor/|\.devcontainer/|docs/|\.editorconfig|GEMINI\.md|generate-repo\.sh|generate-tag\.sh|get-digest\.sh|get-tag-sha\.sh|\.gitattributes|\.gitguardian\.yaml|\.github/|\.gitleaks\.toml|\.golangci\.yml|LICENSE|\.mega-linter\.yml|README\.md|SECURITY\.md|svc-deploy\.sh|\.vscode/|\.yamlfmt\.yaml|\.yamllint\.yml)$|\.md$
   steps:
     cluster_profile: aro-hcp-dev
     env:

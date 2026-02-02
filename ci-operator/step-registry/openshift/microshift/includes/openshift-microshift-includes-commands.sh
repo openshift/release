@@ -230,33 +230,53 @@ function ci_custom_link_report() {
     local scenarios_passed=0
     local scenarios_failed=0
     local scenarios_skipped=0
-    
+
     for test in "${ARTIFACT_DIR}"/scenario-info/*; do
         # Skip if glob didn't match anything
         [ -d "${test}" ] || continue
-        
+
         total_scenarios=$((total_scenarios + 1))
-        
-        # Find junit file
-        local junit_file=""
-        if [ -f "${test}/log.html" ]; then
-            junit_file="${test}/junit.xml"
-        elif [ -f "${test}/ginkgo-results/test-output.log" ]; then
-            junit_file="$( find "${test}/ginkgo-results" -name "junit_e2e_*.xml" -type f | head -1 )"
-        elif [ -f "${test}/gingko-results/test-output.log" ]; then
-            junit_file="$( find "${test}/gingko-results" -name "junit_e2e_*.xml" -type f | head -1 )"
-        fi
+        setup_scenario_status="pass"
 
         # Determine scenario status
-        local scenario_status="pass"
-        if [ ! -d "${test}/vms/" ] || [ ! -f "${junit_file}" ]; then
-            scenario_status="skip"
-        elif [ -f "${junit_file}" ] && grep -q -E 'failures="[1-9][0-9]?"' "${junit_file}"; then
-            scenario_status="fail"
+        ## Check Setup result
+        for setup_junit_file in "${test}"/phase_*/junit.xml ; do
+          if grep -q 'message="FAILED"' "${setup_junit_file}" 2> /dev/null; then
+            setup_scenario_status="fail"
+            break
+          fi
+        done
+
+        ## Check Test Result
+        ### RF, ginkgo or conformance
+        test_junit_file=""
+        test_scenario_status="pass"
+        if [ "${setup_scenario_status}" = "pass" ]; then
+          # Need to check ginkgo results twice because there was a typo on ginkgo name: ginkgo and gingko
+          if [ -f "${test}/ginkgo-results/test-output.log" ]; then
+            test_junit_file="$(find "${test}/ginkgo-results" -name "junit_e2e_*.xml" -type f | head -1 )"
+          elif [ -f "${test}/gingko-results/test-output.log" ]; then
+            test_junit_file="$(find "${test}/gingko-results" -name "junit_e2e_*.xml" -type f | head -1 )"
+          elif [ -f "${test}/log.html" ]; then
+            test_junit_file="${test}/junit.xml"
+          elif [ -f "${test}/e2e.log" ]; then
+            test_junit_file="$(find "${test}" -name "junit_*.xml" -type f | head -1 )"
+          else
+            test_scenario_status="skip"
+          fi
+          if [ -d "${test}/vms/" ]; then
+            if [ -f "${test_junit_file}" ] && grep -q -E '(failures|errors)="[1-9][0-9]*"' "${test_junit_file}"; then
+              test_scenario_status="fail"
+            elif [ ! -f "${test_junit_file}" ]; then
+              test_scenario_status="fail"
+            fi
+          fi
+        else
+          test_scenario_status="fail"
         fi
-        
+
         # Count by status
-        case "${scenario_status}" in
+        case "${test_scenario_status}" in
             pass) scenarios_passed=$((scenarios_passed + 1)) ;;
             fail) scenarios_failed=$((scenarios_failed + 1)) ;;
             skip) scenarios_skipped=$((scenarios_skipped + 1)) ;;
@@ -316,6 +336,9 @@ function ci_custom_link_report() {
     }
     tr:nth-child(even) {
       background-color: rgba(255, 255, 255, 0.04);
+    }
+    tr:hover {
+      background-color: #000000;
     }
     a:link {
       color: #ffffff;
@@ -510,31 +533,52 @@ function ci_custom_link_report() {
     </thead>
     <tbody>
 EOF
-    
-    for test in "${ARTIFACT_DIR}"/scenario-info/*; do
-        junit_file=""
-        # RF or ginkgo
-        if [ -f "${test}/log.html" ]; then
-            junit_file="${test}/junit.xml"
-        elif [ -f "${test}/ginkgo-results/test-output.log" ]; then
-            junit_file="$( find "${test}/ginkgo-results" -name "junit_e2e_*.xml" -type f | head -1 )"
-        elif [ -f "${test}/gingko-results/test-output.log" ]; then
-            junit_file="$( find "${test}/gingko-results" -name "junit_e2e_*.xml" -type f | head -1 )"
-        fi
 
-        # set scenario status
-        testname=$(basename "${test}")
+    for test in "${ARTIFACT_DIR}"/scenario-info/*; do
         status_class="status-pass"
         status_emoji="✅"
-        if [ ! -d "${test}/vms/" ] || [ ! -f "${junit_file}" ]; then
-            status_class="status-skip"
-            status_emoji="⚠️"
-        elif [ -f "${junit_file}" ] && grep -q -E 'failures="[1-9][0-9]?"' "${junit_file}"; then
+
+        # Determine scenario status
+        ## Check Tests Set Up phase result
+        for setup_junit_file in "${test}"/phase_*/junit.xml ; do
+          if grep -q 'message="FAILED"' "${setup_junit_file}" 2> /dev/null; then
             status_class="status-fail"
             status_emoji="❌"
+            break
+          fi
+        done
+
+        ## Check Test Result
+        ### RF, ginkgo or conformance
+        test_junit_file=""
+        # Need to check ginkgo results twice because there was a typo on ginkgo name: ginkgo and gingko
+        if [ -f "${test}/ginkgo-results/test-output.log" ]; then
+          test_junit_file="$( find "${test}/ginkgo-results" -name "junit_e2e_*.xml" -type f | head -1 )"
+        elif [ -f "${test}/gingko-results/test-output.log" ]; then
+          test_junit_file="$( find "${test}/gingko-results" -name "junit_e2e_*.xml" -type f | head -1 )"
+        elif [ -f "${test}/log.html" ]; then
+          test_junit_file="${test}/junit.xml"
+        elif [ -f "${test}/e2e.log" ]; then
+          test_junit_file="$(find "${test}" -name "junit_*.xml" -type f | head -1 )"
+        else
+          status_class="status-skip"
+          status_emoji="⚠️"
+        fi
+        if [ -d "${test}/vms/" ]; then
+          if [ -f "${test_junit_file}" ] && grep -q -E '(failures|errors)="[1-9][0-9]*"' "${test_junit_file}"; then
+            status_class="status-fail"
+            status_emoji="❌"
+          elif [ ! -f "${test_junit_file}" ]; then
+            status_class="status-fail"
+            status_emoji="❌"
+          fi
+        else
+          status_class="status-skip"
+          status_emoji="⚠️"
         fi
 
         # set scenario name
+        testname=$(basename "${test}")
         scenario_cell="<a class=\"scenario-link\" target=\"_blank\" href=\"${url_prefix}/${testname}\">${testname}</a>"
 
         # get microshift version from journal log
@@ -549,11 +593,11 @@ EOF
 
         # set test results
         test_results_cell="<span class=\"skip-state\">0/0/0</span>"
-        if [ -f "${junit_file}" ]; then
-          total_tests=$(grep -oP 'tests="\K[0-9]+' "${junit_file}" | head -1)
-          failures=$(grep -oP 'failures="\K[0-9]+' "${junit_file}" | head -1)
-          errors=$(grep -oP 'errors="\K[0-9]+' "${junit_file}" | head -1)
-          skipped=$(grep -oP 'skipped="\K[0-9]+' "${junit_file}" | head -1)
+        if [ -f "${test_junit_file}" ]; then
+          total_tests=$(grep -oP 'tests="\K[0-9]+' "${test_junit_file}" | head -1)
+          failures=$(grep -oP 'failures="\K[0-9]+' "${test_junit_file}" | head -1)
+          errors=$(grep -oP 'errors="\K[0-9]+' "${test_junit_file}" | head -1)
+          skipped=$(grep -oP 'skipped="\K[0-9]+' "${test_junit_file}" | head -1)
           passed=$((${total_tests:-0} - ${failures:-0} - ${errors:-0} - ${skipped:-0}))
           failed=$((${failures:-0} + ${errors:-0}))
           total_tests=${total_tests:-0}
@@ -587,12 +631,14 @@ EOF
 
         # set test report
         html_report_cell="<span class=\"empty-state\">No test logs</span>"
-        if [ -f "${test}/log.html" ]; then
-            html_report_cell="<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/log.html\">🤖 log.html</a></div>"
-        elif [ -f "${test}/ginkgo-results/test-output.log" ]; then
+        if [ -f "${test}/ginkgo-results/test-output.log" ]; then
             html_report_cell="<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/ginkgo-results/test-output.log\">☘️ test-output.log</a></div>"
         elif [ -f "${test}/gingko-results/test-output.log" ]; then
             html_report_cell="<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/gingko-results/test-output.log\">☘️ test-output.log</a></div>"
+        elif [ -f "${test}/log.html" ]; then
+            html_report_cell="<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/log.html\">🤖 log.html</a></div>"
+        elif [ -f "${test}/e2e.log" ]; then
+            html_report_cell="<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/e2e.log\">☸️ e2e.log</a></div>"
         fi
 
         # set SOS reports
@@ -605,10 +651,7 @@ EOF
                 continue
             fi
             vmname=$(basename "${vm}")
-            if [ -n "${vm_links}" ]; then
-                vm_links="${vm_links}<br>"
-            fi
-            vm_links="${vm_links}<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/vms/${vmname}/sos\">🔎 SOS Reports</a></div>"
+            vm_links="${vm_links}<div class=\"cell-links\"><a target=\"_blank\" href=\"${url_prefix}/${testname}/vms/${vmname}/sos\">🔎 SOS Report</a></div>"
         done
         if [ -z "${vm_links}" ]; then
             vm_links="<span class=\"empty-state\">No SOS report</span>"

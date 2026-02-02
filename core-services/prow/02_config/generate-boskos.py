@@ -40,8 +40,8 @@ CONFIG = {
         'us-west-2': 35,
     },
     'aws-cspi-qe-quota-slice': {
-        'us-east-1': 30,
         'us-east-2': 30,
+        'us-west-2': 30,
     },
     'aws-managed-cspi-qe-quota-slice': {
         'us-east-1': 10,
@@ -170,16 +170,16 @@ CONFIG = {
         'us-west-2': 10,
     },
     'azure4-quota-slice': {
-        'centralus': 33,
-        'eastus': 8,
-        'eastus2': 8,
-        'westus': 8
+        'centralus': 14,
+        'eastus': 14,
+        'eastus2': 14,
+        'westus': 14
     },
     'azure-2-quota-slice': {
         'centralus': 33,
-        'eastus': 8,
-        'eastus2': 8,
-        'westus': 8
+        'eastus': 33,
+        'eastus2': 33,
+        'westus': 33
     },
     'azure-arm64-quota-slice': {
         'centralus': 33,
@@ -237,9 +237,6 @@ CONFIG = {
         'usgovvirginia': 5,
         'usgovtexas': 5
     },
-    'aro-hcp-dev-quota-slice': {
-        'default': 10,
-    },    
     'azure-sustaining-autorelease-412-quota-slice': {
         'eastus': 60,
     },
@@ -253,17 +250,18 @@ CONFIG = {
         'default': 3,
     },
     'aro-hcp-prod-quota-slice': {
-        'default': 3,
+        'default': 2,
     },
     'aro-hcp-dev-quota-slice': {
-        'default': 10,
+        'default': 15,
     },
     'aro-hcp-test-tenant-quota-slice': {
         'default': 10,
     },
-    'aro-hcp-test-tenant-msi-quota-slice': {
-        'default': 10,
-    },
+    'aro-hcp-test-msi-containers-dev': {},
+    'aro-hcp-test-msi-containers-int': {},
+    'aro-hcp-test-msi-containers-stg': {},
+    'aro-hcp-test-msi-containers-prod': {},
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },
@@ -275,6 +273,9 @@ CONFIG = {
     },
     'oex-aws-qe-quota-slice': {
         'default': 40,
+    },
+    'hyperfleet-e2e-quota-slice': {
+        'default': 20,
     },
     'equinix-ocp-hcp-quota-slice': {
         'default': 20,
@@ -326,9 +327,7 @@ CONFIG = {
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
-    'libvirt-s390x-vpn-quota-slice': {
-        'libvirt-s390x-0-1': 1
-    },
+    'libvirt-s390x-vpn-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -366,12 +365,8 @@ CONFIG = {
     'openstack-vh-mecha-central-quota-slice': {
         'default': 3,
     },
-    'openstack-vh-mecha-az0-quota-slice': {
-        'default': 3,
-    },
     'openstack-vh-bm-rhos-quota-slice': {
         'openstack-vh-mecha-central': 3,
-        'openstack-vh-mecha-az0': 3,
         'openstack-hwoffload': 3,
     },
     'openstack-ppc64le-quota-slice': {},
@@ -406,6 +401,12 @@ CONFIG = {
     },
     'hypershift-quota-slice': {
         'default': 50,
+    },
+    'hypershift-aws-quota-slice': {
+        'default': 30,
+    },
+    'hypershift-aks-quota-slice': {
+        'default': 20,
     },
     'powervc-1-quota-slice': {
         'default': 4,
@@ -618,11 +619,22 @@ CONFIG = {
     'metal-redhat-gs-quota-slice': {
         'default': 1,
     },
+    'rosa-regional-platform-int-quota-slice': {
+        'us-east-1': 15,
+        'us-east-2': 15,
+    },
 }
 
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
+
+for i in range(3):
+    for j in range(4):
+        CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
+del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-0']
+del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
+
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
@@ -680,8 +692,16 @@ for i in range(4):
 for i in range(4):
     CONFIG['powervs-7-quota-slice']['lon06-powervs-7-quota-slice-{}'.format(i)] = 1
 
-for i in range(2):
+for i in range(4):
     CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
+
+for i in range(150):
+    CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
+    CONFIG['aro-hcp-test-msi-containers-int']['aro-hcp-test-msi-containers-int-{}'.format(i)] = 1
+    CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
+    CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
+
+
 
 
 config = {

@@ -27,10 +27,10 @@ ref:
   - name: IMAGE_INDEX_OCP_VERSION
     documentation: |-
       System environment variable used to set the channel version to use (valid values would be: '4.15', '4.16', '4.17'...)
-  - name: PREGA_CATSRC_AND_ICSP_CRS_URL
+  - name: PREGA_CATSRC_AND_IDMS_CRS_URL
     default: "http://10.6.116.115"
     documentation: |-
-      To get Catalog Sources and ImageContentSourcePolicy CR resources by Pre GA tag
+      To get Catalog Sources and ImageDigestMirrorSet CR resources by Pre GA tag
   - name: PREGA_OPERATOR_INDEX_TAGS_URL
     default: "https://quay.io/api/v1/repository/prega/prega-operator-index/tag/"
     documentation: |-
@@ -53,3 +53,42 @@ ref:
     mount_path: /var/run/telcov10n/ztp-left-shifting
   documentation: |-
     Install Telco pre-GA catalog source for OLM operators in connected env.
+
+    CATALOG SELECTION STRATEGY:
+    This step uses Quay's stable tag mechanism (v4.21, v4.22) to select validated
+    PreGA catalog versions. The process:
+
+    1. Query Quay API for stable tag (e.g., v4.21) to get manifest digest
+    2. Find timestamped version (e.g., v4.21-20251212T055049) with matching digest
+    3. Verify timestamped version exists on mirror site (http://10.6.116.115)
+    4. Download catalog YAML files (catalogSource, imageDigestMirrorSet)
+
+    WHY THIS APPROACH:
+    - Stable tags point to validated, production-ready catalog indices curated by PreGA team
+    - Direct mapping: Quay stable tag digest → Quay timestamped tag → mirror timestamped version
+    - Simpler than arbitrary N-2 selection or complex version parsing
+    - More reliable than using latest/newest tags which might not be published yet
+
+    RACE CONDITION HANDLING:
+    Race conditions CAN occur when Quay updates stable tags before mirror site publishes.
+    Mitigation via multi-level fallback:
+    1. Try stable tag (v4.21) - most reliable
+    2. Try versioned tag (v4.21.0) - fallback
+    3. Try N-2 timestamped version - last resort for very new releases
+    This ensures deployment succeeds even during mirror publication delays.
+
+    MIRROR SITE ARCHITECTURE:
+    - Quay.io: hosts stable tags (v4.21) AND timestamped tags (v4.21-YYYYMMDDTHHMMSS)
+    - Mirror site: hosts ONLY timestamped versions (no stable tags)
+    - Same catalog content accessed via manifest digest matching
+
+    PRODUCTION PATH MAPPING:
+    PreGA catalogs use development registry paths (acm-d, redhat-user-workloads),
+    but operator CSVs reference production paths. This step automatically appends
+    IDMS entries for:
+    - registry.redhat.io/rhacm2 → quay.io/prega/test/acm-d
+    - registry.redhat.io/multicluster-engine → quay.io/prega/test/acm-d
+    - registry.redhat.io/openshift-gitops-1 → quay.io/prega/test/redhat-user-workloads/rh-openshift-gitops-tenant
+
+    This ensures ACM/MCE/GitOps operators can pull images from PreGA mirrors without
+    ImagePullBackOff errors, requiring only ONE node reboot after IDMS application.

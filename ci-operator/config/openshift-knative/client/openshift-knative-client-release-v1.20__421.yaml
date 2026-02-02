@@ -1,0 +1,177 @@
+base_images:
+  ocp_ubi-minimal_9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+  openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.20
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: github.com/knative/client
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/cli-artifacts/Dockerfile
+  inputs:
+    ocp_ubi-minimal_9:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
+      as:
+      - $GO_BUILDER
+  to: knative-client-cli-artifacts
+- dockerfile_path: openshift/ci-operator/knative-images/kn/Dockerfile
+  inputs:
+    ocp_ubi-minimal_9:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
+      as:
+      - $GO_BUILDER
+  to: knative-client-kn
+- dockerfile_path: openshift/ci-operator/knative-test-images/grpc-ping/Dockerfile
+  inputs:
+    ocp_ubi-minimal_9:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+      as:
+      - $GO_BUILDER
+  to: knative-client-test-grpc-ping
+- dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
+  inputs:
+    ocp_ubi-minimal_9:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-9-release-golang-1.24-openshift-4.20:
+      as:
+      - $GO_BUILDER
+  to: knative-client-test-helloworld
+- dockerfile_path: openshift/ci-operator/knative-test-images/servingcontainer/Dockerfile
+  inputs:
+    ocp_ubi-minimal_9:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+      as:
+      - $GO_BUILDER
+  to: knative-client-test-servingcontainer
+- dockerfile_path: openshift/ci-operator/knative-test-images/sidecarcontainer/Dockerfile
+  inputs:
+    ocp_ubi-minimal_9:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+      as:
+      - $GO_BUILDER
+  to: knative-client-test-sidecarcontainer
+- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+  from: src
+  to: knative-client-source-image
+promotion:
+  to:
+  - additional_images:
+      client-src: src
+    namespace: openshift
+    tag: knative-v1.20
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- always_run: false
+  as: test-e2e
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
+    post:
+    - as: testlog-gather
+      best_effort: true
+      cli: latest
+      commands: cp -v ${SHARED_DIR}/debuglog-*.log ${SHARED_DIR}/stdout-*.log ${SHARED_DIR}/stderr-*.log
+        "${ARTIFACT_DIR}/" || true
+      from: knative-client-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 1m0s
+    - as: knative-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
+        "${ARTIFACT_DIR}/gather-knative"
+      from: knative-client-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: knative-client-source-image
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-gather-extra
+      best_effort: true
+      cli: latest
+      commands: curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/extra/gather-extra-commands.sh
+        | /bin/bash -s
+      from: knative-client-source-image
+      grace_period: 1m0s
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 20m0s
+    - ref: ipi-deprovision-deprovision
+    test:
+    - as: test
+      cli: latest
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
+        make test-e2e
+      dependencies:
+      - env: KNATIVE_CLIENT_TEST_GRPC_PING
+        name: knative-client-test-grpc-ping
+      - env: KNATIVE_CLIENT_TEST_HELLOWORLD
+        name: knative-client-test-helloworld
+      - env: KNATIVE_CLIENT_TEST_SERVINGCONTAINER
+        name: knative-client-test-servingcontainer
+      - env: KNATIVE_CLIENT_TEST_SIDECARCONTAINER
+        name: knative-client-test-sidecarcontainer
+      - env: KNATIVE_CLIENT_SOURCE_IMAGE
+        name: knative-client-source-image
+      from: knative-client-source-image
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-v1.20
+  org: openshift-knative
+  repo: client
+  variant: "421"

@@ -1,0 +1,38 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  openshift-virtualization-tests:
+    name: openshift-virtualization-tests
+    namespace: ci
+    tag: cnv-4.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: gs-baremetal-localnet-ocp419
+  capabilities:
+  - intranet
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: metal-redhat-gs
+    env:
+      OCP_VERSION: "4.19"
+    test:
+    - ref: gs-baremetal-localnet-test
+    workflow: external-cluster
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: master
+  org: RedHatQE
+  repo: interop-testing
+  variant: gs-baremetal-localnet-ocp4.19-lp-gs

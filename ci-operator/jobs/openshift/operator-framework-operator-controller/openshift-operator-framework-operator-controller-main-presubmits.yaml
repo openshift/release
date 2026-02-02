@@ -1,11 +1,65 @@
 presubmits:
   openshift/operator-framework-operator-controller:
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build06
+    context: ci/prow/bindata-check
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-operator-framework-operator-controller-main-bindata-check
+    rerun_command: /test bindata-check
+    run_if_changed: ^openshift/tests-extension/(test/qe/testdata/|pkg/bindata/qe/)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=bindata-check
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )bindata-check,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build06
     context: ci/prow/check-sync-pr-valid
     decorate: true
     labels:
@@ -58,7 +112,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build06
     context: ci/prow/default-catalog-consistency
     decorate: true
     labels:
@@ -119,7 +173,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build09
     context: ci/prow/e2e-aws-olmv1-ext
     decorate: true
     labels:
@@ -191,7 +245,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build09
     context: ci/prow/e2e-aws-techpreview-olmv1-ext
     decorate: true
     labels:
@@ -263,12 +317,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn-upgrade
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp-3
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-operator-framework-operator-controller-main-e2e-gcp-ovn-upgrade
@@ -335,7 +389,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build06
     context: ci/prow/images
     decorate: true
     labels:
@@ -389,14 +443,14 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build09
     context: ci/prow/okd-scos-e2e-aws-ovn
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-5
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: okd-scos
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -466,7 +520,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build06
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -524,7 +578,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build09
     context: ci/prow/openshift-e2e-aws
     decorate: true
     labels:
@@ -597,7 +651,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build11
+    cluster: build09
     context: ci/prow/openshift-e2e-aws-techpreview
     decorate: true
     labels:
@@ -670,7 +724,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build06
     context: ci/prow/tests-extension
     decorate: true
     labels:
@@ -731,7 +785,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build06
     context: ci/prow/unit
     decorate: true
     labels:
@@ -784,7 +838,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build06
     context: ci/prow/verify
     decorate: true
     labels:
@@ -837,7 +891,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build06
     context: ci/prow/verify-commits
     decorate: true
     labels:
@@ -890,7 +944,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build07
+    cluster: build06
     context: ci/prow/verify-deps
     decorate: true
     labels:

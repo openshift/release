@@ -4,6 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This repository holds OpenShift cluster manifests, component build manifests and CI workflow configuration for OpenShift component repositories for both OKD and OCP.
 
+## Documentation
+
+Additional documentation and references for working with this repository:
+
+- [OpenShift CI Documentation](https://docs.ci.openshift.org/) - Main documentation site for OpenShift CI infrastructure
+- [CI Operator Reference](https://steps.ci.openshift.org/ci-operator-reference) - Comprehensive reference for CI operator configuration specification and step registry
+
 ## Repository Structure
 
 - `ci-operator/config/` - CI configuration files defining builds and tests for component repositories
@@ -148,6 +155,36 @@ CI analytical tooling requires release specific configuration.   Branch fast-for
 4. Run `make update` to generate Prow jobs in separate `-periodics.yaml` file
 5. This pattern creates release specific config that produces data consumable by CI analysis tooling
 
+### Security Best Practices for Step Registry Scripts
+When writing step registry command scripts (`*-commands.sh`), protect sensitive information from leaking into CI logs:
+
+**Avoid Accidental Disclosure:**
+- Never `echo` or print passwords, tokens, API keys, cluster URLs, or kubeconfig contents
+- Be cautious with `set -x` (debug tracing) - it logs all executed commands with their arguments
+- Variable expansions in traced commands will expose their values in logs
+
+**Protecting Sensitive Operations:**
+When handling credentials or sensitive data, temporarily disable tracing:
+```bash
+# Save current tracing state
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x  # Disable tracing for sensitive operations
+
+# Handle passwords, tokens, or URLs here
+secret=$(oc get secret --template='{{.data.password}}' | base64 -d)
+echo "$secret" > "${SHARED_DIR}/password"
+
+# Restore previous tracing state
+$WAS_TRACING && set -x
+```
+
+**Best Practices:**
+- Default to `set -euo pipefail` (without `-x`) in scripts
+- Only enable `-x` when actively debugging
+- Add clear comments when disabling tracing: `# Disable tracing due to password handling`
+- Keep the tracing-disabled scope minimal (only around sensitive operations)
+- Use `${SHARED_DIR}` for sharing data between steps instead of echoing to logs
+
 ## OpenShift Release Versioning
 
 ### Release Branches
@@ -183,6 +220,17 @@ deactivate                      # When done
 By default, `podman` is used. Override with:
 ```bash
 export CONTAINER_ENGINE=docker
+```
+
+## Claude Code Slash Commands
+
+Custom slash commands in `.claude/commands/` must include frontmatter:
+```markdown
+---
+description: Brief description of what the command does
+args: "[arg1] [arg2]"
+allowed-tools: Read, Edit, Bash(make release-controllers), AskUserQuestion
+---
 ```
 
 ## Important Notes

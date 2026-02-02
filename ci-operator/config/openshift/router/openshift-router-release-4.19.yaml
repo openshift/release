@@ -3,25 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.19_base-rhel9:
-    name: "4.19"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/router/base/Dockerfile.ocp
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: haproxy-router-base
 - dockerfile_path: images/router/haproxy/Dockerfile.ocp
   from: haproxy-router-base
@@ -58,8 +43,9 @@ tests:
   container:
     from: src
 - as: e2e-agnostic
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
@@ -86,6 +72,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-aws-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
@@ -145,6 +132,7 @@ tests:
     - ref: baremetalds-e2e-test
     workflow: baremetalds-e2e
 - as: e2e-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure

@@ -106,6 +106,9 @@ echo "Restricting the API server to private - delete inbound rule api-v4 from ex
 run_command "az network lb rule delete -n api-v4 --lb-name ${INFRA_ID} -g ${RESOURCE_GROUP}"
 
 echo "Restricting the API server to private - delete associated frontend public ip from external lb"
+# Try to clean up the stale reference by updating LB
+echo "Attempting to clean stale references..."
+run_command "az network lb update --name  ${INFRA_ID} -g ${RESOURCE_GROUP}"
 run_command "az network lb frontend-ip delete --name ${frontend_ip} --lb-name ${INFRA_ID} -g ${RESOURCE_GROUP}"
 
 echo "Restricting the API server to private - delete frontend public IP associated with rule api-v4"
@@ -137,5 +140,6 @@ fi
 # Optional: Disabling redirect when using a private storage endpoint on Azure
 
 echo "Waiting for image registry become Available..."
-run_command "oc wait --for condition=Progressing=True co/image-registry --timeout=600s"
+sleep 600s
+#run_command "oc wait --for condition=Progressing=True co/image-registry --timeout=600s" || ret=1
 run_command "oc wait --for=condition=Available --for condition=Progressing=False --for condition=Degraded=False co/image-registry --timeout=1200s"

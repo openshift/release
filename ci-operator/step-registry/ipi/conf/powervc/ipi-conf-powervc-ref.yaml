@@ -13,7 +13,29 @@ ref:
     mount_path: /var/run/powervc-ipi-cicd-secrets/powervc-creds
   env:
   - name: ARCH
+  - name: BASE_DOMAIN
+    default: "ipi-ppc64le.cis.ibm.net"
+    documentation: |-
+      A fully-qualified domain or subdomain name. The base domain of the cloud
+      provider is used for setting baseDomain variable of the install
+      configuration of the cluster.
+  - name: BASTION_IMAGE_NAME
+    default: "CentOS-Stream2-GenericCloud-10-20241118.0.ppc64le"
+    documentation: |-
+      The image name to use for the bastion node.
   - name: BRANCH
+  - name: CLOUD
+    default: "ocp-ci"
+    documentation: |-
+      The name of the cloud in the clouds.yaml file.
+  - name: CLUSTER_NAME_MODIFIER
+    default: ""
+    documentation: |-
+      Creates a distinguishable hostname between different CI jobs running in the same zone.
+  - name: COMPUTE_NODE_TYPE
+    default: "s1022"
+    documentation: |-
+      The instance type to use for compute nodes.
   - name: CONTROL_PLANE_REPLICAS
     default: "3"
     documentation: |-
@@ -28,32 +50,16 @@ ref:
       * "" (default) - 3 control plane nodes. The standard for stand-alone clusters.
       * "1" - Supportable for single-node OpenShift (SNO).
       * "5" - Supportable only for select customers.
-  - name: WORKER_REPLICAS
-    default: "2"
+  - name: FEATURE_SET
+    default: ""
     documentation: |-
-      The number of worker nodes to create for the cluster.
-
-      Valid values include:
-      * "" (default) - 2 worker nodes. The standard for stand-alone clusters.
-      * "0" - Supportable for single-node OpenShift (SNO).
-  - name: BASE_DOMAIN
-    default: "ipi-ppc64le.cis.ibm.net"
+      This field sets the cluster feature set. This is used to enable custom features such as tech preview features.
+  - name: FEATURE_GATES
+    default: ""
     documentation: |-
-      A fully-qualified domain or subdomain name. The base domain of the cloud
-      provider is used for setting baseDomain variable of the install
-      configuration of the cluster.
-  - name: BASTION_IMAGE_NAME
-    default: "CentOS-Stream2-GenericCloud-10-20241118.0.ppc64le"
-    documentation: |-
-      The image name to use for the bastion node.
-  - name: CLOUD
-    default: "ocp-ci"
-    documentation: |-
-      The name of the cloud in the clouds.yaml file.
-  - name: COMPUTE_NODE_TYPE
-    default: "s1022"
-    documentation: |-
-      The instance type to use for compute nodes.
+      This field sets the cluster feature gates. This is used to enable custom features. Only to be used in conjunction with FEATURE_SET=CustomNoUpgrade.
+      The field should be a valid YAML list of strings. Each string in the list should be of the format "featureName=true|false".
+      E.g. "['Feature1=true', 'Feature2=false']"
   - name: FLAVOR
     default: "ocp-ci-flavor1"
     documentation: |-
@@ -70,20 +76,18 @@ ref:
       Valid values include:
       * "" (default) - do nothing
       * "parm1 parm2 ..." - space separated list of paramters to remove
-  - name: CLUSTER_NAME_MODIFIER
-    default: ""
+  - name: SERVER_IP
+    default: "10.130.41.245"
     documentation: |-
-      Creates a distinguishable hostname between different CI jobs running in the same zone.
-  - name: FEATURE_SET
-    default: ""
+      The IP address of the cluster controller.
+  - name: WORKER_REPLICAS
+    default: "2"
     documentation: |-
-      This field sets the cluster feature set. This is used to enable custom features such as tech preview features.
-  - name: FEATURE_GATES
-    default: ""
-    documentation: |-
-      This field sets the cluster feature gates. This is used to enable custom features. Only to be used in conjunction with FEATURE_SET=CustomNoUpgrade.
-      The field should be a valid YAML list of strings. Each string in the list should be of the format "featureName=true|false".
-      E.g. "['Feature1=true', 'Feature2=false']"
+      The number of worker nodes to create for the cluster.
+
+      Valid values include:
+      * "" (default) - 2 worker nodes. The standard for stand-alone clusters.
+      * "0" - Supportable for single-node OpenShift (SNO).
   documentation: >-
     This step configures an install-config.yaml file to depoloy to the IBM
     Cloud CI project.

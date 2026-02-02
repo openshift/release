@@ -366,7 +366,7 @@ resources:
 
 configMapGenerator:
   - files:
-    $(add_icsp_cr_if_exists)
+    $(add_idms_cr_if_exists)
 $(generate_extracted_list_of_extra_manifest_paths "sno-extra-manifest")
     name: extra-manifests-cm
     namespace: ${SPOKE_CLUSTER_NAME}
@@ -376,9 +376,9 @@ generatorOptions:
 EOK
 }
 
-function add_icsp_cr_if_exists {
-  [ -f "${SHARED_DIR}/imageContentSourcePolicy.yaml" ] && \
-    echo "- sno-extra-manifest/imageContentSourcePolicy.yaml"
+function add_idms_cr_if_exists {
+  [ -f "${SHARED_DIR}/imageDigestMirrorSet.yaml" ] && \
+    echo "- sno-extra-manifest/imageDigestMirrorSet.yaml"
 }
 
 function generate_ztp_cluster_manifests {
@@ -516,9 +516,9 @@ EOK
 ts="$(date -u +%s%N)"
 extra_manifest_path=\${ztp_repo_dir}/clusters/${SPOKE_CLUSTER_NAME}/sno-extra-manifest/
 echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${extra_manifest_path}/.cluster-image-set-used.\${ts}
-cat <<EO-ICSP >| \${extra_manifest_path}/imageContentSourcePolicy.yaml
-$(cat ${SHARED_DIR}/imageContentSourcePolicy.yaml || echo "---")
-EO-ICSP
+cat <<EO-IDMS >| \${extra_manifest_path}/imageDigestMirrorSet.yaml
+$(cat ${SHARED_DIR}/imageDigestMirrorSet.yaml || echo "---")
+EO-IDMS
 echo "$(cat ${SHARED_DIR}/cluster-image-set-ref.txt)" >| \${ztp_repo_dir}/site-policies/.cluster-image-set-used.\${ts}
 
 ############## BEGIN of ArgoCD extra manifest extration #####################################################
@@ -711,7 +711,7 @@ function setup-pre-ga-catalog-access {
 
   if [ -f ${SHARED_DIR}/pull-secret-with-pre-ga.json ];then
 
-      echo "************ telcov10n Setup ZTP to use PreGA catalog ************"
+      echo "************ telcov10n Setup ZTP to use PreGA catalog with Konflux build mirrors ************"
 
       cat <<EO-cm | oc apply -f -
 apiVersion: v1
@@ -725,6 +725,46 @@ data:
   registries.conf: |
     unqualified-search-registries = ["registry.access.redhat.com", "docker.io"]
 
+    # Mirror configuration for multicluster-engine images (PreGA/Konflux builds)
+    # Uses quay.io/prega/test/acm-d which has the PreGA mirrored images
+    [[registry]]
+       prefix = ""
+       location = "registry.redhat.io/multicluster-engine"
+       mirror-by-digest-only = true
+
+       [[registry.mirror]]
+       location = "quay.io/prega/test/acm-d"
+       insecure = false
+
+       [[registry.mirror]]
+       location = "brew.registry.redhat.io/rh-osbs/multicluster-engine"
+       insecure = false
+
+    # Mirror configuration for rhacm2 images (PreGA/Konflux builds)
+    [[registry]]
+       prefix = ""
+       location = "registry.redhat.io/rhacm2"
+       mirror-by-digest-only = true
+
+       [[registry.mirror]]
+       location = "quay.io/prega/test/acm-d"
+       insecure = false
+
+       [[registry.mirror]]
+       location = "brew.registry.redhat.io/rh-osbs/rhacm2"
+       insecure = false
+
+    # Mirror configuration for openshift4 images (for dependencies)
+    [[registry]]
+       prefix = ""
+       location = "registry.redhat.io/openshift4"
+       mirror-by-digest-only = true
+
+       [[registry.mirror]]
+       location = "quay.io/prega/test/acm-d"
+       insecure = false
+
+    # Legacy PreGA catalog mirror (for backward compatibility)
     [[registry]]
        prefix = ""
        location = "registry.redhat.io"
@@ -736,6 +776,11 @@ EO-cm
 
     mirror_registry_ref="mirrorRegistryRef:
       name: assisted-installer-mirror-config"
+
+      # Add annotation to allow unrestricted image pulls
+      oc annotate agentserviceconfig agent \
+        "unsupported.agent-install.openshift.io/assisted-service-allow-unrestricted-image-pulls=" \
+        --overwrite 2>/dev/null || true
 
       set -x
       oc -n multicluster-engine get cm assisted-installer-mirror-config -oyaml

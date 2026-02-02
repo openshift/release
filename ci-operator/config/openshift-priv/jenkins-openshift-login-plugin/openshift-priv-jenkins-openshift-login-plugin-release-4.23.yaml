@@ -1,0 +1,66 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/jenkins-openshift-login-plugin
+images:
+- dockerfile_path: Dockerfile
+  to: jenkins
+- dockerfile_literal: |
+    FROM registry.access.redhat.com/ubi9/openjdk-21:1.20 AS builder
+    WORKDIR /home/default
+    COPY . .
+    USER 0
+    # We need a newer maven version as the RHEL package is still on 3.8.5
+    RUN microdnf -y install gzip && \
+        curl -L -o maven.tar.gz https://archive.apache.org/dist/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz && \
+        mkdir maven && \
+        tar -xvzf maven.tar.gz -C maven --strip-component 1 && \
+        cp -R maven /opt && \
+        ln -sf /opt/maven/bin/mvn /usr/bin/mvn && \
+        chmod -R 777 $HOME && \
+        mvn --version
+  to: jenkins-maven-builder
+promotion:
+  to:
+  - excluded_images:
+    - jenkins
+    - jenkins-maven-builder
+    name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: maven-verify
+  commands: mvn clean package verify
+  container:
+    from: jenkins-maven-builder
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e-aws-jenkins-sync-plugin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-2
+    test:
+    - ref: jenkins-sync-plugin-e2e
+    workflow: ipi-aws
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: ocptools-jenkins-openshift-login-plugin
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: jenkins-openshift-login-plugin

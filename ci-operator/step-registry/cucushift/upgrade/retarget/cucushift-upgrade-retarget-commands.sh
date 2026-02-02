@@ -242,6 +242,26 @@ function clear_upgrade() {
     fi
 }
 
+# Get multi pull spec for ***next minor version***, return 1 if failed to get to digest.
+# $ get_multi_pullspec 4.20.1
+function get_multi_pullspec() {
+    local major_version minor_version version="${1}"
+    major_version="$(echo "$version" | cut -f1 -d.)"
+    minor_version="$(echo "$version" | cut -f2 -d.)"
+    minor_version=$((minor_version + 1))
+
+    echo "Will get pullspec for ${major_version}.${minor_version}.0-ec.0-multi" >&2
+    
+    digest=$(oc image info --show-multiarch quay.io/openshift-release-dev/ocp-release:"${major_version}"."${minor_version}".0-ec.0-multi -o json | jq -r ".[0].listDigest")
+    if [[ -n "$digest" ]]; then
+        echo "quay.io/openshift-release-dev/ocp-release@${digest}"
+        return 0
+    else
+        echo "Error: unable to get digest"
+        return 1
+    fi
+}
+
 # Wait upgrade to start, https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-25473
 # Following conditions will be used to determine if an upgrade is started
 #   Progressing=True
@@ -289,8 +309,11 @@ function upgrade() {
     # *******************
     # No matter y stream or z stream retarget, the TARGET always the final version we want to upgrade to
     # To make OCP-25473 not block the whole pipeline, the upgrade orders are:
-    #  if the minor version in ${SHARED_DIR}/upgrade-edge great than target, then
+    #  if the minor version in ${SHARED_DIR}/upgrade-edge is greater than target, then
     #       initial -> target -> ${SHARED_DIR}/upgrade-edge
+    #  if ${SHARED_DIR}/upgrade-edge is empty, then
+    #       1. get a new target version which greater than target
+    #       2. initial -> target -> new target
     #  if the minor version in ${SHARED_DIR}/upgrade-edge equal to target, then
     #       1. we find a target+1 version as third target upgrade version
     #       2. initial -> ${SHARED_DIR}/upgrade-edge -> target -> third target version
@@ -301,46 +324,55 @@ function upgrade() {
     local testcase="OCP-25473"
     export IMPLICIT_ENABLED_CASES="${IMPLICIT_ENABLED_CASES} ${testcase}"
     
-    intermediate_image="$(< "${SHARED_DIR}/upgrade-edge")"
-    if [[ -z "${intermediate_image:-}" ]]; then
-        echo "Error: The intermediate image is not given, break the job"
-        return 1
-    fi
-    
     echo "Prepare test data"
-    INTERMEDIATE_MINOR_VERSION="$(oc adm release info -ojson "$intermediate_image" | jq -r '.metadata.version' | cut -f2 -d.)"
-    if [[ "$INTERMEDIATE_MINOR_VERSION" -gt "$TARGET_MINOR_VERSION" ]]; then
+    
+    if ! [ -e "${SHARED_DIR}/upgrade-edge" ]; then
         # This is y stream retarget upgrade, e.g.: 4.y -> (4.y | 4.y+1) -> (4.y+1 | 4.y+2)
+        echo "upgrade-edge is empty, get a new target"
         first_upgrade_to_image=${TARGET}
-        second_upgrade_to_image=${intermediate_image}
+        if ! second_upgrade_to_image=$(get_multi_pullspec "${TARGET_VERSION}"); then
+            echo "Error: OCP-25473 could not get new target pullsepc"
+            return 1
+        fi
+        echo "New target pullspec is: ${second_upgrade_to_image}"
         block_second=true
     else
-        if [[ "$INTERMEDIATE_MINOR_VERSION" == "$TARGET_MINOR_VERSION" ]]; then
-            # This is z stream retarget upgrade, e.g.: 4.y -> (4.y | 4.y+1) -> (4.y | 4.y+1)
-            first_upgrade_to_image=${intermediate_image}
-            second_upgrade_to_image=${TARGET}
-            
-            if oc adm release info -o jsonpath='{.digest}' quay.io/openshift-release-dev/ocp-release:4.$((TARGET_MINOR_VERSION+1)).0-ec.0-x86_64 2>&1; then
-                # if third_upgrade_to_image not empty, we will retarget to it, but it will always be blocked
-                # this can make sure we always have z and y stream retarget in one job
-                latest_minor_version=$(( TARGET_MINOR_VERSION+1 ))
-                third_upgrade_to_image="$( oc adm release info -o jsonpath='{.digest}' quay.io/openshift-release-dev/ocp-release:4.${latest_minor_version}.0-ec.0-x86_64 )"
-                third_upgrade_to_image="quay.io/openshift-release-dev/ocp-release@${third_upgrade_to_image}"
-            fi
-
-            block_second=false
+        intermediate_image="$(< "${SHARED_DIR}/upgrade-edge")"
+        echo "upgrade-edge exists, the pullspec is: ${intermediate_image}"
+        INTERMEDIATE_MINOR_VERSION="$(oc adm release info -ojson "$intermediate_image" | jq -r '.metadata.version' | cut -f2 -d.)"
+        if [[ "$INTERMEDIATE_MINOR_VERSION" -gt "$TARGET_MINOR_VERSION" ]]; then
+            # This is y stream retarget upgrade, e.g.: 4.y -> (4.y | 4.y+1) -> (4.y+1 | 4.y+2)
+            first_upgrade_to_image=${TARGET}
+            second_upgrade_to_image=${intermediate_image}
+            block_second=true
         else
-            # If INTERMEDIATE_MINOR_VERSION < TARGET_MINOR_VERSION, then we will naver be able to upgrade to TARGET_MINOR_VERSION
-            # So do not put a small version in upgrade-edge
-            echo "Error: OCP-25473 do not cover rollback, break the job"
-            return 1
+            if [[ "$INTERMEDIATE_MINOR_VERSION" == "$TARGET_MINOR_VERSION" ]]; then
+                # This is z stream retarget upgrade, e.g.: 4.y -> (4.y | 4.y+1) -> (4.y | 4.y+1)
+                first_upgrade_to_image=${intermediate_image}
+                second_upgrade_to_image=${TARGET}
+                
+                if oc adm release info -o jsonpath='{.digest}' quay.io/openshift-release-dev/ocp-release:4.$((TARGET_MINOR_VERSION+1)).0-ec.0-x86_64 2>&1; then
+                    # if third_upgrade_to_image not empty, we will retarget to it, but it will always be blocked
+                    # this can make sure we always have z and y stream retarget in one job
+                    latest_minor_version=$(( TARGET_MINOR_VERSION+1 ))
+                    third_upgrade_to_image="$( oc adm release info -o jsonpath='{.digest}' quay.io/openshift-release-dev/ocp-release:4.${latest_minor_version}.0-ec.0-x86_64 )"
+                    third_upgrade_to_image="quay.io/openshift-release-dev/ocp-release@${third_upgrade_to_image}"
+                fi
+
+                block_second=false
+            else
+                # If INTERMEDIATE_MINOR_VERSION < TARGET_MINOR_VERSION, then we will naver be able to upgrade to TARGET_MINOR_VERSION
+                # So do not put a small version in upgrade-edge
+                echo "Error: OCP-25473 do not cover rollback, break the job"
+                return 1
+            fi
         fi
     fi
 
     local first_version second_version
-    first_version="$(oc adm release info -ojson "$intermediate_image" | jq -r '.metadata.version')"
+    first_version="$(oc adm release info -ojson "$first_upgrade_to_image" | jq -r '.metadata.version')"
     FIRST_MINOR_VERSION="$(echo "$first_version" | cut -f2 -d.)"
-    second_version="$(oc adm release info -ojson "$intermediate_image" | jq -r '.metadata.version')"
+    second_version="$(oc adm release info -ojson "$second_upgrade_to_image" | jq -r '.metadata.version')"
     SECOND_MINOR_VERSION="$(echo "$second_version" | cut -f2 -d.)"
 
     # first_upgrade_to_image can be both nightly build or stable build

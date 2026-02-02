@@ -186,6 +186,30 @@ compute:
   replicas: 0"
 fi
 
+if [[ "${SIZE_VARIANT}" == "large" ]]; then
+  echo "Large SIZE_VARIANT was configured, setting master and worker to 8 vCPU, 32 GB RAM (matches AWS m6a.2xlarge)"
+  MACHINE_POOL_OVERRIDES="controlPlane:
+  name: master
+  replicas: 3
+  platform:
+    vsphere:
+      cpus: 8
+      coresPerSocket: 8
+      memoryMB: 32768
+      osDisk:
+        diskSizeGB: 120
+compute:
+- name: worker
+  replicas: ${COMPUTE_NODE_REPLICAS}
+  platform:
+    vsphere:
+      cpus: 8
+      coresPerSocket: 8
+      memoryMB: 32768
+      osDisk:
+        diskSizeGB: 120"
+fi
+
 if [ "${Z_VERSION}" -lt 13 ]; then
   cat >>"${CONFIG}" <<EOF
 baseDomain: $base_domain

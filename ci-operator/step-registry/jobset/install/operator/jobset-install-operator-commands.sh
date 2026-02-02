@@ -1,8 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
-set -u
-set -o pipefail
+set -euo pipefail
 
 function timestamp() {
     date -u --rfc-3339=seconds
@@ -32,27 +30,26 @@ function wait_for_state() {
 
     echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to exist..."
     for _ in {1..30}; do
-        oc get ${object} --selector="${selector}" -n=${namespace} |& grep -ivE "(no resources found|not found)" && break || sleep 5
+        oc get "${object}" --selector="${selector}" -n="${namespace}" |& grep -ivE "(no resources found|not found)" && break || sleep 5
     done
 
     echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to become '${state}'..."
-    oc wait --for=${state} --timeout=${timeout} ${object} --selector="${selector}" -n="${namespace}"
+    oc wait --for="${state}" --timeout="${timeout}" "${object}" --selector="${selector}" -n="${namespace}"
     return $?
 }
 
 function subscribe_operator () {
     echo "Checking if the PackageManifest exists in the CatalogSource before installing the operator..."
-    local max_retries=6
-    local retry_interval=20
+    local max_retries=12
+    local retry_interval=5
     local retry_count=0
-    
+
     while [[ $retry_count -lt $max_retries ]]; do
-        output=$(oc get packagemanifest -n openshift-marketplace -l=catalog=$CATSRC_NAME --field-selector=metadata.name=job-set 2>&1)
-        if [[ $? -eq 0 ]] && ! echo "$output" | grep -q "No resources found"; then
+        if output=$(oc get packagemanifest -n openshift-marketplace -l=catalog=$CS_CATSRC_NAME --field-selector=metadata.name=job-set 2>&1) && ! echo "$output" | grep -q "No resources found"; then
             echo "PackageManifest found, proceeding with installation..."
             break
         fi
-        
+
         retry_count=$((retry_count + 1))
         if [[ $retry_count -lt $max_retries ]]; then
             echo "PackageManifest not found, retrying in $retry_interval seconds... (attempt $retry_count of $max_retries)"
@@ -92,12 +89,13 @@ metadata:
 spec:
   channel: $CHANNEL
   name: job-set
-  source: $CATSRC_NAME
+  installPlanApproval: Automatic
+  source: $CS_CATSRC_NAME
   sourceNamespace: openshift-marketplace
 EOF
 
     if wait_for_state "deployment/jobset-operator" "condition=Available" "5m" "openshift-jobset-operator"; then
-        echo "Operator is ready"        
+        echo "Operator is ready"
         installedCSV=$(oc get subscription jobset-operator -n openshift-jobset-operator -o jsonpath='{.status.installedCSV}')
         run_command "oc get csv $installedCSV -n openshift-jobset-operator"
         run_command "oc get csv $installedCSV -n openshift-jobset-operator -o=jsonpath='{.spec.relatedImages}'"
@@ -130,7 +128,9 @@ kind: JobSetOperator
 metadata:
   name: cluster
 spec:
+  logLevel: Normal
   managementState: Managed
+  operatorLogLevel: Normal
 EOF
 
     if wait_for_state "deployment/jobset-controller-manager" "condition=Available" "5m" "openshift-jobset-operator"; then
@@ -143,9 +143,9 @@ EOF
     fi
 }
 
-if [ -s "${SHARED_DIR}/catsrc_name" ]; then
-    echo "Loading the catalog source name to use from the '${SHARED_DIR}/catsrc_name'..."
-    CATSRC_NAME=$(cat "${SHARED_DIR}"/catsrc_name)
+if [ -s "${SHARED_DIR}/jobset_catsrc_name" ]; then
+    echo "Loading the catalog source name to use from the '${SHARED_DIR}/jobset_catsrc_name'..."
+    CS_CATSRC_NAME=$(cat "${SHARED_DIR}"/jobset_catsrc_name)
 fi
 
 timestamp

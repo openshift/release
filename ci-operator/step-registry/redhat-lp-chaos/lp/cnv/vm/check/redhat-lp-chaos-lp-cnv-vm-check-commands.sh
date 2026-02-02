@@ -58,7 +58,7 @@ function CheckVmIPConnectivity() {
     )
     for vmName in ${vmList}; do
         : "Testing IP connection via SSH for VM ${vmName}..."
-        sshOutput=$(virtctl ssh root@"${vmName}" --namespace "${LPC_LP_CNV__VM__NS}" "${sshOpts[@]}" 2>&1 ) || {
+        sshOutput=$(virtctl ssh root@"vmi/${vmName}" --namespace "${LPC_LP_CNV__VM__NS}" "${sshOpts[@]}" 2>&1 ) || {
             # Check for SSH Auth failure, as it actually still confirm that IP connection is working.
             { echo "${sshOutput}" | grep 'Permission denied'; } || ((++sshFailedCount))
         }

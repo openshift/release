@@ -1,120 +1,121 @@
-kind: List
+---
 apiVersion: v1
-items:
-- apiVersion: v1
-  kind: Service
-  metadata:
-    namespace: ci
-    labels:
-      app: prow
-      component: result-aggregator
+kind: Service
+metadata:
+  namespace: ci
+  labels:
+    app: prow
+    component: result-aggregator
+  name: result-aggregator
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: main
+  - name: metrics
+    port: 9090
+    protocol: TCP
+    targetPort: metrics
+  selector:
+    app: prow
+    component: result-aggregator
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  labels:
+    app: prow
+    component: result-aggregator
+  name: result-aggregator
+  namespace: ci
+spec:
+  port:
+    targetPort: main
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
     name: result-aggregator
-  spec:
-    ports:
-    - name: main
-      port: 80
-      protocol: TCP
-      targetPort: main
-    - name: metrics
-      port: 9090
-      protocol: TCP
-      targetPort: metrics
-    selector:
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: result-aggregator
+  namespace: ci
+  labels:
+    app: prow
+    component: result-aggregator
+    prow-app: result-aggregator
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+    scheme: http
+  selector:
+    matchLabels:
       app: prow
       component: result-aggregator
-- apiVersion: route.openshift.io/v1
-  kind: Route
-  metadata:
-    labels:
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: result-aggregator
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
       app: prow
       component: result-aggregator
-    name: result-aggregator
-    namespace: ci
-  spec:
-    port:
-      targetPort: main
-    tls:
-      insecureEdgeTerminationPolicy: Redirect
-      termination: edge
-    to:
-      kind: Service
-      name: result-aggregator
-- apiVersion: monitoring.coreos.com/v1
-  kind: ServiceMonitor
-  metadata:
-    name: result-aggregator
-    namespace: ci
-    labels:
-      app: prow
-      component: result-aggregator
-      prow-app: result-aggregator
-  spec:
-    endpoints:
-    - interval: 30s
-      port: metrics
-      scheme: http
-    selector:
-      matchLabels:
+  template:
+    metadata:
+      labels:
         app: prow
         component: result-aggregator
-- apiVersion: apps/v1
-  kind: Deployment
-  metadata:
-    namespace: ci
-    name: result-aggregator
-    annotations:
-      keel.sh/policy: force
-      keel.sh/matchTag: "true"
-      keel.sh/trigger: poll
-      keel.sh/pollSchedule: "@every 5m"
-  spec:
-    replicas: 3
-    strategy:
-      type: RollingUpdate
-    selector:
-      matchLabels:
-        app: prow
-        component: result-aggregator
-    template:
-      metadata:
-        labels:
-          app: prow
-          component: result-aggregator
-      spec:
-        containers:
-        - name: result-aggregator
-          image: quay-proxy.ci.openshift.org/openshift/ci:ci_result-aggregator_latest
-          imagePullPolicy: Always
-          args:
-          - -log-level=debug
-          - -passwd-file=/etc/report/passwd
-          ports:
-          - name: main
-            containerPort: 8080
-          - name: metrics
-            containerPort: 9090
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 8081
-            initialDelaySeconds: 3
-            periodSeconds: 3
-          readinessProbe:
-            httpGet:
-              path: /healthz/ready
-              port: 8081
-            initialDelaySeconds: 10
-            periodSeconds: 3
-            timeoutSeconds: 600
-          resources:
-            requests:
-              memory: "100Mi"
-              cpu: "200m"
-          volumeMounts:
-          - mountPath: /etc/report
-            name: result-aggregator
-            readOnly: true
-        volumes:
-        - name: result-aggregator
-          secret:
-            secretName: result-aggregator
+    spec:
+      containers:
+      - name: result-aggregator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_result-aggregator_latest
+        imagePullPolicy: Always
+        args:
+        - -log-level=debug
+        - -passwd-file=/etc/report/passwd
+        ports:
+        - name: main
+          containerPort: 8080
+        - name: metrics
+          containerPort: 9090
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 600
+        resources:
+          requests:
+            memory: "100Mi"
+            cpu: "200m"
+        volumeMounts:
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      volumes:
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator

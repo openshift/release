@@ -579,6 +579,38 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: openstack-ironic-prometheus-exporter
+  cron: 30 10 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: openstack-ironic-prometheus-exporter
+      commands: |
+        rebasebot --source https://github.com/openstack/ironic-prometheus-exporter:master \
+                  --dest openshift/openstack-ironic-prometheus-exporter:main \
+                  --rebase openshift-metal3/openstack-ironic-prometheus-exporter:ironic-bot-master \
+                  --github-app-id 259896 \
+                  --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
+                  --github-cloner-id 318353 \
+                  --github-cloner-key /secrets/ironic-bot/ironic-cloner-bot-key \
+                  --slack-webhook /secrets/slack-hooks/team-ocp-metal-platform \
+                  --git-username ironic-bot \
+                  --git-email metal-platform@redhat.com
+      credentials:
+      - collection: ""
+        mount_path: /secrets/slack-hooks
+        name: metal-platform-slack-hooks
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /secrets/ironic-bot
+        name: metal-platform-bot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: kubernetes-autoscaler
   cron: 20 13 * * Mon,Thu
   steps:

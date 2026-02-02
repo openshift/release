@@ -4,7 +4,7 @@ from config import Context
 
 def _add_namespace_read_only_rbac(gendoc, namespace):
     gendoc.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'release-controller-developers-read-only',
@@ -49,7 +49,7 @@ def _add_deployment_monitoring_rbac(gendoc):
     context = gendoc.context
 
     gendoc.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'release-controller-developers-monitoring',
@@ -93,7 +93,7 @@ def _add_cache_monitoring_rbac(gendoc):
     context = gendoc.context
 
     gendoc.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'Role',
         'metadata': {
             'name': 'release-controller-developers-monitoring',

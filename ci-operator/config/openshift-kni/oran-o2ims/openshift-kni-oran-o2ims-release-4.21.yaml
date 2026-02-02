@@ -1,0 +1,99 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.31.0
+  ubi-min9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make binary
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.tools
+images:
+- dockerfile_path: Dockerfile
+  from: ubi-min9
+  to: oran-o2ims-operator
+- dockerfile_path: bundle.Dockerfile
+  from: ubi-min9
+  to: oran-o2ims-operator-bundle
+operator:
+  bundles:
+  - as: operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift-kni/oran-o2ims-operator:.*
+    with: pipeline:oran-o2ims-operator
+promotion:
+  to:
+  - name: "4.21"
+    namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.21"
+      namespace: ocp
+      reference_policy: Local
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.21"
+      namespace: ocp
+      reference_policy: Local
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  ./hack/install-markdownlint.sh
+tests:
+- as: ci-job
+  commands: make ci-job
+  container:
+    from: src
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+- always_run: false
+  as: scorecard
+  run_if_changed: ^bundle/
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-telco
+    dependencies:
+      OO_BUNDLE: oran-o2ims-operator-bundle
+    env:
+      BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: oran-o2ims
+      USER_TAGS: |
+        ci-job-source prowci
+        ci-job-branch release-4.21
+        ci-job-fullname openshift-kni-scorecard-oran-o2ims-release-4.21
+        ci-job-type optional-operators-ci-aws
+        ci-repo-name oran-o2ims
+        ci-org-name openshift-kni
+    test:
+    - as: scorecard-test
+      cli: latest
+      commands: make scorecard-test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
+  as: markdownlint
+  commands: |
+    hack/markdownlint.sh
+  container:
+    from: test-bin
+  run_if_changed: (?i)(\.md|\.markdown|^hack/.*markdown.*|^.markdown.*)$
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift-kni
+  repo: oran-o2ims

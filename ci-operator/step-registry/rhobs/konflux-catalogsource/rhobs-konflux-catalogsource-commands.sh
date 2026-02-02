@@ -123,8 +123,9 @@ create_icsp_connected() {
   spec:
     repositoryDigestMirrors:
     - mirrors:
-      - registry.stage.redhat.io
-      source: registry.redhat.io
+      - registry.stage.redhat.io/cluster-observability-operator
+      - quay.io/redhat-user-workloads/cluster-observabilit-tenant/cluster-observability-operator
+      source: registry.redhat.io/cluster-observability-operator
 EOF
 		echo "!!! fail to create the ICSP"
 		return 1

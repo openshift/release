@@ -1,0 +1,50 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/kubernetes-sigs-jobset
+images:
+- dockerfile_path: Dockerfile.ci
+  to: kubernetes-sigs-jobset
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: 4.23-priv
+  namespace: ocp-private
+tests:
+- as: verify
+  commands: HOME=$( mktemp -d ) GOLANGCI_LINT_CACHE=/tmp/.cache GOCACHE=/tmp/ GOFLAGS='-mod=readonly'
+    make -f Makefile-ocp.mk verify verify-ocp
+  container:
+    from: src
+- as: test-integration
+  commands: GOFLAGS='-mod=readonly' make test-integration
+  container:
+    from: src
+- as: test
+  commands: GOFLAGS='-mod=readonly' make test
+  container:
+    from: src
+- as: fips-image-scan-kubernetes-sigs-jobset
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    dependencies:
+      SCAN_IMAGE: kubernetes-sigs-jobset
+    test:
+    - ref: fips-check-image-scan
+- as: security
+  optional: true
+  skip_if_only_changed: ^\.tekton/|\.md$|^(LICENSE|OWNERS)$
+  steps:
+    workflow: openshift-ci-security
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: kubernetes-sigs-jobset
