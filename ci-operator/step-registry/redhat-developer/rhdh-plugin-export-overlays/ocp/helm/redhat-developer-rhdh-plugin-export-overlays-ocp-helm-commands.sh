@@ -141,7 +141,7 @@ post_github_comment() {
     [[ -z "${VAULT_GITHUB_TEST_REPORTER_TOKEN:-}" ]] && { echo "WARNING: VAULT_GITHUB_TEST_REPORTER_TOKEN not set"; return 1; }
 
     local gcs_base="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull"
-    local artifacts_path="${gcs_base}/${GITHUB_ORG_NAME}_${GITHUB_REPOSITORY_NAME}/${GIT_PR_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/e2e-ocp-helm/redhat-developer-rhdh-plugin-export-overlays-ocp-helm/artifacts"
+    local step_path="${gcs_base}/${GITHUB_ORG_NAME}_${GITHUB_REPOSITORY_NAME}/${GIT_PR_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/e2e-ocp-helm/redhat-developer-rhdh-plugin-export-overlays-ocp-helm"
     local stats status comment
 
     stats=$(jq -r '(.stats.duration // 0) / 1000 | floor | "\(. / 60 | floor)m \(. % 60)s"' playwright-report/results.json 2>/dev/null || echo "N/A")
@@ -149,9 +149,9 @@ post_github_comment() {
     [[ "$TEST_EXIT_CODE" -eq 0 ]] && status="✅ Passed" || status="❌ Failed"
 
     comment="### ${status} E2E Tests - \`${CHANGED_WORKSPACES}\`
-**Platform:** ${CONTAINER_PLATFORM} ${CONTAINER_PLATFORM_VERSION} | **RHDH:** ${RHDH_VERSION} | **Duration:** ${stats}
+**Platform:** ${CONTAINER_PLATFORM} ${CONTAINER_PLATFORM_VERSION} | **RHDH Version:** ${RHDH_VERSION} | **Duration:** ${stats}
 ${counts}
-[Playwright Report](${artifacts_path}/playwright-report/index.html) | [Build Log](${artifacts_path}/build-log.txt) | [Artifacts](${artifacts_path})"
+[Playwright Report](${step_path}/artifacts/playwright-report/index.html) | [Build Log](${step_path}/build-log.txt) | [Artifacts](${step_path}/artifacts)"
 
     curl -sS -X POST -H "Authorization: Bearer ${VAULT_GITHUB_TEST_REPORTER_TOKEN}" \
         -H "Accept: application/vnd.github+json" \
