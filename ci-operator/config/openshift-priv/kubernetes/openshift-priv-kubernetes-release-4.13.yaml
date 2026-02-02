@@ -19,6 +19,18 @@ base_images:
     name: 4.13-priv
     namespace: ocp-private
     tag: oc-rpms
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.13
+  openshift_origin-v4.0_machine-os-content:
+    name: origin-v4.0
+    namespace: openshift
+    tag: machine-os-content
+  rhcos-devel_rhel-coreos_latest:
+    name: rhel-coreos
+    namespace: rhcos-devel
+    tag: latest
   tools:
     name: 4.13-priv
     namespace: ocp-private
@@ -30,9 +42,17 @@ canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   from: tools
+  inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
   from: base
@@ -40,6 +60,9 @@ images:
     base-machine-with-rpms:
       as:
       - centos:stream9
+    openshift_origin-v4.0_machine-os-content:
+      as:
+      - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
   to: machine-os-content
 - dockerfile_literal: |
     # This uses the new rhel-coreos base image
@@ -57,10 +80,17 @@ images:
     base-machine-with-rpms:
       as:
       - quay.io/centos/centos:stream9
+    rhcos-devel_rhel-coreos_latest:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos
   to: rhel-coreos
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
   from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: pod
 promotion:
   to:
