@@ -233,6 +233,8 @@ EOF
         if [ "$state" == "READY" ] ; then
             echo "Catalogsource created successfully after waiting $((5*i)) seconds"
             echo "current state of catalogsource is \"$state\""
+            # Write the catalog source name to SHARED_DIR so subsequent steps can use it
+            echo "${name}" > "${SHARED_DIR}/redhat_operators_catalog_source_name"
             created=true
             break
         fi
