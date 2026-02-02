@@ -99,7 +99,7 @@ echo "=== Running DPF Sanity Tests ==="
 SANITY_LOG="${SANITY_DIR}/sanity-$(date +%Y%m%d_%H%M%S).log"
 TEST_RESULT=0
 
-if ${SSH} "cd ${SANITY_DIR} && make run-dpf-sanity 2>&1 | tee ${SANITY_LOG}"; then
+if ${SSH} "set -o pipefail; cd ${SANITY_DIR} && make run-dpf-sanity 2>&1 | tee ${SANITY_LOG}"; then
     echo "Sanity tests PASSED"
 else
     echo "Sanity tests FAILED"
