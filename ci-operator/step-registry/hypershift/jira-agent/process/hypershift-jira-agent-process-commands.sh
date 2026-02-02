@@ -214,7 +214,7 @@ while IFS= read -r line; do
 
   set +e  # Don't exit on error for individual issues
   echo "Starting Claude processing with streaming output..."
-  RESULT=$(claude -p "$ISSUE_KEY origin --ci. $FORK_CONTEXT" \
+  RESULT=$(claude -p "$ISSUE_KEY origin --ci --jira-token $JIRA_TOKEN. $FORK_CONTEXT" \
     --system-prompt "$SKILL_CONTENT" \
     --allowedTools "Bash Read Write Edit Grep Glob WebFetch" \
     --max-turns 100 \
