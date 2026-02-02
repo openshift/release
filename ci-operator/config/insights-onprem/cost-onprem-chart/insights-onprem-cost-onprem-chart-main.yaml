@@ -7,9 +7,20 @@ images:
 - dockerfile_literal: |-
     FROM src
     USER root
+    # Install base packages and Python
     RUN dnf install -y python3.11 python3.11-pip jq && dnf clean all && \
-        alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 20 && \
-        python3 -m pip install --no-cache-dir pytest pyyaml requests
+        alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 20
+    # Install Playwright system dependencies (browser libraries)
+    RUN dnf install -y \
+        nspr nss nss-util atk at-spi2-atk cups-libs libdrm \
+        libX11 libXcomposite libXdamage libXext libXrandr \
+        libxcb libxkbcommon mesa-libgbm pango alsa-lib \
+        gtk3 ca-certificates && \
+        dnf clean all
+    # Install Python packages including playwright
+    RUN python3 -m pip install --no-cache-dir pytest pyyaml requests pytest-playwright && \
+        playwright install --with-deps chromium
+    # Install CLI tools
     RUN curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq && \
         chmod +x /usr/local/bin/yq && \
         curl -sL https://get.helm.sh/helm-v4.0.4-linux-amd64.tar.gz | tar xz -C /tmp && \
