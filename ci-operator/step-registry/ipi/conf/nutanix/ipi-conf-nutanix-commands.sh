@@ -96,6 +96,16 @@ platform:
       uuid: ${PE_UUID}
     subnetUUIDs:
     - ${SUBNET_UUID}
+    failureDomains:
+    - name: failure-domain
+      prismElement:
+        uuid: ${PE_HOST}
+        endpoint:
+          address: ${PE_HOST}
+          port: ${PE_PORT}
+      subnetUUIDs:
+      - ${SUBNET_UUID}
+      storageContainers: ${PE_STORAGE_CONTAINER}
 networking:
   clusterNetwork:
   - cidr: 10.128.0.0/14
