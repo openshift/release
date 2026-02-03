@@ -1,49 +1,64 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+set -euxo pipefail; shopt -s inherit_errexit
 
-# The variables defined in this step come from files in the `SHARED_DIR` and credentials from Vault.
-SECRETS_DIR="/tmp/secrets"
+# --- Variables ---
+typeset secretsDir="/tmp/secrets"
+typeset optionFile="./options.yaml"
+typeset awsCredFile="${CLUSTER_PROFILE_DIR}/.awscred"
 
-# Get the creds from ACMQE CI vault and run the automation on pre-exisiting HUB
-SKIP_OCP_DEPLOY="false"
-if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
-    echo "------------ Skipping OCP Deploy = $SKIP_OCP_DEPLOY ------------"
-    cp ${SECRETS_DIR}/ci/kubeconfig $SHARED_DIR/kubeconfig
-    cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
-fi 
+# Get the creds from ACMQE CI vault and run the automation on pre-existing HUB
+if [[ "${SKIP_OCP_DEPLOY:-false}" == "true" ]]; then
+    : "------------ Skipping OCP Deploy = ${SKIP_OCP_DEPLOY} ------------"
+    cp "${secretsDir}/ci/kubeconfig" "${SHARED_DIR}/kubeconfig"
+    cp "${secretsDir}/ci/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
+fi
 
-######### added for debugging purposes #########
-# export DISPLAY=:99
-# Xvfb :99 &
-# # Xvfb :99 -screen 0 1024x768x16 2>/dev/null &
+cp "${secretsDir}/clc-interop/secret-options-yaml" "${optionFile}"
 
-# export CYPRESS_video=false
-# export CYPRESS_videoCompression=false
-###############################################
+# Update the AWS credentials in options.yaml from cluster profile
+if [[ -f "${awsCredFile}" ]]; then
+    typeset awsAccKeyID=
+    typeset awsAccKeyToken=
 
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
+    set +x
+    awsAccKeyID="$(sed -nE 's/^\s*aws_access_key_id\s*=\s*//p;T;q' "${awsCredFile}")"
+    awsAccKeyToken="$(sed -nE 's/^\s*aws_secret_access_key\s*=\s*//p;T;q' "${awsCredFile}")"
 
-cp ${SECRETS_DIR}/clc-interop/secret-options-yaml ./options.yaml
+    [ -n "${awsAccKeyID}" ] && [ -n "${awsAccKeyToken}" ]
 
-# Set the dynamic vars based on provisioned hub cluster.
-CYPRESS_BASE_URL=$(oc whoami --show-console)
-export CYPRESS_BASE_URL
+    : "Updating credentials in ${optionFile}..."
+    yq -o json eval . "${optionFile}" |
+    jq -c \
+          --arg awsAccKeyID "${awsAccKeyID}" \
+          --arg awsAccKeyToken "${awsAccKeyToken}" \
+        '
+          .connections.apiKeys.aws|=(
+                .awsAccessKeyID=$awsAccKeyID |
+                .awsSecretAccessKey=$awsAccKeyToken
+            )
+        ' |
+    yq -p json -o yaml eval . > "${optionFile}.tmp"
+    mv -f "${optionFile}.tmp" "${optionFile}"
+    set -x
 
-CYPRESS_HUB_API_URL=$(oc whoami --show-server)
-export CYPRESS_HUB_API_URL
+    unset awsAccKeyID awsAccKeyToken
+fi
 
-CYPRESS_OPTIONS_HUB_PASSWORD=$(cat $SHARED_DIR/kubeadmin-password)
-export CYPRESS_OPTIONS_HUB_PASSWORD
-# Version of spoke cluster to be provisioned.
-CYPRESS_CLC_OCP_IMAGE_VERSION=$(cat $SECRETS_DIR/clc/ocp_image_version)
-export CYPRESS_CLC_OCP_IMAGE_VERSION
+: "Executing CLC interop commands..."
+set +x
+export CYPRESS_OPTIONS_HUB_PASSWORD=
+CYPRESS_OPTIONS_HUB_PASSWORD="$(cat "${SHARED_DIR}/kubeadmin-password")"
+set -x
 
-CLOUD_PROVIDERS=$(cat $SECRETS_DIR/clc/ocp_cloud_providers)
-export CLOUD_PROVIDERS
+CYPRESS_BASE_URL="$(oc whoami --show-console)" \
+CYPRESS_HUB_API_URL="$(oc whoami --show-server)" \
+CYPRESS_CLC_OCP_IMAGE_VERSION="$(cat "${secretsDir}/clc/ocp_image_version")" \
+CLOUD_PROVIDERS="$(cat "${secretsDir}/clc/ocp_cloud_providers")" \
+bash +x ./execute_clc_interop_commands.sh || :
 
-# run the test execution script
-bash +x ./execute_clc_interop_commands.sh
+unset CYPRESS_OPTIONS_HUB_PASSWORD
 
-cp -r reports $ARTIFACT_DIR/
+: "Copying artifacts..."
+cp -r reports "${ARTIFACT_DIR}/"
+
+true
