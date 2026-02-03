@@ -408,6 +408,9 @@ CONFIG = {
     'hypershift-aks-quota-slice': {
         'default': 20,
     },
+    'hypershift-gcp-quota-slice': {
+        'default': 10,
+    },
     'powervc-1-quota-slice': {
         'default': 4,
     },

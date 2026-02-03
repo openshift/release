@@ -2,6 +2,12 @@
 set -e
 set -o pipefail
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 echo "Validate JOB_TYPE variable: ${JOB_TYPE}"
 if [ "$JOB_TYPE" = "presubmit" ]; then
   echo "JOB_TYPE=presubmit — skipping script"
