@@ -1,24 +1,8 @@
-base_images:
-  ocp_4.22_base-rhel9:
-    name: "4.23"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
-- inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
-  to: cluster-openshift-apiserver-operator
+- to: cluster-openshift-apiserver-operator
 promotion:
   to:
   - name: "4.23"
@@ -133,6 +117,25 @@ tests:
       cli: latest
       commands: |
         make test-e2e-encryption-rotation-aesgcm JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-operator-encryption-kms
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
       from: src
       resources:
         requests:

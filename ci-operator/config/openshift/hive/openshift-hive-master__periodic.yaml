@@ -1,14 +1,19 @@
+base_images:
+  openstack-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: openstack-installer
 binary_build_commands: GO_COMPLIANCE_INFO=0 make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.20
+    tag: rhel-9-release-golang-1.24-openshift-4.21
 images:
 - dockerfile_literal: |
     FROM ubi9-minimal
     RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-20-rhel9.ocp.svc > /etc/yum.repos.d/base-4-20-rhel9.repo
+    RUN curl http://base-4-21-rhel9.ocp.svc > /etc/yum.repos.d/base-4-21-rhel9.repo
   to: ubi9-minimal-entitled
 - build_args:
   - name: DNF
@@ -21,7 +26,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -42,7 +47,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.19"
+    version: "4.21"
   cron: 5 4 * * 1
   steps:
     test:
@@ -89,7 +94,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.19"
+    version: "4.21"
   cron: 5 4 * * 2
   steps:
     test:
@@ -164,6 +169,36 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: e2e-openstack-weekly
+  cron: 10 23 * * 0
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      HIVE_OSP_RESOURCE: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
+        export API_FLOATING_IP=$(<"${SHARED_DIR}/HIVE_FIP_API")
+        export INGRESS_FLOATING_IP=$(<"${SHARED_DIR}/HIVE_FIP_INGRESS")
+        export EXTERNAL_NETWORK=$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")
+        export COMPUTE_FLAVOR=$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")
+        export CONTROLPLANE_FLAVOR=$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")
+
+        GO_COMPLIANCE_INFO=0 CLOUD=openstack make test-e2e
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-openstack
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -297,12 +297,12 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-hypershift-conformance
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: hypershift
-      ci-operator.openshift.io/cloud-cluster-profile: hypershift
+      ci-operator.openshift.io/cloud: hypershift-aws
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-ingress-operator-master-e2e-aws-ovn-hypershift-conformance
@@ -810,7 +810,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-azure-manual-oidc
     decorate: true
     labels:
@@ -883,7 +883,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-azure-operator
     decorate: true
     labels:
@@ -956,7 +956,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-azure-ovn
     decorate: true
     labels:
@@ -1103,7 +1103,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp-operator
     decorate: true
     labels:
@@ -1176,7 +1176,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp-ovn
     decorate: true
     labels:
@@ -1249,12 +1249,12 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-hypershift
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: hypershift
-      ci-operator.openshift.io/cloud-cluster-profile: hypershift
+      ci-operator.openshift.io/cloud: hypershift-aws
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-ingress-operator-master-e2e-hypershift
@@ -1322,7 +1322,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/e2e-ibmcloud-operator
     decorate: true
     labels:
@@ -1468,12 +1468,159 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: vsphere02
+    context: ci/prow/e2e-vsphere-static-metallb-gatewayapi-conformance
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-ingress-operator-master-e2e-vsphere-static-metallb-gatewayapi-conformance
+    optional: true
+    rerun_command: /test e2e-vsphere-static-metallb-gatewayapi-conformance
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-vsphere-static-metallb-gatewayapi-conformance
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-vsphere-static-metallb-gatewayapi-conformance,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: vsphere02
+    context: ci/prow/e2e-vsphere-static-metallb-operator-gwapi
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-ingress-operator-master-e2e-vsphere-static-metallb-operator-gwapi
+    optional: true
+    rerun_command: /test e2e-vsphere-static-metallb-operator-gwapi
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-vsphere-static-metallb-operator-gwapi
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-vsphere-static-metallb-operator-gwapi,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
     context: ci/prow/hypershift-e2e-aks
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: hypershift
-      ci-operator.openshift.io/cloud-cluster-profile: hypershift
+      ci-operator.openshift.io/cloud: hypershift-aws
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-ingress-operator-master-hypershift-e2e-aks
@@ -1541,7 +1688,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -1672,7 +1819,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -1730,7 +1877,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     labels:
@@ -1783,7 +1930,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/verify
     decorate: true
     labels:
@@ -1836,7 +1983,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build06
+    cluster: build03
     context: ci/prow/verify-deps
     decorate: true
     labels:

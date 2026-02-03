@@ -1123,7 +1123,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260112-782d8a7cf
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260128-95b2a3412
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1150,11 +1150,11 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-core-ci-config-dry
     rerun_command: /test core-ci-config-dry
-    run_if_changed: ^gitops/.*
+    run_if_changed: ^clusters/.*
     spec:
       containers:
       - args:
-        - --config-dir=gitops/cluster-manifests/core-ci
+        - --config-dir=clusters/core-ci
         - --confirm=false
         - --as=
         command:
@@ -2017,7 +2017,7 @@ presubmits:
             cpu: 10m
     trigger: (?m)^/test( | .* )sync-rover-groups,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -2028,19 +2028,26 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-yamllint
     rerun_command: /test yamllint
+    run_if_changed: ^.*\.(yaml|yml)$
     spec:
       containers:
       - args:
-        - --strict
-        - -d
-        - '{extends: default, rules: {indentation: disable, document-start: disable,
-          comments: disable, line-length: disable}}'
         - clusters
         - core-services
         - OWNERS_ALIASES
         command:
-        - yamllint
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_yamllint_latest
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          # Run our comprehensive YAML validation (includes indentation, syntax, structure)
+          export GIT_DIFF=1
+          hack/validate-yaml-indentation.sh . --use-yamllint
+          # Also run yamllint on specific directories for additional checks (if available)
+          if command -v yamllint &> /dev/null; then
+            yamllint --strict -d '{extends: default, rules: {indentation: disable, document-start: disable, comments: disable, line-length: disable}}' clusters core-services OWNERS_ALIASES
+          fi
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
         imagePullPolicy: Always
         name: ""
         resources:

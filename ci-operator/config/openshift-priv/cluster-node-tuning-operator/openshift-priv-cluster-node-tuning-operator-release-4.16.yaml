@@ -7,36 +7,13 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.16_base-rhel9:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
-  openshift_release_golang-1.20:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-node-tuning-operator
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    openshift_release_golang-1.20:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: cluster-node-tuning-operator-us-tuned
 - dockerfile_path: Dockerfile.rhel9
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cluster-node-tuning-operator
 promotion:
   to:
@@ -78,11 +55,11 @@ tests:
     from: src
 - as: e2e-hypershift
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - as: e2e-hypershift-pao
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     test:
     - as: e2e-hypershift-pao
       cli: latest

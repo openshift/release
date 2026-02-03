@@ -11,26 +11,11 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.14_base:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-version-operator
 images:
 - dockerfile_path: Dockerfile.rhel
-  inputs:
-    ocp_4.14_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-version-operator
 promotion:
   to:
@@ -105,11 +90,11 @@ tests:
     workflow: openshift-upgrade-azure
 - as: e2e-hypershift-conformance
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: e2e-hypershift
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: release-4.14

@@ -3,11 +3,12 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+
 export PS4='+ $(date "+%T.%N") \011'
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save stacks events
-trap 'save_stack_events_to_shared' EXIT TERM INT
+trap 'save_stack_events_to_artifacts' EXIT TERM INT
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
@@ -19,11 +20,145 @@ cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
 ami_id=${EC2_AMI}
 instance_type=${EC2_INSTANCE_TYPE}
 
-function save_stack_events_to_shared()
+function log() {
+  # Keep logs readable even with `set -x` enabled.
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
+}
+
+function save_stack_events_to_artifacts()
 {
   set +o errexit
-  aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${SHARED_DIR}/stack-events-${stack_name}.json"
+  aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json \
+    > "${ARTIFACT_DIR}/stack-events-${stack_name}.json" 2>/dev/null
   set -o errexit
+}
+
+function stack_status() {
+  aws --region "${REGION}" cloudformation describe-stacks --stack-name "$1" \
+    --query 'Stacks[0].StackStatus' --output text 2>/dev/null || true
+}
+
+function available_azs_in_region() {
+  aws --region "${REGION}" ec2 describe-availability-zones \
+    --filters Name=state,Values=available Name=zone-type,Values=availability-zone \
+    --query 'AvailabilityZones[].ZoneName' --output text 2>/dev/null | tr '\t' '\n' | sort -u || true
+}
+
+function offered_azs_for_instance_type() {
+  aws --region "${REGION}" ec2 describe-instance-type-offerings \
+    --location-type availability-zone \
+    --filters Name=instance-type,Values="${instance_type}" \
+    --query 'InstanceTypeOfferings[].Location' --output text 2>/dev/null | tr '\t' '\n' | sort -u || true
+}
+
+function az_candidates() {
+  # Order:
+  # - If EC2_AZS is set (comma/space separated): use it verbatim.
+  # - Else: intersect "available AZs" with "AZs offering the instance type" (best-effort).
+  # - Else: fall back to all available AZs in the region.
+  local raw="${EC2_AZS:-}"
+  if [[ -n "${raw}" ]]; then
+    echo "${raw}" | tr ', ' '\n' | sed '/^$/d' | sort -u
+    return 0
+  fi
+
+  local avail offered
+  avail="$(available_azs_in_region)"
+  offered="$(offered_azs_for_instance_type)"
+
+  if [[ -n "${offered}" ]]; then
+    # Intersection (keep stable-ish ordering by scanning `avail`).
+    local -A offered_set=()
+    local z
+    while IFS= read -r z; do
+      [[ -n "${z}" ]] && offered_set["${z}"]=1
+    done <<< "${offered}"
+    while IFS= read -r z; do
+      [[ -n "${z}" && -n "${offered_set[${z}]+x}" ]] && echo "${z}"
+    done <<< "${avail}"
+    return 0
+  fi
+
+  echo "${avail}"
+}
+
+function dump_stack_failure() {
+  local name="$1"
+
+  echo "==== CloudFormation failure details for stack ${name} ===="
+  aws --region "${REGION}" cloudformation describe-stacks --stack-name "${name}" \
+    --query 'Stacks[0].[StackStatus,StackStatusReason]' --output table 2>/dev/null || true
+  aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${name}" \
+    --query 'StackEvents[0:40].[Timestamp,LogicalResourceId,ResourceType,ResourceStatus,ResourceStatusReason]' \
+    --output table 2>/dev/null || true
+}
+
+function force_cleanup_stack_resources() {
+
+  # Best-effort cleanup for resources that most commonly block stack deletion (DELETE_FAILED).
+  # We intentionally keep this minimal (terminate instance) to avoid complex dependency handling.
+  local name="$1"
+
+  local instance_id
+  instance_id="$(aws --region "${REGION}" cloudformation describe-stack-resources --stack-name "${name}" \
+    --query 'StackResources[?ResourceType==`AWS::EC2::Instance`].PhysicalResourceId' --output text 2>/dev/null || true)"
+
+  if [[ -n "${instance_id}" && "${instance_id}" != "None" ]]; then
+    echo "Attempting to terminate instance blocking stack deletion: ${instance_id}"
+    aws --region "${REGION}" ec2 terminate-instances --instance-ids "${instance_id}" >/dev/null 2>&1 || true
+    aws --region "${REGION}" ec2 wait instance-terminated --instance-ids "${instance_id}" >/dev/null 2>&1 || true
+  fi
+
+}
+
+function delete_stack_and_wait() {
+
+  # Returns 0 if the stack disappears, 1 otherwise.
+  local name="$1"
+  local force_cleanup_done=0
+  aws --region "${REGION}" cloudformation delete-stack --stack-name "${name}" >/dev/null 2>&1 || true
+
+  # Poll because waiters are brittle (and we want to branch on DELETE_FAILED).
+  for _ in $(seq 1 180); do # up to ~30m
+    local st
+    st="$(stack_status "${name}")"
+    if [[ -z "${st}" || "${st}" == "None" ]]; then
+      return 0
+    fi
+
+    if [[ "${st}" == "DELETE_FAILED" ]]; then
+      echo "Stack deletion failed (DELETE_FAILED): ${name}"
+      dump_stack_failure "${name}"
+
+      if [[ "${force_cleanup_done}" -eq 0 ]]; then
+        force_cleanup_done=1
+        force_cleanup_stack_resources "${name}"
+        aws --region "${REGION}" cloudformation delete-stack --stack-name "${name}" >/dev/null 2>&1 || true
+      else
+        return 1
+      fi
+    fi
+
+    sleep 10
+  done
+
+  echo "Timed out waiting for stack deletion: ${name}"
+  dump_stack_failure "${name}"
+  return 1
+
+}
+
+function instance_create_failed_reason() {
+  # Returns the most recent CREATE_FAILED reason for RHELInstance (best-effort).
+  local name="$1"
+  aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${name}" \
+    --query "StackEvents[?LogicalResourceId=='RHELInstance' && ResourceStatus=='CREATE_FAILED']|[0].ResourceStatusReason" \
+    --output text 2>/dev/null || true
+}
+
+function is_insufficient_capacity_failure() {
+  local reason="${1:-}"
+  [[ "${reason}" == *"do not have sufficient"* ]] || [[ "${reason}" == *"Insufficient"* ]] || [[ "${reason}" == *"capacity"* ]]
 }
 
 echo "ec2-user" > "${SHARED_DIR}/ssh_user"
@@ -77,6 +212,9 @@ Parameters:
   PublicKeyString:
     Type: String
     Description: The public key used to connect to the EC2 instance
+  AvailabilityZone:
+    Type: String
+    Description: Availability Zone to place the VPC subnet/instance into (used for capacity fallback).
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -85,15 +223,18 @@ Metadata:
         default: "Host Information"
       Parameters:
       - HostInstanceType
+      - AvailabilityZone
     - Label:
         default: "Network Configuration"
       Parameters:
-      - PublicSubnet
+      - PublicSubnetCidr
     ParameterLabels:
-      PublicSubnet:
+      PublicSubnetCidr:
         default: "Worker Subnet"
       HostInstanceType:
         default: "Worker Instance Type"
+      AvailabilityZone:
+        default: "Availability Zone"
 
 Resources:
 ## VPC Creation
@@ -128,6 +269,7 @@ Resources:
     Properties:
       VpcId: !Ref RHELVPC
       CidrBlock: !Ref PublicSubnetCidr
+      AvailabilityZone: !Ref AvailabilityZone
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
@@ -224,7 +366,6 @@ Resources:
   rhelLaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
     Properties:
-      LaunchTemplateName: ${stack_name}-launch-template
       LaunchTemplateData:
         BlockDeviceMappings:
         - DeviceName: /dev/sda1
@@ -245,7 +386,7 @@ Resources:
     Properties:
       ImageId: !Ref AmiId
       LaunchTemplate:
-        LaunchTemplateName: ${stack_name}-launch-template
+        LaunchTemplateId: !Ref rhelLaunchTemplate
         Version: !GetAtt rhelLaunchTemplate.LatestVersionNumber
       IamInstanceProfile: !Ref RHELInstanceProfile
       InstanceType: !Ref HostInstanceType
@@ -286,34 +427,95 @@ Outputs:
     Value: !GetAtt RHELInstance.PublicIp
 EOF
 
-if aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
-    --query "Stacks[].Outputs[?OutputKey == 'InstanceId'].OutputValue" > /dev/null; then
-        echo "Appears that stack ${stack_name} already exists"
-
-        aws --region $REGION cloudformation delete-stack --stack-name "${stack_name}"
-        echo "Deleted stack ${stack_name}"
-
-        aws --region $REGION cloudformation wait stack-delete-complete --stack-name "${stack_name}"
-        echo "Waited for stack-delete-complete ${stack_name}"
+existing_status="$(stack_status "${stack_name}")"
+if [[ -n "${existing_status}" && "${existing_status}" != "None" ]]; then
+  echo "Appears that stack ${stack_name} already exists (status: ${existing_status})"
+  echo "Deleting stack ${stack_name}"
+  if delete_stack_and_wait "${stack_name}"; then
+    echo "Deleted stack ${stack_name}"
+  else
+    echo "Failed to delete pre-existing stack ${stack_name}; refusing to continue to avoid leaking resources."
+    exit 1
+  fi
 fi
 
 echo -e "==== Start to create rhel host ===="
 echo "${stack_name}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
-aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" \
+# truncate the stack name to 27 characters which is the maximum length of the machine name
+machine_name="${stack_name:0:27}"
+
+create_ok=0
+selected_az=""
+
+mapfile -t ZONE_CANDIDATES < <(az_candidates)
+if [[ "${#ZONE_CANDIDATES[@]}" -eq 0 ]]; then
+  echo "No availability zones found for region ${REGION}"
+  exit 1
+fi
+
+log "Region: ${REGION}; instance_type: ${instance_type}; AZ candidates: ${ZONE_CANDIDATES[*]}"
+
+declare -a ATTEMPTED_AZS=()
+declare -a ATTEMPT_REASONS=()
+
+for az in "${ZONE_CANDIDATES[@]}"; do
+  log "Creating stack in AZ ${az}: ${stack_name}"
+
+  aws --region "${REGION}" cloudformation create-stack --stack-name "${stack_name}" \
     --template-body "file://${cf_tpl_file}" \
     --capabilities CAPABILITY_NAMED_IAM \
     --parameters \
-        ParameterKey=HostInstanceType,ParameterValue="${instance_type}"  \
-        ParameterKey=Machinename,ParameterValue="${stack_name}"  \
-        ParameterKey=AmiId,ParameterValue="${ami_id}" \
-        ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)"
+      ParameterKey=HostInstanceType,ParameterValue="${instance_type}" \
+      ParameterKey=Machinename,ParameterValue="${machine_name}" \
+      ParameterKey=AmiId,ParameterValue="${ami_id}" \
+      ParameterKey=PublicKeyString,ParameterValue="$(cat "${CLUSTER_PROFILE_DIR}/ssh-publickey")" \
+      ParameterKey=AvailabilityZone,ParameterValue="${az}"
 
-echo "Created stack"
+  if aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}" >/dev/null 2>&1; then
+    create_ok=1
+    selected_az="${az}"
+    break
+  fi
 
-aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}"
+  status_now="$(stack_status "${stack_name}")"
+  reason="$(instance_create_failed_reason "${stack_name}")"
+  log "Stack create failed in ${az} (status: ${status_now}; reason: ${reason:-unknown})"
+  ATTEMPTED_AZS+=("${az}")
+  ATTEMPT_REASONS+=("${reason:-unknown}")
+
+  if is_insufficient_capacity_failure "${reason}"; then
+    # Expected transient for metal: try next AZ.
+    delete_stack_and_wait "${stack_name}" || true
+    sleep 15
+    continue
+  fi
+
+  # Unexpected failure: dump once and stop trying.
+  dump_stack_failure "${stack_name}"
+  delete_stack_and_wait "${stack_name}" || true
+  break
+done
+
+if [[ "${create_ok}" -ne 1 ]]; then
+  echo "Failed to create CloudFormation stack: ${stack_name}"
+  if [[ "${#ATTEMPTED_AZS[@]}" -gt 0 ]]; then
+    echo "Tried AZs:"
+    for i in "${!ATTEMPTED_AZS[@]}"; do
+      echo "  - ${ATTEMPTED_AZS[$i]}: ${ATTEMPT_REASONS[$i]}"
+    done
+  fi
+  # Dump details once for the last attempt if the stack still exists.
+  status_now="$(stack_status "${stack_name}")"
+  if [[ -n "${status_now}" && "${status_now}" != "None" ]]; then
+    dump_stack_failure "${stack_name}"
+  fi
+  exit 1
+fi
+
 echo "Waited for stack"
 
 echo "$stack_name" > "${SHARED_DIR}/rhel_host_stack_name"
+echo "${selected_az}" > "${SHARED_DIR}/aws-availability-zone"
 # shellcheck disable=SC2016
 INSTANCE_ID="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
 --query 'Stacks[].Outputs[?OutputKey == `InstanceId`].OutputValue' --output text)"

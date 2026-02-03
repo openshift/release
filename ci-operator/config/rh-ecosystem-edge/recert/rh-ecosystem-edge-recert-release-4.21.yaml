@@ -1,0 +1,218 @@
+base_images:
+  assisted-test-infra:
+    name: ocm-2.11
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  bip-orchestrate-vm:
+    name: bip-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ib-orchestrate-vm:
+    name: ib-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
+  installer:
+    name: "4.21"
+    namespace: ocp
+    tag: installer
+  lifecycle-agent-operator-4-21:
+    name: "4.21"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator
+  lifecycle-agent-operator-bundle-4-20:
+    name: "4.20"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
+  lifecycle-agent-operator-bundle-4-21:
+    name: "4.21"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.21
+images:
+- dockerfile_path: Dockerfile.prow
+  to: recert-check
+- dockerfile_path: Dockerfile
+  to: recert
+promotion:
+  to:
+  - namespace: edge-infrastructure
+    tag: release-4.21
+    tag_by_commit: true
+releases:
+  latest:
+    integration:
+      name: "4.21"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: true
+  as: cargo-check
+  commands: cargo check
+  container:
+    from: recert-check
+- always_run: true
+  as: cargo-clippy
+  commands: cargo clippy
+  container:
+    from: recert-check
+- always_run: false
+  as: e2e-aws-ovn-single-node-recert-serial
+  steps:
+    cluster_profile: aws-2
+    env:
+      TEST_SKIPS: Managed cluster should grow and decrease when scaling different
+        machineSets simultaneously
+      TEST_SUITE: openshift/conformance/serial
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-recert
+- always_run: false
+  as: e2e-aws-ovn-single-node-recert-parallel
+  steps:
+    cluster_profile: aws-2
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-recert
+- always_run: false
+  as: e2e-aws-ovn-single-node-recert-openshift-e2e-test-qe
+  steps:
+    cluster_profile: aws-2
+    env:
+      E2E_RUN_TAGS: '@level0'
+      TEST_IMPORTANCE: LEVEL0
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: enable-qe-catalogsource
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: fips-check-fips-or-die
+    - ref: fips-check-node-scan
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
+    workflow: openshift-e2e-aws-single-node-recert
+- as: e2e-aws-ipi-sno-fips-recert
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@level0'
+      FIPS_ENABLED: "true"
+      TEST_IMPORTANCE: LEVEL0
+    test:
+    - ref: single-node-recert
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: fips-check-fips-or-die
+    - ref: fips-check-node-scan
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-aws-ipi-sno
+- always_run: false
+  as: baremetalds-sno-recert-cluster-rename
+  steps:
+    cluster_profile: equinix-edge-enablement
+    test:
+    - ref: baremetalds-sno-rename
+    - ref: baremetalds-sno-test
+    workflow: baremetalds-sno
+- as: e2e-baremetal-pxe-sno-agent-ipv4-fips-recert
+  capabilities:
+  - intranet
+  cron: '@weekly'
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AGENT_PLATFORM_TYPE: none
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@level0'
+      FIPS_ENABLED: "true"
+      RESERVE_BOOTSTRAP: "false"
+      TEST_IMPORTANCE: LEVEL0
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: single-node-recert
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: fips-check-fips-or-die
+    - ref: fips-check-node-scan
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-e2e-test-qe-report
+    workflow: baremetal-lab-agent-install-pxe
+- as: ibu-e2e-flow
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-21
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-21
+      RECERT_IMAGE: recert
+      TARGET_LCA_REF: pipeline:lifecycle-agent-operator-bundle-4-20
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.21"
+      OCP_TARGET_IMAGE_SOURCE: release
+      OCP_TARGET_VERSION: "4.20"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+    workflow: openshift-image-based-upgrade-presubmit
+- as: ibi-e2e-flow
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-21
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-21
+      RECERT_IMAGE: recert
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.21"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-install
+zz_generated_metadata:
+  branch: release-4.21
+  org: rh-ecosystem-edge
+  repo: recert

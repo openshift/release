@@ -7,26 +7,11 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.22_base-rhel9:
-    name: 4.22-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-node-tuning-operator
 images:
 - dockerfile_path: Dockerfile.rhel9
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: cluster-node-tuning-operator
 promotion:
   to:
@@ -66,11 +51,11 @@ tests:
     from: src
 - as: e2e-hypershift
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - as: e2e-hypershift-pao
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE: "true"
     test:
@@ -92,7 +77,7 @@ tests:
 - always_run: false
   as: e2e-pao-updating-profile-hypershift
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE: "true"
     test:
@@ -151,7 +136,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests
+      commands: "export RESERVED_CPU_SET=\"0\"\nexport ISOLATED_CPU_SET=\"1-5\"\nexport
+        CLUSTER=mcp-only \nmake cluster-deploy-pao && make pao-functests"
       from: src
       resources:
         requests:
@@ -167,7 +153,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests-updating-profile
+      commands: "export RESERVED_CPU_SET=\"0\"\nexport ISOLATED_CPU_SET=\"1-5\"\nexport
+        CLUSTER=mcp-only \nmake cluster-deploy-pao && make pao-functests-updating-profile"
       from: src
       resources:
         requests:
@@ -183,7 +170,8 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests-performance-workloadhints
+      commands: "export RESERVED_CPU_SET=\"0\"\nexport ISOLATED_CPU_SET=\"1-5\"\nexport
+        CLUSTER=mcp-only \nmake cluster-deploy-pao && make pao-functests-performance-workloadhints"
       from: src
       resources:
         requests:
