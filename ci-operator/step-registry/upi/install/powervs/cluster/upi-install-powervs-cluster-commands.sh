@@ -140,7 +140,8 @@ function download_automation_code() {
         && curl -L https://github.com/prb112/ocp4-upi-powervs/archive/refs/heads/terraform-1.76.2-updates.tar.gz \
             -o "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && tar -xzf "${IBMCLOUD_HOME}"/ocp.tar.gz \
-        && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-terraform-1.76.2-updates" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
+        && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-terraform-1.76.2-updates" "${IBMCLOUD_HOME}"/ocp4-upi-powervs \
+        && sed -i '' '/default_kernel_options[[:space:]]*=/s/=.*/= []/' "${IBMCLOUD_HOME}"/ocp4-upi-powervs/modules/5_install/install.tf
     echo "Down ... Downloading the head for ocp-upi-powervs"
 }
 
