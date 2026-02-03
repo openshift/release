@@ -62,5 +62,10 @@ echo "Generated cluster config:"
 cat ${CONFIG_FILE}
 
 # Delete cluster using config file
-make cluster-delete CONFIG_FILE_PATH=${CONFIG_FILE}
+if [[ "${SKIP_CLUSTER_DELETE:-false}" != "true" ]]; then
+  echo "Deleting cluster..."
+  make cluster-delete CONFIG_FILE_PATH=${CONFIG_FILE}
+else
+  echo "SKIP_CLUSTER_DELETE is set to true, skipping cluster deletion"
+fi
 
