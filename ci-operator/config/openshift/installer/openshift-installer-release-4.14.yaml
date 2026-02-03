@@ -35,75 +35,29 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.48.0
-  ocp_4.10_cli:
-    name: "4.14"
-    namespace: ocp
-    tag: cli
-  ocp_4.14_cli:
-    name: "4.14"
-    namespace: ocp
-    tag: cli
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
   from: base
-  inputs:
-    ocp_4.10_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.10:cli
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
   from: base
-  inputs:
-    ocp_4.14_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.14:cli
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: ovirt-installer
 - dockerfile_literal: |
     FROM src
@@ -113,11 +67,6 @@ images:
     # Cache dir must be accessible when running the integration tests
     RUN mkdir /.cache -m 0777
   from: src
-  inputs:
-    ocp_4.10_cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
   to: src-oc
 promotion:
   to:
@@ -511,25 +460,6 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
-- always_run: false
-  as: e2e-openstack-ccpmso-zone
-  optional: true
-  steps:
-    cluster_profile: openstack-vh-mecha-az0
-    test:
-    - as: openstack-test-cpms
-      commands: |
-        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
-        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch main --depth=1 $dir
-        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
-        cd $dir
-        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
-        make e2e-presubmit
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: openshift-e2e-openstack-ipi
 - as: openstack-manifests
   run_if_changed: openstack
   steps:
@@ -628,19 +558,6 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-- always_run: false
-  as: e2e-openstack-kuryr
-  optional: true
-  run_if_changed: (openstack|gophercloud)
-  steps:
-    cluster_profile: openstack-vh-mecha-az0
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-    test:
-    - ref: openstack-noop
-    workflow: openshift-e2e-openstack-ipi
 - always_run: false
   as: e2e-azurestack
   optional: true

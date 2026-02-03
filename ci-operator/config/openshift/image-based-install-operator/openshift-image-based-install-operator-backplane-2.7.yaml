@@ -19,10 +19,6 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: installer
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   image_stream_tag:
     name: release
@@ -31,11 +27,11 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: image-based-install-operator
+- dockerfile_literal: |
+    FROM placeholder
+  from: src
+  to: image-based-install-operator-code
 promotion:
   to:
   - name: "2.7"
@@ -99,7 +95,8 @@ tests:
     dependencies:
       BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
       IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
-      IMG: image-based-install-operator
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       CLUSTERTYPE: assisted_medium_el9
@@ -114,7 +111,8 @@ tests:
     dependencies:
       BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
       IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
-      IMG: image-based-install-operator
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       SEED_IMAGE_TAG: "4.17"

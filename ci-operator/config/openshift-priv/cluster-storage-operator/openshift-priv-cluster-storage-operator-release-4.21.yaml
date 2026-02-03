@@ -7,26 +7,11 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.21_base-rhel9:
-    name: 4.21-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-storage-operator
 images:
-- inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: cluster-storage-operator
+- to: cluster-storage-operator
 promotion:
   to:
   - name: 4.21-priv
@@ -176,7 +161,7 @@ tests:
   as: hypershift-e2e-openstack-aws-csi-cinder
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
       TECH_PREVIEW_NO_UPGRADE: "true"
@@ -190,7 +175,7 @@ tests:
   as: hypershift-e2e-openstack-aws-csi-manila
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
       TECH_PREVIEW_NO_UPGRADE: "true"
@@ -202,7 +187,7 @@ tests:
     workflow: hypershift-openstack-aws-conformance
 - as: hypershift-aws-e2e-external
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - as: verify-deps
   steps:
@@ -216,7 +201,7 @@ tests:
     workflow: openshift-ci-security
 - as: hypershift-e2e-aks
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aks
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"

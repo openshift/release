@@ -66,13 +66,17 @@ if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
     patch_netobserv "flp" "$FLP_PR_IMAGE"
 fi
 
-# get NetObserv metadata 
+# get NetObserv metadata
 NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*].spec.containers[0].env[?(@.name=='OPERATOR_CONDITION_NAME')].value}" -A)
 
+# Get Loki version or set to N/A
+LOKI_RELEASE="N/A"
 if [[ ${LOKI_OPERATOR:-} != "None" ]] && [[ -z ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]]; then
     LOKI_RELEASE=$(oc get sub -n openshift-operators-redhat loki-operator -o jsonpath="{.status.currentCSV}")
 fi
 
+# Get Kafka version or set to N/A
+KAFKA_RELEASE="N/A"
 if [[ ${DEPLOYMENT_MODEL:-} == "Kafka" ]]; then
     KAFKA_RELEASE=$(oc get sub -n openshift-operators amq-streams  -o jsonpath="{.status.currentCSV}")
 fi
@@ -80,25 +84,7 @@ fi
 opm --help
 NOO_BUNDLE_INFO=$(scripts/build_info.sh)
 
-MODEL=$(oc get flowcollector cluster -o jsonpath='{.spec.deploymentModel}')
-
-# Build metadata JSON conditionally
-LOKI_VERSION_JSON=""
-if [[ -n ${LOKI_RELEASE:-} ]]; then
-    LOKI_VERSION_JSON=", \"loki_version\": \"$LOKI_RELEASE\""
-fi
-
-KAFKA_VERSION_JSON=""
-if [[ -n ${KAFKA_RELEASE:-} ]]; then
-    KAFKA_VERSION_JSON=", \"kafka_version\": \"$KAFKA_RELEASE\""
-fi
-
-DEPLOYMENT_MODEL_JSON=""
-if [[ -n ${MODEL:-} ]]; then
-    DEPLOYMENT_MODEL_JSON=", \"deployment_model\": \"$MODEL\""
-fi
-
-export METADATA="{\"release\": \"$NETOBSERV_RELEASE\"${LOKI_VERSION_JSON}${KAFKA_VERSION_JSON}${DEPLOYMENT_MODEL_JSON}, \"noo_bundle_info\":\"$NOO_BUNDLE_INFO\"}"
+export METADATA="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$LOKI_RELEASE\", \"kafka_version\": \"$KAFKA_RELEASE\", \"deployment_model\": \"$DEPLOYMENT_MODEL\", \"noo_bundle_info\":\"$NOO_BUNDLE_INFO\"}"
 
 echo "$METADATA" >> "$SHARED_DIR/additional_params.json"
 cp "$SHARED_DIR/additional_params.json" "$ARTIFACT_DIR/additional_params.json"
