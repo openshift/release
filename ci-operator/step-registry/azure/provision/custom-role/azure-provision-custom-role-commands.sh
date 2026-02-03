@@ -418,6 +418,17 @@ ${required_permissions}
 """
     fi
 
+    # optional permissions when installing cluster with outbond type is NATGatewaySingleZone NATGatewayMultiZone NatGateway
+    if [[ "${install_config_outbound_type}" == "NATGatewaySingleZone" ]] || [[ "${install_config_outbound_type}" == "NATGatewayMultiZone" ]] || [[ "${install_config_outbound_type}" == "NatGateway" ]]; then
+         required_permissions="""
+\"Microsoft.Network/natGateways/join/action\",
+\"Microsoft.Network/natGateways/read\",
+\"Microsoft.Network/natGateways/write\",
+${required_permissions}
+"""
+
+    fi
+
     create_role_definition_json "${CUSTOM_ROLE_NAME}" "${required_permissions}" "${ROLE_DEFINITION}"
     echo "Creating custom role..."
     create_custom_role "${ROLE_DEFINITION}"

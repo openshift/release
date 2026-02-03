@@ -11,14 +11,6 @@ base_images:
     name: insights-operator-tests
     namespace: ci
     tag: "4.20"
-  ocp_4.20_base-rhel9:
-    name: "4.20"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
   upi-installer:
     name: "4.20"
     namespace: ocp
@@ -27,13 +19,6 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: insights-operator
 releases:
   arm64-latest:
@@ -56,7 +41,7 @@ tests:
 - as: insights-operator-e2e-tests-periodic
   cron: 0 0 * * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -115,7 +100,7 @@ tests:
 - as: e2e-gcp-techpreview
   cron: 0 0 * * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     pre:
@@ -423,7 +408,7 @@ tests:
 - as: gcp-insights-runtime-extractor-tests
   cron: 0 0 * * *
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live
@@ -724,7 +709,7 @@ tests:
 - as: insights-operator-e2e-tests-slow-tests
   cron: 0 0 * * 6
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     pre:
     - chain: ipi-gcp-pre
     - ref: insights-live

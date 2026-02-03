@@ -29,7 +29,7 @@ ssh "${SSHOPTS[@]}" "${ssh_host_ip}" "mkdir -p ${remote_workdir}"
 
 cat <<EOF > ${SHARED_DIR}/install.sh
 #!/bin/bash
-set -euo pipefail
+set -euxo pipefail
 
 function dnf_install_retry {
   packages=(\$@)
@@ -66,9 +66,9 @@ if ! sudo subscription-manager status >&/dev/null; then
 fi
 
 sudo subscription-manager repos \
---enable "rhel-9-for-$(uname -m)-appstream-rpms" \
---enable "rhel-9-for-$(uname -m)-baseos-rpms" \
---enable "rhocp-4.14-for-rhel-9-$(uname -m)-rpms"
+--enable "rhel-9-for-\$(uname -m)-appstream-rpms" \
+--enable "rhel-9-for-\$(uname -m)-baseos-rpms" \
+--enable "rhocp-4.14-for-rhel-9-\$(uname -m)-rpms"
 
 cd ${remote_workdir}
 
@@ -78,7 +78,7 @@ dnf_install_retry nmstate virt-install virt-manager libvirt-nss openshift-client
 sudo systemctl start libvirtd
 sudo systemctl enable libvirtd
 
-sudo usermod -a -G libvirt ec2-user
+sudo usermod -a -G libvirt ${host}
 
 # Check for git
 if ! command -v git &> /dev/null
@@ -86,8 +86,41 @@ then
     dnf_install_retry git
 fi
 
-git clone https://github.com/rh-ecosystem-edge/ib-orchestrate-vm.git
-cd ib-orchestrate-vm && git checkout ${IB_ORCHESTRATE_VM_REF}
+sudo podman pull "${IB_ORCHESTRATE_VM_REF}"
+IB_ORCHESTRATE_VM_SRC_PATH=\$(sudo podman inspect \
+  --format '{{ .Config.WorkingDir }}' \
+  "${IB_ORCHESTRATE_VM_REF}")
+IB_CTR_ID="\$(sudo podman create "${IB_ORCHESTRATE_VM_REF}")"
+mkdir -p "${remote_workdir}/ib-orchestrate-vm"
+sudo podman cp "\${IB_CTR_ID}:\${IB_ORCHESTRATE_VM_SRC_PATH}/." "${remote_workdir}/ib-orchestrate-vm/"
+sudo podman rm -f "\${IB_CTR_ID}"
+
+sudo podman pull "${BIP_ORCHESTRATE_VM_REF}"
+BIP_ORCHESTRATE_VM_SRC_PATH=\$(sudo podman inspect \
+  --format '{{ .Config.WorkingDir }}' \
+  "${BIP_ORCHESTRATE_VM_REF}")
+BIP_CTR_ID="\$(sudo podman create "${BIP_ORCHESTRATE_VM_REF}")"
+mkdir -p "${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm"
+sudo podman cp "\${BIP_CTR_ID}:\${BIP_ORCHESTRATE_VM_SRC_PATH}/." "${remote_workdir}/ib-orchestrate-vm/bip-orchestrate-vm/"
+sudo podman rm -f "\${BIP_CTR_ID}"
+
+cd "${remote_workdir}/ib-orchestrate-vm"
+
+sudo chown -R ${host}:${host} "${remote_workdir}/ib-orchestrate-vm"
+chmod -R u+rwX,go+rX "${remote_workdir}/ib-orchestrate-vm"
+
+# bip-orchestrate-vm is already vendored into the ib-orchestrate-vm image; 
+# ensure the Makefile target doesn't try to reclone it. 
+# we add a dummy target to the Makefile to skip the clone. 
+# last target wins in case of duplicates.
+if [ -f "Makefile" ]; then
+  cat >> "Makefile" <<'EOF_MAKE'
+
+.PHONY: bip-orchestrate-vm
+bip-orchestrate-vm:
+	@echo "Skipping bip-orchestrate-vm clone; content is expected to be vendored in the ib-orchestrate-vm image."
+EOF_MAKE
+fi
 
 EOF
 

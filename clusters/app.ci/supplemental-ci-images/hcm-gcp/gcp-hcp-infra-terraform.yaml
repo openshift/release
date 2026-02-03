@@ -14,10 +14,10 @@ spec:
       name: quay.io/openshift/ci:ci_gcp-hcp-infra-terraform_latest
   source:
     dockerfile: |
-      FROM quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.24-openshift-4.20
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ocp_builder_rhel-9-golang-1.25-openshift-4.21
       ARG TERRAFORM_VERSION
       ENV TF_PLUGIN_CACHE_DIR="/go/.terraform-cache"
-      RUN mkdir -p ${TF_PLUGIN_CACHE_DIR}
+      RUN mkdir -p --mode=2775 ${TF_PLUGIN_CACHE_DIR}
       RUN dnf config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
           dnf install -y "terraform${TERRAFORM_VERSION:+-${TERRAFORM_VERSION}}"
     type: Dockerfile
@@ -25,10 +25,10 @@ spec:
     dockerStrategy:
       buildArgs:
       - name: TERRAFORM_VERSION
-        value: "1.13.5-1"
+        value: "1.14.3-1"
       from:
         kind: ImageStreamTag
-        name: "builder:rhel-9-golang-1.24-openshift-4.20"
+        name: "builder:rhel-9-golang-1.25-openshift-4.21"
         namespace: ocp
       imageOptimizationPolicy: SkipLayers
     type: Docker
@@ -37,6 +37,6 @@ spec:
   - imageChange:
       from:
         kind: ImageStreamTag
-        name: "builder:rhel-9-golang-1.24-openshift-4.20"
+        name: "builder:rhel-9-golang-1.25-openshift-4.21"
         namespace: ocp
     type: ImageChange

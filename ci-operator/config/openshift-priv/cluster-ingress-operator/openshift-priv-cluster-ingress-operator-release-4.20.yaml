@@ -1,4 +1,8 @@
 base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -7,26 +11,11 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.20_base-rhel9:
-    name: 4.20-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-ingress-operator
 images:
-- inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
-  to: cluster-ingress-operator
+- to: cluster-ingress-operator
 promotion:
   to:
   - name: 4.20-priv
@@ -56,20 +45,24 @@ tests:
   container:
     from: src
 - as: e2e-hypershift
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-ovn-hypershift-conformance
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-azure-ovn
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
@@ -80,6 +73,7 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-aws-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
@@ -98,6 +92,7 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-ovn
 - as: e2e-gcp-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     test:
@@ -110,6 +105,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-azure-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     test:
@@ -122,10 +118,12 @@ tests:
           cpu: 100m
     workflow: ipi-azure
 - as: e2e-aws-ovn-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-3
     workflow: openshift-upgrade-aws
 - as: e2e-aws-ovn-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
@@ -149,6 +147,30 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- always_run: false
+  as: e2e-baremetalds-metallb-gatewayapi-conformance
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    test:
+    - ref: ingress-baremetalds-metallb-gatewayapi-conformance-test
+    workflow: ingress-baremetalds-metallb
+- always_run: false
+  as: e2e-vsphere-static-metallb-gatewayapi-conformance
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: test
+      cli: latest
+      commands: make gatewayapi-conformance
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ingress-vsphere-static-metallb
 - always_run: false
   as: e2e-aws-ovn-techpreview
   optional: true
@@ -206,8 +228,9 @@ tests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
 - as: hypershift-e2e-aks
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"

@@ -11,10 +11,6 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
   tools:
     name: 4.14-priv
     namespace: ocp-private
@@ -26,17 +22,9 @@ canonical_go_repository: github.com/openshift/origin
 images:
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: tools
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: hello-openshift
 promotion:
   to:
@@ -96,7 +84,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-gcp-ovn
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-gcp-fips-serial
@@ -133,7 +121,7 @@ tests:
 - as: e2e-gcp-ovn-builds
   run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp-builds
 - always_run: false
   as: e2e-aws-disruptive
@@ -150,7 +138,7 @@ tests:
   as: e2e-gcp-disruptive
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp-disruption
 - always_run: false
   as: e2e-aws-proxy
@@ -179,7 +167,7 @@ tests:
     workflow: openshift-e2e-aws-image-registry
 - as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-upgrade-gcp
 - always_run: false
   as: e2e-gcp-ovn-rt-upgrade
@@ -191,7 +179,7 @@ tests:
   as: e2e-gcp-csi
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp-csi
 - always_run: false
   as: e2e-aws-ovn-upgrade
@@ -326,22 +314,6 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - always_run: false
-  as: e2e-openstack-kuryr
-  optional: true
-  steps:
-    cluster_profile: openstack-vh-mecha-az0
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-      TEST_SKIPS: NodePort \| session affinity \| Services should be able to change
-        the type from ExternalName to ClusterIP \| Pods should delete a collection
-        of pods \| Kubectl client Guestbook application should create and stop a working
-        application \| Services should serve multiport endpoints from pods \| Services
-        should serve a basic endpoint from pods
-      TEST_SUITE: kubernetes/conformance
-    workflow: openshift-e2e-openstack-ipi
-- always_run: false
   as: e2e-openstack-serial
   optional: true
   steps:
@@ -376,7 +348,7 @@ tests:
   as: e2e-gcp-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp-etcd-scaling
 - always_run: false
   as: e2e-azure-ovn-etcd-scaling
@@ -410,7 +382,7 @@ tests:
   as: e2e-gcp-ovn-techpreview-serial
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp

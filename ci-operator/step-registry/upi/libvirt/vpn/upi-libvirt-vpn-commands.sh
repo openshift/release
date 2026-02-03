@@ -31,9 +31,7 @@ fi
 
 REMOTE_LIBVIRT_URI="qemu+tcp://$HOSTNAME/system"
 
-echo "24" > /tmp/i
-while [ "$(</tmp/i)" -gt 0 ]; do
-        echo "$(($(</tmp/i)-1))" > /tmp/i
+for ((i = 0; i < 24; i++)); do
         curl -s "$EXTERNAL_IP:7001" >/dev/null &&
         curl -s "$HOSTNAME:7001" >/dev/null &&
         mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list >/dev/null

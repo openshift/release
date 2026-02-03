@@ -23,4 +23,4 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-WORKLOAD=rds-core PERFORMANCE_PROFILE=cpt-pao EXTRA_FLAGS="--alerting=true --check-health=true --profile-type=${PROFILE_TYPE}" ./run.sh
+WORKLOAD=rds-core EXTRA_FLAGS+=" --alerting=true --check-health=true --profile-type=${PROFILE_TYPE}" ./run.sh

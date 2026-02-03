@@ -160,6 +160,10 @@ function checking_installation_progress {
   timeout=$(date -d "${ABORT_INSTALLATION_TIMEOUT}" +%s)
   abort_installation=/tmp/abort.installation
 
+  # Counter for quit check - only check every QUIT_CHECK_INTERVAL iterations
+  local quit_check_counter=0
+  local quit_check_interval="${QUIT_CHECK_INTERVAL:-3}"
+
   while true; do
 
     test -f ${abort_installation} && {
@@ -203,6 +207,14 @@ function checking_installation_progress {
         echo "$ touch ${abort_installation}"
       fi
 
+      # Check for quit request every N iterations (QUIT_CHECK_INTERVAL)
+      # Use "force" mode since if interrupted, the rest of the steps are meaningless (cluster not ready)
+      ((quit_check_counter++))
+      if [ "${quit_check_counter}" -ge "${quit_check_interval}" ]; then
+        check_for_quit "cluster_installation_progress" "force"
+        quit_check_counter=0
+      fi
+
       sleep ${refresh_timing:="10m"} ;
     } || echo
   done
@@ -238,6 +250,10 @@ function get_and_save_kubeconfig_and_creds {
 }
 
 function main {
+
+  # Setup SSH and load lock info for quit checks
+  setup_ssh_and_lock_info
+
   set_hub_cluster_kubeconfig
   generate_cluster_image_set
   create_spoke_namespace

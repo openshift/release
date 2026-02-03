@@ -12,6 +12,7 @@ if [[ -n "${BASE_DOMAIN}" ]]; then
 fi
 GCP_PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GCP_REGION="${LEASED_RESOURCE}"
+ZONES_COUNT=3
 
 masters="${CONTROL_PLANE_REPLICAS}"
 
@@ -61,6 +62,37 @@ if [[ -z "${COMPUTE_NODE_TYPE}" ]]; then
   fi
 fi
 
+function join_by { local IFS="$1"; shift; echo "$*"; }
+
+function get_zones_by_machine_type() {
+  local machine_type=$1
+
+  # Get all zones that support this machine type
+  mapfile -t AVAILABILITY_ZONES < <(gcloud compute machine-types list --filter="zone~${GCP_REGION} AND name=${machine_type}" --format='value(zone)')
+  
+  # Filter out AI zones if this is not an AI machine type (AI types start with "a2-")
+  if [[ ! "${machine_type}" =~ ^a2- ]]; then
+    # Filter out zones containing "-ai" followed by a digit (e.g., us-central1-ai1a)
+    local filtered_zones=()
+    for zone in "${AVAILABILITY_ZONES[@]}"; do
+      if [[ ! "${zone}" =~ -ai[0-9] ]]; then
+        filtered_zones+=("${zone}")
+      fi
+    done
+    # Only use filtered zones if we found non-AI zones, otherwise use all zones
+    if [[ ${#filtered_zones[@]} -gt 0 ]]; then
+      AVAILABILITY_ZONES=("${filtered_zones[@]}")
+    fi
+  fi
+  
+  # Shuffle zones randomly to spread load across zones instead of always picking alphabetically first
+  mapfile -t AVAILABILITY_ZONES < <(printf '%s\n' "${AVAILABILITY_ZONES[@]}" | shuf)
+  
+  # Take the first ZONES_COUNT zones
+  ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
+  ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
+  echo "${ZONES_STR}"
+}
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
@@ -86,6 +118,40 @@ compute:
     gcp:
       type: ${COMPUTE_NODE_TYPE}
 EOF
+
+# Set zones for control plane and compute in regions with AI zones to avoid AI zones
+# AI zones (e.g., us-central1-ai1a, us-south1-ai1b) are optimized for GPU/AI machine types
+# and should not be used for standard machine types like control plane nodes
+if [[ "${GCP_REGION}" == "us-central1" ]] || [[ "${GCP_REGION}" == "us-south1" ]]; then
+  export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
+  GOOGLE_PROJECT_ID=$(jq -r .project_id ${GCP_SHARED_CREDENTIALS_FILE} 2>/dev/null || echo "")
+  if [[ -n "${GOOGLE_PROJECT_ID}" ]]; then
+    sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE} 2>/dev/null || echo "")
+    if [[ -n "${sa_email}" ]] && ! gcloud auth list 2>/dev/null | grep -qE "\*\s+${sa_email}"; then
+      gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}" 2>/dev/null || true
+      gcloud config set project "${GOOGLE_PROJECT_ID}" 2>/dev/null || true
+    fi
+    
+    # Get zones for control plane (3 zones for HA)
+    CONTROL_PLANE_ZONES_STR=$(get_zones_by_machine_type "${master_type}")
+    # Get zones for compute
+    COMPUTE_ZONES_STR=$(get_zones_by_machine_type "${COMPUTE_NODE_TYPE}")
+    
+    PATCH="${SHARED_DIR}/install-config-zones.yaml.patch"
+    cat > "${PATCH}" << ZONESPATCH
+controlPlane:
+  platform:
+    gcp:
+      zones: ${CONTROL_PLANE_ZONES_STR}
+compute:
+- platform:
+    gcp:
+      zones: ${COMPUTE_ZONES_STR}
+ZONESPATCH
+    yq-go m -x -i "${CONFIG}" "${PATCH}"
+    rm "${PATCH}"
+  fi
+fi
 
 if [ ${RT_ENABLED} = "true" ]; then
 	cat > "${SHARED_DIR}/manifest_mc-kernel-rt.yml" << EOF
@@ -144,3 +210,7 @@ platform:
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
 fi
+
+yq-go r "${CONFIG}" platform
+yq-go r "${CONFIG}" compute
+yq-go r "${CONFIG}" controlPlane

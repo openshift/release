@@ -57,14 +57,13 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: gcp-ipi-proxy-oidc-amd-f999-logging
-  cron: 7 1 29 2 *
+- as: aws-usgov-ipi-private-sts-f999-logging
+  cron: 30 2 29 2 *
   steps:
-    cluster_profile: gcp-observability
+    cluster_profile: aws-usgov-qe
     env:
-      COMPUTE_NODE_TYPE: e2-standard-8
+      BASE_DOMAIN: qe.devcluster.openshift.com
       EXTRACT_MANIFEST_INCLUDED: "true"
-      FILTERS_ADDITIONAL: ""
       FORCE_SUCCESS_EXIT: "true"
       LOGGING_TEST_VERSION: "6.2"
       OPERATORS: |
@@ -72,9 +71,8 @@ tests:
             {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
             {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
         ]
-      TEST_ADDITIONAL: ""
-      TEST_FILTERS: ~Disruptive&;~Longduration&;~Cloudwatch&;~AWSSTS&;~AZWIF&;~AZMonitor&
-      TEST_IMPORTANCE: Critical|High|Medium
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~AZWIF&;~AZMonitor&;~GCL&
+      TEST_IMPORTANCE: Critical|High
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "15"
@@ -82,7 +80,7 @@ tests:
     - chain: openshift-logging-deploy-operators
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-cco-manual-workload-identity
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

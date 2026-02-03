@@ -282,12 +282,24 @@ tests:
                               outputRefs:
                                 - kafka-open
                   - path: source-crs/PtpOperatorConfig.yaml
+                    patches:
+                      - spec:
+                          daemonNodeSelector:
+                            $patch: replace
+                            node-role.kubernetes.io/worker: ""
                   - path: source-crs/PtpConfigSlaveForEvent.yaml
                     patches:
                       - spec:
                           profile:
                             - name: "slave"
                               interface: "ens2f0"
+                              ptpSettings:
+                                logReduce: "false"
+                          recommend:
+                            - profile: "slave"
+                              priority: 4
+                              match:
+                                - nodeLabel: node-role.kubernetes.io/worker
                     openapi:
                       path: schema.openapi
                   - path: source-crs/SriovOperatorConfigForSNO.yaml
@@ -419,81 +431,160 @@ tests:
                       path: schema.openapi
         - filename: schema.openapi
           content: |-
-            openapi: 3.0.0
-            info:
-              title: Kubernetes CRD OpenAPI Schema
-              version: v1
-            paths: {}
-            components:
-              schemas:
-                # PtpConfig schema for profile field merging
-                io.openshift.ptp.v1.PtpConfig:
-                  type: object
-                  properties:
-                    spec:
-                      type: object
-                      properties:
-                        profile:
-                          type: array
-                          items:
-                            type: object
-                            properties:
-                              name:
-                                type: string
-                              interface:
-                                type: string
-                              ptp4lOpts:
-                                type: string
-                              phc2sysOpts:
-                                type: string
-                              ptp4lConf:
-                                type: string
-                            required:
-                              - name
-                          x-kubernetes-list-map-keys:
-                            - name
-                          x-kubernetes-list-type: map
-
-                # SriovNetworkNodePolicy schema for rootDevices field merging
-                io.openshift.sriovnetwork.v1.SriovNetworkNodePolicy:
-                  type: object
-                  properties:
-                    spec:
-                      type: object
-                      properties:
-                        deviceType:
-                          type: string
-                        isRdma:
-                          type: boolean
-                        nicSelector:
-                          type: object
-                          properties:
-                            pfNames:
-                              type: array
-                              items:
-                                type: string
-                              x-kubernetes-list-type: atomic
-                            rootDevices:
-                              type: array
-                              items:
-                                type: string
-                              x-kubernetes-list-type: atomic
-                            vendor:
-                              type: string
-                            deviceID:
-                              type: string
-                        numVfs:
-                          type: integer
-                        priority:
-                          type: integer
-                        resourceName:
-                          type: string
+            {
+              "definitions": {
+                "io.openshift.ptp.v1.PtpConfig": {
+                  "description": "PtpConfig is the Schema for the ptpconfigs API",
+                  "properties": {
+                    "apiVersion": {
+                      "description": "APIVersion defines the versioned schema of this representation of an object.",
+                      "type": "string"
+                    },
+                    "kind": {
+                      "description": "Kind is a string value representing the REST resource this object represents.",
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "$ref": "#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta_v2",
+                      "description": "Standard object's metadata."
+                    },
+                    "spec": {
+                      "description": "PtpConfigSpec defines the desired state of PtpConfig",
+                      "properties": {
+                        "profile": {
+                          "x-kubernetes-patch-merge-key": "name",
+                          "x-kubernetes-patch-strategy": "merge",
+                          "items": {
+                            "properties": {
+                              "interface": { "type": "string" },
+                              "name": { "type": "string" },
+                              "phc2sysConf": { "type": "string" },
+                              "phc2sysOpts": { "type": "string" },
+                              "plugins": {
+                                "additionalProperties": { "x-kubernetes-preserve-unknown-fields": true },
+                                "type": "object"
+                              },
+                              "ptp4lConf": { "type": "string" },
+                              "ptp4lOpts": { "type": "string" },
+                              "ptpClockThreshold": {
+                                "properties": {
+                                  "holdOverTimeout": { "description": "clock state to stay in holdover state in secs", "format": "int64", "type": "integer" },
+                                  "maxOffsetThreshold": { "description": "max offset in nano secs", "format": "int64", "type": "integer" },
+                                  "minOffsetThreshold": { "description": "min offset in nano secs", "format": "int64", "type": "integer" }
+                                },
+                                "type": "object"
+                              },
+                              "ptpSchedulingPolicy": { "enum": ["SCHED_OTHER", "SCHED_FIFO"], "type": "string" },
+                              "ptpSchedulingPriority": { "format": "int64", "maximum": 65, "minimum": 1, "type": "integer" },
+                              "ptpSettings": { "additionalProperties": { "type": "string" }, "type": "object" },
+                              "ts2phcConf": { "type": "string" },
+                              "ts2phcOpts": { "type": "string" }
+                            },
+                            "required": ["name"],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "recommend": {
+                          "x-kubernetes-patch-merge-key": "profile",
+                          "x-kubernetes-patch-strategy": "merge",
+                          "items": {
+                            "properties": {
+                              "match": {
+                                "items": {
+                                  "x-kubernetes-patch-merge-key": "nodeName",
+                                  "x-kubernetes-patch-strategy": "merge",
+                                  "properties": {
+                                    "nodeLabel": { "type": "string" },
+                                    "nodeName": { "type": "string" }
+                                  },
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "priority": { "format": "int64", "type": "integer" },
+                              "profile": { "type": "string" }
+                            },
+                            "required": ["priority", "profile"],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": ["profile", "recommend"],
+                      "type": "object"
+                    },
+                    "status": {
+                      "description": "PtpConfigStatus defines the observed state of PtpConfig",
+                      "properties": {
+                        "matchList": {
+                          "description": "INSERT ADDITIONAL STATUS FIELD - define observed state of cluster",
+                          "x-kubernetes-patch-merge-key": "nodeName",
+                          "x-kubernetes-patch-strategy": "merge",
+                          "items": {
+                            "properties": {
+                              "nodeName": { "type": "string" },
+                              "profile": { "type": "string" }
+                            },
+                            "required": ["nodeName", "profile"],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object",
+                  "x-kubernetes-group-version-kind": [{ "group": "ptp.openshift.io", "kind": "PtpConfig", "version": "v1" }]
+                },
+                "io.openshift.observability.v1.ClusterLogForwarder": {
+                  "properties": {
+                    "spec": {
+                      "properties": {
+                        "filters": { "x-kubernetes-patch-merge-key": "name", "x-kubernetes-patch-strategy": "merge", "type": "array" },
+                        "outputs": { "x-kubernetes-patch-merge-key": "name", "x-kubernetes-patch-strategy": "merge", "type": "array" }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object",
+                  "x-kubernetes-group-version-kind": [{ "group": "observability.openshift.io", "kind": "ClusterLogForwarder", "version": "v1" }]
+                },
+                "io.openshift.sriovnetwork.v1.SriovNetworkNodePolicy": {
+                  "description": "SriovNetworkNodePolicy schema",
+                  "properties": {
+                    "spec": {
+                      "properties": {
+                        "deviceType": { "type": "string" },
+                        "isRdma": { "type": "boolean" },
+                        "nicSelector": {
+                          "properties": {
+                            "pfNames": { "items": { "type": "string" }, "type": "array" },
+                            "rootDevices": { "items": { "type": "string" }, "type": "array" },
+                            "vendor": { "type": "string" },
+                            "deviceID": { "type": "string" }
+                          },
+                          "type": "object"
+                        },
+                        "numVfs": { "type": "integer" },
+                        "priority": { "type": "integer" },
+                        "resourceName": { "type": "string" }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
       SHARED_HUB_CLUSTER_PROFILE: ztp-hub-preserved-prod-cluster_profile_dir
       SOCKS5_PROXY: socks5h://10.6.157.20:3124
     test:
     - ref: telcov10n-metal-single-node-spoke-kpis-tests-telco-operators
     - ref: telcov10n-metal-single-node-spoke-kpis-tests-oslat
     - ref: telcov10n-metal-single-node-spoke-kpis-tests-cpu-util
+    - ref: telcov10n-metal-single-node-spoke-kpis-tests-ptp-reporting
     workflow: telcov10n-metal-single-node-spoke-kpis
 zz_generated_metadata:
   branch: main

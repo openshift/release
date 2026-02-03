@@ -1,8 +1,4 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
   origin_scos-4.21_base-stream9:
     name: scos-4.21
     namespace: origin
@@ -16,24 +12,14 @@ images:
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: Dockerfile.rhel
+  dockerfile_path: Dockerfile.art
   from: origin_scos-4.21_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - builder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: etcd
 - build_args:
   - name: TAGS
     value: scos
-  dockerfile_path: Dockerfile.installer
+  dockerfile_path: Dockerfile.installer.art
   from: origin_scos-4.21_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - builder
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: installer-etcd-artifacts
 promotion:
   to:
@@ -55,7 +41,7 @@ tests:
   as: e2e-aws-ovn
   optional: true
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: openshift-4.21
