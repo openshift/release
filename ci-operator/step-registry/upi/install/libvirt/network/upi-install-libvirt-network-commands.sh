@@ -39,7 +39,11 @@ cat "${SHARED_DIR}/network.xml"
 
 # Create the libvirt network
 echo "Creating the libvirt network..."
-CLUSTER_NAME="${LEASED_RESOURCE}"
+if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
+  CLUSTER_NAME="${LEASED_RESOURCE}"
+else
+  CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+fi
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-define "${SHARED_DIR}/network.xml"
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-autostart "${CLUSTER_NAME}"
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} net-start "${CLUSTER_NAME}"
