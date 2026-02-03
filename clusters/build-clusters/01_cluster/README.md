@@ -79,7 +79,7 @@ cluster-autoscaler-default-576944b996-h82zp   1/1       Running   0          7m5
 Deploy `./**/admin_*.yaml`.
 
 ### Deploy non-admin assets
-Automated by [branch-ci-openshift-release-master-build01-apply](https://github.com/openshift/release/blob/0ac7c4c6559316a5cf40c40ca7f05a0df150ef8d/ci-operator/jobs/openshift/release/openshift-release-master-postsubmits.yaml#L9) and [Prow's config-updater plugin](https://github.com/openshift/release/blob/0ac7c4c6559316a5cf40c40ca7f05a0df150ef8d/core-services/prow/02_config/_plugins.yaml#L198).
+[Prow's config-updater plugin](https://github.com/openshift/release/blob/0ac7c4c6559316a5cf40c40ca7f05a0df150ef8d/core-services/prow/02_config/_plugins.yaml#L198).
 
 ### CA certificates: Semi-Manual
 
