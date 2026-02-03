@@ -1,8 +1,4 @@
 base_images:
-  stolostron_builder_go1.24-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.24-linux
   stolostron_builder_go1.25-linux:
     name: builder
     namespace: stolostron
@@ -13,16 +9,16 @@ build_root:
     namespace: stolostron
     tag: go1.25-linux
 images:
-- dockerfile_path: Dockerfile.prow
+- dockerfile_path: Dockerfile
   inputs:
     stolostron_builder_go1.25-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.25-linux
-  to: provider-credential-controller
+  to: cluster-image-set-controller
 promotion:
   to:
-  -
-    name: "2.11"
+  - disabled: true
+    name: "2.17"
     namespace: stolostron
 resources:
   '*':
@@ -31,32 +27,51 @@ resources:
       memory: 200Mi
 tests:
 - as: unit-tests
-  commands: |
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow unit-tests
+  commands: make test
   container:
     from: src
+- as: sonar
+  commands: |
+    export SONAR_GO_TEST_ARGS="./..."
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: provider-credential-controller
+      SOURCE_IMAGE_REF: cluster-image-set-controller
     env:
-      IMAGE_REPO: provider-credential-controller
+      IMAGE_REPO: cluster-image-set-controller
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-image-set-controller
+    env:
+      IMAGE_REPO: cluster-image-set-controller
+      IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: provider-credential-controller
+      SOURCE_IMAGE_REF: cluster-image-set-controller
     env:
-      IMAGE_REPO: provider-credential-controller
+      IMAGE_REPO: cluster-image-set-controller
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
-        export OSCI_COMPONENT_NAME=provider-credential-controller
-        export OSCI_COMPONENT_VERSION=2.11.0
+        export OSCI_COMPONENT_NAME=cluster-image-set-controller
+        export OSCI_COMPONENT_VERSION=2.17.0
+        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
         export OSCI_PIPELINE_REPO=backplane-pipeline
         export SELF="make -f /opt/build-harness/Makefile.prow"
@@ -73,16 +88,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: pr-merge-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: provider-credential-controller
-    env:
-      IMAGE_REPO: provider-credential-controller
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: backplane-2.11
+  branch: backplane-2.17
   org: stolostron
-  repo: provider-credential-controller
+  repo: cluster-image-set-controller
