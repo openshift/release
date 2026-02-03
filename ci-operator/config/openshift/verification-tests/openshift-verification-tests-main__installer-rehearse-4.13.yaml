@@ -89,7 +89,15 @@ tests:
   steps:
     allow_skip_on_success: true
     cluster_profile: ibmcloud-qe
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-workers-rhel8
+    env:
+      RT_ENABLED: "true"
+      SLEEP_DURATION: 5h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private-deprovision
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
