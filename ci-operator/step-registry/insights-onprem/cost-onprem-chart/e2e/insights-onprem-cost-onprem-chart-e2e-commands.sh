@@ -264,4 +264,5 @@ export USE_LOCAL_CHART="true"
 # Use bash to execute since source may be read-only (can't chmod)
 bash ./scripts/deploy-test-cost-onprem.sh \
     --namespace "${NAMESPACE}" \
-    --verbose
+    --verbose \
+    --include-ui
