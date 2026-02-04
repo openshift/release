@@ -1,8 +1,10 @@
+base_images:
+  console-plugin-test-cypress:
+    name: console-plugin-test-cypress
+    namespace: ci
+    tag: node20-yarn4
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: console-plugin-test-cypress-v18
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   to: console-pipelines-plugin
@@ -28,7 +30,8 @@ tests:
   steps:
     test:
     - as: build
-      commands: yarn install && yarn build
+      commands: npm install -g corepack && corepack enable && corepack prepare yarn@4.6.0
+        --activate && yarn install && yarn build
       from: src
       resources:
         requests:
@@ -57,7 +60,7 @@ tests:
     - as: e2e
       cli: latest
       commands: ./test-prow-e2e.sh
-      from: src
+      from: console-plugin-test-cypress
       resources:
         requests:
           cpu: 100m
