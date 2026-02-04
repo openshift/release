@@ -95,6 +95,7 @@ run_tests() {
     export KUBECONFIG=/work/ci-kubeconfig
     export BUILD_WITH_CONTAINER=\"0\"
     export CI=\"${CI:-true}\"
+    export HUB=\"${HUB:-quay.io/sail-dev}\"
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
