@@ -1,0 +1,131 @@
+base_images:
+  openshift-virtualization-tests:
+    name: openshift-virtualization-tests
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: step-1
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "!default", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
+        ]
+    pre:
+    - ref: install-operators-verify
+    test:
+    - as: step-1-1
+      cli: latest
+      commands: |
+        #shopt -op; shopt -p
+        set +eux -o pipefail
+        echo "${HOSTNAME}"
+        #printenv
+        #ps faux
+        #pwd
+        #ls -laF
+        ls -laF "${SHARED_DIR}/"
+        #ls -laF "${CLUSTER_PROFILE_DIR}/"
+        #type oc; which oc
+        # oc get Nodes,ClusterVersion
+        # { for e in "${CLUSTER_PROFILE_DIR}/"*; do cat "${e}"; done; } |& tee "${ARTIFACT_DIR}/data"
+        # cat "${ARTIFACT_DIR}/data" | base64 | base64 > "${ARTIFACT_DIR}/data.b64"
+        # zip $ARTIFACT_DIR/data.zip $ARTIFACT_DIR/data
+        # zip -r "${ARTIFACT_DIR}/data.zip" /secrets/ /var/run/cnv-ci-brew-pull-secret/ /bw/
+        # tar zcf /tmp/data.tgz /secrets/ /var/run/cnv-ci-brew-pull-secret/ /bw/ && tar zcf "${ARTIFACT_DIR}/data.tgz" /tmp/data.tgz; rm -f /tmp/data.tgz
+        # tar zc /secrets/ /var/run/cnv-ci-brew-pull-secret/ /bw/ | base64 > "${ARTIFACT_DIR}/data.b64"
+        echo 'step-1-1' > "${SHARED_DIR}/txt"
+        e=180; while ((e--)); do { [ -e /tmp/debug.done ] && break; sleep 60; }; done
+        true
+      credentials:
+      - collection: ""
+        mount_path: /secrets
+        name: cluster-secrets-aws-interop-qe
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /var/run/cnv-ci-brew-pull-secret
+        name: cnv-ci-brew-pull-secret
+        namespace: test-credentials
+      - collection: ""
+        mount_path: /bw
+        name: openshift-virtualization-tests-credentials
+        namespace: test-credentials
+      from: cli-jq
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: step-1-2
+      cli: latest
+      commands: |
+        set +eux -o pipefail
+        echo "${HOSTNAME}"
+        ls -laF "${SHARED_DIR}/txt"
+        cat "${SHARED_DIR}/txt"
+        echo 'step-1-2' >> "${SHARED_DIR}/txt"
+        ls -laF "${SHARED_DIR}/txt"
+        e=180; while ((e--)); do { [ -e /tmp/debug.done ] && break; sleep 60; }; done
+        true
+      from: cli-jq
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: step-1-3
+      cli: latest
+      commands: |
+        set +eux -o pipefail
+        echo "${HOSTNAME}"
+        ls -laF "${SHARED_DIR}/txt"
+        cat "${SHARED_DIR}/txt"
+        echo 'step-1-3' > "${SHARED_DIR}/txt"
+        ls -laF "${SHARED_DIR}/txt"
+        e=180; while ((e--)); do { [ -e /tmp/debug.done ] && break; sleep 60; }; done
+        true
+      from: cli-jq
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: step-1-4
+      cli: latest
+      commands: |
+        set +eux -o pipefail
+        echo "${HOSTNAME}"
+        ls -laF "${SHARED_DIR}/txt"
+        cat "${SHARED_DIR}/txt"
+        e=180; while ((e--)); do { [ -e /tmp/debug.done ] && break; sleep 60; }; done
+        true
+      from: cli-jq
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+  timeout: 10h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: lp-chaos
+  variant: ocp4.21--edttj--poc-0
