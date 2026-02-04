@@ -27,5 +27,5 @@ In reality, the groups `ci-sudoers` and `ci-monitoring-viewers` are there on the
 The Rover groups `test-platform-ci-sudoers` and `test-platform-ci-monitoring-viewers` are created to keep the permissions for the members.
 Until they are replaced by the groups they belong to, we have to maintain these two groups.
 
-Note that the group name `ci-monitoring-viewers` is misleading because they can modify alerts which is because it is bound to [monitoring-alertmanager-edit](/clusters/build-clusters/common/monitoring-alertmanager-edit.yaml).
+Note that the group name `ci-monitoring-viewers` is misleading because they can modify alerts which is because it is bound to [monitoring-alertmanager-edit](/clusters/build-clusters/common_all-clusters/common/monitoring-alertmanager-edit.yaml).
 There is [no read-only role to view alert-manager](https://issues.redhat.com/browse/MON-2637).

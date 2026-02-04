@@ -13,7 +13,7 @@ To expire the tokens,
 
 > make job JOB=periodic-ci-secret-generator
 
-- Delete the secret that the old tokens were previously bound to. It will expire the old tokens. Since the old [secret's manifests](../../clusters/build-clusters/common/assets/bound-object_secrets.yaml) is still in the release repo, it will be created with a new uid and to be prepared the next rotation.
+- Delete the secret that the old tokens were previously bound to. It will expire the old tokens. Since the old [secret's manifests](../../clusters/build-clusters/common_all-clusters/common/assets/bound-object_secrets.yaml) is still in the release repo, it will be created with a new uid and to be prepared the next rotation.
 
 ```console
 oc --context ${CLUSTER} delete secret -A -l ci.openshift.io/token-bound-object=$(TOKEN_BOUND_OBJECT_NAME_SUFFIX)  --dry-run=none --as system:admin
@@ -74,7 +74,7 @@ After merging of the pull request, we expire the token with a previous version o
 $ make CLUSTER=${CLUSTER} EXPIRE_TOKEN_VERSION=1 DRY_RUN=none expire-token-version
 ```
 
-_Note_ that we have to always use a new name for the secrets (e.g, [config-updater-token-version-n](../../clusters/build-clusters/common/prow/admin_config-updater_rbac.yaml)) that contain the non-expiring token because it would reactivate the expired token otherwise.
+_Note_ that we have to always use a new name for the secrets (e.g, [config-updater-token-version-n](../../clusters/build-clusters/common_all-clusters/common/prow/admin_config-updater_rbac.yaml)) that contain the non-expiring token because it would reactivate the expired token otherwise.
 That is the reason we cannot bounce between two secrets like we do for the bound SA's tokens.
 Instead, we increase the number in the secret's names each time.
 
