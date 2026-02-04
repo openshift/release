@@ -58,6 +58,16 @@ esac
 export ES_SERVER
 
 pip install .
+
+# Print Orion version
+orion_version=$(orion --version 2>&1)
+orion_version_exit=$?
+if [ "$orion_version_exit" -ne 0 ]; then
+  echo "orion version prior to v0.1.7"
+else
+  echo "Orion version: $orion_version"
+fi
+
 EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
