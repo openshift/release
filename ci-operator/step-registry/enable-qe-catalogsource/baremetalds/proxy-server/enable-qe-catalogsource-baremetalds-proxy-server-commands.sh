@@ -11,6 +11,7 @@ scp "${SSHOPTS[@]}" "/var/run/vault/mirror-registry/registry_creds_encrypted_htp
 scp "${SSHOPTS[@]}" "/var/run/vault/mirror-registry/registry_brew.json" "root@${IP}:/home/registry_brew.json"
 scp "${SSHOPTS[@]}" "/var/run/vault/mirror-registry/registry_quay_proxy.json" "root@${IP}:/home/registry_quay_proxy.json"
 scp "${SSHOPTS[@]}" "/var/run/vault/mirror-registry/registry_stage.json" "root@${IP}:/home/registry_stage.json"
+scp "${SSHOPTS[@]}" "/var/run/vault/deploy-konflux-operator-art-image-share/.dockerconfigjson" "root@${IP}:/home/registry_konflux_quay_auth.json"
 
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF' |& sed -e 's/.*auths\{0,1\}".*/*** PULL_SECRET ***/g'
 set -eo pipefail
@@ -60,6 +61,11 @@ setup_proxy_registry 6002 "brew.registry.redhat.io" "https://brew.registry.redha
 setup_proxy_registry 6003 "registry.stage.redhat.io" "https://registry.stage.redhat.io" \
   "$(jq -r '.user' /home/registry_stage.json)" \
   "$(jq -r '.password' /home/registry_stage.json)"
+
+konflux_auth=$(jq -r '.auths["quay.io/redhat-user-workloads/ocp-art-tenant/art-images-share"].auth' /home/registry_konflux_quay_auth.json | base64 -d)
+setup_proxy_registry 6004 "konflux quay.io" "https://quay.io" \
+  "$(echo $konflux_auth | cut -d: -f1)" \
+  "$(echo $konflux_auth | cut -d: -f2)"
 EOF
 
 if [ ! -f "${SHARED_DIR}/mirror_registry_url" ] ; then
