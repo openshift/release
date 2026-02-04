@@ -2,6 +2,8 @@
 
 set -eoux pipefail
 
+declare -r REGISTRY_PROXY_PORT="${KONFLUX_REGISTRY_PROXY_PORT:-6004}"
+
 function create_marketplace_namespace () {
     # Since OCP 4.11, the marketplace is optional. If it is not installed, we need to create the namespace manually.
     if ! oc get ns openshift-marketplace; then
@@ -37,7 +39,7 @@ function create_metallb_catalogsource() {
     if [[ "${DISCONNECTED}" == "true" ]]; then
         local mirror_registry_url
         mirror_registry_url=$(cat "${SHARED_DIR}/mirror_registry_url")
-        index_image="${mirror_registry_url//5000/6003}/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__${version}__metallb-rhel9-operator"
+        index_image="${mirror_registry_url//5000/${REGISTRY_PROXY_PORT}}/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__${version}__metallb-rhel9-operator"
     else
         index_image="quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__${version}__metallb-rhel9-operator"
     fi
