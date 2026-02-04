@@ -42,14 +42,13 @@ if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]]; then
 fi
 
 createFlowCollector ${PARAMETERS}
-FLP_PR_IMAGE="quay.io/netobserv/flowlogs-pipeline:6abb827"
-EBPFAGENT_PR_IMAGE="quay.io/netobserv/netobserv-ebpf-agent:c44862a"
+
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
-    patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"
+    patch_netobserv "ebpf" "quay.io/netobserv/netobserv-ebpf-agent:c44862a"
 fi
 
 if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
-    patch_netobserv "flp" "$FLP_PR_IMAGE"
+    patch_netobserv "flp" "quay.io/netobserv/flowlogs-pipeline:6abb827"
 fi
 
 patch_netobserv "plugin" "quay.io/netobserv/network-observability-console-plugin:1d61a10"
