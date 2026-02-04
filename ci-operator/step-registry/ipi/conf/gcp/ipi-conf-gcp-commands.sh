@@ -12,7 +12,6 @@ if [[ -n "${BASE_DOMAIN}" ]]; then
 fi
 GCP_PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GCP_REGION="${LEASED_RESOURCE}"
-ZONES_COUNT=3
 
 masters="${CONTROL_PLANE_REPLICAS}"
 
@@ -62,36 +61,25 @@ if [[ -z "${COMPUTE_NODE_TYPE}" ]]; then
   fi
 fi
 
-function join_by { local IFS="$1"; shift; echo "$*"; }
-
-function get_zones_by_machine_type() {
-  local machine_type=$1
-
-  # Get all zones that support this machine type
-  mapfile -t AVAILABILITY_ZONES < <(gcloud compute machine-types list --filter="zone~${GCP_REGION} AND name=${machine_type}" --format='value(zone)')
+# Get standard zones from the region (excluding AI zones) and randomize selection
+# This prevents control plane nodes from being placed in AI zones when zones aren't explicitly set
+function get_zones_from_region() {
+  local zone_count=${1:-3}
+  # Get all zones from the region, filtering out AI zones and randomizing
+  mapfile -t AVAILABILITY_ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)' 2>/dev/null | grep -v '\-ai[0-9]' | shuf)
   
-  # Filter out AI zones if this is not an AI machine type (AI types start with "a2-")
-  if [[ ! "${machine_type}" =~ ^a2- ]]; then
-    # Filter out zones containing "-ai" followed by a digit (e.g., us-central1-ai1a)
-    local filtered_zones=()
-    for zone in "${AVAILABILITY_ZONES[@]}"; do
-      if [[ ! "${zone}" =~ -ai[0-9] ]]; then
-        filtered_zones+=("${zone}")
-      fi
-    done
-    # Only use filtered zones if we found non-AI zones, otherwise use all zones
-    if [[ ${#filtered_zones[@]} -gt 0 ]]; then
-      AVAILABILITY_ZONES=("${filtered_zones[@]}")
+  # Take the first zone_count zones
+  local zones=("${AVAILABILITY_ZONES[@]:0:${zone_count}}")
+  # Format as YAML array: [zone1, zone2, zone3]
+  local zones_str="["
+  for i in "${!zones[@]}"; do
+    if [[ $i -gt 0 ]]; then
+      zones_str+=", "
     fi
-  fi
-  
-  # Shuffle zones randomly to spread load across zones instead of always picking alphabetically first
-  mapfile -t AVAILABILITY_ZONES < <(printf '%s\n' "${AVAILABILITY_ZONES[@]}" | shuf)
-  
-  # Take the first ZONES_COUNT zones
-  ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
-  ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
-  echo "${ZONES_STR}"
+    zones_str+="${zones[$i]}"
+  done
+  zones_str+="]"
+  echo "${zones_str}"
 }
 
 cat >> "${CONFIG}" << EOF
@@ -133,12 +121,14 @@ if [[ "${GCP_REGION}" == "us-central1" ]] || [[ "${GCP_REGION}" == "us-south1" ]
     fi
     
     # Get zones for control plane (3 zones for HA)
-    CONTROL_PLANE_ZONES_STR=$(get_zones_by_machine_type "${master_type}")
-    # Get zones for compute
-    COMPUTE_ZONES_STR=$(get_zones_by_machine_type "${COMPUTE_NODE_TYPE}")
+    CONTROL_PLANE_ZONES_STR=$(get_zones_from_region 3)
+    # Get zones for compute (same zones for consistency)
+    COMPUTE_ZONES_STR="${CONTROL_PLANE_ZONES_STR}"
     
-    PATCH="${SHARED_DIR}/install-config-zones.yaml.patch"
-    cat > "${PATCH}" << ZONESPATCH
+    # Apply zones via patch if we got valid zones
+    if [[ -n "${CONTROL_PLANE_ZONES_STR}" ]] && [[ "${CONTROL_PLANE_ZONES_STR}" != "[]" ]]; then
+      PATCH="${SHARED_DIR}/install-config-zones.yaml.patch"
+      cat > "${PATCH}" << ZONESPATCH
 controlPlane:
   platform:
     gcp:
@@ -148,8 +138,9 @@ compute:
     gcp:
       zones: ${COMPUTE_ZONES_STR}
 ZONESPATCH
-    yq-go m -x -i "${CONFIG}" "${PATCH}"
-    rm "${PATCH}"
+      yq-go m -x -i "${CONFIG}" "${PATCH}"
+      rm "${PATCH}"
+    fi
   fi
 fi
 
@@ -210,7 +201,3 @@ platform:
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
 fi
-
-yq-go r "${CONFIG}" platform
-yq-go r "${CONFIG}" compute
-yq-go r "${CONFIG}" controlPlane
