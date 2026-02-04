@@ -27,7 +27,7 @@ ADMIN_API_ADDRESS=$(kubectl get virtualservice -n aro-hcp-admin-api admin-api-vs
 
 make frontend-grant-ingress
 
-make e2e/local -o test/aro-hcp-tests FRONTEND_ADDRESS="${FRONTEND_ADDRESS}" ADMIN_API_ADDRESS="${ADMIN_API_ADDRESS}"
+make e2e/local -o test/aro-hcp-tests FRONTEND_ADDRESS="https://${FRONTEND_ADDRESS}" ADMIN_API_ADDRESS="https://${ADMIN_API_ADDRESS}"
 
 # the make target produces a junit.xml in ARTIFACT_DIR.  We want to copy to SHARED_DIR so we can create
 # direct debugging links for the individual tests that failed.
