@@ -94,6 +94,7 @@ run_tests() {
     sh -c "
     export KUBECONFIG=/work/ci-kubeconfig
     export BUILD_WITH_CONTAINER=\"0\"
+    export CI=\"${CI:-true}\"
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
@@ -169,7 +170,7 @@ if [[ "${TEST_RC}" -eq 0 ]] && ! has_junit_reports; then
   sleep "${RETRY_SLEEP_INTERVAL}"
 
   echo "Cleaning up resources before retry..."
-  BUILD_WITH_CONTAINER=0 make test.e2e.ocp.cleanup
+  CI=${CI:-true} BUILD_WITH_CONTAINER=0 make test.e2e.ocp.cleanup
 
   # Retry the test execution
   execute_and_collect_artifacts 2
