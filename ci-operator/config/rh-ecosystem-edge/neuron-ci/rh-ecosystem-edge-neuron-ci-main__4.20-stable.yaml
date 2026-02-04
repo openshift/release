@@ -1,0 +1,84 @@
+base_images:
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.23
+images:
+- dockerfile_path: Containerfile
+  to: neuron-ci
+- dockerfile_literal: |
+    FROM quay.io/ocp-edge-qe/eco-gotests:latest
+    USER 0
+    RUN chgrp -R 0 /home/testuser && chmod -R g=u /home/testuser
+    RUN ln -s /home/testuser/go/bin/ginkgo /usr/local/bin/ginkgo
+    RUN dnf install -y openssh-clients && dnf clean all
+  to: eco-gotests
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.20.6-0
+        stream: 4-stable
+        upper: 4.21.0-0
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: aws-neuron-operator-e2e
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE: public.ecr.aws/neuron/neuron-device-plugin:2.29.16.0
+      ECO_HWACCEL_NEURON_DRIVER_VERSION: 2.24.7.0
+      ECO_HWACCEL_NEURON_DRIVERS_IMAGE: public.ecr.aws/os-partners/neuron-openshift/neuron-kernel-module:2.25.4.0
+      ECO_HWACCEL_NEURON_MODEL_NAME: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+      ECO_HWACCEL_NEURON_NODE_METRICS_IMAGE: public.ecr.aws/neuron/neuron-monitor:1.3.0
+      ECO_HWACCEL_NEURON_SCHEDULER_EXTENSION_IMAGE: public.ecr.aws/neuron/neuron-scheduler:2.29.16.0
+      ECO_HWACCEL_NEURON_SCHEDULER_IMAGE: public.ecr.aws/eks-distro/kubernetes/kube-scheduler:v1.32.9-eks-1-32-24
+      ECO_HWACCEL_NEURON_UPGRADE_TARGET_DRIVERS_IMAGE: public.ecr.aws/os-partners/neuron-openshift/neuron-kernel-module:2.25.4.0
+      ECO_HWACCEL_NEURON_UPGRADE_TARGET_VERSION: 2.25.4.0
+      ECO_HWACCEL_NEURON_VLLM_IMAGE: public.ecr.aws/neuron/pytorch-inference-vllm-neuronx:0.7.2-neuronx-py310-sdk2.24.1-ubuntu22.04
+      ECO_TEST_FEATURES: neuron
+      ECO_TEST_LABELS: neuron
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.20"
+      REGION: us-east-1
+    workflow: aws-neuron-operator-e2e-rosa
+- as: aws-neuron-operator-e2e-weekly
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      ECO_HWACCEL_NEURON_DEVICE_PLUGIN_IMAGE: public.ecr.aws/neuron/neuron-device-plugin:2.29.16.0
+      ECO_HWACCEL_NEURON_DRIVER_VERSION: 2.24.7.0
+      ECO_HWACCEL_NEURON_DRIVERS_IMAGE: public.ecr.aws/os-partners/neuron-openshift/neuron-kernel-module:2.25.4.0
+      ECO_HWACCEL_NEURON_MODEL_NAME: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+      ECO_HWACCEL_NEURON_NODE_METRICS_IMAGE: public.ecr.aws/neuron/neuron-monitor:1.3.0
+      ECO_HWACCEL_NEURON_SCHEDULER_EXTENSION_IMAGE: public.ecr.aws/neuron/neuron-scheduler:2.29.16.0
+      ECO_HWACCEL_NEURON_SCHEDULER_IMAGE: public.ecr.aws/eks-distro/kubernetes/kube-scheduler:v1.32.9-eks-1-32-24
+      ECO_HWACCEL_NEURON_UPGRADE_TARGET_DRIVERS_IMAGE: public.ecr.aws/os-partners/neuron-openshift/neuron-kernel-module:2.25.4.0
+      ECO_HWACCEL_NEURON_UPGRADE_TARGET_VERSION: 2.25.4.0
+      ECO_HWACCEL_NEURON_VLLM_IMAGE: public.ecr.aws/neuron/pytorch-inference-vllm-neuronx:0.7.2-neuronx-py310-sdk2.24.1-ubuntu22.04
+      ECO_TEST_FEATURES: neuron
+      ECO_TEST_LABELS: neuron
+      LAST_KNOWN_DTK_COMMIT: ""
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.20"
+      REGION: us-east-1
+    workflow: aws-neuron-operator-conditional-e2e-rosa
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: neuron-ci
+  variant: 4.20-stable
