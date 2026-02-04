@@ -247,16 +247,13 @@ CONFIG = {
         'default': 1,
     },
     'aro-hcp-stg-quota-slice': {
-        'default': 3,
+        'default': 5,
     },
     'aro-hcp-prod-quota-slice': {
-        'default': 2,
+        'default': 10,
     },
     'aro-hcp-dev-quota-slice': {
         'default': 15,
-    },
-    'aro-hcp-test-tenant-quota-slice': {
-        'default': 10,
     },
     'aro-hcp-test-msi-containers-dev': {},
     'aro-hcp-test-msi-containers-int': {},
