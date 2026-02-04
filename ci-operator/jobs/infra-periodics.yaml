@@ -3055,12 +3055,22 @@ periodics:
           secretKeyRef:
             key: token
             name: qci-pruner-credentials
+      - name: QUAY_DOCKERCONFIGJSON_PATH
+        value: /etc/push/.dockerconfigjson
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_qci-pruner_latest
       imagePullPolicy: Always
       name: ""
       resources:
         requests:
           cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/push
+        name: registry-push-credentials
+        readOnly: true
+    volumes:
+    - name: registry-push-credentials
+      secret:
+        secretName: registry-push-credentials-ci-images-mirror
 - agent: kubernetes
   cluster: build10
   cron: '@daily'

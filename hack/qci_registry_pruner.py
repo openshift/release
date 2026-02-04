@@ -95,11 +95,13 @@ import argparse
 import urllib.request
 import subprocess
 import logging
+import base64
 from typing import Optional, Set, Dict, List
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 
 QUAY_OAUTH_TOKEN_ENV_NAME = "QUAY_OAUTH_TOKEN"
+QUAY_DOCKERCONFIGJSON_PATH_ENV_NAME = "QUAY_DOCKERCONFIGJSON_PATH"
 
 # Repository and registry constants
 QUAY_CI_REPO = "openshift/ci"
@@ -182,12 +184,12 @@ def delete_tag(repository: str, tag: str, token: str) -> bool:
         return False
 
 
-def fetch_tags(repository: str, token: str, page: int = 1, like: Optional[str] = None):
-    """Fetch tags from the quay.io repository with pagination"""
-    like_adder = ''
-    if like:
-        like_adder = f'&filter_tag_name=like:{like}'
-    tags_url = f"https://quay.io/api/v1/repository/{repository}/tag/?page={page}&limit=100&onlyActiveTags=true" + like_adder
+def fetch_tags(repository: str, token: str, last_tag: Optional[str] = None):
+    """Fetch tags from the quay.io repository with keyset-based pagination using Link header"""
+    namespace, repo = repository.split('/')
+    tags_url = f"https://quay.io/v2/{namespace}/{repo}/tags/list?n=100"
+    if last_tag:
+        tags_url += f"&last={urllib.request.quote(last_tag)}"
     headers = {
         "Authorization": f"Bearer {token}"
     }
@@ -200,8 +202,15 @@ def fetch_tags(repository: str, token: str, page: int = 1, like: Optional[str] =
         response_data = response.read()
         if response.status == 200:
             data = json.loads(response_data)
-            tags = data.get("tags", [])
-            has_more = data.get("has_additional", False)
+            tag_names = data.get("tags", [])
+            tags = [{"name": tag} for tag in tag_names]
+
+            has_more = False
+            link_header = response.headers.get("Link") or response.headers.get("link")
+            if link_header:
+                if 'rel="next"' in link_header or "rel='next'" in link_header:
+                    has_more = True
+
             return tags, has_more
         raise IOError(f"Failed to fetch tags: {response.status} {response_data}")
 
@@ -341,11 +350,36 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
         logging.error('OAuth token is required')
         sys.exit(1)
 
+    dockerconfigjson_path = os.getenv(QUAY_DOCKERCONFIGJSON_PATH_ENV_NAME)
+    v2_token = token
+    if dockerconfigjson_path:
+        try:
+            with open(dockerconfigjson_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            auth_string = config.get("auths", {}).get("quay.io/openshift/ci", {}).get("auth", "")
+            if auth_string:
+                decoded = base64.b64decode(auth_string).decode('utf-8')
+                parts = decoded.split(':', 1)
+                if len(parts) == 2:
+                    username, password = parts
+                    auth_url = "https://quay.io/v2/auth?service=quay.io&scope=repository:openshift/ci:pull"
+                    credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+                    request = urllib.request.Request(auth_url, method='GET')
+                    request.add_header("Authorization", f"Basic {credentials}")
+                    try:
+                        with urllib.request.urlopen(request) as response:
+                            if response.status == 200:
+                                data = json.loads(response.read())
+                                v2_token = data.get("token") or token
+                    except Exception:  # pylint: disable=broad-except
+                        pass
+        except Exception:  # pylint: disable=broad-except
+            pass
+
     confirm = args.confirm
     ttl_days = args.ttl_days
 
-    # Fetch all tags with pagination
-    page = 1
+    last_tag = None
     has_more = True
 
     prune_target_tags = set()
@@ -366,7 +400,7 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
         retries = 5
         while True:
             try:
-                tags, has_more = fetch_tags(QUAY_CI_REPO, token, page)
+                tags, has_more = fetch_tags(QUAY_CI_REPO, v2_token, last_tag)
                 break
             except Exception:  # pylint: disable=broad-except
                 logging.exception("Error retrieving tags")
@@ -432,7 +466,11 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                     else:
                         logging.debug('Would have removed %s', image_tag)
 
-        page += 1
+        # Update last_tag for keyset pagination (use the last tag name from current batch)
+        if tags:
+            last_tag = tags[-1]['name']
+        else:
+            has_more = False
 
     # Wait for all prune delete operations to complete
     prune_success_count = 0
