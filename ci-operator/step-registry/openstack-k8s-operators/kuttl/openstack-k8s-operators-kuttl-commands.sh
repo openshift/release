@@ -138,6 +138,8 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
 
     # deploy operators and ctlplane, to be updated
     export OPENSTACK_IMG=${OPENSTACK_IMG_BASE_RELEASE:="quay.io/openstack-k8s-operators/openstack-operator-index:87ab1f1fa16743cad640f994f459ef14c5d2b9ca"}
+    # use fr1 oscp yaml sample with deprecated rabbitMqInstanceBus parameters
+    export OPENSTACK_CTLPLANE="config/samples/core_v1beta1_openstackcontrolplane_galera_fr1.yaml"
     export TIMEOUT=${TIMEOUT:="600s"}
     make openstack_wait || exit 1
 
@@ -154,6 +156,8 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
 
     # update operators and ctlplane to the PR
     export OPENSTACK_IMG=${OPENSTACK_IMG_BKP}
+    # revert to default oscp sample
+    unset OPENSTACK_CTLPLANE
     make openstack_wait || exit 1
     sleep 10
     # if the new initialization resource exists install it
