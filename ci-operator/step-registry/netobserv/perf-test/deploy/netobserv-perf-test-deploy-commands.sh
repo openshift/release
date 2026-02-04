@@ -42,7 +42,8 @@ if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]]; then
 fi
 
 createFlowCollector ${PARAMETERS}
-
+FLP_PR_IMAGE="quay.io/netobserv/flowlogs-pipeline:6abb827"
+EBPFAGENT_PR_IMAGE="quay.io/netobserv/netobserv-ebpf-agent:c44862a"
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
     patch_netobserv "ebpf" "$EBPFAGENT_PR_IMAGE"
 fi
@@ -51,6 +52,7 @@ if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
     patch_netobserv "flp" "$FLP_PR_IMAGE"
 fi
 
+patch_netobserv "plugin" "quay.io/netobserv/network-observability-console-plugin:1d61a10"
 # get NetObserv metadata 
 NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*].spec.containers[0].env[?(@.name=='OPERATOR_CONDITION_NAME')].value}" -A)
 LOKI_RELEASE=$(oc get sub -n openshift-operators-redhat loki-operator -o jsonpath="{.status.currentCSV}")
