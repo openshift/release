@@ -443,6 +443,54 @@ sshKey: |
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 EOF
 
+# Add the chrony config for ppc64le
+# Sets chrony server to clock.corp.redhat.com for both masters and workers.
+if [ "${ARCH}" = "ppc64le" ]; then
+  echo "Saving chrony worker yaml config..."
+  cat >> "${SHARED_DIR}/99-chrony-worker.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 99-chrony-worker
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,c2VydmVyIG5vcnRoLWFtZXJpY2EucG9vbC5udHAub3JnIGlidXJzdApkcmlmdGZpbGUgL3Zhci9saWIvY2hyb255L2RyaWZ0Cm1ha2VzdGVwIDEuMCAzCnJ0Y3N5bmMKbG9nZGlyIC92YXIvbG9nL2Nocm9ueQo=
+        filesystem: root
+        mode: 0644
+        overwrite: true
+        path: /etc/chrony.conf
+EOF
+
+  echo "Saving chrony master yaml config..."
+  cat >> "${SHARED_DIR}/99-chrony-master.yaml" << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 99-chrony-master
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,c2VydmVyIG5vcnRoLWFtZXJpY2EucG9vbC5udHAub3JnIGlidXJzdApkcmlmdGZpbGUgL3Zhci9saWIvY2hyb255L2RyaWZ0Cm1ha2VzdGVwIDEuMCAzCnJ0Y3N5bmMKbG9nZGlyIC92YXIvbG9nL2Nocm9ueQo=
+        filesystem: root
+        mode: 420
+        overwrite: true
+        path: /etc/chrony.conf
+EOF
+fi
+
 echo "OPTIONAL_INSTALL_CONFIG_PARMS=\"${OPTIONAL_INSTALL_CONFIG_PARMS}\""
 read -ra PARAMETERS <<< "${OPTIONAL_INSTALL_CONFIG_PARMS}"
 echo "count = ${#PARAMETERS[*]}"
