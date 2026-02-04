@@ -103,12 +103,12 @@ if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     fi
     echo "TAG_NAME: $TAG_NAME"
 elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
+    QUAY_REPO="rhdh-community/rhdh"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
-        QUAY_REPO="rhdh/rhdh-hub-rhel9"
-        # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
-        TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+        # Get branch version (e.g., 'release-1.5' becomes '1.5') and prefix with 'next-'
+        VERSION="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+        TAG_NAME="next-${VERSION}"
     else
-        QUAY_REPO="rhdh-community/rhdh"
         TAG_NAME="next"
     fi
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
