@@ -3,6 +3,12 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
+
+# Source shared retry library if available
+if [[ -f "${SHARED_DIR}/retry-lib.sh" ]]; then
+    source "${SHARED_DIR}/retry-lib.sh"
+fi
+
 cat /etc/os-release
 
 python --version
@@ -20,7 +26,7 @@ GSHEET_KEY_LOCATION="/ga-gsheet/gcp-sa-account"
 export GSHEET_KEY_LOCATION
 
 REPO_URL="https://github.com/liqcui/e2e-benchmarking";
-git clone -b sdn-ovn-migration $REPO_URL --depth 1
+retry_git_clone -b sdn-ovn-migration $REPO_URL --depth 1
 pushd e2e-benchmarking/workloads/sdn-ovn-migration
 
 # The measurable run

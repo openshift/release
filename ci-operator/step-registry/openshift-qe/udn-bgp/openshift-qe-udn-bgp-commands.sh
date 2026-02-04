@@ -4,6 +4,11 @@ set -o nounset
 set -o pipefail
 set -x
 
+# Source shared retry library if available
+if [[ -f "${SHARED_DIR}/retry-lib.sh" ]]; then
+    source "${SHARED_DIR}/retry-lib.sh"
+fi
+
 pushd /tmp
 
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}

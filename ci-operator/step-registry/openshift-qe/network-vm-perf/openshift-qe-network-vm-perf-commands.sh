@@ -4,6 +4,11 @@ set -o nounset
 set -o pipefail
 set -x
 
+# Source shared retry library if available
+if [[ -f "${SHARED_DIR}/retry-lib.sh" ]]; then
+    source "${SHARED_DIR}/retry-lib.sh"
+fi
+
 cat /etc/os-release
 
 # For disconnected or otherwise unreachable environments, we want to
@@ -41,7 +46,7 @@ if [ ${BAREMETAL} == "true" ]; then
   # kill the ssh tunnel so the job completes
   pkill ssh
 else
-  git clone $REPO_URL $TAG_OPTION --depth 1
+  retry_git_clone $REPO_URL $TAG_OPTION --depth 1
   pushd e2e-benchmarking/workloads/network-perf-v2
   # Clean up resources from possible previous tests.
   oc delete ns netperf --wait=true --ignore-not-found=true
