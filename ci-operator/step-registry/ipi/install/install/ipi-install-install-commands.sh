@@ -814,8 +814,12 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
 case $CLUSTER_TYPE in
+  gcp*)
+    # Terraform-based GCP installs are prone to eventual-consistency issues in resource creation.
+    max=3
+    ;;
   *)
-  # Installs are stable enough to not benefit from retries; and not all platforms support retries.
+  # Most installs are stable enough to not benefit from retries; and not all platforms support retries.
   # If a platform could benefit from retries (e.g. flaking due to resource contention), add a case for the platform above.
     max=1
     ;;
