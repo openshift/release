@@ -35,7 +35,7 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=virt-udn-density
 
-EXTRA_FLAGS+=" --metrics-profile metrics.yml,cnv-metrics.yml --gc-metrics=true --iteration=${ITERATIONS} --layer3=${ENABLE_L3} --vmi-ready-threshold=${VMI_READY_THRESHOLD}s --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --metrics-profile metrics.yml,cnv-metrics.yml --gc-metrics=true --iteration=${ITERATIONS} --layer3=${ENABLE_L3} --vmi-ready-threshold=${VMI_READY_THRESHOLD}s --profile-type=${PROFILE_TYPE} --timeout=${TIMEOUT}"
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
