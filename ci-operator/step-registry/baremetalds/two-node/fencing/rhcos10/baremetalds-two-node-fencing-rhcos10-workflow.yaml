@@ -1,0 +1,31 @@
+workflow:
+  as: baremetalds-two-node-fencing-rhcos10
+  steps:
+    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
+    cluster_profile: equinix-edge-enablement
+    pre:
+      - ref: ofcir-acquire
+      - ref: ipi-install-rbac
+      - ref: baremetalds-devscripts-ibm
+      - ref: baremetalds-devscripts-proxy
+      - ref: ipi-install-hosted-loki
+      - ref: rhcos-conf-rhcos10
+      - ref: baremetalds-devscripts-setup
+      - chain: baremetalds-two-node-fencing-post-install
+      - ref: openshift-cluster-bot-rbac
+    test:
+    - chain: baremetalds-ipi-test
+    post:
+      - chain: baremetalds-ofcir-post
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=32768
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
+        BMC_DRIVER=redfish
+      ENABLE_HYPERVISOR_SSH_CONFIG: "true"
+  documentation: |-
+    This workflow with RHCOS10 executes a Two Node OpenShift with Fencing (TNF) cluster installation
