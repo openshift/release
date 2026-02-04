@@ -88,9 +88,9 @@ VERSION_TAG=$(echo "${VERSION}" | tr '.' '-')
 export VERSION_TAG
 echo "VERSION_TAG=${VERSION_TAG}"
 
-# Substitute VERSION_TAG in OPERATORS variable for TALM operator configuration
-OPERATORS=$(echo "${OPERATORS}" | sed "s/\${VERSION_TAG}/${VERSION_TAG}/g")
-echo "OPERATORS after substitution: ${OPERATORS}"
+# Substitute VERSION_TAG in HUB_OPERATORS variable for TALM operator configuration
+HUB_OPERATORS=$(echo "${HUB_OPERATORS}" | sed "s/\${VERSION_TAG}/${VERSION_TAG}/g")
+echo "HUB_OPERATORS after substitution: ${HUB_OPERATORS}"
 
 export ANSIBLE_HOST_KEY_CHECKING=False
 # deploy ztp operators (acm, lso, gitops)
@@ -98,7 +98,7 @@ export ANSIBLE_HOST_KEY_CHECKING=False
 cd /eco-ci-cd/
 
 ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=$VERSION disconnected=$DISCONNECTED operators='$OPERATORS'"
+    --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=$VERSION disconnected=$DISCONNECTED operators='$HUB_OPERATORS'"
 
 # configure lso 
 ansible-playbook playbooks/ran/hub-sno-configure-lvm-storage.yml -i ./inventories/ocp-deployment/build-inventory.py \
