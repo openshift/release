@@ -19,18 +19,6 @@ base_images:
     name: 4.22-priv
     namespace: ocp-private
     tag: manila-csi-driver-operator-test
-  ocp_4.22_base-rhel9:
-    name: 4.22-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.25-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.22
-  openshift_release_rhel-9-release-golang-1.25-openshift-4.22:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.22
   openstack-cinder-csi-driver-operator-test:
     name: 4.22-priv
     namespace: ocp-private
@@ -40,25 +28,10 @@ build_root:
   use_build_cache: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
-- inputs:
-    openshift_release_rhel-9-release-golang-1.25-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.25-openshift-4.22
-  to: hypershift-operator
+- to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.25-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
   to: hypershift
 - dockerfile_path: Dockerfile.e2e
-  inputs:
-    openshift_release_rhel-9-release-golang-1.25-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.25-openshift-4.22
   to: hypershift-tests
 - dockerfile_literal: |
     FROM base
@@ -231,6 +204,12 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
+- always_run: false
+  as: e2e-v2-aws
+  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-e2e-v2
 - always_run: false
   as: e2e-aws-minimal
   optional: true
@@ -478,6 +457,12 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-421
     workflow: hypershift-aws-reqserving-e2e
+- always_run: false
+  as: review-agent-single-pr
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: hypershift-review-agent
 zz_generated_metadata:
   branch: release-4.22
   org: openshift-priv
