@@ -31,7 +31,7 @@ deploy_lokistack
 deploy_kafka
 deploy_netobserv
 
-PARAMETERS="-p KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS}"
+PARAMETERS="-p KafkaConsumerReplicas=${KAFKA_CONSUMER_REPLICAS} -p EBPFCacheMaxFlows=${CACHE_MAX_FLOWS} -p EBPFCacheActiveTimeout=${CACHE_ACTIVE_TIMEOUT}"
 
 if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_SAMPLING:-} ]]; then
     PARAMETERS+=" EBPFSamplingRate=${MULTISTAGE_PARAM_OVERRIDE_SAMPLING}"
