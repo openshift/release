@@ -126,6 +126,7 @@ function update_node_ip {
 function recert {
   local etcd_image="\${ETCD_IMAGE}"
   local recert_image="${RECERT_IMAGE:-quay.io/edge-infrastructure/recert:latest}"
+  echo "recert image: \${recert_image}"
   local previous_base_domain="${PREVIOUS_BASE_DOMAIN:-redhat.com}"
   local previous_cluster_name="${PREVIOUS_CLUSTER_NAME:-test-infra-cluster}"
   local new_base_domain="${NEW_BASE_DOMAIN:-another.domain}"
@@ -430,4 +431,4 @@ timeout \
   ssh \
   "${SSHOPTS[@]}" \
   "root@${IP}" \
-  timeout --kill-after 5s 60m /usr/local/bin/run-recert-cluster-rename-hostname-change-step.sh
+  RECERT_IMAGE="${RECERT_IMAGE}" timeout --kill-after 5s 60m /usr/local/bin/run-recert-cluster-rename-hostname-change-step.sh
