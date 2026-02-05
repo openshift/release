@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-# Configuration
+# Configuration - requires intranet capability for network access
 REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
 
 echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"

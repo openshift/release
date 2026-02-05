@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Sanity test on EXISTING cluster - no provisioning
 # Uses kubeconfig and sanity-env from Vault
+# Requires intranet capability for network access to hypervisor
 
 REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
 BUILD_ID="${BUILD_ID:-$(date +%Y%m%d-%H%M%S)}"
