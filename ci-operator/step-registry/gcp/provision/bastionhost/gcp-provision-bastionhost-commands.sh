@@ -140,10 +140,6 @@ gcloud ${project_option} compute firewall-rules create "${bastion_name}-ingress-
   --network ${NETWORK} \
   --allow tcp:22,tcp:3128,tcp:3129,tcp:5000,tcp:6001,tcp:6002,tcp:8080,tcp:873 \
   --target-tags="${bastion_name}"
-cat > "${SHARED_DIR}/bastion-destroy.sh" << EOF
-gcloud compute instances delete -q "${bastion_name}" --zone=${ZONE_0}
-gcloud ${project_option} compute firewall-rules delete -q "${bastion_name}-ingress-allow"
-EOF
 
 #####################################
 #########Save Bastion Info###########
@@ -193,12 +189,6 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
   --dns-name "mirror-registry.${BASE_DOMAIN}." --visibility "private" --networks "${NETWORK}"
   gcloud dns record-sets create "${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN}." \
   --rrdatas="${bastion_private_ip}" --type=A --ttl=60 --zone="${CLUSTER_NAME}-mirror-registry-private-zone"
-
-  cat > "${SHARED_DIR}/mirror-dns-destroy.sh" << EOF
-  gcloud dns record-sets delete -q "${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN}." --type=A --zone="${BASE_DOMAIN_ZONE_NAME}"
-  gcloud dns record-sets delete -q "${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN}." --type=A --zone="${CLUSTER_NAME}-mirror-registry-private-zone"
-  gcloud dns managed-zones delete -q "${CLUSTER_NAME}-mirror-registry-private-zone"
-EOF
 
   echo "Waiting for ${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN} taking effect..." && sleep 120s
 
