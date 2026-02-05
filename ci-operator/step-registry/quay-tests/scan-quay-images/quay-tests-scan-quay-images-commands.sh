@@ -5,7 +5,7 @@ set -euo pipefail
 # Retrieve Quay Security Testing Hostname
 quay_security_testing_hostname="$(cat "${SHARED_DIR}/QUAY_SECURITY_TESTING_HOST_NAME")"
 
-# Helper function to read secrets from konflux
+# Helper function to read secrets from Konflux
 read_secret() {
   cat "/var/run/quay-qe-konflux-secret/${1}-v${QUAY_VERSION//./-}-${2}"
 }
