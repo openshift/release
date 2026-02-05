@@ -7,8 +7,8 @@ cat /etc/os-release
 
 SRIOV_NUM_VFS=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".sriov_num_vfs")
 SRIOV_PF_NAME=$(cat ${CLUSTER_PROFILE_DIR}/sriov_pf_name)
-SRIOV_KERNEL_VFS_RANGE=$(cat ${CLUSTER_PROFILE_DIR}/sriov_kernel_vfs_range)
-SRIOV_DPDK_VFS_RANGE=$(cat ${CLUSTER_PROFILE_DIR}/sriov_dpdk_vfs_range)
+KERNEL_VFS_RANGE=$(cat ${CLUSTER_PROFILE_DIR}/sriov_kernel_vfs_range)
+DPDK_VFS_RANGE=$(cat ${CLUSTER_PROFILE_DIR}/sriov_dpdk_vfs_range)
 
 
 oc config view
@@ -85,7 +85,7 @@ spec:
   deviceType: netdevice
   nicSelector:
     pfNames:
-     - ${SRIOV_PF_NAME}#{KERNEL_VFS_RANGE}
+     - ${SRIOV_PF_NAME}#${KERNEL_VFS_RANGE}
   mtu: ${SRIOV_MTU}
   nodeSelector:
     ${SRIOV_NODE_SELECTOR}: ""
@@ -103,7 +103,7 @@ spec:
   deviceType: vfio-pci
   nicSelector:
     pfNames:
-     - ${SRIOV_PF_NAME}#{DPDK_VFS_RANGE}
+     - ${SRIOV_PF_NAME}#${DPDK_VFS_RANGE}
   mtu: ${SRIOV_MTU}
   nodeSelector:
     ${SRIOV_NODE_SELECTOR}: ""
