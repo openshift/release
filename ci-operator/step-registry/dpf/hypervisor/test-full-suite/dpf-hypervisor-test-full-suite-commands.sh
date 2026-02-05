@@ -18,7 +18,7 @@ echo "Cluster: ${CLUSTER_NAME}"
 echo "Remote host: ${REMOTE_HOST}"
 echo "Work directory: ${REMOTE_WORK_DIR}"
 
-# Create test results directory
+# Create results directory
 TEST_RESULTS_DIR="${ARTIFACT_DIR}/e2e-results"
 mkdir -p ${TEST_RESULTS_DIR}
 
@@ -28,7 +28,7 @@ if [[ "${DEPLOYMENT_SUCCESS:-false}" != "true" ]]; then
     exit 1
 fi
 
-# Validate kubeconfig
+# Validate cluster connectivity
 if [[ ! -f ${KUBECONFIG} ]] || ! oc get nodes &>/dev/null; then
     echo "ERROR: Cannot connect to cluster"
     exit 1
@@ -36,169 +36,58 @@ fi
 
 echo "Cluster connectivity confirmed"
 
-# Initialize test tracking
-TESTS_RUN=0
-TESTS_PASSED=0
-TESTS_FAILED=0
+# Run make targets from automation repo
+TEST_FAILED=0
 
-# =============================================================================
-# Test 1: Deployment Verification (optional - runs if target exists)
-# =============================================================================
+# Run sanity tests
 echo ""
-echo "=== Test 1: Deployment Verification ==="
-((TESTS_RUN++))
+echo "=== Running DPF Sanity Tests ==="
+if ${SSH} "cd ${REMOTE_WORK_DIR} && make run-dpf-sanity"; then
+    echo "PASSED: make run-dpf-sanity"
+else
+    echo "FAILED: make run-dpf-sanity"
+    TEST_FAILED=1
+fi
 
-# Check if verify-deployment target exists
+# Run verify-deployment if target exists
+echo ""
+echo "=== Running Deployment Verification ==="
 if ${SSH} "cd ${REMOTE_WORK_DIR} && make -n verify-deployment" &>/dev/null; then
-    echo "Running: make verify-deployment"
-    VERIFY_LOG="${REMOTE_WORK_DIR}/logs/verify-$(date +%Y%m%d_%H%M%S).log"
-
-    if ${SSH} "cd ${REMOTE_WORK_DIR} && VERIFY_DEPLOYMENT=true make verify-deployment 2>&1 | tee ${VERIFY_LOG}"; then
-        echo "PASSED: Deployment verification"
-        ((TESTS_PASSED++))
+    if ${SSH} "cd ${REMOTE_WORK_DIR} && make verify-deployment"; then
+        echo "PASSED: make verify-deployment"
     else
-        echo "FAILED: Deployment verification"
-        ((TESTS_FAILED++))
+        echo "FAILED: make verify-deployment"
+        TEST_FAILED=1
     fi
-    ${SCP} root@${REMOTE_HOST}:${VERIFY_LOG} ${TEST_RESULTS_DIR}/ 2>/dev/null || true
 else
     echo "SKIPPED: verify-deployment target not available"
-    ((TESTS_PASSED++))  # Don't count as failure
 fi
 
-# =============================================================================
-# Test 2: DPF Sanity Tests (iperf)
-# =============================================================================
+# Run traffic-flow-tests if target exists
 echo ""
-echo "=== Test 2: DPF Sanity Tests ==="
-((TESTS_RUN++))
-
-SANITY_LOG="${REMOTE_WORK_DIR}/logs/sanity-$(date +%Y%m%d_%H%M%S).log"
-
-if ${SSH} "cd ${REMOTE_WORK_DIR} && make run-dpf-sanity 2>&1 | tee ${SANITY_LOG}"; then
-    echo "PASSED: DPF sanity tests"
-    ((TESTS_PASSED++))
-    ${SCP} root@${REMOTE_HOST}:${SANITY_LOG} ${TEST_RESULTS_DIR}/sanity-success.log 2>/dev/null || true
-else
-    echo "FAILED: DPF sanity tests"
-    ((TESTS_FAILED++))
-    ${SCP} root@${REMOTE_HOST}:${SANITY_LOG} ${TEST_RESULTS_DIR}/sanity-failed.log 2>/dev/null || true
-fi
-
-# =============================================================================
-# Test 3: Traffic Flow Tests (optional - runs if target exists)
-# =============================================================================
-echo ""
-echo "=== Test 3: Traffic Flow Tests ==="
-((TESTS_RUN++))
-
-# Check if run-traffic-flow-tests target exists
+echo "=== Running Traffic Flow Tests ==="
 if ${SSH} "cd ${REMOTE_WORK_DIR} && make -n run-traffic-flow-tests" &>/dev/null; then
-    echo "Running: make run-traffic-flow-tests"
-    TFT_LOG="${REMOTE_WORK_DIR}/logs/tft-$(date +%Y%m%d_%H%M%S).log"
-
-    if ${SSH} "cd ${REMOTE_WORK_DIR} && make run-traffic-flow-tests 2>&1 | tee ${TFT_LOG}"; then
-        echo "PASSED: Traffic flow tests"
-        ((TESTS_PASSED++))
+    if ${SSH} "cd ${REMOTE_WORK_DIR} && make run-traffic-flow-tests"; then
+        echo "PASSED: make run-traffic-flow-tests"
     else
-        echo "FAILED: Traffic flow tests"
-        ((TESTS_FAILED++))
+        echo "FAILED: make run-traffic-flow-tests"
+        TEST_FAILED=1
     fi
-    ${SCP} root@${REMOTE_HOST}:${TFT_LOG} ${TEST_RESULTS_DIR}/ 2>/dev/null || true
 else
     echo "SKIPPED: run-traffic-flow-tests target not available"
-    ((TESTS_PASSED++))  # Don't count as failure
 fi
 
-# =============================================================================
-# Test 4: Cluster Health Validation
-# =============================================================================
-echo ""
-echo "=== Test 4: Cluster Health Validation ==="
-((TESTS_RUN++))
-
-# Check cluster operators
-oc get co -o wide > ${TEST_RESULTS_DIR}/cluster-operators.txt 2>/dev/null || true
-UNHEALTHY_CO=$(oc get co --no-headers 2>/dev/null | grep -v "True.*False.*False" | wc -l | tr -d ' ')
-
-if [[ "${UNHEALTHY_CO}" == "0" ]]; then
-    echo "PASSED: All cluster operators healthy"
-    ((TESTS_PASSED++))
-else
-    echo "WARNING: ${UNHEALTHY_CO} cluster operators not fully healthy"
-    oc get co | grep -v "True.*False.*False" > ${TEST_RESULTS_DIR}/unhealthy-operators.txt 2>/dev/null || true
-    ((TESTS_PASSED++))  # Warning, not failure
-fi
-
-# =============================================================================
-# Test 5: DPF Operator Status
-# =============================================================================
-echo ""
-echo "=== Test 5: DPF Operator Status ==="
-((TESTS_RUN++))
-
-if oc get namespace dpf-operator-system &>/dev/null; then
-    oc get all -n dpf-operator-system > ${TEST_RESULTS_DIR}/dpf-operator-status.txt 2>/dev/null || true
-
-    if oc get deployment -n dpf-operator-system --no-headers 2>/dev/null | grep -q "1/1"; then
-        echo "PASSED: DPF operator is running"
-        ((TESTS_PASSED++))
-    else
-        echo "FAILED: DPF operator deployment issues"
-        ((TESTS_FAILED++))
-        oc get pods -n dpf-operator-system > ${TEST_RESULTS_DIR}/dpf-operator-pods.txt 2>/dev/null || true
-    fi
-else
-    echo "FAILED: DPF operator namespace not found"
-    ((TESTS_FAILED++))
-fi
-
-# =============================================================================
-# Collect Artifacts
-# =============================================================================
+# Collect artifacts
 echo ""
 echo "=== Collecting Artifacts ==="
-
+${SCP} -r root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/logs/* ${TEST_RESULTS_DIR}/ 2>/dev/null || true
 oc get nodes -o wide > ${TEST_RESULTS_DIR}/nodes.txt 2>/dev/null || true
 oc get pods -A > ${TEST_RESULTS_DIR}/all-pods.txt 2>/dev/null || true
-oc get events -A --sort-by='.lastTimestamp' > ${TEST_RESULTS_DIR}/events.txt 2>/dev/null || true
 
-# Copy logs from hypervisor
-${SCP} -r root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/logs/* ${TEST_RESULTS_DIR}/ 2>/dev/null || true
-
-# =============================================================================
-# Summary
-# =============================================================================
 echo ""
-echo "================================================================================"
-echo "E2E Test Suite Summary"
-echo "================================================================================"
-echo "Tests Run: ${TESTS_RUN}"
-echo "Tests Passed: ${TESTS_PASSED}"
-echo "Tests Failed: ${TESTS_FAILED}"
-echo "Artifacts: ${TEST_RESULTS_DIR}"
-echo "================================================================================"
-
-# Create summary file
-cat > ${TEST_RESULTS_DIR}/summary.txt <<EOF
-DPF E2E Test Suite Summary
-==========================
-Date: $(date)
-Cluster: ${CLUSTER_NAME}
-Hypervisor: ${REMOTE_HOST}
-
-Results:
-- Tests Run: ${TESTS_RUN}
-- Tests Passed: ${TESTS_PASSED}
-- Tests Failed: ${TESTS_FAILED}
-EOF
-
-# Exit with failure if any tests failed
-if [[ ${TESTS_FAILED} -gt 0 ]]; then
-    echo ""
-    echo "E2E test suite completed with ${TESTS_FAILED} failure(s)"
+if [[ ${TEST_FAILED} -eq 1 ]]; then
+    echo "E2E test suite completed with failures"
     exit 1
 else
-    echo ""
-    echo "E2E test suite completed successfully!"
+    echo "E2E test suite completed successfully"
 fi
