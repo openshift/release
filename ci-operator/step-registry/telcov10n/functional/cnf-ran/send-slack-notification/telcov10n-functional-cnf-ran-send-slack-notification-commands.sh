@@ -2,6 +2,12 @@
 set -e
 set -o pipefail
 
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 echo "Validate JOB_TYPE variable: ${JOB_TYPE}"
 if [ "$JOB_TYPE" = "presubmit" ]; then
   echo "JOB_TYPE=presubmit — skipping script"
@@ -9,7 +15,7 @@ if [ "$JOB_TYPE" = "presubmit" ]; then
 fi
 
 SCRIPTS_FOLDER="/eco-ci-cd/scripts/ran"
-PYTHON_SCRIPT="send-ran-report-notification.py"
+PYTHON_SCRIPT="send-ran-slack-notification.py"
 WEBHOOK_URL_FILE=/var/run/slack-webhook-url/url
 
 if [[ ! -f "$WEBHOOK_URL_FILE" ]]; then

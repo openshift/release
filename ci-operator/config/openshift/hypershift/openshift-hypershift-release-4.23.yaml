@@ -1,4 +1,8 @@
 base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
   cli:
     name: "4.23"
     namespace: ocp
@@ -15,18 +19,6 @@ base_images:
     name: "4.23"
     namespace: ocp
     tag: manila-csi-driver-operator-test
-  ocp_4.22_base-rhel9:
-    name: "4.23"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.25-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.22
-  openshift_release_rhel-9-release-golang-1.25-openshift-4.22:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.22
   openstack-cinder-csi-driver-operator-test:
     name: "4.23"
     namespace: ocp
@@ -35,25 +27,10 @@ build_root:
   from_repository: true
   use_build_cache: true
 images:
-- inputs:
-    openshift_release_rhel-9-release-golang-1.25-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.25-openshift-4.22
-  to: hypershift-operator
+- to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.25-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
   to: hypershift
 - dockerfile_path: Dockerfile.e2e
-  inputs:
-    openshift_release_rhel-9-release-golang-1.25-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.25-openshift-4.22
   to: hypershift-tests
 - dockerfile_literal: |
     FROM base
@@ -187,7 +164,7 @@ tests:
 - as: e2e-aks-4-21
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     dependencies:
       OCP_IMAGE_LATEST: release:latest-421
       OCP_IMAGE_N1: release:latest-420
@@ -203,7 +180,7 @@ tests:
 - as: e2e-aks-override
   run_if_changed: (/overrides\.yaml$)
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
@@ -225,6 +202,12 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
+- always_run: false
+  as: e2e-v2-aws
+  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-e2e-v2
 - always_run: false
   as: e2e-aws-minimal
   optional: true
@@ -363,7 +346,7 @@ tests:
   as: e2e-azure-aks-ovn-conformance
   optional: true
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     workflow: hypershift-azure-aks-conformance
 - as: security
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
@@ -472,6 +455,12 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-421
     workflow: hypershift-aws-reqserving-e2e
+- always_run: false
+  as: review-agent-single-pr
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: hypershift-review-agent
 zz_generated_metadata:
   branch: release-4.23
   org: openshift

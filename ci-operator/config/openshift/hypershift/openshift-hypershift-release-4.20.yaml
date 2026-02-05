@@ -23,14 +23,6 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: manila-csi-driver-operator-test
-  ocp_4.20_base-rhel9:
-    name: "4.20"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
   openstack-cinder-csi-driver-operator-test:
     name: "4.20"
     namespace: ocp
@@ -40,13 +32,6 @@ build_root:
   use_build_cache: true
 images:
 - dockerfile_path: Dockerfile.control-plane
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: hypershift
 - dockerfile_literal: |
     FROM base
@@ -145,7 +130,7 @@ tests:
 - as: e2e-aks
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
@@ -159,7 +144,7 @@ tests:
 - as: e2e-aks-4-19
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     dependencies:
       OCP_IMAGE_LATEST: release:latest-419
       OCP_IMAGE_N1: release:latest-418
@@ -321,7 +306,7 @@ tests:
   as: e2e-azure-aks-ovn-conformance
   optional: true
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     workflow: hypershift-azure-aks-conformance
 - as: security
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)

@@ -24,7 +24,7 @@ function join_by { local IFS="$1"; shift; echo "$*"; }
 # aws_source_region: for non-C2S/SC2S cluster, it's the same as REGION, for C2S/SC2S it's the source region that emulator runs on.
 #             e.g. for instance, if installing a cluster on a C2S (us-iso-east-1) region and its emulator runs on us-east-1:
 #                  so the REGION is us-iso-east-1, and aws_source_region is us-east-1
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 aws_source_region="${REGION}"
 
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
@@ -224,17 +224,10 @@ else
 fi
 
 # See if we can use NAT instances as a cost reduction method.
-# OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY is set to false by the release controller (i.e. do not use NAT instances
-# release controller jobs.
 if [[ "${CI_NAT_REPLACE:-false}" == 'auto' ]]; then
   # Enable the option for jobs using the shared aws cluster profiles unless they use a different install topology.
-  # 4.21 is currently excluded as we approach GA.
-  if [[ "${JOB_NAME}" == *-4.21-* ]]; then
-    CI_NAT_REPLACE='false_4_21_jobs_are_excluded'
-  elif [[ "${CLUSTER_PROFILE_NAME}" != "aws" && ! "${CLUSTER_PROFILE_NAME}" =~ ^aws-[0-9]+$ ]]; then
+  if [[ "${CLUSTER_PROFILE_NAME}" != "aws" && ! "${CLUSTER_PROFILE_NAME}" =~ ^aws-[0-9]+$ ]]; then
     CI_NAT_REPLACE='false_CLUSTER_PROFILE_NAME_is_not_a_testplatform_aws_profile'
-  elif [[ "${JOB_NAME}" == *'microshift'* || "${JOB_NAME}" == *'hypershift'* || "${JOB_NAME}" == *'vpc'* || "${JOB_NAME}" == *'single-node'* ]]; then
-    CI_NAT_REPLACE='false_job_uses_non_standalone_install_topology'
   else
     CI_NAT_REPLACE='true'
   fi

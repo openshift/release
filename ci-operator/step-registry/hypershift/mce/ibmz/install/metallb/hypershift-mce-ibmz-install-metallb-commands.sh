@@ -86,7 +86,7 @@ echo "Logging in to IBM Cloud..."
 ibmcloud login --apikey "$IC_API_KEY" -r "$IC_REGION" -g "$RESOURCE_GROUP" || { echo "Login failed"; exit 1; }
 
 # -------------------------
-# Fetch ALL reserved IPs of all VSIs
+#Fetch ALL reserved IPs of all VSIs
 # -------------------------
 mapfile -t ALL_RESERVED_IPS < <(
   ibmcloud is instances --json |
@@ -96,7 +96,7 @@ mapfile -t ALL_RESERVED_IPS < <(
 echo "All Reserved IPs:" "${ALL_RESERVED_IPS[@]}"
 
 # -------------------------
-# Fetch only CONTROL node IPs
+#Fetch only CONTROL node IPs
 # -------------------------
 mapfile -t CONTROL_RIP < <(
   ibmcloud is instances --json |
@@ -106,7 +106,7 @@ mapfile -t CONTROL_RIP < <(
 echo "All Reserved IPs:" "${CONTROL_RIP[@]}"
 
 # -------------------------
-# Pick one control node subnet for MetalLB
+#Pick one control node subnet for MetalLB
 # -------------------------
 BASE_IP="${CONTROL_RIP[0]}"
 SUBNET_PREFIX=$(echo "$BASE_IP" | awk -F. '{print $1"."$2"."$3"."}')
@@ -115,7 +115,7 @@ BASE_LAST_OCTET=$(echo "$BASE_IP" | awk -F. '{print $4}')
 echo "Using subnet: ${SUBNET_PREFIX}0/24"
 
 # -------------------------
-# Function to check collision with existing VSIs
+#Function to check collision with existing VSIs
 # -------------------------
 function ip_in_list() {
     local ip=$1
@@ -128,7 +128,7 @@ function ip_in_list() {
 }
 
 # -------------------------
-# Find next available 3-IP range in subnet
+#Find next available 3-IP range in subnet
 # -------------------------
 START=$((BASE_LAST_OCTET + 1))
 
@@ -306,8 +306,6 @@ spec:
   ipAddressPools:
    - metallb
 EOF
-
-sleep 30
 
 if oc get pods -n metallb-system 2>/dev/null | grep -E "Running" >/dev/null; then
     echo "Successfully installed metallb-operator."
