@@ -4,29 +4,12 @@ set -euo pipefail
 # Sanity test on EXISTING cluster - no provisioning
 # Uses kubeconfig and sanity-env from Vault
 
-REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
+REMOTE_HOST="${REMOTE_HOST:-nvd-srv-45.nvidia.eng.rdu2.dc.redhat.com}"
 BUILD_ID="${BUILD_ID:-$(date +%Y%m%d-%H%M%S)}"
-
-# Determine if this is a rehearsal (release repo PR) or actual openshift-dpf PR
-CI_REPO_NAME="${REPO_NAME:-}"
-if [[ "${CI_REPO_NAME}" == "release" ]]; then
-    # Rehearsal - clone main branch of openshift-dpf
-    REPO_OWNER="rh-ecosystem-edge"
-    REPO_NAME="openshift-dpf"
-    PULL_NUMBER=""
-    echo "Detected rehearsal mode - will clone main branch"
-else
-    # Actual openshift-dpf PR - use CI environment variables
-    REPO_OWNER="${REPO_OWNER:-rh-ecosystem-edge}"
-    REPO_NAME="${REPO_NAME:-openshift-dpf}"
-    PULL_NUMBER="${PULL_NUMBER:-}"
-fi
 
 echo "=== DPF Sanity Test on Existing Cluster ==="
 echo "Remote host: ${REMOTE_HOST}"
 echo "Build ID: ${BUILD_ID}"
-echo "Repository: ${REPO_OWNER}/${REPO_NAME}"
-[[ -n "${PULL_NUMBER}" ]] && echo "Pull Request: #${PULL_NUMBER}"
 
 # Setup SSH
 echo "Setting up SSH..."
@@ -49,20 +32,10 @@ SANITY_DIR="/tmp/dpf-sanity-${BUILD_ID}"
 echo "Creating working directory: ${SANITY_DIR}"
 ${SSH} "mkdir -p ${SANITY_DIR}"
 
-# Clone repository on hypervisor
-echo "Cloning repository on hypervisor..."
-REPO_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}.git"
-
-if [[ -n "${PULL_NUMBER}" ]]; then
-    # For PR builds, clone and checkout the PR ref
-    ${SSH} "cd ${SANITY_DIR} && git clone ${REPO_URL} repo && cd repo && git fetch origin pull/${PULL_NUMBER}/head:pr && git checkout pr"
-else
-    # For branch builds, just clone
-    ${SSH} "cd ${SANITY_DIR} && git clone ${REPO_URL} repo"
-fi
-
-# Update SANITY_DIR to point to the cloned repo
-SANITY_DIR="${SANITY_DIR}/repo"
+# Copy repository to hypervisor (tar + ssh, rsync not available)
+echo "Copying repository to hypervisor..."
+tar czf - --exclude='.git' --exclude='logs' --exclude='*.log' . | \
+    ${SSH} "tar xzf - -C ${SANITY_DIR}"
 
 # Decode and copy kubeconfig from Vault
 echo "Setting up kubeconfig..."
@@ -99,7 +72,7 @@ echo "=== Running DPF Sanity Tests ==="
 SANITY_LOG="${SANITY_DIR}/sanity-$(date +%Y%m%d_%H%M%S).log"
 TEST_RESULT=0
 
-if ${SSH} "set -o pipefail; cd ${SANITY_DIR} && make run-dpf-sanity 2>&1 | tee ${SANITY_LOG}"; then
+if ${SSH} "cd ${SANITY_DIR} && make run-dpf-sanity 2>&1 | tee ${SANITY_LOG}"; then
     echo "Sanity tests PASSED"
 else
     echo "Sanity tests FAILED"
@@ -110,9 +83,9 @@ fi
 mkdir -p ${ARTIFACT_DIR}/sanity-results
 ${SCP} root@${REMOTE_HOST}:${SANITY_LOG} ${ARTIFACT_DIR}/sanity-results/ || echo "Could not retrieve log"
 
-# Cleanup (remove parent directory which contains the cloned repo)
+# Cleanup
 echo "Cleaning up..."
-${SSH} "rm -rf /tmp/dpf-sanity-${BUILD_ID}"
+${SSH} "rm -rf ${SANITY_DIR}"
 
 if [[ ${TEST_RESULT} -eq 0 ]]; then
     echo "=== Sanity Test Completed Successfully ==="
