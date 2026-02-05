@@ -88,7 +88,7 @@ ${HYPERSHIFT_CLI_NAME} create cluster kubevirt \
     --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
     --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --namespace $HC_NS \
-    --memory 8Gi \
+    --memory 16Gi \
     --cores 4 \
     --root-volume-size 60 \
     --release-image ${OCP_IMAGE_MULTI} ${extra_flags} > /tmp/hc-manifests/cluster-agent.yaml
