@@ -1,14 +1,29 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+# shellcheck disable=SC2034 # False pos. due to the way the var. is used.
+set -euxo pipefail; shopt -s inherit_errexit
 
-SECRETS_DIR=/run/secrets/ci.openshift.io/cluster-profile
-GANGWAY_API_TOKEN=$(cat $SECRETS_DIR/gangway-api-token)
-WEEKLY_JOBS="$SECRETS_DIR/$JSON_TRIGGER_LIST"
-URL="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
-#Get the day of the month
-month_day=$(date +%-d)
+typeset jobDescFile="${CLUSTER_PROFILE_DIR}/${JT__TRIG_JOB_LIST}"
+typeset trigCond='' trigCondStep='' trigCondPars=''
+typeset jobList='' jobType='' jobName='' stepName=''
+typeset postTask='' postTaskStep='' postTaskPars=''
+typeset rsp=''
+typeset -i trigCondFlgs=0 postTaskFlgs=0 jobExecType=0
+typeset -i dryRun=0 tryLeft=0 retryWait=60
+typeset -a failedJobs=()
+#   https://github.com/kubernetes-sigs/prow/blob/95b2a34128de51a4f618c8d6bb9d0c6b587fd29c/pkg/gangway/gangway.proto#L108
+typeset -Ai jobExecTypeMaps=(
+    [periodic]=1
+#   [postsubmit]=2  # Not currently supported, because it requires extra `git`
+#   [presubmit]=3   #   ref. parameters, which are not easy to get. Potential
+#   [batch]=4       #   for future enhancement.
+)
+
+typeset gangwayAPIurlPfx='https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions'
+typeset gangwayAPItoken; gangwayAPItoken="$(cat "${CLUSTER_PROFILE_DIR}/${JT__GW__API_TOKEN}")"
+
+### Legacy code start. To be replaced with custom trigger condition Step.    ###
+# Get the day of the month.
+typeset -i month_day; month_day="$(date +%-d)"
 
 # additional checks for self-managed fips and non-fips testing
 self_managed_string='self-managed-lp-interop-jobs'
@@ -16,99 +31,223 @@ zstream_string='zstream'
 fips_string='fips'
 
 # only run self-managed fips if date <= 7 and non-fips scenarios if date > 7 .
-echo "Checking to see if it is a test day for ${JSON_TRIGGER_LIST}"
-if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
-        $JSON_TRIGGER_LIST != *"$fips_string"* &&
-        $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
+: "Checking to see if it is a test day for ${JT__TRIG_JOB_LIST}"
+if [[ $JT__TRIG_JOB_LIST == *"${self_managed_string}"* &&
+        $JT__TRIG_JOB_LIST != *"$fips_string"* &&
+        $JT__TRIG_JOB_LIST != *"$zstream_string"* ]]; then
         if (( $month_day > 7 )); then
-    echo "Triggering jobs because it's a Monday not in the first week of the month."
-    echo "Continue..."
+    : "Triggering jobs because it's a Monday not in the first week of the month."
+    : 'Continue...'
   else
-    echo "We do not run self-managed scenarios on first week of the month"
+    : 'We do not run self-managed scenarios on first week of the month.'
     exit 0
   fi
 fi
 
-if [[ $JSON_TRIGGER_LIST == *"${self_managed_string}"* &&
-        $JSON_TRIGGER_LIST == *"$fips_string"* &&
-        $JSON_TRIGGER_LIST != *"$zstream_string"* ]]; then
+if [[ $JT__TRIG_JOB_LIST == *"${self_managed_string}"* &&
+        $JT__TRIG_JOB_LIST == *"$fips_string"* &&
+        $JT__TRIG_JOB_LIST != *"$zstream_string"* ]]; then
   if (( $month_day <= 7 )); then
-    echo "Triggering jobs because it's the first Monday of the month."
-    echo "Continue..."
+    : "Triggering jobs because it's the first Monday of the month."
+    : 'Continue...'
   else
-    echo "We do not run self-managed fips scenarios past the first Monday of the month"
+    : 'We do not run self-managed fips scenarios past the first Monday of the month.'
     exit 0
   fi
 fi
 
-echo "# Printing the jobs-to-trigger JSON:"
-jq -c '.[]' "$WEEKLY_JOBS"
-echo ""
+(($(
+    jq -cr 'if any(.[]; has("job_name")) then 1 else 0 end' "${jobDescFile}"
+))) && {
+    touch "${SHARED_DIR}/trigger-jobs-trig-bwComp"
+    touch "${SHARED_DIR}/trigger-jobs-post-interop-ocp-watcher-bot-send-message"
+}
+################################################################################
 
-retry_interval=60  # 60 seconds = 1 minute
-failed_jobs=""
+: "Printing the jobs-to-trigger JSON:"
+jq -c '.[]' "${jobDescFile}"
 
-if [[ "$JOB_NAME" == *"rehearse"* ]]; then
-  echo "Job name contains 'rehearse'. Exiting with status 0."
-  exit 0
-fi
+[[ "${JOB_NAME}" == 'rehearse-'* ]] && dryRun=1
 
-if [ "$SKIP_HEALTH_CHECK" = "false" ]; then
-
-  echo "# Test to make sure gangway api is up and running."
-  max_retries=60
-
-  for ((retry_count=1; retry_count<=$max_retries; retry_count++)); do
-    response=$(curl -s -X GET -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${GANGWAY_API_TOKEN}" "${URL}/v1/executions/${PROW_JOB_ID}" -w "%{http_code}\n" -o /dev/null)
-
-    if [ "$response" -eq 200 ]; then
-      echo "Endpoint is up and returning HTTP status code 200 (OK)."
-      break  # Exit the loop if successful response received
-    else
-      echo "Endpoint is not available or returned an error (HTTP status code $response). Retrying..."
-    fi
-
-    # Sleep for the specified interval before the next retry
-    sleep $retry_interval
+if [ "${JT__SKIP_HC}" = "false" ]; then
+  : 'Test to make sure Gangway API is up and running.'
+  for ((tryLeft=60; tryLeft; tryLeft--)); do
+    rsp="$(eval "$(cat - 0<<cmd1EOF
+$( ((dryRun)) && echo echo || echo eval ) $(printf '%q' "$(cat - 0<<cmd2EOF
+    curl -sSL -X GET -w '%{http_code}' -o /dev/null \
+        -d $(printf '%q' "$(
+            jq -cnr \
+                --arg jeType 1 \
+                '.job_execution_type=$jeType'
+        )") \
+        -H 'Authorization: Bearer '${gangwayAPItoken@Q} \
+        ${gangwayAPIurlPfx@Q}/${PROW_JOB_ID@Q}
+cmd2EOF
+)") $( ((dryRun)) && echo '1>&2; echo 200' )
+cmd1EOF
+    )")"
+    ((rsp == 200)) && break || {
+        ((tryLeft - 1)) && : "Retrying $((tryLeft - 1))..."
+    }
+    sleep ${retryWait}
   done
-
-  if [ "$response" -ne 200 ]; then
-    echo "Endpoint is still not available after $max_retries retries. Aborting."
-    exit 1
-  fi
+  ((rsp == 200)) || { echo "Endpoint is still not available after 60 retries. Aborting." 1>&2; exit 1; }
 fi
 
-max_retries=3
+while IFS=$'\t' read -r trigCond jobList postTask; do
+    # Trigger Conditions Check.
+    while IFS=$'\t' read -r trigCondFlgs trigCondStep trigCondPars; do
+        : "trigCondFlgs=${trigCondFlgs}; JT__TRIG_COND_EXEC_FLGS=${JT__TRIG_COND_EXEC_FLGS}"
+        ((trigCondFlgs & JT__TRIG_COND_EXEC_FLGS)) || continue
+        stepName="${trigCondStep}"
+        while true; do
+            case ${stepName} in
+            # (trigger-jobs-trig-future-special-handling-no-common)     break;;
+            # (trigger-jobs-trig-future-special-handling-with-common)   stepName=-common-;;
+              (trigger-jobs-trig-check-resource-owner)
+                typeset trigCondFlag='' expOwnerName=''
+                IFS=$'\t' read -r trigCondFlag expOwnerName 0< <(jq -cr \
+                    --arg defVal "${trigCondStep}" \
+                    '[.trigCondFlag//$defVal, .expOwnerName//""] | @tsv' \
+                0<<<"${trigCondPars}")
+                stepName=-common-
+                ;;
+            #   List supported trigger conditions inside commented section for
+            #       documentation purpose only. UNLESS the Step Name does not
+            #       match `trigger-jobs-trig-*` pattern, then in this case,
+            #       list it un-commented before that glob pattern.
+            # (
+            #       trigger-jobs-trig-some-standard-handling |
+            #       trigger-jobs-trig-future-standard-handling
+            # ) ;&
+            # (
+            #       some-trigger-job-with-different-name-prefix |
+            #       other-trigger-job-with-different-name-prefix
+            # ) ;&
+              (trigger-jobs-trig-*)
+                # Standard handling code.
+                typeset trigCondFlag=''
+                IFS=$'\t' read -r trigCondFlag 0< <(jq -cr \
+                    --arg defVal "${trigCondStep}" \
+                    '.trigCondFlag//$defVal' \
+                0<<<"${trigCondPars}")
+                ;&
+              (-common-)
+                # Common handling code.
+                [ -f "${SHARED_DIR}/${trigCondFlag}" ] || {
+                    : 'Trigger condition is not met, skipping associated Jobs.'
+                    continue 3
+                }
+                break
+                ;;
+              (*)   : "Unsupported Trigger Condition Step: ${trigCondStep}"; continue 3;;
+            esac
+        done
+    done 0< <( jq -cr '
+        .[] |
+        [.trigCondFlgs//0, .trigCondStep//"", (.trigCondPars//{} | @json)] |
+        @tsv
+    ' 0<<<"${trigCond}")
 
-echo ""
-echo "# Loop through the trigger weekly jobs file using jq and issue a command for each job where 'active' is true"
-jq -r '.[] | select(.active == true) | .job_name' "$WEEKLY_JOBS" | while IFS= read -r job; do
-  echo "Issuing trigger for active job: $job"
-  for ((retry_count=1; retry_count<=$max_retries; retry_count++)); do
-    response=$(curl -s -X POST -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${GANGWAY_API_TOKEN}" "${URL}/v1/executions/$job" -w "%{http_code}\n" -o /dev/null)
-    
-    if [ "$response" -eq 200 ]; then
-      echo "Trigger returned a 200 status code"
-      break  # Exit the loop if successful response received
-    else
-      echo "We did not get a 200 status code from the job trigger. Retrying..."
-    fi
+    # Triggering Jobs.
+    while IFS=$'\t' read -r jobType jobName; do
+        : "Issuing trigger for active job: ${jobName}"
+        jobExecType="${jobExecTypeMaps[${jobType}]:-}"
+        ((jobExecType)) || {
+            : "Invalid \`.jobType\` value: ${jobType}"
+            exit 1
+        }
+        for ((tryLeft=3; tryLeft; tryLeft--)); do
+            rsp="$(eval "$(cat - 0<<cmd1EOF
+$( ((dryRun)) && echo echo || echo eval ) $(printf '%q' "$(cat - 0<<cmd2EOF
+    curl -sSL -X GET -w '%{http_code}' -o /dev/null \
+        -d $(printf '%q' "$(
+            jq -cnr \
+                --arg jeType "${jobExecType}" \
+                '.job_execution_type=$jeType'
+        )") \
+        -H 'Authorization: Bearer '${gangwayAPItoken@Q} \
+        ${gangwayAPIurlPfx@Q}/${jobName@Q}
+cmd2EOF
+)") $( ((dryRun)) && echo '1>&2; echo 200' )
+cmd1EOF
+            )")"
+            ((rsp == 200)) && break || {
+                ((tryLeft - 1)) && : "Retrying $((tryLeft - 1))..."
+            }
+            sleep ${retryWait}
+        done
+        ((rsp == 200)) || failedJobs+=("${jobName}")
+    done 0< <(
+        ((JT__SKIP_TRIG_MAIN_JOBS)) && exit
+        jq -cr '
+            .[] |
+            select(.active == true) |
+            [.jobType//"periodic", .jobName//""] |
+            @tsv
+        ' 0<<<"${jobList}"
+    )
 
-    # Sleep for the specified interval before the next retry
-    sleep $retry_interval
-  done
+    # Post Tasks Execution.
+    while IFS=$'\t' read -r postTaskFlgs postTaskStep postTaskPars; do
+        : "postTaskFlgs=${postTaskFlgs}; JT__POST_TASK_EXEC_FLGS=${JT__POST_TASK_EXEC_FLGS}"
+        ((postTaskFlgs & JT__POST_TASK_EXEC_FLGS)) || continue
+        stepName="${postTaskStep}"
+        while true; do
+            case ${stepName} in
+            # (trigger-jobs-post-future-special-handling-no-common)     break;;
+            # (trigger-jobs-post-future-special-handling-with-common)   stepName=-common-;;
+            #   List supported post tasks inside commented section for
+            #       documentation purpose only. UNLESS the Step Name does not
+            #       match `trigger-jobs-post-*` pattern, then in this case, list
+            #       it un-commented before that glob pattern.
+            # (
+            #       trigger-jobs-post-interop-ocp-watcher-bot-send-message |
+            #       trigger-jobs-post-future-standard-handling
+            # ) ;&
+            # (
+            #       some-post-task-with-different-name-prefix |
+            #       other-post-task-with-different-name-prefix
+            # ) ;&
+              (trigger-jobs-post-*)
+                # Standard handling code.
+                typeset postTaskFlag=''
+                IFS=$'\t' read -r postTaskFlag 0< <(jq -cr \
+                    --arg defVal "${postTaskStep}" \
+                    '.postTaskFlag//$defVal' \
+                0<<<"${postTaskPars}")
+                ;&
+              (-common-)
+                # Common handling code.
+                touch "${SHARED_DIR}/${postTaskFlag}"
+                break
+                ;;
+              (*)   : "Unsupported Post Task Step: ${postTaskStep}"; continue 3;;
+            esac
+        done
+    done 0< <(jq -cr '
+        .[] |
+        [.postTaskFlgs//0, .postTaskStep//"", (.postTaskPars//{} | @json)] |
+        @tsv
+    ' 0<<<"${postTask}")
+done 0< <(jq -cr '
+    .[] | ( # Backward compatibility: convert old list format to new one.
+        if has("job_name") then
+            {
+                trigCond: [{trigCondFlgs: 1, trigCondStep: "trigger-jobs-trig-bwComp"}],
+                jobList: [{jobName: .job_name, active: .active}]
+            }
+        else
+            .
+        end
+    ) | [(.trigCond//[] | @json), (.jobList//[] | @json), (.postTask//[] | @json)] | @tsv
+' "${jobDescFile}")
 
-  if [ "$response" -ne 200 ]; then
-    echo "Trigger for active job: $job FAILED, a manual re-run is needed for $job"
-    failed_jobs+="$job "  # Concatenate the job to the string of failed jobs
-  fi
+# Print the list of failed jobs after the loop completes.
+((${#failedJobs[@]})) && (
+    set +x
+    echo 'The following jobs failed to trigger and need manual re-run:'
+    printf '  - %s\n' "${failedJobs[@]}"
+)
 
-done
-
-# Print the list of failed jobs after the loop completes
-if [ -n "$failed_jobs" ]; then
-  echo "The following jobs failed to trigger and need manual re-run:"
-  echo "$failed_jobs"
-else
-  echo "No jobs failed to be triggered."
-fi
+true
