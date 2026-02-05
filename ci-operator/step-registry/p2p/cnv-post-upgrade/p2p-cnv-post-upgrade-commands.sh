@@ -1,86 +1,51 @@
 #!/bin/bash
 
 # KubeVirt Lightweight VM Deployment and Verification Script
-# This script deploys a lightweight VM with public images and performs comprehensive health checks
-# for upgrade testing scenarios with pre-upgrade, post-upgrade, and cleanup modes
-
+# This script verifies VM functionality after upgrade and performs cleanup
 
 set -euxo pipefail; shopt -s inherit_errexit
 
+#=====================
+# Validate required files and variables
+#=====================
+if [[ ! -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]]; then
+    echo "[ERROR] Managed cluster kubeconfig not found: ${SHARED_DIR}/managed-cluster-kubeconfig" >&2
+    exit 1
+fi
 
 export KUBECONFIG="${SHARED_DIR}/managed-cluster-kubeconfig"
 
-curl -sL https://github.com/jqlang/jq/releases/latest/download/jq-linux64 > /tmp/jq
-chmod +x /tmp/jq
+#=====================
+# Download jq if not available
+#=====================
+if ! command -v jq &> /dev/null; then
+    echo "[INFO] Downloading jq..."
+    curl -sL https://github.com/jqlang/jq/releases/latest/download/jq-linux64 > /tmp/jq
+    chmod +x /tmp/jq
+fi
 
+#=====================
+# Configuration variables
+#=====================
+result_file="${ARTIFACT_DIR}/junit_post_upgrade_results.xml"
+suite_name="post-upgrade-test"
+vm_name="${CNV_VM_NAME:-vm-ephemeral}"
+namespace="${CNV_VM_NAMESPACE:-default}"
+csv_namespace="${CNV_CSV_NAMESPACE:-openshift-cnv}"
+timeout="${CNV_VM_TIMEOUT:-600}"
+kubectl_cmd="${CNV_KUBECTL_CMD:-oc}"
+virtctl_cmd="${CNV_VIRTCTL_CMD:-virtctl}"
 
-RESULT_FILE="${ARTIFACT_DIR}/junit_post_upgrade_results.xml"
-SUITE_NAME="post-upgrade-test"
+# Colors for output (constants)
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly NC='\033[0m' # No Color
 
-# Initialize empty JUnit file
-init_junit() {
-    cat > "$RESULT_FILE" <<EOF
-    <?xml version="1.0" encoding="UTF-8"?>
-    <testsuite name="$SUITE_NAME" tests="0" failures="0" errors="0" skipped="0">
-    </testsuite>
-EOF
-}
-
-# Append a test case (pass/fail/skip)
-add_testcase_xml() {
-    local classname="$1"
-    local name="$2"
-    local status="$3"
-    local message="${4:-}"
-
-    case "$status" in
-        pass)
-            xml=" <testcase classname=\"$classname\" name=\"$name\"/>"
-            ;;
-        fail)
-            xml=" <testcase classname=\"$classname\" name=\"$name\"><failure message=\"$message\"/></testcase>"
-            ;;
-        skip)
-            xml=" <testcase classname=\"$classname\" name=\"$name\"><skipped message=\"$message\"/></testcase>"
-            ;;
-        *)
-            echo "Invalid status: $status (use pass|fail|skip)" >&2
-            exit 1
-            ;;
-    esac
-
-    # Insert before </testsuite>
-    sed -i "/<\/testsuite>/i $xml" "$RESULT_FILE"
-}
-
-# Update summary values
-update_counts() {
-    local tests failures skipped
-    tests=$(grep -c "<testcase" "$RESULT_FILE" || true)
-    failures=$(grep -c "<failure" "$RESULT_FILE" || true)
-    skipped=$(grep -c "<skipped" "$RESULT_FILE" || true)
-
-    sed -i "s/tests=\"[0-9]*\"/tests=\"$tests\"/" "$RESULT_FILE"
-    sed -i "s/failures=\"[0-9]*\"/failures=\"$failures\"/" "$RESULT_FILE"
-    sed -i "s/skipped=\"[0-9]*\"/skipped=\"$skipped\"/" "$RESULT_FILE"
-}
-
-# Configuration
-VM_NAME="vm-ephemeral"
-NAMESPACE="default"
-CSV_NAMESPACE="openshift-cnv"
-TIMEOUT="600"
-KUBECTL_CMD="oc"
-VIRTCTL_CMD="virtctl"
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
+#=====================
 # Logging functions
+#=====================
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
 }
@@ -97,25 +62,127 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+#=====================
+# JUnit XML functions
+#=====================
+# Initialize empty JUnit file
+init_junit() {
+    cat > "${result_file}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="${suite_name}" tests="0" failures="0" errors="0" skipped="0">
+</testsuite>
+EOF
+}
 
+# Append a test case (pass/fail/skip)
+add_testcase_xml() {
+    local classname="$1"
+    local name="$2"
+    local status="$3"
+    local message="${4:-}"
+    local xml
+    local temp_file
+
+    case "${status}" in
+        pass)
+            xml=" <testcase classname=\"${classname}\" name=\"${name}\"/>"
+            ;;
+        fail)
+            # Escape XML special characters in message
+            message="${message//&/&amp;}"
+            message="${message//</&lt;}"
+            message="${message//>/&gt;}"
+            message="${message//\"/&quot;}"
+            message="${message//\'/&apos;}"
+            xml=" <testcase classname=\"${classname}\" name=\"${name}\"><failure message=\"${message}\"/></testcase>"
+            ;;
+        skip)
+            # Escape XML special characters in message
+            message="${message//&/&amp;}"
+            message="${message//</&lt;}"
+            message="${message//>/&gt;}"
+            message="${message//\"/&quot;}"
+            message="${message//\'/&apos;}"
+            xml=" <testcase classname=\"${classname}\" name=\"${name}\"><skipped message=\"${message}\"/></testcase>"
+            ;;
+        *)
+            echo "Invalid status: ${status} (use pass|fail|skip)" >&2
+            exit 1
+            ;;
+    esac
+
+    # Use a temporary file approach to safely insert XML before </testsuite>
+    temp_file="$(mktemp)"
+    {
+        while IFS= read -r line; do
+            if [[ "${line}" == *"</testsuite>"* ]]; then
+                printf '%s\n' "${xml}"
+            fi
+            printf '%s\n' "${line}"
+        done < "${result_file}"
+    } > "${temp_file}"
+    mv "${temp_file}" "${result_file}"
+}
+
+# Update summary values
+update_counts() {
+    local tests
+    local failures
+    local skipped
+    local temp_file
+
+    # Count test cases, failures, and skipped tests
+    tests="$(grep -c "<testcase" "${result_file}" 2>/dev/null || echo "0")"
+    failures="$(grep -c "<failure" "${result_file}" 2>/dev/null || echo "0")"
+    skipped="$(grep -c "<skipped" "${result_file}" 2>/dev/null || echo "0")"
+    
+    # Remove any newlines and ensure we have clean numeric values
+    tests="$(echo "${tests}" | tr -d '\n\r' | grep -o '[0-9]*' || echo "0")"
+    failures="$(echo "${failures}" | tr -d '\n\r' | grep -o '[0-9]*' || echo "0")"
+    skipped="$(echo "${skipped}" | tr -d '\n\r' | grep -o '[0-9]*' || echo "0")"
+
+    # Ensure variables are numeric (default to 0 if not)
+    tests="${tests:-0}"
+    failures="${failures:-0}"
+    skipped="${skipped:-0}"
+
+    # Use awk for more robust replacement (avoids sed escaping issues)
+    temp_file="$(mktemp)"
+    awk -v tests="${tests}" -v failures="${failures}" -v skipped="${skipped}" '
+        {
+            gsub(/tests="[0-9]+"/, "tests=\"" tests "\"")
+            gsub(/failures="[0-9]+"/, "failures=\"" failures "\"")
+            gsub(/skipped="[0-9]+"/, "skipped=\"" skipped "\"")
+            print
+        }
+    ' "${result_file}" > "${temp_file}"
+    mv "${temp_file}" "${result_file}"
+}
+
+#=====================
+# Prerequisites and VM check functions
+#=====================
 # Check prerequisites
 check_prerequisites() {
     log_info "Checking prerequisites..."
 
     # Check if kubectl command exists
-    if ! command -v ${KUBECTL_CMD} &> /dev/null; then
-        log_error "kubectl command not found: ${KUBECTL_CMD}"
+    if ! command -v "${kubectl_cmd}" &> /dev/null; then
+        log_error "kubectl command not found: ${kubectl_cmd}"
         exit 1
     fi
 
     # Test kubectl connectivity
-    if ! ${KUBECTL_CMD} cluster-info &> /dev/null; then
+    if ! "${kubectl_cmd}" cluster-info &> /dev/null; then
         log_error "kubectl cannot connect to cluster. Please check your kubeconfig."
         exit 1
     fi
 
     # Check if KubeVirt is installed
-    if ! ${KUBECTL_CMD} api-resources | grep kubevirt.io; then
+    # Use explicit check: get api-resources output and verify it contains kubevirt.io
+    local api_resources_output
+    api_resources_output="$("${kubectl_cmd}" api-resources 2>/dev/null || echo "")"
+    if [[ -z "${api_resources_output}" ]] || ! echo "${api_resources_output}" | grep -q kubevirt.io; then
         log_error "KubeVirt API resources not found. Please ensure KubeVirt is installed in the cluster."
         exit 1
     fi
@@ -123,56 +190,58 @@ check_prerequisites() {
     log_success "Prerequisites check passed"
 }
 
-
 check_vm_exists() {
-    if ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
+    if "${kubectl_cmd}" get vm "${vm_name}" -n "${namespace}" &> /dev/null; then
         local phase
-        phase=$(${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
-        log_info "VM ${VM_NAME} exists with phase: ${phase}"
+        phase="$("${kubectl_cmd}" get vm "${vm_name}" -n "${namespace}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")"
+        log_info "VM ${vm_name} exists with phase: ${phase}"
         return 0
     else
-        log_warning "VM ${VM_NAME} does not exist"
+        log_warning "VM ${vm_name} does not exist"
         return 1
     fi
 }
 
+#=====================
+# VM wait functions
+#=====================
 wait_for_vm_running() {
-    log_info "Waiting for VM ${VM_NAME} to reach Running state (timeout: ${TIMEOUT}s)..."
+    log_info "Waiting for VM ${vm_name} to reach Running state (timeout: ${timeout}s)..."
 
     local elapsed=0
     local interval=5
 
-    while [ ${elapsed} -lt ${TIMEOUT} ]; do
+    while (( elapsed < timeout )); do
         local phase
-        phase=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+        phase="$("${kubectl_cmd}" get vmi "${vm_name}" -n "${namespace}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")"
 
-        case ${phase} in
+        case "${phase}" in
             "Running")
-                log_success "VM ${VM_NAME} is now Running"
+                log_success "VM ${vm_name} is now Running"
                 return 0
                 ;;
             "Failed")
-                log_error "VM ${VM_NAME} failed to start"
+                log_error "VM ${vm_name} failed to start"
                 show_vm_details
                 return 1
                 ;;
             "Succeeded")
-                log_warning "VM ${VM_NAME} completed execution"
+                log_warning "VM ${vm_name} completed execution"
                 return 1
                 ;;
             "")
-                log_info "VM ${VM_NAME} not found yet..."
+                log_info "VM ${vm_name} not found yet..."
                 ;;
             *)
-                log_info "VM ${VM_NAME} current phase: ${phase}"
+                log_info "VM ${vm_name} current phase: ${phase}"
                 ;;
         esac
 
-        sleep ${interval}
+        sleep "${interval}"
         elapsed=$((elapsed + interval))
     done
 
-    log_error "Timeout waiting for VM ${VM_NAME} to reach Running state"
+    log_error "Timeout waiting for VM ${vm_name} to reach Running state"
     return 1
 }
 
@@ -184,62 +253,67 @@ wait_for_pod_ready() {
     local pod_name=""
 
     # Wait for launcher pod to be created
-    while [ ${elapsed} -lt ${TIMEOUT} ]; do
+    while (( elapsed < timeout )); do
         # Find the launcher pod by checking ownerReferences
-        pod_name=$(${KUBECTL_CMD} get pods -n ${NAMESPACE} -l kubevirt.io=virt-launcher -o jsonpath='{.items[?(@.metadata.ownerReferences[0].name=="'${VM_NAME}'")].metadata.name}' 2>/dev/null || echo "")
+        pod_name="$("${kubectl_cmd}" get pods -n "${namespace}" -l kubevirt.io=virt-launcher -o jsonpath='{.items[?(@.metadata.ownerReferences[0].name=="'${vm_name}'")].metadata.name}' 2>/dev/null || echo "")"
 
         if [[ -n "${pod_name}" ]]; then
             break
         fi
 
         log_info "Waiting for launcher pod to be created..."
-        sleep ${interval}
+        sleep "${interval}"
         elapsed=$((elapsed + interval))
     done
 
     if [[ -z "${pod_name}" ]]; then
-        log_error "Launcher pod not found for VM ${VM_NAME} after ${TIMEOUT}s"
-        log_info "Available pods in namespace ${NAMESPACE}:"
-        ${KUBECTL_CMD} get pods -n ${NAMESPACE}
+        log_error "Launcher pod not found for VM ${vm_name} after ${timeout}s"
+        log_info "Available pods in namespace ${namespace}:"
+        "${kubectl_cmd}" get pods -n "${namespace}"
         log_info "Pods with virt-launcher label:"
-        ${KUBECTL_CMD} get pods -n ${NAMESPACE} -l kubevirt.io=virt-launcher
+        "${kubectl_cmd}" get pods -n "${namespace}" -l kubevirt.io=virt-launcher
         log_info "VM status:"
-        ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} -o yaml | head -50
+        "${kubectl_cmd}" get vm "${vm_name}" -n "${namespace}" -o yaml | head -50
         return 1
     fi
 
     log_info "Found launcher pod: ${pod_name}"
 
     # Wait for pod to be ready
-    if ${KUBECTL_CMD} wait --for=condition=Ready pod/${pod_name} -n ${NAMESPACE} --timeout=${TIMEOUT}s; then
+    if "${kubectl_cmd}" wait --for=condition=Ready "pod/${pod_name}" -n "${namespace}" --timeout="${timeout}s"; then
         log_success "Launcher pod ${pod_name} is ready"
         return 0
     else
         log_error "Launcher pod ${pod_name} failed to become ready"
-        ${KUBECTL_CMD} describe pod/${pod_name} -n ${NAMESPACE}
+        "${kubectl_cmd}" describe "pod/${pod_name}" -n "${namespace}"
         return 1
     fi
 }
 
+#=====================
+# Health check functions
+#=====================
 # Check HyperConverged Operator status
 check_hco_status() {
     log_info "Checking HyperConverged Operator (HCO) status..."
 
     # Check if jq is available
-    if ! command -v /tmp/jq &> /dev/null; then
-        log_error "jq command not found - required for HCO status parsing"
+    local jq_cmd
+    jq_cmd="$(command -v jq || echo "/tmp/jq")"
+    if [[ ! -x "${jq_cmd}" ]]; then
+        log_error "jq command not found or not executable - required for HCO status parsing"
         return 1
     fi
 
     # Check if HCO exists
-    if ! ${KUBECTL_CMD} get hco -A &> /dev/null; then
+    if ! "${kubectl_cmd}" get hco -A &> /dev/null; then
         log_warning "HyperConverged Operator not found (this may be normal in upstream KubeVirt)"
         return 0
     fi
 
     # Get HCO conditions
     local hco_conditions
-    hco_conditions=$(${KUBECTL_CMD} get hco -A -o jsonpath='{.items[0].status.conditions}' 2>/dev/null || echo "")
+    hco_conditions="$("${kubectl_cmd}" get hco -A -o jsonpath='{.items[0].status.conditions}' 2>/dev/null || echo "")"
 
     if [[ -z "${hco_conditions}" ]]; then
         log_warning "Could not retrieve HCO conditions"
@@ -248,17 +322,17 @@ check_hco_status() {
 
     # Check for Available condition using jq
     local available
-    available=$(echo "${hco_conditions}" | /tmp/jq -r '.[] | select(.type=="Available") | .status' 2>/dev/null || echo "")
+    available="$(echo "${hco_conditions}" | "${jq_cmd}" -r '.[] | select(.type=="Available") | .status' 2>/dev/null || echo "")"
     local progressing
-    progressing=$(echo "${hco_conditions}" | /tmp/jq -r '.[] | select(.type=="Progressing") | .status' 2>/dev/null || echo "")
+    progressing="$(echo "${hco_conditions}" | "${jq_cmd}" -r '.[] | select(.type=="Progressing") | .status' 2>/dev/null || echo "")"
     local degraded
-    degraded=$(echo "${hco_conditions}" | /tmp/jq -r '.[] | select(.type=="Degraded") | .status' 2>/dev/null || echo "")
+    degraded="$(echo "${hco_conditions}" | "${jq_cmd}" -r '.[] | select(.type=="Degraded") | .status' 2>/dev/null || echo "")"
 
     if [[ "${available}" == "True" ]]; then
         log_success "HCO is Available"
     else
         log_error "HCO is not Available (status: ${available})"
-        add_testcase_xml "HCO status check" "HCO not available" fail "HCO is not Available (status: ${available}"
+        add_testcase_xml "HCO status check" "HCO not available" fail "HCO is not Available (status: ${available})"
         return 1
     fi
 
@@ -276,48 +350,40 @@ check_hco_status() {
         return 1
     fi
 
-    # Show HCO version if available
-    local hco_version
-    hco_version=$(${KUBECTL_CMD} get hco -A -o jsonpath='{.items[0].status.versions}' 2>/dev/null || echo "")
-    if [[ -n "${hco_version}" ]]; then
-        log_info "HCO version info available"
-    fi
-
-    add_testcase_xml "HCO status check" "HCO avaialable" pass
-
+    add_testcase_xml "HCO status check" "HCO available" pass
     return 0
 }
 
 check_csv_status() {
-    log_info "Checking ClusterServiceVersion (CSV) status in namespace: ${CSV_NAMESPACE}..."
+    log_info "Checking ClusterServiceVersion (CSV) status in namespace: ${csv_namespace}..."
 
     # Check if the namespace exists
-    if ! ${KUBECTL_CMD} get namespace "${CSV_NAMESPACE}" &> /dev/null; then
-        log_error "Namespace ${CSV_NAMESPACE} does not exist"
-        add_testcase_xml "Check CSV status" "Check ${CSV_NAMESPACE} exists" fail "Namespace ${CSV_NAMESPACE} does not exist"
+    if ! "${kubectl_cmd}" get namespace "${csv_namespace}" &> /dev/null; then
+        log_error "Namespace ${csv_namespace} does not exist"
+        add_testcase_xml "Check CSV status" "Check ${csv_namespace} exists" fail "Namespace ${csv_namespace} does not exist"
         return 1
     fi
 
     # Get CSVs in the specified namespace
     local csvs
-    csvs=$(${KUBECTL_CMD} get csv -n "${CSV_NAMESPACE}" --no-headers 2>/dev/null || echo "")
+    csvs="$("${kubectl_cmd}" get csv -n "${csv_namespace}" --no-headers 2>/dev/null || echo "")"
 
     if [[ -z "${csvs}" ]]; then
-        log_error "No CSVs found in namespace ${CSV_NAMESPACE}"
-        add_testcase_xml "Check CSV status" "Check CSV's in ${CSV_NAMESPACE}" fail "No CSVs found in namespace ${CSV_NAMESPACE}"
+        log_error "No CSVs found in namespace ${csv_namespace}"
+        add_testcase_xml "Check CSV status" "Check CSVs in ${csv_namespace}" fail "No CSVs found in namespace ${csv_namespace}"
         return 1
     fi
 
-    log_info "Found CSVs in namespace: ${CSV_NAMESPACE}"
+    log_info "Found CSVs in namespace: ${csv_namespace}"
 
     # Check each CSV phase - all must be "Succeeded"
     local all_succeeded=true
     while IFS= read -r csv_line; do
         if [[ -n "${csv_line}" ]]; then
             local csv_name
-            csv_name=$(echo "${csv_line}" | awk '{print $1}')
+            csv_name="$(echo "${csv_line}" | awk '{print $1}')"
             local csv_phase
-            csv_phase=$(echo "${csv_line}" | awk '{print $6}')
+            csv_phase="$(echo "${csv_line}" | awk '{print $6}')"
 
             if [[ "${csv_phase}" == "Succeeded" ]]; then
                 log_success "CSV ${csv_name}: ${csv_phase}"
@@ -329,38 +395,25 @@ check_csv_status() {
     done <<< "${csvs}"
 
     if [[ "${all_succeeded}" == "false" ]]; then
-        log_error "One or more CSVs are not in Succeeded phase in namespace ${CSV_NAMESPACE}"
-        add_testcase_xml "Check CSV status" "Check CSV's in ${CSV_NAMESPACE}" fail "One or more CSVs are not in Succeeded phase in namespace ${CSV_NAMESPACE}"
+        log_error "One or more CSVs are not in Succeeded phase in namespace ${csv_namespace}"
+        add_testcase_xml "Check CSV status" "Check CSVs in ${csv_namespace}" fail "One or more CSVs are not in Succeeded phase in namespace ${csv_namespace}"
         return 1
     fi
 
-    log_success "All CSVs in namespace ${CSV_NAMESPACE} are in Succeeded phase"
-    add_testcase_xml "Check CSV status" "Check CSV's in ${CSV_NAMESPACE}" pass "All CSVs in namespace ${CSV_NAMESPACE} are in Succeeded phase"
+    log_success "All CSVs in namespace ${csv_namespace} are in Succeeded phase"
+    add_testcase_xml "Check CSV status" "Check CSVs in ${csv_namespace}" pass "All CSVs in namespace ${csv_namespace} are in Succeeded phase"
     return 0
 }
-
 
 # Check SSH connectivity to VM
 check_ssh_connectivity() {
     log_info "Testing SSH connectivity to VM..."
 
-    if ! command -v ${VIRTCTL_CMD} &> /dev/null; then
-        log_error "virtctl not available: ${VIRTCTL_CMD}"
+    if ! command -v "${virtctl_cmd}" &> /dev/null; then
+        log_error "virtctl not available: ${virtctl_cmd}"
         log_error "SSH connectivity test failed - virtctl is required"
         return 1
     fi
-
-    # Get VM IP address first
-    local vm_ip
-    vm_ip=$(${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o jsonpath='{.status.interfaces[0].ipAddress}' 2>/dev/null || echo "")
-
-    if [[ -z "${vm_ip}" ]]; then
-        log_error "Could not get VM IP address for SSH test"
-        log_error "VM may not have network connectivity"
-        return 1
-    fi
-
-    log_info "VM IP address: ${vm_ip}"
 
     # Test SSH connectivity using virtctl ssh
     log_info "Attempting SSH connection via virtctl..."
@@ -371,27 +424,26 @@ check_ssh_connectivity() {
 
     # Clean up any existing known_hosts entry for this VM to avoid host key conflicts
     local vm_host
-    vm_host="vmi.${VM_NAME}.${NAMESPACE}"
+    vm_host="vmi.${vm_name}.${namespace}"
     if [[ -f ~/.ssh/known_hosts ]]; then
         ssh-keygen -R "${vm_host}" 2>/dev/null || true
     fi
     sleep 5
     # Try virtctl ssh with a simple command and timeout, bypassing host key checking
-    ssh_test_result=$(timeout 10s sshpass -p "gocubsgo" ${VIRTCTL_CMD} ssh cirros@vmi/${VM_NAME} -n ${NAMESPACE} --command="echo 'SSH_TEST_SUCCESS'" -t "-o StrictHostKeyChecking=no" -t "-o UserKnownHostsFile=/dev/null" 2>&1 || echo "failed")
+    ssh_test_result="$(timeout 10s sshpass -p "gocubsgo" "${virtctl_cmd}" ssh "cirros@vmi/${vm_name}" -n "${namespace}" --command="echo 'SSH_TEST_SUCCESS'" -t "-o StrictHostKeyChecking=no" -t "-o UserKnownHostsFile=/dev/null" 2>&1 || echo "failed")"
 
     if [[ "${ssh_test_result}" =~ "SSH_TEST_SUCCESS" ]]; then
-        log_success "SSH connectivity to VM ${VM_NAME} is working"
-        log_info "SSH access available with: ${VIRTCTL_CMD} ssh cirros@vmi/${VM_NAME} -n ${NAMESPACE}"
-        add_testcase_xml "VM deployement check" "SSH access available with: ${VIRTCTL_CMD} ssh cirros@vmi/${VM_NAME} -n ${NAMESPACE}" pass
+        log_success "SSH connectivity to VM ${vm_name} is working"
+        log_info "SSH access available with: ${virtctl_cmd} ssh cirros@vmi/${vm_name} -n ${namespace}"
+        add_testcase_xml "VM deployment check" "SSH access available with: ${virtctl_cmd} ssh cirros@vmi/${vm_name} -n ${namespace}" pass
         return 0
     else
         # Try alternative methods to determine the specific failure
         log_warning "Direct SSH via virtctl failed, analyzing connection..."
-        #sshpass -p 'gocubsgo' ${VIRTCTL_CMD} ssh cirros@vmi/${VM_NAME} -n ${NAMESPACE} -t '-o StrictHostKeyChecking=no'"
 
         # Check if we can at least establish connection (even if auth fails)
         local connection_test
-        connection_test=$(timeout 5s sshpass -p "gocubsgo" ${VIRTCTL_CMD} ssh cirros@vmi/${VM_NAME} -n ${NAMESPACE} --command="exit" -t "-o StrictHostKeyChecking=no" -t "-o UserKnownHostsFile=/dev/null" 2>&1 || echo "")
+        connection_test="$(timeout 5s sshpass -p "gocubsgo" "${virtctl_cmd}" ssh "cirros@vmi/${vm_name}" -n "${namespace}" --command="exit" -t "-o StrictHostKeyChecking=no" -t "-o UserKnownHostsFile=/dev/null" 2>&1 || echo "")"
         if [[ "${connection_test}" =~ "Permission denied" ]] || [[ "${connection_test}" =~ "password" ]] || [[ "${connection_test}" =~ "Host key verification failed" ]]; then
             log_error "SSH connectivity test failed - authentication required"
             add_testcase_xml "SSH Connectivity check" "SSH connectivity test failed" fail "SSH connectivity test failed - authentication required"
@@ -405,13 +457,16 @@ check_ssh_connectivity() {
             add_testcase_xml "SSH Connectivity check" "SSH connectivity test failed" fail "SSH connection timeout - network connectivity issues"
             return 1
         else
-            log_error "SSH connectivity test failed with unexpected errorr: ${connection_test}"
-            add_testcase_xml "SSH Connectivity check" "SSH connectivity test failed" fail "SSH connectivity test failed with unexpected errorr: ${connection_test}"
+            log_error "SSH connectivity test failed with unexpected error: ${connection_test}"
+            add_testcase_xml "SSH Connectivity check" "SSH connectivity test failed" fail "SSH connectivity test failed with unexpected error: ${connection_test}"
             return 1
         fi
     fi
 }
 
+#=====================
+# VM information and cleanup functions
+#=====================
 # Show detailed VM information
 show_vm_details() {
     log_info "VM Details:"
@@ -419,75 +474,69 @@ show_vm_details() {
 
     # VM status
     echo "VM Status:"
-    ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} -o wide 2>/dev/null || log_warning "Could not get VM status"
+    "${kubectl_cmd}" get vm "${vm_name}" -n "${namespace}" -o wide 2>/dev/null || log_warning "Could not get VM status"
     echo ""
 
     # VMI status (if exists)
     echo "VMI Status:"
-    ${KUBECTL_CMD} get vmi ${VM_NAME} -n ${NAMESPACE} -o wide 2>/dev/null || log_warning "Could not get VMI status (VM may not be running)"
+    "${kubectl_cmd}" get vmi "${vm_name}" -n "${namespace}" -o wide 2>/dev/null || log_warning "Could not get VMI status (VM may not be running)"
     echo ""
 
     # VM description
     echo "VM Description:"
-    ${KUBECTL_CMD} describe vm ${VM_NAME} -n ${NAMESPACE} 2>/dev/null || log_warning "Could not describe VM"
+    "${kubectl_cmd}" describe vm "${vm_name}" -n "${namespace}" 2>/dev/null || log_warning "Could not describe VM"
     echo ""
 
     # VMI description
     echo "VMI Description:"
-    ${KUBECTL_CMD} describe vmi ${VM_NAME} -n ${NAMESPACE} 2>/dev/null || log_warning "Could not describe VMI"
+    "${kubectl_cmd}" describe vmi "${vm_name}" -n "${namespace}" 2>/dev/null || log_warning "Could not describe VMI"
     echo ""
 
     # Launcher pod status
     echo "Launcher Pod Status:"
     local pod_name
-    pod_name=$(${KUBECTL_CMD} get pods -n ${NAMESPACE} -l kubevirt.io=virt-launcher --field-selector=status.phase=Running -o jsonpath='{.items[?(@.metadata.ownerReferences[0].name=="'${VM_NAME}'")].metadata.name}' 2>/dev/null || echo "")
+    pod_name="$("${kubectl_cmd}" get pods -n "${namespace}" -l kubevirt.io=virt-launcher --field-selector=status.phase=Running -o jsonpath='{.items[?(@.metadata.ownerReferences[0].name=="'${vm_name}'")].metadata.name}' 2>/dev/null || echo "")"
 
     if [[ -n "${pod_name}" ]]; then
-        ${KUBECTL_CMD} get pod ${pod_name} -n ${NAMESPACE} -o wide
+        "${kubectl_cmd}" get pod "${pod_name}" -n "${namespace}" -o wide
         echo ""
         echo "Pod Events:"
-        ${KUBECTL_CMD} get events --field-selector involvedObject.name=${pod_name} -n ${NAMESPACE} --sort-by='.lastTimestamp' | tail -10
+        "${kubectl_cmd}" get events --field-selector "involvedObject.name=${pod_name}" -n "${namespace}" --sort-by='.lastTimestamp' | tail -10
     else
         log_warning "Launcher pod not found"
         echo "All pods in namespace:"
-        ${KUBECTL_CMD} get pods -n ${NAMESPACE}
+        "${kubectl_cmd}" get pods -n "${namespace}"
     fi
     echo "============================================"
 }
 
 # Cleanup function
 cleanup_vm() {
-    log_info "Cleaning up VM ${VM_NAME}..."
+    log_info "Cleaning up VM ${vm_name}..."
 
-    if ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
-        ${KUBECTL_CMD} delete vm ${VM_NAME} -n ${NAMESPACE} --timeout=60s
+    if "${kubectl_cmd}" get vm "${vm_name}" -n "${namespace}" &> /dev/null; then
+        "${kubectl_cmd}" delete vm "${vm_name}" -n "${namespace}" --timeout=60s
 
         # Wait for VM to be fully deleted
         local elapsed=0
-        while ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null && [ ${elapsed} -lt 60 ]; do
+        while "${kubectl_cmd}" get vm "${vm_name}" -n "${namespace}" &> /dev/null && (( elapsed < 60 )); do
             sleep 2
             elapsed=$((elapsed + 2))
         done
 
-        if ${KUBECTL_CMD} get vm ${VM_NAME} -n ${NAMESPACE} &> /dev/null; then
-            log_warning "VM ${VM_NAME} is still present after cleanup attempt"
+        if "${kubectl_cmd}" get vm "${vm_name}" -n "${namespace}" &> /dev/null; then
+            log_warning "VM ${vm_name} is still present after cleanup attempt"
         else
-            log_success "VM ${VM_NAME} cleaned up successfully"
+            log_success "VM ${vm_name} cleaned up successfully"
         fi
     else
-        log_info "VM ${VM_NAME} not found (already cleaned up)"
+        log_info "VM ${vm_name} not found (already cleaned up)"
     fi
 }
 
-# Cleanup working directory
-# cleanup_workdir() {
-#     if [[ -d "${WORK_DIR}" ]]; then
-#         log_info "Cleaning up working directory: ${WORK_DIR}..."
-#         rm -rf ${WORK_DIR}
-#         log_success "Working directory cleanup completed"
-#     fi
-# }
-
+#=====================
+# Main functions
+#=====================
 # Main function for post-upgrade mode
 main_post_upgrade() {
     log_info "=== POST-UPGRADE MODE ==="
@@ -496,17 +545,12 @@ main_post_upgrade() {
     # Run checks
     check_prerequisites
 
-    # Setup working environment (minimal, just for workdir)
-    # mkdir -p ${WORK_DIR}
-    # cd ${WORK_DIR}
-
     # Check if VM exists
     if ! check_vm_exists; then
-        log_error "VM ${VM_NAME} not found. It should exist from pre-upgrade phase."
+        log_error "VM ${vm_name} not found. It should exist from pre-upgrade phase."
         exit 1
     fi
     init_junit
-
 
     # Skip deployment, just verify
     if wait_for_vm_running; then
@@ -532,12 +576,9 @@ main_post_upgrade() {
             exit 1
         fi
 
-        log_success "VM ${VM_NAME} is functioning correctly after upgrade!"
+        log_success "VM ${vm_name} is functioning correctly after upgrade!"
         log_info "VM remains running. Use --mode cleanup to remove it."
         update_counts
-
-        # Remove VM cleanup trap, keep only workdir cleanup
-        # trap 'cleanup_workdir' EXIT
     else
         log_error "VM verification failed in post-upgrade mode"
         show_vm_details
@@ -554,19 +595,14 @@ main_cleanup() {
     # Run checks
     check_prerequisites
 
-    # Setup minimal working environment
-    # mkdir -p ${WORK_DIR}
-    # cd ${WORK_DIR}
-
     # Clean up VM
     cleanup_vm
-
-    # Clean up working directory
-    # cleanup_workdir
 
     log_success "Cleanup completed successfully!"
 }
 
-# Run main function
+#=====================
+# Execute main functions
+#=====================
 main_post_upgrade
 main_cleanup
