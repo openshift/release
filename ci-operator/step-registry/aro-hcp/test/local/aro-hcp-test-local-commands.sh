@@ -8,6 +8,7 @@ export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
 export CUSTOMER_SUBSCRIPTION; CUSTOMER_SUBSCRIPTION=$(cat "${CLUSTER_PROFILE_DIR}/subscription-name")
 export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscription-id")
+export INFRA_SUBSCRIPTION_ID; INFRA_SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-subscription-id")
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
 az account set --subscription "${SUBSCRIPTION_ID}"
 
@@ -18,8 +19,9 @@ export KUBECONFIG=kubeconfig
 FRONTEND_ADDRESS=$(kubectl get virtualservice -n aro-hcp aro-hcp-vs-frontend -o jsonpath='{.spec.hosts[0]}')
 ADMIN_API_ADDRESS=$(kubectl get virtualservice -n aro-hcp-admin-api admin-api-vs -o jsonpath='{.spec.hosts[0]}')
 
-export DEPLOY_ENV=prow
-make frontend-grant-ingress
+az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
+make frontend-grant-ingress DEPLOY_ENV=prow
+az account set --subscription "${SUBSCRIPTION_ID}"
 
 make e2e/local -o test/aro-hcp-tests FRONTEND_ADDRESS="https://${FRONTEND_ADDRESS}" ADMIN_API_ADDRESS="https://${ADMIN_API_ADDRESS}"
 
