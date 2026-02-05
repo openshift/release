@@ -4,7 +4,7 @@ set -euo pipefail
 # Sanity test on EXISTING cluster - no provisioning
 # Uses kubeconfig and sanity-env from Vault
 
-REMOTE_HOST="${REMOTE_HOST:-nvd-srv-45.nvidia.eng.rdu2.dc.redhat.com}"
+REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
 BUILD_ID="${BUILD_ID:-$(date +%Y%m%d-%H%M%S)}"
 
 echo "=== DPF Sanity Test on Existing Cluster ==="
