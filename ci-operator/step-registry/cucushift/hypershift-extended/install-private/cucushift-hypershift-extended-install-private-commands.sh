@@ -15,6 +15,11 @@ if [[ $HO_MULTI == "true" ]]; then
 fi
 
 OPERATOR_IMAGE="quay.io/rhn_engineering_lgao/hypershift-operator:scale_zero_azure"
+mkdir /tmp/hs-cli
+oc image extract ${OPERATOR_IMAGE} --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson --filter-by-os="linux/amd64"
+chmod +x /tmp/hs-cli/hypershift
+HCP_CLI="/tmp/hs-cli/hypershift"
+
 # Build up the hypershift install command
 COMMAND=(
     "${HCP_CLI}" install
