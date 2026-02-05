@@ -43,7 +43,7 @@ export EXTRA_FLAGS
 rm -f ${SHARED_DIR}/index.json
 pip install jq
 python3.9 --version
-python3.9 -m pip install virtualenv
+python3.9 -m install virtualenv
 python3.9 -m virtualenv venv3
 source venv3/bin/activate
 python3.9 -m pip install pytimeparse futures
