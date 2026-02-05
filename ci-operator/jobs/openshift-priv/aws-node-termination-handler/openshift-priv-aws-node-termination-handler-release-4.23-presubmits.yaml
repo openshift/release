@@ -1,12 +1,11 @@
 presubmits:
-  openshift-priv/sdn:
+  openshift-priv/aws-node-termination-handler:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.17$
-    - ^release-4\.17-
-    cluster: build09
-    context: ci/prow/images
+    - ^release-4\.23$
+    - ^release-4\.23-
+    context: ci/prow/unit
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -16,9 +15,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-sdn-release-4.17-images
-    path_alias: github.com/openshift/sdn
-    rerun_command: /test images
+    name: pull-ci-openshift-priv-aws-node-termination-handler-release-4.23-unit
+    path_alias: openshift/aws-node-termination-handler
+    rerun_command: /test unit
     spec:
       containers:
       - args:
@@ -26,7 +25,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --target=unit
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -62,4 +61,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
