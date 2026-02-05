@@ -184,6 +184,18 @@ function mirror_capi_specific_release() {
       --from quay.io/openshift-release-dev/ocp-release@sha256:1f2c28ac126453a3b9e83b349822b9f1fb7662973a212f936b90fdc40e06eb58 \
       --to ${LOCAL_REGISTRY_DNS_NAME}:${LOCAL_REGISTRY_PORT}/localimages/local-release-image
   fi
+
+  oc apply -f - <<END
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: mirror-config-capi-specific-release
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - ${LOCAL_REGISTRY_DNS_NAME}:${LOCAL_REGISTRY_PORT}/localimages/local-release-image
+    source: quay.io/openshift-release-dev/ocp-v4.0-art-dev
+END
 }
 
 function mirror_file() {
