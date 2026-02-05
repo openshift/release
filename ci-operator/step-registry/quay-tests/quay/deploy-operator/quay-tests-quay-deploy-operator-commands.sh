@@ -56,4 +56,5 @@ for _ in {1..60}; do
 done
 echo "Quay Operator is deployed successfully"
 sleep 1200
+echo "Sleep ended, proceed to next step"
 
