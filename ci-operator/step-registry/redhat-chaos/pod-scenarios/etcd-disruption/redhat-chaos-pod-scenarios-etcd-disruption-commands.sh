@@ -39,7 +39,7 @@ set -x
 ./pod-scenarios/prow_run.sh
 rc=$?
 echo "Done running the test!" 
-oc get pods -n $TARGET_NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}{.status.conditions[?(@.type=="Ready")].lastTransitionTime}{"\t"}{.status.startTime}{"\n"}{end}'     
+oc get pods -n $TARGET_NAMESPACE -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}{.status.conditions[?(@.type=="Ready")].lastTransitionTime}{"\t"}{.status.startTime}{"\t"}{.metadata.creationTimestamp}{"\n"}{end}'     
 
 
 cat /tmp/*.log
@@ -49,3 +49,4 @@ fi
 
 echo "Return code: $rc"
 exit $rc
+ 
