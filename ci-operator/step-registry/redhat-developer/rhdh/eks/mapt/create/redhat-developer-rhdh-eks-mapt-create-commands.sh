@@ -68,5 +68,10 @@ mapt aws eks create \
   --spot \
   --addons aws-ebs-csi-driver,coredns,eks-pod-identity-agent,kube-proxy,vpc-cni \
   --load-balancer-controller \
-  --tags app-code=rhdh-003,service-phase=dev,cost-center=726 && \
+  --tags app-code=rhdh-003,service-phase=dev,cost-center=726
+if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
+  echo "[ERROR] ❌ kubeconfig file not found at ${SHARED_DIR}/kubeconfig"
+  echo "[ERROR] ❌ Failed to create MAPT EKS cluster"
+  exit 1
+fi
 echo "[SUCCESS] ✅ MAPT EKS cluster created successfully"
