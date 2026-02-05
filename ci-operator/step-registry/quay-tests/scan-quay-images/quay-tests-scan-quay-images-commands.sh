@@ -11,7 +11,9 @@ read_secret() {
 }
 
 # Retrieve registry.redhat.io credentials
+# shellcheck disable=SC2034  # Used indirectly via scan_configs array
 QUAY_REGISTRY_REDHAT_IO_USERNAME=$(cat /var/run/quay-qe-registry-redhat-io-secret/username)
+# shellcheck disable=SC2034  # Used indirectly via scan_configs array
 QUAY_REGISTRY_REDHAT_IO_PASSWORD=$(cat /var/run/quay-qe-registry-redhat-io-secret/password)
 
 # Define component list
