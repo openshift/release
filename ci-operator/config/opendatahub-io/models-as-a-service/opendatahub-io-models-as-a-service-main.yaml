@@ -3,7 +3,7 @@ build_root:
     dockerfile_literal: |-
       FROM registry.access.redhat.com/ubi9/go-toolset:1.25
       USER 0
-      RUN yum install -y --nodocs --allowerasing jq
+      RUN yum install -y --nodocs --allowerasing jq httpd-tools
       RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
       RUN mv kustomize /usr/local/bin/
       RUN yum clean all && rm -rf /var/cache/yum
@@ -41,6 +41,7 @@ tests:
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "3"
     test:
+    - ref: idp-htpasswd
     - as: e2e-maas-api-openshift
       cli: latest
       commands: ./test/e2e/scripts/prow_run_smoke_test.sh

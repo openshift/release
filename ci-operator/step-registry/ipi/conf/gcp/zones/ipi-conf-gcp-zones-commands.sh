@@ -12,10 +12,41 @@ ZONES_COUNT=3
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
+function get_zones_from_region() {
+  # Get all zones from the region, filtering out AI zones
+  mapfile -t AVAILABILITY_ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)' | grep -v '\-ai[0-9]' | shuf)
+  
+  # Take the first ZONES_COUNT zones
+  ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
+  ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
+  echo "GCP region: ${GCP_REGION} (zones: ${ZONES_STR})"
+}
+
 function get_zones_by_machine_type() {
   local machine_type=$1
 
-  mapfile -t AVAILABILITY_ZONES < <(gcloud compute machine-types list --filter="zone~${GCP_REGION} AND name=${machine_type}" --format='value(zone)' | sort)
+  # Get all zones that support this machine type
+  mapfile -t AVAILABILITY_ZONES < <(gcloud compute machine-types list --filter="zone~${GCP_REGION} AND name=${machine_type}" --format='value(zone)')
+  
+  # Filter out AI zones if this is not an AI machine type (AI types start with "a2-")
+  if [[ ! "${machine_type}" =~ ^a2- ]]; then
+    # Filter out zones containing "-ai" followed by a digit (e.g., us-central1-ai1a)
+    local filtered_zones=()
+    for zone in "${AVAILABILITY_ZONES[@]}"; do
+      if [[ ! "${zone}" =~ -ai[0-9] ]]; then
+        filtered_zones+=("${zone}")
+      fi
+    done
+    # Only use filtered zones if we found non-AI zones, otherwise use all zones
+    if [[ ${#filtered_zones[@]} -gt 0 ]]; then
+      AVAILABILITY_ZONES=("${filtered_zones[@]}")
+    fi
+  fi
+  
+  # Shuffle zones randomly to spread load across zones instead of always picking alphabetically first
+  mapfile -t AVAILABILITY_ZONES < <(printf '%s\n' "${AVAILABILITY_ZONES[@]}" | shuf)
+  
+  # Take the first ZONES_COUNT zones
   ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
   ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
   echo "[${machine_type}] GCP region: ${GCP_REGION} (zones: ${ZONES_STR})"
@@ -51,6 +82,9 @@ if [[ -n "${CONTROL_PLANE_ZONES}" ]]; then
   ZONES_STR="${CONTROL_PLANE_ZONES}"
 elif [[ -n "${CONTROL_PLANE_NODE_TYPE}" ]]; then
   get_zones_by_machine_type "${CONTROL_PLANE_NODE_TYPE}"
+else
+  # If no zones are set, get standard zones from the region (excluding AI zones)
+  get_zones_from_region
 fi  
 if [[ -n "${ZONES_STR}" ]]; then
   cat >> "${PATCH}" << EOF

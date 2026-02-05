@@ -247,16 +247,13 @@ CONFIG = {
         'default': 1,
     },
     'aro-hcp-stg-quota-slice': {
-        'default': 3,
+        'default': 5,
     },
     'aro-hcp-prod-quota-slice': {
-        'default': 7,
-    },
+        'default': 10
+  },
     'aro-hcp-dev-quota-slice': {
-        'default': 10,
-    },
-    'aro-hcp-test-tenant-quota-slice': {
-        'default': 10,
+        'default': 15,
     },
     'aro-hcp-test-msi-containers-dev': {},
     'aro-hcp-test-msi-containers-int': {},
@@ -327,9 +324,7 @@ CONFIG = {
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
-    'libvirt-s390x-vpn-quota-slice': {
-        'libvirt-s390x-0-1': 1
-    },
+    'libvirt-s390x-vpn-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -367,12 +362,8 @@ CONFIG = {
     'openstack-vh-mecha-central-quota-slice': {
         'default': 3,
     },
-    'openstack-vh-mecha-az0-quota-slice': {
-        'default': 3,
-    },
     'openstack-vh-bm-rhos-quota-slice': {
         'openstack-vh-mecha-central': 3,
-        'openstack-vh-mecha-az0': 3,
         'openstack-hwoffload': 3,
     },
     'openstack-ppc64le-quota-slice': {},
@@ -407,6 +398,15 @@ CONFIG = {
     },
     'hypershift-quota-slice': {
         'default': 50,
+    },
+    'hypershift-aws-quota-slice': {
+        'default': 30,
+    },
+    'hypershift-aks-quota-slice': {
+        'default': 20,
+    },
+    'hypershift-gcp-quota-slice': {
+        'default': 10,
     },
     'powervc-1-quota-slice': {
         'default': 4,
@@ -619,11 +619,22 @@ CONFIG = {
     'metal-redhat-gs-quota-slice': {
         'default': 1,
     },
+    'rosa-regional-platform-int-quota-slice': {
+        'us-east-1': 15,
+        'us-east-2': 15,
+    },
 }
 
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
+
+for i in range(3):
+    for j in range(4):
+        CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
+del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-0']
+del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
+
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
@@ -681,14 +692,16 @@ for i in range(4):
 for i in range(4):
     CONFIG['powervs-7-quota-slice']['lon06-powervs-7-quota-slice-{}'.format(i)] = 1
 
-for i in range(2):
+for i in range(4):
     CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
 
-for i in range(120):
+for i in range(300):
     CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
+for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-int']['aro-hcp-test-msi-containers-int-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
+
 
 
 

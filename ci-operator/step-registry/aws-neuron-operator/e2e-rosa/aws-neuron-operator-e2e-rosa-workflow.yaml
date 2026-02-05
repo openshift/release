@@ -1,0 +1,27 @@
+workflow:
+  as: aws-neuron-operator-e2e-rosa
+  steps:
+    env:
+      HOSTED_CP: "true"
+      ENABLE_BYOVPC: "true"
+      ZONES_COUNT: "1"
+      COMPUTE_MACHINE_TYPE: "inf2.xlarge"
+      REPLICAS: "2"
+      DISABLE_WORKLOAD_MONITORING: "false"
+      OCM_LOGIN_ENV: "production"
+      MP_MACHINE_TYPE: "trn1.32xlarge"
+      MP_REPLICAS: "2"
+      MP_MULTI_AZ: "false"
+    pre:
+    - chain: rosa-aws-sts-hcp-provision
+    - ref: rosa-conf-machine-pool
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
+    test:
+    - ref: aws-neuron-operator-test
+    post:
+    - chain: rosa-aws-sts-hcp-deprovision
+  documentation: |-
+    This workflow provisions a ROSA HCP cluster with 2x AWS Inferentia (inf2.xlarge)
+    as default compute and 2x Trainium (trn1.32xlarge) as additional machine pool,
+    then runs the AWS Neuron operator E2E tests using eco-gotests framework.

@@ -45,9 +45,11 @@ function ci_copy_secrets() {
 
     # Set up the SSH keys at the expected location
     if [ -e /tmp/ssh-publickey ] && [ -e /tmp/ssh-privatekey ] ; then
-        cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
-        cp /tmp/ssh-privatekey ~/.ssh/id_rsa
-        chmod 0400 ~/.ssh/id_rsa*
+        cp /tmp/ssh-publickey  "${HOME}/.ssh/id_rsa.pub"
+        cp /tmp/ssh-privatekey "${HOME}/.ssh/id_rsa"
+
+        chmod 0400 "${HOME}/.ssh/id_rsa" "${HOME}/.ssh/id_rsa.pub"
+        rm -vf /tmp/ssh-publickey /tmp/ssh-privatekey
     fi
 
     # Set up the pull secret at the expected location
@@ -70,6 +72,19 @@ EOF
         else
             cp /tmp/pull-secret "${PULL_SECRET}"
         fi
+
+        chmod 0600 "${PULL_SECRET}"
+        rm -vf /tmp/pull-secret /tmp/pull-secret-stage /tmp/registry.stage.redhat.io
+    fi
+
+    # Set up the OCP mirror username and password at the expected location
+    if [ -e /tmp/ocp_mirror_username ] && [ -e /tmp/ocp_mirror_password ] ; then
+        echo "Setting up OCP mirror username and password"
+        cp /tmp/ocp_mirror_username "${HOME}/.ocp_mirror_username"
+        cp /tmp/ocp_mirror_password "${HOME}/.ocp_mirror_password"
+
+        chmod 0600 "${HOME}/.ocp_mirror_username" "${HOME}/.ocp_mirror_password"
+        rm -vf /tmp/ocp_mirror_username /tmp/ocp_mirror_password
     fi
 
     # Set up the AWS CLI keys at the expected location for accessing the cached data.
@@ -96,6 +111,8 @@ EOF
 
         # Permissions and environment settings
         chmod -R go-rwx "${HOME}/.aws/"
+        rm -vf /tmp/aws_access_key_id /tmp/aws_secret_access_key
+
         export AWS_PROFILE=microshift-ci
         export AWS_BUCKET_NAME="microshift-build-cache-${cache_region}"
     fi
@@ -124,6 +141,8 @@ set -euo pipefail
 subscription-manager register \
     --org="$(cat /tmp/subscription-manager-org)" \
     --activationkey="$(cat /tmp/subscription-manager-act-key)"
+
+rm -vf /tmp/subscription-manager-org /tmp/subscription-manager-act-key
 EOF
     chmod +x "${submgr_script}"
 
