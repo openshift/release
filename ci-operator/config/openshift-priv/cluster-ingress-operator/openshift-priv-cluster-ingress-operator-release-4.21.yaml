@@ -11,26 +11,11 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.21_base-rhel9:
-    name: 4.21-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-ingress-operator
 images:
-- inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: cluster-ingress-operator
+- to: cluster-ingress-operator
 promotion:
   to:
   - name: 4.21-priv
@@ -62,12 +47,12 @@ tests:
 - as: e2e-hypershift
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-ovn-hypershift-conformance
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
@@ -268,7 +253,7 @@ tests:
 - as: hypershift-e2e-aks
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aks
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"

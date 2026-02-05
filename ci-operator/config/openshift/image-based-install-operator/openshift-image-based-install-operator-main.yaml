@@ -12,31 +12,31 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   installer:
-    name: "4.19"
+    name: "4.22"
     namespace: ocp
     tag: installer
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-9-release-golang-1.22-openshift-4.19
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: image-based-install-operator
+- dockerfile_literal: |
+    FROM placeholder
+  from: src
+  to: image-based-install-operator-code
+promotion:
+  to:
+  - name: "2.12"
+    namespace: stolostron
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -93,11 +93,12 @@ tests:
     dependencies:
       BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
       IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
-      IMG: image-based-install-operator
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       CLUSTERTYPE: assisted_medium_el9
-      SEED_IMAGE_TAG: "4.19"
+      SEED_IMAGE_TAG: "4.22"
     workflow: image-based-install-operator-ofcir
 - as: e2e-ibio-periodic
   capabilities:
@@ -108,10 +109,11 @@ tests:
     dependencies:
       BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
       IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
-      IMG: image-based-install-operator
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      SEED_IMAGE_TAG: "4.19"
+      SEED_IMAGE_TAG: "4.22"
     workflow: image-based-install-operator-ofcir
 - as: ibio-reinstall
   capabilities:
@@ -123,11 +125,12 @@ tests:
     dependencies:
       BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
       IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
-      IMG: image-based-install-operator
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       CLUSTERTYPE: assisted_medium_el9
-      SEED_IMAGE_TAG: "4.19"
+      SEED_IMAGE_TAG: "4.22"
     workflow: image-based-install-operator-ofcir-reinstall
 - as: ibio-reinstall-periodic
   capabilities:
@@ -138,10 +141,11 @@ tests:
     dependencies:
       BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
       IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
-      IMG: image-based-install-operator
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      SEED_IMAGE_TAG: "4.19"
+      SEED_IMAGE_TAG: "4.22"
     workflow: image-based-install-operator-ofcir-reinstall
 zz_generated_metadata:
   branch: main

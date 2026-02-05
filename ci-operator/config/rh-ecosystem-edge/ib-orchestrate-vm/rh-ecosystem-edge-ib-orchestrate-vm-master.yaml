@@ -3,6 +3,18 @@ base_images:
     name: bip-orchestrate-vm
     namespace: edge-infrastructure
     tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  image-based-install-operator:
+    name: "2.12"
+    namespace: stolostron
+    tag: image-based-install-operator
+  image-based-install-operator-code:
+    name: "2.12"
+    namespace: stolostron
+    tag: image-based-install-operator-code
   installer:
     name: "4.22"
     namespace: ocp
@@ -27,7 +39,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-9-release-golang-1.22-openshift-4.19
 images:
 - dockerfile_literal: |
     FROM placeholder
@@ -70,6 +82,48 @@ tests:
       OCP_TARGET_VERSION: "4.21"
       SEED_IMAGE_TAG_FORMAT: presubmit
     workflow: openshift-image-based-upgrade-presubmit
+- always_run: false
+  as: ibu-e2e-flow-v4v6
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: ib-orchestrate-vm
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: pipeline:recert
+      TARGET_LCA_REF: pipeline:lifecycle-agent-operator-bundle-4-21
+    env:
+      IP_STACK: v4v6
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      OCP_TARGET_IMAGE_SOURCE: ci
+      OCP_TARGET_VERSION: "4.21"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: v4v6
+    workflow: openshift-image-based-upgrade-presubmit
+- always_run: false
+  as: ibu-e2e-flow-v6v4
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: ib-orchestrate-vm
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: pipeline:recert
+      TARGET_LCA_REF: pipeline:lifecycle-agent-operator-bundle-4-21
+    env:
+      IP_STACK: v6v4
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      OCP_TARGET_IMAGE_SOURCE: ci
+      OCP_TARGET_VERSION: "4.21"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: v6v4
+    workflow: openshift-image-based-upgrade-presubmit
 - as: ibi-e2e-flow
   optional: true
   skip_if_only_changed: ^(?:.*\.md$|(?:^|/)LICENSE$|\.gitignore$)$
@@ -88,6 +142,44 @@ tests:
       SEED_IMAGE_TAG_FORMAT: presubmit
       SEED_IMAGE_TAG_PREFIX: ibi
     workflow: openshift-image-based-install
+- always_run: false
+  as: ibi-e2e-flow-v4v6
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: pipeline:recert
+    env:
+      IP_STACK: v4v6
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: ibi-v4v6
+    workflow: openshift-image-based-install
+- always_run: false
+  as: ibi-e2e-flow-v6v4
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: pipeline:recert
+    env:
+      IP_STACK: v6v4
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: ibi-v6v4
+    workflow: openshift-image-based-install
 - as: ipc-e2e-flow
   skip_if_only_changed: ^(?:.*\.md$|(?:^|/)LICENSE$|\.gitignore$)$
   steps:
@@ -105,6 +197,72 @@ tests:
       SEED_IMAGE_TAG_FORMAT: presubmit
       SEED_IMAGE_TAG_PREFIX: ibi
     workflow: openshift-image-based-network-configuration
+- always_run: false
+  as: ipc-e2e-flow-v4v6
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: pipeline:recert
+    env:
+      IP_STACK: v4v6
+      IPC_IPV4_ADDRESS: 192.168.128.80
+      IPC_IPV4_GATEWAY: 192.168.128.1
+      IPC_IPV4_MACHINE_NETWORK: 192.168.128.0/24
+      IPC_IPV6_ADDRESS: fd00:128::80
+      IPC_IPV6_GATEWAY: fd00:128::1
+      IPC_IPV6_MACHINE_NETWORK: fd00:128::/64
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: v4v6
+    workflow: openshift-image-based-network-configuration
+- always_run: false
+  as: ipc-e2e-flow-v6v4
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: pipeline:recert
+    env:
+      IP_STACK: v6v4
+      IPC_IPV4_ADDRESS: 192.168.128.80
+      IPC_IPV4_GATEWAY: 192.168.128.1
+      IPC_IPV4_MACHINE_NETWORK: 192.168.128.0/24
+      IPC_IPV6_ADDRESS: fd00:128::80
+      IPC_IPV6_GATEWAY: fd00:128::1
+      IPC_IPV6_MACHINE_NETWORK: fd00:128::/64
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: v6v4
+    workflow: openshift-image-based-network-configuration
+- as: e2e-ibio
+  capabilities:
+  - intranet
+  skip_if_only_changed: ^(?:.*\.md$|(?:^|/)LICENSE$|\.gitignore$)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: ib-orchestrate-vm
+      IBIO_CODE_IMAGE: pipeline:image-based-install-operator-code
+      IBIO_IMAGE: pipeline:image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      CLUSTERTYPE: assisted_medium_el9
+      SEED_IMAGE_TAG: "4.22"
+    workflow: image-based-install-operator-ofcir
 zz_generated_metadata:
   branch: master
   org: rh-ecosystem-edge
