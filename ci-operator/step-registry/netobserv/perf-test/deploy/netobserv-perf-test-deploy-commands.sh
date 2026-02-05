@@ -63,7 +63,7 @@ if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
 fi
 
 if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
-    patch_netobserv "flp" "quay.io/jotak/flowlogs-pipeline:revert-go-k8s"
+    patch_netobserv "flp" "quay.io/jotak/flowlogs-pipeline:revert-ubi"
 fi
 
 patch_netobserv "plugin" "quay.io/netobserv/network-observability-console-plugin:main"
