@@ -539,6 +539,8 @@ fi
 # Build hypervisor and VM SSH configuration
 build_hypervisor_vm_config
 
+sleep 5h
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade
