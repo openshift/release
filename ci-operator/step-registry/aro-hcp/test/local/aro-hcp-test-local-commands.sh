@@ -23,7 +23,7 @@ az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 make frontend-grant-ingress DEPLOY_ENV=prow
 az account set --subscription "${SUBSCRIPTION_ID}"
 
-make e2e/local -o test/aro-hcp-tests FRONTEND_ADDRESS="https://${FRONTEND_ADDRESS}" ADMIN_API_ADDRESS="https://${ADMIN_API_ADDRESS}"
+make e2e/local -o test/aro-hcp-tests SKIP_CERT_VERIFICATION=true FRONTEND_ADDRESS="https://${FRONTEND_ADDRESS}" ADMIN_API_ADDRESS="https://${ADMIN_API_ADDRESS}"
 
 # the make target produces a junit.xml in ARTIFACT_DIR.  We want to copy to SHARED_DIR so we can create
 # direct debugging links for the individual tests that failed.
