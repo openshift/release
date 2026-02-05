@@ -14,17 +14,11 @@ az account set --subscription "${SUBSCRIPTION_ID}"
 unset GOFLAGS
 make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
 export KUBECONFIG=kubeconfig
-PIDFILE="/tmp/svc-tunnel.pid"
-MONITOR_PIDFILE="/tmp/svc-monitor.pid"
-NAMESPACE="aro-hcp"
-SERVICE="aro-hcp-frontend"
-LOCAL_PORT=8443
-REMOTE_PORT=8443
-
 
 FRONTEND_ADDRESS=$(kubectl get virtualservice -n aro-hcp aro-hcp-vs-frontend -o jsonpath='{.spec.hosts[0]}')
 ADMIN_API_ADDRESS=$(kubectl get virtualservice -n aro-hcp-admin-api admin-api-vs -o jsonpath='{.spec.hosts[0]}')
 
+export DEPLOY_ENV=prow
 make frontend-grant-ingress
 
 make e2e/local -o test/aro-hcp-tests FRONTEND_ADDRESS="https://${FRONTEND_ADDRESS}" ADMIN_API_ADDRESS="https://${ADMIN_API_ADDRESS}"
