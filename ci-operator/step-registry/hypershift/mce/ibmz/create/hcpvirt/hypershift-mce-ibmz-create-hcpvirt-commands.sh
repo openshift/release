@@ -99,8 +99,6 @@ oc apply -f /tmp/hc-manifests/cluster-agent.yaml
 oc wait --timeout=15m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
 echo "$(date) Kubevirt cluster is available"
 
-
-
 # Install IBM Cloud CLI
 export PATH="$HOME/.tmp/bin:$PATH"
 mkdir -p "$HOME/.tmp/bin"
@@ -280,7 +278,6 @@ create_sg_rule() {
 sg_name="$CLUSTER_NAME-sg"
 create_sg_rule $sg_name inbound tcp 30000 33000
 create_sg_rule $sg_name inbound tcp 3128 3128
-
 
 echo "$(date) Create hosted cluster kubeconfig"
 ${HYPERSHIFT_CLI_NAME} create kubeconfig kubevirt \

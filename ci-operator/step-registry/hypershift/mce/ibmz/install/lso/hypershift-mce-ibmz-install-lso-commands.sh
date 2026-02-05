@@ -14,12 +14,12 @@ echo "⏳ Waiting for Local Storage Operator packagemanifest to appear..."
 while true; do
     if oc get packagemanifests -n openshift-marketplace 2>/dev/null \
         | grep -i "local-storage"; then
-        echo "✅ Local Storage Operator packagemanifest found!"
+        echo "Local Storage Operator packagemanifest found!"
         break
     fi
 
     if [[ $elapsed -ge $timeout ]]; then
-        echo "❌ Timed out waiting for Local Storage Operator packagemanifest."
+        echo "Timed out waiting for Local Storage Operator packagemanifest."
         exit 1
     fi
 
@@ -100,8 +100,6 @@ oc wait --for=jsonpath='{.status.phase}'=Succeeded \
     -n openshift-local-storage \
     csv/${CSV}
 
-sleep 30
-
 # Create LocalVolumeDiscovery
 oc apply -f - <<EOF
 kind: LocalVolumeDiscovery
@@ -143,8 +141,8 @@ done
 
 # Validation
 if oc get pods -n openshift-local-storage 2>/dev/null | grep -E "Running" >/dev/null; then
-    echo "✅ Successfully installed local-storage-operator."
+    echo "Successfully installed local-storage-operator."
 else
-    echo "❌ Local-storage-operator installation failed."
+    echo "Local-storage-operator installation failed."
     exit 1
 fi
