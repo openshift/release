@@ -59,14 +59,14 @@ fi
 createFlowCollector ${PARAMETERS}
 
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
-    patch_netobserv "ebpf" "quay.io/netobserv/netobserv-ebpf-agent:c44862a"
+    patch_netobserv "ebpf" "quay.io/netobserv/netobserv-ebpf-agent:main"
 fi
 
 if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
-    patch_netobserv "flp" "quay.io/netobserv/flowlogs-pipeline:6abb827"
+    patch_netobserv "flp" "quay.io/jotak/flowlogs-pipeline:revert-go-k8s"
 fi
 
-patch_netobserv "plugin" "quay.io/netobserv/network-observability-console-plugin:1d61a10"
+patch_netobserv "plugin" "quay.io/netobserv/network-observability-console-plugin:main"
 # get NetObserv metadata
 NETOBSERV_RELEASE=$(oc get pods -l app=netobserv-operator -o jsonpath="{.items[*].spec.containers[0].env[?(@.name=='OPERATOR_CONDITION_NAME')].value}" -A)
 
