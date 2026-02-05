@@ -358,7 +358,7 @@ config_updater_vault_secret:  build_farm_credentials_folder
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_applyconfig_latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
 		--rm \
-		-v "$(CURDIR)/clusters/build-clusters/common:/manifests$(VOLUME_MOUNT_FLAGS)" \
+		-v "$(CURDIR)/clusters/build-clusters/common_all-clusters/common:/manifests$(VOLUME_MOUNT_FLAGS)" \
 		-v "$(kubeconfig_path):/_kubeconfig$(VOLUME_MOUNT_FLAGS)" \
 		quay.io/openshift/ci-public:ci_applyconfig_latest \
 		--config-dir=/manifests \
@@ -400,7 +400,7 @@ update_github_ldap_mapping_config_map:
 .PHONY: update_github_ldap_mapping_config_map
 
 download_dp_crd:
-	curl -o clusters/build-clusters/common/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
+	curl -o clusters/build-clusters/common_all-clusters/common/testimagestreamtagimport.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/testimagestreamtagimport/v1/ci.openshift.io_testimagestreamtagimports.yaml
 	curl -o clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml https://raw.githubusercontent.com/openshift/ci-tools/main/pkg/api/pullrequestpayloadqualification/v1/ci.openshift.io_pullrequestpayloadqualificationruns.yaml
 .PHONY: download_dp_crd
 
@@ -416,7 +416,7 @@ sed_cmd := gsed
 timeout_cmd := gtimeout
 endif
 
-crds = 'clusters/build-clusters/common/testimagestreamtagimport.yaml' 'clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml' 'clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml'
+crds = 'clusters/build-clusters/common_all-clusters/common/testimagestreamtagimport.yaml' 'clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml' 'clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml'
 
 $(crds):
 	@#remove the empty lines at the beginning of the file. We do this to pass the yaml lint

@@ -31,11 +31,11 @@ See [OpenShift documentation](https://docs.openshift.com/container-platform/4.11
 
 Create the namespaces:
 
-> oc apply -f clusters/build-clusters/common/00_namespaces.yaml
+> oc apply -f clusters/build-clusters/common_all-clusters/common/00_namespaces.yaml
 
 Create the SA for the `appyconfig` job:
 
-> oc apply -f clusters/build-clusters/common/prow/admin_config-updater_rbac.yaml
+> oc apply -f clusters/build-clusters/common_all-clusters/common/prow/admin_config-updater_rbac.yaml
 
 Note that this will promote `system:serviceaccount:ci:config-updater` to `cluster-admin`.
 
