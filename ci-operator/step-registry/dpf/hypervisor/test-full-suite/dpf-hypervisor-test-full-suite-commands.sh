@@ -35,10 +35,10 @@ fi
 
 echo "Cluster connectivity confirmed"
 
-# Run e2e tests
+# Run tests
 echo ""
-echo "=== Running E2E Tests ==="
-${SSH} "cd ${REMOTE_WORK_DIR} && make e2e"
+echo "=== Running DPF Sanity Tests ==="
+${SSH} "cd ${REMOTE_WORK_DIR} && make run-dpf-sanity"
 TEST_RESULT=$?
 
 # Collect artifacts
