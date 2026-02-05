@@ -1,3 +1,12 @@
+base_images:
+  cluster-api-actuator-pkg-test:
+    name: cluster-api-actuator-pkg-test
+    namespace: ci
+    tag: "4.22"
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
 build_root:
   from_repository: true
 images:
@@ -77,6 +86,19 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-gcp
+- as: regression-clusterinfra-gcp-ipi-mapi-tls
+  optional: true
+  run_if_changed: ^(go\.mod|go\.sum)$
+  steps:
+    cluster_profile: gcp
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build10.ci.openshift.org/ci-ln-sjfd8wb/release:latest
+      E2E_RUN_TAGS: '@mapi'
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: periodic&&!qe-only&&mapi
+      TEST_SCENARIOS: Cluster_Infrastructure CMA
+    test:
+    - chain: openshift-e2e-test-clusterinfra-qe-regression
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: e2e-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
