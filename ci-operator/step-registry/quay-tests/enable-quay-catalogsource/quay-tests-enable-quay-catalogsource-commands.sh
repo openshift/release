@@ -69,7 +69,7 @@ kind: ImageDigestMirrorSet
 metadata:
   name: konflux-quay-registry
 spec:
-  repositoryDigestMirrors:
+  imageDigestMirrors:
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-11
