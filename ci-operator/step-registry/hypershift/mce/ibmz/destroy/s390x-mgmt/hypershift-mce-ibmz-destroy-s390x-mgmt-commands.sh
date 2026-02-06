@@ -5,17 +5,12 @@ set -o pipefail
 
 job_id=$(echo -n $PROW_JOB_ID|cut -c-8)
 export job_id
-export CLUSTER_NAME="hcp-s390x-mgmt-ci-$job_id"
+export CLUSTER_NAME="${CLUSTER_NAME_PREFIX}-${job_id}"
 CLUSTER_ARCH=s390x
 export CLUSTER_ARCH
 #export CLUSTER_VERSION="4.19.0"
 cat "${AGENT_IBMZ_CREDENTIALS}/abi-pull-secret" | jq -c > "$HOME/pull-secret" 
 export PULL_SECRET_FILE="$HOME/pull-secret"
-
-CONTROL_NODE_PROFILE=cz2-16x32
-export CONTROL_NODE_PROFILE
-COMPUTE_NODE_PROFILE=cz2-16x32
-export COMPUTE_NODE_PROFILE
 
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
 export ssh_key_string
@@ -55,6 +50,9 @@ sed -i "s/^IC_CLI_VERSION=.*/IC_CLI_VERSION=\"$IC_CLI_VERSION\"/" "$VARS_FILE"
 sed -i "s|^OCP_RELEASE_IMAGE=.*|OCP_RELEASE_IMAGE=\"$OCP_RELEASE_IMAGE\"|" "$VARS_FILE"
 sed -i "s/^CONTROL_NODE_PROFILE=.*/CONTROL_NODE_PROFILE=\"$CONTROL_NODE_PROFILE\"/" "$VARS_FILE"
 sed -i "s/^COMPUTE_NODE_PROFILE=.*/COMPUTE_NODE_PROFILE=\"$COMPUTE_NODE_PROFILE\"/" "$VARS_FILE"
+sed -i "s/^VSI_IMAGE_NAME=.*/VSI_IMAGE_NAME=\"$VSI_IMAGE_NAME\"/" "$VARS_FILE"
+sed -i "s/^ENABLE_NESTED_VIRT=.*/ENABLE_NESTED_VIRT=\"$ENABLE_NESTED_VIRT\"/" "$VARS_FILE"
+sed -i "s/^CREATE_STORAGE_CLASS=.*/CREATE_STORAGE_CLASS=\"$CREATE_STORAGE_CLASS\"/" "$VARS_FILE"
 
 mkdir -p "$HOME/$CLUSTER_NAME/"
 # Run the install-prerequisites.sh script to delete the OCP cluster in IBM cloud VPC
