@@ -801,6 +801,37 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
+- always_run: false
+  as: e2e-aws-cnv-sig-node
+  steps:
+    cluster_profile: aws-5
+    env:
+      TEST_SUITE: openshift/nodes/cnv
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - ref: interop-tests-deploy-cnv
+    test:
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-azure-fips-cnv-sig-node
+  steps:
+    cluster_profile: azure4
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/nodes/cnv
+    observers:
+      enable:
+      - observers-resource-watch
+    pre:
+    - chain: ipi-azure-pre
+    - ref: fips-check
+    - ref: interop-tests-deploy-cnv
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-azure
 zz_generated_metadata:
   branch: release-4.21
   org: openshift
