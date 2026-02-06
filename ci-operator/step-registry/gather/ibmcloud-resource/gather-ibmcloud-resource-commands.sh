@@ -72,9 +72,9 @@ function ibmcloud_login {
   "${IBMCLOUD_CLI}" config --check-version=false
   echo "Try to login..."
   if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
-      "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${SHARED_DIR}/ibmcloud-min-permission-api-key -q"
+      "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${SHARED_DIR}/ibmcloud-min-permission-api-key" -q
   else
-      "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key -q"
+      "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -q
   fi
 }
 
@@ -255,6 +255,10 @@ check_instance_ssh() {
       continue
     fi
 
+    if [[ "$node_name" == "*bastion" ]]; then
+      printf "%-35s | %-15s | [SKIP - bastion node]\n" "$node_name" "$node_ip"
+      continue
+    fi
     local ssh_args=(-o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "$ssh_key")
 
     # Add Jump Host if bastion exists
