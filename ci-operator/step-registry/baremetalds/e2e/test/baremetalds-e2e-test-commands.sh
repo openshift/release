@@ -16,6 +16,21 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
+echo "shared directory: ${SHARED_DIR}"
+HYPERVISOR_IP=$(cat "${SHARED_DIR}/server-ip")
+export HYPERVISOR_IP
+export HYPERVISOR_SSH_USER="root"
+
+# Determine the correct SSH key path
+# Using equinix-ssh-key for ARM64 hosts or packet-ssh-key for others
+echo "cluster profile directory: ${CLUSTER_PROFILE_DIR}"
+if [[ -f "${CLUSTER_PROFILE_DIR}/equinix-ssh-key" ]]; then
+    export HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/equinix-ssh-key"
+else
+    export HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+fi
+
+
 # Starting in 4.21, we will aggressively retry test failures only in
 # presubmits to determine if a failure is a flake or legitimate. This is
 # to reduce the number of retests on PR's.
@@ -260,13 +275,10 @@ function is_openshift_version_gte() {
 }
 
 function build_hypervisor_config() {
-    # Build hypervisor SSH configuration for tests that need to interact with the hypervisor
-    if [[ "${ENABLE_HYPERVISOR_SSH_CONFIG:-false}" != "true" ]]; then
-        return
-    fi
-
+    # Build hypervisor SSH configuration for tests that need to interact with the hypervisor.
+    # This is also required for tests to interact with VM hosted on the hypervisor.
     if [[ ! -f "${SHARED_DIR}/server-ip" ]]; then
-        echo "Warning: ENABLE_HYPERVISOR_SSH_CONFIG is true but ${SHARED_DIR}/server-ip not found"
+        echo "Warning: Hypervisor IP file ${SHARED_DIR}/server-ip not found"
         return
     fi
 
@@ -291,6 +303,54 @@ function build_hypervisor_config() {
     echo "Hypervisor SSH configuration: IP=${HYPERVISOR_IP}, User=${HYPERVISOR_SSH_USER}, Key=${HYPERVISOR_SSH_KEY}"
 }
 
+function build_hypervisor_vm_config() {
+  build_hypervisor_config
+
+  if [[ ! -f "${SHARED_DIR}/vm-ip" ]]; then
+      echo "Warning: Hypervisor VM IP file ${SHARED_DIR}/vm-ip not found"
+      return
+  fi
+
+  VM_IP=$(cat "${SHARED_DIR}/vm-ip")
+  export VM_IP
+
+  if [[ ! -f "${SHARED_DIR}/vm-private-key" ]]; then
+    echo "WARNING: ${SHARED_DIR}/vm-private-key file not found"
+    return
+  fi
+
+  if [[ ! -f "${SHARED_DIR}/vm-public-key" ]]; then
+    echo "WARNING: ${SHARED_DIR}/vm-public-key file not found"
+    return
+  fi
+
+    # Prepare SSH configuration directory
+    mkdir -p ~/.ssh
+
+    # Setup ssh keys.
+    cp "${HYPERVISOR_SSH_KEY}" ~/.ssh/hypervisor-ssh-key
+    chmod 600 ~/.ssh/hypervisor-ssh-key
+    cp "${SHARED_DIR}/vm-private-key" ~/.ssh/id_ed25519
+    chmod 600 ~/.ssh/id_ed25519
+    cp "${SHARED_DIR}/vm-public-key" ~/.ssh/id_ed25519.pub
+    chmod 644 ~/.ssh/id_ed25519.pub
+
+    # Configure SSH client - use the copied key with correct permissions
+    cat > ~/.ssh/config <<EOF
+Host hypervisor
+    HostName ${HYPERVISOR_IP}
+    User root
+    ServerAliveInterval 120
+    IdentityFile ~/.ssh/hypervisor-ssh-key
+
+Host 192.168.122.*
+    User root
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    ProxyCommand ssh -W %h:%p hypervisor
+EOF
+}
+
 function upgrade() {
     mirror_release_image_for_disconnected_upgrade
     set -x
@@ -303,7 +363,45 @@ function upgrade() {
     set +x
 }
 
-function suite() {
+function suite_in_container() {
+    # Setup SSHOPTS for remote server access using the mounted SSH key
+    SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "${HYPERVISOR_SSH_KEY}")
+
+    mkdir -p ~/.ssh
+    mkdir -p ~/.kcli
+
+    cat >> ~/.ssh/config <<EOF
+Host hypervisor
+    HostName ${IP}
+    User root
+    ServerAliveInterval 120
+    IdentityFile ${HYPERVISOR_SSH_KEY}
+EOF
+
+    cat >> ~/.kcli/config.yml <<EOF
+twix:
+  host: hypervisor
+  pool: default
+  protocol: ssh
+  type: kvm
+  user: root
+EOF
+
+    echo "Connect kcli with remote hypervisor"
+    kcli switch host twix
+
+    echo "Ensuring clean state for VM creation"
+    kcli delete vm ovn-kubernetes-e2e -y 2>/dev/null || true
+
+    echo "Creating test VM with Docker"
+    kcli create vm -i fedora42 ovn-kubernetes-e2e --wait -P "cmds=['dnf install -y docker','systemctl enable --now docker']"
+
+    echo "Verifying Docker installation in VM"
+    if ! kcli ssh ovn-kubernetes-e2e -- sudo docker version; then
+      echo "ERROR: Docker installation failed in VM"
+      exit 1
+    fi
+
     if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/auth/external-oidc") ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
@@ -314,7 +412,7 @@ function suite() {
     fi
 
     set -x
-    if [[ -n "${HYPERVISOR_IP:-}" ]]; then
+    if [[ "${ENABLE_HYPERVISOR_SSH_CONFIG:-false}" == "true" ]]; then
         openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
             --provider "${TEST_PROVIDER:-}" \
             --with-hypervisor-json="{\"hypervisorIP\":\"${HYPERVISOR_IP}\", \"sshUser\":\"${HYPERVISOR_SSH_USER}\", \"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}" \
@@ -326,6 +424,63 @@ function suite() {
             -o "${ARTIFACT_DIR}/e2e.log" \
             --junit-dir "${ARTIFACT_DIR}/junit"
     fi
+    set +x
+}
+
+function suite() {
+    # Determine SSH key path (same logic as build_hypervisor_config)
+    # Reuse HYPERVISOR_SSH_KEY if already set, otherwise determine it
+    if [[ -z "${HYPERVISOR_SSH_KEY:-}" ]]; then
+        if [[ -f "${CLUSTER_PROFILE_DIR}/equinix-ssh-key" ]]; then
+            HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/equinix-ssh-key"
+        else
+            HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+        fi
+    fi
+
+    # Locate openshift-tests binary in the current (outer) container
+    OPENSHIFT_TESTS_BIN=$(which openshift-tests || true)
+    if [[ -n "${OPENSHIFT_TESTS_BIN}" ]]; then
+        echo "Found openshift-tests at: ${OPENSHIFT_TESTS_BIN}"
+    else
+        echo "Warning: openshift-tests binary not found in PATH, skipping mount"
+    fi
+
+    # Prepare podman volume mounts as array
+    PODMAN_MOUNTS=(-v "${KUBECONFIG}:/tmp/kubeconfig:ro")
+    PODMAN_MOUNTS+=(-v "${ARTIFACT_DIR}:/tmp/artifacts")
+    PODMAN_MOUNTS+=(-v "${HYPERVISOR_SSH_KEY}:/tmp/ssh-key:ro")
+
+    # Only mount openshift-tests if it was found
+    if [[ -n "${OPENSHIFT_TESTS_BIN}" ]]; then
+        PODMAN_MOUNTS+=(-v "${OPENSHIFT_TESTS_BIN}:/usr/bin/openshift-tests:ro")
+    fi
+
+    # Prepare environment variables to pass to container as array
+    PODMAN_ENV=(-e "KUBECONFIG=/tmp/kubeconfig")
+    PODMAN_ENV+=(-e "ARTIFACT_DIR=/tmp/artifacts")
+    PODMAN_ENV+=(-e "TEST_SUITE=${TEST_SUITE}")
+    PODMAN_ENV+=(-e "TEST_PROVIDER=${TEST_PROVIDER:-}")
+    PODMAN_ENV+=(-e "TEST_ARGS=${TEST_ARGS:-}")
+    PODMAN_ENV+=(-e "TEST_SKIPS=${TEST_SKIPS:-}")
+    PODMAN_ENV+=(-e "IP=${IP}")
+    PODMAN_ENV+=(-e "HYPERVISOR_SSH_KEY=/tmp/ssh-key")
+
+    # Add hypervisor-specific configuration if enabled
+    if [[ -n "${HYPERVISOR_IP:-}" ]]; then
+        PODMAN_ENV+=(-e "HYPERVISOR_IP=${HYPERVISOR_IP}")
+        PODMAN_ENV+=(-e "HYPERVISOR_SSH_USER=${HYPERVISOR_SSH_USER}")
+    fi
+
+    echo "PODMAN_MOUNTS: ${PODMAN_MOUNTS[*]}"
+    echo "PODMAN_ENV: ${PODMAN_ENV[*]}"
+
+    set -x
+    podman run --network host --rm -i \
+        "${PODMAN_ENV[@]}" \
+        "${PODMAN_MOUNTS[@]}" \
+        "quay.io/karmab/kcli" \
+        bash -c "$(declare -f suite_in_container); suite_in_container"
     set +x
 }
 
@@ -491,8 +646,11 @@ else
   check_clusteroperators_status
 fi
 
-# Build hypervisor SSH configuration if enabled
-build_hypervisor_config
+# Build hypervisor and VM SSH configuration
+build_hypervisor_vm_config
+
+echo "sleep for 6h"
+sleep 6h
 
 case "${TEST_TYPE}" in
 upgrade-conformance)
