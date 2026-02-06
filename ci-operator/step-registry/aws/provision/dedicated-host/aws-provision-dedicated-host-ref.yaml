@@ -1,0 +1,66 @@
+ref:
+  as: aws-provision-dedicated-host
+  from_image:
+    namespace: ocp
+    name: "4.20"
+    tag: upi-installer
+  grace_period: 10m
+  commands: aws-provision-dedicated-host-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: CONTROL_PLANE_INSTANCE_TYPE
+    default: ""
+    documentation: |-
+      Restrict DH allocation in a particular instance type, 
+        * empty (default): trying to allocate DH from AWS_DH_CANDIDATE_TYPES
+        * non-empty: trying to allocate DH from CONTROL_PLANE_INSTANCE_TYPE
+            CONTROL_PLANE_INSTANCE_TYPE and COMPUTE_NODE_TYPE must be identical if this is set.
+  - name: COMPUTE_NODE_TYPE
+    default: ""
+    documentation: |-
+      Restrict DH allocation in a particular instance type.
+        * empty (default): trying to allocate DH from AWS_DH_CANDIDATE_TYPES
+        * non-empty: trying to allocate DH from COMPUTE_NODE_TYPE
+            CONTROL_PLANE_INSTANCE_TYPE and COMPUTE_NODE_TYPE must be identical if this is set.
+  - name: AWS_DH_EXISTING_DH_POOL
+    default: ""
+    documentation: |-
+      If not empty, will select 1 DH from this pool
+      Seperated by space.
+  - name: AWS_DH_REQUIRED_HOST_NUMBER
+    default: "2"
+    documentation: |-
+      Required host number.
+  - name: AWS_DH_MINIMUM_HOST_NUMBER
+    default: "1"
+    documentation: |-
+      If can not allocate AWS_DH_REQUIRED_HOST_NUMBER hosts, AWS_DH_MINIMUM_HOST_NUMBER is also acceptable (same type)
+  - name: AWS_DH_CANDIDATE_TYPES
+    default: "m6a.xlarge m6a.2xlarge m6a.4xlarge m6i.xlarge m6i.2xlarge m6i.4xlarge"
+    documentation: |-
+      Candidate instance types to try (in order of preference) to allocate DH
+  - name: AWS_DH_AUTO_PLACEMENT
+    default: "on"
+  - name: AWS_DH_HOST_RECOVERY
+    default: "on"
+  - name: AWS_DH_MAX_RETRIES
+    default: "10"
+    documentation: |-
+      Retry Configuration (for InsufficientHostCapacity errors)
+      Maximum number of retry attempts
+  - name: AWS_DH_BASE_BACKOFF
+    default: "1"
+    documentation: |-
+      Retry Configuration (for InsufficientHostCapacity errors)
+      Base backoff time in seconds
+  - name: AWS_DH_MAX_BACKOFF
+    default: "300"
+    documentation: |-
+      Retry Configuration (for InsufficientHostCapacity errors)
+      Maximum backoff time in seconds (5 minutes)
+  documentation: >-
+    Allocate AWS Dedicated Hosts.
+    If using byo-VPC, this step must be executed after VPC creation aws-provision-vpc-shared.

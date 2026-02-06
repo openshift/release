@@ -1,0 +1,24 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-byo-dedicated-host-provision
+  steps:
+  - ref: aws-provision-dedicated-host
+  - chain: ipi-conf-aws
+  - ref: ipi-conf-aws-dedicated-host
+  - ref: ipi-conf-aws-usage-info
+  - chain: aws-provision-iam-user-minimal-permission
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install
+  - ref: ipi-install-times-collection
+  - ref: nodes-readiness
+  - ref: multiarch-validate-nodes
+  - chain: cucushift-installer-check
+  - ref: enable-qe-catalogsource
+  env:
+  - name: AWS_DEDICATED_HOST_APPLY_TO
+    default: "defaultMachinePlatform"
+    documentation: |-
+      compute, controlPlane, defaultMachinePlatform
+  documentation: |-
+    Create an IPI cluster on AWS for QE e2e tests.
