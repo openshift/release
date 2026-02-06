@@ -492,7 +492,7 @@ oc --kubeconfig="$HOSTED_KUBECONFIG" config set-cluster "$HCP_KUBE" \
 echo "Downloading the setup script for proxy"
 
 GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
-git clone -b proxy-tst git@github.ibm.com:OpenShift-on-Z/hosted-control-plane.git &&
+git clone git@github.ibm.com:OpenShift-on-Z/hosted-control-plane.git &&
 
 echo "Getting the proxy setup script"
 cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
