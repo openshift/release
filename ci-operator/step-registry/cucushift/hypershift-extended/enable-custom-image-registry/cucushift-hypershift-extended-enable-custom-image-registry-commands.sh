@@ -220,15 +220,18 @@ function check_pods_running() {
 
 retry_until_success 20 5 check_pods_running
 
-REG_ROUTE=$(oc get route "$REGISTRY_NAME" -n "$REGISTRY_NAMESPACE" -o=jsonpath='{.spec.host}')
+function mirror_image_registry_accessible() {
+    REG_ROUTE=$(oc get route "$REGISTRY_NAME" -n "$REGISTRY_NAMESPACE" -o=jsonpath='{.spec.host}')
+    # Mirror the SRC_IMG to the target image registry for testing
+    SRC_IMG="${SRC_IMG:-quay.io/openshifttest/busybox:51055}"
+    IMAGE_PATH="${SRC_IMG#*/}"
+    DST_IMG="${REG_ROUTE}/${REGISTRY_NAMESPACE}/${IMAGE_PATH}"
 
-# Mirror the SRC_IMG to the target image registry for testing
-SRC_IMG="${SRC_IMG:-quay.io/openshifttest/busybox:51055}"
-IMAGE_PATH="${SRC_IMG#*/}"
-DST_IMG="${REG_ROUTE}/${REGISTRY_NAMESPACE}/${IMAGE_PATH}"
+    oc registry login --registry="$REG_ROUTE" --auth-basic="${REGISTRY_USERNAME}:${REGISTRY_PASSWORD}" --to="${temp_dir}"/authfile --insecure -n "$REGISTRY_NAMESPACE"
+    oc image mirror "$SRC_IMG" "$DST_IMG" --insecure -a "${temp_dir}"/authfile --keep-manifest-list=true --filter-by-os=".*"
+}
 
-oc registry login --registry="$REG_ROUTE" --auth-basic="${REGISTRY_USERNAME}:${REGISTRY_PASSWORD}" --to="${temp_dir}"/authfile --insecure -n "$REGISTRY_NAMESPACE"
-oc image mirror "$SRC_IMG" "$DST_IMG" --insecure -a "${temp_dir}"/authfile --keep-manifest-list=true --filter-by-os=".*"
+retry_until_success 20 5 mirror_image_registry_accessible
 
 # record the registry information: route, user, pass, namespace
 cat >>"$SHARED_DIR"/image_registry.ini <<EOF
