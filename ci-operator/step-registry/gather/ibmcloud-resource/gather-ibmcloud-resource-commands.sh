@@ -212,24 +212,33 @@ function run_command() {
 
 check_instance_ssh() {
   local ssh_user="core"
+  local bastion_user="core"
   local ssh_key="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
-  local proxy_ip="${proxy_ip}" # Assumes this is set in your environment
+  local proxy_ip=""
+  if [[ -f "${SHARED_DIR}/proxyip" ]]; then
+    proxy_ip="$(cat "${SHARED_DIR}/proxyip")"
+  fi
+
   if [[ ! -s "$ssh_key" ]]; then
     echo "FAILED: Key $ssh_key does not exist."
     return 1
   fi
 
   if [ -s "${SHARED_DIR}/bastion_ssh_user" ]; then
-    ssh_user="$(< "${SHARED_DIR}/bastion_ssh_user" )"
+    bastion_user="$(< "${SHARED_DIR}/bastion_ssh_user" )"
   fi
   # Ensure the key is added to the agent for forwarding
-  eval $(ssh-agent)
   ssh-add "$ssh_key"
 
   echo "Gathering instances from IBM Cloud..."
   local instances
   "${IBMCLOUD_CLI}" target -g ${RESOURCE_GROUP} -q
   instances=$(ibmcloud is instances --output JSON | jq -r '.[] | "\(.name)|\(.network_interfaces[0].primary_ip.address)|\(.status)"')
+
+  if [[ -z "$instances" ]]; then
+    echo "No instances found in the resource group."
+    return 0
+  fi
 
   echo "------------------------------------------------------------------------------"
   printf "%-35s | %-15s | %-10s\n" "NODE NAME" "INTERNAL IP" "RESULT"
@@ -245,20 +254,19 @@ check_instance_ssh() {
       continue
     fi
 
-    # Use Proxy Jump logic (-A for agent forwarding and -J for jump host)
-    # This tests if the Bastion can actually reach the private node
-    ssh -A -o PreferredAuthentications=publickey \
-           -o StrictHostKeyChecking=false \
-           -o UserKnownHostsFile=/dev/null \
-           -o ConnectTimeout=5 \
-           -J "${ssh_user}@${proxy_ip}" \
-           "${ssh_user}@${node_ip}" 'exit 0' > /dev/null 2>&1
+    local ssh_args=(-o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "$ssh_key")
 
-    if [[ $? -eq 0 ]]; then
+    # Add Jump Host if bastion exists
+    if [[ -n "$proxy_ip" ]]; then
+        ssh_args+=(-J "${bastion_user}@${proxy_ip}")
+    fi
+
+   if ssh "${ssh_args[@]}" "${ssh_user}@${node_ip}" "exit 0" > /dev/null 2>&1; then
       printf "%-35s | %-15s | [PASS]\n" "$node_name" "$node_ip"
     else
       printf "%-35s | %-15s | [FAIL]\n" "$node_name" "$node_ip"
     fi
+
   done
   echo "------------------------------------------------------------------------------"
 }
