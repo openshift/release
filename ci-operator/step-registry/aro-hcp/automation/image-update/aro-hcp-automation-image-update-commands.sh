@@ -230,7 +230,7 @@ for ((i=1; i<=PR_CHECK_MAX_ATTEMPTS; i++)); do
   if [[ -n "${PR_DATA}" ]]; then
     PR_URL=$(echo "${PR_DATA}" | jq -r '.url')
     PR_CREATED_AT=$(echo "${PR_DATA}" | jq -r '.created_at')
-    info "github: PR found at ${PR_URL}"
+    info "github: PR found at ${PR_URL}, created at ${PR_CREATED_AT}"
 
     # Check if PR is older than threshold
     PR_AGE_SECONDS=$(( $(date +%s) - $(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${PR_CREATED_AT}" +%s 2>/dev/null || date -d "${PR_CREATED_AT}" +%s 2>/dev/null) ))
