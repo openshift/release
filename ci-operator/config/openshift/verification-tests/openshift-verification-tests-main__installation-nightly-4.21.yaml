@@ -74,7 +74,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: "true"
       TEST_OBJECT: Regions
     workflow: cucushift-installer-rehearse-aws-cases-clusters
 - as: aws-ipi-all-localzones-f1
@@ -86,7 +85,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: "true"
       TEST_OBJECT: LocalZones
     workflow: cucushift-installer-rehearse-aws-cases-clusters-edge-zone
 - as: aws-ipi-all-wavelength-zones-f1
@@ -98,7 +96,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: "true"
       TEST_OBJECT: WavelengthZones
     workflow: cucushift-installer-rehearse-aws-cases-clusters-edge-zone
 - as: aws-ipi-all-instance-types-f1
@@ -110,7 +107,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: "true"
       TEST_FILTERS: "57148"
       TEST_OBJECT: InstanceTypes
     test:
@@ -299,23 +295,6 @@ tests:
     test:
     - ref: cucushift-installer-check-aws-only-public-subnets
     - ref: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-opt-out-sigstore-signing-mini-perm-arm-f14
-  cron: 3 0 10,26 * *
-  steps:
-    allow_skip_on_success: true
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      OCP_ARCH: arm64
-      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY: "true"
-    test:
-    - ref: cucushift-installer-check-cluster-image-policy
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-proxy-whitelist-arm-f14
   cron: 47 18 7,21 * *
@@ -1137,6 +1116,17 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-users-static
+- as: gcp-ipi-custom-endpoint-clusteruseonly-proxy-mini-perm-f28
+  cron: 34 6 24 * *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: gcp-qe
+    env:
+      CUSTOM_ENDPOINT_FOR_CLUSTER_OPERATORS_ONLY: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+    test:
+    - ref: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints-proxy-whitelist
 - as: gcp-ipi-custom-endpoint-proxy-users-static-mini-perm-f28
   cron: 26 4 24 * *
   steps:

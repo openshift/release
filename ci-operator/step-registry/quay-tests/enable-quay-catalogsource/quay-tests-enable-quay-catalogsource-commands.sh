@@ -15,6 +15,7 @@ function update_pull_secret () {
     cat /var/run/quay-qe-konflux-auth/quay-v3-14-pull > "${temp_dir}"/quay-v3-14-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-15-pull > "${temp_dir}"/quay-v3-15-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-16-pull > "${temp_dir}"/quay-v3-16-pull.json
+    cat /var/run/quay-qe-konflux-auth/quay-v3-17-pull > "${temp_dir}"/quay-v3-17-pull.json
 
     oc get secret/pull-secret -n openshift-config \
       --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${temp_dir}"/global_pull_secret.json
@@ -28,6 +29,7 @@ function update_pull_secret () {
       "${temp_dir}"/quay-v3-14-pull.json \
       "${temp_dir}"/quay-v3-15-pull.json \
       "${temp_dir}"/quay-v3-16-pull.json \
+      "${temp_dir}"/quay-v3-17-pull.json \
       > "${temp_dir}"/merged_pull_secret.json
 
     oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${temp_dir}"/merged_pull_secret.json
@@ -78,6 +80,7 @@ spec:
     source: registry.redhat.io/quay/quay-operator-rhel8
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-16
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-17
     source: registry.redhat.io/quay/quay-operator-rhel9
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-10
@@ -116,6 +119,7 @@ spec:
     source: registry.redhat.io/quay/quay-rhel8
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-16
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-17
     source: registry.redhat.io/quay/quay-rhel9
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-10
@@ -127,6 +131,7 @@ spec:
     source: registry.redhat.io/quay/quay-bridge-operator-rhel8
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-16
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-17
     source: registry.redhat.io/quay/quay-bridge-operator-rhel9
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-10
@@ -138,6 +143,7 @@ spec:
     source: registry.redhat.io/quay/quay-container-security-operator-rhel8
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-16
+    - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-17
     source: registry.redhat.io/quay/quay-container-security-operator-rhel9
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-10
@@ -149,6 +155,7 @@ spec:
     source: registry.redhat.io/quay/container-security-operator-rhel8
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-16
+    - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-17
     source: registry.redhat.io/quay/container-security-operator-rhel9
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-10
@@ -160,6 +167,7 @@ spec:
     source: registry.redhat.io/quay/clair-rhel8
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-16
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-17
     source: registry.redhat.io/quay/clair-rhel9
   - mirrors:
     - brew.registry.redhat.io

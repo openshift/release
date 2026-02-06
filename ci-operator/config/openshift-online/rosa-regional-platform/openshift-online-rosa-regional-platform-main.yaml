@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.23
+    tag: rhel-9-release-golang-1.23-openshift-4.20
 resources:
   '*':
     limits:
@@ -15,6 +15,37 @@ tests:
   commands: ./test/execute-prow-job.sh
   container:
     from: src
+- as: provision-regional
+  cron: 0 7 * * *
+  steps:
+    cluster_profile: rosa-regional-platform-int
+    test:
+    - as: provision-regional
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+
+        # Install Terraform
+        TERRAFORM_VERSION="1.10.4"
+        curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
+        unzip -q /tmp/terraform.zip -d /tmp
+        mv /tmp/terraform /usr/local/bin/terraform
+        chmod +x /usr/local/bin/terraform
+
+        # Verify installation
+        terraform version
+
+        # Set up terraform variables
+        cp terraform/config/regional-cluster/terraform.tfvars.example \
+           terraform/config/regional-cluster/terraform.tfvars
+
+        # Run e2e tests
+        make provision-regional
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift-online

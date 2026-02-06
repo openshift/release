@@ -1,0 +1,60 @@
+base_images:
+  cerberus:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
+  ocp-qe-perfscale-ci:
+    name: ocp-qe-perfscale-ci
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: daily-virt-6nodes
+  capabilities:
+  - intranet
+  cron: 0 8 * * *
+  restrict_network_access: false
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: metal-perfscale-cpt
+    env:
+      BOND: "true"
+      CNV_VERSION: "4.22"
+      CONFIG: config/standard-scalelab.yml
+      INFRA: "true"
+      PUBLIC_VLAN: "false"
+      RUN_ORION: "true"
+      VERSION: "4.22"
+      VM: "true"
+    post:
+    - ref: openshift-qe-installer-bm-must-gather
+    test:
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-cnv
+    - chain: openshift-qe-data-path-tests
+    - ref: openshift-qe-orion-data-path
+    - ref: openshift-qe-virt-udn-density
+    - ref: openshift-qe-orion-virt-udn-density
+    - ref: openshift-qe-virt-density
+    - ref: openshift-qe-orion-virt-density
+    workflow: openshift-qe-installer-bm-deploy
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: metal-4.22-nightly-x86

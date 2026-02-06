@@ -8,6 +8,9 @@ check_result=0
 
 function run_install() {
   local ret
+  if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
+  fi
   echo "install-config.yaml"
   echo "-------------------"
   grep -v "password\|username\|pullSecret\|auth" <"${dir}"/install-config.yaml

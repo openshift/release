@@ -1,6 +1,13 @@
 #!/bin/bash
 set -e
 set -o pipefail
+
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
+
 MOUNTED_HOST_INVENTORY="/var/host_variables"
 
 process_inventory() {
@@ -17,29 +24,13 @@ process_inventory() {
         return 1
     fi
 
-    # Clear destination file first
-    : > "${dest_file}"
-
     find "$directory" -type f | while IFS= read -r filename; do
         if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-            continue
-        fi
-
-        local key
-        local value
-        key=$(basename "${filename}")
-        value=$(cat "$filename")
-
-        # Handle multi-line values (e.g., certificates) with YAML literal block scalar
-        if [[ "$value" == *$'\n'* ]]; then
-            echo "${key}: |" >> "${dest_file}"
-            while IFS= read -r line; do
-                echo "  ${line}" >> "${dest_file}"
-            done <<< "$value"
+          continue
         else
-            echo "${key}: '${value}'" >> "${dest_file}"
+          echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
         fi
-    done
+    done > "${dest_file}"
 
     echo "Processing complete. Check \"${dest_file}\""
 }
@@ -77,3 +68,18 @@ ansible-playbook ./playbooks/deploy-ocp-sno.yml -i ./inventories/ocp-deployment/
 echo "Store inventory in SHARED_DIR"
 cp -r /eco-ci-cd/inventories/ocp-deployment/host_vars/* "${SHARED_DIR}"/
 cp -r /eco-ci-cd/inventories/ocp-deployment/group_vars/* "${SHARED_DIR}"/
+
+echo "Getting cluster version from hub cluster"
+HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
+
+BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion | sed "s/'//g")
+BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' /eco-ci-cd/inventories/ocp-deployment/group_vars/all | sed "s/'//g")
+
+cat /var/group_variables/common/all/ansible_ssh_private_key > "/tmp/temp_ssh_key"
+chmod 600 "/tmp/temp_ssh_key"
+
+CLUSTER_VERSION=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}" \
+  "KUBECONFIG=${HUB_KUBECONFIG} oc get clusterversion version -ojsonpath='{.status.desired.version}'")
+
+echo "Cluster version: ${CLUSTER_VERSION}"
+echo "${CLUSTER_VERSION}" > "${SHARED_DIR}/cluster_version"

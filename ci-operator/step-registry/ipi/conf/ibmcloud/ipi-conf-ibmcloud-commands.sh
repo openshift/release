@@ -22,7 +22,7 @@ case "${SIZE_VARIANT}" in
     compact)
         master_type=bx2-8x32
         ;;
-    middle)
+    medium)
         master_type=bx2-8x32
         ;;
     default)

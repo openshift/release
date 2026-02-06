@@ -3,31 +3,19 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: base-rhel9
-  cli-operator-sdk:
-    name: cli-operator-sdk
-    namespace: ocp
-    tag: v1.39.2
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/ci/Dockerfile
   from: base-rhel9
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cert-manager-operator
 - dockerfile_path: images/ci/operand.Dockerfile
   from: base-rhel9
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cert-manager
 operator:
   bundles:
@@ -93,21 +81,17 @@ tests:
     version: "4.19"
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    dependencies:
-      OO_BUNDLE: cert-manager-operator-bundle
-    env:
-      OO_INSTALL_MODE: AllNamespaces
-      OO_INSTALL_NAMESPACE: cert-manager-operator
-      OO_SECURITY_CONTEXT: restricted
     test:
     - as: install
       cli: latest
       commands: |
-        oc -n cert-manager-operator rollout status deployment cert-manager-operator-controller-manager
+        oc create namespace cert-manager-operator
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n cert-manager-operator "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n cert-manager-operator deployment cert-manager-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: cert-manager-operator-bundle
-      from: src
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
@@ -119,7 +103,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-generic-claim
+    workflow: generic-claim
 - as: e2e-operator-tech-preview
   optional: true
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

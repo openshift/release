@@ -1,27 +1,33 @@
-base_images:
-  ubi9:
-    name: ubi
-    namespace: ocp
-    tag: "9"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-9-release-golang-1.21-openshift-4.18
+images:
+- dockerfile_path: Containerfile
+  to: dpf-ci
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 500m
+      memory: 1Gi
 tests:
-- as: unit
-  commands: make verify-files
+- as: validate
+  commands: make ci-validate
   container:
-    clone: true
-    from: ubi9
-  skip_if_only_changed: ^(README|OWNERS|LICENSE)$|\.(md|adoc)$|^docs/|^\.github/
+    from: dpf-ci
+  timeout: 15m0s
+- as: sanity
+  steps:
+    test:
+    - ref: dpf-hypervisor-sanity-existing
+  timeout: 1h0m0s
+- as: e2e
+  steps:
+    workflow: dpf-hypervisor-e2e
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
