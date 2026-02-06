@@ -92,10 +92,13 @@ run_tests() {
 
   oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
     sh -c "
+    docker login -u=\"${QUAY_USERNAME}\" -p=\"${QUAY_PASSWORD}\" quay.io
     export KUBECONFIG=/work/ci-kubeconfig
     export BUILD_WITH_CONTAINER=\"0\"
     export CI=\"${CI:-true}\"
     export HUB=\"${HUB:-quay.io/sail-dev}\"
+    export USE_INTERNAL_REGISTRY=\"false\"
+    export PR_NUMBER=\"${PR_NUMBER:-}\"
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
