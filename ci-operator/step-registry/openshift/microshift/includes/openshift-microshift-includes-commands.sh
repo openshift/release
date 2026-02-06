@@ -124,6 +124,8 @@ function ci_subscription_register() {
         return 0
     fi
 
+    # NOTE: Subscription files cannot be removed after the system is registered
+    # because they are used by RPM-based test scenarios
     if [ ! -e /tmp/subscription-manager-org ] || [ ! -e /tmp/subscription-manager-act-key ] ; then
         echo "ERROR: The subscription files do not exist in /tmp directory"
         return 1
@@ -141,8 +143,6 @@ set -euo pipefail
 subscription-manager register \
     --org="$(cat /tmp/subscription-manager-org)" \
     --activationkey="$(cat /tmp/subscription-manager-act-key)"
-
-rm -vf /tmp/subscription-manager-org /tmp/subscription-manager-act-key
 EOF
     chmod +x "${submgr_script}"
 
