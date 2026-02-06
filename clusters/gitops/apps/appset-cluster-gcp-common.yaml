@@ -3,7 +3,7 @@ kind: ApplicationSet
 metadata:
   annotations:
     argocd.argoproj.io/manifest-generate-paths: .
-  name: appset-common
+  name: appset-cluster-common-gcp
   namespace: openshift-gitops
 spec:
   goTemplate: true
@@ -11,33 +11,15 @@ spec:
   generators:
   - list:
       elements:
-      - cluster: core-ci
-        name: core-ci
-      - cluster: build01
-        name: build01
       - cluster: build02
         name: build02
-      - cluster: build03
-        name: build03
       - cluster: build04
         name: build04
-      - cluster: build05
-        name: build05
-      - cluster: build06
-        name: build06
-      - cluster: build07
-        name: build07
       - cluster: build08
         name: build08
-      - cluster: build09
-        name: build09
-      - cluster: build10
-        name: build10
-      - cluster: build11
-        name: build11
   template:
     metadata:
-      name: 'obsoleted-app-cluster-{{.cluster}}-common'
+      name: 'app-cluster-{{.cluster}}-common'
     spec:
       destination:
         name: '{{.name}}'
@@ -88,13 +70,6 @@ spec:
             include: '{*.yaml,*.yml}'
             recurse: true
           path: clusters/build-clusters/common_ocp
-          repoURL: https://github.com/openshift/release.git
-          targetRevision: master
-        - directory:
-            exclude: '{OWNERS,*.md}'
-            include: '{*.yaml,*.yml}'
-            recurse: true
-          path: clusters/build-clusters/multiarch_tuning_operator
           repoURL: https://github.com/openshift/release.git
           targetRevision: master
       syncPolicy:
