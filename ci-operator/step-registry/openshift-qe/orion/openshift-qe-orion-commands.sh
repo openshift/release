@@ -139,6 +139,102 @@ set -e
 
 cp *.csv *.xml *.json *.txt "${ARTIFACT_DIR}/" 2>/dev/null || true
 
+if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
+    local bucket="gs://test-platform-results"
+    local path=""
+
+    # Determine the path to prowjob.json based on prow ENV variables
+    case "${JOB_TYPE:-}" in
+        presubmit)
+        if [[ -n "${ORG_REPO:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+            path="pr-logs/pull/${ORG_REPO}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/prowjob.json"
+        fi
+        ;;
+        periodic)
+        if [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+            path="logs/${JOB_NAME}/${BUILD_ID}/prowjob.json"
+        fi
+        ;;
+        *)
+        return 0
+        ;;
+    esac
+
+    [[ -z "$path" ]] && return 0
+
+    echo "Fetching prowjob.json from $bucket/$path"
+    gsutil -m cp -r "${bucket}/${path}" .
+
+    # Extract trigger repos from prowjob.json
+    repos=$(jq -r '
+        if (.spec.extra_refs // []) | length > 0 then
+            .spec.extra_refs[] | "\(.org)/\(.repo)"
+        elif (.spec.refs // null) != null then
+            "\(.spec.refs.org)/\(.spec.refs.repo)"
+        else
+            empty
+        end
+        ' prowjob.json)
+
+    owners_file=owners.txt
+    > "$owners_file"
+
+    # Iterate over each url to fetch OWNERS
+    for repo in $repos; do
+        org="${repo%%/*}"
+        name="${repo##*/}"
+
+        url="https://raw.githubusercontent.com/openshift/release/master/ci-operator/jobs/${org}/${name}/OWNERS"
+
+        echo "Fetching OWNERS for $repo"
+
+        curl -fsSL "$url" \
+            | yq -r '.approvers[], .reviewers[]' \
+            >> "$owners_file" \
+            || echo "OWNERS not found for $repo"
+    done
+
+    # dedupe at the end
+    sort -u "$owners_file" -o "$owners_file"
+
+    # Load owners list as a JSON array (skip blank lines)
+    OWNERS_JSON=$(jq -R -s -c 'split("\n") | map(select(length > 0))' owners.txt)
+
+    # Check if owners.json is loaded correctly
+    echo "Owners loaded as JSON array: $OWNERS_JSON"
+
+    # Loop over each junit*.json file in current directory
+    for f in junit*.json; do
+        # Skip if no matching files found
+        [ -e "$f" ] || { echo "No junit*.json files found"; break; }
+
+        echo "Processing file: $f"
+
+        # Apply jq filter and overwrite the file safely
+        jq --argjson owners "$OWNERS_JSON" '
+        map(
+            if .is_changepoint != true then
+            .
+            else
+            .github_context.repositories |=
+                with_entries(
+                .value.commits.items |=
+                    map(
+                        select(
+                            (.commit_author.email // "" | ascii_downcase | contains($owners[]))
+                            or
+                            (.commit_author.name // "" | ascii_downcase | contains($owners[]))
+                        )
+                    )
+                | .value.commits.count = (.value.commits.items | length)
+                )
+            end
+        )
+        ' "$f" > "${f}.tmp" && mv "${f}.tmp" "$f"
+        echo "Updated $f"
+    done
+fi
+
 if [ $orion_exit_status -eq 3 ]; then
   echo "Orion returned exit code 3, which means there are no results to analyze."
   echo "Exiting zero since there were no regressions found."
