@@ -15,14 +15,9 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-python --version
-pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
-
 oc config view
 oc projects
-oc version
+pushd /tmp
 
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 
@@ -53,10 +48,11 @@ fi
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
+EXTRA_FLAGS="${UDP_EXTRA_FLAGS} --layer3=${ENABLE_LAYER_3} --iterations=${ITERATIONS} --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --layer3=${ENABLE_LAYER_3} --iterations=${ITERATIONS} --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 export EXTRA_FLAGS
 
 ./run.sh
