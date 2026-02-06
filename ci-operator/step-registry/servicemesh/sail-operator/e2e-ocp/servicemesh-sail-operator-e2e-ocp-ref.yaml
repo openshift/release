@@ -5,6 +5,10 @@ ref:
     requests:
       cpu: '1'
       memory: 500Mi
+  credentials:
+  - mount_path: /tmp/secrets
+    name: quay-sail
+    namespace: test-credentials
   timeout: 2h0m0s
   commands: servicemesh-sail-operator-e2e-ocp-commands.sh
   env:
@@ -25,5 +29,17 @@ ref:
     default: "make test.e2e.ocp"
     documentation: |-
       The make command to execute for e2e tests
+  - name: CI
+    default: "true"
+    documentation: |-
+      Set to true to indicate that the tests are running in a CI environment
+  - name: PR_NUMBER
+    default: ""
+    documentation: |-
+      The pull request number for the current build, if applicable
+  - name: HUB
+    default: "quay.io/sail-dev"
+    documentation: |-
+      Container registry hub to use for pushing images when CI=true
   documentation: |-
     Executes sail operator e2e tests (with default values against product operator (ossm operator)). Ensure that your pipeline has `maistra-builder` as the build root, since `from: src` is used here and the script expects the sail repository to be in the root directory.
