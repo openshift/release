@@ -221,9 +221,10 @@ for ((i=1; i<=PR_CHECK_MAX_ATTEMPTS; i++)); do
   debug "github: attempting to find PR (attempt ${i} of ${PR_CHECK_MAX_ATTEMPTS})"
 
   # Security: Use authenticated API call with silent mode to prevent token exposure
+  # Optimization: Use head parameter to filter PRs server-side by user:branch
   PR_DATA=$(curl -f -s -H "Authorization: token ${GITHUB_TOKEN}" \
-    "https://api.github.com/repos/Azure/ARO-HCP/pulls?per_page=100" 2>/dev/null | \
-    jq -r ".[] | select(.user.login == \"${GITHUB_PR_USER}\" and .title == \"${GITHUB_PR_TITLE}\") | {url: .html_url, created_at: .created_at}" | \
+    "https://api.github.com/repos/Azure/ARO-HCP/pulls?per_page=10&head=${GITHUB_PR_USER}:${GITHUB_PR_BRANCH}" 2>/dev/null | \
+    jq -r ".[] | select(.title == \"${GITHUB_PR_TITLE}\") | {url: .html_url, created_at: .created_at}" | \
     head -1)
 
   if [[ -n "${PR_DATA}" ]]; then
