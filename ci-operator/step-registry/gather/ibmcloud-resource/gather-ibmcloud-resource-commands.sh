@@ -245,9 +245,10 @@ check_instance_ssh() {
   echo "------------------------------------------------------------------------------"
 
   for entry in $instances; do
-    local node_name=$(echo "$entry" | cut -d'|' -f1)
-    local node_ip=$(echo "$entry" | cut -d'|' -f2)
-    local status=$(echo "$entry" | cut -d'|' -f3)
+    local node_name, node_ip, status
+    node_name=$(echo "$entry" | cut -d'|' -f1)
+    node_ip=$(echo "$entry" | cut -d'|' -f2)
+    status=$(echo "$entry" | cut -d'|' -f3)
 
     if [[ "$status" != "running" ]]; then
       printf "%-35s | %-15s | [SKIP - %s]\n" "$node_name" "$node_ip" "$status"
