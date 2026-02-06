@@ -1,0 +1,34 @@
+workflow:
+  as: baremetalds-e2e-ovn-bgp-dualstack-no-overlay
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
+      EXTRA_MG_ARGS: --host-network
+      TEST_SKIPS: Services should fallback to local terminating endpoints when there
+        are no ready endpoints with externalTrafficPolicy=Local\|CPU Partitioning
+        cluster platform workloads should be annotated correctly for Deployments\|egressip\|EgressIP\|EgressService\|blocking ICMP needs frag\|Multicast
+    pre:
+      - ref: baremetalds-devscripts-conf-featureset
+      - ref: baremetalds-e2e-ovn-bgp-no-overlay
+      - ref: baremetalds-e2e-ovn-bgp-nftables-pre
+      - chain: baremetalds-ofcir-pre
+      - ref: baremetalds-e2e-ovn-bgp-pre
+      - ref: baremetalds-e2e-ovn-debug-enable-console
+    test:
+      - chain: baremetalds-ipi-test
+    post:
+      - ref: baremetalds-e2e-ovn-debug-console-gather
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    This workflow executes the common end-to-end test suite on a cluster provisioned by running dev-scripts
+    on a packet server with both IPv4 and IPv6 enabled with the cluster configured with NoOverlay network transport,
+    Unmanaged routing, FRR provider, and BGP in shared gateway mode.
+    This workflow differs from baremetalds-e2e-ovn-bgp-dualstack by creating a NoOverlay network operator
+    manifest before cluster installation, and from baremetalds-e2e-ovn-bgp-dualstack-local-gw-no-overlay
+    by using shared gateway mode instead of local gateway mode (without extra network and nmstate operator).
+
+
