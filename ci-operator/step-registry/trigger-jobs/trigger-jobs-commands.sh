@@ -64,7 +64,7 @@ fi
 }
 ################################################################################
 
-: "Printing the jobs-to-trigger JSON:"
+: "INPUT:"
 jq -c '.[]' "${jobDescFile}"
 
 [[ "${JOB_NAME}" == 'rehearse-'* ]] && dryRun=1
@@ -95,9 +95,11 @@ cmd1EOF
 fi
 
 while IFS=$'\t' read -r trigCond jobList postTask; do
+    : "Processing: ${trigCond@Q} ${jobList@Q} ${postTask@Q}"
     # Trigger Conditions Check.
     while IFS=$'\t' read -r trigCondFlgs trigCondStep trigCondPars; do
-        : "trigCondFlgs=${trigCondFlgs}; JT__TRIG_COND_EXEC_FLGS=${JT__TRIG_COND_EXEC_FLGS}"
+        : "Processing: ${trigCondFlgs@Q} ${trigCondStep@Q} ${trigCondPars@Q}"
+        : "$(printf 'trigCondFlgs=0x%08x; JT__TRIG_COND_EXEC_FLGS=0x%08x' ${trigCondFlgs} "${JT__TRIG_COND_EXEC_FLGS}")"
         ((trigCondFlgs & JT__TRIG_COND_EXEC_FLGS)) || continue
         stepName="${trigCondStep}"
         while true; do
@@ -117,7 +119,7 @@ while IFS=$'\t' read -r trigCond jobList postTask; do
             #       match `trigger-jobs-trig-*` pattern, then in this case,
             #       list it un-commented before that glob pattern.
             # (
-            #       trigger-jobs-trig-some-standard-handling |
+            #       trigger-jobs-trig-time-eval |
             #       trigger-jobs-trig-future-standard-handling
             # ) ;&
             # (
@@ -143,7 +145,7 @@ while IFS=$'\t' read -r trigCond jobList postTask; do
               (*)   : "Unsupported Trigger Condition Step: ${trigCondStep}"; continue 3;;
             esac
         done
-    done 0< <( jq -cr '
+    done 0< <(jq -cr '
         .[] |
         [.trigCondFlgs//0, .trigCondStep//"", (.trigCondPars//{} | @json)] |
         @tsv
@@ -151,7 +153,7 @@ while IFS=$'\t' read -r trigCond jobList postTask; do
 
     # Triggering Jobs.
     while IFS=$'\t' read -r jobType jobName; do
-        : "Issuing trigger for active job: ${jobName}"
+        : "Processing: ${jobType@Q} ${jobName@Q}"
         jobExecType="${jobExecTypeMaps[${jobType}]:-}"
         ((jobExecType)) || {
             : "Invalid \`.jobType\` value: ${jobType}"
@@ -190,7 +192,8 @@ cmd1EOF
 
     # Post Tasks Execution.
     while IFS=$'\t' read -r postTaskFlgs postTaskStep postTaskPars; do
-        : "postTaskFlgs=${postTaskFlgs}; JT__POST_TASK_EXEC_FLGS=${JT__POST_TASK_EXEC_FLGS}"
+        : "Processing: ${postTaskFlgs@Q} ${postTaskStep@Q} ${postTaskPars@Q}"
+        : "$(printf 'postTaskFlgs=0x%08x; JT__POST_TASK_EXEC_FLGS=0x%08x' ${postTaskFlgs} "${JT__POST_TASK_EXEC_FLGS}")"
         ((postTaskFlgs & JT__POST_TASK_EXEC_FLGS)) || continue
         stepName="${postTaskStep}"
         while true; do

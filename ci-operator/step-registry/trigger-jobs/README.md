@@ -15,7 +15,7 @@ The two sources of data are:
  1. The **`gangway-api-token`**: Request from the DPTP team and store under a key named `gangway-api-token` in the vault.
  2. ENV var **`JT__TRIG_JOB_LIST`**: This Env. Var. is used to access a key in vault which holds a JSON structure as its value. See the
     [Step configuration file](trigger-jobs-ref.yaml) for the JSON Schema.
-    - Example of JSON value to store in the jobs-to-trigger key:
+    - Example of JSON Input:
       ```json
       [
         {
@@ -54,7 +54,8 @@ The two sources of data are:
       ]
       ```
     - Example of naming of vault key and `JT__TRIG_JOB_LIST` Env. Var.:
-      If you name the secret in vault holding the JSON blob **job-list**, then you will need to assign the **JT__TRIG_JOB_LIST** Env. Var. the value **job-list**.
+      If you name the secret in vault holding the JSON blob **job-list**, then you will need to assign the **JT__TRIG_JOB_LIST** Env. Var. the value
+      **job-list**.
 
       Example test block configuration for triggering 3 sets of Jobs:
       ```yaml
@@ -89,6 +90,7 @@ The two sources of data are:
 
 ### Supported Trigger Condition Steps
 - [trigger-jobs-trig-check-resource-owner](trig/check-resource-owner/)
+- [trigger-jobs-trig-time-eval](trig/time-eval/)
 
 Example of Trigger Condition Step Configuration:
 ```yaml
@@ -129,6 +131,7 @@ Example of Trigger Condition Step Script:
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+typeset jobDescFile="${CLUSTER_PROFILE_DIR}/${JT__TRIG_JOB_LIST}"
 typeset trigCondStep='' trigCondPars=''
 typeset trigCondName=trigger-jobs-trig-some-cond
 typeset -i trigCondFlgs=0
@@ -149,9 +152,13 @@ PATH="$(exec 3>&1 1>&2
     }
 echo "${binDir}" 1>&3):${PATH}"
 
+: "INPUT:"
+jq -c '.[]' "${jobDescFile}"
+
 while IFS=$'\t' read -r trigCondFlgs trigCondStep trigCondPars; do
+    : "Processing: ${trigCondFlgs@Q} ${trigCondStep@Q} ${trigCondPars@Q}"
     typeset trigCondFlag=''
-    : "trigCondFlgs=${trigCondFlgs}; JT__TRIG_COND_EXEC_FLGS=${JT__TRIG_COND_EXEC_FLGS}"
+    : "$(printf 'trigCondFlgs=0x%08x; JT__TRIG_COND_EXEC_FLGS=0x%08x' ${trigCondFlgs} "${JT__TRIG_COND_EXEC_FLGS}")"
     ((trigCondFlgs & JT__TRIG_COND_EXEC_FLGS)) || continue
     [ "${trigCondStep}" = "${trigCondName}" ] || continue
     IFS=$'\t' read -r trigCondFlag 0< <(jq -cr \
@@ -167,7 +174,7 @@ done 0< <(jq -cr '
     .[] |
     [.trigCondFlgs//0, .trigCondStep//"", (.trigCondPars//{} | @json)] |
     @tsv
-' "${CLUSTER_PROFILE_DIR}/${JT__TRIG_JOB_LIST}")
+' "${jobDescFile}")
 
 true
 ```
@@ -213,6 +220,7 @@ Example of Post Task Step Script:
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+typeset jobDescFile="${CLUSTER_PROFILE_DIR}/${JT__TRIG_JOB_LIST}"
 typeset postTaskStep='' postTaskPars=''
 typeset postTaskName=trigger-jobs-post-some-task
 typeset -i dryRun=0 postTaskFlgs=0
@@ -233,11 +241,15 @@ PATH="$(exec 3>&1 1>&2
     }
 echo "${binDir}" 1>&3):${PATH}"
 
+: "INPUT:"
+jq -c '.[]' "${jobDescFile}"
+
 [[ "${JOB_NAME}" == 'rehearse-'* ]] && dryRun=1
 
 while IFS=$'\t' read -r postTaskFlgs postTaskStep postTaskPars; do
+    : "Processing: ${postTaskFlgs@Q} ${postTaskStep@Q} ${postTaskPars@Q}"
     typeset postTaskFlag=''
-    : "postTaskFlgs=${postTaskFlgs}; JT__POST_TASK_EXEC_FLGS=${JT__POST_TASK_EXEC_FLGS}"
+    : "$(printf 'postTaskFlgs=0x%08x; JT__POST_TASK_EXEC_FLGS=0x%08x' ${postTaskFlgs} "${JT__POST_TASK_EXEC_FLGS}")"
     ((postTaskFlgs & JT__POST_TASK_EXEC_FLGS)) || continue
     [ "${postTaskStep}" = "${postTaskName}" ] || continue
     IFS=$'\t' read -r postTaskFlag 0< <(jq -cr \
@@ -257,7 +269,7 @@ done 0< <(jq -cr '
     .[] |
     [.postTaskFlgs//0, .postTaskStep//"", (.postTaskPars//{} | @json)] |
     @tsv
-' "${CLUSTER_PROFILE_DIR}/${JT__TRIG_JOB_LIST}")
+' "${jobDescFile}")
 
 true
 
