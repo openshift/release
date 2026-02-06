@@ -35,7 +35,7 @@ if [ "$CNV_AVAILABLE" != "True" ]; then
     updateStrategy:
       registryPoll:
         interval: 8h
-  EOF
+EOF
 
   sleep 30
 
@@ -46,7 +46,7 @@ if [ "$CNV_AVAILABLE" != "True" ]; then
   kind: Namespace
   metadata:
       name: openshift-cnv
-  EOF
+EOF
 
   cat << EOF| oc apply -f -
   apiVersion: operators.coreos.com/v1
@@ -57,7 +57,7 @@ if [ "$CNV_AVAILABLE" != "True" ]; then
   spec:
       targetNamespaces:
       - openshift-cnv
-  EOF
+EOF
 
   cat << EOF| oc apply -f -
   apiVersion: operators.coreos.com/v1alpha1
@@ -71,7 +71,7 @@ if [ "$CNV_AVAILABLE" != "True" ]; then
       name: kubevirt-hyperconverged
       startingCSV: ${STARTING_CSV}
       channel: "nightly-${CNV_VERSION}"
-  EOF
+EOF
 
   until oc get csv -n openshift-cnv $STARTING_CSV ; do  sleep 5; done
   oc wait --timeout=300s -n openshift-cnv csv $STARTING_CSV --for=jsonpath='{.status.phase}'=Succeeded
@@ -83,7 +83,7 @@ if [ "$CNV_AVAILABLE" != "True" ]; then
     name: kubevirt-hyperconverged
     namespace: openshift-cnv
   Spec: {}
-  EOF
+EOF
 
   sleep 20
 
