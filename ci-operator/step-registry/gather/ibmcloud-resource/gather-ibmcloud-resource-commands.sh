@@ -1,9 +1,18 @@
 #!/bin/bash
+function debug_on_failure() {
+    local exit_code=$?
+    # Only sleep if the exit code is non-zero (failure)
+    if [ $exit_code -ne 0 ]; then
+        echo "Script failed with exit code $exit_code. Sleeping for 2 hours for debugging purposes."
+        sleep 2h
+    fi
+}
+
+trap debug_on_failure EXIT ERR
 
 set -o nounset
 set -o pipefail
 set -o errexit
-
 
 RESOURCE_DUMP_DIR="${ARTIFACT_DIR}"
 CLUSTER_FILTER="${NAMESPACE}-${UNIQUE_HASH}"
@@ -63,9 +72,9 @@ function ibmcloud_login {
   "${IBMCLOUD_CLI}" config --check-version=false
   echo "Try to login..."
   if [ -f "${SHARED_DIR}/ibmcloud-min-permission-api-key" ]; then
-      "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${SHARED_DIR}/ibmcloud-min-permission-api-key"
+      "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${SHARED_DIR}/ibmcloud-min-permission-api-key -q"
   else
-      "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+      "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key -q"
   fi
 }
 
@@ -76,15 +85,15 @@ function gather_lb_resources {
     for lb in "${LBS[@]}"; do
         {
             echo -e "# ibmcloud is lb-ls ${lb}\n"
-            "${IBMCLOUD_CLI}" is lb-ls "${lb}"
+            "${IBMCLOUD_CLI}" is lb-ls "${lb}" -q
             echo -e "\n\n\n# ibmcloud is lb-l ${lb} <listener>\n"
-            "${IBMCLOUD_CLI}" is lb-ls "${lb}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is lb-l ${lb} %"
+            "${IBMCLOUD_CLI}" is lb-ls "${lb}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is lb-l ${lb} % -q"
             echo -e "\n\n\n# ibmcloud is lb-ps ${lb}\n"
             "${IBMCLOUD_CLI}" is lb-ps "${lb}"
             echo -e "\n\n\n# ibmcloud is lb-p ${lb} <pool>\n"
-            "${IBMCLOUD_CLI}" is lb-ps "${lb}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is lb-p ${lb} %"
+            "${IBMCLOUD_CLI}" is lb-ps "${lb}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is lb-p ${lb} % -q"
             echo -e "\n\n\n# ibmcloud is lb-pms ${lb} <pool>\n"
-            "${IBMCLOUD_CLI}" is lb-ps "${lb}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is lb-pms ${lb} %"
+            "${IBMCLOUD_CLI}" is lb-ps "${lb}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is lb-pms ${lb} % -q"
         } > "${RESOURCE_DUMP_DIR}/load-balancer-${lb}.txt"
     done
 }
@@ -92,12 +101,12 @@ function gather_lb_resources {
 # Gather vpc-routing-tables
 function gather_vpc_routing_tables {
     local VPC
-    VPC=$("${IBMCLOUD_CLI}" is vpcs | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}')
+    VPC=$("${IBMCLOUD_CLI}" is vpcs -q| awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}')
     {
         echo -e "# ibmcloud is vpc-routing-tables ${VPC}\n"
-        "${IBMCLOUD_CLI}" is vpc-routing-tables "${VPC}"
+        "${IBMCLOUD_CLI}" is vpc-routing-tables "${VPC} -q"
         echo -e "\n\n\n# ibmcloud is vpc-routing-table ${VPC} <table>\n"
-        "${IBMCLOUD_CLI}" is vpc-routing-tables "${VPC}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is vpc-routing-table ${VPC} %; echo "
+        "${IBMCLOUD_CLI}" is vpc-routing-tables "${VPC}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is vpc-routing-table ${VPC} % -q; echo "
     } > "${RESOURCE_DUMP_DIR}/vpc-routing-tables.txt"
 }
 
@@ -105,9 +114,9 @@ function gather_vpc_routing_tables {
 function gather_cos {
     {
         echo -e "# ibmcloud resource service-instances --service-name cloud-object-storage\n"
-        "${IBMCLOUD_CLI}" resource service-instances --service-name cloud-object-storage | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter'
+        "${IBMCLOUD_CLI}" resource service-instances --service-name cloud-object-storage -q| awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter'
         echo -e "\n\n\n# ibmcloud resource service-instance <cos>"
-        "${IBMCLOUD_CLI}" resource service-instances --service-name cloud-object-storage | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} resource service-instance %"
+        "${IBMCLOUD_CLI}" resource service-instances --service-name cloud-object-storage | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} resource service-instance % -q"
     } > "${RESOURCE_DUMP_DIR}/cos.txt"
 
 }
@@ -127,14 +136,14 @@ function gather_cis {
     DOMAIN_ID=$(eval "${cmd}")
     if [[ -z "${DOMAIN_ID}" ]] ; then
         echo "Debug: Did not find the cis domain id of ${BASE_DOMAIN}"
-        run_command "${IBMCLOUD_CLI} cis domains"
+        run_command "${IBMCLOUD_CLI} cis domains -q"
     else 
     {
         echo -e "## ibmcloud cis dns-records ${DOMAIN_ID}\n"
         # DNS Record Names do not contain the $UNIQUE_HASH, so we filter on the $NAMESPACE only
-        command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter'
+        command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" -q | awk -v filter="${NAMESPACE}" '$0 ~ filter'
         echo -e "## ibmcloud cis dns-record ${DOMAIN_ID} <dns-record>\n"
-        command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} cis dns-record ${DOMAIN_ID} %"
+        command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" -q | awk -v filter="${NAMESPACE}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} cis dns-record ${DOMAIN_ID} % -q"
     } > "${RESOURCE_DUMP_DIR}/cis.txt"
     fi
 }
@@ -163,7 +172,7 @@ function gather_dns() {
         }  > "${RESOURCE_DUMP_DIR}/dns.txt"
         fi
     else
-        run_command "${IBMCLOUD_CLI} dns instances"
+        run_command "${IBMCLOUD_CLI} dns instances -q"
     fi
 }
 
@@ -179,7 +188,7 @@ function gather_resources {
             fi
             "${IBMCLOUD_CLI}" is "${resource}s" -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter'
             echo -e "\n\n\n# ibmcloud is ${resource} <item>\n"
-            "${IBMCLOUD_CLI}" is "${resource}s" -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is ${resource} %"
+            "${IBMCLOUD_CLI}" is "${resource}s" -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is ${resource} % -q"
         } > "${RESOURCE_DUMP_DIR}/${resource}s.txt"
         
         if [ "$hasSetTarget" = true ];  then
@@ -199,6 +208,59 @@ function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
     eval "${CMD}"
+}
+
+check_instance_ssh() {
+  local ssh_user="core"
+  local ssh_key="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
+  local proxy_ip="${proxy_ip}" # Assumes this is set in your environment
+  if [[ ! -s "$ssh_key" ]]; then
+    echo "FAILED: Key $ssh_key does not exist."
+    return 1
+  fi
+
+  if [ -s "${SHARED_DIR}/bastion_ssh_user" ]; then
+    ssh_user="$(< "${SHARED_DIR}/bastion_ssh_user" )"
+  fi
+  # Ensure the key is added to the agent for forwarding
+  eval $(ssh-agent)
+  ssh-add "$ssh_key"
+
+  echo "Gathering instances from IBM Cloud..."
+  local instances
+  "${IBMCLOUD_CLI}" target -g ${RESOURCE_GROUP} -q
+  instances=$(ibmcloud is instances --output JSON | jq -r '.[] | "\(.name)|\(.network_interfaces[0].primary_ip.address)|\(.status)"')
+
+  echo "------------------------------------------------------------------------------"
+  printf "%-35s | %-15s | %-10s\n" "NODE NAME" "INTERNAL IP" "RESULT"
+  echo "------------------------------------------------------------------------------"
+
+  for entry in $instances; do
+    local node_name=$(echo "$entry" | cut -d'|' -f1)
+    local node_ip=$(echo "$entry" | cut -d'|' -f2)
+    local status=$(echo "$entry" | cut -d'|' -f3)
+
+    if [[ "$status" != "running" ]]; then
+      printf "%-35s | %-15s | [SKIP - %s]\n" "$node_name" "$node_ip" "$status"
+      continue
+    fi
+
+    # Use Proxy Jump logic (-A for agent forwarding and -J for jump host)
+    # This tests if the Bastion can actually reach the private node
+    ssh -A -o PreferredAuthentications=publickey \
+           -o StrictHostKeyChecking=false \
+           -o UserKnownHostsFile=/dev/null \
+           -o ConnectTimeout=5 \
+           -J "${ssh_user}@${proxy_ip}" \
+           "${ssh_user}@${node_ip}" 'exit 0' > /dev/null 2>&1
+
+    if [[ $? -eq 0 ]]; then
+      printf "%-35s | %-15s | [PASS]\n" "$node_name" "$node_ip"
+    else
+      printf "%-35s | %-15s | [FAIL]\n" "$node_name" "$node_ip"
+    fi
+  done
+  echo "------------------------------------------------------------------------------"
 }
 
 ibmcloud_login
@@ -224,3 +286,8 @@ fi
 
 mkdir -p "${RESOURCE_DUMP_DIR}"
 gather_resources
+
+echo "IBM Cloud resource gathering completed."
+
+set -o xtrace
+check_instance_ssh
