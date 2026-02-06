@@ -248,5 +248,4 @@ if [[ -z "${PR_URL}" ]]; then
   error "github: No PR found after ${PR_CHECK_MAX_ATTEMPTS} attempts"
 fi
 
-notify "✅ Image digest update PR ready to review: ${PR_URL}"
 exit 0
