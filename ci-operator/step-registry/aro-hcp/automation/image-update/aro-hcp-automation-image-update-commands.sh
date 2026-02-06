@@ -25,6 +25,7 @@ trap 'set +o xtrace' DEBUG
 
 # Environment variable defaults (overridable via ref.yaml)
 VERBOSITY=${VERBOSITY:-1}
+PR_AGE_NOTIFICATION_HOURS=${PR_AGE_NOTIFICATION_HOURS:-24}
 
 # Internal variables (not configurable via ref.yaml)
 readonly IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.md"
@@ -220,13 +221,25 @@ for ((i=1; i<=PR_CHECK_MAX_ATTEMPTS; i++)); do
   debug "github: attempting to find PR (attempt ${i} of ${PR_CHECK_MAX_ATTEMPTS})"
 
   # Security: Use authenticated API call with silent mode to prevent token exposure
-  PR_URL=$(curl -f -s -H "Authorization: token ${GITHUB_TOKEN}" \
+  PR_DATA=$(curl -f -s -H "Authorization: token ${GITHUB_TOKEN}" \
     "https://api.github.com/repos/Azure/ARO-HCP/pulls?per_page=100" 2>/dev/null | \
-    jq -r ".[] | select(.user.login == \"${GITHUB_PR_USER}\" and .title == \"${GITHUB_PR_TITLE}\") | .html_url" | \
+    jq -r ".[] | select(.user.login == \"${GITHUB_PR_USER}\" and .title == \"${GITHUB_PR_TITLE}\") | {url: .html_url, created_at: .created_at}" | \
     head -1)
 
-  if [[ -n "${PR_URL}" ]]; then
+  if [[ -n "${PR_DATA}" ]]; then
+    PR_URL=$(echo "${PR_DATA}" | jq -r '.url')
+    PR_CREATED_AT=$(echo "${PR_DATA}" | jq -r '.created_at')
     info "github: PR found at ${PR_URL}"
+
+    # Check if PR is older than threshold
+    PR_AGE_SECONDS=$(( $(date +%s) - $(date -j -f "%Y-%m-%dT%H:%M:%SZ" "${PR_CREATED_AT}" +%s 2>/dev/null || date -d "${PR_CREATED_AT}" +%s 2>/dev/null) ))
+    THRESHOLD_SECONDS=$((PR_AGE_NOTIFICATION_HOURS * 60 * 60))
+
+    if [[ ${PR_AGE_SECONDS} -gt ${THRESHOLD_SECONDS} ]]; then
+      PR_AGE_HOURS=$((PR_AGE_SECONDS / 3600))
+      notify "⚠️ Image digest updater PR already exists and is ${PR_AGE_HOURS} hours old: ${PR_URL}. Please review and merge or close it."
+    fi
+
     break
   fi
 
