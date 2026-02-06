@@ -1,0 +1,84 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: .
+  name: appset-cluster-common-gcp
+  namespace: openshift-gitops
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+  - list:
+      elements:
+      - cluster: build02
+        name: build02
+      - cluster: build04
+        name: build04
+      - cluster: build08
+        name: build08
+  template:
+    metadata:
+      name: 'app-cluster-{{.cluster}}-common'
+    spec:
+      destination:
+        name: '{{.name}}'
+        namespace: openshift-gitops
+      ignoreDifferences:
+        - group: rbac.authorization.k8s.io
+          jsonPointers:
+            - /rules
+          kind: ClusterRole
+          name: ci-admins-aggregated
+        - group: '*'
+          jsonPointers:
+            - /imagePullSecrets
+            - /secrets
+          kind: ServiceAccount
+      project: default
+      sources:
+        - directory:
+            exclude: '{OWNERS,*.md}'
+            include: '{*.yaml,*.yml}'
+            recurse: true
+          path: clusters/build-clusters/common
+          repoURL: https://github.com/openshift/release.git
+          targetRevision: master
+        - directory:
+            exclude: '{OWNERS,*.md}'
+            include: '{*.yaml,*.yml}'
+            recurse: true
+          path: clusters/build-clusters/common_ci_scheduling_webhook
+          repoURL: https://github.com/openshift/release.git
+          targetRevision: master
+        - directory:
+            exclude: '{OWNERS,*.md}'
+            include: '{*.yaml,*.yml}'
+            recurse: true
+          path: clusters/build-clusters/common_gpu_scheduling_webhook
+          repoURL: https://github.com/openshift/release.git
+          targetRevision: master
+        - directory:
+            exclude: '{OWNERS,*.md}'
+            include: '{*.yaml,*.yml}'
+            recurse: true
+          path: clusters/build-clusters/common_managed
+          repoURL: https://github.com/openshift/release.git
+          targetRevision: master
+        - directory:
+            exclude: '{OWNERS,*.md}'
+            include: '{*.yaml,*.yml}'
+            recurse: true
+          path: clusters/build-clusters/common_ocp
+          repoURL: https://github.com/openshift/release.git
+          targetRevision: master
+      syncPolicy:
+        automated:
+          enabled: true
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - ApplyOutOfSyncOnly=true
+          - CreateNamespace=true
+          - PruneLast=true
+          - ServerSideApply=true

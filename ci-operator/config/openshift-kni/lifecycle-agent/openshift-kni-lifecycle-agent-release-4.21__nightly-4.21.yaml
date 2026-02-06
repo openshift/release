@@ -56,6 +56,44 @@ tests:
       SEED_FLOATING_TAG: "4.21"
       SEED_IMAGE_TAG_FORMAT: nightly
     workflow: openshift-image-based-upgrade-seed-create
+- as: seedgen-aws-ocp-4-21-v4v6
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle
+      RECERT_IMAGE: pipeline:recert
+    env:
+      IP_STACK: v4v6
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.21"
+      OO_BUNDLE_OVERRIDE: quay.io/openshift-kni/lifecycle-agent-operator-bundle:4.21
+      RECERT_IMAGE_OVERRIDE: quay.io/edge-infrastructure/recert:v0
+      SEED_FLOATING_TAG: 4.21-v4v6
+      SEED_IMAGE_TAG_FORMAT: nightly
+    workflow: openshift-image-based-upgrade-seed-create
+- as: seedgen-aws-ocp-4-21-v6v4
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle
+      RECERT_IMAGE: pipeline:recert
+    env:
+      IP_STACK: v6v4
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.21"
+      OO_BUNDLE_OVERRIDE: quay.io/openshift-kni/lifecycle-agent-operator-bundle:4.21
+      RECERT_IMAGE_OVERRIDE: quay.io/edge-infrastructure/recert:v0
+      SEED_FLOATING_TAG: 4.21-v6v4
+      SEED_IMAGE_TAG_FORMAT: nightly
+    workflow: openshift-image-based-upgrade-seed-create
 - as: image-based-install
   interval: 24h
   steps:
@@ -72,6 +110,42 @@ tests:
       OCP_BASE_VERSION: "4.21"
       SEED_IMAGE_TAG_FORMAT: nightly
       SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-install
+- as: image-based-install-v4v6
+  cron: 47 15 * * 0
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle
+      RECERT_IMAGE: pipeline:recert
+    env:
+      IP_STACK: v4v6
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.21"
+      SEED_IMAGE_TAG_FORMAT: nightly
+      SEED_IMAGE_TAG_PREFIX: ibi-v4v6
+    workflow: openshift-image-based-install
+- as: image-based-install-v6v4
+  cron: 47 12 * * 0
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle
+      RECERT_IMAGE: pipeline:recert
+    env:
+      IP_STACK: v6v4
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.21"
+      SEED_IMAGE_TAG_FORMAT: nightly
+      SEED_IMAGE_TAG_PREFIX: ibi-v6v4
     workflow: openshift-image-based-install
 zz_generated_metadata:
   branch: release-4.21

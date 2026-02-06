@@ -77,19 +77,7 @@ tests:
     cluster_profile: gcp-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
-    env:
-      CLUSTER_PARAMETER_SELECT_CONDITIONS: |
-        [
-          [
-              {"column": "Region", "value": "us-west4", "operator": "equals"}
-          ]
-        ]
-      TEST_FILTERS: "57148"
-      TEST_OBJECT: Regions
-    test:
-    - ref: openshift-extended-test-longduration
-    - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-gcp-cases-clusters
+    workflow: cucushift-installer-rehearse-gcp-ipi-custom-endpoints
 - as: installer-rehearse-gcp-regions
   cron: '@yearly'
   steps:
@@ -110,6 +98,14 @@ tests:
     - ref: openshift-extended-test-longduration
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-gcp-cases-clusters
+- as: installer-rehearse-ibmcloud
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: ibmcloud-qe
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
 - as: installer-rehearse-vsphere
   cron: '@yearly'
   steps:

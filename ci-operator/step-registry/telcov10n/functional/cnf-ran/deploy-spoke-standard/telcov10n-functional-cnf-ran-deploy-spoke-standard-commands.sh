@@ -2,11 +2,13 @@
 set -e
 set -o pipefail
 
-echo "Deploying spoke standard cluster: ${SPOKE_CLUSTER:-kni-qe-100}"
+echo "Checking if the job should be skipped..."
+if [ -f "${SHARED_DIR}/skip.txt" ]; then
+  echo "Detected skip.txt file — skipping the job"
+  exit 0
+fi
 
-# Save spoke cluster name for subsequent steps
-echo "${SPOKE_CLUSTER}" > "${SHARED_DIR}/spoke_cluster"
-echo "Saved spoke cluster name to ${SHARED_DIR}/spoke_cluster"
+echo "Deploying spoke standard cluster: ${SPOKE_CLUSTER}"
 
 process_inventory() {
     local directory="$1"
@@ -22,29 +24,13 @@ process_inventory() {
         return 1
     fi
 
-    # Clear destination file first
-    : > "${dest_file}"
-
     find "$directory" -type f | while IFS= read -r filename; do
         if [[ $filename == *"secretsync-vault-source-path"* ]]; then
-            continue
-        fi
-
-        local key
-        local value
-        key=$(basename "${filename}")
-        value=$(cat "$filename")
-
-        # Handle multi-line values (e.g., certificates) with YAML literal block scalar
-        if [[ "$value" == *$'\n'* ]]; then
-            echo "${key}: |" >> "${dest_file}"
-            while IFS= read -r line; do
-                echo "  ${line}" >> "${dest_file}"
-            done <<< "$value"
+          continue
         else
-            echo "${key}: '${value}'" >> "${dest_file}"
+          echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
         fi
-    done
+    done > "${dest_file}"
 
     echo "Processing complete. Check \"${dest_file}\""
 }
@@ -79,14 +65,11 @@ find "/var/host_variables/${SPOKE_CLUSTER}/" -mindepth 1 -type d 2>/dev/null | w
     process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
 done
 
-# Set kubeconfig path from hub cluster
 KUBECONFIG_PATH="/home/telcov10n/project/generated/kni-qe-99/auth/kubeconfig"
 
-# Fix HOME for localhost delegation in Ansible
 export HOME=/tmp
 mkdir -p /tmp/.ansible/tmp
 
-# Create ansible.cfg with proper temp paths (includes original /eco-ci-cd/ansible.cfg settings)
 cat > /tmp/ansible.cfg << 'EOF'
 [defaults]
 local_tmp = /tmp/.ansible/tmp

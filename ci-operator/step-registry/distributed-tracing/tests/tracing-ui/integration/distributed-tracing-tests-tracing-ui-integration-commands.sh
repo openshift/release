@@ -89,6 +89,8 @@ fi
 function copyArtifacts {
   if [ -d "gui_test_screenshots" ]; then
     cp -r gui_test_screenshots "${ARTIFACT_DIR}/gui_test_screenshots"
+    # Copy JUnit files directly to ARTIFACT_DIR with a unique name for BigQuery ingestion
+    cp gui_test_screenshots/junit_cypress-*.xml "${ARTIFACT_DIR}/junit_distributed-tracing-console-plugin.xml" 2>/dev/null || true
     echo "Artifacts copied successfully."
   else
     echo "Directory gui_test_screenshots does not exist. Nothing to copy."

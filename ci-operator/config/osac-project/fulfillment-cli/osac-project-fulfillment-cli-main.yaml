@@ -1,8 +1,25 @@
+binary_build_commands: GOFLAGS="-mod=readonly" go build -o /tmp/fulfillment-cli main.go
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.21
+images:
+- dockerfile_literal: |
+    FROM src
+    WORKDIR /app
+    COPY fulfillment-cli /app/fulfillment-cli
+  from: src
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /tmp/fulfillment-cli
+  to: fulfillment-cli
+promotion:
+  to:
+  - name: latest
+    namespace: osac-project
 resources:
   '*':
     limits:

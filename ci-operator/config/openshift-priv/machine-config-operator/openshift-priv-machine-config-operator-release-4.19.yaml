@@ -35,18 +35,6 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.19_base-rhel9:
-    name: 4.19-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.23-openshift-4.19
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
   ocp_os:
     name: 4.19-priv
     namespace: ocp-private
@@ -56,16 +44,6 @@ build_root:
 canonical_go_repository: github.com/openshift/machine-config-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-8-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.23-openshift-4.19
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: machine-config-operator
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
@@ -483,7 +461,7 @@ tests:
 - as: e2e-hypershift
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - always_run: false
   as: e2e-openstack-dualstack
@@ -501,7 +479,7 @@ tests:
   as: e2e-openstack-hypershift
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       TECH_PREVIEW_NO_UPGRADE: "true"
