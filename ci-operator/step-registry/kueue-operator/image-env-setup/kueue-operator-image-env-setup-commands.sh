@@ -20,7 +20,7 @@ EOF
 
 echo "Current PWD: $(pwd)"
 ls -lah
-REVISION=$(git rev-parse HEAD)
+REVISION=$(git log --oneline -1 | awk '{print $4}' | tr -d "'")
 echo "Current Git branch:"
 git branch --show-current
 
