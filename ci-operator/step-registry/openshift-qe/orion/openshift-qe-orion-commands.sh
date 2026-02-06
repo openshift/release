@@ -140,30 +140,30 @@ set -e
 cp *.csv *.xml *.json *.txt "${ARTIFACT_DIR}/" 2>/dev/null || true
 
 if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
-    local bucket="gs://test-platform-results"
-    local path=""
+    GCS_BUCKET="gs://test-platform-results"
+    GCS_PATH=""
 
     # Determine the path to prowjob.json based on prow ENV variables
     case "${JOB_TYPE:-}" in
         presubmit)
         if [[ -n "${ORG_REPO:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
-            path="pr-logs/pull/${ORG_REPO}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/prowjob.json"
+            GCS_PATH="pr-logs/pull/${ORG_REPO}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/prowjob.json"
         fi
         ;;
         periodic)
         if [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
-            path="logs/${JOB_NAME}/${BUILD_ID}/prowjob.json"
+            GCS_PATH="logs/${JOB_NAME}/${BUILD_ID}/prowjob.json"
         fi
         ;;
         *)
-        return 0
+        exit 0
         ;;
     esac
 
-    [[ -z "$path" ]] && return 0
+    [[ -z "$GCS_PATH" ]] && exit 0
 
-    echo "Fetching prowjob.json from $bucket/$path"
-    gsutil -m cp -r "${bucket}/${path}" .
+    echo "Fetching prowjob.json from $GCS_BUCKET/$GCS_PATH"
+    gsutil -m cp -r "${GCS_BUCKET}/${GCS_PATH}" .
 
     # Extract trigger repos from prowjob.json
     repos=$(jq -r '
@@ -176,8 +176,8 @@ if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
         end
         ' prowjob.json)
 
-    owners_file=owners.txt
-    > "$owners_file"
+    OWNERS_FILE=owners.txt
+    : > "$OWNERS_FILE"
 
     # Iterate over each url to fetch OWNERS
     for repo in $repos; do
@@ -190,12 +190,12 @@ if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
 
         curl -fsSL "$url" \
             | yq -r '.approvers[], .reviewers[]' \
-            >> "$owners_file" \
+            >> "$OWNERS_FILE" \
             || echo "OWNERS not found for $repo"
     done
 
     # dedupe at the end
-    sort -u "$owners_file" -o "$owners_file"
+    sort -u "$OWNERS_FILE" -o "$OWNERS_FILE"
 
     # Load owners list as a JSON array (skip blank lines)
     OWNERS_JSON=$(jq -R -s -c 'split("\n") | map(select(length > 0))' owners.txt)
