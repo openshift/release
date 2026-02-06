@@ -210,51 +210,11 @@ function manage_baremetal_instances(){
 
     # Lab baremetal envinronments
     if [[ \$(hostname -f) =~ ocpci.eng.rdu2.redhat.com ]] ; then
-        # Generate node network configuration with secondary VLAN
-        export NETWORK_CONFIG_FOLDER=/root/dev-scripts/network-configs/sec-vlan
-        mkdir -p network-configs/sec-vlan
-        cat - << EOF2 > network-configs/sec-vlan/network-config.yaml
-networkConfig:
-  interfaces:
-  - name: enp3s0f0
-    type: ethernet
-    state: up
-    ipv4:
-      dhcp: true
-      enabled: true
-    ipv6:
-      enabled: false
-  - name: enp3s0f0.100
-    type: vlan
-    state: up
-    vlan:
-      base-iface: enp3s0f0
-      id: 100
-    ipv4:
-      dhcp: true
-      enabled: true
-EOF2
-
         nmcli --fields UUID c show | grep -v UUID | xargs -t -n 1 nmcli con delete
         nmcli con add ifname \${CLUSTER_NAME}bm type bridge con-name \${CLUSTER_NAME}bm bridge.stp off
         nmcli con add type ethernet ifname eth2 master \${CLUSTER_NAME}bm con-name \${CLUSTER_NAME}bm-eth2
-        nmcli con add ifname \${CLUSTER_NAME}sec type bridge con-name \${CLUSTER_NAME}sec bridge.stp off ipv4.method manual ipv4.address "20.20.20.1/24"
-        nmcli connection add type vlan con-name eth2.100 dev eth2 id 100 master \${CLUSTER_NAME}sec
         nmcli con reload
         sleep 10
-
-        # Create DHCP service for secondary network
-        mkdir -p ~/resources
-        cat - << EOF2 > ~/resources/dnsmasq-sec.conf
-# DHCP configuration for secondary network
-interface=\${CLUSTER_NAME}sec
-bind-dynamic
-dhcp-range=20.20.20.10,20.20.20.250,24h
-dhcp-option=option:router,20.20.20.1
-dhcp-option=option:dns-server,20.20.20.1
-server=8.8.8.8
-EOF2
-        podman run --name dnsmasqsec -d --privileged --net host -v ~/resources:/conf quay.io/metal3-io/ironic dnsmasq -C /conf/dnsmasq-sec.conf -d -q
     # MOC baremetal envinronments
     else
 
