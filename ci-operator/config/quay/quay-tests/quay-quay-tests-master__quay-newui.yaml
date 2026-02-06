@@ -1,28 +1,34 @@
 base_images:
   cli:
-    name: "4.16"
+    name: "4.20"
     namespace: ocp
     tag: cli
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
+    tag: rhel-8-golang-1.24-openshift-4.20
 images:
-- dockerfile_literal: |
-    FROM src
-    RUN set -x && \
-      curl --silent --location  https://rpm.nodesource.com/setup_16.x | bash - && \
-      curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-      PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo jq podman bzip2 python3.9" && \
-      yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-      ln -sf /usr/bin/python3.9 /usr/bin/python3  && \
-      python3 -m pip install requests  && \
-      yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
-      yum -y install terraform && \
-      wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
-      yum install -y ./google-chrome-stable_current_x86_64.rpm && \
-      yum clean all && rm -rf /var/cache/yum/*
+- dockerfile_literal: "FROM src \nRUN set -x && \\\n  yum module disable nodejs -y
+    || true && \\\n  yum remove -y nodejs npm npx || true && \\\n  rpm -qa | grep
+    -i node | xargs rpm -e --nodeps || true && \\                               \n
+    \ yum clean all && \\                                                                        \n
+    \ rm -rf /usr/bin/node /usr/bin/npm /usr/bin/npx /usr/local/bin/node /usr/local/bin/npm
+    /usr/local/bin/npx || true && \\                                                             \n
+    \ rm -rf /usr/lib/node_modules /usr/local/lib/node_modules || true && \\                     \n
+    \ curl -fsSL https://rpm.nodesource.com/setup_20.x | bash - && \\                            \n
+    \ cp /etc/yum.repos.d/nodesource*.repo /etc/yum.repos.art/ci/ && \\        \n
+    \ yum install -y nodejs && \\                                                                \n
+    \ node --version && \\                                                                       \n
+    \ which node && \\                                                                           \n
+    \ yum module enable container-tools:rhel8 -y --setopt=sslverify=false  && \\\n
+    \ PACKAGES=\"openssh-clients httpd-tools xorg-x11-server-Xvfb gtk2-devel gtk3-devel
+    libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo jq podman bzip2 python3.9\"
+    && \\\n  yum install -y --setopt=sslverify=false --setopt=tsflags=nodocs $PACKAGES
+    && \\\n  ln -sf /usr/bin/python3.9 /usr/bin/python3  && \\\n  python3 -m pip install
+    requests  && \\\n  wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm
+    && \\\n  yum install -y ./google-chrome-stable_current_x86_64.rpm && \\\n  yum
+    clean all && rm -rf /var/cache/yum/*  \n"
   from: src
   to: quay-newui-test
 promotion:
@@ -35,7 +41,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.16"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -44,7 +50,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay-e2e-tests-quay314-ocp416-newui
+- as: quay-e2e-tests-quay314-ocp420-newui-p1-p2
   cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
@@ -52,7 +58,7 @@ tests:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       NEW_UI_TESTING_COVERAGE: p1+-noprowci p2+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-16@sha256:28e130e04a4a63c40074d330311929a95d88aa7b9dbe5aed8ebad0c31de88c4f
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-20@sha256:c3ae2f8abd3af31f4aa36531a0b7b2980d6bf83c64464ab07ab9fdf2e6a234ec
       QUAY_OLD_UI_DISABLED: "false"
       QUAY_OPERATOR_CHANNEL: stable-3.14
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -62,7 +68,7 @@ tests:
     - ref: quay-tests-test-quay-newui
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 8h0m0s
-- as: quay-e2e-tests-quay314-ocp416-newui-p3
+- as: quay-e2e-tests-quay314-ocp420-newui-p3
   cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
@@ -70,7 +76,7 @@ tests:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       NEW_UI_TESTING_COVERAGE: p3+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-16@sha256:28e130e04a4a63c40074d330311929a95d88aa7b9dbe5aed8ebad0c31de88c4f
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-14-v4-20@sha256:c3ae2f8abd3af31f4aa36531a0b7b2980d6bf83c64464ab07ab9fdf2e6a234ec
       QUAY_OLD_UI_DISABLED: "false"
       QUAY_OPERATOR_CHANNEL: stable-3.14
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -80,7 +86,7 @@ tests:
     - ref: quay-tests-test-quay-newui
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 8h0m0s
-- as: quay-e2e-tests-quay315-ocp416-newui-p1-p2
+- as: quay-e2e-tests-quay315-ocp420-newui-p1-p2
   cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
@@ -88,7 +94,7 @@ tests:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       NEW_UI_TESTING_COVERAGE: p1+-noprowci p2+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-15-v4-16@sha256:6cdfd670d291aa0d5f564ad9c9ddd28726e11fb9c9caccc8167030d263a586e5
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-15-v4-20@sha256:6e2c3c1a35df02e994b6a787e51d3a7d05562b249a371bb84cd6845535334f21
       QUAY_OLD_UI_DISABLED: "false"
       QUAY_OPERATOR_CHANNEL: stable-3.15
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -98,7 +104,7 @@ tests:
     - ref: quay-tests-test-quay-newui
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 8h0m0s
-- as: quay-e2e-tests-quay315-ocp416-newui-p3
+- as: quay-e2e-tests-quay315-ocp420-newui-p3
   cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
@@ -106,7 +112,7 @@ tests:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       NEW_UI_TESTING_COVERAGE: p3+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-15-v4-16@sha256:6cdfd670d291aa0d5f564ad9c9ddd28726e11fb9c9caccc8167030d263a586e5
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-15-v4-20@sha256:6e2c3c1a35df02e994b6a787e51d3a7d05562b249a371bb84cd6845535334f21
       QUAY_OLD_UI_DISABLED: "false"
       QUAY_OPERATOR_CHANNEL: stable-3.15
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -116,7 +122,7 @@ tests:
     - ref: quay-tests-test-quay-newui
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 8h0m0s
-- as: quay-e2e-tests-quay316-ocp416-newui-p1-p2
+- as: quay-e2e-tests-quay316-ocp420-newui-p1-p2
   cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
@@ -124,7 +130,7 @@ tests:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       NEW_UI_TESTING_COVERAGE: p1+-noprowci p2+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-16@sha256:49d5870ca7956d61694d88caf9632d5d8a8c52ac6657606e5e2f16f3c2392de7
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-20@sha256:b34557a4167499eb887d1a1813c2701db3de1470a18ae5788d77089cbe037cca
       QUAY_OLD_UI_DISABLED: "true"
       QUAY_OPERATOR_CHANNEL: stable-3.16
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -134,7 +140,7 @@ tests:
     - ref: quay-tests-test-quay-newui
     workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 8h0m0s
-- as: quay-e2e-tests-quay316-ocp416-newui-p3
+- as: quay-e2e-tests-quay316-ocp420-newui-p3
   cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
@@ -142,7 +148,7 @@ tests:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       NEW_UI_TESTING_COVERAGE: p3+-noprowci
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-16@sha256:49d5870ca7956d61694d88caf9632d5d8a8c52ac6657606e5e2f16f3c2392de7
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-20@sha256:b34557a4167499eb887d1a1813c2701db3de1470a18ae5788d77089cbe037cca
       QUAY_OLD_UI_DISABLED: "true"
       QUAY_OPERATOR_CHANNEL: stable-3.16
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
