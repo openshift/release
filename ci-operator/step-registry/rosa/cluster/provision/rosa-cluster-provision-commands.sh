@@ -38,6 +38,16 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
 }
 
+# Source prow_ci.sh for rosa CLI override support
+# Functions are defined in https://github.com/openshift/rosa/blob/master/tests/prow_ci.sh
+if [[ -f "./tests/prow_ci.sh" ]]; then
+  source ./tests/prow_ci.sh
+  if [[ -n "${ROSACLI_BUILD:-}" ]]; then
+    log "Overriding rosa CLI with build: ${ROSACLI_BUILD}"
+    override_rosacli_build
+  fi
+fi
+
 get_channel_versions() {
   local channel="$1"
   local cmd="rosa list versions --channel-group ${channel} -o json"
