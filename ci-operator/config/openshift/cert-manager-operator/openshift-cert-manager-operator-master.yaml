@@ -238,6 +238,56 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-operator-azure-ovn
+  optional: true
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: wait
+    - ref: cucushift-installer-wait
+    - ref: clusterbot-wait
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {Azure} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-azure-ovn
+- always_run: false
+  as: e2e-operator-azure-workload-identity
+  optional: true
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: wait
+    - ref: cucushift-installer-wait
+    - ref: clusterbot-wait
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {Azure} && CredentialsMode: isSubsetOf {Manual}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 zz_generated_metadata:
   branch: master
   org: openshift
