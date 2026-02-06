@@ -16,6 +16,8 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
+which podman >/dev/null 2>&1 && echo "Podman installed" || echo "Podman NOT installed"
+
 # Starting in 4.21, we will aggressively retry test failures only in
 # presubmits to determine if a failure is a flake or legitimate. This is
 # to reduce the number of retests on PR's.
@@ -303,7 +305,45 @@ function upgrade() {
     set +x
 }
 
-function suite() {
+function suite_in_container() {
+    # Setup SSHOPTS for remote server access using the mounted SSH key
+    SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "${HYPERVISOR_SSH_KEY}")
+
+    mkdir -p ~/.ssh
+    mkdir -p ~/.kcli
+
+    cat >> ~/.ssh/config <<EOF
+Host hypervisor
+    HostName ${IP}
+    User root
+    ServerAliveInterval 120
+    IdentityFile ${HYPERVISOR_SSH_KEY}
+EOF
+
+    cat >> ~/.kcli/config.yml <<EOF
+twix:
+  host: hypervisor
+  pool: default
+  protocol: ssh
+  type: kvm
+  user: root
+EOF
+
+    echo "Connect kcli with remote hypervisor"
+    kcli switch host twix
+
+    echo "Ensuring clean state for VM creation"
+    kcli delete vm ovn-kubernetes-e2e -y 2>/dev/null || true
+
+    echo "Creating test VM with Docker"
+    kcli create vm -i fedora42 ovn-kubernetes-e2e --wait -P "cmds=['dnf install -y docker','systemctl enable --now docker']"
+
+    echo "Verifying Docker installation in VM"
+    if ! kcli ssh ovn-kubernetes-e2e -- sudo docker version; then
+      echo "ERROR: Docker installation failed in VM"
+      exit 1
+    fi
+
     if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/auth/external-oidc") ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
@@ -326,6 +366,66 @@ function suite() {
             -o "${ARTIFACT_DIR}/e2e.log" \
             --junit-dir "${ARTIFACT_DIR}/junit"
     fi
+    set +x
+}
+
+function suite() {
+    # Determine SSH key path (same logic as build_hypervisor_config)
+    # Reuse HYPERVISOR_SSH_KEY if already set, otherwise determine it
+    if [[ -z "${HYPERVISOR_SSH_KEY:-}" ]]; then
+        if [[ -f "${CLUSTER_PROFILE_DIR}/equinix-ssh-key" ]]; then
+            HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/equinix-ssh-key"
+        else
+            HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+        fi
+    fi
+
+    # Locate openshift-tests binary in the current (outer) container
+    OPENSHIFT_TESTS_BIN=$(which openshift-tests || true)
+    if [[ -n "${OPENSHIFT_TESTS_BIN}" ]]; then
+        echo "Found openshift-tests at: ${OPENSHIFT_TESTS_BIN}"
+    else
+        echo "Warning: openshift-tests binary not found in PATH, skipping mount"
+    fi
+
+    # Prepare podman volume mounts as array
+    PODMAN_MOUNTS=(-v "${KUBECONFIG}:/tmp/kubeconfig:ro")
+    PODMAN_MOUNTS+=(-v "${ARTIFACT_DIR}:/tmp/artifacts")
+    PODMAN_MOUNTS+=(-v "${HYPERVISOR_SSH_KEY}:/tmp/ssh-key:ro")
+
+    # Only mount openshift-tests if it was found
+    if [[ -n "${OPENSHIFT_TESTS_BIN}" ]]; then
+        PODMAN_MOUNTS+=(-v "${OPENSHIFT_TESTS_BIN}:/usr/bin/openshift-tests:ro")
+    fi
+
+    # Prepare environment variables to pass to container as array
+    PODMAN_ENV=(-e "KUBECONFIG=/tmp/kubeconfig")
+    PODMAN_ENV+=(-e "ARTIFACT_DIR=/tmp/artifacts")
+    PODMAN_ENV+=(-e "TEST_SUITE=${TEST_SUITE}")
+    PODMAN_ENV+=(-e "TEST_PROVIDER=${TEST_PROVIDER:-}")
+    PODMAN_ENV+=(-e "TEST_ARGS=${TEST_ARGS:-}")
+    PODMAN_ENV+=(-e "TEST_SKIPS=${TEST_SKIPS:-}")
+    PODMAN_ENV+=(-e "IP=${IP}")
+    PODMAN_ENV+=(-e "HYPERVISOR_SSH_KEY=/tmp/ssh-key")
+
+    # Add hypervisor-specific configuration if enabled
+    if [[ -n "${HYPERVISOR_IP:-}" ]]; then
+        PODMAN_ENV+=(-e "HYPERVISOR_IP=${HYPERVISOR_IP}")
+        PODMAN_ENV+=(-e "HYPERVISOR_SSH_USER=${HYPERVISOR_SSH_USER}")
+    fi
+
+    echo "PODMAN_MOUNTS: ${PODMAN_MOUNTS[*]}"
+    echo "PODMAN_ENV: ${PODMAN_ENV[*]}"
+
+    echo "sleep for 3h"
+    sleep 3h
+
+    set -x
+    podman run --network host --rm -i \
+        "${PODMAN_ENV[@]}" \
+        "${PODMAN_MOUNTS[@]}" \
+        "quay.io/karmab/kcli" \
+        bash -c "$(declare -f suite_in_container); suite_in_container"
     set +x
 }
 
