@@ -2,6 +2,7 @@
 # shellcheck disable=SC2034 # False pos. due to the way the var. is used.
 set -euxo pipefail; shopt -s inherit_errexit
 
+typeset jobDescFile="${CLUSTER_PROFILE_DIR}/${JT__TRIG_JOB_LIST}"
 typeset postTaskStep='' postTaskPars=''
 typeset postTaskName=trigger-jobs-post-interop-ocp-watcher-bot-send-message
 typeset -i dryRun=0 postTaskFlgs=0
@@ -27,11 +28,15 @@ PATH="$(exec 3>&1 1>&2
     }
 echo "${binDir}" 1>&3):${PATH}"
 
+: "INPUT:"
+jq -c '.[]' "${jobDescFile}"
+
 [[ "${JOB_NAME}" == 'rehearse-'* ]] && dryRun=1
 
 while IFS=$'\t' read -r postTaskFlgs postTaskStep postTaskPars jobList; do
+    : "Processing: ${postTaskFlgs@Q} ${postTaskStep@Q} ${postTaskPars@Q} ${jobList@Q}"
     typeset postTaskFlag=''
-    : "postTaskFlgs=${postTaskFlgs}; JT__POST_TASK_EXEC_FLGS=${JT__POST_TASK_EXEC_FLGS}"
+    : "$(printf 'postTaskFlgs=0x%08x; JT__POST_TASK_EXEC_FLGS=0x%08x' ${postTaskFlgs} "${JT__POST_TASK_EXEC_FLGS}")"
     ((postTaskFlgs & JT__POST_TASK_EXEC_FLGS)) || continue
     [ "${postTaskStep}" = "${postTaskName}" ] || continue
     IFS=$'\t' read -r postTaskFlag 0< <(jq -cr \
@@ -65,7 +70,7 @@ done 0< <(jq -cr '
     .[] |
     [.postTaskFlgs//0, .postTaskStep//"", (.postTaskPars//{} | @json), ($parent.jobList//[] | @json)] |
     @tsv
-' "${CLUSTER_PROFILE_DIR}/${JT__TRIG_JOB_LIST}")
+' "${jobDescFile}")
 
 ((${#botJobArr[@]})) && {
     printf '%s\n' "${botJobArr[@]}" | jq -cs '.' 1> "${botJobList}"

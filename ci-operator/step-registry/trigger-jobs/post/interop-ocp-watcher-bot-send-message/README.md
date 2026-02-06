@@ -18,7 +18,7 @@ The Step also requires credentials mounted at `/tmp/bot_secrets` containing:
 - Secret specified by `JT__POST__MENTIONED_GROUP_ID_SECRET_NAME`.
 - Secret specified by `JT__POST__WEBHOOK_URL_SECRET_NAME`.
 
-Example configuration in vault:
+Example of JSON Input:
 ```json
 [
   {
@@ -39,7 +39,7 @@ Example configuration in vault:
 
 ## Process
 This Step will do the following:
- 1. Parse the JSON file specified by `${CLUSTER_PROFILE_DIR}/${JT__TRIG_JOB_LIST}`.
+ 1. Parse the JSON structure from file `${CLUSTER_PROFILE_DIR}/${JT__TRIG_JOB_LIST}`.
  2. For each entry where `postTaskStep` is `trigger-jobs-post-interop-ocp-watcher-bot-send-message`.
  3. Check if the bitwise mask `(postTaskFlgs & JT__POST_TASK_EXEC_FLGS)` evaluates to non-0. If not, skip this post task.
  4. Check post task execution marker (set earlier by `trigger-jobs`) to determine whether this post task is supposed to be executed.
@@ -47,3 +47,10 @@ This Step will do the following:
  6. Execute the `interop-ocp-watcher-bot` to send notifications to the configured webhook with information about the triggered Jobs.
 
 For more information about the watcher bot functionality, see https://github.com/CSPI-QE/interop-ocp-watcher-bot.
+
+## Parameters
+### `postTaskFlag`
+- **Type**: String
+- **Required**: No
+- **Default**: Step name.
+- **Description**: File name (no directory) under `${SHARED_DIR}/` used as execution marker to determine whether this post task should run.
