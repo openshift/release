@@ -1,8 +1,12 @@
 base_images:
-  base:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.22-openshift-4.17
+  elasticsearch-operator-src:
+    name: "5.8"
+    namespace: logging
+    tag: elasticsearch-operator-src
+  go_builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.20
   log-file-metric-exporter:
     name: "6.0"
     namespace: logging
@@ -23,16 +27,17 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.20
 images:
 - from: ubi9-minimal
   inputs:
-    base:
+    go_builder:
       as:
       - registry.redhat.io/ubi9/go-toolset:latest
+      - golang:1.24
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
-  from: base
+  from: ubi9-minimal
   to: cluster-logging-operator-registry
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src AS es-src
@@ -41,13 +46,14 @@ images:
     COPY --from=es-src /go/src/github.com/openshift/elasticsearch-operator /go/src/github.com/openshift/elasticsearch-operator
     WORKDIR /go/src/github.com/openshift/cluster-logging-operator
     USER 0
+    RUN dnf install -y gettext
     RUN mkdir -p /go/src/github.com/openshift/cluster-logging-operator/bin/
     RUN go mod download
     RUN make tools
     RUN chmod -R 777 /go
     RUN make bin/functional-benchmarker
   inputs:
-    base:
+    go_builder:
       as:
       - registry.redhat.io/ubi9/go-toolset:latest
   to: cluster-logging-operator-e2e

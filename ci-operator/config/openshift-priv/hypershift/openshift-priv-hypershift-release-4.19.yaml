@@ -23,14 +23,6 @@ base_images:
     name: 4.19-priv
     namespace: ocp-private
     tag: manila-csi-driver-operator-test
-  ocp_4.19_base-rhel9:
-    name: 4.19-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
   openstack-cinder-csi-driver-operator-test:
     name: 4.19-priv
     namespace: ocp-private
@@ -41,13 +33,6 @@ build_root:
 canonical_go_repository: github.com/openshift/hypershift
 images:
 - dockerfile_path: Dockerfile.control-plane
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: hypershift
 promotion:
   to:
@@ -142,7 +127,7 @@ tests:
 - as: e2e-aks
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
@@ -300,7 +285,7 @@ tests:
   as: e2e-azure-aks-ovn-conformance
   optional: true
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     workflow: hypershift-azure-aks-conformance
 - as: security
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

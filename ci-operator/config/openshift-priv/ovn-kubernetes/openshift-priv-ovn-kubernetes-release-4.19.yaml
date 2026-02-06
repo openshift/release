@@ -7,18 +7,6 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.20_base-rhel9:
-    name: 4.20-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.20
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
   tests-private:
     name: tests-private
     namespace: ci
@@ -27,31 +15,16 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-8-release-golang-1.22-openshift-4.19
 canonical_go_repository: github.com/openshift/ovn-kubernetes
 images:
 - dockerfile_path: Dockerfile.base
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
   to: ovn-kubernetes-base
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ovn-kubernetes-microshift
 promotion:
   to:
@@ -598,7 +571,7 @@ tests:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      ND_CNI_EXTRA_FLAGS: --churn-duration=20m --service-latency
       PROFILE_TYPE: both
       WORKER_REPLICA_COUNT: "120"
       ZONES_COUNT: "3"
@@ -647,9 +620,9 @@ tests:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency
       GC: "false"
       GC_METRICS: "false"
+      ND_CNI_EXTRA_FLAGS: --churn-duration=20m --service-latency
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
       OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
       PPROF: "false"
@@ -708,9 +681,9 @@ tests:
       CLUSTER_NETWORK_CIDR: 20.0.0.0/8
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency
       GC: "false"
       GC_METRICS: "false"
+      ND_CNI_EXTRA_FLAGS: --churn-duration=20m --service-latency
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
       OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
       PPROF: "false"

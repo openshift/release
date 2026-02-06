@@ -54,11 +54,6 @@ releases:
       include_built_images: true
       name: "4.19"
       namespace: ocp
-  latest-414:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.14"
   latest-415:
     candidate:
       product: ocp
@@ -126,7 +121,7 @@ tests:
 - as: e2e-aks
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
@@ -201,23 +196,6 @@ tests:
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TEST_CPO_OVERRIDE: "1"
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-4-18
-  capabilities:
-  - build-tmpfs
-  run_if_changed: ^(test/e2e|hypershift-operator)
-  steps:
-    cluster_profile: hypershift-aws
-    dependencies:
-      OCP_IMAGE_LATEST: release:latest-418
-      OCP_IMAGE_N1: release:latest-417
-      OCP_IMAGE_N2: release:latest-416
-      OCP_IMAGE_N3: release:latest-415
-      OCP_IMAGE_N4: release:latest-414
-      OCP_IMAGE_PREVIOUS: release:initial-418
-    env:
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-external
 - as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|\.github|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(/\.testcoverage\.yml$)
   steps:
@@ -284,7 +262,7 @@ tests:
   as: e2e-azure-aks-ovn-conformance
   optional: true
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     workflow: hypershift-azure-aks-conformance
 - as: security
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

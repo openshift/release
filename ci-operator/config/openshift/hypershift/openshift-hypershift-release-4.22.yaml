@@ -165,7 +165,7 @@ tests:
 - as: e2e-aks-4-21
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     dependencies:
       OCP_IMAGE_LATEST: release:latest-421
       OCP_IMAGE_N1: release:latest-420
@@ -181,7 +181,7 @@ tests:
 - as: e2e-aks-override
   run_if_changed: (/overrides\.yaml$)
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
@@ -203,6 +203,12 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
+- always_run: false
+  as: e2e-v2-aws
+  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-e2e-v2
 - always_run: false
   as: e2e-aws-minimal
   optional: true
@@ -341,7 +347,7 @@ tests:
   as: e2e-azure-aks-ovn-conformance
   optional: true
   steps:
-    cluster_profile: hypershift-aws
+    cluster_profile: hypershift-aks
     workflow: hypershift-azure-aks-conformance
 - as: security
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
@@ -456,6 +462,19 @@ tests:
     env:
       JIRA_AGENT_MAX_ISSUES: "1"
     workflow: hypershift-jira-agent
+- as: periodic-review-agent
+  cron: 0 8-23/3 * * 1-5
+  steps:
+    env:
+      REVIEW_AGENT_BATCH_ONLY: "true"
+      REVIEW_AGENT_MAX_PRS: "10"
+    workflow: hypershift-review-agent
+- always_run: false
+  as: review-agent-single-pr
+  optional: true
+  skip_if_only_changed: .*
+  steps:
+    workflow: hypershift-review-agent
 zz_generated_metadata:
   branch: release-4.22
   org: openshift
