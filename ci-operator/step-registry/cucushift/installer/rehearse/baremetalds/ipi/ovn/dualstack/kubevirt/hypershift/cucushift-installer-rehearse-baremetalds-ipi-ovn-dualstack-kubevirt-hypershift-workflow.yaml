@@ -1,0 +1,39 @@
+workflow:
+  as: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-kubevirt-hypershift
+  steps:
+    pre:
+      - chain: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-kubevirt-hypershift-provision
+      - ref: cucushift-installer-reportportal-marker
+    post:
+      - chain: cucushift-installer-rehearse-baremetalds-ipi-ovn-dualstack-kubevirt-hypershift-deprovision
+      - ref: send-results-to-reportportal
+    env:
+      CLUSTERTYPE: host_384gb_el9
+      METALLB_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      REDHAT_OPERATORS_INDEX_TAG: v4.20
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      LVM_SUB_TARGET_NAMESPACES: openshift-lvm-storage
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      ETCD_STORAGE_CLASS: lvms-vg1
+      ENABLE_ICSP: "true"
+      CLOUD_PROVIDER: "kubevirt"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.20
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-20
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=4
+        WORKER_VCPU=16
+        WORKER_MEMORY=65536
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=1024G
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="nmstate1 nmstate2"
+        NMSTATE1_NETWORK_SUBNET_V4="192.168.221.0/24"
+        NMSTATE1_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:ca56::/120"
+        NMSTATE2_NETWORK_SUBNET_V4="192.168.222.0/24"
+        NMSTATE2_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:cc56::/120"
+  documentation: |-
+    This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow
