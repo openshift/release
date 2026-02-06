@@ -1,0 +1,30 @@
+workflow:
+  as: hypershift-gcp-gke-e2e
+  documentation: |-
+    The HyperShift GCP GKE e2e workflow provisions a GKE Autopilot cluster
+    for use as a HyperShift management cluster and runs e2e tests.
+
+    Pre phase:
+    1. ipi-install-rbac: Grant image-puller permissions on build farm
+    2. gke-provision: Create GCP projects, VPC, and GKE cluster
+    3. hypershift-install: Install the HyperShift operator
+
+    Test phase:
+    1. hypershift-gcp-run-e2e: Run e2e tests against the management cluster
+
+    Post phase:
+    1. gke-deprovision: Delete GKE cluster and GCP projects
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - ref: gke-provision
+    - ref: hypershift-install
+    test:
+    - ref: hypershift-gcp-run-e2e
+    post:
+    - ref: gke-deprovision
+    env:
+      CLOUD_PROVIDER: "GCP"
+      GKE_REGION: "us-central1"
+      GKE_RELEASE_CHANNEL: "stable"
+      TECH_PREVIEW_NO_UPGRADE: "true"

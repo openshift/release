@@ -1,0 +1,38 @@
+ref:
+  as: gke-provision
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  commands: gke-provision-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 45m0s
+  grace_period: 10m0s
+  env:
+  - name: GKE_REGION
+    default: "us-central1"
+    documentation: GCP region for the GKE cluster.
+  - name: GKE_RELEASE_CHANNEL
+    default: "stable"
+    documentation: |-
+      GKE release channel. Allowed values: rapid, regular, stable.
+  documentation: |-
+    This step provisions a GKE Autopilot cluster for use as a HyperShift management cluster.
+    It creates dynamic GCP projects under the CI folder, sets up networking with VPC,
+    Cloud Router, NAT, and PSC subnet, then creates the GKE cluster.
+
+    The cluster profile must contain:
+    - credentials.json: GCP service account key with project creator/deleter permissions
+    - ci-folder-id: GCP folder ID where dynamic projects are created
+    - billing-account-id: GCP billing account ID to link projects
+
+    Outputs saved to ${SHARED_DIR}:
+    - mgmt-project-id: Management project ID
+    - customer-project-id: Customer project ID
+    - cluster-name: GKE cluster name
+    - gcp-region: GCP region
+    - infra-id: Infrastructure identifier
+    - kubeconfig: Kubeconfig for the GKE cluster

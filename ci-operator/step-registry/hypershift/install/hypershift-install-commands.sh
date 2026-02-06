@@ -97,7 +97,87 @@ if [ "${CLOUD_PROVIDER}" == "Azure" ]; then
   ${EXTRA_ARGS}
 fi
 
-if [ "${CLOUD_PROVIDER}" != "Azure" ] && [ "${CLOUD_PROVIDER}" != "AWS" ]; then
+if [ "${CLOUD_PROVIDER}" == "GCP" ]; then
+  # Install gcloud CLI and GKE auth plugin for kubectl/oc to authenticate with GKE clusters
+  # The hypershift-operator image doesn't have gcloud, so we download it
+  echo "Installing Google Cloud CLI..."
+  GCLOUD_SDK_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz"
+  GCLOUD_INSTALL_DIR="${HOME}/google-cloud-sdk"
+
+  curl -sL "${GCLOUD_SDK_URL}" | tar -xzf - -C "${HOME}"
+  export PATH="${GCLOUD_INSTALL_DIR}/bin:${PATH}"
+
+  # Install GKE auth plugin using the shared script from gke-provision step
+  # Copy script locally since SHARED_DIR (backed by k8s secret) doesn't preserve execute permissions
+  INSTALL_SCRIPT=$(mktemp)
+  cp "${SHARED_DIR}/install-gke-auth-plugin.sh" "${INSTALL_SCRIPT}"
+  chmod +x "${INSTALL_SCRIPT}"
+  GKE_AUTH_PLUGIN_INSTALL_DIR="${GCLOUD_INSTALL_DIR}/bin" "${INSTALL_SCRIPT}"
+  rm -f "${INSTALL_SCRIPT}"
+  export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+
+  echo "gcloud version: $(gcloud version 2>/dev/null | head -1)"
+
+  # Authenticate gcloud with the service account from the cluster profile
+  # CLUSTER_PROFILE_DIR is available to all steps when cluster_profile is specified
+  echo "Authenticating gcloud with service account..."
+  gcloud auth activate-service-account --key-file="${CLUSTER_PROFILE_DIR}/credentials.json"
+
+  # Install CRDs that GKE doesn't have by default (unlike OpenShift)
+  # Same approach as AKS - required for HyperShift functionality
+  echo "Installing required CRDs..."
+  # Prometheus operator CRDs (for monitoring resources)
+  oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
+  oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
+  oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
+  # OpenShift Route CRD (for hosted cluster ingress)
+  oc apply -f https://raw.githubusercontent.com/openshift/api/6bababe9164ea6c78274fd79c94a3f951f8d5ab2/route/v1/zz_generated.crd-manifests/routes.crd.yaml
+  # DNSEndpoint CRD (for external-dns zone delegation)
+  oc apply -f https://raw.githubusercontent.com/kubernetes-sigs/external-dns/v0.15.0/docs/contributing/crd-source/crd-manifest.yaml
+
+  # Read GCP environment variables from SHARED_DIR (saved by gke-provision)
+  # These are required by the operator's GCPPrivateServiceConnect controller
+  GCP_PROJECT_ID="$(<"${SHARED_DIR}/mgmt-project-id")"
+  GCP_REGION_VALUE="$(<"${SHARED_DIR}/gcp-region")"
+
+  # Install HyperShift operator
+  # The --pull-secret flag creates the pull-secret in the hypershift namespace
+  # (same approach as AKS - see hypershift-install logs)
+  # Disable conversion webhook - same approach as AKS
+  # GKE Autopilot has compatibility issues with cert-manager webhook initialization
+  # Webhooks can be enabled later once cert-manager integration is stabilized
+  #
+  # NOTE: We do NOT use --wait-until-available here because the operator needs
+  # GCP_PROJECT and GCP_REGION env vars to start, but we can only set those
+  # after the deployment is created. We'll wait manually after setting env vars.
+  "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
+  --enable-conversion-webhook=false \
+  --external-dns-provider=google \
+  --external-dns-domain-filter=dummy \
+  --private-platform=GCP \
+  --platform-monitoring=All \
+  --enable-ci-debug-output \
+  --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+  ${EXTRA_ARGS}
+
+  # TODO(GCP-402): Remove this workaround once hypershift install supports
+  # --gcp-project and --gcp-region flags. See https://issues.redhat.com/browse/GCP-402
+  #
+  # Set GCP environment variables on the operator deployment
+  # This must be done after install creates the deployment, but before
+  # the operator can become ready (it requires these to start)
+  echo "Setting GCP_PROJECT=${GCP_PROJECT_ID} and GCP_REGION=${GCP_REGION_VALUE} on operator deployment"
+  oc set env deployment/operator -n hypershift \
+    GCP_PROJECT="${GCP_PROJECT_ID}" \
+    GCP_REGION="${GCP_REGION_VALUE}"
+
+  # Wait for the operator to become ready with the env vars set
+  echo "Waiting for operator to become available..."
+  oc rollout status deployment/operator -n hypershift --timeout=300s
+  oc wait --for=condition=Available --namespace hypershift deployments/operator --timeout=300s
+fi
+
+if [ "${CLOUD_PROVIDER}" != "Azure" ] && [ "${CLOUD_PROVIDER}" != "AWS" ] && [ "${CLOUD_PROVIDER}" != "GCP" ]; then
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
   --platform-monitoring=All \
   --enable-ci-debug-output \
