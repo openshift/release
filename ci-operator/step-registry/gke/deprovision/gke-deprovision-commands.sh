@@ -87,11 +87,10 @@ gcloud compute routers delete "${INFRA_ID}-router" \
 
 # Delete subnets (including PSC subnet)
 echo "Deleting subnets..."
-for subnet in $(gcloud compute networks subnets list --project="${MGMT_PROJECT_ID}" \
-    --filter="network~${INFRA_ID}-vpc" --format="value(name,region)" 2>/dev/null || true); do
-    subnet_name=$(echo "$subnet" | cut -f1)
-    subnet_region=$(echo "$subnet" | cut -f2)
-    echo "Deleting subnet: ${subnet_name}"
+gcloud compute networks subnets list --project="${MGMT_PROJECT_ID}" \
+    --filter="network~${INFRA_ID}-vpc" --format="value(name,region)" 2>/dev/null \
+    | while IFS=$'\t' read -r subnet_name subnet_region; do
+    echo "Deleting subnet: ${subnet_name} in region: ${subnet_region}"
     gcloud compute networks subnets delete "${subnet_name}" \
         --region="${subnet_region}" \
         --project="${MGMT_PROJECT_ID}" \
@@ -118,14 +117,14 @@ if [[ -n "${CUSTOMER_PROJECT_ID}" ]]; then
     done
 
     # Delete routers and NATs in customer project
-    for router in $(gcloud compute routers list --project="${CUSTOMER_PROJECT_ID}" \
-        --format="value(name,region)" 2>/dev/null || true); do
-        router_name=$(echo "$router" | cut -f1)
-        router_region=$(echo "$router" | cut -f2)
+    gcloud compute routers list --project="${CUSTOMER_PROJECT_ID}" \
+        --format="value(name,region)" 2>/dev/null \
+        | while IFS=$'\t' read -r router_name router_region; do
         # Delete NATs first
-        for nat in $(gcloud compute routers nats list --router="${router_name}" \
+        gcloud compute routers nats list --router="${router_name}" \
             --region="${router_region}" --project="${CUSTOMER_PROJECT_ID}" \
-            --format="value(name)" 2>/dev/null || true); do
+            --format="value(name)" 2>/dev/null \
+            | while read -r nat; do
             gcloud compute routers nats delete "${nat}" \
                 --router="${router_name}" --region="${router_region}" \
                 --project="${CUSTOMER_PROJECT_ID}" --quiet || true
@@ -136,10 +135,9 @@ if [[ -n "${CUSTOMER_PROJECT_ID}" ]]; then
     done
 
     # Delete subnets in customer project
-    for subnet in $(gcloud compute networks subnets list --project="${CUSTOMER_PROJECT_ID}" \
-        --format="value(name,region)" 2>/dev/null || true); do
-        subnet_name=$(echo "$subnet" | cut -f1)
-        subnet_region=$(echo "$subnet" | cut -f2)
+    gcloud compute networks subnets list --project="${CUSTOMER_PROJECT_ID}" \
+        --format="value(name,region)" 2>/dev/null \
+        | while IFS=$'\t' read -r subnet_name subnet_region; do
         gcloud compute networks subnets delete "${subnet_name}" \
             --region="${subnet_region}" \
             --project="${CUSTOMER_PROJECT_ID}" --quiet || true
