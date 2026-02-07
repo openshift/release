@@ -9,6 +9,7 @@ STATE_FILE="${SHARED_DIR}/processed-prs.txt"
 # Clone ai-helpers repository (contains /utils:address-reviews command)
 echo "Cloning ai-helpers repository..."
 git clone https://github.com/openshift-eng/ai-helpers /tmp/ai-helpers
+export CLAUDE_PLUGIN_ROOT=/tmp/ai-helpers/plugins/utils
 
 # Clone HyperShift fork (we work on branches here)
 echo "Cloning HyperShift repository..."
