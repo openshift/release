@@ -30,7 +30,7 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 30 7 * * 1-5
   decorate: true
   labels:
@@ -3036,6 +3036,8 @@ periodics:
   cluster: app.ci
   cron: '@daily'
   decorate: true
+  decoration_config:
+    timeout: 12h0m0s
   name: periodic-openshift-release-qci-pruner
   reporter_config:
     slack:
@@ -3055,12 +3057,22 @@ periodics:
           secretKeyRef:
             key: token
             name: qci-pruner-credentials
+      - name: QUAY_DOCKERCONFIGJSON_PATH
+        value: /etc/push/.dockerconfigjson
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_qci-pruner_latest
       imagePullPolicy: Always
       name: ""
       resources:
         requests:
           cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/push
+        name: registry-push-credentials
+        readOnly: true
+    volumes:
+    - name: registry-push-credentials
+      secret:
+        secretName: registry-push-credentials-ci-images-mirror
 - agent: kubernetes
   cluster: build10
   cron: '@daily'
@@ -3087,7 +3099,7 @@ periodics:
       kubernetes.io/arch: amd64
     serviceAccountName: mabc-updater
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:

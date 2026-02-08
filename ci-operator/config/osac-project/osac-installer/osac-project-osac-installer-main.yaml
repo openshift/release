@@ -1,8 +1,44 @@
+base_images:
+  fulfillment-cli:
+    name: latest
+    namespace: osac-project
+    tag: fulfillment-cli
+  origin-cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.21
+images:
+- dockerfile_literal: |
+    FROM src
+
+    ADD . /installer
+    WORKDIR /installer
+
+    RUN dnf install -y git jq
+    RUN git submodule update --init --recursive
+
+    RUN cp oc /usr/local/bin/oc
+    RUN cp fulfillment-cli /usr/local/bin/fulfillment-cli
+  from: src
+  inputs:
+    fulfillment-cli:
+      paths:
+      - destination_dir: .
+        source_path: /app/fulfillment-cli
+    origin-cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: osac-installer
+promotion:
+  to:
+  - name: latest
+    namespace: osac-project
 resources:
   '*':
     limits:

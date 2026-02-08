@@ -34,28 +34,6 @@ readonly RETRY_SLEEP_INTERVAL=30
 
 # --- Functions ---
 
-# verify_internal_registry checks that the internal OpenShift image registry is
-# available and running, creating the default route if it doesn't exist.
-verify_internal_registry() {
-  echo "Verifying internal OCP image registry..."
-  oc get pods -n openshift-image-registry --no-headers | grep -v "Running\|Completed" && \
-    echo "ERROR: OCP image registry is not running. Aborting. OCP image registry needs to be installed in the cluster" && exit 1
-
-  if [ -z "$(oc get route default-route -n openshift-image-registry -o name)" ]; then
-    echo "Creating default route for image registry..."
-    oc patch configs.imageregistry.operator.openshift.io/cluster \
-      --patch '{"spec":{"defaultRoute":true}}' --type=merge
-
-    echo "Waiting for the route to be ready..."
-    if ! timeout 3m bash -c \
-      "until oc get route default-route -n openshift-image-registry &>/dev/null; do sleep 5; done"; then
-      echo "ERROR: Timed out waiting for the image registry route to become available." >&2
-      exit 1
-    fi
-    echo "Image registry route is ready."
-  fi
-}
-
 # check_cluster_operators waits up to 15 minutes for all OpenShift cluster
 # operators to be in a stable (not Progressing, not Degraded, and Available) state.
 check_cluster_operators() {
@@ -114,13 +92,20 @@ run_tests() {
 
   oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
     sh -c "
+    docker login -u=\"${QUAY_USERNAME}\" -p=\"${QUAY_PASSWORD}\" quay.io
     export KUBECONFIG=/work/ci-kubeconfig
-    export ENABLE_OVERLAY2_STORAGE_DRIVER=true
     export BUILD_WITH_CONTAINER=\"0\"
-    export DOCKER_INSECURE_REGISTRIES=\"default-route-openshift-image-registry.\$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr(\$0, index(\$0,\$2))}')\"
+    export CI=\"${CI:-true}\"
+    export HUB=\"${HUB:-quay.io/sail-dev}\"
+    export USE_INTERNAL_REGISTRY=\"false\"
+    export PR_NUMBER=\"${PR_NUMBER:-}\"
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
+    echo '--- Executing E2E Command ---'
+    echo 'Command: ${E2E_COMMAND:-make test.e2e.ocp}'
+    echo '--- Running on CI Environment: ' \${CI:-}' ---'
+    echo '--- Pull Request Number: ' \${PR_NUMBER:-}' ---'
     entrypoint ${E2E_COMMAND:-make test.e2e.ocp}
     "
 }
@@ -165,8 +150,16 @@ has_junit_reports() {
 
 # --- Execution ---
 
-# Step 1: Verify if internal OCP registry is up and running and if there is a route to access to the registry
-verify_internal_registry
+# Step 1: Login to quay.io using provided credentials
+if [ -f /tmp/secrets/username ] && [ -f /tmp/secrets/password ]; then
+    echo "Logging into quay.io registry..."
+    QUAY_USERNAME=$(cat /tmp/secrets/username)
+    QUAY_PASSWORD=$(cat /tmp/secrets/password)
+    docker login -u="${QUAY_USERNAME}" -p="${QUAY_PASSWORD}" quay.io
+else
+    echo "Quay.io credentials not found. Exit with failure."
+    exit 1 
+fi
 
 # Step 2: Run the tests for the first time
 echo "Starting e2e test execution in pod ${MAISTRA_SC_POD}..."
@@ -181,7 +174,7 @@ if [[ "${TEST_RC}" -eq 0 ]] && ! has_junit_reports; then
   sleep "${RETRY_SLEEP_INTERVAL}"
 
   echo "Cleaning up resources before retry..."
-  BUILD_WITH_CONTAINER=0 make test.e2e.ocp.cleanup
+  CI=${CI:-true} BUILD_WITH_CONTAINER=0 make test.e2e.ocp.cleanup
 
   # Retry the test execution
   execute_and_collect_artifacts 2

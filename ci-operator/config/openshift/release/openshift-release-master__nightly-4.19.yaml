@@ -71,6 +71,10 @@ base_images:
     name: ocm-cli
     namespace: ci
     tag: latest
+  recert:
+    name: recert
+    namespace: edge-infrastructure
+    tag: release-4.19
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
@@ -778,6 +782,16 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn-serial
+- as: e2e-aws-ovn-tls-13
+  interval: 168h
+  steps:
+    cluster_profile: aws-3
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-tls-13
 - as: e2e-aws-csi
   interval: 168h
   steps:
@@ -1043,14 +1057,6 @@ tests:
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node-one-core
-- as: e2e-aws-ovn-single-node-4vcpu-compute-serial
-  interval: 168h
-  steps:
-    cluster_profile: aws-3
-    env:
-      SINGLE_NODE_AWS_INSTANCE_TYPE: r6i.xlarge
-      TEST_SUITE: openshift/conformance/serial
-    workflow: openshift-e2e-aws-single-node
 - as: e2e-gcp-graceful-shutdown
   interval: 168h
   steps:
@@ -1483,6 +1489,8 @@ tests:
   cron: 57 11 12,24 * *
   steps:
     cluster_profile: equinix-edge-enablement
+    dependencies:
+      RECERT_IMAGE: recert
     test:
     - ref: baremetalds-sno-rename
     - ref: baremetalds-sno-test
@@ -1517,6 +1525,7 @@ tests:
     env:
       PLATFORM_EXTERNAL_CCM_ENABLED: "yes"
     workflow: opct-conformance-external-aws
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-kube-apiserver-rollout
   cron: 22 21 * * 0
   steps:

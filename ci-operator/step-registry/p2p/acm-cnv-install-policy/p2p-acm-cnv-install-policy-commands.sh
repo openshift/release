@@ -2,25 +2,70 @@
 
 set -euxo pipefail; shopt -s inherit_errexit
 
-cluster_name="$(cat "${SHARED_DIR}/managed.cluster.name")"
+#=====================
+# Validate required files and variables
+#=====================
+if [[ ! -f "${SHARED_DIR}/managed-cluster-name" ]]; then
+    echo "[ERROR] Spoke cluster name not found in file: ${SHARED_DIR}/managed-cluster-name" >&2
+    exit 1
+fi
+
+if [[ ! -f "${SHARED_DIR}/managed-cluster-kubeconfig" ]]; then
+    echo "[ERROR] Managed cluster kubeconfig not found: ${SHARED_DIR}/managed-cluster-kubeconfig" >&2
+    exit 1
+fi
+
+#=====================
+# Helper functions
+#=====================
+need() {
+    command -v "$1" >/dev/null 2>&1 || {
+        echo "[FATAL] '$1' not found" >&2
+        exit 1
+    }
+}
+
+need oc
+need jq
+
+#=====================
+# Configuration variables
+#=====================
+cluster_name="$(cat "${SHARED_DIR}/managed-cluster-name")"
+if [[ -z "${cluster_name}" ]]; then
+    echo "[ERROR] Extracted cluster name is empty from ${SHARED_DIR}/managed-cluster-name" >&2
+    exit 1
+fi
+
 policy_ns="install-cnv"
+wait_timeout_minutes="${CNV_WAIT_TIMEOUT_MINUTES:-30}"
+poll_interval_seconds="${CNV_POLL_INTERVAL_SECONDS:-30}"
 
-# create policy namespace
-oc create namespace $policy_ns
+#=====================
+# Create policy namespace
+#=====================
+echo "[INFO] Creating policy namespace '${policy_ns}'"
+oc create namespace "${policy_ns}" --dry-run=client -o yaml | oc apply -f -
 
-  
-oc create -f - <<EOF
-        apiVersion: cluster.open-cluster-management.io/v1beta2
-        kind: ManagedClusterSetBinding
-        metadata:
-          name: ${cluster_name}-set
-          namespace: ${policy_ns}
-        spec:
-          clusterSet: ${cluster_name}-set
+#=====================
+# Create ManagedClusterSetBinding
+#=====================
+echo "[INFO] Creating ManagedClusterSetBinding for cluster set '${cluster_name}-set'"
+oc create -f - --dry-run=client -o yaml --save-config <<EOF | oc apply -f -
+apiVersion: cluster.open-cluster-management.io/v1beta2
+kind: ManagedClusterSetBinding
+metadata:
+  name: ${cluster_name}-set
+  namespace: ${policy_ns}
+spec:
+  clusterSet: ${cluster_name}-set
 EOF
 
-# create CNV policy and apply it to the clustersset, create the placement and placementbinding for the policy
-oc create -f - <<EOF
+#=====================
+# Create CNV policy, placement, and placement binding
+#=====================
+echo "[INFO] Creating CNV installation policy, placement, and placement binding"
+oc create -f - --dry-run=client -o yaml --save-config <<EOF | oc apply -f -
 apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
 metadata:
@@ -191,51 +236,52 @@ subjects:
   - name: install-cnv-operator
     apiGroup: policy.open-cluster-management.io
     kind: Policy
-
 EOF
 
+#=====================
+# Wait for CNV installation to complete
+#=====================
+# Note: The OperatorPolicy installs the operator (which registers CRDs),
+# and the ConfigurationPolicy creates the HyperConverged CR.
+# We only need to wait for the final availability status.
 export KUBECONFIG="${SHARED_DIR}/managed-cluster-kubeconfig"
-wait_timeout=20
-crd_start_time=$(date +%s)
-crd_timeout=$(( wait_timeout * 60 ))
-has_timed_out() {
-  current_time=$(date +%s)
-  (( current_time - crd_start_time >= crd_timeout ))
-}
 
-echo  "waiting for hyperconverged CRD to be registered"
-while ! oc get crd hyperconvergeds.hco.kubevirt.io >/dev/null 2>&1; do
-  if has_timed_out; then
-    echo " Timed out waiting for CRD hyperconvergeds.hco.kubevirt.io"
-    exit 1
-  fi
-  sleep 30
-done 
-echo "CRD  hyperconvergeds.hco.kubevirt.io is registered"
+echo "[INFO] Waiting for HyperConverged operator to become available (timeout=${wait_timeout_minutes}m)"
+echo "[INFO] This includes operator installation, CRD registration, CR creation, and reconciliation"
 
-echo  "waiting for hyperconverged CR kubevirt-hyperconverged to be created"
+start_time="$(date +%s)"
+deadline=$((start_time + wait_timeout_minutes * 60))
+
+# Wait for the HyperConverged CR to exist (ensures operator and CRD are ready)
+echo "[INFO] Waiting for HyperConverged CR to be created..."
 while ! oc -n openshift-cnv get hyperconverged kubevirt-hyperconverged >/dev/null 2>&1; do
-  if has_timed_out; then
-    echo " Timed out waiting for HCO CR"
-    exit 1
-  fi
-  sleep 30
-done 
-echo "CR kubevirt-hyperconverged is registered"
+    if (( $(date +%s) > deadline )); then
+        echo "[ERROR] Timeout waiting for HyperConverged CR to be created" >&2
+        exit 1
+    fi
+    sleep "${poll_interval_seconds}"
+done
+echo "[INFO] HyperConverged CR created"
 
+# Wait for the Available condition to be True
+echo "[INFO] Waiting for HyperConverged operator to become Available..."
 while true; do
-  cond=$(oc -n openshift-cnv get hyperconverged kubevirt-hyperconverged \
-           -o jsonpath='{range .status.conditions[?(@.type=="Available")]}{.status}{end}' \
-           2>/dev/null || echo "")
-  if [[ "$cond" == "True" ]]; then
-    echo " HCO is available"
-    break
-  fi
-  if has_timed_out; then
-    echo "Timed out waiting for HCO to become available"
-    exit 1
-  fi
-  sleep 30
-done 
+    cond="$(oc -n openshift-cnv get hyperconverged kubevirt-hyperconverged \
+        -o jsonpath='{range .status.conditions[?(@.type=="Available")]}{.status}{end}' \
+        2>/dev/null || echo "")"
+    
+    if [[ "${cond}" == "True" ]]; then
+        echo "[INFO] HyperConverged operator is available"
+        break
+    fi
+    
+    if (( $(date +%s) > deadline )); then
+        echo "[ERROR] Timeout waiting for HyperConverged operator to become available" >&2
+        exit 1
+    fi
+    
+    echo "[INFO] Waiting for HyperConverged operator... (status: ${cond:-Unknown})"
+    sleep "${poll_interval_seconds}"
+done
 
-
+echo "[INFO] CNV installation via policy completed successfully"
