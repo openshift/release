@@ -1,0 +1,41 @@
+ref:
+  as: aws-neuron-operator-rosa-cluster-provision
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: aws-neuron-operator-rosa-cluster-provision-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for rosa login. The supported values are [production, staging, integration].
+  - name: HOSTED_CP
+    default: "true"
+    documentation: Enable the use of hosted control planes (HyperShift).
+  - name: COMPUTE_MACHINE_TYPE
+    default: "inf2.xlarge"
+    documentation: The instance size for compute nodes.
+  - name: REGION
+    default: ""
+    documentation: Use a specific AWS region, overriding the LEASED_RESOURCE environment variable in the cluster_profile.
+  - name: REPLICAS
+    default: "2"
+    documentation: Number of compute nodes to provision.
+  - name: OPENSHIFT_VERSION
+    default: ""
+    documentation: The openshift version for rosa to install (e.g. "4.10.12"). Specify a major/minor (e.g. "4.10") to get the latest version from that stream.
+  - name: CHANNEL_GROUP
+    default: "candidate,stable"
+    documentation: The channel group where to get the openshift version.
+  - name: ENABLE_BYOVPC
+    default: "true"
+    documentation: Use the customized VPC to install the cluster.
+  - name: CLUSTER_TAGS
+    default: ""
+    documentation: Apply user defined tags to all resources created by ROSA in AWS.
+  documentation: |-
+    Custom ROSA HCP cluster provision step for AWS Neuron CI that handles
+    the "zero egress" CLI bug by checking if cluster was created despite
+    the error exit code.
