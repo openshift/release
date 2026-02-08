@@ -18,7 +18,7 @@ fi
 oc config view
 oc projects
 
-CNV_AVAILABLE=$(oc get hyperconverged -n openshift-cnv kubevirt-hyperconverged -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')
+CNV_AVAILABLE=$(oc get hyperconverged -n openshift-cnv kubevirt-hyperconverged -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || echo "False")
 if [ "$CNV_AVAILABLE" != "True" ]; then
   # Install the CNV operator
   cat << EOF| oc apply -f -
