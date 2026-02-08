@@ -134,16 +134,9 @@ if [[ -n "${CUSTOMER_PROJECT_ID}" ]]; then
             --project="${CUSTOMER_PROJECT_ID}" --quiet || true
     done
 
-    # Delete subnets in customer project
-    gcloud compute networks subnets list --project="${CUSTOMER_PROJECT_ID}" \
-        --format="value(name,region)" 2>/dev/null \
-        | while IFS=$'\t' read -r subnet_name subnet_region; do
-        gcloud compute networks subnets delete "${subnet_name}" \
-            --region="${subnet_region}" \
-            --project="${CUSTOMER_PROJECT_ID}" --quiet || true
-    done
-
     # Delete VPCs in customer project
+    # Note: Customer project uses default auto-mode VPC, so we delete networks directly
+    # (auto-mode networks remove all subnets automatically when deleted)
     for vpc in $(gcloud compute networks list --project="${CUSTOMER_PROJECT_ID}" \
         --format="value(name)" 2>/dev/null || true); do
         gcloud compute networks delete "${vpc}" \
