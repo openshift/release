@@ -121,7 +121,6 @@ if [[ "$ENABLE_BYOVPC" == "true" ]]; then
 fi
 
 # Get account roles
-ACCOUNT_ROLES_PREFIX=$CLUSTER_PREFIX
 roleARNFile="${SHARED_DIR}/account-roles-arns"
 account_installer_role_arn=$(cat "$roleARNFile" | grep "Installer-Role" || true)
 account_support_role_arn=$(cat "$roleARNFile" | grep "Support-Role" || true)
