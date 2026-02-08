@@ -1,19 +1,16 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.18-openshift-4.12
+  from_repository: true
 images:
-- dockerfile_path: Dockerfile.assisted-service
-  to: assisted-service
+- dockerfile_path: Dockerfile.image-service
+  to: assisted-image-service
 promotion:
   to:
-  - name: "2.17"
+  - name: "2.11"
     namespace: stolostron
 releases:
   latest:
     integration:
-      name: "4.18"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -25,18 +22,18 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: assisted-service
+      SOURCE_IMAGE_REF: assisted-image-service
     env:
-      IMAGE_REPO: assisted-service
+      IMAGE_REPO: assisted-image-service
       OSCI_ENV_CONFIG: |
         OSCI_PUBLISH_DELAY=0
         OSCI_PIPELINE_PRODUCT_PREFIX=backplane
         OSCI_PIPELINE_REPO=backplane-pipeline
-        OSCI_RELEASE_BRANCH=backplane-2.17
-      RELEASE_REF: backplane-2.17
+        OSCI_RELEASE_BRANCH=backplane-2.11
+      RELEASE_REF: backplane-2.11
     workflow: ocm-ci-manifest-update
 zz_generated_metadata:
-  branch: master
+  branch: release-ocm-2.16
   org: openshift
-  repo: assisted-service
+  repo: assisted-image-service
   variant: mce
