@@ -2,6 +2,7 @@
 
 set -o nounset
 set -o pipefail
+# Note: NOT using errexit because we handle errors manually
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
