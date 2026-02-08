@@ -1,40 +1,28 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.17
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer-agent:
-    name: ocm-2.17
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-service:
-    name: ocm-2.17
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
     name: assisted-service-index
     namespace: edge-infrastructure
-    tag: latest
+    tag: ocm-2.16
   assisted-service-scripts:
-    name: ocm-2.17
+    name: ocm-2.16
     namespace: edge-infrastructure
     tag: assisted-service-scripts
-  assisted-test-infra:
-    name: ocm-2.17
-    namespace: edge-infrastructure
-    tag: assisted-test-infra
-  assisted-test-infra-internal:
-    name: ocm-2.17
-    namespace: edge-infrastructure
-    tag: assisted-test-infra-internal
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  upi-installer:
-    name: "4.21"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   from_repository: true
 images:
@@ -46,14 +34,14 @@ images:
   to: assisted-installer-build
 promotion:
   to:
-  - name: ocm-2.17
+  - name: ocm-2.16
     namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -61,21 +49,23 @@ resources:
       memory: 200Mi
 tests:
 - as: mirror-nightly-image
-  cron: 0 0 * * *
+  cron: 20 3 * * *
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer
     env:
       IMAGE_REPO: assisted-installer
+      RELEASE_TAG_PREFIX: ocm-2.16
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-nightly-image-controller
-  cron: 20 0 * * *
+  cron: 40 3 * * *
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-controller
     env:
       IMAGE_REPO: assisted-installer-controller
+      RELEASE_TAG_PREFIX: ocm-2.16
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
@@ -85,6 +75,7 @@ tests:
       SOURCE_IMAGE_REF: assisted-installer
     env:
       IMAGE_REPO: assisted-installer
+      RELEASE_TAG_PREFIX: ocm-2.16
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image-controller
@@ -94,6 +85,7 @@ tests:
       SOURCE_IMAGE_REF: assisted-installer-controller
     env:
       IMAGE_REPO: assisted-installer-controller
+      RELEASE_TAG_PREFIX: ocm-2.16
     test:
     - ref: assisted-baremetal-images-publish
 - as: lint
@@ -137,89 +129,6 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-codecov-token
-- as: e2e-metal-assisted-4-21
-  capabilities:
-  - intranet
-  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.21
-    workflow: assisted-ofcir-baremetal
-- always_run: false
-  as: e2e-metal-assisted-ipv6-4-21
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        IPv6=yes
-        IPv4=no
-        OPENSHIFT_VERSION=4.21
-    workflow: assisted-ofcir-baremetal
-- always_run: false
-  as: e2e-metal-assisted-single-node-4-21
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        NUM_MASTERS=1
-        OPENSHIFT_VERSION=4.21
-    workflow: assisted-ofcir-baremetal
-- always_run: false
-  as: e2e-metal-assisted-cnv-4-19
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.19
-        MASTER_MEMORY=18700
-        MASTER_CPU=9
-        WORKER_MEMORY=9216
-        MASTER_DISK_COUNT=2
-        WORKER_DISK_COUNT=2
-        WORKER_CPU=5
-    workflow: assisted-ofcir-baremetal
-- always_run: false
-  as: e2e-metal-assisted-lvm-4-21
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=lvm
-        NUM_MASTERS=3
-        NUM_WORKERS=0
-        MASTER_MEMORY=25600
-        MASTER_CPU=9
-        MASTER_DISK_COUNT=2
-        OPENSHIFT_VERSION=4.21
-    workflow: assisted-ofcir-baremetal
-- always_run: false
-  as: e2e-metal-assisted-odf-4-19
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.19
-      CLUSTERTYPE: assisted_large_el9
-    workflow: assisted-ofcir-baremetal
 - as: e2e-ai-operator-ztp
   capabilities:
   - intranet
@@ -233,41 +142,7 @@ tests:
     env:
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal-operator-ztp
-- always_run: false
-  as: e2e-oci-assisted-4-21
-  optional: true
-  steps:
-    cluster_profile: oci-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.21
-    workflow: assisted-oci
-- always_run: false
-  as: e2e-metal-assisted-external-4-21
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        PLATFORM=external
-        OPENSHIFT_VERSION=4.21
-    workflow: assisted-ofcir-baremetal
-- always_run: false
-  as: e2e-vsphere-assisted-4-21
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      ASSISTED_CONFIG: |
-        NUM_WORKERS=0
-        MAKEFILE_TARGET=test
-        OPENSHIFT_VERSION=4.21
-      PLATFORM: vsphere
-    workflow: assisted-vsphere
 zz_generated_metadata:
-  branch: master
+  branch: release-ocm-2.16
   org: openshift
   repo: assisted-installer
-  variant: edge
