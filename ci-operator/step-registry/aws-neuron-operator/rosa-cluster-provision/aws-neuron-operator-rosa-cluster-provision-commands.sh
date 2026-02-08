@@ -71,9 +71,10 @@ AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 get_version() {
   local channel="$1"
   local target="$2"
-  
+
+  local versions
   versions=$(rosa list versions --channel-group "${channel}" --hosted-cp -o json | jq -r '.[].raw_id')
-  
+
   if [[ -n "$target" ]]; then
     echo "$versions" | grep -E "^${target}" | head -1
   else
@@ -115,16 +116,16 @@ fi
 # Get subnet IDs for BYOVPC
 SUBNET_IDS=""
 if [[ "$ENABLE_BYOVPC" == "true" ]]; then
-  PUBLIC_SUBNET_IDs=$(cat ${SHARED_DIR}/public_subnet_ids | tr -d "[']")
-  PRIVATE_SUBNET_IDs=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
+  PUBLIC_SUBNET_IDs=$(cat "${SHARED_DIR}/public_subnet_ids" | tr -d "[']")
+  PRIVATE_SUBNET_IDs=$(cat "${SHARED_DIR}/private_subnet_ids" | tr -d "[']")
   SUBNET_IDS="${PUBLIC_SUBNET_IDs},${PRIVATE_SUBNET_IDs}"
 fi
 
 # Get account roles
 roleARNFile="${SHARED_DIR}/account-roles-arns"
-account_installer_role_arn=$(cat "$roleARNFile" | grep "Installer-Role" || true)
-account_support_role_arn=$(cat "$roleARNFile" | grep "Support-Role" || true)
-account_worker_role_arn=$(cat "$roleARNFile" | grep "Worker-Role" || true)
+account_installer_role_arn=$(grep "Installer-Role" "$roleARNFile" || true)
+account_support_role_arn=$(grep "Support-Role" "$roleARNFile" || true)
+account_worker_role_arn=$(grep "Worker-Role" "$roleARNFile" || true)
 
 if [[ -z "${account_installer_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
   echo "Error: Missing account roles"
@@ -132,11 +133,11 @@ if [[ -z "${account_installer_role_arn}" ]] || [[ -z "${account_support_role_arn
 fi
 
 # Get OIDC config
-oidc_config_id=$(cat "${SHARED_DIR}/oidc-config" | jq -r '.id')
+oidc_config_id=$(jq -r '.id' "${SHARED_DIR}/oidc-config")
 operator_roles_prefix=$CLUSTER_PREFIX
 
 # Initialize cluster-config file for downstream steps
-cat > "${SHARED_DIR}/cluster-config" << EOF
+cat > "${SHARED_DIR}/cluster-config" << CLUSTERCONFIG
 {
   "name": "${CLUSTER_NAME}",
   "sts": true,
@@ -147,7 +148,7 @@ cat > "${SHARED_DIR}/cluster-config" << EOF
     "raw_id": "${SELECTED_VERSION}"
   }
 }
-EOF
+CLUSTERCONFIG
 
 log "Creating ROSA HCP cluster: ${CLUSTER_NAME}"
 log "  Region: ${CLOUD_PROVIDER_REGION}"
@@ -155,81 +156,63 @@ log "  Version: ${SELECTED_VERSION}"
 log "  Machine type: ${COMPUTE_MACHINE_TYPE}"
 log "  Replicas: ${REPLICAS}"
 
-# Build and execute the create command
-cmd="rosa create cluster -y --sts --hosted-cp \
-  --cluster-name ${CLUSTER_NAME} \
-  --region ${CLOUD_PROVIDER_REGION} \
-  --version ${SELECTED_VERSION} \
-  --channel-group ${SELECTED_CHANNEL} \
-  --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
-  --tags ${TAGS} \
-  --role-arn ${account_installer_role_arn} \
-  --support-role-arn ${account_support_role_arn} \
-  --worker-iam-role ${account_worker_role_arn} \
-  --replicas ${REPLICAS} \
-  --oidc-config-id ${oidc_config_id} \
-  --operator-roles-prefix ${operator_roles_prefix} \
-  --subnet-ids ${SUBNET_IDS}"
+# Build the command arguments as an array (avoids eval issues)
+rosa_args=(
+  create cluster -y
+  --sts
+  --hosted-cp
+  --cluster-name "${CLUSTER_NAME}"
+  --region "${CLOUD_PROVIDER_REGION}"
+  --version "${SELECTED_VERSION}"
+  --channel-group "${SELECTED_CHANNEL}"
+  --compute-machine-type "${COMPUTE_MACHINE_TYPE}"
+  --tags "${TAGS}"
+  --role-arn "${account_installer_role_arn}"
+  --support-role-arn "${account_support_role_arn}"
+  --worker-iam-role "${account_worker_role_arn}"
+  --replicas "${REPLICAS}"
+  --oidc-config-id "${oidc_config_id}"
+  --operator-roles-prefix "${operator_roles_prefix}"
+  --subnet-ids "${SUBNET_IDS}"
+)
 
 log "Running command:"
-echo "$cmd" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
+echo "rosa ${rosa_args[*]}" | sed "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK}/g"
 
-# Execute and capture output with retry logic
-max_retries=3
-retry_count=0
-exit_code=1
-cmd_output=""
+# Execute and capture output
+OUTPUT_FILE=$(mktemp)
+exit_code=0
+rosa "${rosa_args[@]}" 2>&1 | tee "${OUTPUT_FILE}" || exit_code=$?
 
-while [ $retry_count -lt $max_retries ]; do
-  echo "Attempt $((retry_count + 1)) of $max_retries..."
-  
-  cmd_output=$(eval "${cmd}" 2>&1)
-  exit_code=$?
-  
-  echo "$cmd_output"
-  
-  # Check for retryable errors
-  if [[ "$cmd_output" =~ "does not have release image for" ]]; then
-    echo "Retryable error detected. Sleeping for 10 minutes before retry..."
-    retry_count=$((retry_count + 1))
-    if [ $retry_count -lt $max_retries ]; then
-      sleep 600
-    fi
-    continue
-  fi
-  
-  # Check if cluster was created despite potential error (handles zero egress bug)
-  if echo "$cmd_output" | grep -q "Cluster '${CLUSTER_NAME}' has been created"; then
-    log "Cluster creation confirmed successful"
-    
+cmd_output=$(cat "${OUTPUT_FILE}")
+rm -f "${OUTPUT_FILE}"
+
+echo ""
+log "rosa create cluster exited with code: ${exit_code}"
+
+# Check if cluster was created despite potential error (handles zero egress bug)
+if [[ $exit_code -ne 0 ]]; then
+  if echo "$cmd_output" | grep -q "has been created"; then
+    log "Cluster creation confirmed successful despite CLI exit code"
+
     if echo "$cmd_output" | grep -q "Failed to get zero egress info"; then
       log "WARNING: Ignoring 'zero egress' CLI bug - cluster was created successfully"
     fi
     exit_code=0
-    break
+  else
+    echo "Cluster creation failed with exit code: ${exit_code}"
+    echo "${exit_code}" > "${SHARED_DIR}/install-status.txt"
+    exit $exit_code
   fi
-  
-  # If we get here with non-zero exit and no cluster created, it's a real failure
-  if [ $exit_code -ne 0 ]; then
-    echo "Command failed with non-retryable error, exit code: $exit_code"
-    break
-  fi
-  
-  break
-done
-
-# Save install status for gather steps
-echo $exit_code > "${SHARED_DIR}/install-status.txt"
-
-if [[ $exit_code -ne 0 ]]; then
-  echo "Cluster creation failed"
-  exit $exit_code
 fi
 
-# Get cluster ID - try multiple methods
+# Save install status for gather steps
+echo "0" > "${SHARED_DIR}/install-status.txt"
+
+# Get cluster ID
 CLUSTER_ID=""
 
-# Method 1: Parse from output
+# Method 1: Parse from command output
 CLUSTER_ID=$(echo "$cmd_output" | grep '^ID:' | tr -d '[:space:]' | cut -d ':' -f 2 || true)
 
 # Method 2: rosa describe
@@ -253,6 +236,6 @@ echo "Cluster ${CLUSTER_NAME} created with ID: ${CLUSTER_ID}"
 echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
 
 # Save cluster info to artifacts
-echo "$cmd_output" | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g" > "${ARTIFACT_DIR}/cluster.txt"
+echo "$cmd_output" | sed "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK}/g" > "${ARTIFACT_DIR}/cluster.txt"
 
 log "Cluster provision step completed successfully"
