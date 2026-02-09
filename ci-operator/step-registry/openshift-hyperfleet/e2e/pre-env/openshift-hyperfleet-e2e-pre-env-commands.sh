@@ -22,6 +22,8 @@ chmod +x bin/hyperfleet-credential-provider
 
 bin/hyperfleet-credential-provider generate-kubeconfig \
   --provider=gcp \
+  --project-id="$PROJECT_ID" \
+  --region="us-central1" \
   --cluster-name="$GKE_CLUSTER_NAME" \
   --output="${SHARED_DIR}/kubeconfig"
 
