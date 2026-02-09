@@ -7,18 +7,6 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.21_base-rhel9:
-    name: "4.21"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.21
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
   tests-private:
     name: tests-private
     namespace: ci
@@ -31,27 +19,12 @@ build_root:
 canonical_go_repository: github.com/openshift/ovn-kubernetes
 images:
 - dockerfile_path: Dockerfile.base
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
   to: ovn-kubernetes-base
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-8-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.21
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: ovn-kubernetes-microshift
 promotion:
   to:
@@ -359,32 +332,13 @@ tests:
       EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
       ITERATION_MULTIPLIER_ENV: "15"
       OUTPUT_FORMAT: JUNIT
-      RUN_ORION: "true"
-      VERSION: "4.20"
+      RUN_ORION: "false"
+      VERSION: "4.21"
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
-- always_run: true
-  as: qe-perfscale-aws-ovn-small-udn-density-churn-l3
-  optional: true
-  steps:
-    cluster_profile: aws-perfscale-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "24"
-      COMPUTE_NODE_TYPE: m5.xlarge
-      EXTRA_FLAGS: --churn-duration=30m --churn-percent=25
-      ITERATION_MULTIPLIER_ENV: "3"
-      RUN_ORION: "true"
-      VERSION: "4.20"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-udn-density-pods
 - always_run: true
   as: qe-perfscale-aws-ovn-small-udn-density-l3
   optional: true
@@ -395,8 +349,8 @@ tests:
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge
       ITERATION_MULTIPLIER_ENV: "3"
-      RUN_ORION: "true"
-      VERSION: "4.20"
+      RUN_ORION: "false"
+      VERSION: "4.21"
     post:
     - chain: ipi-aws-post
     pre:
@@ -414,8 +368,8 @@ tests:
       COMPUTE_NODE_TYPE: m5.xlarge
       ENABLE_LAYER_3: "false"
       ITERATION_MULTIPLIER_ENV: "3"
-      RUN_ORION: "true"
-      VERSION: "4.20"
+      RUN_ORION: "false"
+      VERSION: "4.21"
     post:
     - chain: ipi-aws-post
     pre:
