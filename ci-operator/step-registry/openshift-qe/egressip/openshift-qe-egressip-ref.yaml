@@ -1,0 +1,67 @@
+ref:
+  as: openshift-qe-egressip
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  commands: openshift-qe-egressip-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: ocp-perfscale-prod-es-creds
+    mount_path: /prod-secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: ADDRESSES-PER-ITERATION
+    default: "10"
+    documentation: |-
+      Number of egress IP addresses to allocate per iteration
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: EGRESSIP_EXTERNAL_SERVER_IP
+    default: "192.168.216.1"
+    documentation: |-
+      IP of the external server (nginx instance)
+  - name: EGRESSIP_GC
+    default: "true"
+    documentation: |-
+      Garbage collection
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local-indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path
+  - name: EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Add args for e2e-benchmarking kube-burner-ocp cmd
+  - name: ITERATIONS
+    default: "10"
+    documentation: |-
+      Iterations of the workload
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: PPROF
+    default: "true"
+    documentation: |-
+      Enable or disable pprof collection
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  documentation: >-
+    This step runs the perfscale egressip workload in the deployed cluster
+  timeout: 2h30m
