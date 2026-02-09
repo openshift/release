@@ -60,5 +60,28 @@ yq eval -n "
 echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
 cat ${OVERRIDE_CONFIG_FILE}
 
+# TODO: Remove this block once ci-export-provision-vars is upstreamed to ARO-HCP
+# https://github.com/Azure/ARO-HCP/pull/4037
+if ! grep -q '^ci-export-provision-vars:' dev-infrastructure/Makefile; then
+  cat >> dev-infrastructure/Makefile << 'EOF'
+
+ci-export-provision-vars:
+	@{ \
+		echo "export SVC_RESOURCEGROUP='$(SVC_RESOURCEGROUP)'"; \
+		echo "export MGMT_RESOURCEGROUP='$(MGMT_RESOURCEGROUP)'"; \
+		echo "export REGIONAL_RESOURCEGROUP='$(REGIONAL_RESOURCEGROUP)'"; \
+		echo "export GLOBAL_RESOURCEGROUP='$(GLOBAL_RESOURCEGROUP)'"; \
+		echo "export REGION='$(REGION)'"; \
+	} > "$${SHARED_DIR}/provision.env"
+.PHONY: ci-export-provision-vars
+EOF
+fi
+
+# Export resource group names to make sure this is available even if provisioning fails.
+make -C dev-infrastructure ci-export-provision-vars DEPLOY_ENV=prow
+
 unset GOFLAGS
 make -o tooling/templatize/templatize entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml
+
+# Mark successful completion
+touch "${SHARED_DIR}/provision-complete"
