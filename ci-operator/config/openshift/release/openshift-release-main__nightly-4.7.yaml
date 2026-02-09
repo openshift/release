@@ -1,0 +1,311 @@
+base_images:
+  ansible:
+    name: "4.7"
+    namespace: ocp
+    tag: ansible
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+  console-tests:
+    name: "4.7"
+    namespace: ocp
+    tag: console-tests
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  libvirt-installer:
+    name: "4.7"
+    namespace: ocp
+    tag: libvirt-installer
+  upi-installer:
+    name: "4.7"
+    namespace: ocp
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.7"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.7"
+  oldest-supported-credentials-request:
+    release:
+      channel: candidate
+      version: 4.7.38
+  oldest-supported-z-rollback:
+    release:
+      channel: candidate
+      version: 4.7.40
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-ipi
+  capabilities:
+  - intranet
+  cron: 17 20 15 */12 *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-sdn-ipv4
+- as: e2e-metal-ipi-upgrade
+  capabilities:
+  - intranet
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+      TEST_TYPE: upgrade-conformance
+    workflow: baremetalds-e2e-upgrade-sdn
+- as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
+  cron: 36 23 3 */12 *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-dualstack
+  capabilities:
+  - intranet
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-compact
+  capabilities:
+  - intranet
+  cron: 0 1 6 */12 *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NUM_WORKERS=0
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-virtualmedia
+  capabilities:
+  - intranet
+  cron: 47 6 5 */12 *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+- as: e2e-aws-proxy
+  cron: 59 7 7 */12 *
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws-proxy
+- as: e2e-vsphere
+  cron: 44 19 5 7 *
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-ovn
+  cron: 30 6 5 3 *
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-ovn
+- as: e2e-vsphere-serial
+  cron: 16 21 9 7 *
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-serial
+- as: e2e-vsphere-upi
+  cron: 59 14 2 1 *
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-upi
+- as: e2e-vsphere-upi-serial
+  cron: 52 17 5 12 *
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-upi-serial
+- as: e2e-aws-workers-rhel7
+  cron: 6 1 7 */12 *
+  steps:
+    cluster_profile: aws-2
+    env:
+      PLATFORM_VERSION: "7.9"
+    workflow: openshift-e2e-aws-workers-rhel
+- as: e2e-ovirt
+  cron: 36 0 12 */12 *
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-e2e-ovirt-conformance-release-4.6-4.7
+- as: e2e-azure-fips
+  cron: 14 16 12 */12 *
+  steps:
+    cluster_profile: azure4
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-azure-pre
+    - ref: fips-check
+    workflow: openshift-e2e-azure
+- as: e2e-aws-fips
+  cron: 20 23 10 */12 *
+  steps:
+    cluster_profile: aws-2
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-e2e-aws
+- as: e2e-gcp
+  cron: 37 20 1 */12 *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-fips
+  cron: 8 22 9 */12 *
+  steps:
+    cluster_profile: gcp
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
+    workflow: openshift-e2e-gcp
+- as: e2e-azure-fips-serial
+  cron: 11 5 26 */12 *
+  steps:
+    cluster_profile: azure4
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/serial
+    pre:
+    - chain: ipi-azure-pre
+    - ref: fips-check
+    workflow: openshift-e2e-azure
+- as: e2e-aws-fips-serial
+  cron: 41 20 19 */12 *
+  steps:
+    cluster_profile: aws-3
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/serial
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-fips-serial
+  cron: 55 16 1 */12 *
+  steps:
+    cluster_profile: gcp
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/serial
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
+    workflow: openshift-e2e-gcp
+- as: console-aws
+  cron: 55 1 12 */12 *
+  steps:
+    cluster_profile: aws-3
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: ./test-prow-e2e.sh release
+      from: console-tests
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-gcp-rt
+  cron: 38 20 14 */12 *
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+      RT_ENABLED: "true"
+    workflow: openshift-e2e-gcp-realtime
+- as: e2e-aws-upgrade
+  cron: 54 7 9 */12 *
+  steps:
+    cluster_profile: aws-3
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws
+- as: credentials-request-freeze
+  cron: 38 3 6 */12 *
+  steps:
+    dependencies:
+      OPENSHIFT_FROZEN_RELEASE_IMAGE: release:oldest-supported-credentials-request
+      OPENSHIFT_LATEST_RELEASE_IMAGE: release:latest
+    workflow: openshift-credentials-request-freeze
+- as: e2e-aws-upgrade-rollback-oldest-supported
+  cron: 17 11 3 */12 *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=100
+    workflow: openshift-upgrade-aws
+- as: e2e-aws
+  cron: 36 17 6 */12 *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-serial
+  cron: 52 7 24 */12 *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: e2e-azure
+  cron: 1 8 22 */12 *
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-powervs
+  cron: 46 7 10 */12 *
+  steps:
+    test:
+    - as: test-e2e
+      cli: latest
+      commands: |
+        oc get nodes
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-powervs-upi
+- as: e2e-gcp-serial
+  cron: 9 9 5 */12 *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-serial
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: nightly-4.7

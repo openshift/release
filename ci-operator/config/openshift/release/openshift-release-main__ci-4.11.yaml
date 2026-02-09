@@ -1,0 +1,218 @@
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.11"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.11"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  cron: 43 3 8 */12 *
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-e2e-aws
+- as: e2e-aws-techpreview
+  cron: 24 10 10 */12 *
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws-techpreview
+- as: e2e-aws-ovn
+  cron: 20 7 5 */12 *
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-serial
+  cron: 2 8 6 */12 *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: e2e-aws-ovn-serial
+  cron: 16 6 6 */12 *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn-serial
+- as: e2e-aws-techpreview-serial
+  cron: 22 10 5 */12 *
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws-techpreview-serial
+- as: e2e-aws-sdn-multitenant
+  cron: 55 9 7 */12 *
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws-sdn-multi
+- as: e2e-aws-upgrade
+  cluster: build01
+  cron: 51 4 10 */12 *
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-ovn-upgrade
+  cluster: build01
+  cron: 31 8 9 */12 *
+  steps:
+    cluster_profile: aws
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws-ovn
+- as: e2e-aws-cilium
+  cron: 37 8 10 */12 *
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws-cilium
+- as: e2e-aws-imdsv2
+  cron: 47 9 10 */12 *
+  steps:
+    cluster_profile: aws-3
+    env:
+      AWS_METADATA_SERVICE_AUTH: Required
+    workflow: openshift-e2e-aws
+- as: e2e-azure
+  cron: 39 8 7 */12 *
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-techpreview
+  cron: 29 4 7 */12 *
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-techpreview
+- as: e2e-azure-serial
+  cron: 40 1 5 */12 *
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-serial
+- as: e2e-azure-techpreview-serial
+  cron: 5 2 5 */12 *
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-techpreview-serial
+- as: e2e-azure-upgrade
+  cron: 26 2 10 */12 *
+  steps:
+    cluster_profile: azure4
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-azure
+- as: e2e-azure-ovn-upgrade
+  cron: 33 5 8 */12 *
+  steps:
+    cluster_profile: azure4
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-azure-cilium
+  cron: 32 5 5 */12 *
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-cilium
+- as: e2e-azure-ovn
+  cron: 44 10 9 */12 *
+  steps:
+    cluster_profile: azure4
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+    workflow: openshift-e2e-azure-ovn
+- as: e2e-gcp
+  cron: 26 2 6 */12 *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-techpreview
+  cron: 8 3 6 */12 *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-e2e-gcp-techpreview
+- as: e2e-gcp-ovn
+  cron: 4 2 9 */12 *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-techpreview-serial
+  cron: 2 2 10 */12 *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-e2e-gcp-techpreview-serial
+- as: e2e-gcp-upgrade
+  cron: 35 2 7 */12 *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-gcp
+- as: e2e-gcp-cilium
+  cron: 6 1 7 */12 *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-cilium
+- as: e2e-aws-upgrade-rollback
+  cron: 4 3 7 */12 *
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-upgrade-ovn-single-node
+  cron: 38 7 7 */12 *
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws-single-node
+- as: e2e-network-migration
+  cron: 44 4 8 */12 *
+  steps:
+    cluster_profile: aws-3
+    env:
+      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
+        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
+        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
+    test:
+    - ref: ovn-sdn-migration
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- as: e2e-network-migration-rollback
+  cron: 59 7 6 */12 *
+  steps:
+    cluster_profile: aws-2
+    env:
+      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
+        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
+        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
+    test:
+    - ref: ovn-sdn-migration
+    - ref: ovn-sdn-migration-rollback
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
+- as: e2e-aws-cgroupsv2
+  cron: 14 7 8 */12 *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-cgroupsv2
+- as: e2e-aws-crun
+  cron: 24 1 6 */12 *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-crun
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: ci-4.11
