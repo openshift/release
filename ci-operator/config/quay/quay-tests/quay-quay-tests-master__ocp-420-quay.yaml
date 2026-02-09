@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.18-openshift-4.12
+    tag: rhel-9-release-golang-1.23-openshift-4.20
 releases:
   latest:
     candidate:
@@ -141,6 +141,29 @@ tests:
     - ref: quay-tests-quay-deploy-registry-builder
     - ref: quay-tests-test-quay-api
     - ref: quay-tests-test-quay-newui
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-acs-violations-check-quay317
+  cron: 0 22 24 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      ACS_OPERATOR_CHANNEL: stable
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.20
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-20@sha256:ebd38d2e196a047d662be9e5c053b92a2606ffea1e16edde4d8c23ef111fd32d
+      QUAY_OPERATOR_CHANNEL: stable-3.17
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.17"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-noobaa
+    - ref: quay-tests-quay-acs
+    - ref: quay-tests-test-quay-api
     - ref: quay-tests-test-quay-e2e
     workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
