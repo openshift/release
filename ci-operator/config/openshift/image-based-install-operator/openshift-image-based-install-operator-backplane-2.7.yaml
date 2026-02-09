@@ -23,11 +23,15 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-8-release-golang-1.22-openshift-4.17
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: image-based-install-operator
+- dockerfile_literal: |
+    FROM placeholder
+  from: src
+  to: image-based-install-operator-code
 promotion:
   to:
   - name: "2.7"
@@ -91,7 +95,8 @@ tests:
     dependencies:
       BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
       IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
-      IMG: image-based-install-operator
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       CLUSTERTYPE: assisted_medium_el9
@@ -106,7 +111,8 @@ tests:
     dependencies:
       BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
       IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
-      IMG: image-based-install-operator
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       SEED_IMAGE_TAG: "4.17"

@@ -2,43 +2,35 @@ workflow:
   as: aws-neuron-operator-e2e-rosa
   steps:
     env:
-      # ROSA HCP configuration
       HOSTED_CP: "true"
       ENABLE_BYOVPC: "true"
-      ZONES_COUNT: "2"
-      
-      # Default compute pool (inf2.xlarge)
+      ZONES_COUNT: "1"
       COMPUTE_MACHINE_TYPE: "inf2.xlarge"
       REPLICAS: "2"
-      
-      # Machine pool 1: Additional Inferentia (inf2.xlarge)
-      MP_MACHINE_TYPE: "inf2.xlarge"
-      MP_REPLICAS: "2"
-      MP_LABELS: "workload=neuron-inference,feature.node.kubernetes.io/aws-neuron=true"
-      MP_ZONE: ""  # Will use multiple AZs
-      
-      # Machine pool 2: Trainium (trn1.2xlarge) - created in test step
-      MP2_MACHINE_TYPE: "trn1.2xlarge"
-      MP2_REPLICAS: "2"
-      MP2_LABELS: "workload=neuron-training,feature.node.kubernetes.io/aws-neuron=true"
-      
-      DISABLE_WORKLOAD_MONITORING: "false"
-    
+      OCM_LOGIN_ENV: "production"
     pre:
-      - chain: rosa-aws-sts-hcp-provision
-      - ref: rosa-conf-machine-pool
-      - ref: aws-neuron-operator-provision-trainium-pool
-      - ref: osd-ccs-conf-idp-htpasswd-multi-users
-      - ref: rosa-cluster-wait-ready-nodes
-    
+    # VPC and tagging setup
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    # OIDC and account roles setup
+    - chain: rosa-sts-oidc-config-create
+    # Custom cluster provision step that handles "zero egress" CLI bug
+    - ref: aws-neuron-operator-rosa-cluster-provision
+    - ref: rosa-cluster-wait-ready-cluster
+    - ref: rosa-cluster-notify-error
+    - ref: rosa-conf-idp-htpasswd
+    - ref: rosa-cluster-wait-ready-operators
+    - ref: aws-provision-tags-for-byo-vpc
+    # Additional configuration
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
     test:
-      - ref: aws-neuron-operator-test
-    
+    - ref: aws-neuron-operator-test
     post:
-      - chain: rosa-aws-sts-hcp-deprovision
-      - ref: send-results-to-reportportal
-  
+    - chain: rosa-aws-sts-hcp-deprovision
   documentation: |-
-    This workflow provisions a ROSA HCP cluster with AWS Neuron instances
-    (Inferentia2 and Trainium1) and runs comprehensive Neuron operator tests
-    including vLLM inference, metrics, and upgrade testing.
+    This workflow provisions a ROSA HCP cluster with 2x AWS Inferentia (inf2.xlarge)
+    compute nodes, then runs the AWS Neuron operator E2E tests using eco-gotests framework.
+
+    Uses a custom provision step to work around the ROSA CLI "zero egress" bug
+    where the CLI returns exit code 1 after successfully creating the cluster.
