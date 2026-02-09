@@ -18,12 +18,13 @@ git clone https://github.com/yasun1/hyperfleet-credential-provider.git
 cd hyperfleet-credential-provider
 make build
 chmod +x bin/hyperfleet-credential-provider
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-bin/hyperfleet-credential-provider get-token \
+
+bin/hyperfleet-credential-provider generate-kubeconfig \
   --provider=gcp \
   --cluster-name="$GKE_CLUSTER_NAME" \
-  --project-id=$PROJECT_ID
+  --output="${SHARED_DIR}/kubeconfig"
 
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # Test CMD
 kubectl get namespaces
