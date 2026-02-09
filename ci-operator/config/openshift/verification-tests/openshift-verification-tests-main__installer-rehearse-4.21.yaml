@@ -64,12 +64,36 @@ tests:
     allow_skip_on_success: true
     cluster_profile: azure-qe
     env:
-      AZURE_BYO_COMPUTE_SUBNETS_NUMBER: "4"
-      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       CUSTOM_AZURE_REGION: centralus
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build07.ci.openshift.org/ci-ln-hwgwkn2/release:latest
       OUTBOUND_TYPE: NATGatewayMultiZone
-    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway-byo-subnets
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-nat-gateway
+- as: installer-rehearse-azure-1
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build07.ci.openshift.org/ci-ln-hwgwkn2/release:latest
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-usertags-storage-account-encryption
+- as: installer-rehearse-azure-2
+  cron: '@yearly'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build07.ci.openshift.org/ci-ln-hwgwkn2/release:latest
+      ENABLE_DES_DEFAULT_MACHINE: "true"
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
 - as: installer-rehearse-gcp
   cron: '@yearly'
   steps:
