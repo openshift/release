@@ -208,25 +208,27 @@ if [[ ${CONTROL_PLANE_INSTANCE_TYPE} != "" ]]; then
   export CONTROL_PLANE_INSTANCE_TYPE
   yq-v4 eval -i '.controlPlane.platform.gcp.type = env(CONTROL_PLANE_INSTANCE_TYPE)' "${CONFIG}"
 
-  # Patch OS disk type for N4 / C4 / C4A machine series
-  if [[ ${CONTROL_PLANE_INSTANCE_TYPE_FAMILY} == N4 ]] || \
-  [[ ${CONTROL_PLANE_INSTANCE_TYPE_FAMILY} == C4 ]] || \
-  [[ ${CONTROL_PLANE_INSTANCE_TYPE_FAMILY} == C4A ]]; then
-    export OS_DISK_TYPE="hyperdisk-balanced"
-    yq-v4 eval -i '.controlPlane.platform.gcp.osDisk.diskType = env(OS_DISK_TYPE)' "${CONFIG}"
-  fi
+  # Patch OS disk type for machine series only supporting hyperdisk-balanced, or not supporting the default pd-ssd
+  # FYI https://github.com/openshift/installer/pull/10271
+  case ${CONTROL_PLANE_INSTANCE_TYPE_FAMILY} in
+    C4D|C4|C4A|N4|N4A|N4D|H4D|H3|X4|M4|A4X|A4|G4|A3ULTRA)
+      export OS_DISK_TYPE="hyperdisk-balanced"
+      yq-v4 eval -i '.controlPlane.platform.gcp.osDisk.diskType = env(OS_DISK_TYPE)' "${CONFIG}"
+      ;;
+  esac
 fi
 if [[ ${COMPUTE_INSTANCE_TYPE} != "" ]]; then
   export COMPUTE_INSTANCE_TYPE
   yq-v4 eval -i '.compute[0].platform.gcp.type = env(COMPUTE_INSTANCE_TYPE)' "${CONFIG}"
 
-  # Patch OS disk type for N4 / C4 / C4A machine series
-  if [[ ${COMPUTE_INSTANCE_TYPE_FAMILY} == N4 ]] || \
-  [[ ${COMPUTE_INSTANCE_TYPE_FAMILY} == C4 ]] || \
-  [[ ${COMPUTE_INSTANCE_TYPE_FAMILY} == C4A ]]; then
-    export OS_DISK_TYPE="hyperdisk-balanced"
+  # Patch OS disk type for machine series only supporting hyperdisk-balanced, or not supporting the default pd-ssd
+  # FYI https://github.com/openshift/installer/pull/10271
+  case ${COMPUTE_INSTANCE_TYPE_FAMILY} in
+    C4D|C4|C4A|N4|N4A|N4D|H4D|H3|X4|M4|A4X|A4|G4|A3ULTRA)
+      export OS_DISK_TYPE="hyperdisk-balanced"
     yq-v4 eval -i '.compute[0].platform.gcp.osDisk.diskType = env(OS_DISK_TYPE)' "${CONFIG}"
-  fi
+    ;;
+  esac
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Patch availability zones"
