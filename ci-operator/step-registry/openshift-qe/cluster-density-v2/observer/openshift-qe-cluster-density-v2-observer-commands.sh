@@ -49,7 +49,7 @@ export WORKLOAD=cluster-density-v2
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
 # The measurable run
-iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
+iteration_multiplier=$(($CDV2_ITERATION_MULTIPLIER))
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
 export ES_SERVER=""
