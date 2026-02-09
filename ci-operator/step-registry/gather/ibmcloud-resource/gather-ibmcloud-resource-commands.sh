@@ -104,7 +104,7 @@ function gather_vpc_routing_tables {
     VPC=$("${IBMCLOUD_CLI}" is vpcs -q| awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}')
     {
         echo -e "# ibmcloud is vpc-routing-tables ${VPC}\n"
-        "${IBMCLOUD_CLI}" is vpc-routing-tables "${VPC} -q"
+        "${IBMCLOUD_CLI}" is vpc-routing-tables "${VPC}" -q
         echo -e "\n\n\n# ibmcloud is vpc-routing-table ${VPC} <table>\n"
         "${IBMCLOUD_CLI}" is vpc-routing-tables "${VPC}" -q | sed 1d | awk '{print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is vpc-routing-table ${VPC} % -q; echo "
     } > "${RESOURCE_DUMP_DIR}/vpc-routing-tables.txt"
@@ -183,7 +183,7 @@ function gather_resources {
         {
             echo -e "# ibmcloud is ${resource}s\n"
             if [[ ${resource} == "image" ]] && [[ ! -z $RESOURCE_GROUP ]]; then
-                "${IBMCLOUD_CLI}" target -g ${RESOURCE_GROUP}
+                "${IBMCLOUD_CLI}" target -g ${RESOURCE_GROUP} -q
                 hasSetTarget=true
             fi
             "${IBMCLOUD_CLI}" is "${resource}s" -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter'
