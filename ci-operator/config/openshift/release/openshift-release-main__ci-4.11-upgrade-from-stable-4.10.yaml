@@ -1,0 +1,116 @@
+base_images:
+  upi-installer:
+    name: "4.11"
+    namespace: ocp
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+releases:
+  initial:
+    release:
+      channel: candidate
+      version: "4.10"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.11"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-upgrade
+  cron: 48 3 7 */12 *
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws
+- as: e2e-gcp-upgrade
+  cron: 17 9 10 */12 *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
+- as: e2e-azure-upgrade
+  cron: 3 3 7 */12 *
+  steps:
+    cluster_profile: azure4
+    env:
+      TEST_REQUIRES_SSH: "true"
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-azure
+- as: e2e-ovirt-upgrade
+  cron: 25 9 23 */12 *
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-upgrade-ovirt
+- as: e2e-vsphere-upgrade
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-upgrade-vsphere
+- as: e2e-aws-ovn-upgrade
+  cron: 47 1 7 */12 *
+  steps:
+    cluster_profile: aws
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-aws-ovn
+- as: e2e-gcp-ovn-upgrade
+  cron: 9 10 9 */12 *
+  steps:
+    cluster_profile: gcp
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-gcp-ovn
+- as: e2e-gcp-ovn-rt-upgrade
+  cron: 51 9 5 */12 *
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-gcp-ovn-rt
+- as: e2e-azure-ovn-upgrade
+  cron: 8 3 10 */12 *
+  steps:
+    cluster_profile: azure4
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-aws-uwm
+  cron: 0 1 9 */12 *
+  steps:
+    cluster_profile: aws-2
+    pre:
+    - ref: ipi-conf-user-workload-monitoring
+    - chain: ipi-aws-pre-stableinitial
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-upgrade-workload
+  cron: 31 6 7 */12 *
+  steps:
+    cluster_profile: aws-3
+    env:
+      EXTERNAL_MANIFESTS_POST_INSTALL: "true"
+      EXTERNAL_MANIFESTS_SHA256_HASH: 6007d0022343793a2c40cc4862337eaf9d5e0f4bd8375578b762ee2a5eb298be
+      EXTERNAL_MANIFESTS_URL: https://gist.githubusercontent.com/vrutkovs/1199226040a1942fdbcbe5fa76ab4467/raw/bfc5e67eef6df45f91af76df2a211fb839ebeda9/sample_workload.yaml
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - ref: openshift-manifests-external
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-upgrade-infra
+  cron: 36 8 10 */12 *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws-infra
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: ci-4.11-upgrade-from-stable-4.10
