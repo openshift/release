@@ -61,7 +61,7 @@ notify() {
   }
 
   # Security: Use silent curl to prevent webhook URL exposure in logs
-  if ! curl -f -s -X POST -H 'Content-type: application/json' \
+  if ! curl -f -s -o /dev/null -X POST -H 'Content-type: application/json' \
     --data "{\"text\":\"${*}\"}" "${webhook_url}" 2>/dev/null; then
     error "slack: failed to send Slack notification"
   fi
@@ -224,8 +224,7 @@ for ((i=1; i<=PR_CHECK_MAX_ATTEMPTS; i++)); do
   # Optimization: Use head parameter to filter PRs server-side by user:branch
   PR_DATA=$(curl -f -s -H "Authorization: token ${GITHUB_TOKEN}" \
     "https://api.github.com/repos/Azure/ARO-HCP/pulls?per_page=10&head=${GITHUB_PR_USER}:${GITHUB_PR_BRANCH}" 2>/dev/null | \
-    jq -r ".[] | select(.title == \"${GITHUB_PR_TITLE}\") | {url: .html_url, created_at: .created_at}" | \
-    head -1)
+    jq -c "[.[] | select(.title == \"${GITHUB_PR_TITLE}\")] | first // empty | {url: .html_url, created_at: .created_at}")
 
   if [[ -n "${PR_DATA}" ]]; then
     PR_URL=$(echo "${PR_DATA}" | jq -r '.url')
