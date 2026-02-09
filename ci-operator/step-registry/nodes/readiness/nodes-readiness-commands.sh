@@ -9,14 +9,25 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 function debug() {
+  local wait_for_debug="${NODE_READINESS_WAIT_FOR_DEBUG:-}"
   echo "[DEBUG] Current machinesets, machines and nodes are:"
   set +e
-  for resource in machinesets.machine.openshift.io machines.machine.openshift.io nodes; do
-    oc -n openshift-machine-api get "${resource}" -owide | tee "${ARTIFACT_DIR}/${resource}.txt"
-    oc -n openshift-machine-api get "${resource}" -oyaml | tee "${ARTIFACT_DIR}/${resource}.yaml"
-    oc -n openshift-machine-api describe "${resource}"   | tee "${ARTIFACT_DIR}/${resource}-describe.txt"
-  done
+  dump_machine_api_resources
+  if [[ -n "${wait_for_debug}" && "${wait_for_debug}" == "true" ]]; then
+    echo "[DEBUG] Waiting to allow live debugging..."
+    sleep 4500 # 75 minutes
+    # Dump the resources again after waiting, just in case we miss the debug window
+    dump_machine_api_resources
+  fi
   set -e
+}
+
+function dump_machine_api_resources() {
+    for resource in machinesets.machine.openshift.io machines.machine.openshift.io nodes; do
+      oc -n openshift-machine-api get "${resource}" -owide | tee -a "${ARTIFACT_DIR}/${resource}.txt"
+      oc -n openshift-machine-api get "${resource}" -oyaml | tee -a "${ARTIFACT_DIR}/${resource}.yaml"
+      oc -n openshift-machine-api describe "${resource}"   | tee -a "${ARTIFACT_DIR}/${resource}-describe.txt"
+    done
 }
 
 # get_ready_nodes_count returns the number of ready nodes
