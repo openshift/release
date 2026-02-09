@@ -180,3 +180,4 @@ if [ "$EXTERNAL_IP_READY" != "true" ]; then
   kubectl get svc hyperfleet-api -n $NAMESPACE_NAME
   exit 1
 fi
+
