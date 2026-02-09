@@ -4,7 +4,7 @@ function debug_on_failure() {
     # Only sleep if the exit code is non-zero (failure)
     if [ $exit_code -ne 0 ]; then
         echo "Script failed with exit code $exit_code. Sleeping for 2 hours for debugging purposes."
-        sleep 2h
+        sleep 2s
     fi
 }
 
@@ -228,6 +228,12 @@ check_instance_ssh() {
     bastion_user="$(< "${SHARED_DIR}/bastion_ssh_user" )"
   fi
   # Ensure the key is added to the agent for forwarding
+  if ! whoami &> /dev/null; then
+    if [ -w /etc/passwd ]; then
+      echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    fi
+  fi
+  eval "$(ssh-agent)"
   ssh-add "$ssh_key"
 
   echo "Gathering instances from IBM Cloud..."
@@ -300,7 +306,9 @@ fi
 mkdir -p "${RESOURCE_DUMP_DIR}"
 gather_resources
 
-echo "IBM Cloud resource gathering completed."
+echo "==== Check the instance SSH connectivity ... ========="
 
 set -o xtrace
 check_instance_ssh
+
+echo "==== IBM Cloud resource gathering completed. ========="
