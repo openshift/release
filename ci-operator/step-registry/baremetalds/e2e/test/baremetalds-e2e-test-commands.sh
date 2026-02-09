@@ -260,13 +260,10 @@ function is_openshift_version_gte() {
 }
 
 function build_hypervisor_config() {
-    # Build hypervisor SSH configuration for tests that need to interact with the hypervisor
-    if [[ "${ENABLE_HYPERVISOR_SSH_CONFIG:-false}" != "true" ]]; then
-        return
-    fi
-
+    # Build hypervisor SSH configuration for tests that need to interact with the hypervisor.
+    # This is also required for tests to interact with VM hosted on the hypervisor.
     if [[ ! -f "${SHARED_DIR}/server-ip" ]]; then
-        echo "Warning: ENABLE_HYPERVISOR_SSH_CONFIG is true but ${SHARED_DIR}/server-ip not found"
+        echo "Warning: Hypervisor IP file ${SHARED_DIR}/server-ip not found"
         return
     fi
 
@@ -289,6 +286,54 @@ function build_hypervisor_config() {
     fi
 
     echo "Hypervisor SSH configuration: IP=${HYPERVISOR_IP}, User=${HYPERVISOR_SSH_USER}, Key=${HYPERVISOR_SSH_KEY}"
+}
+
+function build_hypervisor_vm_config() {
+  build_hypervisor_config
+
+  if [[ ! -f "${SHARED_DIR}/vm-ip" ]]; then
+      echo "Warning: Hypervisor VM IP file ${SHARED_DIR}/vm-ip not found"
+      return
+  fi
+
+  VM_IP=$(cat "${SHARED_DIR}/vm-ip")
+  export VM_IP
+
+  if [[ ! -f "${SHARED_DIR}/vm-private-key" ]]; then
+    echo "WARNING: ${SHARED_DIR}/vm-private-key file not found"
+    return
+  fi
+
+  if [[ ! -f "${SHARED_DIR}/vm-public-key" ]]; then
+    echo "WARNING: ${SHARED_DIR}/vm-public-key file not found"
+    return
+  fi
+
+    # Prepare SSH configuration directory
+    mkdir -p ~/.ssh
+
+    # Setup ssh keys.
+    cp "${HYPERVISOR_SSH_KEY}" ~/.ssh/hypervisor-ssh-key
+    chmod 600 ~/.ssh/hypervisor-ssh-key
+    cp "${SHARED_DIR}/vm-private-key" ~/.ssh/id_ed25519
+    chmod 600 ~/.ssh/id_ed25519
+    cp "${SHARED_DIR}/vm-public-key" ~/.ssh/id_ed25519.pub
+    chmod 644 ~/.ssh/id_ed25519.pub
+
+    # Configure SSH client - use the copied key with correct permissions
+    cat > ~/.ssh/config <<EOF
+Host hypervisor
+    HostName ${HYPERVISOR_IP}
+    User root
+    ServerAliveInterval 120
+    IdentityFile ~/.ssh/hypervisor-ssh-key
+
+Host 192.168.122.*
+    User root
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    ProxyCommand ssh -W %h:%p hypervisor
+EOF
 }
 
 function upgrade() {
@@ -314,7 +359,7 @@ function suite() {
     fi
 
     set -x
-    if [[ -n "${HYPERVISOR_IP:-}" ]]; then
+    if [[ "${ENABLE_HYPERVISOR_SSH_CONFIG:-false}" == "true" ]]; then
         openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
             --provider "${TEST_PROVIDER:-}" \
             --with-hypervisor-json="{\"hypervisorIP\":\"${HYPERVISOR_IP}\", \"sshUser\":\"${HYPERVISOR_SSH_USER}\", \"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}" \
@@ -491,8 +536,10 @@ else
   check_clusteroperators_status
 fi
 
-# Build hypervisor SSH configuration if enabled
-build_hypervisor_config
+# Build hypervisor and VM SSH configuration
+build_hypervisor_vm_config
+
+sleep 5h
 
 case "${TEST_TYPE}" in
 upgrade-conformance)
