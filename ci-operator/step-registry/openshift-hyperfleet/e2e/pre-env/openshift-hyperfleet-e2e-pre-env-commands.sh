@@ -29,8 +29,10 @@ hyperfleet-credential-provider generate-kubeconfig \
   --project-id="$PROJECT_ID" \
   --region="us-central1-a" \
   --cluster-name="$GKE_CLUSTER_NAME" \
-  --output="${SHARED_DIR}/kubeconfig"
+  --output="${SHARED_DIR}/kubeconfig" \
+  --credentials-file="${HYPERFLEET_E2E_PATH}/hcm-hyperfleet-e2e.json"
 
+cp /tmp/secret/kubeconfig "${SHARED_DIR}/kubeconfig"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # Test CMD
 kubectl get namespaces
