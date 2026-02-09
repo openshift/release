@@ -33,7 +33,7 @@ tests:
       CD_V2_EXTRA_FLAGS: --churn-duration=20m --timeout=6h
       CHANNEL_GROUP: nightly
       CLUSTER_TAGS: TicketId:382
-      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      COMPUTE_MACHINE_TYPE: m5.xlarge
       ENABLE_AUTOSCALING: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
@@ -52,7 +52,7 @@ tests:
     env:
       CHANNEL_GROUP: nightly
       CLUSTER_TAGS: TicketId:382
-      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      COMPUTE_MACHINE_TYPE: m5.xlarge
       ENABLE_AUTOSCALING: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
@@ -70,8 +70,7 @@ tests:
     env:
       ADDITIONAL_WORKER_NODES: "21"
       CHANNEL_GROUP: nightly
-      CLUSTER_TAGS: TicketId:382
-      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      COMPUTE_MACHINE_TYPE: m5.xlarge
       ENABLE_AUTOSCALING: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
@@ -88,7 +87,7 @@ tests:
     env:
       ADDITIONAL_WORKER_NODES: "6"
       CHANNEL_GROUP: nightly
-      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      COMPUTE_MACHINE_TYPE: m5.xlarge
       CONFIG: config/standard-classic-rosa.yml
       ENABLE_AUTOSCALING: "false"
       INDEX_ENABLED: "true"
@@ -107,7 +106,7 @@ tests:
     env:
       ADDITIONAL_WORKER_NODES: "21"
       CHANNEL_GROUP: nightly
-      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      COMPUTE_MACHINE_TYPE: m5.xlarge
       ENABLE_AUTOSCALING: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
@@ -125,7 +124,7 @@ tests:
     env:
       ADDITIONAL_WORKER_NODES: "21"
       CHANNEL_GROUP: nightly
-      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      COMPUTE_MACHINE_TYPE: m5.xlarge
       ENABLE_AUTOSCALING: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
@@ -142,11 +141,11 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
-      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      COMPUTE_MACHINE_TYPE: m5.xlarge
       ENABLE_AUTOSCALING: "false"
       INDEX_ENABLED: "true"
       MP_LABELS: concurrent-builds=enabled
-      MP_MACHINE_TYPE: m6i.xlarge
+      MP_MACHINE_TYPE: m5.xlarge
       MP_REPLICAS: "3"
       MP_TAINTS: test=test:PreferNoSchedule
       MULTI_AZ: "true"
@@ -164,7 +163,7 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: nightly
-      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      COMPUTE_MACHINE_TYPE: m5.xlarge
       ENABLE_AUTOSCALING: "false"
       INDEX_ENABLED: "true"
       MULTI_AZ: "true"
@@ -174,6 +173,25 @@ tests:
     test:
     - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
+- as: build-farm-114nodes
+  cron: 0 4 * * 1
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      CLUSTER_TAGS: TicketId:382
+      ENABLE_AUTOSCALING: "true"
+      INDEX_ENABLED: "true"
+      MIN_REPLICAS: "18"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.21"
+      PROFILE_TYPE: reporting
+      REPLICAS: "114"
+    test:
+    - chain: openshift-qe-build-farm
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
