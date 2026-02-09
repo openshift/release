@@ -4,7 +4,7 @@ function debug_on_failure() {
     # Only sleep if the exit code is non-zero (failure)
     if [ $exit_code -ne 0 ]; then
         echo "Script failed with exit code $exit_code. Sleeping for 2 hours for debugging purposes."
-        sleep 2m
+        sleep 2h
     fi
 }
 
@@ -136,7 +136,7 @@ function gather_cis {
     DOMAIN_ID=$(eval "${cmd}")
     if [[ -z "${DOMAIN_ID}" ]] ; then
         echo "Debug: Did not find the cis domain id of ${BASE_DOMAIN}"
-        run_command "${IBMCLOUD_CLI} cis domains -q"
+        run_command "${IBMCLOUD_CLI} cis domains"
     else 
     {
         echo -e "## ibmcloud cis dns-records ${DOMAIN_ID}\n"
