@@ -43,6 +43,27 @@ oc registry login -a /tmp/registry.json
 OCP_VERSION=$(oc adm release info -o=jsonpath='{.metadata.version}' -a /tmp/registry.json "${RELEASE_IMAGE_LATEST}" | cut -d. -f1-2)
 rm -f /tmp/registry.json
 
+# DEBUG: Test brewroot and brewhub network access from CI pod
+echo "=== Testing internal RH network access ==="
+
+echo "1. Testing download.devel.redhat.com (brewroot):"
+host download.devel.redhat.com || echo "   DNS resolution failed"
+curl -s -o /dev/null -w "   HTTP Code: %{http_code}\n" --connect-timeout 10 \
+    "https://download.devel.redhat.com/brewroot/vol/rhel-9/packages/microshift/" || echo "   Curl failed"
+
+echo ""
+echo "2. Testing brewhub.engineering.redhat.com:"
+host brewhub.engineering.redhat.com || echo "   DNS resolution failed"
+curl -s -o /dev/null -w "   HTTP Code: %{http_code}\n" --connect-timeout 10 \
+    "https://brewhub.engineering.redhat.com" || echo "   Curl failed"
+
+echo ""
+echo "3. Testing S3 bucket access (microshift-build-cache-us-west-2):"
+curl -s -o /dev/null -w "   HTTP Code: %{http_code}\n" --connect-timeout 10 \
+    "https://microshift-build-cache-us-west-2.s3.us-west-2.amazonaws.com" || echo "   Curl failed"
+
+echo "=== End network access test ==="
+
 if [[ -z "${EC2_INSTANCE_TYPE+x}" ]] || [[ "${EC2_INSTANCE_TYPE}" == "" ]]; then
 	: EC2_INSTANCE_TYPE is empty, determining from ARCH
 	EC2_INSTANCE_TYPE="${instance_types[${MICROSHIFT_ARCH}]}"
