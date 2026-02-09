@@ -98,7 +98,7 @@ run_tests() {
     export CI=\"${CI:-true}\"
     export HUB=\"${HUB:-quay.io/sail-dev}\"
     export USE_INTERNAL_REGISTRY=\"false\"
-    export PR_NUMBER=\"${PR_NUMBER:-}\"
+    export PR_NUMBER=\"${PULL_NUMBER:-}\"
     ${VERSIONS_YAML_CONFIG:-}
     oc version
     cd /work
