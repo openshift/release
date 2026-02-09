@@ -74,7 +74,7 @@ if [ "${JT__SKIP_HC}" = "false" ]; then
   for ((tryLeft=60; tryLeft; tryLeft--)); do
     rsp="$(eval "$(cat - 0<<cmd1EOF
 $( ((dryRun)) && echo echo || echo eval ) $(printf '%q' "$(cat - 0<<cmd2EOF
-    curl -sSL -X GET -w '%{http_code}' -o /dev/null \
+    curl -sSL -w '%{http_code}' -o /dev/stderr \
         -d $(printf '%q' "$(
             jq -cnr \
                 --arg jeType 1 \
@@ -162,7 +162,7 @@ while IFS=$'\t' read -r trigCond jobList postTask; do
         for ((tryLeft=3; tryLeft; tryLeft--)); do
             rsp="$(eval "$(cat - 0<<cmd1EOF
 $( ((dryRun)) && echo echo || echo eval ) $(printf '%q' "$(cat - 0<<cmd2EOF
-    curl -sSL -X GET -w '%{http_code}' -o /dev/null \
+    curl -sSL -X POST -w '%{http_code}' -o /dev/stderr \
         -d $(printf '%q' "$(
             jq -cnr \
                 --arg jeType "${jobExecType}" \
