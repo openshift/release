@@ -30,20 +30,21 @@ PR_AGE_NOTIFICATION_HOURS=${PR_AGE_NOTIFICATION_HOURS:-24}
 # Internal variables (not configurable via ref.yaml)
 readonly IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.md"
 readonly IMAGE_UPDATER_OUTPUT_FORMAT="markdown"
+ERROR=""
 
 # Logging functions with timestamps and severity levels
 log() { echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] ${*}"; }
 info()  { if [[ ${VERBOSITY-0} -ge 1 ]]; then log "[info] ${*}"; fi }
 debug() { if [[ ${VERBOSITY-0} -ge 2 ]]; then log "[debug] ${*}"; fi }
-error() { log "[error] ${*}"; exit ${ERR_EXIT_CODE:-1}; }
+error() { ERROR="${*}"; log "[error] ${ERROR}"; exit ${ERR_EXIT_CODE:-1}; }
 
 
 # Cleanup function to handle failures gracefully
 cleanup() {
   readonly EXIT_CODE=${?}
   if [[ ${EXIT_CODE} -ne 0 ]]; then
-    notify "❌ Image digest updater job failed with exit code ${EXIT_CODE}. Please check prow at ${PROW_JOB_URL:-https://prow.ci.openshift.org}"
-    error "Script failed with exit code ${EXIT_CODE}. Cleaning up..."
+    notify "❌ ${ERROR:-Image digest updater job failed with exit code ${EXIT_CODE}}. Please check prow at ${PROW_JOB_URL:-https://prow.ci.openshift.org}"
+    log "[error] Script failed with exit code ${EXIT_CODE}. Cleaning up..."
   fi
 }
 trap cleanup EXIT
@@ -207,8 +208,7 @@ set -o errexit
 
 # Verify prcreator succeeded
 if [[ ${prcreator_exit_code} -ne 0 ]]; then
-  notify "❌ Image digest updater job failed to create PR. Please check prow at ${PROW_JOB_URL}"
-  error "github: prcreator command failed with exit code ${prcreator_exit_code}"
+  error "Image digest updater job failed to create PR"
 fi
 
 # GitHub: Poll for PR creation with exponential backoff
@@ -257,8 +257,7 @@ done
 # Slack: Send notification based on PR creation result
 info "slack: sending notification for PR creation"
 if [[ -z "${PR_URL}" ]]; then
-  notify "❌ Image digest updater job failed, no PR found after ${PR_CHECK_MAX_ATTEMPTS} attempts. Please check prow$ at ${PROW_JOB_URL}"
-  error "github: No PR found after ${PR_CHECK_MAX_ATTEMPTS} attempts"
+  error "Image digest updater job failed, no PR found after ${PR_CHECK_MAX_ATTEMPTS} attempts"
 fi
 
 exit 0
