@@ -14,13 +14,17 @@ export GOOGLE_APPLICATION_CREDENTIALS="${HYPERFLEET_E2E_PATH}/hcm-hyperfleet-e2e
 PROJECT_ID="$(jq -r -c .project_id "${GOOGLE_APPLICATION_CREDENTIALS}")"
 
 cd ${SHARED_DIR}
+mkdir -p ${SHARED_DIR}/bin
+
 git clone https://github.com/yasun1/hyperfleet-credential-provider.git
 cd hyperfleet-credential-provider
 make build
 chmod +x bin/hyperfleet-credential-provider
 
+cp bin/hyperfleet-credential-provider ${SHARED_DIR}/bin/
+export PATH=${SHARED_DIR}/bin:${PATH}
 
-bin/hyperfleet-credential-provider generate-kubeconfig \
+hyperfleet-credential-provider generate-kubeconfig \
   --provider=gcp \
   --project-id="$PROJECT_ID" \
   --region="us-central1" \
