@@ -43,7 +43,8 @@ export WORKLOAD=udn-density-pods
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
 # The measurable run
-iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
+# Use UDN_ITERATION_MULTIPLIER if set, fall back to ITERATION_MULTIPLIER_ENV, default to 3
+iteration_multiplier=$((${UDN_ITERATION_MULTIPLIER:-${ITERATION_MULTIPLIER_ENV:-3}}))
 if [[ -n "$OVERRIDE_ITERATIONS" ]]; then
   export ITERATIONS=$OVERRIDE_ITERATIONS
 else
