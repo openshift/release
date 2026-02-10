@@ -8,7 +8,7 @@ cd /tmp
 # --- SETUP AND VARIABLES ---
 SECRET_DIR="/tmp/vault/ibmz-ci-creds"
 PRIVATE_KEY_FILE="${SECRET_DIR}/IPI_SSH_KEY"
-IP_JUMPHOST=128.168.131.205
+IP_JUMPHOST=128.168.131.115
 CLUSTER_VARS_PATH="/root/ocp-cluster-ibmcloud/ibmcloud-openshift-provisioning/cluster-vars"
 SSH_KEY_PATH="/tmp/id_rsa"
 
