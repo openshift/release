@@ -4,39 +4,18 @@ set -o nounset
 set -o pipefail
 set -x
 
-# Create shared retry library for use by subsequent steps
-cat > ${SHARED_DIR}/retry-lib.sh << 'RETRY_EOF'
-#!/bin/bash
+# Source shared retry library if available
+if [[ -f "${SHARED_DIR}/retry-lib.sh" ]]; then
+    source "${SHARED_DIR}/retry-lib.sh"
+else
+    echo "retry-lib.sh not found in ${SHARED_DIR}"
+fi
 
-# Retry function for git clone operations
-# Usage: retry_git_clone <repo_url> [git clone options...]
-retry_git_clone() {
-    local max_retries=3
-    local retry_delay=5
-    local attempt=1
-
-    while [ $attempt -le $max_retries ]; do
-        echo "Attempt $attempt of $max_retries: git clone $@"
-        if git clone "$@"; then
-            echo "git clone succeeded on attempt $attempt"
-            return 0
-        fi
-        echo "git clone failed on attempt $attempt"
-        if [ $attempt -lt $max_retries ]; then
-            echo "Waiting ${retry_delay} seconds before retry..."
-            sleep $retry_delay
-            retry_delay=$((retry_delay * 2))
-        fi
-        attempt=$((attempt + 1))
-    done
-
-    echo "git clone failed after $max_retries attempts"
-    return 1
-}
-RETRY_EOF
-
-# Source the retry library
-source ${SHARED_DIR}/retry-lib.sh
+# Guarantee fallback
+if ! declare -F retry_git_clone >/dev/null; then
+    echo "retry_git_clone not defined; falling back to plain git clone (no retries)"
+    retry_git_clone() { git clone "$@"; }
+fi
 
 cat /etc/os-release
 oc config view
