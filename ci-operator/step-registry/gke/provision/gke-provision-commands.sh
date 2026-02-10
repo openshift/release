@@ -21,8 +21,8 @@ INFRA_ID="${RESOURCE_NAME_PREFIX}"
 
 # Dynamic project IDs (created per-test)
 # Truncate to meet GCP's 30 character limit for project IDs
-CP_PROJECT_ID="${INFRA_ID:0:15}-control-plane"
-HC_PROJECT_ID="${INFRA_ID:0:15}-hosted-cluster"
+CP_PROJECT_ID="${INFRA_ID:0:14}-control-plane"
+HC_PROJECT_ID="${INFRA_ID:0:14}-hosted-cluster"
 
 # ============================================================================
 # Step 1: Create Dynamic Projects (under CI folder)
