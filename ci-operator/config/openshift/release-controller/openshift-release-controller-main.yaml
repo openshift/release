@@ -59,9 +59,22 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/release-controller/release-mirror-cleanup-controller
   to: release-mirror-cleanup-controller
+- dockerfile_literal: |-
+    FROM pipeline:govulncheck
+    COPY release-controller /workdir
+    WORKDIR /workdir
+  from: govulncheck
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/release-controller
+  to: govulncheck-src
 promotion:
   to:
-  - namespace: ci
+  - excluded_images:
+    - govulncheck-src
+    namespace: ci
     tag: latest
 resources:
   '*':
@@ -78,10 +91,17 @@ tests:
   container:
     from: src
 - as: govulncheck
-  commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck ./...
-  container:
-    from: govulncheck
-  optional: true
+  steps:
+    test:
+    - as: govulncheck
+      commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) make vulncheck
+      from: pipeline:govulncheck-src
+      resources:
+        limits:
+          memory: 11Gi
+        requests:
+          cpu: 500m
+          memory: 8Gi
 - as: security
   optional: true
   steps:
