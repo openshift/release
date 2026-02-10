@@ -134,6 +134,7 @@ gcloud container clusters create-auto "${CLUSTER_NAME}" \
     --cluster-secondary-range-name="gke-pods" \
     --services-secondary-range-name="gke-services" \
     --release-channel="${RELEASE_CHANNEL}" \
+    --enable-private-nodes \
     --quiet
 
 # ============================================================================
