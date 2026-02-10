@@ -39,6 +39,8 @@ fi
 echo "Switching to the $non_ext_oidc_context context"
 oc config use-context "$non_ext_oidc_context"
 oc whoami
+CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
+AUTH_CONFIG=$(oc get authentication.config cluster -o json | jq -c)
 
 echo "Granting ClusterRole $EXT_OIDC_ROLE_NAME to the external user"
 cat <<EOF | oc create -f -
@@ -57,13 +59,14 @@ subjects:
 EOF
 
 echo "Making sure that the external user has appropriate permissions"
-oc config use-context "$ext_oidc_context"
+oc config use-context "$ext_oidc_context" 2>&1 | sed -E "s|/[^/]+/|/XXXXXXXXXXXX/|"
 # Save external oidc kubeconfig for the later qe test suite using 
 oc config view --flatten --raw > "$SHARED_DIR"/external-oidc-user.kubeconfig
 oc whoami
-# TODO: Remove this conditional when OCPBUGS-57736 is backported to 4.19.
-if [[ $(awk "BEGIN {print ($HOSTED_CLUSTER_VERSION >= 4.20)}") == "1"  ]]; then
-    if [ -f "${SHARED_DIR}/nested_kubeconfig" ] && oc get featuregate cluster -o=jsonpath='{.status.featureGates[*].enabled}' | grep -q ExternalOIDCWithUIDAndExtraClaimMappings; then
+
+# OCPBUGS-57736 has no backport to 4.19
+if [[ $(awk "BEGIN {print ($CLUSTER_VERSION >= 4.20)}") == "1"  ]]; then
+    if grep -qE "extratest.openshift.com/bar.*extratest.openshift.com/foo.*testuid-.+-uidtest" <<< $AUTH_CONFIG; then
         USER_INFO_JSON=$(oc auth whoami -o jsonpath='{.status.userInfo}')
         # The values in the grep patterns are configured otherwhere and tested as checkpoints here
         if jq -c '.extra' <<< "$USER_INFO_JSON" | grep -qE '"extratest.openshift.com/bar":\[".+"\],"extratest.openshift.com/foo":\[".+"\]' && jq -c '.uid' <<< "$USER_INFO_JSON" | grep -qE 'testuid-.+-uidtest'; then
@@ -80,3 +83,4 @@ oc get co
 echo "Switching to the $non_ext_oidc_context context"
 oc config use-context "$non_ext_oidc_context"
 oc whoami
+echo "The KUBECONFIG is $KUBECONFIG" # This line is intentionally added for possible debugging
