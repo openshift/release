@@ -19,9 +19,22 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin/jira-lifecycle-plugin
   to: jira-lifecycle-plugin
+- dockerfile_literal: |-
+    FROM pipeline:govulncheck
+    COPY jira-lifecycle-plugin /workdir
+    WORKDIR /workdir
+  from: govulncheck
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-eng/jira-lifecycle-plugin
+  to: govulncheck-src
 promotion:
   to:
-  - namespace: ci
+  - excluded_images:
+    - govulncheck-src
+    namespace: ci
     tag: latest
 resources:
   '*':
@@ -40,10 +53,17 @@ tests:
   container:
     from: src
 - as: govulncheck
-  commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck ./...
-  container:
-    from: govulncheck
-  optional: true
+  steps:
+    test:
+    - as: govulncheck
+      commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) make vulncheck
+      from: pipeline:govulncheck-src
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: 500m
+          memory: 5Gi
 - as: security
   optional: true
   steps:
