@@ -136,22 +136,6 @@ echo "--- Container Images ---"
 docker images 2>&1 || echo "Docker not available"
 echo ""
 
-echo "--- Libvirt VMs ---"
-if command -v virsh &> /dev/null; then
-    sudo virsh list --all 2>&1 || echo "Could not list VMs"
-else
-    echo "Libvirt not available"
-fi
-echo ""
-
-echo "--- VM Disk Images ---"
-if [ -d "/var/lib/libvirt/images" ]; then
-    ls -lh /var/lib/libvirt/images/ 2>&1 || echo "Could not list libvirt images directory"
-else
-    echo "Libvirt images directory not found"
-fi
-echo ""
-
 echo "--- Build Artifacts ---"
 ls -ld "${HOME}/investigations" 2>&1 || echo "No investigations directory"
 ls -ld /var/log/kbs_logs_* 2>&1 || echo "No KBS log directories"
@@ -270,16 +254,14 @@ if [ "${CLEANUP_IMAGES}" == "true" ]; then
         echo "[INFO] Keeping: kindest/node, registry:2 (infrastructure images)"
 
         # Remove images matching operator names (all tags and registries)
-        for image_pattern in "compute-pcrs" "registration-server" "trusted-cluster-operator" "attestation-key-register"; do
+        for image_pattern in "compute-pcrs" "registration-server" "trusted-cluster-operator" "attestation-key-register" "fedora-coreos-kubevirt" "key-broker-service"; do
             echo "[INFO] Removing images matching pattern: ${image_pattern}"
             docker images --format "{{.Repository}}:{{.Tag}}" | grep -i "${image_pattern}" | xargs -r docker rmi -f 2>&1 || echo "[INFO] No ${image_pattern} images to remove"
         done
 
         echo "[SUCCESS] Test operator images removed"
 
-        # Remove dangling images (broken layers with no tags)
-        echo "[INFO] Removing dangling images (broken layers)..."
-        docker image prune -f 2>&1 || echo "[WARN] Image prune failed"
+        # Preserve dangling images (Docker build cache) for faster subsequent builds
 
         # Remove unused volumes (safe - only removes volumes not attached to containers)
         docker volume prune -f 2>&1 || echo "[WARN] Volume prune failed"
@@ -336,14 +318,19 @@ rm -rf /tmp/e2e-test-* 2>&1 || echo "[WARN] Could not remove e2e-test temp direc
 
 echo "[SUCCESS] Temporary files cleaned up"
 
-echo "--- Step 6: Cleaning up operator working directory ---"
+echo "--- Step 6: Cleaning up operator working directories ---"
 
 if [ -d "${HOME}/operator-kind-setup" ]; then
     echo "[INFO] Removing operator-kind-setup directory..."
-    rm -rf "${HOME}/operator-kind-setup" 2>&1 || echo "[WARN] Could not remove directory"
+    rm -rf "${HOME}/operator-kind-setup" 2>&1 || echo "[WARN] Could not remove operator-kind-setup"
 fi
 
-echo "[SUCCESS] Operator working directory cleaned up"
+if [ -d "${HOME}/operator-pr-code" ]; then
+    echo "[INFO] Removing operator-pr-code directory..."
+    rm -rf "${HOME}/operator-pr-code" 2>&1 || echo "[WARN] Could not remove operator-pr-code"
+fi
+
+echo "[SUCCESS] Operator working directories cleaned up"
 
 echo "--- Step 7: Cleaning up test logs ---"
 
@@ -457,22 +444,6 @@ echo ""
 
 echo "--- Container Images ---"
 docker images 2>&1 || echo "Docker not available"
-echo ""
-
-echo "--- Libvirt VMs (should be empty) ---"
-if command -v virsh &> /dev/null; then
-    sudo virsh list --all 2>&1 || echo "Could not list VMs"
-else
-    echo "Libvirt not available"
-fi
-echo ""
-
-echo "--- VM Disk Images (should be minimal) ---"
-if [ -d "/var/lib/libvirt/images" ]; then
-    ls -lh /var/lib/libvirt/images/ 2>&1 || echo "Could not list libvirt images directory"
-else
-    echo "Libvirt images directory not found"
-fi
 echo ""
 
 echo "--- Build Artifacts (should be removed) ---"
