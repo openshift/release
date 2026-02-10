@@ -44,6 +44,7 @@ rm -f ${SHARED_DIR}/index.json
 python3.9 --version
 curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
 python3.9 get-pip.py --user
+export PATH=$PATH:/alabama/.local/bin:.
 python3.9 -m pip3 install virtualenv jq
 python3.9 -m virtualenv venv3
 source venv3/bin/activate
