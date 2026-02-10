@@ -249,22 +249,71 @@ function upgrade_machinepool_to () {
 # check if the nodes are Ready status
 function check_node() {
     local node_number ready_number
-    node_number=$(oc get node --no-headers | grep -cv STATUS)
-    ready_number=$(oc get node --no-headers | awk '$2 == "Ready"' | wc -l)
-    if (( node_number == ready_number )); then
-        echo "All nodes status Ready"
-        return 0
-    else
-        echo "Find Not Ready worker nodes, node recreated"
-        oc get no
-        exit 1
-    fi
+    local max_retries=20
+    local retry_count=0
+    local node_output=""
+    local rc=0
+
+    while (( retry_count < max_retries )); do
+        set +e
+        node_output=$(oc get node --no-headers 2>&1)
+        rc=$?
+        set -e
+
+        if [[ $rc -ne 0 ]]; then
+            log "API unreachable (exit code $rc): $node_output"
+        fi
+
+        if [[ $rc -eq 0 ]]; then
+            node_number=$(echo "$node_output" | wc -l)
+            ready_number=$(echo "$node_output" | awk '$2 == "Ready"' | wc -l)
+            if (( node_number == ready_number )); then
+                echo "All nodes status Ready"
+                return 0
+            fi
+        fi
+        ((++retry_count))
+        if (( retry_count < max_retries )); then
+            log "Not all nodes Ready or transient API failure (attempt $retry_count of $max_retries), retrying in 30s..."
+            sleep 30
+        fi
+    done
+
+    log "Failed: Not all nodes in Ready state after $max_retries attempts"
+    oc get no || true
+    return 1
 }
 
 function check_worker_node_not_changed() {
   check_node
   # ensure the worker node UIDs are not changed
-  current_uids=$(oc get nodes -o jsonpath='{.items[*].metadata.uid}')
+  local max_retries=20
+  local retry_count=0
+  local current_uids=""
+  local rc=0
+
+  while (( retry_count < max_retries )); do
+      set +e
+      current_uids=$(oc get nodes -o jsonpath='{.items[*].metadata.uid}' 2>&1)
+      rc=$?
+      set -e
+
+      if [[ $rc -eq 0 ]]; then
+          break
+      fi
+      log "API unreachable while getting node UIDs (exit code $rc): $current_uids"
+      ((++retry_count))
+      if (( retry_count < max_retries )); then
+          log "Transient failure getting node UIDs (attempt $retry_count of $max_retries), retrying in 30s..."
+          sleep 30
+      fi
+  done
+
+  if (( retry_count >= max_retries )); then
+      log "Failed to get node UIDs after $max_retries attempts: $current_uids"
+      return 1
+  fi
+
   IFS=' ' read -r -a current_array <<< "$current_uids"
   sorted_current_uids=$(printf "%s\n" "${current_array[@]}" | sort | tr '\n' ' ')
 
