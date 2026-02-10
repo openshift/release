@@ -30,16 +30,28 @@ set -x
 
 # ============================================================================
 # Cleanup Strategy:
-# 1. Delete GKE cluster first (has finalizers, can block project deletion)
-# 2. Delete projects (handles remaining resources like VPCs, firewall rules)
+# 1. Delete customer project first (removes cross-project PSC references)
+# 2. Delete GKE cluster (has finalizers, must complete before project deletion)
+# 3. Delete management project (handles remaining VPCs, firewall rules)
 #
-# We use --async for GKE deletion since project deletion will wait for
-# any remaining cleanup. Individual VPC resource cleanup is skipped since
-# project deletion handles it automatically.
+# We use --async + polling for GKE deletion for explicit control over
+# completion status and better timeout handling.
 # ============================================================================
 
 # ----------------------------------------------------------------------------
-# Step 1: Delete GKE cluster (must be deleted before project)
+# Step 1: Delete customer project (if it exists)
+# Delete first to remove any cross-project dependencies (PSC endpoints, etc.)
+# ----------------------------------------------------------------------------
+if [[ -n "${CUSTOMER_PROJECT_ID}" ]]; then
+    echo "Deleting customer project: ${CUSTOMER_PROJECT_ID}"
+    gcloud projects delete "${CUSTOMER_PROJECT_ID}" --quiet || true
+else
+    echo "No customer project to clean up"
+fi
+
+# ----------------------------------------------------------------------------
+# Step 2: Delete GKE cluster
+# Using --async + polling for explicit control over completion
 # ----------------------------------------------------------------------------
 echo "Deleting GKE management cluster: ${CLUSTER_NAME}"
 gcloud container clusters delete "${CLUSTER_NAME}" \
@@ -48,19 +60,18 @@ gcloud container clusters delete "${CLUSTER_NAME}" \
     --async \
     --quiet || true
 
-# Brief wait for cluster deletion to start before project deletion
-echo "Waiting for GKE cluster deletion to initiate..."
-sleep 30
-
-# ----------------------------------------------------------------------------
-# Step 2: Delete customer project (if it exists)
-# ----------------------------------------------------------------------------
-if [[ -n "${CUSTOMER_PROJECT_ID}" ]]; then
-    echo "Deleting customer project: ${CUSTOMER_PROJECT_ID}"
-    gcloud projects delete "${CUSTOMER_PROJECT_ID}" --quiet || true
-else
-    echo "No customer project to clean up"
-fi
+# Poll for cluster deletion (60 attempts x 10s = 10 minutes max wait)
+echo "Waiting for GKE cluster deletion to complete..."
+for i in {1..60}; do
+    if ! gcloud container clusters describe "${CLUSTER_NAME}" \
+        --project="${MGMT_PROJECT_ID}" \
+        --region="${GCP_REGION}" 2>/dev/null; then
+        echo "GKE cluster deleted successfully"
+        break
+    fi
+    echo "Waiting for GKE cluster deletion... (attempt $i/60)"
+    sleep 10
+done
 
 # ----------------------------------------------------------------------------
 # Step 3: Delete management project
