@@ -100,30 +100,8 @@ case "${CLOUD_PROVIDER}" in
     ;;
 
   GCP)
-  # Install gcloud CLI and GKE auth plugin for kubectl/oc to authenticate with GKE clusters
-  # The hypershift-operator image doesn't have gcloud, so we download it
-  echo "Installing Google Cloud CLI..."
-  GCLOUD_SDK_URL="https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz"
-  GCLOUD_INSTALL_DIR="${HOME}/google-cloud-sdk"
-
-  curl -sL "${GCLOUD_SDK_URL}" | tar -xzf - -C "${HOME}"
-  export PATH="${GCLOUD_INSTALL_DIR}/bin:${PATH}"
-
-  # Install GKE auth plugin using the shared script from gke-provision step
-  # Copy script locally since SHARED_DIR (backed by k8s secret) doesn't preserve execute permissions
-  INSTALL_SCRIPT=$(mktemp)
-  cp "${SHARED_DIR}/install-gke-auth-plugin.sh" "${INSTALL_SCRIPT}"
-  chmod +x "${INSTALL_SCRIPT}"
-  GKE_AUTH_PLUGIN_INSTALL_DIR="${GCLOUD_INSTALL_DIR}/bin" "${INSTALL_SCRIPT}"
-  rm -f "${INSTALL_SCRIPT}"
-  export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-
-  echo "gcloud version: $(gcloud version 2>/dev/null | head -1)"
-
-  # Authenticate gcloud with the service account from the cluster profile
-  # CLUSTER_PROFILE_DIR is available to all steps when cluster_profile is specified
-  echo "Authenticating gcloud with service account..."
-  gcloud auth activate-service-account --key-file="${CLUSTER_PROFILE_DIR}/credentials.json"
+  # The kubeconfig from gke-provision uses a static access token,
+  # so no gcloud/auth-plugin installation is needed here.
 
   # Install CRDs that GKE doesn't have by default (unlike OpenShift)
   # Same approach as AKS - required for HyperShift functionality

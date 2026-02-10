@@ -12,47 +12,6 @@ RELEASE_CHANNEL="${GKE_RELEASE_CHANNEL:-stable}"
 # Authenticate with GCP (before set -x to avoid exposing credentials path)
 gcloud auth activate-service-account --key-file="${GCP_CREDS_FILE}"
 
-# Create and save the GKE auth plugin install script to SHARED_DIR
-# This script is reused by subsequent steps (hypershift-install, run-e2e)
-# Note: gcloud components install is disabled in upi-installer image (installed via yum)
-# so we download the plugin binary directly
-cat > "${SHARED_DIR}/install-gke-auth-plugin.sh" << 'INSTALL_SCRIPT'
-#!/usr/bin/env bash
-# Install GKE auth plugin (required for kubectl/oc authentication with GKE)
-# Source: Google's official package distribution (dl.google.com)
-# Checksum from: https://aur.archlinux.org/packages/google-cloud-cli-gke-gcloud-auth-plugin
-set -euo pipefail
-
-GKE_AUTH_PLUGIN_VERSION="542.0.0"
-GKE_AUTH_PLUGIN_SHA256="b8fb245a2f2112c3f7f45f9482cba82936e26a52d6376683e8ea9b27f053958d"
-GKE_AUTH_PLUGIN_URL="https://dl.google.com/dl/cloudsdk/release/downloads/for_packagers/linux/google-cloud-cli-gke-gcloud-auth-plugin_${GKE_AUTH_PLUGIN_VERSION}.orig_amd64.tar.gz"
-
-# Allow caller to specify install directory, default to ${HOME}/bin
-INSTALL_DIR="${GKE_AUTH_PLUGIN_INSTALL_DIR:-${HOME}/bin}"
-
-echo "Installing gke-gcloud-auth-plugin v${GKE_AUTH_PLUGIN_VERSION} to ${INSTALL_DIR}..."
-mkdir -p "${INSTALL_DIR}"
-PLUGIN_TARBALL=$(mktemp)
-curl -sL "${GKE_AUTH_PLUGIN_URL}" -o "${PLUGIN_TARBALL}"
-
-echo "Verifying checksum..."
-echo "${GKE_AUTH_PLUGIN_SHA256}  ${PLUGIN_TARBALL}" | sha256sum -c -
-
-tar -xzf "${PLUGIN_TARBALL}" -C "${INSTALL_DIR}" --strip-components=2 google-cloud-sdk/bin/gke-gcloud-auth-plugin
-rm -f "${PLUGIN_TARBALL}"
-chmod +x "${INSTALL_DIR}/gke-gcloud-auth-plugin"
-
-echo "gke-gcloud-auth-plugin installed successfully"
-INSTALL_SCRIPT
-
-chmod +x "${SHARED_DIR}/install-gke-auth-plugin.sh"
-
-# Run the install script for this step
-"${SHARED_DIR}/install-gke-auth-plugin.sh"
-export PATH="${PATH}:${HOME}/bin"
-export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-
-
 gcloud --version
 
 # Generate unique resource name prefix (following AKS pattern)
@@ -177,11 +136,48 @@ gcloud container clusters create-auto "${CLUSTER_NAME}" \
     --release-channel="${RELEASE_CHANNEL}" \
     --quiet
 
-echo "Getting kubeconfig"
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-gcloud container clusters get-credentials "${CLUSTER_NAME}" \
+# ============================================================================
+# Step 5: Create static kubeconfig with GCP access token
+# This avoids requiring gcloud/auth-plugin installation in downstream steps.
+# The access token is valid for ~60 minutes, sufficient for CI jobs.
+# ============================================================================
+echo "Creating static kubeconfig with embedded access token"
+
+# Get cluster CA and endpoint
+CLUSTER_CA=$(gcloud container clusters describe "${CLUSTER_NAME}" \
     --project="${MGMT_PROJECT_ID}" \
-    --region="${GCP_REGION}"
+    --region="${GCP_REGION}" \
+    --format="value(masterAuth.clusterCaCertificate)")
+CLUSTER_ENDPOINT=$(gcloud container clusters describe "${CLUSTER_NAME}" \
+    --project="${MGMT_PROJECT_ID}" \
+    --region="${GCP_REGION}" \
+    --format="value(endpoint)")
+
+# Get a short-lived access token (valid ~60 minutes)
+ACCESS_TOKEN=$(gcloud auth print-access-token)
+
+# Write kubeconfig with embedded token (no exec plugin needed)
+cat > "${SHARED_DIR}/kubeconfig" << EOF
+apiVersion: v1
+kind: Config
+clusters:
+- cluster:
+    certificate-authority-data: ${CLUSTER_CA}
+    server: https://${CLUSTER_ENDPOINT}
+  name: gke-cluster
+contexts:
+- context:
+    cluster: gke-cluster
+    user: gke-user
+  name: gke-context
+current-context: gke-context
+users:
+- name: gke-user
+  user:
+    token: ${ACCESS_TOKEN}
+EOF
+
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 # Save cluster info for deprovision step and downstream steps
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"

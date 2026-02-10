@@ -8,21 +8,8 @@ set -euo pipefail
 
 echo "Starting HyperShift GCP e2e tests..."
 
-# Install GKE auth plugin using the shared script from gke-provision step
-# Each step runs in a separate pod, so we need to install the plugin in each step
-# The upi-installer image has gcloud pre-installed, we just need the plugin
-# Copy script locally since SHARED_DIR (backed by k8s secret) doesn't preserve execute permissions
-INSTALL_SCRIPT=$(mktemp)
-cp "${SHARED_DIR}/install-gke-auth-plugin.sh" "${INSTALL_SCRIPT}"
-chmod +x "${INSTALL_SCRIPT}"
-"${INSTALL_SCRIPT}"
-rm -f "${INSTALL_SCRIPT}"
-export PATH="${PATH}:${HOME}/bin"
-export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-
-# Authenticate gcloud with the service account from the cluster profile
-echo "Authenticating gcloud with service account..."
-gcloud auth activate-service-account --key-file="${CLUSTER_PROFILE_DIR}/credentials.json"
+# The kubeconfig from gke-provision uses a static access token,
+# so no gcloud/auth-plugin installation is needed here.
 
 # Load kubeconfig for the management cluster
 if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
