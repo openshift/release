@@ -65,7 +65,7 @@ echo "Waiting for GKE cluster deletion to complete..."
 for i in {1..60}; do
     if ! gcloud container clusters describe "${CLUSTER_NAME}" \
         --project="${MGMT_PROJECT_ID}" \
-        --region="${GCP_REGION}" 2>/dev/null; then
+        --region="${GCP_REGION}" >/dev/null 2>&1; then
         echo "GKE cluster deleted successfully"
         break
     fi
