@@ -177,12 +177,6 @@ gcloud container clusters create-auto "${CLUSTER_NAME}" \
     --release-channel="${RELEASE_CHANNEL}" \
     --quiet
 
-echo "Waiting for GKE cluster to be ready"
-gcloud container clusters describe "${CLUSTER_NAME}" \
-    --project="${MGMT_PROJECT_ID}" \
-    --region="${GCP_REGION}" \
-    --format="value(status)" | grep -q "RUNNING"
-
 echo "Getting kubeconfig"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 gcloud container clusters get-credentials "${CLUSTER_NAME}" \
