@@ -277,6 +277,37 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
+- as: aws-ipi-disc-priv-sts-ep-fips-rhcos10-tp-f14
+  cron: 41 14 11,27 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@disconnected'
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OS_IMAGE_STREAM: rhel-10
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
+- as: aws-ipi-disc-priv-sts-ep-oc-mirror-rhcos10-tp-f14-destructive
+  cron: 32 4 5,21 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@disconnected'
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      MIRROR_BIN: oc-mirror
+      OS_IMAGE_STREAM: rhel-10
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
 - as: aws-ipi-efa-pg-mini-perm-f7
   cron: 6 5 5,14,21,28 * *
   steps:
@@ -342,7 +373,7 @@ tests:
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f7-longduration-workload
-  cron: 46 11 9,16,23,30 * *
+  cron: 3 15 5,12,19,26 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -1851,6 +1882,28 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
+- as: aws-usgov-ipi-priv-marketplace-rhcos10-tp-f7
+  cron: 29 15 7,14,21,30 * *
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
+- as: aws-usgov-ipi-priv-marketplace-rhcos10-tp-f14-destructive
+  cron: 15 20 11,25 * *
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
 - as: azure-aks-hypershift-arm-nodepool-guest-f7
   cron: 1 2 7,14,23,30 * *
   steps:
@@ -1909,6 +1962,39 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-confidential-confidentialvm
+- as: azure-ipi-vmgueststateonly-mini-perm-rhcos10-tp-f7
+  cron: 56 15 7,14,21,30 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_CUSTOM_AZURE_AZ: '[''2'']'
+      COMPUTE_NODE_TYPE: Standard_EC4es_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_DC8ads_v5
+      ENABLE_CONFIDENTIAL_COMPUTE: "true"
+      ENABLE_CONFIDENTIAL_CONTROL_PLANE: "true"
+      ENABLE_ENCRYPTIONATHOST_CONTROL_PLANE: "false"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-confidential-confidentialvm
+- as: azure-ipi-vmgueststateonly-rhcos10-tp-f14-destructive
+  cron: 36 0 11,27 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_DC4ads_v5
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_DC4es_v5
+      ENABLE_CONFIDENTIAL_DEFAULT_MACHINE: "true"
+      ENABLE_ENCRYPTIONATHOST_DEFAULT_MACHINE: "false"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-confidential-confidentialvm
 - as: azure-ipi-confidential-trustedlaunch-mini-perm-f7
   cron: 52 4 6,13,20,29 * *
   steps:
@@ -1929,6 +2015,33 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       ENABLE_CONFIDENTIAL_DEFAULT_MACHINE: "true"
       ENABLE_ENCRYPTIONATHOST_DEFAULT_MACHINE: "false"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-confidential-trustedlaunch
+- as: azure-ipi-trustedlaunch-mini-perm-rhcos10-tp-f7
+  cron: 43 0 7,14,23,30 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_CONFIDENTIAL_COMPUTE: "true"
+      ENABLE_CONFIDENTIAL_CONTROL_PLANE: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-confidential-trustedlaunch
+- as: azure-ipi-trustedlaunch-rhcos10-tp-f14-destructive
+  cron: 52 4 8,24 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      ENABLE_CONFIDENTIAL_DEFAULT_MACHINE: "true"
+      ENABLE_ENCRYPTIONATHOST_DEFAULT_MACHINE: "false"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-confidential-trustedlaunch
@@ -1998,6 +2111,32 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       OS_IMAGE_PLAN: NoPurchasePlan
+      OS_IMAGE_URN: azureopenshift:aro4:413_v2:413.92.20230614
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-marketplace
+- as: azure-ipi-marketplace-mini-perm-rhcos10-tp-f7
+  cron: 37 10 7,16,23,30 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+      OS_IMAGE_VERSION: 4.18.2025031114
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-marketplace
+- as: azure-ipi-marketplace-noplan-rhcos10-tp-f14-destructive
+  cron: 25 19 5,19 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_PLAN: NoPurchasePlan
+      OS_IMAGE_STREAM: rhel-10
       OS_IMAGE_URN: azureopenshift:aro4:413_v2:413.92.20230614
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -2299,6 +2438,36 @@ tests:
       COMPUTE_NODE_TYPE: Standard_NP10s
       CONTROL_PLANE_INSTANCE_TYPE: Standard_NP10s
       CUSTOM_AZURE_REGION: southcentralus
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-generation
+- as: azure-ipi-vmgenv1-mini-perm-rhcos10-tp-f7
+  cron: 16 14 6,13,22,29 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_NP10s
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_NP10s
+      CUSTOM_AZURE_REGION: southcentralus
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-generation
+- as: azure-ipi-vmgenv1-mini-perm-rhcos10-tp-f14-destructive
+  cron: 46 10 12,28 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_NP10s
+      CONTROL_PLANE_INSTANCE_TYPE: Standard_NP10s
+      CUSTOM_AZURE_REGION: southcentralus
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-generation
@@ -2809,6 +2978,54 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-secureboot-confidential-computing
+- as: gcp-ipi-confidential-fips-rhcos10-tp-f14-destructive
+  cron: 6 9 9,23 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_NODE_TYPE: c3-standard-4
+      CONFIDENTIAL_COMPUTE: IntelTrustedDomainExtensions
+      CONTROL_PLANE_CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualization
+      CONTROL_PLANE_NODE_TYPE: c2d-standard-4
+      CONTROL_PLANE_ON_HOST_MAINTENANCE: Terminate
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      ON_HOST_MAINTENANCE: Terminate
+      OS_IMAGE_STREAM: rhel-10
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    - ref: send-results-to-reportportal
+    pre:
+    - ref: gcp-provision-minimal-permission
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-gcp
+    - ref: ipi-conf-gcp-control-plane-node-type
+    - ref: ipi-conf-gcp-confidential-computing
+    - ref: storage-conf-storageclass-pre-set-default-gcp-hyperdisk
+    - chain: ipi-install
+    - ref: enable-qe-catalogsource
+    - ref: cucushift-installer-check-gcp-machine-type
+    - ref: cucushift-installer-check-gcp-confidential-computing
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-reportportal-marker
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+- as: gcp-ipi-confidential-secureboot-rhcos10-tp-f14
+  cron: 23 5 12,26 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualizationNestedPaging
+      COMPUTE_NODE_TYPE: n2d-standard-2
+      COMPUTE_ON_HOST_MAINTENANCE: Terminate
+      CONFIDENTIAL_COMPUTE: AMDEncryptedVirtualization
+      CONTROL_PLANE_NODE_TYPE: c3d-standard-4
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-secureboot-confidential-computing
 - as: gcp-ipi-disc-priv-oidc-fips-mini-perm-f28
   cron: 30 19 26 * *
   steps:
@@ -2979,6 +3196,38 @@ tests:
       CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       MINIMAL_PERMISSIONS_WITHOUT_ACT_AS: "yes"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-marketplace-mini-perm-rhcos10-tp-f14
+  cron: 28 2 6,20 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
+      CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      FEATURE_SET: TechPreviewNoUpgrade
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      MINIMAL_PERMISSIONS_WITHOUT_ACT_AS: "yes"
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-ipi-marketplace-mini-perm-f14-rhcos10-tp-destructive
+  cron: 36 13 4,18 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      COMPUTE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      COMPUTE_SERVICE_ACCOUNT: jiwei-worker-sa
+      CONTROL_PLANE_OSIMAGE: projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736
+      CONTROL_PLANE_SERVICE_ACCOUNT: jiwei-control-plane-sa
+      FEATURE_SET: TechPreviewNoUpgrade
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      MINIMAL_PERMISSIONS_WITHOUT_ACT_AS: "yes"
+      OS_IMAGE_STREAM: rhel-10
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi
@@ -3161,7 +3410,7 @@ tests:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-gcp-upi
 - as: ibmcloud-ipi-dedicatedhost-dynamic-f999
-  cron: 8 22 29 2 *
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -3228,7 +3477,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
 - as: ibmcloud-ipi-ovn-mtu-migrate-f999
-  cron: 8 22 29 2 *
+  cron: 8 8 29 2 *
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -3249,6 +3498,29 @@ tests:
   cron: 36 21 10 * *
   steps:
     cluster_profile: ibmcloud-qe
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-byo-kms
+- as: ibmcloud-ipi-private-byo-kms-rhcos10-tp-f28
+  cron: 57 2 16 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      IBMCLOUD_COMPUTE_ENCRYPTION_KEY: "true"
+      IBMCLOUD_CONTROL_PLANE_ENCRYPTION_KEY: "true"
+      IBMCLOUD_DEFAULT_MACHINE_ENCRYPTION_KEY: "false"
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-byo-kms
+- as: ibmcloud-ipi-private-byo-kms-rhcos10-tp-f28-destructive
+  cron: 17 16 15 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-byo-kms
@@ -3288,6 +3560,28 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
+- as: ibmcloud-ipi-private-fips-rhcos10-tp-f28
+  cron: 31 18 16 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
+- as: ibmcloud-ipi-private-fips-rhcos10-tp-f28-destructive
+  cron: 23 18 2 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
 - as: ibmcloud-ipi-proxy-private-rt-f14
   cron: 32 9 2,16 * *
   steps:
@@ -3302,6 +3596,28 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     env:
+      RT_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
+- as: ibmcloud-ipi-proxy-private-rt-rhcos10-tp-f14
+  cron: 12 10 6,20 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+      RT_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
+- as: ibmcloud-ipi-proxy-private-rt-rhcos10-tp-f28-destructive
+  cron: 24 20 13 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
       RT_ENABLED: "true"
     test:
     - chain: openshift-e2e-test-qe-destructive
@@ -3363,6 +3679,32 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
+- as: nutanix-ipi-boot-cate-project-rt-rhcos10-tp-f28
+  cluster: build01
+  cron: 24 0 22 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+      RT_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
+- as: nutanix-ipi-boot-cate-project-rt-rhcos10-tp-f28-destructive
+  cluster: build01
+  cron: 23 4 22 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+      RT_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
 - as: nutanix-ipi-compact-image-registry-s3-f28
   cluster: build01
   cron: 8 1 28 * *
@@ -3402,6 +3744,30 @@ tests:
     cluster_profile: nutanix-qe-zone
     env:
       EXTRACT_MANIFEST_INCLUDED: "true"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-nutanix-ipi-compute-data-disks
+- as: nutanix-ipi-data-disks-rhcos10-tp-f28
+  cluster: build01
+  cron: 18 15 27 * *
+  steps:
+    cluster_profile: nutanix-qe-zone
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-nutanix-ipi-compute-data-disks
+- as: nutanix-ipi-data-disks-rhcos10-tp-f28-destructive
+  cluster: build01
+  cron: 32 17 9 * *
+  steps:
+    cluster_profile: nutanix-qe-zone
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi-compute-data-disks
@@ -3471,6 +3837,30 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi-compute-gpu
+- as: nutanix-ipi-gpu-rhcos10-tp-f28
+  cluster: build01
+  cron: 41 19 18 * *
+  steps:
+    cluster_profile: nutanix-qe-gpu
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-nutanix-ipi-compute-gpu
+- as: nutanix-ipi-gpu-rhcos10-tp-f28-destructive
+  cluster: build01
+  cron: 41 19 25 * *
+  steps:
+    cluster_profile: nutanix-qe-gpu
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-nutanix-ipi-compute-gpu
 - as: nutanix-ipi-multi-nic-f28
   cluster: build01
   cron: 10 21 24 * *
@@ -3494,6 +3884,32 @@ tests:
       EXTRACT_MANIFEST_INCLUDED: "true"
       FEATURE_GATES: '["NutanixMultiSubnets=true"]'
       FEATURE_SET: CustomNoUpgrade
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-nutanix-ipi-multi-nic
+- as: nutanix-ipi-multi-nic-rhcos10-tp-f28
+  cluster: build01
+  cron: 8 18 2 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      API_CALL_TIMEOUT: "30"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-nutanix-ipi-multi-nic
+- as: nutanix-ipi-multi-nic-rhcos10-tp-f28-destructive
+  cluster: build01
+  cron: 21 12 4 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      API_CALL_TIMEOUT: "30"
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-nutanix-ipi-multi-nic
@@ -3794,6 +4210,28 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-etcd-encryption
+- as: vsphere-ipi-compact-etcd-encrypt-rhcos10-tp-f28
+  cron: 55 13 30 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+      SIZE_VARIANT: compact
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-vsphere-ipi-etcd-encryption
+- as: vsphere-ipi-compact-etcd-encrypt-rhcos10-tp-f28-destructive
+  cron: 58 3 16 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+      SIZE_VARIANT: compact
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-vsphere-ipi-etcd-encryption
 - as: vsphere-ipi-disc-f28
   cron: 26 1 14 * *
   steps:
@@ -3842,6 +4280,35 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       FIPS_ENABLED: "true"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disk-encryption-tang
+- as: vsphere-ipi-disk-encrypt-tang-fips-rhcos10-tp-f28
+  cron: 44 12 23 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    - ref: idp-htpasswd
+    - ref: fips-check-fips-or-die
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-extended-test-supplementary
+    - ref: openshift-e2e-test-qe-report
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disk-encryption-tang
+- as: vsphere-ipi-disk-encrypt-tang-fips-rhcos10-tp-f28-destructive
+  cron: 56 6 4 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OS_IMAGE_STREAM: rhel-10
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi-disk-encryption-tang
@@ -3932,6 +4399,28 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: vsphere-ipi-multi-disk-rhcos10-tp-f28
+  cron: 23 20 15 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_DISK: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: vsphere-ipi-multi-disk-rhcos10-tp-f28-destructive
+  cron: 14 18 29 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ADDITIONAL_DISK: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-vsphere-ipi
 - as: vsphere-ipi-multi-nic-f28
   cron: 32 11 16 * *
   steps:
@@ -3947,6 +4436,28 @@ tests:
     cluster_profile: vsphere-elastic
     env:
       MULTI_NIC_IPI: "true"
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: vsphere-ipi-multi-nic-rhcos10-tp-f28
+  cron: 28 14 17 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      MULTI_NIC_IPI: "true"
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: vsphere-ipi-multi-nic-rhcos10-tp-f28-destructive
+  cron: 16 1 6 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      MULTI_NIC_IPI: "true"
+      OS_IMAGE_STREAM: rhel-10
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-ipi
@@ -4053,6 +4564,21 @@ tests:
     - chain: openshift-e2e-test-qe-regenerate-cluster-cert
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: vsphere-ipi-proxy-fips-regen-cert-rhcos10-tp-f14
+  cron: 4 1 11,27 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OS_IMAGE_STREAM: rhel-10
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-e2e-test-qe-regenerate-cluster-cert
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-f14-disasterrecovery
   cron: 26 18 16,30 * *
   steps:
@@ -4075,12 +4601,40 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-automated-release
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: vsphere-ipi-proxy-fips-rhcos10-tp-f28
+  cron: 26 18 19 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OS_IMAGE_STREAM: rhel-10
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-fips-f28-destructive
   cron: 3 7 21 * *
   steps:
     cluster_profile: vsphere-dis-2
     env:
       FIPS_ENABLED: "true"
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: vsphere-ipi-proxy-fips-rhcos10-tp-f28-destructive
+  cron: 51 22 26 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OS_IMAGE_STREAM: rhel-10
     leases:
     - env: VSPHERE_BASTION_LEASED_RESOURCE
       resource_type: vsphere-connected-2-quota-slice
@@ -4237,6 +4791,38 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot
+- as: vsphere-upi-disc-secureboot-fips-rhcos10-tp-f28
+  cron: 36 11 12 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      E2E_RUN_TAGS: '@disconnected'
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OS_IMAGE_STREAM: rhel-10
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-e2e-test-qe-automated-release
+    workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot
+- as: vsphere-upi-disc-secureboot-fips-rhcos10-tp-f28-destructive
+  cron: 44 16 6 * *
+  steps:
+    cluster_profile: vsphere-dis-2
+    env:
+      E2E_RUN_TAGS: '@disconnected'
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      OS_IMAGE_STREAM: rhel-10
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial&;Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot
 - as: vsphere-upi-disconnecting-network-f28
   cron: 12 5 20 * *
   steps:
@@ -4386,6 +4972,24 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-ipi-virtual-media
+- as: baremetal-ipi-ovn-vmedia-disk-encryption-rhcos10-tp-f7
+  capabilities:
+  - intranet
+  cron: 38 16 1,8,15,24 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_DISK_ENCRYPTION: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-ipi-virtual-media
 - as: vsphere-short-cert-rotation-f7
   cron: 2 10 5,14,21,28 * *
   steps:
@@ -4446,6 +5050,48 @@ tests:
       AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
       BASELINE_CAPABILITY_SET: None
       ENABLE_ETCD_ENCRYPTION: "true"
+      RESERVE_BOOTSTRAP: "false"
+      RT_ENABLED: "true"
+      architecture: amd64
+      masters: "1"
+      workers: "0"
+    test:
+    - ref: cucushift-installer-check-capability
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-sno
+- as: baremetal-sno-ipv4-etcd-encryption-rt-kdump-rhcos10-tp-f7
+  capabilities:
+  - intranet
+  cron: 11 19 6,13,22,29 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      ENABLE_ETCD_ENCRYPTION: "true"
+      ENABLE_KDUMP: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
+      RESERVE_BOOTSTRAP: "false"
+      RT_ENABLED: "true"
+      architecture: amd64
+      masters: "1"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-sno
+- as: baremetal-sno-ipv4-etcd-encryption-rt-basecap-rhcos10-tp-f7
+  capabilities:
+  - intranet
+  cron: 51 17 5,12,19,26 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      ADDITIONAL_ENABLED_CAPABILITIES: baremetal MachineAPI Ingress
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      BASELINE_CAPABILITY_SET: None
+      ENABLE_ETCD_ENCRYPTION: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OS_IMAGE_STREAM: rhel-10
       RESERVE_BOOTSTRAP: "false"
       RT_ENABLED: "true"
       architecture: amd64
