@@ -11,7 +11,7 @@ SCANNER_ARTIFACT_DIR="${ARTIFACT_DIR}/tls-scanner"
 
 # Determine scanner arguments based on whether a specific namespace is requested
 if [[ -n "${SCAN_NAMESPACE:-}" ]]; then
-    SCANNER_ARGS="--namespace ${SCAN_NAMESPACE}"
+    SCANNER_ARGS="--all-pods --namespace-filter ${SCAN_NAMESPACE}"
 else
     SCANNER_ARGS="--all-pods"
 fi
