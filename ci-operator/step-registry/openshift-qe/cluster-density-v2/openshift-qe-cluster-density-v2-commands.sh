@@ -58,7 +58,8 @@ export WORKLOAD=cluster-density-v2
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
-iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
+# Use CDV2_ITERATION_MULTIPLIER if set, fall back to ITERATION_MULTIPLIER_ENV, default to 9
+iteration_multiplier=$((${CDV2_ITERATION_MULTIPLIER:-${ITERATION_MULTIPLIER_ENV:-9}}))
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
