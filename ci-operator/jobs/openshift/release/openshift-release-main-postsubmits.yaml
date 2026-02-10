@@ -116,48 +116,6 @@ postsubmits:
     - ^main$
     cluster: app.ci
     decorate: true
-    labels:
-      ci.openshift.io/role: infra
-    max_concurrency: 1
-    name: branch-ci-openshift-release-main-hosted-mgmt-apply
-    spec:
-      containers:
-      - args:
-        - --config-dir=clusters/hosted-mgmt
-        - --confirm=true
-        - --as=
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-        command:
-        - applyconfig
-        env:
-        - name: hosted_mgmt_id
-          valueFrom:
-            secretKeyRef:
-              key: hosted-mgmt-id
-              name: hosted-mgmt-dex-oidc
-        image: quay.io/openshift/ci-public:ci_applyconfig_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.hosted-mgmt.config
-            path: kubeconfig
-          secretName: config-updater
-  - agent: kubernetes
-    branches:
-    - ^main$
-    cluster: app.ci
-    decorate: true
     decoration_config:
       grace_period: 0s
       timeout: 8h0m0s
