@@ -6,6 +6,20 @@ set -o pipefail
 
 echo "Installing Konflux using the operator-based approach..."
 
+# Install newer kubectl (deploy-deps.sh requires v1.31.4+)
+echo "Installing kubectl v1.31.4..."
+ARCH=$(uname -m)
+if [[ "$ARCH" == "aarch64" ]] || [[ "$ARCH" == "arm64" ]]; then
+    KUBECTL_ARCH="arm64"
+else
+    KUBECTL_ARCH="amd64"
+fi
+curl -LO "https://dl.k8s.io/release/v1.31.4/bin/linux/${KUBECTL_ARCH}/kubectl"
+chmod +x kubectl
+KUBECTL_DIR="$(pwd)"
+export PATH="${KUBECTL_DIR}:$PATH"
+echo "kubectl version: $(kubectl version --client --short 2>/dev/null || kubectl version --client)"
+
 # Configuration - can be overridden via env vars
 KONFLUX_BRANCH="${KONFLUX_BRANCH:-main}"
 KONFLUX_OPERATOR_REGISTRY="${KONFLUX_OPERATOR_REGISTRY:-quay.io/redhat-user-workloads/konflux-vanguard-tenant}"
