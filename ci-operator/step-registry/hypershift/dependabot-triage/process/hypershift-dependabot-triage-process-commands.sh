@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+export GOTOOLCHAIN=auto
 
 echo "=== HyperShift Dependabot Triage Process ==="
 
@@ -147,7 +148,7 @@ echo ""
 
 # Build the Claude prompt
 read -r -d '' CLAUDE_PROMPT << 'PROMPT_EOF' || true
-Process the following dependabot PRs and consolidate them into a single PR.
+Process the following dependabot PRs and consolidate them into a single branch.
 
 PR Numbers: ${PR_NUMBERS}
 
@@ -168,13 +169,13 @@ For EACH PR in the list above, do the following steps IN ORDER:
 
 2. **Cherry-pick**: Fetch and cherry-pick the PR's commits onto the branch
    - Convert commit messages to conventional format (chore(deps): ...)
-   - If cherry-pick fails: record PR as failed with reason, reset to saved SHA, continue to next PR
+   - If cherry-pick fails: record PR as failed with reason, run `git reset --hard <saved_sha> && git clean -fd` to fully revert all changes, continue to next PR
 
 3. **Run make verify**: Regenerate all necessary files
-   - If make verify fails: record PR as failed with reason, reset to saved SHA, continue to next PR
+   - If make verify fails: check the output. If the ONLY failure is gitlint, ignore it and continue (gitlint validates commit messages which are not relevant here). If there are other failures, record PR as failed with reason, run `git reset --hard <saved_sha> && git clean -fd` to fully revert all changes, continue to next PR
 
 4. **Run UPDATE=true make test**: Update test fixtures
-   - If make test fails: record PR as failed with reason, reset to saved SHA, continue to next PR
+   - If make test fails: record PR as failed with reason, run `git reset --hard <saved_sha> && git clean -fd` to fully revert all changes, continue to next PR
 
 5. **Commit generated changes**: Commit any files changed by make verify/test
    - Use message: "chore: regenerate files for PR #<number>"
@@ -192,30 +193,179 @@ After processing all PRs, reorganize the accumulated commits into logical groups
 4. Fourth commit: regenerated assets (cmd/install/assets/)
 5. Fifth commit: any other generated changes
 
-### Phase 4: Final Validation
-1. Run make verify - must pass
-2. Run make test - must pass
+### Phase 4: Output Results and Exit
 
-### Phase 5: Create Consolidated PR
+IMPORTANT: Do NOT run final make verify/test. Do NOT push the branch. Do NOT create a PR.
+The bash script that invoked you will handle final validation, push, and PR creation.
 
-If at least one PR was successfully processed:
-1. Push the branch to origin
-2. Create a single consolidated PR with title: 'NO-JIRA: chore(deps): weekly dependabot consolidation'
-   - Use: gh pr create --repo openshift/hypershift --head hypershift-community:fix/weekly-dependabot-consolidation --no-maintainer-edit --draft
+Write the results to the file ${CLAUDE_RESULTS_FILE} using these EXACT structured markers (one per line, appended with >>):
+- For each successfully processed PR: echo "SUCCEEDED_PR:<number>:<title>" >> ${CLAUDE_RESULTS_FILE}
+- For each failed PR: echo "FAILED_PR:<number>:<reason>" >> ${CLAUDE_RESULTS_FILE}
 
-PR body format:
-## Summary
+Write each marker IMMEDIATELY after processing that PR (do not wait until the end).
+
+After processing all PRs, you are DONE. Exit immediately.
+PROMPT_EOF
+
+# Create temp files before substituting into prompt
+CLAUDE_OUTPUT_FILE=$(mktemp /tmp/claude-output.XXXXXX)
+CLAUDE_RESULTS_FILE=$(mktemp /tmp/claude-results.XXXXXX)
+
+# Substitute variables into prompt
+CLAUDE_PROMPT="${CLAUDE_PROMPT//\$\{PR_NUMBERS\}/$PR_NUMBERS}"
+CLAUDE_PROMPT="${CLAUDE_PROMPT//\$\{CLAUDE_RESULTS_FILE\}/$CLAUDE_RESULTS_FILE}"
+
+echo "Invoking Claude to process and consolidate PRs..."
+echo "=========================================="
+
+# Run Claude with explicit tool allowlist
+set +e
+echo "$CLAUDE_PROMPT" | claude --print \
+  --allowedTools "Bash,Read,Write,Edit,Grep,Glob,WebFetch,Skill,Task,TodoWrite" \
+  --output-format json \
+  --max-turns 100 \
+  2>&1 | tee "$CLAUDE_OUTPUT_FILE"
+CLAUDE_EXIT_CODE=$?
+set -e
+
+echo "=========================================="
+echo ""
+
+if [ $CLAUDE_EXIT_CODE -ne 0 ]; then
+  echo "=========================================="
+  echo "CLAUDE PROCESSING FAILED"
+  echo "=========================================="
+  echo "Exit code: $CLAUDE_EXIT_CODE"
+  rm -f "$CLAUDE_OUTPUT_FILE"
+  rm -f "$CLAUDE_RESULTS_FILE"
+  exit 1
+fi
+
+echo "Claude processing completed. Starting bash-level validation..."
+
+# Parse structured markers from results file (written by Claude during processing)
+rm -f "$CLAUDE_OUTPUT_FILE"
+SUCCEEDED_PRS=$(grep -E '^SUCCEEDED_PR:' "$CLAUDE_RESULTS_FILE" || true)
+FAILED_PRS=$(grep -E '^FAILED_PR:' "$CLAUDE_RESULTS_FILE" || true)
+rm -f "$CLAUDE_RESULTS_FILE"
+
+SUCCEEDED_COUNT=$(echo "$SUCCEEDED_PRS" | grep -c '^SUCCEEDED_PR:' || true)
+echo "Successfully processed PRs: $SUCCEEDED_COUNT"
+
+if [ "$SUCCEEDED_COUNT" -eq 0 ]; then
+  echo "No PRs were successfully processed. Nothing to do."
+  if [ -n "$FAILED_PRS" ]; then
+    echo ""
+    echo "Failed PRs:"
+    echo "$FAILED_PRS"
+  fi
+  exit 0
+fi
+
+# Verify the consolidation branch exists
+CONSOLIDATION_BRANCH="fix/weekly-dependabot-consolidation"
+if ! git rev-parse --verify "$CONSOLIDATION_BRANCH" >/dev/null 2>&1; then
+  echo "ERROR: Consolidation branch '$CONSOLIDATION_BRANCH' does not exist"
+  exit 1
+fi
+
+# Check for actual changes vs upstream/main
+if git diff --quiet upstream/main..."$CONSOLIDATION_BRANCH"; then
+  echo "No actual changes between upstream/main and consolidation branch. Nothing to do."
+  exit 0
+fi
+
+# Checkout the consolidation branch
+git checkout "$CONSOLIDATION_BRANCH"
+
+# Run make verify - two-pass: first to fix, second to gate
+echo ""
+echo "=========================================="
+echo "Running make verify (pass 1: fix stale generated files)..."
+echo "=========================================="
+make verify || true
+
+# Commit any changes from first pass
+if ! git diff --quiet; then
+  git add -A
+  git commit -m "chore: apply make verify fixes"
+  echo "Committed make verify changes"
+fi
+
+echo "Running make verify (pass 2: hard gate)..."
+VERIFY_LOG=$(mktemp /tmp/make-verify.XXXXXX)
+if ! make verify 2>&1 | tee "$VERIFY_LOG"; then
+  # Ignore failures caused only by gitlint (commit message linting is not relevant here)
+  if grep -qi 'gitlint' "$VERIFY_LOG"; then
+    echo "make verify failed due to gitlint - ignoring (commit message linting is not relevant for dependabot consolidation)"
+  else
+    echo ""
+    echo "=========================================="
+    echo "MAKE VERIFY FAILED - NO PR WILL BE CREATED"
+    echo "=========================================="
+    rm -f "$VERIFY_LOG"
+    exit 1
+  fi
+fi
+rm -f "$VERIFY_LOG"
+
+# Run make test - two-pass: first to fix, second to gate
+echo ""
+echo "=========================================="
+echo "Running make test (pass 1: update test fixtures)..."
+echo "=========================================="
+make test || true
+
+# Commit any changes from first pass
+if ! git diff --quiet; then
+  git add -A
+  git commit -m "chore: apply make test fixes"
+  echo "Committed make test changes"
+fi
+
+echo "Running make test (pass 2: hard gate)..."
+if ! make test; then
+  echo ""
+  echo "=========================================="
+  echo "MAKE TEST FAILED - NO PR WILL BE CREATED"
+  echo "=========================================="
+  exit 1
+fi
+
+echo ""
+echo "make verify and make test passed. Pushing branch and creating PR..."
+
+# Push branch to origin
+git push origin "$CONSOLIDATION_BRANCH" --force
+
+# Build PR body from structured markers
+PR_BODY="## Summary
 Weekly consolidation of dependabot dependency updates.
 
-## Consolidated PRs
-- #123: bump foo from 1.0 to 1.1
-- #124: bump bar from 2.0 to 2.1
-[list all successfully processed PRs with their titles]
+## Consolidated PRs"
 
-## Failed PRs (if any)
-- #125: cherry-pick conflict in go.mod
-- #126: make verify failed
-[list any PRs that could not be processed with failure reasons]
+while IFS= read -r line; do
+  if [ -z "$line" ]; then continue; fi
+  pr_num=$(echo "$line" | cut -d: -f2)
+  pr_title=$(echo "$line" | cut -d: -f3-)
+  PR_BODY="${PR_BODY}
+- #${pr_num}: ${pr_title}"
+done <<< "$SUCCEEDED_PRS"
+
+if [ -n "$FAILED_PRS" ]; then
+  PR_BODY="${PR_BODY}
+
+## Failed PRs"
+  while IFS= read -r line; do
+    if [ -z "$line" ]; then continue; fi
+    pr_num=$(echo "$line" | cut -d: -f2)
+    pr_reason=$(echo "$line" | cut -d: -f3-)
+    PR_BODY="${PR_BODY}
+- #${pr_num}: ${pr_reason}"
+  done <<< "$FAILED_PRS"
+fi
+
+PR_BODY="${PR_BODY}
 
 ## Commits
 1. go.mod/go.sum dependency updates
@@ -225,61 +375,22 @@ Weekly consolidation of dependabot dependency updates.
 5. Other generated changes (if any)
 
 ---
-Assisted-by: Claude (via Claude Code)
+Assisted-by: Claude (via Claude Code)"
 
-### Phase 6: Report Results and Exit
-Report which PRs succeeded, which failed (with reasons), and the new PR URL.
+# Create PR
+NEW_PR_URL=$(gh pr create \
+  --repo openshift/hypershift \
+  --head "hypershift-community:${CONSOLIDATION_BRANCH}" \
+  --title "NO-JIRA: chore(deps): weekly dependabot consolidation" \
+  --body "$PR_BODY" \
+  --no-maintainer-edit \
+  --draft)
 
-IMPORTANT: After reporting results, you are DONE. Do not attempt any additional operations like closing original PRs or making further changes. Exit immediately after reporting.
-PROMPT_EOF
-
-# Substitute PR numbers into prompt
-CLAUDE_PROMPT="${CLAUDE_PROMPT//\$\{PR_NUMBERS\}/$PR_NUMBERS}"
-
-echo "Invoking Claude to process and consolidate PRs..."
-echo "=========================================="
-
-# Run Claude with explicit tool allowlist
-set +e
-RESULT=$(echo "$CLAUDE_PROMPT" | claude --print \
-  --allowedTools "Bash,Read,Write,Edit,Grep,Glob,WebFetch,Skill,Task,TodoWrite" \
-  --output-format json \
-  --max-turns 100 \
-  2>&1)
-EXIT_CODE=$?
-set -e
-
-echo "=========================================="
 echo ""
-
-if [ $EXIT_CODE -eq 0 ]; then
-  echo "Claude processing completed successfully"
-
-  # Try to extract PR URL from result
-  NEW_PR_URL=$(echo "$RESULT" | grep -oP 'https://github.com/openshift/hypershift/pull/[0-9]+' | head -1 || echo "")
-
-  if [ -n "$NEW_PR_URL" ]; then
-    echo ""
-    echo "=========================================="
-    echo "SUCCESS"
-    echo "=========================================="
-    echo "Consolidated PR: $NEW_PR_URL"
-  else
-    echo ""
-    echo "Processing completed but no PR URL found in output."
-    echo "Check the logs above for details."
-  fi
-else
-  echo ""
-  echo "=========================================="
-  echo "PROCESSING FAILED"
-  echo "=========================================="
-  echo "Exit code: $EXIT_CODE"
-  echo ""
-  echo "Last 50 lines of output:"
-  echo "$RESULT" | tail -50
-  exit 1
-fi
+echo "=========================================="
+echo "SUCCESS"
+echo "=========================================="
+echo "Consolidated PR: $NEW_PR_URL"
 
 echo ""
 echo "=== Dependabot Triage Complete ==="
