@@ -8,7 +8,7 @@ export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
 export CUSTOMER_SUBSCRIPTION; CUSTOMER_SUBSCRIPTION=$(cat "${CLUSTER_PROFILE_DIR}/subscription-name")
 export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscription-id")
-az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}"
+az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 az account set --subscription "${SUBSCRIPTION_ID}"
 oc version
 kubelogin --version
@@ -24,11 +24,21 @@ FRONTEND_REPOSITORY=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
 FRONTEND_SOURCE_REGISTRY=$(echo ${FRONTEND_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
 echo "source registry set to ${FRONTEND_SOURCE_REGISTRY} and repo ${FRONTEND_REPOSITORY} for Frontend Image"
 
+ADMIN_API_DIGEST=$(echo ${ADMIN_API_IMAGE} | cut -d'@' -f2)
+ADMIN_API_REPOSITORY=$(echo ${ADMIN_API_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+ADMIN_API_SOURCE_REGISTRY=$(echo ${ADMIN_API_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+echo "source registry set to ${ADMIN_API_SOURCE_REGISTRY} and repo ${ADMIN_API_REPOSITORY} for Admin API Image"
+
+SESSIONGATE_DIGEST=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f2)
+SESSIONGATE_REPOSITORY=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f1 | cut -d '/' -f2-)
+SESSIONGATE_SOURCE_REGISTRY=$(echo ${SESSIONGATE_IMAGE} | cut -d'@' -f1 | cut -d '/' -f1)
+echo "source registry set to ${SESSIONGATE_SOURCE_REGISTRY} and repo ${SESSIONGATE_REPOSITORY} for SessionGate Image"
+
 # Set up registries that require oc login - append backend and frontend registries
 if [[ -n "${USE_OC_LOGIN_REGISTRIES}" ]]; then
-    USE_OC_LOGIN_REGISTRIES="${USE_OC_LOGIN_REGISTRIES} ${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY}"
+    USE_OC_LOGIN_REGISTRIES="${USE_OC_LOGIN_REGISTRIES} ${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY}"
 else
-    USE_OC_LOGIN_REGISTRIES="${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY}"
+    USE_OC_LOGIN_REGISTRIES="${BACKEND_SOURCE_REGISTRY} ${FRONTEND_SOURCE_REGISTRY} ${ADMIN_API_SOURCE_REGISTRY} ${SESSIONGATE_SOURCE_REGISTRY}"
 fi
 echo "USE_OC_LOGIN_REGISTRIES set to: ${USE_OC_LOGIN_REGISTRIES}"
 
@@ -39,10 +49,39 @@ yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.digest = \"${BACKEND_DIGEST}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.registry = \"${FRONTEND_SOURCE_REGISTRY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.repository = \"${FRONTEND_REPOSITORY}\" |
-  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.digest = \"${FRONTEND_DIGEST}\"
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.frontend.image.digest = \"${FRONTEND_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.registry = \"${ADMIN_API_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.repository = \"${ADMIN_API_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.adminApi.image.digest = \"${ADMIN_API_DIGEST}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.registry = \"${SESSIONGATE_SOURCE_REGISTRY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.repository = \"${SESSIONGATE_REPOSITORY}\" |
+  .clouds.dev.environments.${DEPLOY_ENV}.defaults.sessiongate.image.digest = \"${SESSIONGATE_DIGEST}\"
 " > ${OVERRIDE_CONFIG_FILE}
 echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
 cat ${OVERRIDE_CONFIG_FILE}
 
+# TODO: Remove this block once ci-export-provision-vars is upstreamed to ARO-HCP
+# https://github.com/Azure/ARO-HCP/pull/4037
+if ! grep -q '^ci-export-provision-vars:' dev-infrastructure/Makefile; then
+  cat >> dev-infrastructure/Makefile << 'EOF'
+
+ci-export-provision-vars:
+	@{ \
+		echo "export SVC_RESOURCEGROUP='$(SVC_RESOURCEGROUP)'"; \
+		echo "export MGMT_RESOURCEGROUP='$(MGMT_RESOURCEGROUP)'"; \
+		echo "export REGIONAL_RESOURCEGROUP='$(REGIONAL_RESOURCEGROUP)'"; \
+		echo "export GLOBAL_RESOURCEGROUP='$(GLOBAL_RESOURCEGROUP)'"; \
+		echo "export REGION='$(REGION)'"; \
+	} > "$${SHARED_DIR}/provision.env"
+.PHONY: ci-export-provision-vars
+EOF
+fi
+
+# Export resource group names to make sure this is available even if provisioning fails.
+make -C dev-infrastructure ci-export-provision-vars DEPLOY_ENV=prow
+
 unset GOFLAGS
-make -o tooling/templatize/templatize entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml  
+make -o tooling/templatize/templatize entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml DEPLOY_ENV=prow ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml
+
+# Mark successful completion
+touch "${SHARED_DIR}/provision-complete"

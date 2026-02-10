@@ -15,6 +15,10 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: cli
+  cli-jq:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
   cluster-api-actuator-pkg-test:
     name: cluster-api-actuator-pkg-test
     namespace: ci
@@ -42,7 +46,7 @@ base_images:
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
-    tag: release
+    tag: latest
   tests-private:
     name: tests-private
     namespace: ci
@@ -1529,7 +1533,7 @@ tests:
       FIPS_ENABLED: "true"
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Security_Profiles_Operator
+      TEST_SCENARIOS: Security_Profiles_Operator|Node_Audit_Logging
     test:
     - ref: file-integrity-konflux-catalogsource
     - ref: openshift-extended-test
@@ -2312,8 +2316,8 @@ tests:
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
-- as: ibmcloud-ipi-ovn-mtu-migrate-f28
-  cron: 7 1 12 * *
+- as: ibmcloud-ipi-ovn-mtu-migrate-f999
+  cron: 8 16 29 2 *
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -3267,6 +3271,58 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi-install-disconnected
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-virt-netobserv
+  capabilities:
+  - intranet
+  cron: 19 1 3 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: with VMs
+      TEST_TIMEOUT: "55"
+    test:
+    - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-ipv6-netobserv
+  capabilities:
+  - intranet
+  cron: 51 3 4 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: "53844"
+      TEST_TIMEOUT: "55"
+    test:
+    - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: vsphere-ipi-amd-f28-ipsec-netobserv
+  cron: 52 13 7 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: "82637"
+      TEST_TIMEOUT: "55"
+    test:
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

@@ -9,7 +9,6 @@ declare -r TOOLS_DIR=/tmp/bin
 declare -r MIRROR_REGISTRY_DIR="${MIRROR_REGISTRY_DIR:-"/var/run/vault/mirror-registry"}"
 declare -r MIRROR_REGISTRY_CREDS="${MIRROR_REGISTRY_DIR}/registry_creds"
 declare -r USE_REGISTRY_PROXY="${KONFLUX_USE_REGISTRY_PROXY:-false}"
-declare -r REGISTRY_PROXY_CREDENTIALS="${KONFLUX_REGISTRY_PROXY_CREDENTIALS:-"${MIRROR_REGISTRY_CREDS}"}"
 declare -r REGISTRY_PROXY_HOST="${KONFLUX_REGISTRY_PROXY_HOST:-""}"
 declare -r REGISTRY_PROXY_PORT="${KONFLUX_REGISTRY_PROXY_PORT:-""}"
 declare -r DEPLOY_KONFLUX_OPERATOR_VERSION=v8.1
@@ -39,6 +38,23 @@ function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
     eval "${CMD}"
+}
+
+function create_registry_auth() {
+    local registry_url="$1"
+    local auth_creds="$2"
+    local auth_file
+    auth_file=$(mktemp)
+    cat <<EOF > "${auth_file}"
+{
+    "auths": {
+        "${registry_url}": {
+            "auth": "${auth_creds}"
+        }
+    }
+}
+EOF
+    echo "${auth_file}"
 }
 
 function install_opm() {
@@ -71,6 +87,9 @@ function deploy_operators() {
         args+=(--fbc-tag "${KONFLUX_TARGET_FBC_TAGS}")
     fi
 
+    local mirror_registry_creds
+    mirror_registry_creds=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
+
     if [[ "${DISCONNECTED:-false}" == "true" ]]; then
         local mirror_registry_url
         mirror_registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
@@ -93,31 +112,11 @@ function deploy_operators() {
             fi
 
             local registry_proxy_auth
-            registry_proxy_auth=$(mktemp)
-            cat <<EOF > "${registry_proxy_auth}"
-{
-    "auths": {
-        "${registry_proxy_url}": {
-            "auth": "${REGISTRY_PROXY_CREDENTIALS}"
-        }
-    }
-}
-EOF
+            registry_proxy_auth=$(create_registry_auth "${registry_proxy_url}" "${mirror_registry_creds}")
             args+=(--internal-registry-proxy "${registry_proxy_url}" --internal-registry-proxy-auth "${registry_proxy_auth}")
         else
-            local registry_creds
-            registry_creds=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
             local registry_auth
-            registry_auth=$(mktemp)
-            cat <<EOF > "${registry_auth}"
-{
-    "auths": {
-        "${mirror_registry_url}": {
-            "auth": "${registry_creds}"
-        }
-    }
-}
-EOF
+            registry_auth=$(create_registry_auth "${mirror_registry_url}" "${mirror_registry_creds}")
             args+=(--internal-registry "${mirror_registry_url}" --internal-registry-auth "${registry_auth}" --quay-auth "${PULL_SECRET}/.dockerconfigjson")
         fi
     else

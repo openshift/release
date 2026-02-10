@@ -1,27 +1,12 @@
 base_images:
-  ocp_4.21_base-rhel9:
-    name: "4.23"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.21"
+    tag: "4.22"
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cluster-control-plane-machine-set-operator
 promotion:
   to:
@@ -137,7 +122,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 6h0m0s
     workflow: ipi-aws
 - always_run: false
   as: e2e-aws-periodic-pre-techpreview
@@ -155,7 +140,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 6h0m0s
     workflow: ipi-aws
 - always_run: false
   as: e2e-azure-operator
@@ -187,7 +172,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 6h0m0s
     workflow: ipi-azure
 - always_run: false
   as: e2e-azure-periodic-pre-techpreview
@@ -205,7 +190,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 6h0m0s
     workflow: ipi-azure
 - always_run: false
   as: e2e-gcp-operator
@@ -237,7 +222,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 6h0m0s
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-periodic-pre-techpreview
@@ -255,7 +240,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 6h0m0s
     workflow: ipi-gcp
 - always_run: false
   as: e2e-vsphere-operator
@@ -322,7 +307,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 6h0m0s
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-vsphere-operator-periodic-pre-techpreview
@@ -340,7 +325,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 6h0m0s
     workflow: openshift-e2e-vsphere
 - always_run: false
   as: e2e-openstack-operator
@@ -351,24 +336,6 @@ tests:
     test:
     - as: test
       commands: |
-        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
-        make e2e-presubmit
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: openshift-e2e-openstack-ipi
-- always_run: false
-  as: e2e-openstack-operator-zone
-  optional: true
-  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*
-  steps:
-    cluster_profile: openstack-vh-mecha-az0
-    test:
-    - as: test
-      commands: |
-        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
         export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
         make e2e-presubmit
       from: src
@@ -392,7 +359,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 6h0m0s
     workflow: openshift-e2e-openstack-ipi
 - always_run: false
   as: e2e-openstack-periodic-pre-techpreview
@@ -411,7 +378,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 4h0m0s
+      timeout: 6h0m0s
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-aws-ovn-etcd-scaling
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

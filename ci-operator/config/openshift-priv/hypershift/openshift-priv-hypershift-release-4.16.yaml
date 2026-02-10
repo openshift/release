@@ -15,26 +15,11 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.16_base-rhel9:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
 - dockerfile_path: Dockerfile.control-plane
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: hypershift
 promotion:
   to:
@@ -79,7 +64,7 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
@@ -131,17 +116,19 @@ tests:
   as: e2e-aws-metrics
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-metrics
 - always_run: false
   as: e2e-conformance
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
 - always_run: false
   as: e2e-kubevirt-metal-ovn-conformance
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-hcp

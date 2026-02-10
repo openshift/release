@@ -205,6 +205,28 @@ echo "[INFO] Environment configured:"
 echo "  IP=${IP}"
 echo "  RUNTIME=${RUNTIME}"
 
+echo "[INFO] Cleaning up any existing Kind resources before creation..."
+echo "[INFO] This ensures a clean state even if previous deprovision failed"
+
+# Force delete any existing Kind cluster
+if command -v kind &> /dev/null; then
+    kind delete cluster --name "${KIND_CLUSTER_NAME}" 2>&1 || echo "[INFO] No existing cluster to delete"
+fi
+
+# Force remove Kind containers by name (handles cases where cluster delete failed)
+if command -v docker &> /dev/null; then
+    docker rm -f kind-control-plane 2>&1 || echo "[INFO] No kind-control-plane container"
+    docker rm -f kind-registry 2>&1 || echo "[INFO] No kind-registry container"
+
+    # Remove any other containers with "kind" in the name
+    docker ps -aq --filter "name=kind" | xargs -r docker rm -f 2>&1 || echo "[INFO] No other kind-named containers"
+
+    # Remove Kind network (critical - prevents "network already exists" errors)
+    docker network rm kind 2>&1 || echo "[INFO] No kind network to remove"
+fi
+
+echo "[SUCCESS] Pre-creation cleanup completed"
+
 echo "[INFO] Executing: make cluster-up RUNTIME=${RUNTIME}"
 if ! make cluster-up RUNTIME="${RUNTIME}"; then
   echo "[ERROR] 'make cluster-up' failed"

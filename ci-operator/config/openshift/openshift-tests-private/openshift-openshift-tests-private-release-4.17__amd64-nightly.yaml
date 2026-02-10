@@ -15,6 +15,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: cli
+  cli-jq:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
   cluster-api-actuator-pkg-test:
     name: cluster-api-actuator-pkg-test
     namespace: ci
@@ -46,7 +50,7 @@ base_images:
   rosa-aws-cli:
     name: rosa-aws-cli
     namespace: ci
-    tag: release
+    tag: latest
   tests-private:
     name: tests-private
     namespace: ci
@@ -1335,7 +1339,7 @@ tests:
       FILTERS_ADDITIONAL: ""
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Security_Profiles_Operator
+      TEST_SCENARIOS: Security_Profiles_Operator|Node_Audit_Logging
       TEST_TIMEOUT: "30"
     test:
     - ref: file-integrity-konflux-catalogsource
@@ -2777,6 +2781,58 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-virt-netobserv
+  capabilities:
+  - intranet
+  cron: 8 6 22 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: with VMs
+      TEST_TIMEOUT: "55"
+    test:
+    - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-ipv6-netobserv
+  capabilities:
+  - intranet
+  cron: 33 4 12 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: "53844"
+      TEST_TIMEOUT: "55"
+    test:
+    - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: vsphere-ipi-amd-f28-ipsec-netobserv
+  cron: 10 5 27 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: "82637"
+      TEST_TIMEOUT: "55"
+    test:
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
 - as: vsphere-ipi-f14-sanity-reliability-test
   cron: 53 13 15 10 *
   steps:

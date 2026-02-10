@@ -11,20 +11,12 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: cluster-network-operator
 promotion:
   to:
@@ -147,22 +139,6 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 - always_run: false
-  as: e2e-openstack-kuryr
-  optional: true
-  steps:
-    cluster_profile: openstack-vh-mecha-az0
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-      TEST_SKIPS: NodePort \| session affinity \| Services should be able to change
-        the type from ExternalName to ClusterIP \| Pods should delete a collection
-        of pods \| Kubectl client Guestbook application should create and stop a working
-        application \| Services should serve multiport endpoints from pods \| Services
-        should serve a basic endpoint from pods
-      TEST_SUITE: kubernetes/conformance
-    workflow: openshift-e2e-openstack-ipi
-- always_run: false
   as: e2e-openstack
   optional: true
   steps:
@@ -216,7 +192,7 @@ tests:
   as: e2e-hypershift
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: lint
   commands: |

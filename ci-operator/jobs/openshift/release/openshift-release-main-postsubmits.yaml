@@ -1,0 +1,251 @@
+postsubmits:
+  openshift/release:
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: app.ci
+    decorate: true
+    labels:
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-main-app-ci-apply
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/app.ci
+        - --confirm=true
+        - --as=
+        command:
+        - applyconfig
+        env:
+        - name: PAGERDUTY_INTEGRATION_KEY
+          valueFrom:
+            secretKeyRef:
+              key: integration_key
+              name: pagerduty
+        - name: SLACK_API_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+      serviceAccountName: config-updater
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: app.ci
+    decorate: true
+    labels:
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-main-config-change-trigger
+    spec:
+      containers:
+      - args:
+        - --candidate-path=.
+        - --github-token-path=/etc/github/oauth
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-graphql-endpoint=https://api.github.com/graphql
+        - --dry-run=false
+        command:
+        - config-change-trigger
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_config-change-trigger_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: token
+          readOnly: true
+      serviceAccountName: hook
+      volumes:
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-ci-robot
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: app.ci
+    decorate: true
+    decoration_config:
+      grace_period: 0s
+      timeout: 1h0m0s
+    labels:
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-main-gsm-secrets-reconciler
+    run_if_changed: core-services/sync-rover-groups/_config.yaml
+    spec:
+      containers:
+      - args:
+        - --config=./core-services/sync-rover-groups/_config.yaml
+        - --log-level=info
+        - --gcp-service-account-key-file=/tmp/gcp-credentials/key.json
+        command:
+        - gsm-secret-sync
+        env:
+        - name: GCP_PROJECT_ID
+          value: openshift-ci-secrets
+        - name: GCP_PROJECT_NUMBER
+          value: "384486694155"
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_gsm-secret-sync_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 100m
+        volumeMounts:
+        - mountPath: /tmp/gcp-credentials
+          name: gcp-sa-key
+          readOnly: true
+      volumes:
+      - name: gcp-sa-key
+        secret:
+          secretName: gsm-secrets-reconciler-sa-credentials
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: app.ci
+    decorate: true
+    labels:
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-main-hosted-mgmt-apply
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/hosted-mgmt
+        - --confirm=true
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: hosted_mgmt_id
+          valueFrom:
+            secretKeyRef:
+              key: hosted-mgmt-id
+              name: hosted-mgmt-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.hosted-mgmt.config
+            path: kubeconfig
+          secretName: config-updater
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: app.ci
+    decorate: true
+    decoration_config:
+      grace_period: 0s
+      timeout: 8h0m0s
+    labels:
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-main-label-sync
+    run_if_changed: core-services/prow/02_config/_labels.yaml
+    spec:
+      containers:
+      - args:
+        - --config=./core-services/prow/02_config/_labels.yaml
+        - --confirm=true
+        - --orgs=openshift,cri-o,operator-framework,openshift-priv,redhat-openshift-ecosystem,openshift-psap,openshift-metal3,shipwright-io,openshift-assisted,openshift-eng
+        - --token=/etc/github/oauth
+        - --endpoint=http://ghproxy
+        - --debug
+        command:
+        - /ko-app/label_sync
+        image: quay.io/openshift/ci:ci_label-sync_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: token
+          readOnly: true
+      volumes:
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-ci-robot
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: app.ci
+    decorate: true
+    labels:
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-main-release-controller-annotate
+    spec:
+      containers:
+      - command:
+        - hack/annotate.sh
+        image: quay-proxy.ci.openshift.org/openshift/ci:ocp_cli-jq_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: config-updater
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: app.ci
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: vsphere02
+      ci.openshift.io/generator: cluster-init
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-main-vsphere02-apply
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/vsphere02
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        - --confirm=true
+        command:
+        - applyconfig
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.vsphere02.config
+            path: kubeconfig
+          secretName: config-updater

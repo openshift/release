@@ -1,18 +1,18 @@
 base_images:
   assisted-installer:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
@@ -20,15 +20,15 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   dev-scripts:
@@ -44,20 +44,20 @@ images:
   to: assisted-image-service-build
 promotion:
   to:
-  - name: ocm-2.16
+  - name: ocm-2.17
     namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     requests:
@@ -114,19 +114,18 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
-- always_run: false
-  as: e2e-metal-assisted-4-20
+- as: e2e-metal-assisted-4-21
   capabilities:
   - intranet
-  pipeline_run_if_changed: ^(internal/.*|packages/.*|pkg/.*|rpm-prefetching/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore|main\.go)$
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.20
+        OPENSHIFT_VERSION=4.21
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-deploy-nodes-4-20
+  as: e2e-metal-assisted-deploy-nodes-4-21
   capabilities:
   - intranet
   optional: true
@@ -135,10 +134,10 @@ tests:
     env:
       ASSISTED_CONFIG: |
         MAKEFILE_TARGET="deploy_nodes"
-        OPENSHIFT_VERSION=4.20
+        OPENSHIFT_VERSION=4.21
     workflow: assisted-ofcir-baremetal
 - always_run: false
-  as: e2e-metal-assisted-day2-arm-workers-4-20
+  as: e2e-metal-assisted-day2-arm-workers-4-21
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -149,13 +148,12 @@ tests:
         CONTROLLER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-controller-ds-main:latest
         INSTALLER_IMAGE=quay.io/redhat-user-workloads/assisted-installer-tenant/assisted-installer-application-ds-main/assisted-installer-ds-main:latest
         DAY2_CPU_ARCHITECTURE=arm64
-        OPENSHIFT_VERSION=4.20-multi
+        OPENSHIFT_VERSION=4.21-multi
     workflow: assisted-ofcir-baremetal-heterogeneous
-- always_run: false
-  as: e2e-ai-operator-ztp
+- as: e2e-ai-operator-ztp
   capabilities:
   - intranet
-  pipeline_run_if_changed: ^(internal/.*|packages/.*|pkg/.*|rpm-prefetching/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore|main\.go)$
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -166,16 +164,16 @@ tests:
       CLUSTERTYPE: assisted_medium_el9
     workflow: assisted-ofcir-baremetal-operator-ztp
 - always_run: false
-  as: e2e-oci-assisted-4-20
+  as: e2e-oci-assisted-4-21
   optional: true
   steps:
     cluster_profile: oci-assisted
     env:
       ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.20
+        OPENSHIFT_VERSION=4.21
     workflow: assisted-oci
 - always_run: false
-  as: e2e-metal-assisted-external-4-20
+  as: e2e-metal-assisted-external-4-21
   capabilities:
   - intranet
   optional: true
@@ -184,7 +182,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         PLATFORM=external
-        OPENSHIFT_VERSION=4.20
+        OPENSHIFT_VERSION=4.21
     workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: main

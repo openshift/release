@@ -24,21 +24,37 @@ tests:
     make check
   container:
     from: src
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|(.*\.md)|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - always_run: false
   as: hypershift-pr-check
   commands: |
+    # Check if there are changes in pkg/ or cmd/ directories
+    if ! (git diff --name-only ${PULL_BASE_SHA} $(git merge-base FETCH_HEAD main) | grep -qE '^(pkg/|cmd/)'); then
+    echo "No changes detected in pkg/ or cmd/ directories. Skipping test." && exit 0; fi
+
     export GOFLAGS=""
     export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="hypershift"
     export CHANNEL="stable"
+    export SHARED_DIR="tmp/"
     export SKIP_MUST_GATHER="true"
+    export SKIP_DESTROY_CLUSTER="true"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-credentials"
 
     go mod tidy
     make build
-
+    echo "Provisioning and running e2e commands"
     out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+
+    echo "Copying cluster ID for krknai commands."
+    if [[ ! -f "${SHARED_DIR}/cluster-id" ]];
+    then
+        echo "'cluster-id' not found in shared dir. Cluster may not have been provisioned."
+        exit 1
+    fi
+    echo "Running krknai commands"
+    DRY_RUN=true SKIP_DESTROY_CLUSTER=false out/osde2e krkn-ai --configs "${CONFIGS}" --secret-locations "${SECRET_LOCATIONS}" --cluster-id "$(cat "${SHARED_DIR}/cluster-id")"
+    echo "Finished osde2e pr checks on ROSA hypershift."
   container:
     from: src
   secrets:
@@ -48,7 +64,6 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-hypershift-credentials
     name: osde2e-hypershift-credentials
-  skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: rosa-stage-e2e-byo-vpc-proxy-install
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
