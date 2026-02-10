@@ -6,10 +6,6 @@ build_root:
 images:
 - dockerfile_path: Containerfile
   to: dpf-ci
-promotion:
-  to:
-  - name: latest
-    namespace: dpf-ci
 resources:
   '*':
     limits:
@@ -19,11 +15,18 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: unit
-  commands: make test
-  container:
-    from: dpf-ci
+  as: sanity-existing
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    env:
+      REMOTE_HOST: 10.6.135.45
+    test:
+    - ref: dpf-hypervisor-sanity-existing
+  timeout: 1h0m0s
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
   repo: openshift-dpf
+  variant: 4.20-stable
