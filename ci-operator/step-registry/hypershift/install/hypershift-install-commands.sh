@@ -117,7 +117,7 @@ case "${CLOUD_PROVIDER}" in
 
   # Read GCP environment variables from SHARED_DIR (saved by gke-provision)
   # These are required by the operator's GCPPrivateServiceConnect controller
-  GCP_PROJECT_ID="$(<"${SHARED_DIR}/mgmt-project-id")"
+  GCP_PROJECT_ID="$(<"${SHARED_DIR}/control-plane-project-id")"
   GCP_REGION_VALUE="$(<"${SHARED_DIR}/gcp-region")"
 
   # Install HyperShift operator

@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-# This step runs e2e tests against a HyperShift management cluster on GKE
+# This step runs e2e tests against a HyperShift Control Plane cluster on GKE
 # Currently this is a placeholder that runs basic validation
 # Full e2e test suite will be integrated once infrastructure is validated
 
@@ -11,9 +11,9 @@ echo "Starting HyperShift GCP e2e tests..."
 # The kubeconfig from gke-provision uses a static access token,
 # so no gcloud/auth-plugin installation is needed here.
 
-# Load kubeconfig for the management cluster
+# Load kubeconfig for the Control Plane cluster
 if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
-    echo "ERROR: Management cluster kubeconfig not found"
+    echo "ERROR: Control Plane cluster kubeconfig not found"
     exit 1
 fi
 

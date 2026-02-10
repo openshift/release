@@ -14,17 +14,17 @@ ref:
   documentation: |-
     This step destroys the GKE cluster and cleans up GCP projects created by gke-provision.
 
-    IMPORTANT: GCP project deletion does NOT automatically clean up all resources.
-    Some resources (VPC, GKE clusters) can block project deletion and must be
-    deleted explicitly first. This step handles the proper cleanup order:
-    1. Delete GKE cluster
-    2. Delete VPC resources (firewall rules, NAT, router, subnets, VPC)
-    3. Delete customer project resources
-    4. Delete both projects
+    Cleanup order:
+    1. Delete Hosted Cluster project (removes cross-project PSC references)
+    2. Delete GKE cluster with async polling (prevents liens on Control Plane project)
+    3. Delete Control Plane project
+
+    GKE clusters can place liens on their project, blocking deletion. By explicitly
+    deleting the cluster first and waiting for completion, we ensure the Control Plane
+    project can be deleted cleanly.
 
     Reads from ${SHARED_DIR}:
-    - mgmt-project-id: Management project ID
-    - customer-project-id: Customer project ID
+    - control-plane-project-id: Control Plane project ID
+    - hosted-cluster-project-id: Hosted Cluster project ID (optional)
     - cluster-name: GKE cluster name
     - gcp-region: GCP region
-    - infra-id: Infrastructure identifier
