@@ -638,6 +638,8 @@ del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
+# Reserve one for internal debugging use
+del CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-3']
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 
