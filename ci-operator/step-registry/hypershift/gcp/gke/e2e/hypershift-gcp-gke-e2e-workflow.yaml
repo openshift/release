@@ -13,7 +13,8 @@ workflow:
     1. hypershift-gcp-run-e2e: Run e2e tests against the management cluster
 
     Post phase:
-    1. gke-deprovision: Delete GKE cluster and GCP projects
+    1. hypershift-dump: Collect HyperShift artifacts for debugging
+    2. gke-deprovision: Delete GKE cluster and GCP projects
   steps:
     pre:
     - ref: ipi-install-rbac
@@ -22,6 +23,7 @@ workflow:
     test:
     - ref: hypershift-gcp-run-e2e
     post:
+    - chain: hypershift-dump
     - ref: gke-deprovision
     env:
       CLOUD_PROVIDER: "GCP"
