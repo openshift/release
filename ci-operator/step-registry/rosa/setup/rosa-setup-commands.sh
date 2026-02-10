@@ -18,7 +18,7 @@ log(){
 }
 
 source ./tests/prow_ci.sh
-ROSACLI_BUILD=v1.2.60
+ROSACLI_BUILD=v1.2.59
 if [[ ! -z $ROSACLI_BUILD ]]; then
   override_rosacli_build
 fi
