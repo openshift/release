@@ -143,7 +143,9 @@ gcloud container clusters create-auto "${CLUSTER_NAME}" \
 # ============================================================================
 echo "Creating static kubeconfig with embedded access token"
 
-# Get cluster CA and endpoint
+# Disable tracing to protect sensitive values (access token)
+set +x
+
 CLUSTER_CA=$(gcloud container clusters describe "${CLUSTER_NAME}" \
     --project="${MGMT_PROJECT_ID}" \
     --region="${GCP_REGION}" \
@@ -152,11 +154,8 @@ CLUSTER_ENDPOINT=$(gcloud container clusters describe "${CLUSTER_NAME}" \
     --project="${MGMT_PROJECT_ID}" \
     --region="${GCP_REGION}" \
     --format="value(endpoint)")
-
-# Get a short-lived access token (valid ~60 minutes)
 ACCESS_TOKEN=$(gcloud auth print-access-token)
 
-# Write kubeconfig with embedded token (no exec plugin needed)
 cat > "${SHARED_DIR}/kubeconfig" << EOF
 apiVersion: v1
 kind: Config
@@ -178,6 +177,10 @@ users:
 EOF
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+echo "Kubeconfig created successfully"
+
+# Re-enable tracing
+set -x
 
 # Save cluster info for deprovision step and downstream steps
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
