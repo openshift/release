@@ -24,6 +24,8 @@ oc config view
 oc projects
 oc version
 
+UUID=$(uuidgen)
+
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 
 ES_HOST=${ES_HOST:-"search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"}
@@ -38,7 +40,6 @@ LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmark
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
 git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
-export WORKLOAD=udn-density-pods
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
@@ -51,19 +52,29 @@ else
   export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 fi
 
+
+export WORKLOAD=udn-density-pods
+EXTRA_FLAGS+=" --local-indexing --layer3=${ENABLE_LAYER_3} --local-indexing --iterations=${ITERATIONS} --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
-if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
-    EXTRA_FLAGS+=" --local-indexing"
-fi
-EXTRA_FLAGS+=" --layer3=${ENABLE_LAYER_3} --iterations=${ITERATIONS} --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
-export EXTRA_FLAGS
+export EXTRA_FLAGS UUID
 
 ./run.sh
 
-if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
-    metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
-    cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
+
+if [[ -f collected-metrics-${UUID}/jobSummary.json ]]; then
+  OCP_PERF_DASH_HOST=$(cat ${ES_SECRETS_PATH}/ocp-perf-dash-address)
+  OCP_PERF_DASH_DIR="/usr/share/ocp-perf-dash/${JOB_NAME}/${WORKLOAD}/${UUID}"
+  METRICS="collected-metrics-${UUID}/*QuantilesMeasurement*.json collected-metrics-${UUID}/jobSummary.json"
+  SSH_ARGS="-i ${ES_SECRETS_PATH}/ocp-perf-dash-id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  # Prevent ssh or scp to cause error
+  if ! ssh ${SSH_ARGS} ${OCP_PERF_DASH_HOST} "mkdir -p ${OCP_PERF_DASH_DIR}"; then
+    echo "Warning: failed to create remote directory in ${OCP_PERF_DASH_HOST}"
+  fi
+  if ! scp ${SSH_ARGS} ${METRICS} ${OCP_PERF_DASH_HOST}:${OCP_PERF_DASH_DIR}; then
+    echo "Warning: failed to copy metrics to ${OCP_PERF_DASH_HOST}:${OCP_PERF_DASH_DIR}"
+  fi
 fi
 
 if [[ ${PPROF} == "true" ]]; then
