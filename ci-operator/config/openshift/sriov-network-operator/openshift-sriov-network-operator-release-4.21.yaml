@@ -332,6 +332,47 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: telco5g-sno-ztp-cnf
+- as: operator-e2e-sriov-sno
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-operator-bundle
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
+      OO_PACKAGE: sriov-network-operator
+      OO_TARGET_NAMESPACES: '!install'
+    post:
+    - ref: telco5g-delete-interface
+    test:
+    - ref: telco5g-add-interface
+    - as: start-sriov-operator
+      cli: latest
+      commands: |
+        oc apply -f - <<EOF
+        apiVersion: sriovnetwork.openshift.io/v1
+        kind: SriovOperatorConfig
+        metadata:
+          name: default
+          namespace: openshift-sriov-network-operator
+        spec:
+          enableInjector: true
+          enableOperatorWebhook: true
+          logLevel: 2
+        EOF
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - as: e2e
+      commands: make test-e2e-validation-only
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws-sno
 zz_generated_metadata:
   branch: release-4.21
   org: openshift
