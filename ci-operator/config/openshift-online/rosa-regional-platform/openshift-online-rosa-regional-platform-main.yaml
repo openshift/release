@@ -3,6 +3,12 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.20
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -20,7 +26,7 @@ tests:
   steps:
     cluster_profile: rosa-regional-platform-int
     test:
-    - as: provision-regional
+    - as: provision-both-accounts
       commands: |
         #!/bin/bash
         set -euo pipefail
@@ -39,7 +45,16 @@ tests:
         cp terraform/config/regional-cluster/terraform.tfvars.example \
            terraform/config/regional-cluster/terraform.tfvars
 
-        # Run e2e tests
+        echo "=== Using Account 1 for management cluster ==="
+        # Account 1: Management cluster
+        export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        aws sts get-caller-identity
+        make provision-management
+
+        echo "=== Using Account 2 for regional cluster ==="
+        # Account 2: Regional cluster
+        export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+        aws sts get-caller-identity
         make provision-regional
       from: src
       resources:
