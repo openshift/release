@@ -36,17 +36,14 @@ tests:
     export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
     podman system service --time=0 &
     PODMAN_PID=$!
+    # Ensure podman service is always stopped when the script exits,
+    # even if make hangs or a test panics (HYPERFLEET-625).
+    trap 'kill $PODMAN_PID 2>/dev/null || true; wait $PODMAN_PID 2>/dev/null || true' EXIT
     sleep 2
     export TESTCONTAINERS_RYUK_DISABLED=true
     export PATH=$PATH:$(go env GOPATH)/bin
     make generate
     make test-integration
-
-    # Cleanup: stop podman service to allow job to complete
-    TEST_EXIT_CODE=$?
-    kill $PODMAN_PID 2>/dev/null || true
-    wait $PODMAN_PID 2>/dev/null || true
-    exit $TEST_EXIT_CODE
   container:
     from: podman-test
   nested_podman: true
