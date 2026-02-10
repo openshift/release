@@ -12,6 +12,8 @@ log(){
 
 export GOOGLE_APPLICATION_CREDENTIALS="${HYPERFLEET_E2E_PATH}/hcm-hyperfleet-e2e.json"
 PROJECT_ID="$(jq -r -c .project_id "${GOOGLE_APPLICATION_CREDENTIALS}")"
+cp /app/hyperfleet-credential-provider ${SHARED_DIR}/
+export PATH=${SHARED_DIR}:${PATH}
 
 hyperfleet-credential-provider generate-kubeconfig \
   --provider=gcp \
@@ -24,7 +26,3 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # Test CMD
 kubectl get namespaces
 
-gcloud pubsub subscriptions delete "test-clusters-example1-namespace" --quiet 
-gcloud pubsub topics delete "testb-clusters" --quiet
-
-cp /app/hyperfleet-credential-provider ${SHARED_DIR}
