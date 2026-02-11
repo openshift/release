@@ -8,6 +8,7 @@ set -o pipefail
 function update_pull_secret () {
     
     temp_dir=$(mktemp -d)
+    cat /var/run/quay-qe-konflux-auth/quay-v3-9-pull > "${temp_dir}"/quay-v3-9-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-10-pull > "${temp_dir}"/quay-v3-10-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-11-pull > "${temp_dir}"/quay-v3-11-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-12-pull > "${temp_dir}"/quay-v3-12-pull.json
@@ -22,6 +23,7 @@ function update_pull_secret () {
 
     jq -s 'map(.auths) | add | {auths: .}' \
       "${temp_dir}"/global_pull_secret.json \
+      "${temp_dir}"/quay-v3-9-pull.json \
       "${temp_dir}"/quay-v3-10-pull.json \
       "${temp_dir}"/quay-v3-11-pull.json \
       "${temp_dir}"/quay-v3-12-pull.json \
@@ -59,18 +61,19 @@ function wait_mcp_ready () {
     set -e   
 
 }
-#create image digest mirror set (previous image content source policy)
-#https://docs.redhat.com/en/documentation/openshift_container_platform/4.13/html/images/image-configuration
-#Feb 6, 2026, ImageContentSourcePolicy is deprecated since OCP 4.13, using ImageDigestMirrorSet instead
-function create_idms () {
+#create image content source policy
+#https://docs.redhat.com/en/documentation/openshift_container_platform/4.12/html/images/image-configuration
+#ImageContentSourcePolicy is deprecated, will replace with ImageDigestMirrorSet with OCP 4.12 EOL(January 17, 2027)
+function create_icsp () {
   cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
 metadata:
   name: konflux-quay-registry
 spec:
-  imageDigestMirrors:
+  repositoryDigestMirrors:
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-12
@@ -83,6 +86,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-17
     source: registry.redhat.io/quay/quay-operator-rhel9
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-12
@@ -93,6 +97,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-17
     source: registry.redhat.io/quay/quay-operator-bundle
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-12
@@ -103,6 +108,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-17
     source: registry.redhat.io/quay/quay-container-security-operator-bundle
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-12
@@ -113,6 +119,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-17
     source: registry.redhat.io/quay/quay-bridge-operator-bundle
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-12
@@ -125,6 +132,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-17
     source: registry.redhat.io/quay/quay-rhel9
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-12
@@ -137,6 +145,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-17
     source: registry.redhat.io/quay/quay-bridge-operator-rhel9
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-12
@@ -149,6 +158,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-17
     source: registry.redhat.io/quay/quay-container-security-operator-rhel9
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-12
@@ -161,6 +171,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-17
     source: registry.redhat.io/quay/container-security-operator-rhel9
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-12
@@ -180,9 +191,9 @@ spec:
     source: registry-proxy.engineering.redhat.com
 EOF
   if [ $? == 0 ]; then
-    echo "Create the IDMS successfully"
+    echo "Create the ICSP successfully"
   else
-    echo "!!! Fail to create the IDMS"
+    echo "!!! Fail to create the ICSP"
     return 1
   fi
 
@@ -237,7 +248,7 @@ elif [ -z "$QUAY_INDEX_IMAGE_BUILD" ]; then
 else #Install Quay operator with fbc image
   echo "Installing Quay from unreleased fbc image: $QUAY_INDEX_IMAGE_BUILD"
   update_pull_secret
-  create_idms
+  create_icsp
   create_catalog_source
   check_catalog_source_status
   wait_mcp_ready
