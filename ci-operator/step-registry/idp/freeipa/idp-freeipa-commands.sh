@@ -61,9 +61,31 @@ function set_users() {
 
 function configure_freeipa() {
     echo "Configuring FreeIPA in OpenShift"
+
+    # Query for the latest FreeIPA Fedora image tag
+    echo "Querying quay.io for latest FreeIPA Fedora image tag..."
+    tags_json=$(curl -sL "https://quay.io/api/v1/repository/freeipa/freeipa-server/tag/?onlyActiveTags=true&limit=100")
+
+    # Extract fedora-XX tags, sort numerically, and get the latest
+    latest_tag=$(echo "$tags_json" | \
+        grep -oP '"name":\s*"fedora-\K[0-9]+' | \
+        sort -rn | \
+        head -n 1)
+
+    if [ -z "$latest_tag" ]; then
+        echo "Warning: Could not determine latest Fedora tag, falling back to fedora-43-4.13.1"
+        FREEIPA_IMAGE_TAG="fedora-43-4.13.1"
+    else
+        echo "Found latest FreeIPA Fedora tag: fedora-${latest_tag}"
+        FREEIPA_IMAGE_TAG="fedora-${latest_tag}"
+    fi
+
     oc create ns freeipa
 
-    oc adm policy add-scc-to-user anyuid -z default -n freeipa
+    echo "Creating dedicated service account for FreeIPA"
+    oc create serviceaccount freeipa-sa -n freeipa
+    # For systemd to run inside containers, below SCC is needed otherwise the pods will show CrashLoopBackOff, logging "Permission denied" errors on control group etc.
+    oc adm policy add-scc-to-user privileged -z freeipa-sa -n freeipa
 
     echo "Creating a secret from the updated temporary users file"
     oc create secret generic freeipa-users-secret --from-file=users.txt="$temp_users" -n freeipa
@@ -103,19 +125,21 @@ spec:
       labels:
         app: freeipa
     spec:
+      serviceAccountName: freeipa-sa
       hostname: freeipa
       subdomain: freeipa
       initContainers:
       - name: step-1-gen-ipa-ca-csr
-        image: quay.io/freeipa/freeipa-server:fedora-40
+        image: quay.io/freeipa/freeipa-server:${FREEIPA_IMAGE_TAG}
         securityContext:
+          privileged: true
           runAsUser: 0
         tty: true
         env:
         - name: DEBUG_TRACE
           value: ""
         - name: IPA_SERVER_INSTALL_OPTS
-          value: "--unattended --external-ca --realm=IPA.EXAMPLE.COM  --domain=ipa.example.com --no-host-dns"
+          value: "--unattended --external-ca --realm=IPA.EXAMPLE.COM  --domain=ipa.example.com --no-host-dns --no-ntp"
         - name: KUBERNETES
           value: "1"
         - name: PASSWORD
@@ -137,8 +161,9 @@ spec:
           - name: systemd-var-dirsrv
             mountPath: /var/run/dirsrv
       - name: setup-certs
-        image: quay.io/freeipa/freeipa-server:fedora-40
+        image: quay.io/freeipa/freeipa-server:${FREEIPA_IMAGE_TAG}
         securityContext:
+          privileged: true
           runAsUser: 0
         command: ["/bin/bash", "-c"]
         args:
@@ -161,15 +186,16 @@ spec:
             mountPath: /certs
       containers:
       - name: step-2-run-ipa-server
-        image: quay.io/freeipa/freeipa-server:fedora-40
+        image: quay.io/freeipa/freeipa-server:${FREEIPA_IMAGE_TAG}
         securityContext:
+          privileged: true
           runAsUser: 0
         tty: true
         env:
         - name: DEBUG_TRACE
           value: ""
         - name: IPA_SERVER_INSTALL_OPTS
-          value: "--unattended --external-cert-file=/data/ipa.crt --external-cert-file=/certs/tls.crt --realm=IPA.EXAMPLE.COM  --domain=ipa.example.com --no-host-dns"
+          value: "--unattended --external-cert-file=/data/ipa.crt --external-cert-file=/certs/tls.crt --realm=IPA.EXAMPLE.COM  --domain=ipa.example.com --no-host-dns --no-ntp"
         - name: KUBERNETES
           value: "1"
         - name: PASSWORD
@@ -257,6 +283,8 @@ spec:
       protocol: TCP
 EOF
 
+    # Substitute the FREEIPA_IMAGE_TAG variable in the manifest
+    sed -i "s|\${FREEIPA_IMAGE_TAG}|${FREEIPA_IMAGE_TAG}|g" "$temp_file"
     oc apply -f "$temp_file"
 
     echo "Waiting for FreeIPA pod to be running and ready..."
