@@ -8,7 +8,8 @@ set -o pipefail
 function update_pull_secret () {
     
     temp_dir=$(mktemp -d)
-    cat /var/run/quay-qe-konflux-auth/quay-v3-9-pull > "${temp_dir}"/quay-v3-9-pull.json
+    SCRIPT_DIR="$(dirname "$0")"
+    cat "${SCRIPT_DIR}"/quay-v3-9-pull.json > "${temp_dir}"/quay-v3-9-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-10-pull > "${temp_dir}"/quay-v3-10-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-11-pull > "${temp_dir}"/quay-v3-11-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-12-pull > "${temp_dir}"/quay-v3-12-pull.json
