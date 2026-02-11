@@ -1,0 +1,54 @@
+base_images:
+  base:
+    name: 4.22-priv
+    namespace: ocp-private
+    tag: base
+binary_build_commands: make build
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/kedacore-http-add-on
+images:
+- build_args:
+  - name: GIT_COMMIT
+    value: dummy-ci-commit-value
+  dockerfile_path: operator/Dockerfile
+  from: base
+  to: custom-metrics-autoscaler-http-add-on-operator
+- build_args:
+  - name: GIT_COMMIT
+    value: dummy-ci-commit-value
+  dockerfile_path: interceptor/Dockerfile
+  from: base
+  to: custom-metrics-autoscaler-http-add-on-interceptor
+- build_args:
+  - name: GIT_COMMIT
+    value: dummy-ci-commit-value
+  dockerfile_path: scaler/Dockerfile
+  from: base
+  to: custom-metrics-autoscaler-http-add-on-scaler
+promotion:
+  to:
+  - name: 4.22-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.22-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.22-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make test
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: kedacore-http-add-on
