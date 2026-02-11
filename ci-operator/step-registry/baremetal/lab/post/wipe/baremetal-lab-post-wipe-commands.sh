@@ -107,8 +107,8 @@ function bmc_reset() {
   echo "$(date): Reseting BMC of host #$host"
   ipmitool -I lanplus -H "${AUX_HOST}" -p "${bmc_forwarded_port}" -U "$bmc_user" -P "$bmc_pass" mc reset "$temp"
 
-  echo -e "Waiting for #${host} BMC to reset..\n"
-  sleep 200
+  echo -e "Waiting 5 min for #${host} BMC to reset..\n"
+  sleep 300
   check_bmc
 }
 
