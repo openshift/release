@@ -25,14 +25,27 @@ images:
   to: ci-chat-bot
 - dockerfile_path: images/Dockerfile.python
   to: rosa-cleanup
+- dockerfile_literal: |-
+    FROM pipeline:govulncheck
+    COPY ci-chat-bot /workdir
+    WORKDIR /workdir
+  from: govulncheck
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ci-chat-bot
+  to: govulncheck-src
 promotion:
   to:
   - excluded_images:
     - rosa-cleanup
+    - govulncheck-src
     namespace: ci
     tag: latest
   - excluded_images:
     - ci-chat-bot
+    - govulncheck-src
     namespace: continuous-release-jobs
     tag: latest
 resources:
@@ -54,10 +67,17 @@ tests:
   container:
     from: src
 - as: govulncheck
-  commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) make vulncheck
-  container:
-    from: govulncheck
-  optional: true
+  steps:
+    test:
+    - as: govulncheck
+      commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) make vulncheck
+      from: pipeline:govulncheck-src
+      resources:
+        limits:
+          memory: 14Gi
+        requests:
+          cpu: 500m
+          memory: 11Gi
 - as: unit
   commands: make test
   container:
