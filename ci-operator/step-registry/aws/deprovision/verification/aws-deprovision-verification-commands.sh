@@ -57,8 +57,19 @@ function verify_arn_exists() {
                     return 0
                     ;;
                 volume)
-                    aws ec2 describe-volumes --region "$check_region" --volume-ids "$resource_id" --filters "Name=status,Values=available,in-use" &>/dev/null
-                    return $?
+                    local volumes
+                    volumes=$(aws ec2 describe-volumes --region "$check_region" --volume-ids "$resource_id" --filters "Name=status,Values=available,in-use" 2>/dev/null)
+                    local exit_code=$?
+                    if [[ $exit_code -ne 0 ]]; then
+                        return 1
+                    fi
+                    # Check if Volumes array is empty (happens when volume is deleted or in deleting state)
+                    local volume_count
+                    volume_count=$(echo "$volumes" | jq -r '.Volumes | length')
+                    if [[ "$volume_count" -eq 0 ]]; then
+                        return 1
+                    fi
+                    return 0
                     ;;
                 snapshot)
                     aws ec2 describe-snapshots --region "$check_region" --snapshot-ids "$resource_id" &>/dev/null
