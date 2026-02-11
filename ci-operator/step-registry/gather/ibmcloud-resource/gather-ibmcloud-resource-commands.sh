@@ -142,9 +142,9 @@ function gather_cis {
     {
         echo -e "## ibmcloud cis dns-records ${DOMAIN_ID}\n"
         # DNS Record Names do not contain the $UNIQUE_HASH, so we filter on the $NAMESPACE only
-        command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" -q | awk -v filter="${NAMESPACE}" '$0 ~ filter'
+        command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter'
         echo -e "## ibmcloud cis dns-record ${DOMAIN_ID} <dns-record>\n"
-        command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" -q | awk -v filter="${NAMESPACE}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} cis dns-record ${DOMAIN_ID} % -q"
+        command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} cis dns-record ${DOMAIN_ID} %"
     } > "${RESOURCE_DUMP_DIR}/cis.txt"
     fi
 }
@@ -212,6 +212,7 @@ function run_command() {
 }
 
 check_instance_ssh() {
+  echo "==== Check the instance SSH connectivity ... ========="
   local xtrace_state
   xtrace_state=$(set +o | grep xtrace)
   set +x
@@ -282,7 +283,7 @@ check_instance_ssh() {
         success=true
         break
       else
-        echo "  (Attempt $attempt/$max_retries failed for $node_name, retrying in ${sleep_time}s...)" >&2
+        #echo "  (Attempt $attempt/$max_retries failed for $node_name, retrying in ${sleep_time}s...)" >&2
         sleep $sleep_time
         ((attempt++))
       fi
@@ -294,7 +295,7 @@ check_instance_ssh() {
       printf "%-35s | %-15s | [FAIL]\n" "$node_name" "$node_ip"
     fi
 
-  done
+  done > "${RESOURCE_DUMP_DIR}/$node_ssh.txt"
   eval "$xtrace_state" # Restore previous state
   echo "------------------------------------------------------------------------------"
 }
@@ -322,8 +323,6 @@ fi
 
 mkdir -p "${RESOURCE_DUMP_DIR}"
 gather_resources
-
-echo "==== Check the instance SSH connectivity ... ========="
 
 check_instance_ssh
 
