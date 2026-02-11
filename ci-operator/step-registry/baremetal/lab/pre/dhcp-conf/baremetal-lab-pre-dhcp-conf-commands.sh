@@ -22,8 +22,8 @@ fi
 
 echo "Generating the DHCP/PXE config..."
 
-# DHCP unique identifier (DUID)
-DUID="00:03:00:01"
+## DHCP unique identifier (DUID)
+#DUID="00:03:00:01"
 
 DHCP_CONF_OPTS="
 tag:$CLUSTER_NAME,15,$CLUSTER_NAME.$BASE_DOMAIN
@@ -49,14 +49,16 @@ $mac,$ip,set:$CLUSTER_NAME,infinite"
       echo "Error when parsing the Bare Metal Host metadata"
       exit 1
     fi
+#    DHCP_CONF="${DHCP_CONF}
+#id:$DUID:$mac,$name,[$ipv6],infinite"
     DHCP_CONF="${DHCP_CONF}
-id:$DUID:$mac,$name,[$ipv6],infinite"
+$mac,$name,[$ipv6],infinite"
   fi
 done
 
 DHCP_CONF="${DHCP_CONF}
 $(<"${SHARED_DIR}/ipi_bootstrap_mac_address"),$(<"${SHARED_DIR}/ipi_bootstrap_ip_address"),set:$CLUSTER_NAME,infinite
-id:$DUID:$(<"${SHARED_DIR}/ipi_bootstrap_mac_address"),$CLUSTER_NAME,[$(<"${SHARED_DIR}/ipi_bootstrap_ipv6_address")],infinite"
+$(<"${SHARED_DIR}/ipi_bootstrap_mac_address"),$CLUSTER_NAME,[$(<"${SHARED_DIR}/ipi_bootstrap_ipv6_address")],infinite"
 
 echo "Setting the DHCP/PXE config in the auxiliary host..."
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
