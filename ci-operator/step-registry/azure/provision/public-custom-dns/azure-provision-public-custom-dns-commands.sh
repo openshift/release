@@ -94,7 +94,7 @@ fi
 get_lb_ip "${INFRA_ID}" "6443" "${ARTIFACT_DIR}/apiserver_lb_ip"
 api_lb_ip="$(< "${ARTIFACT_DIR}/apiserver_lb_ip")"
 if [[ -n "${api_lb_ip}" ]]; then
-    add_lb_record "api.${CLUSTER_NAME}.${BASE_DOMAIN}" "${api_lb_ip}" "A" "${SHARED_DIR}/public_custom_dns.json"
+    add_lb_record "api.${CLUSTER_NAME}.${BASE_DOMAIN}." "${api_lb_ip}" "A" "${SHARED_DIR}/public_custom_dns.json"
 else
     echo "Unable to get apiserver rule's frontend IP from public/internal LB"
     exit 1
@@ -104,7 +104,7 @@ fi
 get_lb_ip "${INFRA_ID}" "443" "${ARTIFACT_DIR}/ingress_lb_ip"
 ingress_lb_ip="$(< "${ARTIFACT_DIR}/ingress_lb_ip")"
 if [[ -n "${ingress_lb_ip}" ]]; then
-    add_lb_record "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}" "${ingress_lb_ip}" "A" "${SHARED_DIR}/public_custom_dns.json"
+    add_lb_record "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}." "${ingress_lb_ip}" "A" "${SHARED_DIR}/public_custom_dns.json"
 else
     echo "Unable to get ingress rule's frontend IP from public/internal LB"
     exit 1
