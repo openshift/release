@@ -54,5 +54,8 @@ spec:
     userLevelNetworking: false
 EOF
 
+# Added a 5 minutes delay as Performance operator will take sometime to update updatedMachineCount
+sleep 300
+
 kubectl wait --for jsonpath='{.status.updatedMachineCount}'="$(oc get node --no-headers -l node-role.kubernetes.io/worker= | wc -l)" --timeout=30m mcp worker
 oc adm wait-for-stable-cluster --minimum-stable-period=2m --timeout=20m
