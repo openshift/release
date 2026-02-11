@@ -59,17 +59,17 @@ function wait_mcp_ready () {
     set -e   
 
 }
-#create image digest mirror set (previous image content source policy)
+#create image content source policy
 #https://docs.redhat.com/en/documentation/openshift_container_platform/4.13/html/images/image-configuration
-#Feb 6, 2026, ImageContentSourcePolicy is deprecated since OCP 4.13, using ImageDigestMirrorSet instead
-function create_idms () {
+#ImageContentSourcePolicy is deprecated, will change to ImageDigestMirrorSet after 4.12 EOL
+function create_icsp () {
   cat <<EOF | oc apply -f -
-apiVersion: config.openshift.io/v1
-kind: ImageDigestMirrorSet
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
 metadata:
   name: konflux-quay-registry
 spec:
-  imageDigestMirrors:
+  repositoryDigestMirrors:
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-11
@@ -90,7 +90,6 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-14
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-15
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-16
-    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-17
     source: registry.redhat.io/quay/quay-operator-bundle
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-10
@@ -100,7 +99,6 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-14
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-15
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-16
-    - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-17
     source: registry.redhat.io/quay/quay-container-security-operator-bundle
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-10
@@ -110,7 +108,6 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-14
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-15
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-16
-    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-17
     source: registry.redhat.io/quay/quay-bridge-operator-bundle
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-10
@@ -180,9 +177,9 @@ spec:
     source: registry-proxy.engineering.redhat.com
 EOF
   if [ $? == 0 ]; then
-    echo "Create the IDMS successfully"
+    echo "Create the ICSP successfully" 
   else
-    echo "!!! Fail to create the IDMS"
+    echo "!!! Fail to create the ICSP"
     return 1
   fi
 
@@ -237,7 +234,7 @@ elif [ -z "$QUAY_INDEX_IMAGE_BUILD" ]; then
 else #Install Quay operator with fbc image
   echo "Installing Quay from unreleased fbc image: $QUAY_INDEX_IMAGE_BUILD"
   update_pull_secret
-  create_idms
+  create_icsp
   create_catalog_source
   check_catalog_source_status
   wait_mcp_ready
