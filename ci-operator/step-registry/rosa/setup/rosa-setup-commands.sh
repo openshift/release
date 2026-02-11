@@ -42,6 +42,7 @@ if [[ -z "$TEST_PROFILE" ]]; then
   exit 1
 fi
 
+CLOUD_PROVIDER_REGION=$aws_region
 # get shard id based on sector
 if [[ ! -z "${CLUSTER_SECTOR}" ]]; then
   psList=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters --parameter search="sector is '${CLUSTER_SECTOR}' and region is '${CLOUD_PROVIDER_REGION}' and status in ('ready')" | jq -r '.items[].provision_shard_reference.id')
