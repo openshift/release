@@ -81,7 +81,7 @@ fi
 make -C dev-infrastructure ci-export-provision-vars DEPLOY_ENV=prow REGION="${LOCATION}"
 
 unset GOFLAGS
-make -o tooling/templatize/templatize entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml.gz DEPLOY_ENV=prow EXTRA_ARGS="--region ${LOCATION}" ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml
+make -o tooling/templatize/templatize entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml.gz DEPLOY_ENV=prow EXTRA_ARGS="--region ${LOCATION}" ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml EXTRA_ARGS="--abort-if-regional-exist"
 
 # Mark successful completion
 touch "${SHARED_DIR}/provision-complete"
