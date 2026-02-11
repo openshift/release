@@ -32,12 +32,9 @@ set -x
 
 exit_code=0
 scripts/openshift-CI-kuttl-tests.sh
-unset CI
-make ginkgo
-./bin/ginkgo -v --trace  --junit-report=openshift-gitops-parallel-e2e.xml -r ./test/openshift/e2e/ginkgo/parallel || exit_code=1
 
-# Find report
-cat openshift-gitops-parallel-e2e.xml || cat "$(find . -name "*openshift-gitops-parallel-e2e.xml")"
+make ginkgo
+./bin/ginkgo -v --trace --timeout 210m --junit-report=openshift-gitops-parallel-e2e.xml -r ./test/openshift/e2e/ginkgo/parallel || exit_code=1
 
 original_results="${ARTIFACT_DIR}/original_results/"
 mkdir "${original_results}"
