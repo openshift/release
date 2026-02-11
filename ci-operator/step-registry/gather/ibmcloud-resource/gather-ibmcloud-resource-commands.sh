@@ -3,8 +3,8 @@ function debug_on_failure() {
     local exit_code=$?
     # Only sleep if the exit code is non-zero (failure)
     if [ $exit_code -ne 0 ]; then
-        echo "Script failed with exit code $exit_code. Sleeping for 2 hours for debugging purposes."
-        sleep 2h
+        echo "Script failed with exit code $exit_code. Sleeping for debugging purposes."
+        sleep 2s
     fi
 }
 
