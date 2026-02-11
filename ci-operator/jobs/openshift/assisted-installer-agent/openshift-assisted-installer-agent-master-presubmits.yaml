@@ -372,8 +372,6 @@ presubmits:
     trigger: (?m)^/test( | .* )e2e-agent-sno-ipv6,?($|\s.*)
   - agent: kubernetes
     always_run: false
-    annotations:
-      pipeline_run_if_changed: ^(hack/.*|pkg/.*|src/.*|scripts/.*|vendor/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore)$
     branches:
     - ^master$
     - ^master-
@@ -390,6 +388,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-installer-agent-master-edge-e2e-ai-operator-ztp
     rerun_command: /test edge-e2e-ai-operator-ztp
+    skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -450,13 +449,11 @@ presubmits:
     trigger: (?m)^/test( | .* )edge-e2e-ai-operator-ztp,?($|\s.*)
   - agent: kubernetes
     always_run: false
-    annotations:
-      pipeline_run_if_changed: ^(hack/.*|pkg/.*|src/.*|scripts/.*|vendor/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore)$
     branches:
     - ^master$
     - ^master-
     cluster: build09
-    context: ci/prow/edge-e2e-metal-assisted-4-21
+    context: ci/prow/edge-e2e-metal-assisted-4-20
     decorate: true
     labels:
       capability/intranet: intranet
@@ -466,8 +463,9 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-installer-agent-master-edge-e2e-metal-assisted-4-21
-    rerun_command: /test edge-e2e-metal-assisted-4-21
+    name: pull-ci-openshift-assisted-installer-agent-master-edge-e2e-metal-assisted-4-20
+    rerun_command: /test edge-e2e-metal-assisted-4-20
+    skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -476,7 +474,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-assisted-4-21
+        - --target=e2e-metal-assisted-4-20
         - --variant=edge
         command:
         - ci-operator
@@ -525,7 +523,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-4-21,?($|\s.*)
+    trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-4-20,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
