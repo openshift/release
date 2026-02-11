@@ -16,8 +16,8 @@ chmod 600 /tmp/id_rsa
 SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
 ### DEBUG: add a ong timeout to troubleshoot from pod
-echo "Sleeping for 999999999 seconds ...."
-sleep 999999999
+## echo "Sleeping for 999999999 seconds ...."
+## sleep 999999999
 
 # Test SSH connection
 echo "Testing SSH connection to ${REMOTE_HOST}..."
@@ -37,3 +37,6 @@ fi
 echo "REMOTE_HOST=${REMOTE_HOST}" >> ${SHARED_DIR}/dpf-env
 echo "SSH_OPTS=${SSH_OPTS}" >> ${SHARED_DIR}/dpf-env
 echo "SSH setup completed successfully for ${REMOTE_HOST}"
+
+# Run dpf-sanity-checks sanity test
+if ssh $SSH_OPTS root@$REMOTE_HOST "ls -ltr; cd /root/doca8/openshift-dpf; export KUBECONFIG=/root/doca8/openshift-dpf/kubeconfig-mno; oc get dpu -A; make verify-workers; make verify-dpu-nodes; make verify-deployment; make verify-dpudeployment; make run-dpf-sanity"; then echo "Sanity Test Passed"; else echo "Sanity Test Failed"; fi
