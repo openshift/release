@@ -11,7 +11,7 @@ function cerberus_cleanup() {
 
   curl_status=$(curl -X GET http://0.0.0.0:8080 2>/dev/null || cat /tmp/cerberus_status 2>/dev/null)
   
-  curl -X GET http://0.0.0.0:8080 2>/dev/null > /tmp/cerberus_history.json
+  curl -X GET http://0.0.0.0:8080/history?loopback=10h 2>/dev/null > /tmp/cerberus_history.json
   cp -r  /tmp/cerberus_history.json "${SHARED_DIR}/cerberus_history.json"
   cp -r  /tmp/cerberus_history.json ${ARTIFACT_DIR}/cerberus/cerberus_history.json
 
