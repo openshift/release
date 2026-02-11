@@ -7,10 +7,7 @@ cat /etc/os-release
 oc config view
 oc projects
 oc version
-python --version
 pushd /tmp
-python -m virtualenv ./venv_qe
-source ./venv_qe/bin/activate
 
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}
 
@@ -56,7 +53,7 @@ git clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export WORKLOAD=cluster-density-v2
 
-current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
+current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
 
 # Use CDV2_ITERATION_MULTIPLIER if set, fall back to ITERATION_MULTIPLIER_ENV, default to 9
 iteration_multiplier=$((${CDV2_ITERATION_MULTIPLIER:-${ITERATION_MULTIPLIER_ENV:-9}}))
@@ -64,10 +61,11 @@ export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
+EXTRA_FLAGS="${CD_V2_EXTRA_FLAGS} --gc=${GC} --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc=$GC --gc-metrics=$GC_METRICS --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 
 if [[ -n "${USER_METADATA}" ]]; then
   echo "${USER_METADATA}" > user-metadata.yaml
