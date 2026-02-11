@@ -211,8 +211,8 @@ function run_command() {
     eval "${CMD}"
 }
 
-check_instance_ssh() {
-  echo "==== Check the instance SSH connectivity ... ========="
+ssh_instances() {
+  echo "==== Check the instances SSH connectivity ... ========="
   local xtrace_state
   xtrace_state=$(set +o | grep xtrace)
   set +x
@@ -295,7 +295,7 @@ check_instance_ssh() {
       printf "%-35s | %-15s | [FAIL]\n" "$node_name" "$node_ip"
     fi
 
-  done > "${RESOURCE_DUMP_DIR}/$node_ssh.txt"
+  done > "${RESOURCE_DUMP_DIR}/ssh_instances.txt"
   eval "$xtrace_state" # Restore previous state
   echo "------------------------------------------------------------------------------"
 }
@@ -324,6 +324,6 @@ fi
 mkdir -p "${RESOURCE_DUMP_DIR}"
 gather_resources
 
-check_instance_ssh
+ssh_instances
 
 echo "==== IBM Cloud resource gathering completed. ========="
