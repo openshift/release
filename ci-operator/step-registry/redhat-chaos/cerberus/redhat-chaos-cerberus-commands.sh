@@ -10,11 +10,10 @@ ls
 function cerberus_cleanup() {
 
   curl_status=$(curl -X GET http://0.0.0.0:8080 2>/dev/null || cat /tmp/cerberus_status 2>/dev/null)
-
-  curl -X GET http://0.0.0.0:8080/history 2>/dev/null >> /tmp/cerberus_history.json
-
-  cp -r /tmp/cerberus_history.json "${SHARED_DIR}/cerberus_history.json"
-  cp -r /tmp/cerberus_history.json ${ARTIFACT_DIR}/cerberus/cerberus_history.json
+  
+  curl -X GET http://0.0.0.0:8080 2>/dev/null > /tmp/cerberus_history.json
+  cp -r  /tmp/cerberus_history.json "${SHARED_DIR}/cerberus_history.json"
+  cp -r  /tmp/cerberus_history.json ${ARTIFACT_DIR}/cerberus/cerberus_history.json
 
   echo "killing cerberus observer"
   kill ${cerberus_pid}
@@ -33,6 +32,7 @@ function cerberus_cleanup() {
   jobs -l
   
   oc cluster-info
+  ls ./cerberus/history
   echo "ended resource watch gracefully"
   echo "Finished running cerberus scenarios"
   echo '{"cerberus": '$curl_status'}' >> test.json
@@ -41,6 +41,8 @@ function cerberus_cleanup() {
   if [[ -n $pods ]]; then 
 
     CREATED_POD_NAME=$(oc get pods -n $TEST_NAMESPACE --no-headers | awk '{print $1}')
+
+    oc cp -n $TEST_NAMESPACE /tmp/cerberus_history.json $CREATED_POD_NAME:/tmp/cerberus_history.json 
 
     oc cp -n $TEST_NAMESPACE test.json $CREATED_POD_NAME:/tmp/test.json 
     output=$(oc rsh -n $TEST_NAMESPACE $CREATED_POD_NAME cat /tmp/test.json)
