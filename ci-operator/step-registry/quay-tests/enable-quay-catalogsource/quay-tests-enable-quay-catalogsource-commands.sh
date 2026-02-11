@@ -8,6 +8,7 @@ set -o pipefail
 function update_pull_secret () {
     
     temp_dir=$(mktemp -d)
+    cat /var/run/quay-qe-konflux-auth/quay-v3-9-pull > "${temp_dir}"/quay-v3-9-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-10-pull > "${temp_dir}"/quay-v3-10-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-11-pull > "${temp_dir}"/quay-v3-11-pull.json
     cat /var/run/quay-qe-konflux-auth/quay-v3-12-pull > "${temp_dir}"/quay-v3-12-pull.json
@@ -22,6 +23,7 @@ function update_pull_secret () {
 
     jq -s 'map(.auths) | add | {auths: .}' \
       "${temp_dir}"/global_pull_secret.json \
+      "${temp_dir}"/quay-v3-9-pull.json \
       "${temp_dir}"/quay-v3-10-pull.json \
       "${temp_dir}"/quay-v3-11-pull.json \
       "${temp_dir}"/quay-v3-12-pull.json \
@@ -71,6 +73,7 @@ metadata:
 spec:
   repositoryDigestMirrors:
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-12
@@ -83,6 +86,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-v3-17
     source: registry.redhat.io/quay/quay-operator-rhel9
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-12
@@ -92,6 +96,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-16
     source: registry.redhat.io/quay/quay-operator-bundle
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-12
@@ -101,6 +106,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-16
     source: registry.redhat.io/quay/quay-container-security-operator-bundle
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-12
@@ -110,6 +116,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-16
     source: registry.redhat.io/quay/quay-bridge-operator-bundle
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-12
@@ -122,6 +129,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-17
     source: registry.redhat.io/quay/quay-rhel9
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-12
@@ -134,6 +142,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-v3-17
     source: registry.redhat.io/quay/quay-bridge-operator-rhel9
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-12
@@ -146,6 +155,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-17
     source: registry.redhat.io/quay/quay-container-security-operator-rhel9
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-12
@@ -158,6 +168,7 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-v3-17
     source: registry.redhat.io/quay/container-security-operator-rhel9
   - mirrors:
+    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-9
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-10
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-11
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-clair-v3-12

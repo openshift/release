@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    argocd.argoproj.io/manifest-generate-paths: .
+  name: app-cluster-hosted-mgmt
+  namespace: openshift-gitops
+spec:
+  destination:
+    name: hosted-mgmt
+    namespace: openshift-gitops
+  ignoreDifferences:
+    - group: rbac.authorization.k8s.io
+      jsonPointers:
+        - /rules
+      kind: ClusterRole
+      name: ci-admins-aggregated
+  project: default
+  source:
+    directory:
+      exclude: '{OWNERS,*.md}'
+      include: '{*.yaml,*.yml}'
+      recurse: true
+    path: clusters/hosted-mgmt/
+    repoURL: https://github.com/openshift/release.git
+    targetRevision: main
+  sources:
+    - directory:
+        exclude: '{OWNERS,*.md}'
+        include: '{*.yaml,*.yml}'
+        recurse: true
+      path: clusters/hosted-mgmt/
+      repoURL: https://github.com/openshift/release.git
+      targetRevision: main
+    - directory:
+        exclude: '{OWNERS,*.md}'
+        include: '{*.yaml,*.yml}'
+        recurse: true
+      path: clusters/build-clusters/common_managed/
+      repoURL: https://github.com/openshift/release.git
+      targetRevision: main
+    - directory:
+        exclude: '{OWNERS,*.md}'
+        include: '{*.yaml,*.yml}'
+        recurse: true
+      path: clusters/build-clusters/common_ocp/
+      repoURL: https://github.com/openshift/release.git
+      targetRevision: main
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+      - CreateNamespace=true
+      - PruneLast=true
+      - ServerSideApply=true
