@@ -28,6 +28,7 @@ done
 # Parse job spec
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
+export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER
 echo "Repository: ${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}"
 echo "Branch: ${RELEASE_BRANCH_NAME}, PR: ${GIT_PR_NUMBER}"
 
