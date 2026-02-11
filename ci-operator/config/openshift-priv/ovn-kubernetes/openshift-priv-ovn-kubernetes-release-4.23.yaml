@@ -37,6 +37,12 @@ releases:
       include_built_images: true
       name: 4.23-priv
       namespace: ocp-private
+  nightly-arm64:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.23"
 resources:
   '*':
     requests:
@@ -72,6 +78,15 @@ tests:
       EXTRA_MG_ARGS: --host-network
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn
+- always_run: false
+  as: e2e-aws-ovn-microshift
+  steps:
+    cluster_profile: aws-4
+    env:
+      MICROSHIFT_OS: rhel-9.6
+      SRC_FROM_GIT: "true"
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-microshift-e2e-origin-conformance
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv4
   capabilities:
