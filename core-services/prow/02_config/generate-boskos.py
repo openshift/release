@@ -187,6 +187,11 @@ CONFIG = {
         'eastus': 8,
         'westus2': 8
     },
+    'azure-cnv-devops-quota-slice': {
+        'northcentralus': 10,
+        'southcentralus': 10,
+        'centralus': 10
+    },
     'azure-perfscale-quota-slice': {
         'northcentralus': 10,
         'southcentralus': 10,
