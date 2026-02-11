@@ -4,7 +4,7 @@ function debug_on_failure() {
     # Only sleep if the exit code is non-zero (failure)
     if [ $exit_code -ne 0 ]; then
         echo "Script failed with exit code $exit_code. Sleeping for 2 hours for debugging purposes."
-        sleep 2s
+        sleep 2h
     fi
 }
 
@@ -76,6 +76,7 @@ function ibmcloud_login {
   else
       "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -q
   fi
+  echo "Login successful."
 }
 
 
@@ -172,7 +173,7 @@ function gather_dns() {
         }  > "${RESOURCE_DUMP_DIR}/dns.txt"
         fi
     else
-        run_command "${IBMCLOUD_CLI} dns instances -q"
+        run_command "${IBMCLOUD_CLI} dns instances"
     fi
 }
 
@@ -211,6 +212,11 @@ function run_command() {
 }
 
 check_instance_ssh() {
+  local xtrace_state
+  xtrace_state=$(set +o | grep xtrace)
+  set +x
+  local max_retries=3
+  local sleep_time=30
   local ssh_user="core"
   local bastion_user="core"
   local ssh_key="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
@@ -246,12 +252,8 @@ check_instance_ssh() {
     return 0
   fi
 
-  echo "------------------------------------------------------------------------------"
-  printf "%-35s | %-15s | %-10s\n" "NODE NAME" "INTERNAL IP" "RESULT"
-  echo "------------------------------------------------------------------------------"
-
   for entry in $instances; do
-    local node_name, node_ip, status
+    local node_name node_ip status
     node_name=$(echo "$entry" | cut -d'|' -f1)
     node_ip=$(echo "$entry" | cut -d'|' -f2)
     status=$(echo "$entry" | cut -d'|' -f3)
@@ -272,13 +274,28 @@ check_instance_ssh() {
         ssh_args+=(-J "${bastion_user}@${proxy_ip}")
     fi
 
-   if ssh "${ssh_args[@]}" "${ssh_user}@${node_ip}" "exit 0" > /dev/null 2>&1; then
+    local attempt=1
+    local success=false
+    set +e
+    while [ $attempt -le $max_retries ]; do
+      if ssh "${ssh_args[@]}" "${ssh_user}@${node_ip}" "exit 0" > /dev/null 2>&1; then
+        success=true
+        break
+      else
+        echo "  (Attempt $attempt/$max_retries failed for $node_name, retrying in ${sleep_time}s...)" >&2
+        sleep $sleep_time
+        ((attempt++))
+      fi
+    done
+    set -e
+    if [ "$success" = true ]; then
       printf "%-35s | %-15s | [PASS]\n" "$node_name" "$node_ip"
     else
       printf "%-35s | %-15s | [FAIL]\n" "$node_name" "$node_ip"
     fi
 
   done
+  eval "$xtrace_state" # Restore previous state
   echo "------------------------------------------------------------------------------"
 }
 
@@ -308,7 +325,6 @@ gather_resources
 
 echo "==== Check the instance SSH connectivity ... ========="
 
-set -o xtrace
 check_instance_ssh
 
 echo "==== IBM Cloud resource gathering completed. ========="
