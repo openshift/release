@@ -3,6 +3,20 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
+
+# Source shared retry library if available
+if [[ -f "${SHARED_DIR}/retry-lib.sh" ]]; then
+    source "${SHARED_DIR}/retry-lib.sh"
+else
+    echo "retry-lib.sh not found in ${SHARED_DIR}"
+fi
+
+# Guarantee fallback
+if ! declare -F retry_git_clone >/dev/null; then
+    echo "retry_git_clone not defined; falling back to plain git clone (no retries)"
+    retry_git_clone() { git clone "$@"; }
+fi
+
 cat /etc/os-release
 
 oc config view
@@ -18,7 +32,7 @@ ES_USERNAME=$(cat "/secret/username")
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
-git clone $REPO_URL $TAG_OPTION --depth 1
+retry_git_clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"

@@ -4,6 +4,19 @@ set -o nounset
 set -o pipefail
 set -x
 
+# Source shared retry library if available
+if [[ -f "${SHARED_DIR}/retry-lib.sh" ]]; then
+    source "${SHARED_DIR}/retry-lib.sh"
+else
+    echo "retry-lib.sh not found in ${SHARED_DIR}"
+fi
+
+# Guarantee fallback
+if ! declare -F retry_git_clone >/dev/null; then
+    echo "retry_git_clone not defined; falling back to plain git clone (no retries)"
+    retry_git_clone() { git clone "$@"; }
+fi
+
 pushd /tmp
 
 ES_SECRETS_PATH=${ES_SECRETS_PATH:-/secret}

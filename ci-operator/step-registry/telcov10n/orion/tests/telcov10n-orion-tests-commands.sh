@@ -1,6 +1,19 @@
 #!/bin/bash
 set -x
 
+# Source shared retry library if available
+if [[ -f "${SHARED_DIR}/retry-lib.sh" ]]; then
+    source "${SHARED_DIR}/retry-lib.sh"
+else
+    echo "retry-lib.sh not found in ${SHARED_DIR}"
+fi
+
+# Guarantee fallback
+if ! declare -F retry_git_clone >/dev/null; then
+    echo "retry_git_clone not defined; falling back to plain git clone (no retries)"
+    retry_git_clone() { git clone "$@"; }
+fi
+
 if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
@@ -15,7 +28,7 @@ if [[ $TAG == "latest" ]]; then
 else
     LATEST_TAG=$TAG
 fi
-git clone --branch $LATEST_TAG $ORION_REPO --depth 1
+retry_git_clone --branch $LATEST_TAG $ORION_REPO --depth 1
 pushd orion
 
 pip install -r requirements.txt

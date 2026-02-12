@@ -4,6 +4,19 @@ set -o nounset
 set -o pipefail
 set -x
 
+# Source shared retry library if available
+if [[ -f "${SHARED_DIR}/retry-lib.sh" ]]; then
+    source "${SHARED_DIR}/retry-lib.sh"
+else
+    echo "retry-lib.sh not found in ${SHARED_DIR}"
+fi
+
+# Guarantee fallback
+if ! declare -F retry_git_clone >/dev/null; then
+    echo "retry_git_clone not defined; falling back to plain git clone (no retries)"
+    retry_git_clone() { git clone "$@"; }
+fi
+
 cat /etc/os-release
 
 # For disconnected or otherwise unreachable environments, we want to
@@ -26,7 +39,7 @@ source ./venv_qe/bin/activate
 REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking";
 LATEST_TAG=$(curl -s "https://api.github.com/repos/cloud-bulldozer/e2e-benchmarking/releases/latest" | jq -r '.tag_name');
 TAG_OPTION="--branch $(if [ "$E2E_VERSION" == "default" ]; then echo "$LATEST_TAG"; else echo "$E2E_VERSION"; fi)";
-git clone $REPO_URL $TAG_OPTION --depth 1
+retry_git_clone $REPO_URL $TAG_OPTION --depth 1
 pushd e2e-benchmarking/workloads/network-perf-v2
 
 # Clean up
