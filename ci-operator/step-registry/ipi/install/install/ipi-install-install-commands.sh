@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+echo "debug"
 function set-cluster-version-spec-update-service() {
     local payload_version
     local jsonpath_flag
