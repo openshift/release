@@ -105,8 +105,14 @@ if [[ "$VERSION" == "4.14" ]]; then
         --extra-vars "version=$VERSION"
 fi
 
+# For 4.14, skip internal registry cleanup to preserve images mirrored by the ose-kube-rbac-proxy workaround
+SKIP_REGISTRY_CLEANUP=""
+if [[ "$VERSION" == "4.14" ]]; then
+    SKIP_REGISTRY_CLEANUP="ocp_operator_mirror_skip_internal_registry_cleanup=true"
+fi
+
 ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=$VERSION disconnected=$DISCONNECTED operators='$HUB_OPERATORS'"
+    --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=$VERSION disconnected=$DISCONNECTED operators='$HUB_OPERATORS' $SKIP_REGISTRY_CLEANUP"
 
 # configure lso 
 ansible-playbook playbooks/ran/hub-sno-configure-lvm-storage.yml -i ./inventories/ocp-deployment/build-inventory.py \
