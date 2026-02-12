@@ -67,7 +67,7 @@ done
 echo "ODF/OCS Operator is deployed successfully"
 
 #Wait for odf operator startup, from odf 4.19, there is no ocs-operator
-for i in {1..60}; do
+for i in {1..80}; do
   PStatus=$(oc -n "$OO_INSTALL_NAMESPACE" get pod -l app.kubernetes.io/name=odf-operator -o jsonpath='{..status.conditions[?(@.type=="Ready")].status}' || true)
   if [[ "$PStatus" == "True" ]]; then
       echo "ODF pod is running \"$PStatus\""
