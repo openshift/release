@@ -27,6 +27,7 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
@@ -56,6 +57,7 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 function run_command() {
     local CMD="$1"
@@ -104,6 +106,9 @@ echo "Restricting the API server to private - delete inbound rule api-v4 from ex
 run_command "az network lb rule delete -n api-v4 --lb-name ${INFRA_ID} -g ${RESOURCE_GROUP}"
 
 echo "Restricting the API server to private - delete associated frontend public ip from external lb"
+# Try to clean up the stale reference by updating LB
+echo "Attempting to clean stale references..."
+run_command "az network lb update --name  ${INFRA_ID} -g ${RESOURCE_GROUP}"
 run_command "az network lb frontend-ip delete --name ${frontend_ip} --lb-name ${INFRA_ID} -g ${RESOURCE_GROUP}"
 
 echo "Restricting the API server to private - delete frontend public IP associated with rule api-v4"
@@ -135,5 +140,6 @@ fi
 # Optional: Disabling redirect when using a private storage endpoint on Azure
 
 echo "Waiting for image registry become Available..."
-run_command "oc wait --for condition=Progressing=True co/image-registry --timeout=600s"
+sleep 600s
+#run_command "oc wait --for condition=Progressing=True co/image-registry --timeout=600s" || ret=1
 run_command "oc wait --for=condition=Available --for condition=Progressing=False --for condition=Degraded=False co/image-registry --timeout=1200s"

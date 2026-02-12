@@ -3,26 +3,11 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.18_base-rhel9:
-    name: 4.18-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-monitoring-operator
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.18_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: cluster-monitoring-operator
 - dockerfile_literal: |
     FROM src
@@ -94,7 +79,7 @@ tests:
     from: src
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       TELEMETRY_ENABLED: "true"
     workflow: openshift-e2e-aws
@@ -105,16 +90,17 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
       TELEMETRY_ENABLED: "true"
     workflow: openshift-e2e-aws
-- as: e2e-aws-ovn-single-node
+- always_run: false
+  as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       TELEMETRY_ENABLED: "true"
     workflow: openshift-e2e-aws-single-node
 - as: e2e-agnostic-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       TELEMETRY_ENABLED: "true"
     test:
@@ -134,7 +120,7 @@ tests:
     workflow: openshift-upgrade-aws
 - as: e2e-hypershift-conformance
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 zz_generated_metadata:
   branch: release-4.18

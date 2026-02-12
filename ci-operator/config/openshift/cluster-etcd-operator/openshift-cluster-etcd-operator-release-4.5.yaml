@@ -7,23 +7,15 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_golang-1.13:
-    name: builder
-    namespace: ocp
-    tag: golang-1.13
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
-  inputs:
-    ocp_builder_golang-1.13:
-      as:
-      - registry.svc.ci.openshift.org/ocp/builder:golang-1.13
   to: cluster-etcd-operator
 promotion:
   to:
@@ -69,12 +61,14 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
-- as: e2e-aws-disruptive
+- always_run: false
+  as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-disruption
-- as: e2e-azure
+- always_run: false
+  as: e2e-azure
   optional: true
   steps:
     cluster_profile: azure4
@@ -83,8 +77,10 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-metal-ipi
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal

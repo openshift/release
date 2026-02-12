@@ -17,24 +17,24 @@ CACHE_REGION="${regions[0]}"
 # Command to get AMIs without using WebUI/AWS console:
 # aws ec2 describe-images --region $region --filters 'Name=name,Values=RHEL-9.*' --query 'Images[*].[Name,ImageId,Architecture]' --output text | sort --reverse
 declare -A ami_map=(
-  [us-east-1,x86_64,rhel-9.2]=ami-078cb4217e3046abf  # RHEL-9.2.0_HVM-20240521-x86_64-93-Hourly2-GP3
-  [us-east-1,arm64,rhel-9.2]=ami-04c1dfc4f324c64b2   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
-  [us-east-1,x86_64,rhel-9.3]=ami-0fc8883cbe9d895c8  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
-  [us-east-1,arm64,rhel-9.3]=ami-0677a1dd1ad031d74   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
-  [us-east-1,x86_64,rhel-9.4]=ami-0ceb31b482870cee1  # RHEL-9.4.0_HVM-20241114-x86_64-0-Hourly2-GP3
-  [us-east-1,arm64,rhel-9.4]=ami-08fbb4c856514bf2f   # RHEL-9.4.0_HVM-20241114-arm64-0-Hourly2-GP3
-  [us-west-2,x86_64,rhel-9.2]=ami-0e4e5e5727c2a7a33  # RHEL-9.2.0_HVM-20240521-x86_64-93-Hourly2-GP3
-  [us-west-2,arm64,rhel-9.2]=ami-0538b6fddb813b795   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
-  [us-west-2,x86_64,rhel-9.3]=ami-0c2f1f1137a85327e  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
-  [us-west-2,arm64,rhel-9.3]=ami-04379fa947a959c92   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
-  [us-west-2,x86_64,rhel-9.4]=ami-05d9b7d9c05363c76  # RHEL-9.4.0_HVM-20241114-x86_64-0-Hourly2-GP3
-  [us-west-2,arm64,rhel-9.4]=ami-083a0eb0b1c55a7da   # RHEL-9.4.0_HVM-20241114-arm64-0-Hourly2-GP3
-  [eu-central-1,x86_64,rhel-9.2]=ami-0d4c002fec950de2b  # RHEL-9.2.0_HVM-20240521-x86_64-93-Hourly2-GP3
-  [eu-central-1,arm64,rhel-9.2]=ami-07dda6169c6afa927   # RHEL-9.2.0_HVM-20240521-arm64-93-Hourly2-GP3
-  [eu-central-1,x86_64,rhel-9.3]=ami-0955dc0147853401b  # RHEL-9.3.0_HVM-20240229-x86_64-27-Hourly2-GP3
-  [eu-central-1,arm64,rhel-9.3]=ami-0ea2a765094f230d5   # RHEL-9.3.0_HVM-20240229-arm64-27-Hourly2-GP3
-  [eu-central-1,x86_64,rhel-9.4]=ami-089b71495d6cacd26  # RHEL-9.4.0_HVM-20241114-arm64-0-Hourly2-GP3
-  [eu-central-1,arm64,rhel-9.4]=ami-06ce7461a466fec39   # RHEL-9.4.0_HVM-20241114-x86_64-0-Hourly2-GP3
+  [us-east-1,x86_64,rhel-9.2]=ami-05f26a378a37b8fec     # RHEL-9.2.0_HVM-20250520-x86_64-0-Hourly2-GP3
+  [us-east-1,arm64,rhel-9.2]=ami-047cb634268ecc0a6      # RHEL-9.2.0_HVM-20250520-arm64-0-Hourly2-GP3
+  [us-east-1,x86_64,rhel-9.4]=ami-0e078af919796acf1     # RHEL-9.4.0_HVM-20250917-x86_64-0-Hourly2-GP3
+  [us-east-1,arm64,rhel-9.4]=ami-04e40399249acc576      # RHEL-9.4.0_HVM-20250917-arm64-0-Hourly2-GP3
+  [us-east-1,x86_64,rhel-9.6]=ami-03f1d522d98841360     # RHEL-9.6.0_HVM-20250910-x86_64-0-Hourly2-GP3
+  [us-east-1,arm64,rhel-9.6]=ami-04db3c91a597912d6      # RHEL-9.6.0_HVM-20250910-arm64-0-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.2]=ami-0828b5584587b20b2     # RHEL-9.2.0_HVM-20250520-x86_64-0-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.2]=ami-0fe01cf6276fcc8c5      # RHEL-9.2.0_HVM-20250520-arm64-0-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.4]=ami-0afbb67255ef6e726     # RHEL-9.4.0_HVM-20250917-x86_64-0-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.4]=ami-0ff4bae26d5e7e36a      # RHEL-9.4.0_HVM-20250917-arm64-0-Hourly2-GP3
+  [us-west-2,x86_64,rhel-9.6]=ami-022daef1002763216     # RHEL-9.6.0_HVM-20250910-x86_64-0-Hourly2-GP3
+  [us-west-2,arm64,rhel-9.6]=ami-0b2dc437bf4878d14      # RHEL-9.6.0_HVM-20250910-arm64-0-Hourly2-GP3
+  [eu-central-1,x86_64,rhel-9.2]=ami-02ad2ca65425af1c8  # RHEL-9.2.0_HVM-20250520-x86_64-0-Hourly2-GP3
+  [eu-central-1,arm64,rhel-9.2]=ami-0334bf2525c55070d   # RHEL-9.2.0_HVM-20250520-arm64-0-Hourly2-GP3
+  [eu-central-1,x86_64,rhel-9.4]=ami-0f7fa5d86c8e44172  # RHEL-9.4.0_HVM-20250917-x86_64-0-Hourly2-GP3
+  [eu-central-1,arm64,rhel-9.4]=ami-078e99bcb609a9931   # RHEL-9.4.0_HVM-20250917-arm64-0-Hourly2-GP3
+  [eu-central-1,x86_64,rhel-9.6]=ami-0066d4651999e27f1  # RHEL-9.6.0_HVM-20250910-x86_64-0-Hourly2-GP3
+  [eu-central-1,arm64,rhel-9.6]=ami-0f0cd53332525ff39   # RHEL-9.6.0_HVM-20250910-arm64-0-Hourly2-GP3
 )
 
 MICROSHIFT_CLUSTERBOT_SETTINGS="${SHARED_DIR}/microshift-clusterbot-settings"
@@ -47,16 +47,15 @@ fi
 # All graviton instances have a lower case g in the family part. Using
 # this we avoid adding the full map here.
 ARCH="x86_64"
-if [[ "${EC2_INSTANCE_TYPE%.*}" =~ .*"g".* ]]; then
+if [[ "${EC2_INSTANCE_TYPE%.*}" =~ .+"g".* ]]; then
   ARCH="arm64"
 fi
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION=""
-JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
-stack_name="${JOB_NAME}"
-cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
+stack_name="microshift-$(cat /proc/sys/kernel/random/uuid)"
+cf_tpl_file="${SHARED_DIR}/${NAMESPACE}-cf-tpl.yaml"
 
 curl -o "${cf_tpl_file}" https://raw.githubusercontent.com/openshift/microshift/refs/heads/main/scripts/aws/cf-gen.yaml
 
@@ -83,15 +82,6 @@ for aws_region in "${regions[@]}"; do
   REGION="${aws_region}"
   echo "Current region: ${REGION}"
   ami_id="${ami_map[$REGION,$ARCH,$MICROSHIFT_OS]}"
-
-  if "${aws}" --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
-    --query "Stacks[].Outputs[?OutputKey == 'InstanceId'].OutputValue" > /dev/null; then
-      echo "Appears that stack ${stack_name} already exists"
-      "${aws}" --region $REGION cloudformation delete-stack --stack-name "${stack_name}"
-      echo "Deleted stack ${stack_name}"
-      "${aws}" --region $REGION cloudformation wait stack-delete-complete --stack-name "${stack_name}"
-      echo "Waited for stack-delete-complete ${stack_name}"
-  fi
 
   echo -e "${REGION} ${stack_name}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 
@@ -134,6 +124,8 @@ for aws_region in "${regions[@]}"; do
       exit 0
   fi
   save_stack_events_to_shared
+  # Get reason for creation failure and print for quicker debugging
+  jq -r '.StackEvents[] | select (.ResourceStatus == "CREATE_FAILED" and .ResourceStatusReason != "Resource creation cancelled") | { timestamp: .Timestamp, reason: .ResourceStatusReason }' "${ARTIFACT_DIR}/stack-events-${stack_name}.${REGION}.json"
 done
 
 echo "Unable to create stack in any of the regions."

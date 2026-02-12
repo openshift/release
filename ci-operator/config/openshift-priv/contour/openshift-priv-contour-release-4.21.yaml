@@ -1,0 +1,42 @@
+base_images:
+  base:
+    name: 4.21-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/contour
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  to: contour
+promotion:
+  to:
+  - name: 4.21-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.21-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.21-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make check-test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift-priv
+  repo: contour

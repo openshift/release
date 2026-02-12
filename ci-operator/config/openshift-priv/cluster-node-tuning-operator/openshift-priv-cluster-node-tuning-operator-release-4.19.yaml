@@ -7,31 +7,15 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.19_base-rhel9:
-    name: 4.19-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-node-tuning-operator
 images:
 - dockerfile_path: Dockerfile.rhel9
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: cluster-node-tuning-operator
 promotion:
   to:
-  - disabled: true
-    name: 4.19-priv
+  - name: 4.19-priv
     namespace: ocp-private
 releases:
   initial:
@@ -67,11 +51,11 @@ tests:
     from: src
 - as: e2e-hypershift
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - as: e2e-hypershift-pao
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE: "true"
     test:
@@ -93,7 +77,7 @@ tests:
 - always_run: false
   as: e2e-pao-updating-profile-hypershift
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE: "true"
     test:
@@ -112,10 +96,9 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: hypershift-aws-e2e-cluster
-  timeout: 5h0m0s
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-techpreview
   steps:
@@ -135,7 +118,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -146,7 +129,8 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-gcp-pao
-  cluster: build03
+  capabilities:
+  - intranet
   steps:
     cluster_profile: gcp
     test:
@@ -161,7 +145,8 @@ tests:
       timeout: 2h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-pao-updating-profile
-  cluster: build03
+  capabilities:
+  - intranet
   steps:
     cluster_profile: gcp
     test:
@@ -175,9 +160,9 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: ipi-gcp
-  timeout: 5h0m0s
 - as: e2e-gcp-pao-workloadhints
-  cluster: build03
+  capabilities:
+  - intranet
   steps:
     cluster_profile: gcp
     test:
@@ -191,10 +176,9 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: ipi-gcp
-  timeout: 4h0m0s
 - as: e2e-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-upgrade-aws
 - as: e2e-no-cluster
   commands: make test-e2e-local
@@ -202,7 +186,8 @@ tests:
     from: src
 - always_run: false
   as: e2e-telco5g-cnftests
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   restrict_network_access: false
   steps:
@@ -211,10 +196,15 @@ tests:
         CNF_E2E_TESTS=true
         CNF_ORIGIN_TESTS=false
       T5CI_JOB_TYPE: cnftests
-      T5CI_VERSION: "4.16"
+      T5CI_VERSION: "4.19"
       TEST_RUN_FEATURES: performance
     workflow: telco5g-cnf
-  timeout: 6h0m0s
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.19
   org: openshift-priv

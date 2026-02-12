@@ -19,6 +19,28 @@ echo "Is multiarch image: ${MULTI_ARCH_IMAGE}"
 
 echo "Set KUBECONFIG to management cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
+cp "$KUBECONFIG" "${SHARED_DIR}/mgmt_kubeconfig" # idp-htpasswd step needs
+
+# Copy token file if kubeconfig references one
+CURRENT_CONTEXT=$(oc config current-context)
+if [[ -n "${CURRENT_CONTEXT}" ]]; then
+  CURRENT_USER=$(oc config view -o jsonpath="{.contexts[?(@.name==\"${CURRENT_CONTEXT}\")].context.user}")
+  if [[ -n "${CURRENT_USER}" ]]; then
+    TOKEN_FILE=$(oc config view -o jsonpath="{.users[?(@.name==\"${CURRENT_USER}\")].user.tokenFile}")
+    if [[ -n "${TOKEN_FILE}" ]]; then
+      # tokenFile is just a basename, relative to the directory containing KUBECONFIG
+      KUBECONFIG_DIR=$(dirname "${KUBECONFIG}")
+      TOKEN_FILE_PATH="${KUBECONFIG_DIR}/${TOKEN_FILE}"
+      if [[ -f "${TOKEN_FILE_PATH}" ]]; then
+        cp "${TOKEN_FILE_PATH}" "${SHARED_DIR}/${TOKEN_FILE}"
+        echo "Copied token file to the SHARED_DIR"
+      else
+        echo "Error: Token file not found"
+        exit 1
+      fi
+    fi
+  fi
+fi
 
 if [[ "${PLATFORM}" == "aws" ]]; then
   AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -37,6 +59,13 @@ else
   exit 1
 fi
 
+if [[ -z "$BASE_DOMAIN" ]]; then
+	if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+		BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/baseDomain")
+	fi
+fi
+
+DOMAIN=""
 [[ ! -z "$BASE_DOMAIN" ]] && DOMAIN=${BASE_DOMAIN}
 [[ ! -z "$HYPERSHIFT_BASE_DOMAIN" ]] && DOMAIN=${HYPERSHIFT_BASE_DOMAIN}
 echo "DOMAIN is ${DOMAIN}"
@@ -50,6 +79,8 @@ CLUSTER_NAME=${HASH:0:20}
 INFRA_ID=${HASH:20:5}
 echo "Using cluster name $CLUSTER_NAME and infra id $INFRA_ID"
 echo "CLUSTER_NAME=$CLUSTER_NAME" > ${SHARED_DIR}/hosted_cluster.txt
+echo "$CLUSTER_NAME" > ${SHARED_DIR}/cluster-name # idp-htpasswd step needs
+echo "clusters" > ${SHARED_DIR}/hypershift-clusters-namespace # idp-htpasswd step needs
 echo "INFRA_ID=$INFRA_ID" >> ${SHARED_DIR}/hosted_cluster.txt
 
 if [[ -f ${SHARED_DIR}/pull-secret-build-farm.json ]]; then
@@ -66,6 +97,13 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 case "${PLATFORM}" in
   "aws")
+    DEFAULT_NODE_SELECTOR="hypershift.openshift.io/control-plane=true"
+    if [[ -n "${CONTROL_PLANE_NODE_SELECTOR}" ]]; then
+      NODE_SELECTOR="${DEFAULT_NODE_SELECTOR},${CONTROL_PLANE_NODE_SELECTOR}"
+    else
+      NODE_SELECTOR="${DEFAULT_NODE_SELECTOR}"
+    fi
+
     ARGS=( --name "${CLUSTER_NAME}" \
       --infra-id "${INFRA_ID}" \
       --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
@@ -77,7 +115,7 @@ case "${PLATFORM}" in
       --pull-secret /tmp/pull-secret.json \
       --aws-creds "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" \
       --release-image "${RELEASE_IMAGE}" \
-      --node-selector "hypershift.openshift.io/control-plane=true" \
+      --node-selector "${NODE_SELECTOR}" \
       --olm-catalog-placement "${OLM_CATALOG_PLACEMENT}" \
       --additional-tags "expirationDate=${EXPIRATION_DATE}" \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
@@ -93,10 +131,11 @@ case "${PLATFORM}" in
       ARGS+=( "--multi-arch" )
     fi
 
-    if [[ -n "${CONTROL_PLANE_NODE_SELECTOR}" ]]; then
-      ARGS+=( "--node-selector \"${CONTROL_PLANE_NODE_SELECTOR}\"" )
+    if [[ "${HYPERSHIFT_SKIP_VERSION_VALIDATION}" == "true" ]]; then
+      ARGS+=( --annotations "hypershift.openshift.io/skip-release-image-validation=true" )
     fi
 
+    echo "Creating cluster with the following arguments:"
     /usr/bin/hypershift create cluster aws "${ARGS[@]}"
     ;;
   "powervs")
@@ -153,7 +192,6 @@ case "${PLATFORM}" in
       --processors ${POWERVS_PROCESSORS} \
       --cloud-instance-id ${POWERVS_GUID} \
       --vpc ${POWERVS_VPC} \
-      --power-edge-router true \
       --transit-gateway ${POWERVS_TRANSIT_GATEWAY} \
       --transit-gateway-location ${TRANSIT_GATEWAY_LOCATION} \
       --annotations "prow.k8s.io/job=${JOB_NAME}" \
@@ -186,9 +224,11 @@ done
 
 # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
 echo "Waiting for cluster to become available"
-oc wait --timeout=120m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME} || {
+oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME} || {
   echo "Cluster did not become available"
-  oc get hostedcluster --namespace=clusters -o yaml ${CLUSTER_NAME}
+  echo "Collect minimal required cluster information"
+  mkdir -p $ARTIFACT_DIR/hypershift-snapshot
+  oc get hostedcluster ${CLUSTER_NAME} --namespace=clusters -o yaml > $ARTIFACT_DIR/hypershift-snapshot/hostedcluster_failed.yaml
   exit 1
 }
 echo "Cluster became available, creating kubeconfig"
@@ -205,6 +245,8 @@ bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} > $
 
 # Data for cluster bot.
 # The kubeadmin-password secret is reconciled only after the kas is available so we will wait up to 5 minutes for it to become available
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x # Always disable tracing due to below lines printing protected stuff, in case this script happens to enable tracing again in future
 echo "Retrieving kubeadmin password"
 for _ in {1..50}; do
   kubeadmin_pwd=`oc get secret --namespace=clusters ${CLUSTER_NAME}-kubeadmin-password --template='{{.data.password}}' | base64 -d` || true
@@ -216,6 +258,7 @@ for _ in {1..50}; do
     break
   fi
 done
+$WAS_TRACING && set -x
 
 if [[ ! -f ${SHARED_DIR}/kubeadmin-password ]]; then
   echo "Failed to get kubeadmin password for the cluster"
@@ -234,5 +277,8 @@ until \
 done
 
 # Data for cluster bot.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x # Always disable tracing due to below lines printing cluster urls, in case this script happens to enable tracing again in future
 echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+$WAS_TRACING && set -x
 KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "created-at=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"

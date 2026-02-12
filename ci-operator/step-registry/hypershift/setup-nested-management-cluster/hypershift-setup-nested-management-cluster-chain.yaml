@@ -40,11 +40,13 @@ chain:
       DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
 
       DEFAULT_RELEASE_STREAM=4-stable
+      HYPERSHIFT_HC_RELEASE_IMAGE=quay.io/openshift-release-dev/ocp-release:4.20.10-x86_64
 
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
       
       echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
       bin/hypershift create cluster aws \
+        --annotations=hypershift.openshift.io/prow-job-id=${PROW_JOB_ID} \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
         --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
@@ -52,6 +54,8 @@ chain:
         --region=us-east-1 \
         --infra-id=${CLUSTER_NAME} \
         --base-domain=${DOMAIN} \
+        --oidc-issuer-url=https://hypershift-ci-2-oidc.s3.us-east-1.amazonaws.com/shared-mgmt \
+        --sa-token-issuer-private-key-path=/etc/hypershift-ci-jobs-awscreds/serviceaccount-signer.private \
         --instance-type=${HYPERSHIFT_INSTANCE_TYPE} \
         --zones=${HYPERSHIFT_ZONES} \
         --service-cidr=172.29.0.0/16 \
@@ -61,6 +65,7 @@ chain:
         --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
         --release-stream=${DEFAULT_RELEASE_STREAM} \
         --public-only \
+        --shared-role \
         --namespace=${HYPERSHIFT_NAMESPACE}
       
       echo "Waiting for cluster to become available"

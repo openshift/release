@@ -1,23 +1,7 @@
-base_images:
-  ocp_builder_rhel-9-base-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-base-openshift-4.15
-  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 images:
-- inputs:
-    ocp_builder_rhel-9-base-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.15
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
-  to: cluster-samples-operator
+- to: cluster-samples-operator
 promotion:
   to:
   - name: "4.15"
@@ -69,13 +53,13 @@ tests:
 - as: e2e-aws-ovn-builds
   run_if_changed: ^(tmp/build)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-builds
-- as: e2e-aws-ovn-proxy
+- always_run: false
+  as: e2e-aws-ovn-proxy
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-proxy
 - as: e2e-aws-ovn-jenkins
   run_if_changed: ^(tmp/build)

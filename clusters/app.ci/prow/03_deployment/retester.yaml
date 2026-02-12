@@ -23,7 +23,10 @@ metadata:
   namespace: ci
   name: retester
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"retester:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"retester\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
   labels:
     app: prow
     component: retester
@@ -47,12 +50,13 @@ spec:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
-        - --ref=master
+        - --ref=main
         - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -62,12 +66,13 @@ spec:
         - /git-sync
         args:
         - --repo=https://github.com/openshift/release.git
-        - --ref=master
+        - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
         - --max-failures=3
         - --link=release
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        imagePullPolicy: Always
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -75,8 +80,9 @@ spec:
           requests:
             memory: "1Gi"
             cpu: "0.5"
-      - image: retester:latest
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_retester_latest
         name: retester
+        imagePullPolicy: Always
         command:
         - retester
         args:

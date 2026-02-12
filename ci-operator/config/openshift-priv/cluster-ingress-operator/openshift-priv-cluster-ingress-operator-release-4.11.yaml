@@ -3,19 +3,11 @@ base_images:
     name: 4.11-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-ingress-operator
 images:
 - from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: cluster-ingress-operator
 promotion:
   to:
@@ -47,16 +39,17 @@ tests:
     from: src
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
-- as: e2e-azure
+- always_run: false
+  as: e2e-azure
   optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -66,7 +59,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-gcp-operator
+- always_run: false
+  as: e2e-gcp-operator
   optional: true
   steps:
     cluster_profile: gcp
@@ -79,7 +73,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-azure-operator
+- always_run: false
+  as: e2e-azure-operator
   optional: true
   steps:
     cluster_profile: azure4
@@ -94,16 +89,17 @@ tests:
     workflow: ipi-azure
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: e2e-gcp-serial
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-serial
-- as: e2e-aws-single-node
+- always_run: false
+  as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
 zz_generated_metadata:
   branch: release-4.11

@@ -1,41 +1,11 @@
-base_images:
-  ocp_4.16_base-rhel9:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/sdn
 images:
 - dockerfile_path: images/sdn/Dockerfile.rhel
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-8-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.21-openshift-4.16
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: sdn
 - dockerfile_path: images/kube-proxy/Dockerfile.rhel
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: kube-proxy
 promotion:
   to:
@@ -88,11 +58,12 @@ tests:
     workflow: openshift-upgrade-aws-sdn
 - as: e2e-gcp-sdn
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-gcp-sdn
-- as: e2e-aws-sdn-multitenant
+- always_run: false
+  as: e2e-aws-sdn-multitenant
   steps:
     cluster_profile: aws
     env:
@@ -104,7 +75,6 @@ tests:
     env:
       OVERRIDE_OPENSHIFT_SDN_DEPRECATION: "true"
     workflow: openshift-e2e-aws-sdn-serial
-  timeout: 5h0m0s
 - as: e2e-aws-live-migration-sdn-ovn
   steps:
     cluster_profile: aws
@@ -119,8 +89,8 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     workflow: openshift-e2e-aws-sdn
-  timeout: 3h0m0s
-- as: e2e-aws-live-migration-sdn-ovn-rollback
+- always_run: false
+  as: e2e-aws-live-migration-sdn-ovn-rollback
   optional: true
   steps:
     cluster_profile: aws
@@ -135,7 +105,6 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     workflow: openshift-e2e-aws-sdn
-  timeout: 4h0m0s
 - as: security
   optional: true
   steps:

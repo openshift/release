@@ -16,6 +16,7 @@ COMMAND=(
     --cluster-name "$CLUSTER_NAME"
     --name "$NODEPOOL_NAME"
     --nodepool-subnet-id "$SUBNET_ID"
+    --release-image "${NODEPOOL_RELEASE_IMAGE_LATEST}"
 )
 
 if [[ -n $ADDITIONAL_HYPERSHIFT_INSTANCE_TYPE ]]; then
@@ -37,7 +38,7 @@ if [[ -n $HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER ]]; then
     COMMAND+=(--marketplace-version "$(cat "${SHARED_DIR}"/azure-marketplace-image-version-extra)")
 fi
 
-eval "${COMMAND[@]}"
+"${COMMAND[@]}"
 
 echo "Waiting for the additional NodePool to be ready"
 oc wait --timeout=30m nodepool -n clusters "$NODEPOOL_NAME" --for=condition=Ready=True

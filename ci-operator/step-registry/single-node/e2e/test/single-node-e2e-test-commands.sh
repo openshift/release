@@ -21,6 +21,15 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
+# Starting in 4.21, we will aggressively retry test failures only in
+# presubmits to determine if a failure is a flake or legitimate. This is
+# to reduce the number of retests on PR's.
+if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_REF" == "master" ) ]]; then
+    if openshift-tests run --help | grep -q 'retry-strategy'; then
+        TEST_ARGS+=" --retry-strategy=aggressive"
+    fi
+fi
+
 # HACK: HyperShift clusters use their own profile type, but the cluster type
 # underneath is actually AWS and the type identifier is derived from the profile
 # type. For now, just treat the `hypershift` type the same as `aws` until
@@ -300,11 +309,21 @@ function suite() {
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
     fi &&
 
+    # Determine max parallel tests if not already specified in TEST_ARGS
+    MAX_PARALLEL_ARGS="" &&
+    if [[ ! "${TEST_ARGS:-}" =~ --max-parallel-tests ]]; then
+        if [[ "${TEST_SUITE}" =~ serial ]]; then
+            MAX_PARALLEL_ARGS="--max-parallel-tests 1"
+        else
+            MAX_PARALLEL_ARGS="--max-parallel-tests 15"
+        fi
+    fi &&
+
     set -x &&
     openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
-        --max-parallel-tests 15 \
+        ${MAX_PARALLEL_ARGS} \
         --junit-dir "${ARTIFACT_DIR}/junit" &
     wait "$!" &&
     set +x

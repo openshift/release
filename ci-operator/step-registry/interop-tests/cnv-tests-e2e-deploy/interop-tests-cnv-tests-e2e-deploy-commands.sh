@@ -4,6 +4,35 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Ensure Requirements.
+# yq should be installed within the container of openshift-cnv/cnv-ci
+# as fallback we check if it is missing and install it if necessary
+PATH="$(exec 3>&1 1>&2
+    typeset binDir="/tmp/bin"
+    mkdir -p "${binDir}"
+    yq --version || {
+        curl -sLo "${binDir}/yq" \
+            "https://github.com/mikefarah/yq/releases/latest/download/yq_$(
+                uname -s | tr '[:upper:]' '[:lower:]'
+            )_$(
+                uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/'
+            )" &&
+        chmod a+x "${binDir}/yq"
+        "${binDir}/yq" --version
+    }
+echo "${binDir}" 1>&3):${PATH}"
+
+function mapTestsForComponentReadiness() {
+    if [[ $MAP_TESTS == "true" ]]; then
+        results_file="${1}"
+        echo "Patching Tests Result File: ${results_file}"
+        if [ -f "${results_file}" ]; then
+            echo "Mapping Test Suite Name To: CNV-lp-interop"
+            yq eval -px -ox -iI0 '.testsuite."+@name" = "CNV-lp-interop"' "${results_file}"
+        fi
+    fi
+}
+
 # Set cluster variables
 # CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
 # CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
@@ -27,7 +56,6 @@ unset KUBERNETES_PORT_443_TCP_PORT
 
 
 set -x
-START_TIME=$(date "+%s")
 
 # Get oc binary
 # curl -sL "${OC_URL}" | tar -C "${BIN_FOLDER}" -xzvf - oc
@@ -44,26 +72,22 @@ if [[ -n "${KUBEVIRT_TESTING_CONFIGURATION:-}" ]]; then
     echo "🔄 KUBEVIRT_TESTING_CONFIGURATION_FILE set to ${KUBEVIRT_TESTING_CONFIGURATION_FILE}"
 fi
 
+
 # Run the tests
 make deploy_test || exit_code=$?
 
-FINISH_TIME=$(date "+%s")
-DIFF_TIME=$((FINISH_TIME-START_TIME))
 set +x
 
-if [[ ${DIFF_TIME} -le 720 ]]; then
-    echo ""
-    echo " 🚨  The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give us time to debug"
-    echo "  😴 😴 😴"
-    sleep 7200
-    exit 1
-else
-    echo "Finished in: ${DIFF_TIME} sec"
-fi
+ # Map tests if needed for related use cases
+mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
+
+ # Send junit files to shared dir for Data Router Reporter step
+cp "${ARTIFACT_DIR}"/*.xml "${SHARED_DIR}"
+
 
 if [ "${exit_code:-0}" -ne 0 ]; then
     echo "deploy_test failed with exit code $exit_code"
-    exit ${exit_code}
+    exit "${exit_code}"
 else
     echo "deploy_test succeeded"
 fi

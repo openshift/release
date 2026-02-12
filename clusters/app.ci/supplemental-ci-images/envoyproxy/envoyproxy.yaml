@@ -1,12 +1,3 @@
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: tp-envoyproxy
-  namespace: ci
-spec:
-  tags:
-  - name: "1.26.4"
----
 kind: BuildConfig
 apiVersion: build.openshift.io/v1
 metadata:
@@ -16,12 +7,14 @@ spec:
   successfulBuildsHistoryLimit: 1
   failedBuildsHistoryLimit: 2
   output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
     to:
-      kind: ImageStreamTag
-      name: tp-envoyproxy:1.26.4
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_tp-envoyproxy_latest
   source:
     dockerfile: |
-      FROM registry.ci.openshift.org/ci/ubuntu:20.04
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ci_ubuntu_20.04
       LABEL org.opencontainers.image.ref.name=ubuntu
       LABEL org.opencontainers.image.version=20.04
       ARG DEBIAN_FRONTEND=noninteractive
@@ -63,6 +56,8 @@ spec:
                       function envoy_on_request(request_handle) \n\
                           request_handle:headers():add("x-endpoint-api-consumer-type", "PROJECT") \n\
                           request_handle:headers():add("x-endpoint-api-consumer-number", "1") \n\
+                          local headers = request_handle:headers() \n\
+                          local user = request_handle:headers():get("x-forwarded-user") \n\
                           local path = request_handle:headers():get(":path") \n\
                           request_handle:streamInfo():dynamicMetadata():set("envoy.filters.http.lua", "path", path) \n\
                           local job_name = string.match(path, "/v1/executions/([^/]+)$") \n\
@@ -71,7 +66,8 @@ spec:
                           local bodyTable = json.decode(jsonString) \n\
                           local podSpecOptions = bodyTable.pod_spec_options or {} \n\
                           podSpecOptions.annotations = podSpecOptions.annotations or {} \n\
-                          podSpecOptions.annotations.executor = "gangway" \n\
+                          podSpecOptions.annotations["ci.openshift.io/executor"] = "gangway" \n\
+                          podSpecOptions.annotations["ci.openshift.io/user"] = user \n\
                           bodyTable.pod_spec_options = podSpecOptions \n\
                           if job_name then \n\
                             request_handle:headers():replace(":path", "/v1/executions") \n\

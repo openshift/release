@@ -77,6 +77,20 @@ function get_recommended_version_for_machinepool () {
   fi
 }
 
+# check_admin_gates function for ROSA
+function check_admin_gates() {
+    check_admin_gates=$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r '.data')
+    log -e "Admin ack required for these:\n$check_admin_gates"
+
+    ack_list=$(echo $check_admin_gates | jq -r 'keys[]')
+    for item in ${ack_list}; do
+      # $ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.18-kube-1.32-api-removals-in-4.19":"true"}}' --type=merge
+      # https://access.redhat.com/articles/7112216
+      log "Patch Admin-acks configmap with ${item}: true"
+      oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${item}"'": "true"}}' --type=merge
+    done
+}
+
 function upgrade_cluster_to () {
   major_version=$1
   recommended_version=""
@@ -87,15 +101,38 @@ function upgrade_cluster_to () {
   echo "rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH}"
   start_time=$(date +"%s")
   while true; do
-    if (( $(date +"%s") - $start_time >= 1800 )); then
+    if (( $(date +"%s") - $start_time >= 7200 )); then
       log "error: Timed out while waiting for the previous upgrade schedule to be removed."
       exit 1
     fi
 
     rosa upgrade cluster -y -m auto --version $recommended_version -c $cluster_id ${HCP_SWITCH} 1>"/tmp/update_info.txt" 2>&1 || true
+    rosa list upgrade -c $cluster_id
     upgrade_info=$(cat "/tmp/update_info.txt")
     if [[ "$upgrade_info" == *"There is already"* ]]; then
-      log "Waiting for the previous upgrade schedule to be removed."
+      current_sched=$(rosa list upgrade -c $cluster_id | grep -Ei 'started|scheduled|pending' | awk '{print$1}')
+      if [[ "$current_sched" == "$recommended_version" ]]; then
+        log "Upgrade is already scheduled to the right version"
+        log "$upgrade_info"
+        break
+      else
+        log "Waiting for the previous upgrade schedule to be removed."
+        sleep 120
+      fi
+    elif [[ "$upgrade_info" == *"Missing required acknowledgements to schedule upgrade"* ]]; then 
+      log "Admin Acknowledgements required."
+      set_proxy
+      check_admin_gates
+      unset_proxy
+      sleep 120
+      # ROSA Classic can take up to 2h to schedule, so attempts a re-try after clearing admin-gates.
+      # ROSA-HCP schedules instantly so breaking the loop after clearing admin-gates.
+      if [[ "$HOSTED_CP" == "true" ]]; then
+        break
+      fi
+    elif [[ "$upgrade_info" == *"Failed to schedule upgrade for cluster"* ]]; then
+      log -e "$upgrade_info"
+      log "Failed to schedule upgrade for cluster, so retry after a pause"
       sleep 120
     else
       log -e "$upgrade_info"
@@ -112,6 +149,29 @@ function upgrade_cluster_to () {
   fi
   unset_proxy
 
+  # Setting maxUnavailable and maxSurge to speed up upgrades
+  if [[ "${NP_MAX_UNAVAILABLE}" != "" ]]; then
+    mp_id_list=$(rosa list machinepool -c $cluster_id -o json | jq -r ".[].id" | grep -i worker)
+    for mp_id in $mp_id_list; do
+      log "Update the machinepool maxUnavailable and maxSurge of $mp_id to ${NP_MAX_UNAVAILABLE} and ${NP_MAX_SURGE}"
+      if [[ "$HOSTED_CP" == "false" ]]; then
+        # ROSA cluster kubeadmin user auth is required for this patch command
+        ocm get /api/clusters_mgmt/v1/clusters/"$cluster_id"/credentials | jq -r .kubeconfig > "${SHARED_DIR}/kubeconfig-$cluster_id"
+        set_proxy
+        log "oc patch mcp worker with maxUnavailable to ${NP_MAX_UNAVAILABLE}"
+        oc --kubeconfig "${SHARED_DIR}/kubeconfig-$cluster_id" patch mcp worker --patch '{"spec":{"maxUnavailable": "'"${NP_MAX_UNAVAILABLE}"'"}}' --type=merge
+        unset_proxy
+      else
+        if [[ "${NP_MAX_SURGE}" == "" ]]; then
+          NP_MAX_SURGE=$NP_MAX_UNAVAILABLE
+          log "MaxUnavailable: ${NP_MAX_UNAVAILABLE}, MaxSurge: ${NP_MAX_SURGE}"
+        fi
+        log "rosa update machinepool -c $cluster_id $mp_id --max-unavailable  ${NP_MAX_UNAVAILABLE} --max-surge ${NP_MAX_SURGE}"
+        rosa update machinepool -c $cluster_id $mp_id --max-unavailable  ${NP_MAX_UNAVAILABLE} --max-surge ${NP_MAX_SURGE}      
+      fi
+    done
+  fi
+
   # Upgrade cluster
   start_time=$(date +"%s")
   while true; do
@@ -121,11 +181,16 @@ function upgrade_cluster_to () {
     if [[ "$current_version" == "$recommended_version" ]]; then
       record_cluster "timers.ocp_upgrade" "${recommended_version}" $(( $(date +"%s") - "${start_time}" ))
       log "Upgrade the cluster $cluster_id to the openshift version $recommended_version successfully after $(( $(date +"%s") - ${start_time} )) seconds"
+      set_proxy
+      log "Cluster state after upgrade"
+      oc get clusteroperators
+      unset_proxy
       break
     fi
 
     # for ROSA HCP, when control plane is upgrading, worker nodes should not be recreated
     if [[ "$HOSTED_CP" == "true" ]]; then
+      sleep 180
       set_proxy
       check_worker_node_not_changed
       unset_proxy

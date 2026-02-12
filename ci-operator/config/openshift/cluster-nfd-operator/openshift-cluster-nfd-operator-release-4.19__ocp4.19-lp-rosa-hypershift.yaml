@@ -1,0 +1,83 @@
+base_images:
+  ci-artifacts:
+    name: master
+    namespace: psap
+    tag: ci-artifacts
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
+  ocp_4.19_base-rhel9:
+    name: "4.19"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: nfd-e2e-master-aws-rosa-hypershift
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "nfd-tests-e2e", "failure_type": "all", "classification": "PQE test failure", "jira_project": "OCPBUGS", "group": {"name": "lp-tests", "priority": 2}, "jira_component": ["!default"], "jira_assignee": "!default", "jira_priority": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/rosa/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.19-lp","rosa-hypershift-lp","nfd-lp"]'
+      FIREWATCH_DEFAULT_JIRA_AFFECTS_VERSION: "4.19"
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: ggordani@redhat.com
+      FIREWATCH_DEFAULT_JIRA_COMPONENT: '["Customer Impact"]'
+      FIREWATCH_DEFAULT_JIRA_PRIORITY: critical
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      NAME_PREFIX: ocpe2e
+      OCM_LOGIN_ENV: staging
+      OPERATORS: |
+        [
+            {"name": "nfd", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-nfd", "target_namespaces": "openshift-nfd", "operator_group":"openshift-nfd"}
+        ]
+      ROSACLI_BUILD: latest
+      TEST_PROFILE: rosa-hcp-advanced
+      VERSION: "4.19"
+    test:
+    - ref: ipi-install-rbac
+    - ref: cucushift-hypershift-extended-health-check
+    - ref: install-operators
+    - ref: nfd-tests-e2e
+    - ref: firewatch-report-issues
+    workflow: rosa-lifecycle-advanced
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: cluster-nfd-operator
+  variant: ocp4.19-lp-rosa-hypershift

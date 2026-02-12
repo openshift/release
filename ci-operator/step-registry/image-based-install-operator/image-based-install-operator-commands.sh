@@ -48,16 +48,39 @@ export SEED_VERSION=$(cat /home/ib-orchestrate-vm/seed-version)
 
 echo "### Configuring dns for ibi cluster on the host"
 export IBI_VM_IP=$(cat /home/ib-orchestrate-vm/ibi-vm-ip)
-echo "address=/api.ibi-cluster.mydomain.com/${IBI_VM_IP}" | sudo tee -a /etc/NetworkManager/dnsmasq.d/openshift-ibi-cluster.conf
-echo "address=/.apps.ibi-cluster.mydomain.com/${IBI_VM_IP}" | sudo tee -a /etc/NetworkManager/dnsmasq.d/openshift-ibi-cluster.conf
+echo "address=/api.ibi-cluster.redhat.com/${IBI_VM_IP}" | sudo tee -a /etc/NetworkManager/dnsmasq.d/openshift-ibi-cluster.conf
+echo "address=/.apps.ibi-cluster.redhat.com/${IBI_VM_IP}" | sudo tee -a /etc/NetworkManager/dnsmasq.d/openshift-ibi-cluster.conf
 systemctl reload NetworkManager
 
-nslookup api.ibi-cluster.mydomain.com
-nslookup a.apps.ibi-cluster.mydomain.com
+nslookup api.ibi-cluster.redhat.com
+nslookup a.apps.ibi-cluster.redhat.com
 
 echo "Configured dns successfully"
 
 export SSH_PUB_KEY=$(cat /home/ib-orchestrate-vm/bip-orchestrate-vm/ssh-key/key.pub)
+
+echo "### Configuring ImageClusterInstall machineNetworks based on IP_STACK=${IP_STACK:-}"
+if [[ "${IP_STACK:-v4}" == "v4v6" ]]; then
+  MACHINE_NETWORKS_YAML="$(cat <<EOF_MN
+  machineNetworks:
+  - cidr: ${EXTERNAL_SUBNET_V4}
+  - cidr: ${EXTERNAL_SUBNET_V6}
+EOF_MN
+)"
+elif [[ "${IP_STACK:-v4}" == "v6v4" ]]; then
+  MACHINE_NETWORKS_YAML="$(cat <<EOF_MN
+  machineNetworks:
+  - cidr: ${EXTERNAL_SUBNET_V6}
+  - cidr: ${EXTERNAL_SUBNET_V4}
+EOF_MN
+)"
+else
+  MACHINE_NETWORKS_YAML="$(cat <<EOF_MN
+  machineNetworks:
+  - cidr: ${EXTERNAL_SUBNET_V4}
+EOF_MN
+)"
+fi
 
 tee <<EOCR | oc create -f -
 apiVersion: hive.openshift.io/v1
@@ -81,7 +104,7 @@ spec:
   hostname: ostest-extraworker-0 
   imageSetRef:
     name: ibi-cluster-image-set
-  machineNetwork: ${EXTERNAL_SUBNET_V4}
+${MACHINE_NETWORKS_YAML}
   sshKey: ${SSH_PUB_KEY}
 ---
 apiVersion: hive.openshift.io/v1
@@ -90,7 +113,7 @@ metadata:
   name: ibi-cluster
   namespace: ibi-cluster
 spec:
-  baseDomain: mydomain.com
+  baseDomain: redhat.com
   clusterInstallRef:
     group: extensions.hive.openshift.io
     kind: ImageClusterInstall

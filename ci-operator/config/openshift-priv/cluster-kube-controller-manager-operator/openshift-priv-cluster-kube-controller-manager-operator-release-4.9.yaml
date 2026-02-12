@@ -3,10 +3,6 @@ base_images:
     name: 4.9-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -14,10 +10,6 @@ canonical_go_repository: github.com/openshift/cluster-kube-controller-manager-op
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-kube-controller-manager-operator
 promotion:
   to:
@@ -57,11 +49,11 @@ tests:
     from: test-bin
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -74,7 +66,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-aws-operator-preferred-host
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest

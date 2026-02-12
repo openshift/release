@@ -18,13 +18,47 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-/usr/bin/create-efs-volume start --kubeconfig "$KUBECONFIG" --local-aws-creds=true --namespace openshift-cluster-csi-drivers
+# TODO: Consider use the test manifest from source repo 
+#  Research whether we could also add the cross account volume create logic to create-efs-volume tool
+if [[ ${ENABLE_CROSS_ACCOUNT} == "yes" ]]; then
+  echo "Skip efs volume create since ENABLE_CROSS_ACCOUNT set to yes"
+  cat <<EOF > "${MANIFEST_LOCATION}"
+StorageClass:
+  FromExistingClassName: efs-sc
+SnapshotClass:
+  FromName: true
+DriverInfo:
+  Name: efs.csi.aws.com
+  SupportedSizeRange:
+    Min: 1Gi
+    Max: 64Ti
+  Capabilities:
+    persistence: true
+    fsGroup: false
+    block: false
+    exec: true
+    volumeLimits: false
+    controllerExpansion: false
+    nodeExpansion: false
+    snapshotDataSource: false
+    RWX: true
+    topology: false
+    multiplePVsSameID: true
+EOF
+else
+  ARG=(--kubeconfig "$KUBECONFIG" --local-aws-creds=true --namespace openshift-cluster-csi-drivers)
+  if [[ ${EFS_ENABLE_SINGLE_ZONE} == "true" ]]; then
+    ZONE_NAME=$(oc get node -l node-role.kubernetes.io/worker \
+      -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}')
+    ARG+=(--single-zone="$ZONE_NAME")
+  fi
+  /usr/bin/create-efs-volume start "${ARG[@]}"
+  echo "Using storageclass ${STORAGECLASS_LOCATION}"
+  cat ${STORAGECLASS_LOCATION}
 
-echo "Using storageclass ${STORAGECLASS_LOCATION}"
-cat ${STORAGECLASS_LOCATION}
-
-oc create -f ${STORAGECLASS_LOCATION}
-echo "Created storageclass from file ${STORAGECLASS_LOCATION}"
+  oc create -f ${STORAGECLASS_LOCATION}
+  echo "Created storageclass from file ${STORAGECLASS_LOCATION}"
+fi
 
 oc create -f - <<EOF
 apiVersion: operator.openshift.io/v1

@@ -12,5 +12,12 @@ set -o pipefail
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
 
-echo "$(date -u --rfc-3339=seconds) - Enabling the IAM service account of minimal permissions, i.e. no permissions creating/deleting firewall-rules and binding a private zone to the shared VPC in the host project, for deploying OCP cluster into GCP shared VPC..."
-cp "${CLUSTER_PROFILE_DIR}/ipi-xpn-no-fw-no-dns-sa.json" "${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json"
+if [[ "${PRE_CREATE_PRIVATE_ZONE}" == "yes" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - Enabling the IAM service account of minimal permissions, i.e. no permissions creating/deleting firewall-rules and binding a private zone to the shared VPC in the host project, for deploying OCP cluster into GCP shared VPC..."
+    cp "${CLUSTER_PROFILE_DIR}/ipi-xpn-no-fw-no-dns-sa.json" "${SHARED_DIR}/xpn_byo-hosted-zone_min_perm_passthrough.json"
+else
+    echo "$(date -u --rfc-3339=seconds) - Enabling the IAM service account of minimal permissions for deploying OCP cluster into GCP shared VPC..."
+    # For now using the same service account as the user-tags testing, 
+    # but it is possible to use another service account in future. 
+    cp "${CLUSTER_PROFILE_DIR}/user_tags_sa.json" "${SHARED_DIR}/xpn_min_perm_passthrough.json"
+fi

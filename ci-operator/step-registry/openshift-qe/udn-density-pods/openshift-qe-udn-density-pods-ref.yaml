@@ -1,0 +1,79 @@
+ref:
+  as: openshift-qe-udn-density-pods
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: E2E_VERSION
+    default: "default"
+    documentation: |-
+      Override the e2e version
+  - name: KUBE_BURNER_VERSION
+    default: "default"
+    documentation: |-
+      Override the kube burner version
+  - name: OVERRIDE_ITERATIONS
+    default: ""
+    documentation:
+      Allow job to override the iteration count
+  - name: UDN_ITERATION_MULTIPLIER
+    default: ""
+    documentation: |-
+      The number of iterations per worker nodes to create for udn-density-pods workload
+  - name: ITERATION_MULTIPLIER_ENV
+    default: ""
+    documentation: |-
+      Deprecated: use UDN_ITERATION_MULTIPLIER instead. Kept for backward compatibility.
+  - name: POD_READY_THRESHOLD
+    default: "1400s"
+    documentation: |-
+      Defines the maximum threshold for Pod Ready
+  - name: EXTRA_FLAGS
+    default: ""
+    documentation: |-
+      Default EXTRA_FLAGS for udn-density-pods workload is disabled
+  - name: PROFILE_TYPE
+    default: "both"
+    documentation: |-
+      Kube-burner indexing profile type
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resource
+  - name: PPROF
+    default: "true"
+    documentation: |-
+      Enable or disable pprof collection
+  - name: ENABLE_LOCAL_INDEX
+    default: "false"
+    documentation: |-
+      Trigger to enable local indexing
+  - name: ES_SECRETS_PATH
+    default: ""
+    documentation: |-
+      Override elasticsearch secrets path.
+  - name: ENABLE_LAYER_3
+    default: "true"
+    documentation: |-
+      Defaults to true switches to --layer3, when false switches to layer2
+  - name: PPROF
+    default: "true"
+    documentation: |-
+      Enable or disable pprof collection
+  commands: openshift-qe-udn-density-pods-commands.sh
+  timeout: 6h
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  - namespace: test-credentials
+    name: stackrox-perfscale-elasticsearch
+    mount_path: /secret_stackrox
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale udn-density-pods workload in the deployed cluster

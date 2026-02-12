@@ -7,7 +7,7 @@ set -o pipefail
 
 function check_pod_status() {
     INTERVAL=60
-    CNT=10
+    CNT=15
     while [ $((CNT)) -gt 0 ]; do
         READY=false
         while read -r i
@@ -110,6 +110,8 @@ spec:
       value: "${PULL_PULL_SHA:-}"
     - name: PULL_HEAD_REF
       value: "${PULL_HEAD_REF:-}"
+    - name: HUB
+      value: "${HUB:-}"
     volumeMounts:
     - mountPath: /lib/modules
       name: modules
@@ -126,6 +128,11 @@ spec:
     name: varlibdocker
 EOF
 }
+
+if [ "${SKIP_CREATE_TEST_RESOURCES:-}" == "true" ]; then
+    echo "SKIP: the step servicemesh-istio-e2e is going to be skipped because SKIP_CREATE_TEST_RESOURCES is set to true"
+    exit 0
+fi
 
 create_namespace "${MAISTRA_NAMESPACE}"
 create_pod "${MAISTRA_SC_POD}"

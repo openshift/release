@@ -24,7 +24,7 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.16:tools'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.21:tools'
                     },
                     'importPolicy': {
                         'scheduled': True
@@ -51,7 +51,7 @@ def _add_osd_rc_route(gendoc):
             'host': f'{context.rc_app_url}',
             'tls': {
                 'insecureEdgeTerminationPolicy': 'Redirect',
-                'termination': 'Reencrypt' if context.private else 'Edge'
+                'termination': 'reencrypt' if context.private else 'edge'
             },
             'to': {
                 'kind': 'Service',
@@ -191,7 +191,7 @@ def _get_osd_rc_deployment_sidecars(context):
                      '-cookie-secret-file=/etc/proxy/secrets/session_secret',
                      '-tls-cert=/etc/tls/private/tls.crt',
                      '-tls-key=/etc/tls/private/tls.key'],
-            'image': 'quay.io/openshift/origin-oauth-proxy:4.16',
+            'image': 'quay.io/openshift/origin-oauth-proxy:4.19',
             'imagePullPolicy': 'IfNotPresent',
             'name': 'oauth-proxy',
             'ports': [{
@@ -210,6 +210,7 @@ def _get_osd_rc_deployment_sidecars(context):
         })
     return sidecars
 
+
 def get_oc_env_vars():
     return [
         {
@@ -222,41 +223,49 @@ def get_oc_env_vars():
         }
     ]
 
+
 def get_oc_prepare_container():
     return [
         {
             "name": "oc-prepare",
             "command": ["/bin/bash", "-c",
-            """#!/bin/bash
-set -euo pipefail
-trap 'kill $(jobs -p); exit 0' TERM
+                        """#!/bin/bash
+            set -euo pipefail
+            trap 'kill $(jobs -p); exit 0' TERM
 
-SECONDS=0
+            SECONDS=0
 
-# ensure we are logged in to our registry
-mkdir -p ${XDG_RUNTIME_DIR}/containers
-cp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true
+            # ensure we are logged in to our registry
+            mkdir -p ${XDG_RUNTIME_DIR}/containers
+            cp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true
 
-# global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods
-git config --global credential.helper store
-git config --global user.name test
-git config --global user.email test@test.com
-oc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json
+            # global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods
+            git config --global credential.helper store
+            git config --global user.name test
+            git config --global user.email test@test.com
+            oc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json
 
-FROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.["4-stable"][0] // empty')
-TO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.["4-dev-preview"][0] // empty')
+            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I -w '%{http_code}' https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted)
+            if [[ "$RC_SERVICE_AVAILABLE" -ne 200 ]]
+            then
+                FROM=""
+                TO=""
+            else
+                FROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.["4-stable"][0] // empty')
+                TO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.["4-dev-preview"][0] // empty')
+            fi
 
-if [[ -n "$FROM" && -n "$TO" ]]
-then
-    echo "Pre-populating the git cache..."
-    oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64
-else
-    echo "Unable to Pre-populate the git cache!"
-fi
+            if [[ -n "$FROM" && -n "$TO" ]]
+            then
+                echo "Pre-populating the git cache..."
+                oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64
+            else
+                echo "Unable to Pre-populate the git cache!"
+            fi
 
-DURATION=$SECONDS
-echo "Took: $(($DURATION / 60))m $(($DURATION % 60))s"
-            """],
+            DURATION=$SECONDS
+            echo "Took: $(($DURATION / 60))m $(($DURATION % 60))s"
+                        """],
             "image": "release-controller:latest",
             "volumeMounts": get_oc_volume_mounts(),
             "env": get_oc_env_vars(),
@@ -273,17 +282,15 @@ def _add_osd_rc_deployment(gendoc):
         # The main x86_64 release controller also monitors origin
         extra_rc_args.append('--publish-namespace=origin')
 
-    # Creating Cluster Groups for the AMD64 jobs...
-    if context.arch == 'x86_64':
-        extra_rc_args.append('--cluster-group=build01,build02,build03,build05')
-        extra_rc_args.append('--cluster-group=vsphere')
-
     gendoc.append({
         'apiVersion': 'apps/v1',
         'kind': 'Deployment',
         'metadata': {
             'annotations': {
-                'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+                'keel.sh/policy': 'force',
+                'keel.sh/matchTag': 'true',
+                'keel.sh/trigger': 'poll',
+                'keel.sh/pollSchedule': '@every 5m'
             },
             'name': f'release-controller-{context.is_namespace}',
             'namespace': context.config.rc_deployment_namespace,
@@ -303,32 +310,32 @@ def _add_osd_rc_deployment(gendoc):
                 },
                 'spec': {
                     "initContainers": [
-                        {
-                            "name": "git-sync-init",
-                            "command": ["/git-sync"],
-                            "args": [
-                                "--repo=https://github.com/openshift/release.git",
-                                "--ref=master",
-                                "--root=/tmp/git-sync",
-                                "--one-time=true",
-                                "--depth=1",
-                                "--link=release"
-                            ],
-                            "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
-                            "volumeMounts": [
-                                {
-                                    "name": "release",
-                                    "mountPath": "/tmp/git-sync"
-                                }
-                            ]
-                        }] + get_oc_prepare_container(),
+                                          {
+                                              "name": "git-sync-init",
+                                              "command": ["/git-sync"],
+                                              "args": [
+                                                  "--repo=https://github.com/openshift/release.git",
+                                                  "--ref=main",
+                                                  "--root=/tmp/git-sync",
+                                                  "--one-time=true",
+                                                  "--depth=1",
+                                                  "--link=release"
+                                              ],
+                                              "image": "quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0",
+                                              "volumeMounts": [
+                                                  {
+                                                      "name": "release",
+                                                      "mountPath": "/tmp/git-sync"
+                                                  }
+                                              ]
+                                          }] + get_oc_prepare_container(),
                     "containers": [
                         {
                             "name": "git-sync",
                             "command": ["/git-sync"],
                             "args": [
                                 "--repo=https://github.com/openshift/release.git",
-                                "--ref=master",
+                                "--ref=main",
                                 "--period=30s",
                                 "--root=/tmp/git-sync",
                                 "--max-failures=3",
@@ -379,7 +386,8 @@ def _add_osd_rc_deployment(gendoc):
                                         f'--art-suffix={context.art_suffix}',
                                         "--manifest-list-mode"
                                         ],
-                            'image': 'release-controller:latest',
+                            'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest',
+                            'imagePullPolicy': 'Always',
                             'name': 'controller',
                             'volumeMounts': get_rc_volume_mounts(),
                             'env': get_oc_env_vars(),
@@ -413,7 +421,10 @@ def _add_osd_rc_deployment(gendoc):
         'kind': 'Deployment',
         'metadata': {
             'annotations': {
-                'image.openshift.io/triggers': '[{"from":{"kind":"ImageStreamTag","name":"release-controller-api:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\\"controller\\")].image"}]'
+                'keel.sh/policy': 'force',
+                'keel.sh/matchTag': 'true',
+                'keel.sh/trigger': 'poll',
+                'keel.sh/pollSchedule': '@every 5m'
             },
             'name': f'release-controller-api-{context.is_namespace}',
             'namespace': context.config.rc_deployment_namespace,
@@ -456,7 +467,8 @@ def _add_osd_rc_deployment(gendoc):
                                         '--jira-endpoint=https://issues.redhat.com',
                                         '--jira-bearer-token-file=/etc/jira/api',
                                         ],
-                            'image': 'release-controller-api:latest',
+                            'image': 'quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest',
+                            'imagePullPolicy': 'Always',
                             'name': 'controller',
                             'volumeMounts': get_rcapi_volume_mounts(),
                             'env': get_oc_env_vars(),

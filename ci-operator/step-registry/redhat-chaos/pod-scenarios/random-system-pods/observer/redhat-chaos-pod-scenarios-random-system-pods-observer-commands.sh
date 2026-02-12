@@ -31,8 +31,8 @@ done
 
 echo "starting pod scenarios"
 ./pod-scenarios/prow_run.sh
-
+rc=$?
 echo "Done running the test!" 
 
-exit 0
-
+echo "Return code: $rc"
+exit $rc

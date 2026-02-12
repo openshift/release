@@ -1,22 +1,24 @@
 presubmits:
   openshift-service-mesh/sail-operator:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-3\.0$
     - ^release-3\.0-
-    cluster: build03
-    context: ci/prow/e2e-ocp-4-16
+    cluster: build05
+    context: ci/prow/ocp-4.20-e2e-ocp
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
+      ci-operator.openshift.io/variant: ocp-4.20
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-e2e-ocp-4-16
-    rerun_command: /test e2e-ocp-4-16
+    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-ocp-4.20-e2e-ocp
+    rerun_command: /test ocp-4.20-e2e-ocp
+    skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
     spec:
       containers:
       - args:
@@ -25,10 +27,11 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-4-16
+        - --target=e2e-ocp
+        - --variant=ocp-4.20
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -73,24 +76,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-4-16,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.20-e2e-ocp,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-3\.0$
     - ^release-3\.0-
-    cluster: build03
-    context: ci/prow/e2e-ocp-4-16-arm
+    cluster: build05
+    context: ci/prow/ocp-4.20-e2e-ocp-arm
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
+      ci-operator.openshift.io/variant: ocp-4.20
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-e2e-ocp-4-16-arm
-    rerun_command: /test e2e-ocp-4-16-arm
+    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-ocp-4.20-e2e-ocp-arm
+    rerun_command: /test ocp-4.20-e2e-ocp-arm
+    skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
     spec:
       containers:
       - args:
@@ -99,10 +104,11 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-4-16-arm
+        - --target=e2e-ocp-arm
+        - --variant=ocp-4.20
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -147,246 +153,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-4-16-arm,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.20-e2e-ocp-arm,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-3\.0$
     - ^release-3\.0-
-    cluster: build03
-    context: ci/prow/e2e-ocp-4-17
+    cluster: build05
+    context: ci/prow/ocp-4.20-gencheck
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
+      ci-operator.openshift.io/variant: ocp-4.20
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-e2e-ocp-4-17
-    rerun_command: /test e2e-ocp-4-17
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-4-17
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-4-17,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-3\.0$
-    - ^release-3\.0-
-    cluster: build03
-    context: ci/prow/e2e-ocp-4-17-arm
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-e2e-ocp-4-17-arm
-    rerun_command: /test e2e-ocp-4-17-arm
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-4-17-arm
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-4-17-arm,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-3\.0$
-    - ^release-3\.0-
-    cluster: build03
-    context: ci/prow/e2e-ocp-4-18
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-e2e-ocp-4-18
-    optional: true
-    rerun_command: /test e2e-ocp-4-18
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-4-18
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-4-18,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-3\.0$
-    - ^release-3\.0-
-    cluster: build09
-    context: ci/prow/gencheck
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 30m0s
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-gencheck
-    rerun_command: /test gencheck
+    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-ocp-4.20-gencheck
+    rerun_command: /test ocp-4.20-gencheck
     spec:
       containers:
       - args:
@@ -394,9 +177,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=gencheck
+        - --variant=ocp-4.20
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -426,23 +210,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )gencheck,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.20-gencheck,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-3\.0$
     - ^release-3\.0-
-    cluster: build09
-    context: ci/prow/integration
+    cluster: build05
+    context: ci/prow/ocp-4.20-integration
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 1h0m0s
     labels:
+      ci-operator.openshift.io/variant: ocp-4.20
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-integration
-    rerun_command: /test integration
+    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-ocp-4.20-integration
+    rerun_command: /test ocp-4.20-integration
     spec:
       containers:
       - args:
@@ -450,9 +234,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=integration
+        - --variant=ocp-4.20
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -482,23 +267,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )integration,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.20-integration,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-3\.0$
     - ^release-3\.0-
-    cluster: build09
-    context: ci/prow/lint
+    cluster: build05
+    context: ci/prow/ocp-4.20-lint
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 20m0s
     labels:
+      ci-operator.openshift.io/variant: ocp-4.20
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-lint
-    rerun_command: /test lint
+    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-ocp-4.20-lint
+    rerun_command: /test ocp-4.20-lint
     spec:
       containers:
       - args:
@@ -506,9 +291,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=lint
+        - --variant=ocp-4.20
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -538,24 +324,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )lint,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.20-lint,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-3\.0$
     - ^release-3\.0-
-    cluster: build03
-    context: ci/prow/scorecard
+    cluster: build05
+    context: ci/prow/ocp-4.20-scorecard
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
+      ci-operator.openshift.io/variant: ocp-4.20
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-scorecard
-    rerun_command: /test scorecard
+    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-ocp-4.20-scorecard
+    rerun_command: /test ocp-4.20-scorecard
     run_if_changed: ^bundle/
     spec:
       containers:
@@ -566,9 +353,10 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=scorecard
+        - --variant=ocp-4.20
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -613,23 +401,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )scorecard,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.20-scorecard,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-3\.0$
     - ^release-3\.0-
-    cluster: build09
-    context: ci/prow/unit
+    cluster: build05
+    context: ci/prow/ocp-4.20-unit
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 1h0m0s
     labels:
+      ci-operator.openshift.io/variant: ocp-4.20
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-unit
-    rerun_command: /test unit
+    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-ocp-4.20-unit
+    rerun_command: /test ocp-4.20-unit
     spec:
       containers:
       - args:
@@ -637,9 +425,10 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=unit
+        - --variant=ocp-4.20
         command:
         - ci-operator
-        image: ci-operator:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
         resources:
@@ -669,4 +458,82 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )ocp-4.20-unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-3\.0$
+    - ^release-3\.0-
+    cluster: build05
+    context: ci/prow/ocp-4.21-e2e-ocp
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: ossm-aws
+      ci-operator.openshift.io/variant: ocp-4.21
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-service-mesh-sail-operator-release-3.0-ocp-4.21-e2e-ocp
+    rerun_command: /test ocp-4.21-e2e-ocp
+    skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-ocp
+        - --variant=ocp-4.21
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ocp-4.21-e2e-ocp,?($|\s.*)

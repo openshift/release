@@ -5,18 +5,6 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-# Ensure our UID, which is randomly generated, is in /etc/passwd. This is required to be able to SSH.
-if ! whoami &>/dev/null; then
-  if [[ -w /etc/passwd ]]; then
-    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >>/etc/passwd
-  else
-    echo "/etc/passwd is not writeable, and user matching this uid is not found."
-    exit 1
-  fi
-fi
-curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh -o /tmp/install.sh
-chmod +x /tmp/install.sh
-/tmp/install.sh --accept-all-defaults --exec-dir /tmp 2>/dev/null
 
 source "${SHARED_DIR}"/platform-conf.sh
 CONTENT=$(<"${CLUSTER_PROFILE_DIR}"/oci-privatekey)
@@ -27,9 +15,9 @@ echo "export NAMESPACE_NAME=${NAMESPACE_NAME}; export BUCKET_NAME=${BUCKET_NAME}
 CLUSTER_NAME=$(<"${SHARED_DIR}"/cluster-name.txt)
 BASE_DOMAIN=$(<"${SHARED_DIR}"/base-domain.txt)
 
-machineNetwork=$( [ "${ISCSI:-false}" == "true" ] && echo "10.0.32.0/20" || echo "10.0.16.0/20" )
+machineNetwork="10.0.16.0/20"
 
-yq-v4 --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
+yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<<"
 baseDomain: ${BASE_DOMAIN}
 controlPlane:
   name: master
@@ -46,17 +34,14 @@ platform:
     platformName: oci
 "
 
-pull_secret_path=${CLUSTER_PROFILE_DIR}/pull-secret
-build03_secrets="/var/run/vault/secrets/.dockerconfigjson"
-extract_build03_auth=$(jq -c '.auths."registry.build03.ci.openshift.org"' ${build03_secrets})
-final_pull_secret=$(jq -c --argjson auth "$extract_build03_auth" '.auths["registry.build03.ci.openshift.org"] += $auth' "${pull_secret_path}")
-
-echo "${final_pull_secret}" >>"${SHARED_DIR}"/pull-secrets
-pull_secret=$(<"${SHARED_DIR}/pull-secrets")
+cp "${CLUSTER_PROFILE_DIR}"/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+pull_secret_path=/tmp/pull-secret
+pull_secret=$(jq -c . < "$pull_secret_path")
 
 # Add build03 secrets if the mirror registry secrets are not available.
 if [ ! -f "${SHARED_DIR}/pull_secret_ca.yaml.patch" ]; then
-  yq-v4 -i 'del(.pullSecret)' "${SHARED_DIR}/install-config.yaml"
+  yq -i 'del(.pullSecret)' "${SHARED_DIR}/install-config.yaml"
   cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
 pullSecret: >
   ${pull_secret}
@@ -68,12 +53,12 @@ mkdir -p "${INSTALL_DIR}"/openshift
 pushd ${INSTALL_DIR}
 cp -t "${INSTALL_DIR}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
 
-echo "Installing from initial release $RELEASE_IMAGE_LATEST"
-oc adm release extract -a "${SHARED_DIR}"/pull-secrets "$RELEASE_IMAGE_LATEST" \
+echo "Installing from initial release $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
+oc adm release extract -a "$pull_secret_path" "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" \
   --command=openshift-install --to=/tmp
-
+rm ${pull_secret_path}
 echo "Copying Custom Manifest"
-/tmp/oci resource-manager job-output-summary list-job-outputs \
+oci resource-manager job-output-summary list-job-outputs \
 --job-id "${JOB_ID}" \
 --query "data.items[?\"output-name\"=='dynamic_custom_manifest'].\"output-value\" | [0]" \
 --raw-output > "${INSTALL_DIR}"/openshift/custom-manifest.yaml
@@ -81,6 +66,9 @@ echo "Copying Custom Manifest"
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then
     export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
 fi
+
+grep -v "password\|username\|pullSecret" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
+grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
 
 /tmp/openshift-install agent create image --dir="${INSTALL_DIR}" --log-level debug
 
@@ -93,12 +81,12 @@ AGENT_IMAGE="agent.x86_64_${CLUSTER_NAME}.iso"
 mv "${INSTALL_DIR}"/agent.x86_64.iso "${INSTALL_DIR}"/"${AGENT_IMAGE}"
 echo "${AGENT_IMAGE}" > "${SHARED_DIR}"/agent-image.txt
 
-/tmp/oci os object put -bn "${BUCKET_NAME}" --file "${INSTALL_DIR}"/"${AGENT_IMAGE}" -ns "${NAMESPACE_NAME}"
+oci os object put -bn "${BUCKET_NAME}" --file "${INSTALL_DIR}"/"${AGENT_IMAGE}" -ns "${NAMESPACE_NAME}"
 
 EXPIRE_DATE=$(date -d "+7 days" +"%Y-%m-%d")
 
 echo "Creating Pre-auth Request"
-IMAGE_URI=$(/tmp/oci os preauth-request create \
+IMAGE_URI=$(oci os preauth-request create \
 -bn "${BUCKET_NAME}" \
 -ns "${NAMESPACE_NAME}" \
 --access-type ObjectRead \
@@ -117,23 +105,28 @@ VARIABLES=$(cat <<EOF
 "tenancy_ocid":"${OCI_CLI_TENANCY}",
 "create_openshift_instances":true,
 "compartment_ocid":"${COMPARTMENT_ID}",
-"region":"${OCI_CLI_REGION}"}
+"region":"${OCI_CLI_REGION}",
+"tag_namespace_name":"openshift-ci-abi",
+"enable_public_api_lb":true,
+"use_existing_tags":true,
+"tag_namespace_compartment_ocid":"${COMPARTMENT_ID}",
+"tag_namespace_compartment_ocid_resource_tagging":"${OCI_CLI_TENANCY}"}
 EOF
 )
 
 if [ "${ISCSI:-false}" = "true" ]; then
-    VARIABLES=$(echo "${VARIABLES}" | jq '. + {control_plane_shape:"BM.Standard2.52",compute_shape:"BM.Standard3.64",rendezvous_ip:"10.0.32.20"}')
+    VARIABLES=$(echo "${VARIABLES}" | jq '. + {control_plane_shape:"BM.Standard2.52",compute_shape:"BM.Standard3.64",rendezvous_ip:"10.0.16.20"}')
 fi
 
 echo "Updating Stack Variables"
-/tmp/oci resource-manager stack update \
+oci resource-manager stack update \
 --stack-id "${STACK_ID}" \
 --variables "${VARIABLES}" \
 --query 'data.id' --raw-output \
 --force
 
 echo "Creating Apply Job"
-/tmp/oci resource-manager job create-apply-job \
+oci resource-manager job create-apply-job \
 --stack-id "${STACK_ID}" \
 --execution-plan-strategy AUTO_APPROVED \
 --max-wait-seconds 2400 \
@@ -162,4 +155,4 @@ if ! wait "$!"; then
 fi
 
 echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
-oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=15m
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m

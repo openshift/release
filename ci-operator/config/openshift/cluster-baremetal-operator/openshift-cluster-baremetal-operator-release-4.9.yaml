@@ -39,10 +39,6 @@ build_root:
   from_repository: true
 images:
 - from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-baremetal-operator
 promotion:
   to:
@@ -97,7 +93,8 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-metal-ipi
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
@@ -107,15 +104,17 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-serial-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-ipv4
-- as: e2e-metal-ipi-upgrade
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-upgrade
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -127,7 +126,8 @@ tests:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade-sdn
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
@@ -136,10 +136,11 @@ tests:
         IP_STACK=v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-dualstack
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -147,24 +148,27 @@ tests:
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-virtualmedia
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-virtualmedia
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
-- as: e2e-metal-assisted
+- always_run: false
+  as: e2e-metal-assisted
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: packet-assisted
-    workflow: assisted-baremetal
-- as: e2e-aws
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-aws
   optional: true
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.9

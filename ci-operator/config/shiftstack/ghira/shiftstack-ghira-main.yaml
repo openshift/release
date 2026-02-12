@@ -1,0 +1,30 @@
+binary_build_commands: go build -o /bin/ghira .
+build_root:
+  from_repository: true
+promotion:
+  to:
+  - additional_images:
+      ghira: bin
+    name: tooling
+    namespace: shiftstack
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: go-vet
+  commands: go vet ./...
+  container:
+    from: src
+- as: go-fmt
+  commands: if [ "$(gofmt -s -l cmd | tee /dev/stderr | wc -l)" -gt 0 ]; then exit
+    1; fi
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: shiftstack
+  repo: ghira

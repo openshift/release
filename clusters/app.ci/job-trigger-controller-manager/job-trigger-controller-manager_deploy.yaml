@@ -4,7 +4,10 @@ metadata:
   namespace: ci
   name: job-trigger-controller-manager
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"job-trigger-controller-manager:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"job-trigger-controller-manager\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
   labels:
     app: pr-payload-tests
     component: job-trigger-controller-manager
@@ -22,8 +25,9 @@ spec:
     spec:
       serviceAccount: job-trigger-controller-manager
       containers:
-      - image: job-trigger-controller-manager:latest
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_job-trigger-controller-manager_latest
         name: job-trigger-controller-manager
+        imagePullPolicy: Always
         command:
         - job-trigger-controller-manager
         args:

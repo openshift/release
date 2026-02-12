@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-
+sleep 8s
 if [[ "$QUAY_STORAGE_PROVIDER" == 'gcp' ]]; then
     #Copy GCP auth.json from mounted secret to current directory
     mkdir -p QUAY_GCP && cd QUAY_GCP
@@ -63,6 +63,21 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'awssts' ]]; then
     export TF_VAR_aws_sts_user_name="${QUAY_AWS_STS_USER}"
 
     echo "Start to destroy quay aws sts ..."
+    terraform init
+    terraform destroy -auto-approve || true
+fi
+
+if [[ "$QUAY_STORAGE_PROVIDER" == 'S3CloudFront' ]]; then
+    mkdir -p QUAY_S3CloundFront && cd QUAY_S3CloundFront
+    cp "${SHARED_DIR}/terraform.s3cf.tgz" .
+    tar -xzvf terraform.s3cf.tgz && ls
+
+    QUAY_AWS_S3_CF_BUCKET=$(cat "${SHARED_DIR}/QUAY_AWS_S3_CF_BUCKET")
+    randomnum=$(cat "${SHARED_DIR}/QUAY_AWS_CF_RANDOM")
+    export TF_VAR_aws_bucket="${QUAY_AWS_S3_CF_BUCKET}"
+    export TF_VAR_quay_s3_origin_id="quay_origin_id${randomnum}"
+
+    echo "Start to destroy quay aws s3 cloudfront ..."
     terraform init
     terraform destroy -auto-approve || true
 fi

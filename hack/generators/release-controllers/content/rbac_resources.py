@@ -4,7 +4,7 @@ from config import Context
 
 def _release_admins_cluster_role(gendoc):
     gendoc.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'ClusterRole',
         'metadata': {
             'name': 'openshift-release-admins'
@@ -92,7 +92,7 @@ def _add_release_admin_cluster_role_bindings(gendoc, namespace):
 
 def _release_controller_developers_cluster_role(gendoc):
     gendoc.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'ClusterRole',
         'metadata': {
             'name': 'openshift-release-controller-developers'
@@ -134,7 +134,7 @@ def _add_release_controller_developers_cluster_role_bindings(gendoc, namespace):
 
 def _release_payload_modifiers_cluster_role(gendoc):
     gendoc.append({
-        'apiVersion': 'authorization.openshift.io/v1',
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'ClusterRole',
         'metadata': {
             'name': 'openshift-release-payload-modifiers'

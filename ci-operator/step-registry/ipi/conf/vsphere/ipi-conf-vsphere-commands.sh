@@ -112,6 +112,13 @@ VERSION=$(oc adm release info ${TESTING_RELEASE_IMAGE} --output=json | jq -r '.m
 
 set -o errexit
 
+# Ensure at least 3 control planes for vSphere. Single node is not supported.
+CONTROL_PLANE_REPLICAS=${CONTROL_PLANE_REPLICAS:-3}
+if [ "${CONTROL_PLANE_REPLICAS}" -lt 3 ]; then
+  echo "CONTROL_PLANE_REPLICAS must be at least 3 for vSphere"
+  exit 1
+fi
+
 Z_VERSION=1000
 
 if [ ! -z ${VERSION} ]; then
@@ -177,6 +184,30 @@ if [[ "${SIZE_VARIANT}" == "compact" ]]; then
 compute:
 - name: worker
   replicas: 0"
+fi
+
+if [[ "${SIZE_VARIANT}" == "large" ]]; then
+  echo "Large SIZE_VARIANT was configured, setting master and worker to 8 vCPU, 32 GB RAM (matches AWS m6a.2xlarge)"
+  MACHINE_POOL_OVERRIDES="controlPlane:
+  name: master
+  replicas: 3
+  platform:
+    vsphere:
+      cpus: 8
+      coresPerSocket: 8
+      memoryMB: 32768
+      osDisk:
+        diskSizeGB: 120
+compute:
+- name: worker
+  replicas: ${COMPUTE_NODE_REPLICAS}
+  platform:
+    vsphere:
+      cpus: 8
+      coresPerSocket: 8
+      memoryMB: 32768
+      osDisk:
+        diskSizeGB: 120"
 fi
 
 if [ "${Z_VERSION}" -lt 13 ]; then
@@ -268,7 +299,12 @@ if [ ${Z_VERSION} -gt 9 ]; then
       fi
       if [ -f ${PULL_THROUGH_CACHE_CONFIG} ]; then
         echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration found. updating install-config"
-        cat ${PULL_THROUGH_CACHE_CONFIG} >>${CONFIG}
+        if [ "${Z_VERSION}" -lt 14 ]; then
+          echo "$(date -u --rfc-3339=seconds) - detected OCP version < 4.14.  converting imageDigestSources to imageContentSources for backwards compatability."
+          cat ${PULL_THROUGH_CACHE_CONFIG} | sed 's/imageDigestSources/imageContentSources/g' >>${CONFIG}
+        else
+          cat ${PULL_THROUGH_CACHE_CONFIG} >>${CONFIG}
+        fi
       else
         echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration not found. not updating install-config"
       fi

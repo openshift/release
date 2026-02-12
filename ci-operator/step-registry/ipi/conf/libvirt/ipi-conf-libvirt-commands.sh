@@ -38,6 +38,9 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 
 BASE_DOMAIN="${LEASED_RESOURCE}.ci"
 CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+if [[ "${LEASED_RESOURCE}" == *ppc64le* ]]; then
+  CLUSTER_NAME="${LEASED_RESOURCE}"
+fi
 CLUSTER_SUBNET="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".subnet" "${CLUSTER_PROFILE_DIR}/leases")"
 if [[ -z "${CLUSTER_SUBNET}" ]]; then
   echo "Failed to lookup subnet"
@@ -56,7 +59,7 @@ controlPlane:
   replicas: ${MASTER_REPLICAS}
 networking:
   clusterNetwork:
-  - cidr: 10.128.0.0/14
+  - cidr: 10.8.0.0/14
     hostPrefix: 23
   machineCIDR: 192.168.${CLUSTER_SUBNET}.0/24
   networkType: OVNKubernetes

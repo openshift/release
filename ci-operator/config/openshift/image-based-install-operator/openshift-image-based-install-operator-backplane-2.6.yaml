@@ -3,22 +3,14 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-9-release-golang-1.22-openshift-4.19
 images:
 - dockerfile_path: Dockerfile
   from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: image-based-install-operator
 promotion:
   to:
@@ -42,6 +34,7 @@ tests:
   commands: HOME=/tmp make test
   container:
     from: src
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
 - as: integration
   cluster_claim:
     architecture: amd64
@@ -50,6 +43,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.14"
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
   steps:
     allow_best_effort_post_steps: true
     test:

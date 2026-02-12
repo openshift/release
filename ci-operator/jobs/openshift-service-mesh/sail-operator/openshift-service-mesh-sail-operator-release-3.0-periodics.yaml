@@ -1,19 +1,27 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
-  cron: 00 03 * * 1-5
+  cluster: build11
+  cron: 00 0,3,6,9,12,15,18,21 * * 1-5
   decorate: true
   decoration_config:
     skip_cloning: true
-    timeout: 20m0s
   extra_refs:
   - base_ref: release-3.0
     org: openshift-service-mesh
     repo: sail-operator
   labels:
+    ci-operator.openshift.io/variant: ocp-4.20
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-service-mesh-sail-operator-release-3.0-sync-upstream
+  name: periodic-ci-openshift-service-mesh-sail-operator-release-3.0-ocp-4.20-sync-upstream
+  reporter_config:
+    slack:
+      channel: '#team-ossm-release-maintenance'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -22,9 +30,10 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ossm-github-simple-job
       - --target=sync-upstream
+      - --variant=ocp-4.20
       command:
       - ci-operator
-      image: ci-operator:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
       resources:

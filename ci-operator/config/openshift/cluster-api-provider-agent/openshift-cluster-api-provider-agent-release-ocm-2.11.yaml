@@ -37,10 +37,7 @@ base_images:
     tag: latest
 binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.20
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   to: cluster-api-provider-agent
@@ -93,6 +90,9 @@ tests:
     from: src
   skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
 - as: e2e-ai-operator-ztp-capi
+  capabilities:
+  - intranet
+  skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -101,18 +101,7 @@ tests:
       INDEX_IMAGE: assisted-service-index
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
-    workflow: assisted-baremetal-operator-capi
-- as: e2e-ai-operator-ztp-capi-periodic
-  cron: 00 20 * * 1,4
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      HYPERSHIFT_IMAGE: hypershift-operator
-      INDEX_IMAGE: assisted-service-index
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
-    workflow: assisted-baremetal-operator-capi
+    workflow: assisted-ofcir-baremetal-operator-capi
 zz_generated_metadata:
   branch: release-ocm-2.11
   org: openshift

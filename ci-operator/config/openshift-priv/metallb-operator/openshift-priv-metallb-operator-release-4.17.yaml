@@ -15,14 +15,6 @@ base_images:
     name: 4.17-priv
     namespace: ocp-private
     tag: metallb-frr
-  ocp_builder_rhel-9-base-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-base-openshift-4.17
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
   operator-sdk:
     name: "4.17"
     namespace: origin
@@ -32,13 +24,6 @@ build_root:
 canonical_go_repository: github.com/openshift/metallb-operator
 images:
 - dockerfile_path: Dockerfile.openshift
-  inputs:
-    ocp_builder_rhel-9-base-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.17
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: metallb-operator
 - dockerfile_path: bundleci.Dockerfile
   to: metallb-operator-bundle
@@ -58,6 +43,9 @@ operator:
     with: pipeline:kube-rbac-proxy
 promotion:
   to:
+  - disabled: true
+    name: metallb-4.17
+    namespace: origin
   - name: 4.17-priv
     namespace: ocp-private
 releases:
@@ -115,7 +103,8 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: metallb-e2e-metal-frrk8s
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -127,7 +116,8 @@ tests:
         BGP_TYPE=frr-k8s
     workflow: baremetalds-metallb-e2e
 - as: metallb-e2e-metal-ipi-ovn
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:

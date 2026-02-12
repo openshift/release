@@ -70,4 +70,20 @@ status:
   networkType: OVNKubernetes
 EOF
 
-openshift-tests run "${TEST_SUITE}" -f "${CONFORMANCE_TEST_LIST}" -v 2 --provider=none -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"
+TEST_ARGS="--max-parallel-tests 30"
+# Starting in 4.21, we will aggressively retry test failures only in
+# presubmits to determine if a failure is a flake or legitimate. This is
+# to reduce the number of retests on PR's.
+if [[ "$JOB_TYPE" == "presubmit" && ( "$PULL_BASE_REF" == "main" || "$PULL_BASE_REF" == "master" ) ]]; then
+    if openshift-tests run --help | grep -q 'retry-strategy'; then
+        TEST_ARGS+=" --retry-strategy=aggressive"
+    fi
+fi
+
+openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-}  \
+  -f "${CONFORMANCE_TEST_LIST}" \
+  --max-parallel-tests 15 \
+  -v 2 \
+  --provider=none \
+  -o "${ARTIFACT_DIR}/e2e.log" \
+  --junit-dir "${ARTIFACT_DIR}/junit"

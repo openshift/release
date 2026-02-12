@@ -1,0 +1,57 @@
+base_images:
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
+  observability-operator-test-harness:
+    name: observability-operator-test-harness
+    namespace: ci
+    tag: latest
+  tools:
+    name: "4.12"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4G
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: coo-stage
+  cron: 30 0 * * 1
+  steps:
+    cluster_profile: azure-observability
+    env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE: quay.io/redhat-user-workloads/cluster-observabilit-tenant/cluster-observability-operator/coo-fbc-v4-12@sha256:876c53e409c0baaf07d9007234803d818ce35d00cb744aefe38541c7876b7fca
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"}
+        ]
+    test:
+    - ref: rhobs-konflux-catalogsource
+    - ref: install-operators
+    - ref: rhobs-obo-test-harness
+    workflow: cucushift-installer-rehearse-azure-ipi
+zz_generated_metadata:
+  branch: main
+  org: rhobs
+  repo: observability-operator
+  variant: amd64-ocp-4.12-azure

@@ -1,57 +1,47 @@
 base_images:
   base-rhel9:
-    name: "4.17"
+    name: "4.20"
     namespace: ocp
     tag: base-rhel9
-  cli-operator-sdk:
-    name: cli-operator-sdk
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+  upi-installer:
+    name: "4.20"
     namespace: ocp
-    tag: v1.30.0
-  ocp-golang-builder:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
+    tag: upi-installer
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/ci/Dockerfile
   from: base-rhel9
-  inputs:
-    ocp-golang-builder:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cert-manager-operator
 - dockerfile_path: images/ci/operand.Dockerfile
   from: base-rhel9
-  inputs:
-    ocp-golang-builder:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cert-manager
 operator:
   bundles:
   - as: cert-manager-operator-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
-  - pullspec: openshift.io/cert-manager-operator:latest
+  - pullspec: openshift.io/cert-manager-operator:.*
     with: pipeline:cert-manager-operator
-  - pullspec: quay.io/jetstack/cert-manager-controller:v1.15.5
+  - pullspec: quay.io/jetstack/cert-manager-controller:.*
     with: pipeline:cert-manager
-  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.15.5
+  - pullspec: quay.io/jetstack/cert-manager-webhook:.*
     with: pipeline:cert-manager
-  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.15.5
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:.*
     with: pipeline:cert-manager
 releases:
-  initial:
-    integration:
-      name: "4.17"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.17"
-      namespace: ocp
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -86,33 +76,169 @@ tests:
     test:
     - ref: fips-check-image-scan
 - as: e2e-operator
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace cert-manager-operator
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n cert-manager-operator "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n cert-manager-operator deployment cert-manager-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: cert-manager-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint} && !TechPreview"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: e2e-operator-tech-preview
+  optional: true
+  skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws-4
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"!/Platform:/"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-hypershift
+- always_run: false
+  as: e2e-operator-aws-proxy
+  optional: true
   steps:
     cluster_profile: aws
     dependencies:
       OO_BUNDLE: cert-manager-operator-bundle
     env:
-      FIPS_ENABLED: "true"
       OO_INSTALL_MODE: AllNamespaces
       OO_INSTALL_NAMESPACE: cert-manager-operator
       OO_SECURITY_CONTEXT: restricted
     test:
-    - as: install
-      cli: latest
-      commands: |
-        oc -n cert-manager-operator rollout status deployment cert-manager-operator-controller-manager
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    - ref: fips-check-fips-or-die
+    - ref: optional-operators-operator-sdk
     - as: test
       cli: latest
-      commands: make test-e2e
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-aws
+    workflow: openshift-e2e-aws-proxy
+- always_run: false
+  as: e2e-operator-aws-upi-proxy
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-upi-proxy
+- always_run: false
+  as: e2e-operator-aws-sts
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Manual}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-manual-oidc-sts
+- always_run: false
+  as: e2e-operator-gcp-ovn
+  optional: true
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {GCP} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-gcp-ovn
+- always_run: false
+  as: e2e-operator-gcp-workload-identity
+  optional: true
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {GCP} && CredentialsMode: isSubsetOf {Manual}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
 zz_generated_metadata:
   branch: master
   org: openshift

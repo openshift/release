@@ -24,7 +24,7 @@ spec:
   tags:
   - from:
       kind: DockerImage
-      name: image-registry.openshift-image-registry.svc:5000/ocp/4.16:tools
+      name: image-registry.openshift-image-registry.svc:5000/ocp/4.21:tools
     importPolicy:
       scheduled: true
     name: tools
@@ -44,7 +44,7 @@ spec:
   host: openshift-release-ppc64le-priv.apps.ci.l2s4.p1.openshiftapps.com
   tls:
     insecureEdgeTerminationPolicy: Redirect
-    termination: Reencrypt
+    termination: reencrypt
   to:
     kind: Service
     name: release-controller-api-ocp-ppc64le-priv
@@ -140,7 +140,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
   name: release-controller-ocp-ppc64le-priv
   namespace: ci
 spec:
@@ -156,7 +159,7 @@ spec:
       containers:
       - args:
         - --repo=https://github.com/openshift/release.git
-        - --ref=master
+        - --ref=main
         - --period=30s
         - --root=/tmp/git-sync
         - --max-failures=3
@@ -187,7 +190,7 @@ spec:
         - -cookie-secret-file=/etc/proxy/secrets/session_secret
         - -tls-cert=/etc/tls/private/tls.crt
         - -tls-key=/etc/tls/private/tls.key
-        image: quay.io/openshift/origin-oauth-proxy:4.16
+        image: quay.io/openshift/origin-oauth-proxy:4.19
         imagePullPolicy: IfNotPresent
         name: oauth-proxy
         ports:
@@ -230,7 +233,8 @@ spec:
           value: /tmp/home
         - name: XDG_RUNTIME_DIR
           value: /tmp/home/run
-        image: release-controller:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
@@ -278,7 +282,7 @@ spec:
       initContainers:
       - args:
         - --repo=https://github.com/openshift/release.git
-        - --ref=master
+        - --ref=main
         - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
@@ -293,7 +297,7 @@ spec:
       - command:
         - /bin/bash
         - -c
-        - "#!/bin/bash\nset -euo pipefail\ntrap 'kill $(jobs -p); exit 0' TERM\n\nSECONDS=0\n\n# ensure we are logged in to our registry\nmkdir -p ${XDG_RUNTIME_DIR}/containers\ncp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true\n\n# global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods\ngit config --global credential.helper store\ngit config --global user.name test\ngit config --global user.email test@test.com\noc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json\n\nFROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-stable\"][0] // empty')\nTO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-dev-preview\"][0] // empty')\n\nif [[ -n \"$FROM\" && -n \"$TO\" ]]\nthen\n    echo \"Pre-populating the git cache...\"\n    oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64\nelse\n    echo \"Unable to Pre-populate the git cache!\"\nfi\n\nDURATION=$SECONDS\necho \"Took: $(($DURATION / 60))m $(($DURATION % 60))s\"\n            "
+        - "#!/bin/bash\n            set -euo pipefail\n            trap 'kill $(jobs -p); exit 0' TERM\n\n            SECONDS=0\n\n            # ensure we are logged in to our registry\n            mkdir -p ${XDG_RUNTIME_DIR}/containers\n            cp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true\n\n            # global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods\n            git config --global credential.helper store\n            git config --global user.name test\n            git config --global user.email test@test.com\n            oc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json\n\n            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I -w '%{http_code}' https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted)\n            if [[ \"$RC_SERVICE_AVAILABLE\" -ne 200 ]]\n            then\n                FROM=\"\"\n                TO=\"\"\n            else\n                FROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-stable\"][0] // empty')\n                TO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-dev-preview\"][0] // empty')\n            fi\n\n            if [[ -n \"$FROM\" && -n \"$TO\" ]]\n            then\n                echo \"Pre-populating the git cache...\"\n                oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64\n            else\n                echo \"Unable to Pre-populate the git cache!\"\n            fi\n\n            DURATION=$SECONDS\n            echo \"Took: $(($DURATION / 60))m $(($DURATION % 60))s\"\n                        "
         env:
         - name: HOME
           value: /tmp/home
@@ -365,7 +369,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller-api:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+    keel.sh/matchTag: 'true'
+    keel.sh/policy: force
+    keel.sh/pollSchedule: '@every 5m'
+    keel.sh/trigger: poll
   name: release-controller-api-ocp-ppc64le-priv
   namespace: ci
 spec:
@@ -394,7 +401,7 @@ spec:
         - -cookie-secret-file=/etc/proxy/secrets/session_secret
         - -tls-cert=/etc/tls/private/tls.crt
         - -tls-key=/etc/tls/private/tls.key
-        image: quay.io/openshift/origin-oauth-proxy:4.16
+        image: quay.io/openshift/origin-oauth-proxy:4.19
         imagePullPolicy: IfNotPresent
         name: oauth-proxy
         ports:
@@ -427,7 +434,8 @@ spec:
           value: /tmp/home
         - name: XDG_RUNTIME_DIR
           value: /tmp/home/run
-        image: release-controller-api:latest
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller-api_latest
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
@@ -465,7 +473,7 @@ spec:
       - command:
         - /bin/bash
         - -c
-        - "#!/bin/bash\nset -euo pipefail\ntrap 'kill $(jobs -p); exit 0' TERM\n\nSECONDS=0\n\n# ensure we are logged in to our registry\nmkdir -p ${XDG_RUNTIME_DIR}/containers\ncp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true\n\n# global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods\ngit config --global credential.helper store\ngit config --global user.name test\ngit config --global user.email test@test.com\noc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json\n\nFROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-stable\"][0] // empty')\nTO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-dev-preview\"][0] // empty')\n\nif [[ -n \"$FROM\" && -n \"$TO\" ]]\nthen\n    echo \"Pre-populating the git cache...\"\n    oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64\nelse\n    echo \"Unable to Pre-populate the git cache!\"\nfi\n\nDURATION=$SECONDS\necho \"Took: $(($DURATION / 60))m $(($DURATION % 60))s\"\n            "
+        - "#!/bin/bash\n            set -euo pipefail\n            trap 'kill $(jobs -p); exit 0' TERM\n\n            SECONDS=0\n\n            # ensure we are logged in to our registry\n            mkdir -p ${XDG_RUNTIME_DIR}/containers\n            cp /tmp/pull-secret/auth.json ${XDG_RUNTIME_DIR}/containers/auth.json || true\n\n            # global git config stored to $HOME/.gitconfig which is shared with the main release-controller pods\n            git config --global credential.helper store\n            git config --global user.name test\n            git config --global user.email test@test.com\n            oc registry login --to ${XDG_RUNTIME_DIR}/containers/auth.json\n\n            RC_SERVICE_AVAILABLE=$(curl -s -o /dev/null -I -w '%{http_code}' https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted)\n            if [[ \"$RC_SERVICE_AVAILABLE\" -ne 200 ]]\n            then\n                FROM=\"\"\n                TO=\"\"\n            else\n                FROM=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-stable\"][0] // empty')\n                TO=$(curl -s https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestreams/accepted | jq -r '.[\"4-dev-preview\"][0] // empty')\n            fi\n\n            if [[ -n \"$FROM\" && -n \"$TO\" ]]\n            then\n                echo \"Pre-populating the git cache...\"\n                oc adm release info --changelog=/tmp/git quay.io/openshift-release-dev/ocp-release:$FROM-x86_64 quay.io/openshift-release-dev/ocp-release:$TO-x86_64\n            else\n                echo \"Unable to Pre-populate the git cache!\"\n            fi\n\n            DURATION=$SECONDS\n            echo \"Took: $(($DURATION / 60))m $(($DURATION % 60))s\"\n                        "
         env:
         - name: HOME
           value: /tmp/home
@@ -614,7 +622,7 @@ spec:
   host: openshift-release-artifacts-ppc64le-priv.apps.ci.l2s4.p1.openshiftapps.com
   tls:
     insecureEdgeTerminationPolicy: Redirect
-    termination: Reencrypt
+    termination: reencrypt
   to:
     kind: Service
     name: files-cache-oauth-proxy
@@ -655,7 +663,7 @@ spec:
         - -cookie-secret-file=/etc/proxy/secrets/session_secret
         - -tls-cert=/etc/tls/private/tls.crt
         - -tls-key=/etc/tls/private/tls.key
-        image: quay.io/openshift/origin-oauth-proxy:4.16
+        image: quay.io/openshift/origin-oauth-proxy:4.19
         imagePullPolicy: IfNotPresent
         name: oauth-proxy
         ports:

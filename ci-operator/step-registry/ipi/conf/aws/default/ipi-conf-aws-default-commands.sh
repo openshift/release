@@ -8,6 +8,13 @@ set -o pipefail
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
+if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+  echo "Using default value: ${BASE_DOMAIN}"
+  AWS_BASE_DOMAIN="${BASE_DOMAIN}"
+else
+  AWS_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
+fi
+
 expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 
 REGION="${LEASED_RESOURCE}"
@@ -26,7 +33,7 @@ fi
 
 PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
 cat > "${PATCH}" << EOF
-baseDomain: ${BASE_DOMAIN}
+baseDomain: ${AWS_BASE_DOMAIN}
 platform:
   aws:
     region: ${REGION}

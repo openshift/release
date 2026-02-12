@@ -11,14 +11,6 @@ base_images:
     name: 4.10-priv
     namespace: ocp-private
     tag: must-gather
-  ocp_builder_rhel-7-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-7-golang-1.17-openshift-4.10
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
   tests-base:
     name: 4.10-priv
     namespace: ocp-private
@@ -30,27 +22,15 @@ canonical_go_repository: github.com/openshift/oc
 images:
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: cli
 - context_dir: images/tools
   from: cli
   to: tools
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: tests-base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: tests
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: must-gather-base
-  inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: must-gather
 - context_dir: images/deployer
   dockerfile_path: Dockerfile.rhel
@@ -58,13 +38,6 @@ images:
   to: deployer
 - dockerfile_path: images/cli-artifacts/Dockerfile.rhel
   from: cli
-  inputs:
-    ocp_builder_rhel-7-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-7-golang-1.17-openshift-4.10
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: cli-artifacts
 - context_dir: images/recycler/
   dockerfile_path: Dockerfile.rhel
@@ -140,7 +113,7 @@ tests:
     from: test-bin
 - as: e2e-aws
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws
 - as: e2e-aws-serial
   steps:
@@ -154,15 +127,17 @@ tests:
     workflow: openshift-e2e-azure
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: e2e-aws-builds
   run_if_changed: ^(pkg/.*build.*)|^(pkg/.*newapp.*)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-builds
-- as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-ovn-ipv6
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal

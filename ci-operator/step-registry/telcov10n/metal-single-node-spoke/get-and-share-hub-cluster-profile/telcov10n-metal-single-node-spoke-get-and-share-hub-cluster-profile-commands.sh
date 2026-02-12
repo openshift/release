@@ -7,20 +7,7 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
-function setup_aux_host_ssh_access {
-
-  echo "************ telcov10n Setup AUX_HOST SSH access ************"
-
-  SSHOPTS=(
-    -o 'ConnectTimeout=5'
-    -o 'StrictHostKeyChecking=no'
-    -o 'UserKnownHostsFile=/dev/null'
-    -o 'ServerAliveInterval=90'
-    -o LogLevel=ERROR
-    -i "${CLUSTER_PROFILE_DIR}/ssh-key"
-  )
-
-}
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
 
 function append_pr_tag_cluster_profile_artifacts {
 
@@ -58,11 +45,17 @@ function share_hub_cluster_profile {
   cp -v $local_hub_cluster_profile/* ${SHARED_DIR}/
 }
 
+function set_hub_kubeconfig_as_default {
+  echo "************ telcov10n Set the Hub cluster kubeconfig file as default to be used in later steps ************"
+  cp -v ${SHARED_DIR}/hub-kubeconfig ${SHARED_DIR}/kubeconfig
+}
+
 function main {
   setup_aux_host_ssh_access
   append_pr_tag_cluster_profile_artifacts
   get_hub_cluster_profile_artifacts
   share_hub_cluster_profile
+  set_hub_kubeconfig_as_default
 }
 
 main

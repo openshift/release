@@ -1,12 +1,4 @@
 base_images:
-  ocp_4.15_base-rhel9:
-    name: 4.15-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.15
   openstack-installer:
     name: 4.15-priv
     namespace: ocp-private
@@ -36,31 +28,10 @@ build_root:
 canonical_go_repository: github.com/openshift/sriov-network-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
-  inputs:
-    ocp_4.15_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: sriov-network-operator
 - dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
-  inputs:
-    ocp_4.15_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: sriov-network-config-daemon
 - dockerfile_path: Dockerfile.webhook.rhel7
-  inputs:
-    ocp_4.15_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.15:base-rhel9
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: sriov-network-webhook
 operator:
   bundles:
@@ -124,7 +95,7 @@ tests:
     from: src
 - as: operator-e2e
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
       OO_INDEX: ci-index-sriov-network-operator-bundle
     env:
@@ -141,7 +112,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
-- as: e2e-openstack-nfv
+- always_run: false
+  as: e2e-openstack-nfv
   optional: true
   steps:
     cluster_profile: openstack-nfv
@@ -152,7 +124,8 @@ tests:
     workflow: openshift-e2e-openstack-sriov-cgroupsv1
 - always_run: false
   as: e2e-telco5g-sriov
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
   restrict_network_access: false
   steps:
@@ -160,7 +133,6 @@ tests:
       T5CI_JOB_TYPE: sriov
       T5CI_VERSION: "4.15"
     workflow: telco5g-sriov
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

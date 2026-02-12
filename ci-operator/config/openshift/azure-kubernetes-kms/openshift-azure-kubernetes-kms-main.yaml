@@ -1,0 +1,56 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.openshift
+  to: azure-kms-encryption-provider
+promotion:
+  to:
+  - name: "4.22"
+    namespace: ocp
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.22"
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.22"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+- as: e2e-hypershift
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-e2e-external
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: azure-kubernetes-kms

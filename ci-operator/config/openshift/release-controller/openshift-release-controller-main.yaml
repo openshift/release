@@ -2,7 +2,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.59.0
+    tag: latest
   govulncheck:
     name: govulncheck
     namespace: ci
@@ -12,7 +12,7 @@ base_images:
     namespace: openshift
     tag: stream9
   tools:
-    name: "4.16"
+    name: "4.21"
     namespace: ocp
     tag: tools
 binary_build_commands: make
@@ -51,9 +51,30 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/release-controller/release-reimport-controller
   to: release-reimport-controller
+- dockerfile_path: images/release-mirror-cleanup-controller/Dockerfile
+  from: tools
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/release-controller/release-mirror-cleanup-controller
+  to: release-mirror-cleanup-controller
+- dockerfile_literal: |-
+    FROM pipeline:govulncheck
+    COPY release-controller /workdir
+    WORKDIR /workdir
+  from: govulncheck
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/release-controller
+  to: govulncheck-src
 promotion:
   to:
-  - namespace: ci
+  - excluded_images:
+    - govulncheck-src
+    namespace: ci
     tag: latest
 resources:
   '*':
@@ -70,16 +91,31 @@ tests:
   container:
     from: src
 - as: govulncheck
-  commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck ./...
-  container:
-    from: govulncheck
-  optional: true
+  steps:
+    test:
+    - as: govulncheck
+      commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) make vulncheck
+      from: pipeline:govulncheck-src
+      resources:
+        limits:
+          memory: 11Gi
+        requests:
+          cpu: 500m
+          memory: 8Gi
 - as: security
   optional: true
   steps:
     env:
       PROJECT_NAME: openshift/release-controller
     workflow: openshift-ci-security
+- as: verify-codegen-script
+  commands: make verify-codegen-script
+  container:
+    from: src
+- as: verify-codegens-crds
+  commands: make verify-codegen-crds
+  container:
+    from: src
 zz_generated_metadata:
   branch: main
   org: openshift

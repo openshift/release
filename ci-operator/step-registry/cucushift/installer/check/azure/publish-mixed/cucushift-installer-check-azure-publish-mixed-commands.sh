@@ -17,6 +17,7 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
@@ -46,6 +47,7 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 API_PUBLISH_STRATEGY=$(yq-go r "${INSTALL_CONFIG}" 'operatorPublishingStrategy.apiserver')
@@ -58,6 +60,7 @@ RESOURCE_GROUP=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.resourceGroupName')
 if [[ -z "${RESOURCE_GROUP}" ]]; then
     RESOURCE_GROUP="${INFRA_ID}-rg"
 fi
+USER_PROVISIONED_DNS=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.userProvisionedDNS')
 
 PUBLIC_LB_NAME="${INFRA_ID}"
 INTERNAL_LB_NAME="${INFRA_ID}-internal"
@@ -119,12 +122,16 @@ if [[ "${API_PUBLISH_STRATEGY}" == "Internal" ]]; then
         fi
     fi
 
-    echo "(*) check that api dns record is not created in public zone..."
-    ret=0
-    az network dns record-set cname show --name ${API_DNS_NAME} --resource-group ${BASE_DOMAIN_RESOURCE_GROUP} --zone-name ${BASE_DOMAIN} || ret=1
-    if (( ret == 0 )); then
-        echo "ERROR: found api dns in public zone!"
-        check_result=1
+    if [[ "${USER_PROVISIONED_DNS}" != "Enabled" ]]; then
+        echo "(*) check that api dns record is not created in public zone..."
+        ret=0
+        az network dns record-set cname show --name ${API_DNS_NAME} --resource-group ${BASE_DOMAIN_RESOURCE_GROUP} --zone-name ${BASE_DOMAIN} || ret=1
+        if (( ret == 0 )); then
+            echo "ERROR: found api dns in public zone!"
+            check_result=1
+        fi
+    else
+        echo "(*) skip api dns record check in public zone, because parameter userProvisionedDNS is enabled!"
     fi
 
 else
@@ -167,12 +174,16 @@ else
         check_result=1
     fi
 
-    echo "(*) check that api dns record is created in public zone..."
-    ret=0
-    az network dns record-set cname show --name ${API_DNS_NAME} --resource-group ${BASE_DOMAIN_RESOURCE_GROUP} --zone-name ${BASE_DOMAIN} || ret=1
-    if (( ret == 1 )); then
-        echo "ERROR: not found api dns in public zone!"
-        check_result=1
+    if [[ "${USER_PROVISIONED_DNS}" != "Enabled" ]]; then
+        echo "(*) check that api dns record is created in public zone..."
+        ret=0
+        az network dns record-set cname show --name ${API_DNS_NAME} --resource-group ${BASE_DOMAIN_RESOURCE_GROUP} --zone-name ${BASE_DOMAIN} || ret=1
+        if (( ret == 1 )); then
+            echo "ERROR: not found api dns in public zone!"
+            check_result=1
+        fi
+    else
+        echo "(*) skip api dns record check in public zone, because parameter userProvisionedDNS is enabled!"
     fi
 fi
 
@@ -199,12 +210,16 @@ if [[ "${INGRESS_PUBLISH_STRATEGY}" == "Internal" ]]; then
         fi
     done
 
-    echo "(*) check that *.apps dns record is not created in public zone..."
-    ret=0
-    az network dns record-set a show --name ${INGRESS_DNS_NAME} --resource-group ${BASE_DOMAIN_RESOURCE_GROUP} --zone-name ${BASE_DOMAIN} || ret=1
-    if (( ret == 0 )); then
-        echo "ERROR: found *.apps dns in public zone!\n${ret}"
-        check_result=1
+    if [[ "${USER_PROVISIONED_DNS}" != "Enabled" ]]; then
+        echo "(*) check that *.apps dns record is not created in public zone..."
+        ret=0
+        az network dns record-set a show --name ${INGRESS_DNS_NAME} --resource-group ${BASE_DOMAIN_RESOURCE_GROUP} --zone-name ${BASE_DOMAIN} || ret=1
+        if (( ret == 0 )); then
+            echo "ERROR: found *.apps dns in public zone!\n${ret}"
+            check_result=1
+        fi
+    else
+        echo "(*) skip *.apps dns record check in public zone, becuase parameter userProvisionedDNS is enabled!"
     fi
 else
     # API_PUBLISH_STRATEGY should be External or ""
@@ -231,12 +246,16 @@ else
         fi
     done
 
-    echo "(*) check that *.apps dns record is created in public zone..."
-    ret=0
-    az network dns record-set a show --name ${INGRESS_DNS_NAME} --resource-group ${BASE_DOMAIN_RESOURCE_GROUP} --zone-name ${BASE_DOMAIN} || ret=1
-    if (( ret == 1 )); then
-        echo "ERROR: not found *.apps dns in public zone!"
-        check_result=1
+    if [[ "${USER_PROVISIONED_DNS}" != "Enabled" ]]; then
+        echo "(*) check that *.apps dns record is created in public zone..."
+        ret=0
+        az network dns record-set a show --name ${INGRESS_DNS_NAME} --resource-group ${BASE_DOMAIN_RESOURCE_GROUP} --zone-name ${BASE_DOMAIN} || ret=1
+        if (( ret == 1 )); then
+            echo "ERROR: not found *.apps dns in public zone!"
+            check_result=1
+        fi
+    else
+        echo "(*) skip *.apps dns record check in public zone, becuase parameter userProvisionedDNS is enabled!"
     fi
 fi
 exit ${check_result}

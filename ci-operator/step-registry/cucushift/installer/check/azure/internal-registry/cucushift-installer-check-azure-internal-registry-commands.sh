@@ -16,7 +16,8 @@ function field_check() {
 
     local expected_value=$1 actual_value=$2
 
-    if [[ "${expected_value}" == "${actual_value}" ]]; then
+    #shellcheck disable=SC2076
+    if [[ "${expected_value}" == "${actual_value}" ]] || [[ " ${expected_value} " =~ " ${actual_value} " ]]; then
         echo "Get expected value!"
         return 0
     else
@@ -30,6 +31,7 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
@@ -59,6 +61,7 @@ else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
 INFRA_ID=$(jq -r .infraID ${SHARED_DIR}/metadata.json)
@@ -69,10 +72,12 @@ fi
 
 vnet_resource_group=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.networkResourceGroupName')
 vnet_name=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.virtualNetwork')
-vnet_subnet_name=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.controlPlaneSubnet')
+master_subnet=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.controlPlaneSubnet')
+worker_subnet=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.computeSubnet')
+vnet_subnet_name="${worker_subnet} or ${master_subnet}"
 if [[ -z "${vnet_resource_group}" ]]; then
     vnet_name="${INFRA_ID}-vnet"
-    vnet_subnet_name="${INFRA_ID}-master-subnet"
+    vnet_subnet_name="${INFRA_ID}-master-subnet or ${INFRA_ID}-worker-subnet"
 fi
 image_registry_sa_name=$(az storage account list -g ${RESOURCE_GROUP} --query '[].name' -otsv | grep imageregistry)
 image_registry_private_endpoint=$(az network private-endpoint list -g ${RESOURCE_GROUP} --query '[].name' -otsv)
@@ -89,7 +94,14 @@ oc get config.image/cluster -ojson | jq -r '.spec.storage.azure' | tee -a ${imag
 
 echo "Check spec of image-registry config have correct setting..."
 echo "storage account name check..."
-field_check "${image_registry_sa_name}" "$(jq -r '.accountName' ${image_registry_spec_file})" || ret=1
+sa_name_registry_in_cluster="$(jq -r '.accountName' ${image_registry_spec_file})"
+#shellcheck disable=SC2076
+if [[ " ${image_registry_sa_name} " =~ " ${sa_name_registry_in_cluster} " ]]; then
+    echo "Get expected value!"
+else
+    echo "ERROR: Get unexpected value! expected value: ${image_registry_sa_name}; actual value: ${sa_name_registry_in_cluster}"
+    ret=1
+fi
 if [[ -n "${vnet_resource_group}" ]]; then
     echo "networkResourceGroupName check..."
     field_check "${vnet_resource_group}" "$(jq -r '.networkAccess.internal.networkResourceGroupName' ${image_registry_spec_file})" || ret=1

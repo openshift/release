@@ -16,10 +16,10 @@ function ibmcloud_login {
 }
 
 function create_resource_group() {
-    local rg="$1"
+    local rg="$1" id
     echo "create resource group ... ${rg}"
-    "${IBMCLOUD_CLI}" resource group-create ${rg} || return 1
-    "${IBMCLOUD_CLI}" target -g ${rg} || return 1
+    id=$("${IBMCLOUD_CLI}" resource group-create ${rg} --output json | jq -r .id)
+    "${IBMCLOUD_CLI}" target -g ${id} || return 1
     "${IBMCLOUD_CLI}" resource group ${rg} || return 1
 }
 

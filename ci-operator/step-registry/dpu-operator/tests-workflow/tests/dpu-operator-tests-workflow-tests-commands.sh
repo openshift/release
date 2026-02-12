@@ -1,7 +1,7 @@
 #!/bin/bash
 
-token_dpu_operator_key=$(cat "/var/run/token/dpu-token/dpu-key")
-endpoint=$(cat "/var/run/token/dpu-token/url")
+token_dpu_operator_key=$(cat "/var/run/token/jenkins-secrets/dpu-key")
+endpoint=$(cat "/var/run/token/jenkins-secrets/url")
 
 job_url="https://${endpoint}/job/Lab140_DPU_Operator_Test/lastBuild"
 

@@ -3,10 +3,6 @@ base_images:
     name: 4.12-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -14,10 +10,6 @@ canonical_go_repository: github.com/openshift/openshift-apiserver
 images:
 - dockerfile_path: images/Dockerfile.rhel
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: openshift-apiserver
 promotion:
   to:
@@ -68,22 +60,28 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-builds
-- as: e2e-aws-ovn-cmd
+- always_run: false
+  as: e2e-aws-ovn-cmd
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-cmd
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-upgrade-aws
 - as: e2e-aws-ovn-serial
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-serial
+- as: go-verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.12
   org: openshift-priv

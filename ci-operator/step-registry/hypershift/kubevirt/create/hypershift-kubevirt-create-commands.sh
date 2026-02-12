@@ -20,23 +20,29 @@ fi
 if [[ -n ${MCE} ]] ; then
   arch=$(arch)
   if [ "$arch" == "x86_64" ]; then
-    if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-      echo "MCE version is less than 2.4, use hypershift command"
-      downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hypershift CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hypershift.tar.gz" "${downURL}"
-      cd /tmp && tar -xvf "/tmp/hypershift.tar.gz"
-      chmod +x "/tmp/hypershift"
-      HCP_CLI="/tmp/hypershift"
-      cd -
-    else
-      downURL=$(oc get ConsoleCLIDownload hcp-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hcp CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hcp.tar.gz" "${downURL}"
-      cd /tmp && tar -xvf "/tmp/hcp.tar.gz"
-      chmod +x "/tmp/hcp"
-      HCP_CLI="/tmp/hcp"
-      cd -
-    fi
+    downURL=$(oc get ConsoleCLIDownload hcp-cli-download -o=jsonpath='{.spec.links[?(@.text=="Download hcp CLI for Linux for x86_64")].href}') && curl -k --output "/tmp/hcp.tar.gz" "${downURL}"
+    cd /tmp && tar -xvf "/tmp/hcp.tar.gz"
+    chmod +x "/tmp/hcp"
+    HCP_CLI="/tmp/hcp"
+    cd -
   fi
 fi
 
+function support_np_skew() {
+  local EXTRA_FLARGS=""
+  if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && -n "$MCE" && "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
+    curl -L "https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" -o /tmp/yq && chmod +x /tmp/yq
+    # >= 2.7: "--render-sensitive --render", else: "--render"
+    if [[ "$(printf '%s\n' "2.7" "$MCE_VERSION" | sort -V | head -n1)" == "2.7" ]]; then
+      EXTRA_FLARGS+="--render-sensitive --render > /tmp/hc.yaml "
+    else
+      EXTRA_FLARGS+="--render > /tmp/hc.yaml "
+    fi
+    EXTRA_FLARGS+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
+    EXTRA_FLARGS+="&& oc apply -f /tmp/hc.yaml"
+  fi
+  echo "$EXTRA_FLARGS"
+}
 
 if [[ ! -f $HCP_CLI ]]; then
   # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
@@ -52,7 +58,6 @@ then
   exit 0
 fi
 
-EXTRA_ARGS=""
 
 if [ -n "${KUBEVIRT_CSI_INFRA}" ]
 then
@@ -90,7 +95,7 @@ oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p 
   '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
 
 
-RELEASE_IMAGE="${RELEASE_IMAGE_LATEST}"
+RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
 if [[ "${DISCONNECTED}" == "true" ]];
 then
@@ -114,7 +119,7 @@ then
   fi
   HO_OPERATOR_IMAGE=$(cat "${SHARED_DIR}/ho_operator_image")
 
-  EXTRA_ARGS="${EXTRA_ARGS} --additional-trust-bundle=${SHARED_DIR}/registry.2.crt --network-type=OVNKubernetes --annotations=hypershift.openshift.io/control-plane-operator-image=${HO_OPERATOR_IMAGE} --annotations=hypershift.openshift.io/olm-catalogs-is-registry-overrides=${OLM_CATALOGS_R_OVERRIDES}"
+  EXTRA_ARGS="${EXTRA_ARGS} --additional-trust-bundle=${SHARED_DIR}/registry.2.crt --annotations=hypershift.openshift.io/control-plane-operator-image=${HO_OPERATOR_IMAGE} --annotations=hypershift.openshift.io/olm-catalogs-is-registry-overrides=${OLM_CATALOGS_R_OVERRIDES}"
 
   ### workaround for https://issues.redhat.com/browse/OCPBUGS-32770
   if [[ -z ${MCE} ]] ; then
@@ -153,9 +158,9 @@ spec:
   }'
 EOF
   if [[ "${ATTACH_DEFAULT_NETWORK}" == "true" ]]; then
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=true --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
   else
-    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
+    EXTRA_ARGS="${EXTRA_ARGS} --attach-default-network=false --additional-network name:local-cluster-${CLUSTER_NAME}/macvlan-bridge-whereabouts"
   fi
 fi
 
@@ -163,6 +168,7 @@ if [[ -f "${SHARED_DIR}/GPU_DEVICE_NAME" ]]; then
   EXTRA_ARGS="${EXTRA_ARGS} --host-device-name $(cat "${SHARED_DIR}/GPU_DEVICE_NAME"),count:2"
 fi
 
+EXTRA_ARGS="${EXTRA_ARGS} --network-type=${HYPERSHIFT_NETWORK_TYPE}"
 
 echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
 # Workaround for: https://issues.redhat.com/browse/OCPBUGS-42867
@@ -193,56 +199,27 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
   oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 else
   # shellcheck disable=SC2086
-  "${HCP_CLI}" create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
-    --name "${CLUSTER_NAME}" \
-    --namespace "${CLUSTER_NAMESPACE_PREFIX}" \
-    --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
-    --memory "${HYPERSHIFT_NODE_MEMORY}Gi" \
-    --cores "${HYPERSHIFT_NODE_CPU_CORES}" \
+  eval "${HCP_CLI} create cluster kubevirt ${EXTRA_ARGS} ${ICSP_COMMAND} \
+    --name ${CLUSTER_NAME} \
+    --namespace ${CLUSTER_NAMESPACE_PREFIX} \
+    --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
+    --memory ${HYPERSHIFT_NODE_MEMORY}Gi \
+    --cores ${HYPERSHIFT_NODE_CPU_CORES} \
     --root-volume-size 64 \
-    --release-image "${RELEASE_IMAGE}" \
-    --pull-secret "${PULL_SECRET_PATH}" \
+    --release-image ${RELEASE_IMAGE} \
+    --pull-secret ${PULL_SECRET_PATH} \
     --generate-ssh \
-    --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
-    --infra-availability-policy "${INFRA_AVAILABILITY}" \
+    --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
+    --infra-availability-policy ${INFRA_AVAILABILITY} \
     --service-cidr 172.32.0.0/16 \
-    --cluster-cidr 10.136.0.0/14
+    --cluster-cidr 10.136.0.0/14  $(support_np_skew)"
 fi
 
 
-if [[ -n ${MCE} ]] ; then
-  if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-    oc annotate hostedclusters -n "${CLUSTER_NAMESPACE_PREFIX}" "${CLUSTER_NAME}" "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
-    oc apply -f - <<EOF
-apiVersion: cluster.open-cluster-management.io/v1
-kind: ManagedCluster
-metadata:
-  annotations:
-    import.open-cluster-management.io/hosting-cluster-name: local-cluster
-    import.open-cluster-management.io/klusterlet-deploy-mode: Hosted
-    open-cluster-management/created-via: other
-  labels:
-    cloud: auto-detect
-    cluster.open-cluster-management.io/clusterset: default
-    name: ${CLUSTER_NAME}
-    vendor: OpenShift
-  name: ${CLUSTER_NAME}
-spec:
-  hubAcceptsClient: true
-  leaseDurationSeconds: 60
-EOF
-  fi
-fi
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
 
-if [ -n "${KUBEVIRT_CSI_INFRA}" ]
-then
-  for item in $(oc get sc --no-headers | awk '{print $1}'); do
-  oc annotate --overwrite sc "${item}" storageclass.kubernetes.io/is-default-class='false'
-  done
-  oc annotate --overwrite sc "${KUBEVIRT_CSI_INFRA}" storageclass.kubernetes.io/is-default-class='true'
-fi
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"

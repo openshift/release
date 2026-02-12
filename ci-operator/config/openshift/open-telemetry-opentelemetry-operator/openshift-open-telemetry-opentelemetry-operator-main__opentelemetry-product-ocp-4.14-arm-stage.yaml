@@ -3,11 +3,15 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.25-openshift-4.22
 canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
 images:
 - context_dir: .
@@ -38,39 +42,45 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: opentelemetry-stage-tests
+- as: opentelemetry-stage-tests
+  cron: 0 0 30 2 *
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: gcp-observability
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      JAEGER_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:870285
       OCP_ARCH: arm64
       OPERATORS: |
         [
-            {"name": "jaeger-product", "source": "jaeger-catalogsource", "channel": "stable", "install_namespace": "openshift-distributed-tracing","target_namespaces": "", "operator_group": "openshift-distributed-tracing"},
-            {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
-            {"name": "opentelemetry-product", "source": "otel-catalogsource", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
-            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "development", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "loki-operator", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
-            {"name": "cluster-logging", "source": "redhat-operators", "channel": "stable-5.9", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"}
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""}
         ]
-      OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:870302
       SKIP_TESTS: tests/e2e-targetallocator/targetallocator-features tests/e2e-multi-instrumentation/instrumentation-multi-multicontainer
         tests/e2e-instrumentation/instrumentation-nginx* tests/e2e-instrumentation/instrumentation-dotnet*
-        tests/e2e-instrumentation/instrumentation-apache* tests/e2e/smoke-ip-families
-      TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:872941
+        tests/e2e-instrumentation/instrumentation-apache* tests/e2e-openshift/export-to-cluster-logging-lokistack
+        tests/e2e/smoke-ip-families tests/e2e-targetallocator/targetallocator-prometheuscr
+        tests/e2e-otel/*aws* tests/e2e-openshift/must-gather tests/e2e-otel/google*
     test:
     - ref: idp-htpasswd
-    - ref: distributed-tracing-install-otel-konflux-catalogsource
-    - ref: distributed-tracing-install-tempo-konflux-catalogsource
-    - ref: distributed-tracing-install-jaeger-konflux-catalogsource
+    - as: install-opentelemetry-operator
+      cli: latest
+      commands: |
+        oc create -f https://raw.githubusercontent.com/openshift/distributed-tracing-qe/refs/heads/main/resources/otel-icsp.yaml
+        oc create namespace openshift-opentelemetry-operator
+        oc label namespace openshift-opentelemetry-operator openshift.io/cluster-monitoring="true"
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n openshift-opentelemetry-operator "$MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE"
+        oc wait --for condition=Available -n openshift-opentelemetry-operator deployment opentelemetry-operator-controller-manager
+      env:
+      - default: ""
+        name: MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
     - ref: install-operators
-    - ref: distributed-tracing-tests-opentelemetry-downstream
-    workflow: cucushift-installer-rehearse-aws-ipi
+    - ref: distributed-tracing-tests-opentelemetry-stage
+    workflow: cucushift-installer-rehearse-gcp-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -3,10 +3,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-base-openshift-4.6
-  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.6
   os-7:
     name: ubi
     namespace: ocp
@@ -15,7 +11,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: rhel-8-release-golang-1.25-openshift-4.23
 canonical_go_repository: github.com/openshift/images
 images:
 - context_dir: base/
@@ -28,10 +24,6 @@ images:
   to: base-8
 - dockerfile_path: pod/Dockerfile.rhel
   from: os-7
-  inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: pod
 - context_dir: egress/router
   from: base-8
@@ -82,7 +74,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-aws-upgrade
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-upgrade-aws
 zz_generated_metadata:
   branch: release-4.6

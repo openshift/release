@@ -2,12 +2,16 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
   labels:
     app: gcsweb
   name: gcsweb
   namespace: ci
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       component: gcsweb
@@ -23,8 +27,8 @@ spec:
         - gs://test-platform-results=gs://origin-ci-test
         - -b
         - origin-federated-results
-        image: gcr.io/k8s-staging-test-infra/gcsweb:v20250130-6e7c990ab3
-        imagePullPolicy: IfNotPresent
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_gcsweb_latest
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
@@ -41,8 +45,8 @@ spec:
             cpu: 10m
             memory: 60Mi
           limits:
-            cpu: 20m
-            memory: 100Mi
+            cpu: 40m
+            memory: 200Mi
 ---
 apiVersion: v1
 kind: Service

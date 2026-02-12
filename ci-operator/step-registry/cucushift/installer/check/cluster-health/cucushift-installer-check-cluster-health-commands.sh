@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+
+# generate a health check reuslt file
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-health-check-status.txt";' EXIT TERM INT
+
 function run_command() {
     local CMD="$1"
     echo "Running command: ${CMD}"
@@ -88,7 +93,7 @@ function check_clusteroperators() {
 }
 
 function wait_clusteroperators_continous_success() {
-    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=20
+    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=40
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
         if check_clusteroperators; then

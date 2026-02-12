@@ -1,0 +1,81 @@
+ref:
+  as: trusted-execution-clusters-ref-operator-test
+  timeout: 3h0m0s
+  from_image:
+    namespace: ci
+    name: telco-runner
+    tag: latest
+  commands: trusted-execution-clusters-ref-operator-test-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: beaker-bm
+    mount_path: /var/run/beaker-bm
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      memory: 1Gi
+  env:
+  - name: BEAKER_IP
+    default: ""
+    documentation: |-
+      IP address of the Beaker provisioned bare metal machine.
+      If not set, will read from Vault or ${SHARED_DIR}/beaker_ip
+  - name: BEAKER_USER
+    default: "root"
+    documentation: |-
+      Username for SSH access to the Beaker machine.
+      If not set, will read from Vault or default to 'root'
+  - name: POD_READY_TIMEOUT
+    default: "900"
+    documentation: |-
+      Timeout in seconds for waiting for all pods to be ready.
+      Defaults to 900 seconds (15 minutes).
+  documentation: |-
+    This step runs the integration tests for the trusted-execution-clusters operator.
+
+    The step performs the following operations:
+    1. Connects to the Beaker machine via SSH using credentials from Vault
+    2. For presubmit jobs: Transfers PR code from test pod to Beaker machine
+       - PR code is already checked out in test pod at /go/src/github.com/trusted-execution-clusters/operator
+       - Creates tarball and transfers to Beaker
+       - Extracts to ~/operator-pr-code (separate from infrastructure directory)
+    3. For periodic/rehearsal jobs: Uses main branch code from ~/operator-kind-setup
+    4. Verifies Kind cluster is running (uses cluster from beaker-kind-provision step)
+    5. Builds and pushes container images to local registry (localhost:5000/trusted-execution-clusters)
+    6. Installs KubeVirt with 'make install-kubevirt'
+    7. Runs integration tests with 'make integration-tests'
+       - Test images are pulled on-demand during test execution
+    8. Collects test results and cluster state
+
+    Directory Structure on Beaker:
+    - ~/operator-kind-setup: Infrastructure directory (Kind cluster, customized kind/config.yaml with BEAKER_IP)
+    - ~/operator-pr-code: PR code directory (created for presubmit jobs only)
+
+    This two-directory approach keeps infrastructure config separate from test code, avoiding
+    the need for complex git operations or conflict resolution on the Beaker machine.
+
+    Prerequisites:
+    - beaker-kind-provision step must have run (creates cluster in ~/operator-kind-setup)
+    - SSH credentials must be available in Vault
+    - Local container registry must be running at localhost:5000
+
+    Outputs:
+    - ${ARTIFACT_DIR}/operator-test-logs/: Test logs and diagnostics
+    - ${ARTIFACT_DIR}/operator-test-logs/installation.log: Complete test execution log
+    - ${ARTIFACT_DIR}/operator-test-logs/cluster-all-resources.yaml: All cluster resources
+    - ${ARTIFACT_DIR}/operator-test-logs/nodes.yaml: Node information
+
+    After this step completes:
+    - Integration tests have been executed against PR code (presubmit) or main branch (periodic)
+    - Test results are collected for analysis
+    - Cluster state is available for debugging
+
+    Exit Codes:
+    - 0: Integration tests passed successfully
+    - 1: Critical failure (SSH issues, cluster creation failed, tests failed)
+
+    Note: OpenShift CI automatically checks out PR code in the test pod for presubmit jobs.
+    This step transfers that code to Beaker rather than cloning/fetching from GitHub,
+    ensuring the exact code being tested matches what CI checked out.

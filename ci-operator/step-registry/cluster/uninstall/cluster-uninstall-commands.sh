@@ -19,7 +19,7 @@ export DOCKER_CONFIG=${CLUSTER_PROFILE_DIR}
 # Extract clusters archive from SHARED_DIR
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=$CLUSTER_DATA_DIR
 
-RUN_COMMAND="poetry run python openshift_cli_installer/cli.py \
+RUN_COMMAND="uv run openshift_cli_installer/cli.py \
             --ocm-token=$OCM_TOKEN \
             --destroy-clusters-from-install-data-directory-using-s3-bucket \
             --clusters-install-data-directory $CLUSTER_DATA_DIR"

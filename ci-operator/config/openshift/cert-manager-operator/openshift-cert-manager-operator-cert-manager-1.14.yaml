@@ -11,27 +11,15 @@ base_images:
     name: check-payload
     namespace: ci
     tag: latest
-  ocp-golang-builder:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/ci/Dockerfile
   from: base-rhel9
-  inputs:
-    ocp-golang-builder:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cert-manager-operator
 - dockerfile_path: images/ci/operand.Dockerfile
   from: base-rhel9
-  inputs:
-    ocp-golang-builder:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cert-manager
 operator:
   bundles:
@@ -98,7 +86,8 @@ tests:
           /check-payload scan local -v=6 --path=/tmp/unpacked-images/"$image_k" --output-file=$ARTIFACT_DIR/$image_k/check-payload-report.txt
         done
       credentials:
-      - mount_path: /var/secrets/registry-pull-secret
+      - collection: ""
+        mount_path: /var/secrets/registry-pull-secret
         name: registry-pull-credentials
         namespace: test-credentials
       dependencies:

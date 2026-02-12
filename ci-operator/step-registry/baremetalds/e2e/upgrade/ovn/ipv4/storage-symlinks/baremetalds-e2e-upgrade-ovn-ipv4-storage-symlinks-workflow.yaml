@@ -1,0 +1,24 @@
+workflow:
+  as: baremetalds-e2e-upgrade-ovn-ipv4-storage-symlinks
+  steps:
+    pre:
+      - chain: baremetalds-ofcir-pre
+    test:
+      - ref: storage-disk-symlinks-save
+      - chain: baremetalds-ipi-test
+      - ref: storage-disk-symlinks-check
+    post:
+      - chain: baremetalds-ofcir-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_DISK=80
+        WORKER_DISK=80
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+  documentation: |-
+    This workflow executes the common end-to-end upgrade test suite on a cluster provisioned by running dev-scripts on a packet server checking that root device symlinks are in place after upgrade. The purpose is make sure that udev rules are stable across upgrades.

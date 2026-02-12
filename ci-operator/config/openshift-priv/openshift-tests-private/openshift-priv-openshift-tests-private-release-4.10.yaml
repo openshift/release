@@ -3,14 +3,6 @@ base_images:
     name: tests-private-base
     namespace: ci
     tag: "4.10"
-  ci_tests-private-baseui_4.10:
-    name: tests-private-baseui
-    namespace: ci
-    tag: "4.10"
-  ci_tests-private-builder_4.10:
-    name: tests-private-builder
-    namespace: ci
-    tag: "4.10"
   cli:
     name: 4.10-priv
     namespace: ocp-private
@@ -29,10 +21,6 @@ canonical_go_repository: github.com/openshift/openshift-tests-private
 images:
 - dockerfile_path: images/Dockerfile.golang
   from: ci_tests-private-base_4.10
-  inputs:
-    ci_tests-private-builder_4.10:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-builder:4.10
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
@@ -41,9 +29,6 @@ images:
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
   inputs:
-    ci_tests-private-baseui_4.10:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-baseui:4.10
     src:
       as:
       - src
@@ -73,21 +58,19 @@ resources:
     requests:
       cpu: "2"
       memory: 8Gi
-  e2e-aws:
-    requests:
-      cpu: "4"
-      memory: 4Gi
 test_binary_build_commands: make test
 tests:
 - as: title-check
   commands: make name-check
   container:
     from: src
-- as: e2e-aws
+  skip_if_only_changed: OWNERS$
+- always_run: false
+  as: e2e-aws
   optional: true
-  skip_if_only_changed: (frontend/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata)/)
   steps:
-    cluster_profile: aws
+    allow_skip_on_success: true
+    cluster_profile: aws-3
     test:
     - as: critical-test
       cli: latest
@@ -111,11 +94,12 @@ tests:
           cpu: "2"
           memory: 600Mi
     workflow: ipi-aws
-- as: e2e-console
+- always_run: false
+  as: e2e-console
   optional: true
   run_if_changed: frontend/tests/.*.ts
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     test:
     - ref: enable-qe-catalogsource
     - as: console-test

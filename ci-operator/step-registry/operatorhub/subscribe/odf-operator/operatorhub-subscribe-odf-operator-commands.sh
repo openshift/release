@@ -4,6 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Check if a custom redhat-operators CatalogSource was created and use it
+if [[ -f "${SHARED_DIR}/redhat_operators_catalog_source_name" ]]; then
+  CUSTOM_CATALOG_SOURCE=$(cat "${SHARED_DIR}/redhat_operators_catalog_source_name")
+  echo "Found custom CatalogSource name: ${CUSTOM_CATALOG_SOURCE}"
+  ODF_OPERATOR_SUB_SOURCE="${CUSTOM_CATALOG_SOURCE}"
+  
+  # Derive the channel from the CatalogSource name
+  EXTRACTED_VERSION=$(echo "${CUSTOM_CATALOG_SOURCE}" | sed -n 's/.*-v\([0-9]*\)-\([0-9]*\)$/\1.\2/p')
+  if [[ -n "${EXTRACTED_VERSION}" ]]; then
+    ODF_OPERATOR_SUB_CHANNEL="stable-${EXTRACTED_VERSION}"
+    echo "Derived ODF_OPERATOR_SUB_CHANNEL from CatalogSource: ${ODF_OPERATOR_SUB_CHANNEL}"
+  fi
+fi
+
 if [[ -z "${ODF_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
   echo "ERROR: INSTALL_NAMESPACE is not defined"
   exit 1
@@ -22,7 +36,7 @@ fi
 if [[ "${ODF_SUB_TARGET_NAMESPACES}" == "!install" ]]; then
   ODF_SUB_TARGET_NAMESPACES="${ODF_OPERATOR_SUB_INSTALL_NAMESPACE}"
 fi
-echo "Installing ${ODF_OPERATOR_SUB_PACKAGE} from ${ODF_OPERATOR_SUB_CHANNEL} into ${ODF_OPERATOR_SUB_INSTALL_NAMESPACE}, targeting ${ODF_SUB_TARGET_NAMESPACES}"
+echo "Installing ${ODF_OPERATOR_SUB_PACKAGE} from channel: ${ODF_OPERATOR_SUB_CHANNEL} in source: ${ODF_OPERATOR_SUB_SOURCE} into ${ODF_OPERATOR_SUB_INSTALL_NAMESPACE}, targeting ${ODF_SUB_TARGET_NAMESPACES}"
 
 # create the install namespace
 oc apply -f - <<EOF

@@ -31,10 +31,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
   tests-private:
     name: tests-private
     namespace: ci
@@ -45,10 +41,6 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: cluster-etcd-operator
 promotion:
   to:
@@ -88,28 +80,32 @@ tests:
     from: test-bin
 - as: e2e-agnostic-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: e2e-agnostic-ovn-upgrade
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
-- as: e2e-aws-disruptive
+- always_run: false
+  as: e2e-aws-disruptive
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-disruption
-- as: e2e-aws-disruptive-ovn
+- always_run: false
+  as: e2e-aws-disruptive-ovn
   optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-disruption-ovn
-- as: e2e-gcp-disruptive
+- always_run: false
+  as: e2e-gcp-disruptive
   optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-disruption
-- as: e2e-gcp-disruptive-ovn
+- always_run: false
+  as: e2e-gcp-disruptive-ovn
   optional: true
   steps:
     cluster_profile: gcp
@@ -131,7 +127,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-operator-fips
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       FIPS_ENABLED: "true"
@@ -145,23 +141,28 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws
+- always_run: false
+  as: e2e-aws
   optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-azure
+- always_run: false
+  as: e2e-azure
   optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
-- as: e2e-gcp
+- always_run: false
+  as: e2e-gcp
   optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-metal-ipi
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -170,14 +171,17 @@ tests:
         IP_STACK=v4
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-serial-ipv4
-  cluster: build05
+- always_run: false
+  as: e2e-metal-ipi-serial-ipv4
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -186,17 +190,20 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-assisted
+  capabilities:
+  - intranet
   steps:
     cluster_profile: packet-assisted
-    workflow: assisted-baremetal
+    workflow: assisted-ofcir-baremetal
 - as: e2e-aws-ovn-single-node
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
-- as: e2e-metal-single-node-live-iso
+- always_run: false
+  as: e2e-metal-single-node-live-iso
   optional: true
   steps:
-    cluster_profile: packet-sno
+    cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
 - as: configmap-scale
   optional: true
@@ -205,35 +212,40 @@ tests:
     workflow: openshift-perfscale-e2e-configmap-scale
 - as: e2e-aws-ovn-serial
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-ovn-etcd-scaling
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-etcd-scaling
-- as: e2e-gcp-ovn-etcd-scaling
+- always_run: false
+  as: e2e-gcp-ovn-etcd-scaling
   optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-etcd-scaling
-- as: e2e-azure-ovn-etcd-scaling
+- always_run: false
+  as: e2e-azure-ovn-etcd-scaling
   optional: true
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-etcd-scaling
-- as: e2e-vsphere-ovn-etcd-scaling
+- always_run: false
+  as: e2e-vsphere-ovn-etcd-scaling
   optional: true
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
-- as: e2e-aws-etcd-recovery
+- always_run: false
+  as: e2e-aws-etcd-recovery
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-etcd-recovery
-- as: e2e-gcp-qe-no-capabilities
+- always_run: false
+  as: e2e-gcp-qe-no-capabilities
   optional: true
   steps:
     cluster_profile: gcp-qe

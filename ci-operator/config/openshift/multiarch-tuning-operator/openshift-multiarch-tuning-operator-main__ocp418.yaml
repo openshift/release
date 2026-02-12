@@ -2,11 +2,7 @@ base_images:
   base:
     name: builder
     namespace: ocp
-    tag: rhel-9-enterprise-base-multi-openshift-4.17
-  builder:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-builder-multi-openshift-4.17
+    tag: rhel-9-enterprise-base-multi-openshift-4.19
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -15,10 +11,6 @@ images:
   - arm64
   dockerfile_path: Dockerfile
   from: base
-  inputs:
-    builder:
-      as:
-      - golang:1.22
   to: multiarch-tuning-operator
 - additional_architectures:
   - arm64
@@ -27,7 +19,7 @@ images:
 - additional_architectures:
   - arm64
   dockerfile_literal: |
-    FROM quay.io/operator-framework/operator-sdk:v1.31.0 as osdk
+    FROM quay.io/operator-framework/operator-sdk:v1.33.0 as osdk
     FROM src
     COPY --from=osdk /usr/local/bin/operator-sdk /usr/local/bin/
   from: src
@@ -35,6 +27,8 @@ images:
 operator:
   bundles:
   - as: multiarch-tuning-operator-bundle
+    capabilities:
+    - arm64
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: registry.ci.openshift.org/origin/multiarch-tuning-operator:main
@@ -68,36 +62,44 @@ resources:
     requests:
       cpu: 500m
       memory: 1Gi
+  multiarch-tuning-operator:
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
   sast:
     limits:
-      memory: 6Gi
+      memory: 8Gi
     requests:
-      cpu: 300m
-      memory: 400Mi
+      cpu: 500m
+      memory: 1Gi
 tests:
-- as: e2e-gcp
-  cluster: build10
+- as: e2e-azure
+  capabilities:
+  - arm64
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
   steps:
-    cluster_profile: gcp
+    cluster_profile: azure-arm64
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
       OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: t2a-standard-4
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
     test:
     - ref: ipi-install-heterogeneous
     - ref: multiarch-tuning-operator-e2e-olm-kustomize
-    workflow: ipi-gcp
+    workflow: ipi-azure
 - always_run: false
   as: e2e-aws-ovn-proxy-mto-origin
-  cluster: build10
-  cron: 30 10 10 * *
+  capabilities:
+  - arm64
+  cron: 30 10 * * 2
   steps:
     cluster_profile: aws
     dependencies:
@@ -106,9 +108,11 @@ tests:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
       ADDITIONAL_WORKERS: "1"
+      CATALOG_IMAGE_OVERRIDE: quay.io/multi-arch/multiarch-tuning-operator:catalog-downstream-main
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       MTO_OPERATOR_INSTALL_METHOD: catalog
+      MTO_PROJECT_NAME: openshift
       OCP_ARCH: arm64
       SUBSCRIPTION_CHANNEL_OVERRIDE: main
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
@@ -130,9 +134,8 @@ tests:
     - chain: multiarch-tuning-operator
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-proxy
-  timeout: 6h0m0s
 - as: e2e-aws-ovn-mto-origin-post
-  cluster: build10
+  cluster: build01
   postsubmit: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/)konflux\.Dockerfile$)
   steps:
@@ -143,9 +146,11 @@ tests:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
       ADDITIONAL_WORKERS: "1"
+      CATALOG_IMAGE_OVERRIDE: quay.io/multi-arch/multiarch-tuning-operator:catalog-downstream-main
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       MTO_OPERATOR_INSTALL_METHOD: catalog
+      MTO_PROJECT_NAME: openshift
       OCP_ARCH: arm64
       SUBSCRIPTION_CHANNEL_OVERRIDE: main
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|

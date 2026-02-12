@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.17"
+    name: "4.20"
     namespace: ocp
     tag: cli
 build_root:
@@ -12,8 +12,9 @@ build_root:
 releases:
   latest:
     release:
+      architecture: multi
       channel: stable
-      version: "4.17"
+      version: "4.20"
 resources:
   '*':
     limits:
@@ -22,32 +23,6 @@ resources:
       cpu: "4"
       memory: 4Gi
 tests:
-- as: sync-upstream-istio-release-1-24
-  commands: |
-    git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
-    cd test-infra
-    export BUILD_WITH_CONTAINER="0"
-    export XDG_CACHE_HOME="/tmp/cache"
-    export GOCACHE="/tmp/cache"
-    export GOMODCACHE="/tmp/cache"
-    ./tools/automator-main.sh \
-    --org=openshift-service-mesh \
-    --repo=istio \
-    --branch=release-1.24 \
-    --token-path=/creds-github/token \
-    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
-    "--labels=tide/merge-method-merge,auto-merge" \
-    --modifier=merge_upstream_istio_release_1_24 \
-    --merge-repository=https://github.com/istio/istio \
-    --merge-branch=release-1.24 \
-    --merge-strategy=merge
-  container:
-    from: src
-  cron: 00 05 * * 1-5
-  secrets:
-  - mount_path: /creds-github
-    name: ossm-github-simple-job
-  timeout: 20m0s
 - as: lint
   commands: |
     make lint \
@@ -59,7 +34,6 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-  timeout: 1h0m0s
 - as: gencheck
   commands: |
     make gen-check \
@@ -71,15 +45,11 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-  timeout: 1h0m0s
 - as: unit
   steps:
     cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.17.8-multi
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.24
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -116,198 +86,79 @@ tests:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 2h0m0s
+      timeout: 3h0m0s
     workflow: servicemesh-istio-e2e-hypershift
 - as: integ-helm
   steps:
     cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.17.8-multi
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.24
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestAmbientInstall|TestAmbientInstallMultiNamespace|TestCanaryUpgradeFromTwoMinorRelease|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease|TestZtunnelFromPreviousMinorRelease|TestDefaultInPlaceUpgradeFromPreviousMinorRelease|TestCanaryUpgradeFromPreviousMinorRelease
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: helm
+      TEST_SUITE_DESC: Istio Integration helm
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
-    - as: integ-helm
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export BUILD_WITH_CONTAINER=0 && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-kind.sh \
-          test.integration.helm.kube.presubmit"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: integ-security
   steps:
     cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.17.8-multi
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.24
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestMultiTlsGateway_InvalidSecret|TestMultiMtlsGateway_InvalidSecret
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: security
+      TEST_SUITE_DESC: Istio Integration security
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
-    - as: integ-security
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export BUILD_WITH_CONTAINER=0 && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-kind.sh \
-          test.integration.security.kube.presubmit" && status=0 || status=1
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-        exit ${status}
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: integ-pilot
   steps:
     cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.17.8-multi
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.24
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: pilot
+      TEST_SUITE_DESC: Istio Integration pilot
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
-    - as: integ-pilot
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export BUILD_WITH_CONTAINER=0 && \
-          export INTEGRATION_TEST_FLAGS=\" -skip 'TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge' \" && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-kind.sh \
-          test.integration.pilot.kube.presubmit"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: integ-telemetry
   steps:
     cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.17.8-multi
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.24
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: telemetry
+      TEST_SUITE_DESC: Istio Integration telemetry
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
-    - as: integ-telemetry
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export BUILD_WITH_CONTAINER=0 && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-kind.sh \
-          test.integration.telemetry.kube.presubmit"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 zz_generated_metadata:
   branch: release-1.24

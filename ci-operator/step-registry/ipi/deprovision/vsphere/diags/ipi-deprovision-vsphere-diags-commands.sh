@@ -163,6 +163,10 @@ function collect_diagnostic_data {
       for vm in "${vms[@]}"; do
           datacenter=$(echo "$vm" | cut -d'/' -f 2)
           vm_host="$(govc vm.info -dc="${datacenter}" ${vm} | grep "Host:" | awk -F "Host:         " '{print $2}')"
+          vm_ip="$(govc vm.info -dc="${datacenter}" ${vm} | grep "IP address:" | awk -F "IP address:   " '{print $2}')"
+          if [ ! -z "${vm_ip}" ]; then
+            curl -o "${ARTIFACT_DIR}/${vm_ip}.txt" http://log-gather.vmc.ci.openshift.org:8080/retrieve?node-ip=${vm-ip}
+          fi
 
           if [ ! -z "${vm_host}" ]; then
               hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
@@ -239,6 +243,33 @@ function generate_host_input() {
   done
 
   HOST_INPUT="${HOST_INPUT}</select>"
+}
+
+function embed_topology_data() {
+  echo "<hr>" >> "${RESULT_HTML}"
+  for LEASE in volumes/__runtime__/shared/LEASE_*; do
+    if [[ $LEASE == *_single.json* ]]; then
+        continue
+    fi
+
+    POOL=$(jq --compact-output -r .status.name < "${LEASE}")
+    SERVER=$(jq --compact-output -r .status.server < "${LEASE}")
+    CLUSTER=$(jq --compact-output -r .status.topology.computeCluster < "${LEASE}")
+    DATACENTER=$(jq --compact-output -r .status.topology.datacenter < "${LEASE}")
+    DATASTORE=$(jq --compact-output -r .status.topology.datastore < "${LEASE}")
+    NETWORKS=$(jq --compact-output -r .status.topology.networks[] < "${LEASE}")
+    NAME=$(jq --compact-output -r .metadata.name < "${LEASE}")
+
+    echo "Lease: ${NAME}<br>" >> "${RESULT_HTML}"
+    echo "- Pool: ${POOL}<br>" >> "${RESULT_HTML}"
+    echo "- Server: ${SERVER}<br>" >> "${RESULT_HTML}"
+    echo "- Cluster: ${CLUSTER}<br>" >> "${RESULT_HTML}"
+    echo "- Datacenter: ${DATACENTER}<br>" >> "${RESULT_HTML}"
+    echo "- Datastore: ${DATASTORE}<br>" >> "${RESULT_HTML}"
+    echo "- Networks: ${NETWORKS}<br>" >> "${RESULT_HTML}"
+    echo "<br>" >> "${RESULT_HTML}"
+  done
+
 }
 
 function embed_vm_data() {
@@ -325,6 +356,11 @@ function write_results_html() {
         <dl>
           <dt class="text-light bg-secondary ps-1 mb-1">Info</dt>
           <dd>This report contains metrics for both the Virtual Machines used in the CI tests as well as the hosts the VMs ran on.</dd>
+EOF
+
+embed_topology_data
+
+cat >> "${RESULT_HTML}" << EOF
       </dl>
     </data>
     <data id="vm-data">

@@ -1,0 +1,27 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-byo-subnets-provision
+  steps:
+  - ref: aws-provision-vpc-shared
+  - chain: ipi-conf-aws
+  - ref: aws-provision-security-group
+  - ref: ipi-conf-aws-custom-vpc
+  - ref: ipi-conf-aws-custom-security-groups
+  - ref: ipi-conf-aws-usage-info
+  - chain: aws-provision-iam-user-minimal-permission
+  - chain: ipi-install
+  - ref: aws-provision-tags-for-byo-vpc
+  - ref: cucushift-installer-check-aws-custom-vpc
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  env:
+  - name: ADD_ZONES
+    default: "no"
+  - name: CONTROL_PLANE_INSTANCE_TYPE
+    default: "m6i.xlarge"
+    documentation: "Instance type for control plane nodes"
+  - name: COMPUTE_NODE_TYPE
+    default: "m5.xlarge"
+    documentation: "Instance type for compute nodes"
+  documentation: |-
+    Create an IPI cluster on AWS for QE e2e tests.
+

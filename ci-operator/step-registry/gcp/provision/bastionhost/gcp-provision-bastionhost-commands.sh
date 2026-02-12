@@ -4,6 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
+# to be able to SSH.
+if ! whoami &> /dev/null; then
+    if [[ -w /etc/passwd ]]; then
+        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    else
+        echo "/etc/passwd is not writeable, and user matching this uid is not found."
+        exit 1
+    fi
+fi
+
 # save the exit code for junit xml file generated in step gather-must-gather
 # pre configuration steps before running installation, exit code 100 if failed,
 # save to install-pre-config-status.txt
@@ -12,8 +23,20 @@ set -o pipefail
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' EXIT TERM
 
+function run_ssh_cmd() {
+    local sshkey=$1
+    local user=$2
+    local host=$3
+    local remote_cmd=$4
+
+    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=300 -o ServerAliveCountMax=10 "
+    cmd="ssh ${options} -i \"${sshkey}\" ${user}@${host} \"${remote_cmd}\""
+    eval "$cmd" || return 2
+}
+
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
+SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
 if [[ ! -f "${bastion_ignition_file}" ]]; then
   echo "'${bastion_ignition_file}' not found, abort." && exit 1
@@ -82,11 +105,6 @@ MACHINE_TYPE="n2-standard-2"
 #####################################
 ##########Create Bastion#############
 #####################################
-
-# we need to be able to tear down the proxy even if install fails
-# cannot rely on presence of ${SHARED_DIR}/metadata.json
-echo "${REGION}" >> "${SHARED_DIR}/proxyregion"
-
 bastion_name="${CLUSTER_NAME}-bastion"
 CMD="gcloud compute instances create ${bastion_name} \
   --hostname=${bastion_name}.test.com \
@@ -122,10 +140,6 @@ gcloud ${project_option} compute firewall-rules create "${bastion_name}-ingress-
   --network ${NETWORK} \
   --allow tcp:22,tcp:3128,tcp:3129,tcp:5000,tcp:6001,tcp:6002,tcp:8080,tcp:873 \
   --target-tags="${bastion_name}"
-cat > "${SHARED_DIR}/bastion-destroy.sh" << EOF
-gcloud compute instances delete -q "${bastion_name}" --zone=${ZONE_0}
-gcloud ${project_option} compute firewall-rules delete -q "${bastion_name}-ingress-allow"
-EOF
 
 #####################################
 #########Save Bastion Info###########
@@ -176,12 +190,6 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
   gcloud dns record-sets create "${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN}." \
   --rrdatas="${bastion_private_ip}" --type=A --ttl=60 --zone="${CLUSTER_NAME}-mirror-registry-private-zone"
 
-  cat > "${SHARED_DIR}/mirror-dns-destroy.sh" << EOF
-  gcloud dns record-sets delete -q "${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN}." --type=A --zone="${BASE_DOMAIN_ZONE_NAME}"
-  gcloud dns record-sets delete -q "${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN}." --type=A --zone="${CLUSTER_NAME}-mirror-registry-private-zone"
-  gcloud dns managed-zones delete -q "${CLUSTER_NAME}-mirror-registry-private-zone"
-EOF
-
   echo "Waiting for ${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN} taking effect..." && sleep 120s
 
   MIRROR_REGISTRY_URL="${CLUSTER_NAME}.mirror-registry.${BASE_DOMAIN}:5000"
@@ -195,3 +203,38 @@ rm -rf "${workdir}"
 
 echo "Sleeping 5 mins, make sure that the bastion host is fully started."
 sleep 300
+
+if [[ -f "${SHARED_DIR}/gcp_custom_endpoint" ]]; then
+  gcp_custom_endpoint=$(< "${SHARED_DIR}/gcp_custom_endpoint")
+  gcp_custom_endpoint_ip_address=$(< "${SHARED_DIR}/gcp_custom_endpoint_ip_address")
+
+  echo "$(date -u --rfc-3339=seconds) - Ensure GCP custom endpoint '${gcp_custom_endpoint}' is accessible..."
+
+  declare -a services=("compute" "container" "dns" "file" "iam" "serviceusage" "cloudresourcemanager" "storage")
+  test_cmd=""
+  for service_name in "${services[@]}"
+  do
+    test_cmd="${test_cmd} dig +short ${service_name}-${gcp_custom_endpoint}.p.googleapis.com;"
+  done
+  count=0
+  dig_result=""
+
+  set +e
+  for i in {1..20}
+  do
+    dig_result=$(run_ssh_cmd "${SSH_PRIV_KEY_PATH}" core "${bastion_public_ip}" "${test_cmd}")
+    count=$(echo "${dig_result}" | grep -c "${gcp_custom_endpoint_ip_address}")
+    if [[ ${count} -eq "${#services[@]}" ]]; then
+      echo "$(date -u --rfc-3339=seconds) - [$i] The custom endpoint turns accessible."
+      break
+    else
+      echo "$(date -u --rfc-3339=seconds) - [$i] Waiting for another 60 seconds..."
+      sleep 60s
+    fi
+  done
+  set -e
+
+  if [[ ${count} -ne "${#services[@]}" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to wait for the custom endpoint turning into accessible, abort. " && exit 1
+  fi
+fi

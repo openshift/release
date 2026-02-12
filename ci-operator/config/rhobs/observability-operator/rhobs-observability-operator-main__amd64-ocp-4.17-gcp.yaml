@@ -1,0 +1,68 @@
+base_images:
+  cli:
+    name: "4.17"
+    namespace: ocp
+    tag: cli
+  observability-operator-test-harness:
+    name: observability-operator-test-harness
+    namespace: ci
+    tag: latest
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.17"
+  tools:
+    name: "4.17"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    limits:
+      memory: 4G
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: coo-stage-dast
+  cron: 30 0 * * 2
+  steps:
+    cluster_profile: gcp-observability
+    env:
+      CYPRESS_COO_NAMESPACE: coo
+      MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE: quay.io/redhat-user-workloads/cluster-observabilit-tenant/cluster-observability-operator/coo-fbc-v4-17@sha256:fea04cf704272438ad425fadcacc57351f63641e5e426845345116adc0780266
+      OPERATORS: |
+        [
+            {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"},
+            {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespace": "", "operator_group": "openshift-tempo-operator"},
+            {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespace": "", "operator_group": "openshift-opentelemetry-operator"},
+            {"name": "lightspeed-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-lightspeed", "target_namespaces": "openshift-lightspeed", "operator_group": "openshift-lightspeed"}
+        ]
+      TEST_FILTERS: Serial
+      TEST_SCENARIOS: Cluster_Observability.*DAST
+    test:
+    - ref: rhobs-konflux-catalogsource
+    - ref: install-operators
+    - ref: distributed-tracing-tests-tracing-ui-integration
+    - ref: openshift-extended-test
+    - ref: rhobs-obo-test-harness
+    workflow: cucushift-installer-rehearse-gcp-ipi
+zz_generated_metadata:
+  branch: main
+  org: rhobs
+  repo: observability-operator
+  variant: amd64-ocp-4.17-gcp

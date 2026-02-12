@@ -2,15 +2,14 @@ chain:
   as: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-provision
   steps:
   - chain: cucushift-installer-rehearse-azure-aks-provision
+  - ref: hypershift-azure-aks-attach-kv
   - ref: azure-provision-vnet-hypershift
   - ref: azure-provision-resourcegroup
-  - ref: cucushift-hypershift-extended-nodepool-image-azure-get-marketplace-image
   - ref: cucushift-hypershift-extended-k8s-mgmt-apply-crds
   - chain: cucushift-hypershift-extended-install-private
   - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
   - ref: cucushift-hypershift-extended-k8s-mgmt-simulate-icsp
   - chain: hypershift-azure-create
-  - ref: cucushift-hypershift-extended-nodepool-image-azure-health-check
   - chain: cucushift-hypershift-extended-enable-qe-catalogsource
   env:
   - name: AKS_ZONES
@@ -23,12 +22,6 @@ chain:
     default: "Managed"
   - name: HYPERSHIFT_AZURE_LOCATION
     default: "centralus"
-  - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_ARCH
-    default: "x64"
-  - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_OFFER
-    default: "aro4"
-  - name: HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER
-    default: "azureopenshift"
   - name: HYPERSHIFT_BASE_DOMAIN
     default: "qe.azure.devcluster.openshift.com"
   - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
@@ -50,6 +43,12 @@ chain:
   - name: HYPERSHIFT_MANAGED_SERVICE
     default: "ARO-HCP"
   - name: HYPERSHIFT_OPERATOR_PULL_SECRET
+    default: "true"
+  - name: AKS_ADDONS
+    default: "azure-keyvault-secrets-provider"
+  - name: ASSIGN_SERVICE_PRINCIPAL_ROLES
+    default: "true"
+  - name: HYPERSHIFT_AZURE_CP_MI
     default: "true"
   documentation: |-
     This chain provisions an aks management cluster and a public hosted cluster using BYO vnet, subnet and nsg.

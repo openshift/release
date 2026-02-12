@@ -3,10 +3,6 @@ base_images:
     name: 4.13-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
 binary_build_commands: make binaries
 build_root:
   from_repository: true
@@ -14,17 +10,9 @@ canonical_go_repository: github.com/kubernetes-sigs/cloud-provider-azure
 images:
 - dockerfile_path: openshift-hack/images/cloud-controller-manager-openshift.Dockerfile
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: azure-cloud-controller-manager
 - dockerfile_path: openshift-hack/images/cloud-node-manager-openshift.Dockerfile
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: azure-cloud-node-manager
 promotion:
   to:
@@ -73,9 +61,9 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
-- as: e2e-azure-ovn-ccm
+- always_run: false
+  as: e2e-azure-ovn-ccm
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ccm
@@ -86,9 +74,9 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure
-- as: openshift-e2e-azure-ovn-techpreview-upgrade
+- always_run: false
+  as: openshift-e2e-azure-ovn-techpreview-upgrade
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     env:

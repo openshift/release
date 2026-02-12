@@ -1,0 +1,41 @@
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: openstack-ipe-tester.Dockerfile
+  from: src
+  optional: true
+  to: ipe-tester
+promotion:
+  to:
+  - name: "4.22"
+    namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.22"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.22"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: HOME=`dirname .` tox -vv -e py3
+  container:
+    from: ipe-tester
+- as: pep8
+  commands: HOME=`dirname .` tox -vv -e pep8
+  container:
+    from: ipe-tester
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: openstack-ironic-prometheus-exporter

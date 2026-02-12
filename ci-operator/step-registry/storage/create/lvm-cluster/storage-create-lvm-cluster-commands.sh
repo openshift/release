@@ -12,30 +12,49 @@ set -x
 # that libcurl doesn't recognize the uppercase variables).
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
-	# shellcheck disable=SC1090
+	# shellcheck disable=SC1091
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 if test -f "${SHARED_DIR}/packet-conf.sh"
 then
-	# shellcheck disable=SC1090
+	# shellcheck disable=SC1091
 	source "${SHARED_DIR}/packet-conf.sh"
 fi
 
-cat <<EOF | oc apply -f -
+LVM_CLUSTER_MANIFEST="${SHARED_DIR}/lvm-cluster.yaml"
+
+# Use the same namespace as the operator installation, or auto-detect if not set
+if [[ -z "${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
+  # Auto-detect namespace based on cluster version
+  CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
+  MINOR_VERSION=$(echo $CLUSTER_VERSION | cut -d. -f2)
+
+  echo "Detected OpenShift version: ${CLUSTER_VERSION}"
+
+  # For OpenShift 4.20+, use openshift-lvm-storage, otherwise use openshift-storage
+  if [[ ${MINOR_VERSION} -ge 20 ]]; then
+    LVM_NAMESPACE="openshift-lvm-storage"
+  else
+    LVM_NAMESPACE="openshift-storage"
+  fi
+
+  echo "Auto-detected LVM namespace: ${LVM_NAMESPACE}"
+else
+  LVM_NAMESPACE="${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
+  echo "Using operator namespace: ${LVM_NAMESPACE}"
+fi
+
+cat <<EOF > "$LVM_CLUSTER_MANIFEST"
 apiVersion: lvm.topolvm.io/v1alpha1
 kind: LVMCluster
 metadata:
   name: my-lvmcluster
-  namespace: openshift-storage
+  namespace: ${LVM_NAMESPACE}
 spec:
   storage:
     deviceClasses:
     - name: vg1
-      deviceSelector:
-        forceWipeDevicesAndDestroyAllData: ${LVM_CLUSTER_WIPE_DEVICE}
-        paths:
-        - ${LVM_CLUSTER_DEVICE_PATH}
       default: true
       thinPoolConfig:
         name: thin-pool-1
@@ -43,12 +62,32 @@ spec:
         overprovisionRatio: 10
 EOF
 
+if [ "$LVM_CLUSTER_AUTO_SELECT_AVAILABLE_DEVICES" == "true" ]; then
+    echo "Using auto-selecting available LVM devices mode ..."
+else
+    echo "LVM auto-selection is disabled ..."
+    yq eval ".spec.storage.deviceClasses[0].deviceSelector.paths[0] = \"${LVM_CLUSTER_DEVICE_PATH}\"" -i "$LVM_CLUSTER_MANIFEST"
+fi
+
+if [ "$LVM_CLUSTER_WIPE_DEVICE" == "true" ]; then
+    echo "Enabling forceWipeDevicesAndDestroyAllData mode ..."
+    yq eval ".spec.storage.deviceClasses[0].deviceSelector.forceWipeDevicesAndDestroyAllData = ${LVM_CLUSTER_WIPE_DEVICE}" -i "$LVM_CLUSTER_MANIFEST"
+fi
+
+# Conditionally add tolerations for master/control-plane nodes
+if [ "$LVM_CLUSTER_TOLERATE_MASTER" == "true" ]; then
+    echo "Enabling lvm storage on master nodes ..."
+    yq eval '.spec.tolerations = [{"key": "node-role.kubernetes.io/master", "operator": "Exists", "effect": "NoSchedule"}]' -i "$LVM_CLUSTER_MANIFEST"
+fi
+
+oc apply -f "$LVM_CLUSTER_MANIFEST"
+
 echo "Create lvmcluster successfully, waiting for it becomes ready(max 10min)."
 iter=10
 period=60
 result=""
 while [[ "${result}" != "Ready" && ${iter} -gt 0 ]]; do
-  result=$(oc get lvmcluster -n openshift-storage -o=jsonpath='{.items[0].status.state}')
+  result=$(oc get lvmcluster -n "${LVM_NAMESPACE}" -o=jsonpath='{.items[0].status.state}')
   (( iter -- ))
   sleep $period
 done
@@ -56,11 +95,11 @@ if [ "${result}" == "Ready" ]; then
   echo "Set up lvm cluster successfully."
 else
   echo "Failed to set up lvm cluster."
-  oc describe lvmcluster -n openshift-storage
-  for pod in $(oc get pods -n openshift-storage --no-headers | grep -Ev "Running|Completed" | awk '{print $1}')
+  oc describe lvmcluster -n "${LVM_NAMESPACE}"
+  for pod in $(oc get pods -n "${LVM_NAMESPACE}" --no-headers | grep -Ev "Running|Completed" | awk '{print $1}')
   do
     echo "This is describe info of pod ${pod}"
-    oc -n openshift-storage describe pod "${pod}"
+    oc -n "${LVM_NAMESPACE}" describe pod "${pod}"
   done
   exit 1
 fi

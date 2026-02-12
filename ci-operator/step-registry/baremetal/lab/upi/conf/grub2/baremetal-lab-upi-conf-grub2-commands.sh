@@ -46,7 +46,15 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   mac_postfix=${mac//:/-}
   kargs="$(join_by_semicolon "$ipi_disabled_ifaces" "ip=" ":off")"
   kargs="$kargs$(join_by_semicolon "$console_kargs" "console=" "")"
-  [ "$USE_CONSOLE_HOOK" == "true" ] && kargs="${kargs} ignition.config.url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/$mac_postfix-console-hook.ign"
+  
+  if [[ "$USE_CONSOLE_HOOK" == "true" ]]; then
+    if [[ "$BOOTSTRAP_IN_PLACE" == "true" ]]; then
+      kargs="${kargs} ignition.config.url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/bootstrap.ign"
+    else
+      kargs="${kargs} ignition.config.url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/$mac_postfix-console-hook.ign"
+    fi
+  fi
+
   if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
     cat > "${GRUB_DIR}/grub.cfg-01-${mac_postfix}" <<EOF
 set timeout=5

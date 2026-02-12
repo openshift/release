@@ -2,20 +2,27 @@
 
 set -euo pipefail
 
+AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
+  AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
+fi
 
-AZURE_AUTH_LOCATION="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 AZURE_AUTH_SUBSCRIPTION_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .subscriptionId)"
 
-AZURE_KEY_VAULT_INFO_LOCATION="/etc/hypershift-ci-jobs-azurecreds/keyvault-info.json"
-KV_NAME="$(<"${AZURE_KEY_VAULT_INFO_LOCATION}" jq -r .keyvaultName)"
-KV_RG_NAME="$(<"${AZURE_KEY_VAULT_INFO_LOCATION}" jq -r .keyvaultRGName)"
-
 az --version
 az cloud set --name AzureCloud
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
+
+AZURE_KEY_VAULT_INFO_LOCATION="/etc/hypershift-aro-azurecreds/keyvault-info.json"
+if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" ]]; then
+  AZURE_KEY_VAULT_INFO_LOCATION="/etc/hypershift-ci-jobs-azurecreds/keyvault-info.json"
+fi
+KV_NAME="$(<"${AZURE_KEY_VAULT_INFO_LOCATION}" jq -r .keyvaultName)"
+KV_RG_NAME="$(<"${AZURE_KEY_VAULT_INFO_LOCATION}" jq -r .keyvaultRGName)"
 
 set -x
 
@@ -33,5 +40,12 @@ az role assignment create \
 
 echo "Granting ServicePrincipal permissions to the KeyVault"
 SP_ID=$(az ad sp show --id "$AZURE_AUTH_CLIENT_ID" --query id -o tsv)
-KV_ID=$(az keyvault show --name "$KV_NAME" -g "$KV_RG_NAME" --query id -o tsv)
-az role assignment create --assignee "$SP_ID" --scope "$KV_ID" --role "Key Vault Administrator"
+SCOPE=$(az keyvault show --name "$KV_NAME" -g "$KV_RG_NAME" --query id -o tsv)
+ROLE="Key Vault Administrator"
+
+if [ -z "$(az role assignment list --assignee $SP_ID --role "$ROLE" --scope $SCOPE -o tsv)" ]; then
+    echo "ServicePrincipal permissions to the KeyVault does not exist. Creating..."
+    az role assignment create --assignee $SP_ID --role "$ROLE" --scope $SCOPE
+else
+    echo "ServicePrincipal permissions to the KeyVault already exists. Skipping."
+fi

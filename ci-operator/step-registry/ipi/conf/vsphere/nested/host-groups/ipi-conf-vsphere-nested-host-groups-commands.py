@@ -28,14 +28,30 @@ platform_spec = f"""platform:
         name: "zone-1"
         zone: "zone-1"
         region: "region-1"
-        zoneAffinity: "HostGroup"
+        zoneType: "HostGroup"
+        regionType: "ComputeCluster"
         topology:
-          resourcePool: /cidatacenter-nested-0/host/cicluster-nested-0/Resources/ipi-ci-clusters
+          resourcePool: /cidatacenter-nested-0/host/cicluster-nested-0/Resources
           computeCluster: /cidatacenter-nested-0/host/cicluster-nested-0
           datacenter: cidatacenter-nested-0
           datastore: /cidatacenter-nested-0/datastore/dsnested
           networks:
             - "VM Network"
+          hostGroup: zone-1
+      - server: {cluster_name}-1
+        name: "zone-2"
+        zone: "zone-2"
+        region: "region-1"
+        zoneType: "HostGroup"
+        regionType: "ComputeCluster"
+        topology:
+          resourcePool: /cidatacenter-nested-0/host/cicluster-nested-0/Resources
+          computeCluster: /cidatacenter-nested-0/host/cicluster-nested-0
+          datacenter: cidatacenter-nested-0
+          datastore: /cidatacenter-nested-0/datastore/dsnested
+          networks:
+            - "VM Network"
+          hostGroup: zone-2
 """
 
 with open(os.path.join(shared_dir, "nested-ansible-platform.yaml"), "w") as nested_ansible_platform_file:

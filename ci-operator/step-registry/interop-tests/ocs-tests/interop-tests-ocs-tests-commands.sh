@@ -26,6 +26,34 @@ cleanup() {
 # Set trap to catch EXIT and run cleanup on any exit code
 trap cleanup EXIT SIGINT
 
+function install_yq_if_not_exists() {
+    # Install yq manually if not found in image
+    echo "Checking if yq exists"
+    cmd_yq="$(yq --version 2>/dev/null || true)"
+    if [ -n "$cmd_yq" ]; then
+        echo "yq version: $cmd_yq"
+    else
+        echo "Installing yq"
+        mkdir -p /tmp/bin
+        export PATH=$PATH:/tmp/bin/
+        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+    fi
+}
+
+function mapTestsForComponentReadiness() {
+    if [[ $MAP_TESTS == "true" ]]; then
+        results_file="${1}"
+        echo "Patching Tests Result File: ${results_file}"
+        if [ -f "${results_file}" ]; then
+            install_yq_if_not_exists
+            export REPORTPORTAL_CMP
+            echo "Mapping Test Suite Name To: ${REPORTPORTAL_CMP}"
+            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name=env(REPORTPORTAL_CMP)' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+        fi
+    fi
+}
+
 #
 # Remove the ACM Subscription to allow OCS interop tests full control of operators
 #
@@ -61,6 +89,25 @@ DEPLOYMENT:
   skip_download_client: True
 __EOF__
 
+# Append ENV_DATA in ocs-tests config file for vsphere platform
+if [[ -f "${SHARED_DIR}/vsphere_context.sh" ]]; then
+    declare vsphere_datacenter
+    declare vsphere_datastore
+    declare vsphere_cluster
+    source "${SHARED_DIR}/vsphere_context.sh"
+    source "${SHARED_DIR}/govc.sh"
+
+    cat >> "${LOGS_CONFIG}" << __APPENDED_ENV_DATA__
+ENV_DATA:
+  platform: "vsphere"
+  vsphere_user: "${GOVC_USERNAME}"
+  vsphere_password: "${GOVC_PASSWORD}"
+  vsphere_datacenter: "${vsphere_datacenter}"
+  vsphere_cluster: "${vsphere_cluster}"
+  vsphere_datastore: "${vsphere_datastore}"
+__APPENDED_ENV_DATA__
+fi
+
 
 set -x
 START_TIME=$(date "+%s")
@@ -76,9 +123,16 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   --junit-xml    "${CLUSTER_PATH}/junit.xml"         \
   || /bin/true
 
+
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
 set +x
+
+# Map tests if needed for related use cases
+mapTestsForComponentReadiness "${CLUSTER_PATH}/junit.xml"
+
+# Send junit file to shared dir for Data Router Reporter step
+cp "${CLUSTER_PATH}/junit.xml" "${SHARED_DIR}"
 
 if [[ ${DIFF_TIME} -le 1800 ]]; then
     echo ""

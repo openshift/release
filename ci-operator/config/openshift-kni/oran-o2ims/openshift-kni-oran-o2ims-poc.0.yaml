@@ -1,0 +1,56 @@
+base_images:
+  ubi-min9:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make binary
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.tools
+images:
+- dockerfile_path: Dockerfile
+  from: ubi-min9
+  to: oran-o2ims-operator
+- dockerfile_path: bundle.Dockerfile
+  from: ubi-min9
+  to: oran-o2ims-operator-bundle
+operator:
+  bundles:
+  - as: operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift-kni/oran-o2ims-operator:.*
+    with: pipeline:oran-o2ims-operator
+promotion:
+  to:
+  - name: oran-poc.0
+    namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.18"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.18"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  ./hack/install-markdownlint.sh
+tests:
+- as: ci-job
+  commands: make ci-job
+  container:
+    from: src
+zz_generated_metadata:
+  branch: poc.0
+  org: openshift-kni
+  repo: oran-o2ims

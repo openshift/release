@@ -1,0 +1,50 @@
+ref:
+  as: interop-tests-ibm-fusion-access-prepare-worker-nodes
+  from: cli
+  commands: interop-tests-ibm-fusion-access-prepare-worker-nodes-commands.sh
+  timeout: 10m0s
+  grace_period: 15s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Prepare worker nodes for IBM Storage Scale deployment on Red Hat CoreOS.
+    
+    This step creates required directories on worker nodes that IBM Storage Scale
+    kernel module build process (mmbuildgpl) expects to exist. While IBM's 
+    documentation (https://www.ibm.com/docs/en/scalecontainernative/5.2.3) confirms
+    that mmbuildgpl builds kernel modules on OpenShift, these directory prerequisites
+    are not explicitly documented because standard Linux systems have them by default.
+    Red Hat CoreOS's minimal, immutable filesystem requires explicit creation.
+    
+    Required directories created on each worker node:
+    - /var/lib/firmware - Required by mmbuildgpl for kernel module compilation
+    - /var/mmfs/etc - IBM Storage Scale configuration directory
+    - /var/mmfs/tmp/traces - IBM Storage Scale trace/log directory
+    - /var/mmfs/pmcollector - IBM Storage Scale performance monitoring directory
+    
+    Without these directories, deployment fails with multiple symptoms:
+    - mmbuildgpl init container enters CrashLoopBackOff
+    - Error: "rsync: change_dir /host/var/lib/firmware failed: No such file or directory"
+    - SSH key secrets never created (operator can't progress)
+    - Filesystem stuck in "ongoing" status indefinitely
+    - Pods fail with: "MountVolume.NewMounter initialization failed: 
+      path '/var/mmfs/pmcollector' does not exist"
+    
+    Evidence from rehearsal runs (before this step existed):
+    - October 1st builds showed mmbuildgpl CrashLoopBackOff on all daemon pods
+    - After adding this step (October 6th+), all tests passed successfully
+    
+    IBM Storage Scale worker node requirements:
+    - CPU: 2000mCPU minimum (configured via STORAGE_SCALE_*_CPU)
+    - Memory: 4 GiB (client) / 8 GiB (storage) (configured via STORAGE_SCALE_*_MEMORY)
+    - Storage: ~25 GiB in /var directory
+    - Reference: https://www.ibm.com/docs/en/scalecontainernative/5.2.2?topic=planning-hardware-requirements
+    
+    This step must run after:
+    - Worker nodes are ready and labeled
+    
+    This step must run before:
+    - IBM Storage Scale Cluster creation
+

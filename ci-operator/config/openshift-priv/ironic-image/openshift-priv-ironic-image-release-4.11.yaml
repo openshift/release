@@ -13,10 +13,6 @@ canonical_go_repository: github.com/openshift/ironic-image
 images:
 - dockerfile_path: Dockerfile.ocp
   from: base
-  inputs:
-    ocp_builder_rhel-8-base-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.11
   to: ironic
 promotion:
   to:
@@ -48,13 +44,15 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-metal-ipi
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-virtualmedia
-  cluster: build05
+  capabilities:
+  - intranet
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
     cluster_profile: equinix-ocp-metal

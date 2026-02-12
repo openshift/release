@@ -1,8 +1,3 @@
-base_images:
-  ocp_builder_rhel-8-base-nodejs-openshift-4.15:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-base-nodejs-openshift-4.15
 build_root:
   image_stream_tag:
     name: release
@@ -11,10 +6,6 @@ build_root:
 canonical_go_repository: github.com/openshift/nmstate-console-plugin
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    ocp_builder_rhel-8-base-nodejs-openshift-4.15:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-base-nodejs-openshift-4.15
   to: nmstate-console-plugin
 promotion:
   to:
@@ -40,14 +31,15 @@ resources:
 tests:
 - as: e2e-tests
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: e2e-tests
       cli: latest
       commands: |
         ./test-prow-e2e.sh ${NMSTATE_UI_PLUGIN_IMG_NAME};
       credentials:
-      - mount_path: /var/run/operator-secret
+      - collection: ""
+        mount_path: /var/run/operator-secret
         name: operator-secret
         namespace: test-credentials
       dependencies:

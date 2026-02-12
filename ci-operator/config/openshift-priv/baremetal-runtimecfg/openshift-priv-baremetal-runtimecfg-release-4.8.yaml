@@ -3,10 +3,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.8
   ubi8:
     name: ubi
     namespace: ocp
@@ -15,15 +11,11 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: rhel-golang-1.12
 canonical_go_repository: github.com/openshift/baremetal-runtimecfg
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base-os
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: baremetal-runtimecfg
 promotion:
   to:
@@ -65,21 +57,25 @@ tests:
   container:
     from: src
 - as: e2e-metal-ipi
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-openstack
+- always_run: false
+  as: e2e-openstack
   optional: true
   steps:
     cluster_profile: openstack-vexxhost

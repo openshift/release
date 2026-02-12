@@ -1,0 +1,62 @@
+base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
+binary_build_commands: go build .
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cloud-provider-powervs
+images:
+- dockerfile_path: openshift-hack/images/Dockerfile.openshift
+  to: powervs-cloud-controller-manager
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: vet
+  commands: go vet $(go list ./... | grep -v "/vendor/")
+  container:
+    from: src
+- as: test
+  commands: go test -v -race -covermode=atomic -coverprofile=cover.out $(go list ./...)
+  container:
+    from: src
+- as: fmt
+  commands: gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/")
+  container:
+    from: src
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
+  optional: true
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: cloud-provider-powervs

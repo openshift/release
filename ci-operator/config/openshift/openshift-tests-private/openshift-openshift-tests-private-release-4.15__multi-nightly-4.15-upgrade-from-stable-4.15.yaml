@@ -60,7 +60,7 @@ resources:
       memory: 200Mi
 tests:
 - as: aws-ipi-byo-route53-compact-cloudfront-arm-f60
-  cron: 36 2 9 1,3,5,7,9,11 *
+  cron: 9 16 13 2,4,6,8,10,12 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -101,8 +101,8 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-proxy-sts-arm-f28
-  cron: 53 5 15 * *
+- as: aws-ipi-proxy-sts-arm-f60
+  cron: 24 20 8 1,3,5,7,9,11 *
   steps:
     cluster_profile: aws-qe
     env:
@@ -119,35 +119,38 @@ tests:
   steps:
     cluster_profile: azure-qe
     env:
-      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       ENABLE_DES_DEFAULT_MACHINE: "true"
-      ENABLE_MIN_PERMISSION_FOR_DES: "true"
       OCP_ARCH: arm64
     test:
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
-- as: gcp-ipi-oidc-mini-perm-rt-fips-amd-f28
-  cron: 23 13 12 * *
+- as: gcp-ipi-oidc-mini-perm-rt-fips-amd-f60
+  cron: 22 2 29 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       RT_ENABLED: "true"
     test:
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity-minimal-permission
-- as: gcp-ipi-proxy-oidc-amd-mixarch-f60
-  cron: 4 7 10 1,3,5,7,9,11 *
+    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
+- as: gcp-ipi-proxy-oidc-mini-perm-amd-mixarch-f60
+  cron: 20 23 28 1,3,5,7,9,11 *
   steps:
     cluster_profile: gcp-qe
     env:
       ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
+      ENABLE_MIN_PERMISSION_FOR_STS: "true"
       EXTRACT_MANIFEST_INCLUDED: "true"
+      GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test

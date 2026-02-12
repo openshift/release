@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: rhel-8-release-golang-1.19-openshift-4.14
 images:
 - dockerfile_path: Dockerfile
   from: base
@@ -35,11 +35,13 @@ releases:
     integration:
       name: "4.14"
       namespace: ocp
+      reference_policy: Local
   latest:
     integration:
       include_built_images: true
       name: "4.14"
       namespace: ocp
+      reference_policy: Local
 resources:
   '*':
     limits:
@@ -51,10 +53,15 @@ tests:
 - as: ci-job
   commands: |
     unset VERSION
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
     make ci-job
   container:
     from: src
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: integration
+  skip_if_only_changed: ^(?:.*/)?(?:\.gitignore|\.tekton/.*|\.konflux/.*|.*\.md|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: aws-telco
     env:

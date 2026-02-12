@@ -18,47 +18,127 @@ fi
 git clone --branch $LATEST_TAG $ORION_REPO --depth 1
 pushd orion
 
+# Invoked from orion repo by the openshift-ci bot
+if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
+  echo "Invoked from orion repo by the openshift-ci bot, switching to PR#${PULL_NUMBER}"
+  git pull origin pull/${PULL_NUMBER}/head:${PULL_NUMBER} --rebase
+  git switch ${PULL_NUMBER}
+fi
+
 pip install -r requirements.txt
 
-if [[ ${ES_TYPE} == "qe" ]]; then
-    ES_PASSWORD=$(cat "/secret/qe/password")
-    ES_USERNAME=$(cat "/secret/qe/username")
-    export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-else
-    ES_PASSWORD=$(cat "/secret/internal/password")
-    ES_USERNAME=$(cat "/secret/internal/username")
-    export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
-fi
+case "$ES_TYPE" in
+  qe)
+    ES_PASSWORD=$(<"/secret/qe/password")
+    ES_USERNAME=$(<"/secret/qe/username")
+    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+    ;;
+  quay-qe)
+    ES_PASSWORD=$(<"/secret/quay-qe/password")
+    ES_USERNAME=$(<"/secret/quay-qe/username")
+    ES_HOST=$(<"/secret/quay-qe/hostname")
+    ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
+    ;;
+  stackrox)
+    ES_SECRETS_PATH='/secret_stackrox'
+    ES_PASSWORD=$(<"${ES_SECRETS_PATH}/password")
+    ES_USERNAME=$(<"${ES_SECRETS_PATH}/username")
+    if [ -e "${ES_SECRETS_PATH}/host" ]; then
+        ES_HOST=$(<"${ES_SECRETS_PATH}/host")
+    fi
+    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+    ;;
+  *)
+    ES_PASSWORD=$(<"/secret/internal/password")
+    ES_USERNAME=$(<"/secret/internal/username")
+    ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@opensearch.app.intlab.redhat.com"
+    ;;
+esac
+
+export ES_SERVER
 
 pip install .
-export  EXTRA_FLAGS=""
-if [[ -n "$UUID" ]]; then
-    export EXTRA_FLAGS+=" --uuid ${UUID}"
-fi
-if [ ${HUNTER_ANALYZE} == "true" ]; then
- export EXTRA_FLAGS+=" --hunter-analyze"
-fi
-if [ ${JUNIT} == true ]; then
-  export EXTRA_FLAGS+=" --lookback ${LOOKBACK}d"
-  export EXTRA_FLAGS+=" --output-format junit"
-  export EXTRA_FLAGS+=" --save-output-path=junit.xml"
-  export EXTRA_FLAGS+=" --ack ack/${VERSION}_${ACK_FILE}"
-  export EXTRA_FLAGS+=" --hunter-analyze"
+EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
+
+if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
+    EXTRA_FLAGS+=" --output-format junit --save-output-path=junit.xml"
+elif [ "${OUTPUT_FORMAT}" == "JSON" ]; then
+    EXTRA_FLAGS+=" --output-format json"
+elif [ "${OUTPUT_FORMAT}" == "TEXT" ]; then
+    EXTRA_FLAGS+=" --output-format text"
+else
+    echo "Unsupported format: ${OUTPUT_FORMAT}"
+    exit 1
 fi
 
 if [[ -n "$ORION_CONFIG" ]]; then
-  export CONFIG="${ORION_CONFIG}"
+    if [[ "$ORION_CONFIG" =~ ^https?:// ]]; then
+        fileBasename="$(basename ${ORION_CONFIG})"
+        if curl -fsSL "$ORION_CONFIG" -o "$ARTIFACT_DIR/$fileBasename"; then
+            ORION_CONFIG="$ARTIFACT_DIR/$fileBasename"
+        else
+            echo "Error: Failed to download $ORION_CONFIG" >&2
+            exit 1
+        fi
+    fi
+fi
+
+if [[ -n "$ACK_FILE" ]]; then
+    if [[ "$ACK_FILE" =~ ^https?:// ]]; then
+        ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
+        if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then
+            echo "Error: Failed to download $ACK_FILE" >&2
+            exit 1
+        fi
+    else
+        # Download the latest ACK file
+        ackFilePath="$ARTIFACT_DIR/$ACK_FILE"
+        curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} -o "$ackFilePath"
+    fi
+    EXTRA_FLAGS+=" --ack $ackFilePath"
+fi
+
+if [ ${COLLAPSE} == "true" ]; then
+    EXTRA_FLAGS+=" --collapse"
+fi
+
+if [[ -n "${ORION_ENVS}" ]]; then
+    ORION_ENVS=$(echo "$ORION_ENVS" | xargs)
+    IFS=',' read -r -a env_array <<< "$ORION_ENVS"
+    for env_pair in "${env_array[@]}"; do
+      env_pair=$(echo "$env_pair" | xargs)
+      env_key=$(echo "$env_pair" | cut -d'=' -f1)
+      env_value=$(echo "$env_pair" | cut -d'=' -f2-)
+      export "$env_key"="$env_value"
+    done
+fi
+
+if [[ -n "${LOOKBACK_SIZE}" ]]; then
+    EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
+fi
+
+if [[ -n "${LOOKBACK_SIZE}" ]]; then
+    EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
+fi
+
+if [[ -n "${DISPLAY}" ]]; then
+    EXTRA_FLAGS+=" --display ${DISPLAY}"
 fi
 
 set +e
-es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} orion cmd --config ${CONFIG} ${EXTRA_FLAGS}
+set -o pipefail
+FILENAME=$(basename ${ORION_CONFIG} | awk -F. '{print $1}')
+export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" 
+orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/${FILENAME}.txt
 orion_exit_status=$?
 set -e
 
-if [ ${JUNIT} == true ]; then
-  cp *.xml ${ARTIFACT_DIR}/
-else
-  cat *.csv
+cp *.csv *.xml *.json *.txt "${ARTIFACT_DIR}/" 2>/dev/null || true
+
+if [ $orion_exit_status -eq 3 ]; then
+  echo "Orion returned exit code 3, which means there are no results to analyze."
+  echo "Exiting zero since there were no regressions found."
+  exit 0
 fi
 
 exit $orion_exit_status

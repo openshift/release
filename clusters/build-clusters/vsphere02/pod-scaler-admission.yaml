@@ -56,7 +56,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"pod-scaler:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"pod-scaler\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
   labels:
     app: pod-scaler-consumer-admission
   name: pod-scaler-consumer-admission
@@ -75,7 +78,8 @@ spec:
     spec:
       serviceAccountName: pod-scaler
       containers:
-      - image: pod-scaler
+      - image: quay-proxy.ci.openshift.org/openshift/ci:ci_pod-scaler_latest
+        imagePullPolicy: Always
         name: pod-scaler
         args:
         - --loglevel=debug
@@ -134,17 +138,3 @@ spec:
       - name: report-credentials
         secret:
           secretName: result-aggregator
----
-apiVersion: image.openshift.io/v1
-kind: ImageStream
-metadata:
-  name: pod-scaler
-  namespace: ci
-spec:
-  tags:
-  - from:
-      kind: DockerImage
-      name: quay.io/openshift/ci:ci_pod-scaler_latest
-    name: latest
-    importPolicy:
-      scheduled: true

@@ -64,12 +64,19 @@ timeout 5m bash -c 'until oc version; do sleep 10; done' || true
 must_gather_dir=/tmp/artifacts/post-tests-must-gather
 mkdir -p "${must_gather_dir}"
 
+# Download the MCO sanitizer binary from mirror
+curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+chmod +x /tmp/mco-sanitize
+
 echo "Gathering must-gather data..."
 oc adm must-gather \
   --insecure-skip-tls-verify \
   --dest-dir "${must_gather_dir}" > "${must_gather_dir}/must-gather.log"
 
-find "${must_gather_dir}" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "\$1" && mv "\$1" "\$1.redacted"' _ {} \;
-
+# Sanitize MCO resources to remove sensitive information.
+# If the sanitizer fails, fall back to manual redaction.
+if ! /tmp/mco-sanitize --input="${must_gather_dir}"; then
+  find "${must_gather_dir}" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "\$1" && mv "\$1" "\$1.redacted"' _ {} \;
+fi    
 
 EOF

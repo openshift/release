@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-8-release-golang-1.18-openshift-4.12
 releases:
   latest:
     candidate:
@@ -46,11 +46,12 @@ tests:
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","quay-lp"]'
-      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dyan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: rhn-support-dyan
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       QBO_CHANNEL: stable-3.13
       QUAY_OPERATOR_CHANNEL: stable-3.13
+      QUAY_VERSION: "3.13"
       USER_TAGS: |
         scenario quay
     test:
@@ -79,11 +80,12 @@ tests:
         }
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.18-lp","self-managed-lp","fips","quay-lp"]'
-      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dyan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: rhn-support-dyan
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       QBO_CHANNEL: stable-3.13
       QUAY_OPERATOR_CHANNEL: stable-3.13
+      QUAY_VERSION: "3.13"
       USER_TAGS: |
         scenario quay
     test:
@@ -133,6 +135,7 @@ tests:
       COMPUTE_NODE_TYPE: m5.2xlarge
       QUAY_OPERATOR_CHANNEL: stable-3.13
       QUAY_STORAGE_PROVIDER: aws
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-test-quay-e2e
@@ -147,6 +150,7 @@ tests:
       COMPUTE_NODE_TYPE: m5.2xlarge
       QUAY_OPERATOR_CHANNEL: stable-3.13
       QUAY_STORAGE_PROVIDER: azure
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-deploy-quay-azure
     - ref: quay-tests-test-quay-e2e
@@ -160,6 +164,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
       QUAY_OPERATOR_CHANNEL: stable-3.13
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-deploy-quay-ibmcos
     - ref: quay-tests-test-quay-e2e
@@ -172,6 +177,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
       QUAY_OPERATOR_CHANNEL: stable-3.13
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-deploy-quay-netapp-storagegrid
     - ref: quay-tests-test-quay-e2e
@@ -185,6 +191,7 @@ tests:
       COMPUTE_NODE_TYPE: m5.2xlarge
       QUAY_OPERATOR_CHANNEL: stable-3.13
       QUAY_STORAGE_PROVIDER: gcp
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-deploy-quay-gcp
     - ref: quay-tests-test-quay-e2e
@@ -201,6 +208,7 @@ tests:
       FIPS_ENABLED: "true"
       QBO_CHANNEL: stable-3.13
       QUAY_OPERATOR_CHANNEL: stable-3.13
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-test-quay-e2e
@@ -216,6 +224,7 @@ tests:
       COMPUTE_NODE_TYPE: m5.2xlarge
       POSTGRESQL_VERSION: "16"
       QUAY_OPERATOR_CHANNEL: stable-3.13
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-deploy-quay-aws-rds-postgresql
     - ref: quay-tests-test-quay-e2e
@@ -229,6 +238,7 @@ tests:
       COMPUTE_NODE_TYPE: m5.2xlarge
       POSTGRESQL_VERSION: "15"
       QUAY_OPERATOR_CHANNEL: stable-3.13
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-deploy-quay-aws-rds-postgresql
     - ref: quay-tests-test-quay-e2e
@@ -242,6 +252,7 @@ tests:
       COMPUTE_NODE_TYPE: m5.2xlarge
       POSTGRESQL_VERSION: "14"
       QUAY_OPERATOR_CHANNEL: stable-3.13
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-deploy-quay-aws-rds-postgresql
     - ref: quay-tests-test-quay-e2e
@@ -255,10 +266,117 @@ tests:
       COMPUTE_NODE_TYPE: m5.2xlarge
       POSTGRESQL_VERSION: "13"
       QUAY_OPERATOR_CHANNEL: stable-3.13
+      QUAY_VERSION: "3.13"
     test:
     - ref: quay-tests-deploy-quay-aws-rds-postgresql
     - ref: quay-tests-test-quay-e2e
     workflow: quay-tests-cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay316-gcp-sql
+  cron: 0 22 28 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      DB_VERSION: POSTGRES_17
+      ODF_OPERATOR_CHANNEL: stable-4.18
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-18@sha256:7a55241634a8bbb9ffb032f9c41145591aa1ece4b0070023420beb36210465c0
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-gcp-sql
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-gsql
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-resource-deprovisioning-gcp-sql
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay316-ocp418-unmanaged-tls
+  cron: 0 23 27 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.18
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-18@sha256:7a55241634a8bbb9ffb032f9c41145591aa1ece4b0070023420beb36210465c0
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.16"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-resource-provisioning-tls
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-unmanaged-tls
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay315-ocp418-virtual-builder
+  cron: 0 22 26 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.18
+      QUAY_BUILDER_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-15@sha256:728e2440e7aae26051ead1ea27a6fb81c3f2849c8e0bd28d088a43ad1038c8f2
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-15-v4-18@sha256:e35185c103b5f52273f5ad83a88f93768f35fb0d42a0643bd968e71df22853e8
+      QUAY_OPERATOR_CHANNEL: stable-3.15
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.15"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-resource-provisioning-tls
+    - ref: quay-tests-resource-provisioning-builder
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-builder
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay316-ocp418-aws-sts
+  cron: 0 22 25 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-18@sha256:7a55241634a8bbb9ffb032f9c41145591aa1ece4b0070023420beb36210465c0
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_STORAGE_PROVIDER: awssts
+      QUAY_VERSION: "3.16"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-aws-sts-s3
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-awssts
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-deprovisioning-aws-gcp-azure-storage-buckets
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay316-ocp418-aws-s3-couldfront
+  cron: 0 22 23 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-18@sha256:7a55241634a8bbb9ffb032f9c41145591aa1ece4b0070023420beb36210465c0
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_STORAGE_PROVIDER: S3CloudFront
+      QUAY_VERSION: "3.16"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-s3cloudfront
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-awss3cloudfront
+    - ref: quay-tests-test-quay-api
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-deprovisioning-aws-gcp-azure-storage-buckets
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay

@@ -15,10 +15,6 @@ base_images:
     name: "5.8"
     namespace: logging
     tag: elasticsearch-operator-registry
-  elasticsearch-operator-src:
-    name: "5.8"
-    namespace: logging
-    tag: elasticsearch-operator-src
   elasticsearch-proxy:
     name: 5.y
     namespace: logging
@@ -55,10 +51,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: oauth-proxy
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
   ubi9-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -77,9 +69,6 @@ images:
     cli:
       as:
       - quay.io/openshift/origin-cli:4.13
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
@@ -100,9 +89,6 @@ images:
     base:
       as:
       - registry.redhat.io/ubi9/go-toolset:latest
-    elasticsearch-operator-src:
-      as:
-      - registry.ci.openshift.org/logging/5.8:elasticsearch-operator-src
   to: cluster-logging-operator-e2e
 operator:
   bundles:
@@ -146,7 +132,6 @@ tests:
   commands: ARTIFACTS_DIR=${ARTIFACT_DIR} make coverage
   container:
     from: src
-  timeout: 15m0s
 - as: e2e-target
   cluster_claim:
     architecture: amd64
@@ -199,7 +184,6 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: generic-claim
-  timeout: 5h0m0s
 - as: e2e-ocp-target-minus-one
   cluster_claim:
     architecture: amd64
@@ -253,7 +237,6 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: generic-claim
-  timeout: 5h0m0s
 - as: e2e-ocp-target-minus-two
   cluster_claim:
     architecture: amd64
@@ -307,7 +290,6 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: generic-claim
-  timeout: 5h0m0s
 - as: functional
   cluster_claim:
     architecture: amd64

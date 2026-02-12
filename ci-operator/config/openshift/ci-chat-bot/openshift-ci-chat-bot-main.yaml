@@ -2,15 +2,11 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.59.0
+    tag: latest
   govulncheck:
     name: govulncheck
     namespace: ci
     tag: latest
-  ocp_ubi-python-311_9:
-    name: ubi-python-311
-    namespace: ocp
-    tag: "9"
   os:
     name: centos
     namespace: openshift
@@ -28,19 +24,28 @@ images:
         source_path: /go/src/github.com/openshift/ci-chat-bot/ci-chat-bot
   to: ci-chat-bot
 - dockerfile_path: images/Dockerfile.python
-  inputs:
-    ocp_ubi-python-311_9:
-      as:
-      - registry.ci.openshift.org/ocp/ubi-python-311:9
   to: rosa-cleanup
+- dockerfile_literal: |-
+    FROM pipeline:govulncheck
+    COPY ci-chat-bot /workdir
+    WORKDIR /workdir
+  from: govulncheck
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ci-chat-bot
+  to: govulncheck-src
 promotion:
   to:
   - excluded_images:
     - rosa-cleanup
+    - govulncheck-src
     namespace: ci
     tag: latest
   - excluded_images:
     - ci-chat-bot
+    - govulncheck-src
     namespace: continuous-release-jobs
     tag: latest
 resources:
@@ -62,10 +67,17 @@ tests:
   container:
     from: src
 - as: govulncheck
-  commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck ./...
-  container:
-    from: govulncheck
-  optional: true
+  steps:
+    test:
+    - as: govulncheck
+      commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) make vulncheck
+      from: pipeline:govulncheck-src
+      resources:
+        limits:
+          memory: 14Gi
+        requests:
+          cpu: 500m
+          memory: 11Gi
 - as: unit
   commands: make test
   container:

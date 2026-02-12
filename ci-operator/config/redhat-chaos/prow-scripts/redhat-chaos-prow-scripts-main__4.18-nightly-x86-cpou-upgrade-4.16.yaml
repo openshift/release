@@ -52,23 +52,26 @@ tests:
     cluster_profile: aws-chaos
     env:
       BASE_DOMAIN: aws.rhperfscale.org
-      CHURN: "false"
+      CDV2_ITERATION_MULTIPLIER: "10"
       CONTROL_PLANE_INSTANCE_TYPE: m5.xlarge
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "6"
       MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "infra"}]'
       PAUSED_MCP_NAME: worker infra
+      USER_TAGS: |
+        TicketId 419
       ZONES_COUNT: "3"
     observers:
       enable:
       - redhat-chaos-cerberus
       - redhat-chaos-pod-scenarios-random-system-pods-observer
     post:
+    - ref: redhat-chaos-observer-stop
     - chain: ipi-aws-post
     pre:
     - chain: ipi-conf-aws
     - ref: ovn-conf
     - chain: ipi-install
+    - ref: redhat-chaos-observer-start
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -83,19 +86,17 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: openshift-qe-upgrade-max-unavailable
-    - chain: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     - chain: openshift-upgrade-qe-sanity-cpou
-  timeout: 8h0m0s
 - always_run: false
   as: loaded-upgrade-416to418-gcp
   steps:
     allow_skip_on_success: true
     cluster_profile: gcp-chaos
     env:
-      CHURN: "false"
+      CDV2_ITERATION_MULTIPLIER: "10"
       GC: "false"
-      ITERATION_MULTIPLIER_ENV: "6"
       MCO_CONF_DAY2_CUSTOM_MCP: '[{"mcp_name": "infra"}]'
       PAUSED_MCP_NAME: worker infra
     observers:
@@ -116,11 +117,10 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: openshift-qe-upgrade-max-unavailable
-    - chain: openshift-qe-cluster-density-v2
+    - ref: openshift-qe-cluster-density-v2
     - ref: redhat-chaos-start-krkn
     - chain: openshift-upgrade-qe-sanity-cpou
-    workflow: openshift-qe-installer-gcp-ipi-ovn-etcd-encryption-fips
-  timeout: 8h0m0s
+    workflow: redhat-chaos-installer-gcp-ipi-ovn-etcd-encryption-fips
 zz_generated_metadata:
   branch: main
   org: redhat-chaos

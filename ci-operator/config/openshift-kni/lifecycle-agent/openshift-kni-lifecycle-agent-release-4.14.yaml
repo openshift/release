@@ -1,19 +1,36 @@
 base_images:
-  base:
+  bip-orchestrate-vm:
+    name: bip-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
+  ib-orchestrate-vm:
+    name: ib-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
+  previous-lca:
     name: "4.14"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
+  recert:
+    name: recert
+    namespace: edge-infrastructure
+    tag: release-4.14
+  ubi9-minimal:
+    name: ubi-minimal
     namespace: ocp
-    tag: base
+    tag: "9"
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  from: base
+  from: ubi9-minimal
   to: lifecycle-agent-operator
 - dockerfile_path: bundle.Dockerfile
   to: lifecycle-agent-operator-bundle
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: lifecycle-agent-operator-bundle-pipeline
+    dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/openshift-kni/lifecycle-agent-operator:.*
     with: pipeline:lifecycle-agent-operator
@@ -26,11 +43,13 @@ releases:
     integration:
       name: "4.14"
       namespace: ocp
+      reference_policy: Local
   latest:
     integration:
       include_built_images: true
       name: "4.14"
       namespace: ocp
+      reference_policy: Local
 resources:
   '*':
     limits:
@@ -44,14 +63,19 @@ tests:
 - as: ci-job
   commands: |
     unset VERSION
+    export XDG_CACHE_HOME=/tmp/.cache
+    export XDG_CONFIG_HOME=/tmp/.config
+    export XDG_DATA_HOME=/tmp/.local/share
     make ci-job
   container:
     from: src
 - always_run: false
   as: integration
-  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
     cluster_profile: aws-telco
+    dependencies:
+      OO_INDEX: ci-index-lifecycle-agent-operator-bundle-pipeline
     env:
       BASE_DOMAIN: telco5g-ci.devcluster.openshift.com
       OO_CHANNEL: alpha
@@ -69,6 +93,9 @@ tests:
     - as: integration
       cli: latest
       commands: |
+        export XDG_CACHE_HOME=/tmp/.cache
+        export XDG_CONFIG_HOME=/tmp/.config
+        export XDG_DATA_HOME=/tmp/.local/share
         make test
       from: src
       resources:
@@ -84,13 +111,17 @@ tests:
     from: test-bin
   run_if_changed: (\.md|^Makefile|^hack/.*markdown.*|^.markdown.*)$
 - as: ibu-e2e-flow
-  cluster: build02
   optional: true
-  skip_if_only_changed: ^docs/|LICENSE|OWNERS|\.md$|^hack$
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
   steps:
     cluster_profile: aws
     dependencies:
-      LCA_PULL_REF: pipeline:lifecycle-agent-operator
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      LCA_PULL_REF: lifecycle-agent-operator
+      OO_BUNDLE: lifecycle-agent-operator-bundle-pipeline
+      RECERT_IMAGE: pipeline:recert
+      TARGET_LCA_REF: pipeline:previous-lca
     env:
       OCP_BASE_IMAGE_SOURCE: release
       OCP_BASE_VERSION: "4.14"
@@ -98,14 +129,13 @@ tests:
       OCP_TARGET_VERSION: "4.13"
       SEED_IMAGE_TAG_FORMAT: release
     workflow: openshift-image-based-upgrade-presubmit
-  timeout: 4h0m0s
 - as: security
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     env:
       PROJECT_NAME: lifecycle-agent
-      SNYK_CODE_ADDITIONAL_ARGS: --policy-path=.snyk
+      SNYK_CODE_ADDITIONAL_ARGS: --policy-path=.snyk --severity-threshold=high
     workflow: openshift-ci-security
 zz_generated_metadata:
   branch: release-4.14

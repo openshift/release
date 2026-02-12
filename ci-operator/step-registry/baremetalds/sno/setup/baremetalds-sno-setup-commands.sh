@@ -10,6 +10,29 @@ echo "************ baremetalds single-node setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+# Get dev-scripts logs and other configuration
+finished()
+{
+  # Make sure we always execute all of this, so we gather logs and installer status, even when
+  # install fails.
+  set +o pipefail
+  set +o errexit
+
+  echo "Fetching kubeconfig, other credentials..."
+  scp "${SSHOPTS[@]}" "root@${IP}:/home/sno/build/ibip/auth/kubeconfig" "${SHARED_DIR}/"
+  scp "${SSHOPTS[@]}" "root@${IP}:/home/sno/build/ibip/auth/kubeadmin-password" "${SHARED_DIR}/"
+
+  # ESI nodes are all using the same IP with different ports (which is forwarded to 8213)
+  PROXYPORT="8213"
+
+  echo "Adding proxy-url in kubeconfig"
+  sed -i "/- cluster/ a\    proxy-url: http://$IP:$PROXYPORT/" "${SHARED_DIR}"/kubeconfig
+
+  echo "Restarting proxy container"
+  ssh "${SSHOPTS[@]}" "root@${IP}" "podman restart external-squid"
+}
+trap finished EXIT TERM
+
 echo "Creating Ansible inventory file"
 cat > "${SHARED_DIR}/inventory" <<-EOF
 
@@ -22,12 +45,15 @@ echo "Creating Ansible configuration file"
 cat > "${SHARED_DIR}/ansible.cfg" <<-EOF
 
 [defaults]
-callback_whitelist = profile_tasks
+callbacks_enabled = profile_tasks
 host_key_checking = False
 
 verbosity = 2
-stdout_callback = yaml
+stdout_callback = ansible.builtin.default
 bin_ansible_callbacks = True
+
+[callback_default]
+result_format = yaml
 
 EOF
 
@@ -107,6 +133,8 @@ cd "\${REPO_DIR}"
 set +x
 echo "export PULL_SECRET='\$(cat /root/pull-secret)'" >> /root/config
 echo "export NO_MINIKUBE=true" >> /root/config
+# 40GB Size
+echo "export WORKER_DISK=40000000000" >> /root/config
 
 echo "export OPENSHIFT_INSTALL_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE:-${RELEASE_IMAGE_LATEST}}" >> /root/config
 
@@ -128,8 +156,12 @@ for ingress_app in ${INGRESS_APPS[@]}; do
 done
 echo "export SINGLE_NODE_IP_ADDRESS=${SINGLE_NODE_IP_ADDRESS}" >> /root/config
 
-echo Reloading NetworkManager systemd configuration
-systemctl reload NetworkManager
+# Keeping for posterity, this breaks ofcir nodes resolve config
+#echo Reloading NetworkManager systemd configuration
+#systemctl reload NetworkManager
+
+echo "Enabling podman rest api"
+systemctl --user enable --now podman.socket
 
 export TEST_ARGS="TEST_FUNC=${TEST_FUNC}"
 if [[ -e /root/sno-additional-manifests ]]

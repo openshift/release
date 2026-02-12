@@ -37,22 +37,24 @@ periodics:
         bad_dependency=false
         # work dir is release-controller
         echo "Checking release-controller"
-        govulncheck ./... || bad_dependency=true
+        make vulncheck || bad_dependency=true
         cd ../ci-chat-bot
         echo "Checking ci-chat-bot"
-        govulncheck ./... || bad_dependency=true
+        make vulncheck || bad_dependency=true
         cd ../../openshift-eng/jira-lifecycle-plugin
         echo "Checking jira-lifecycle-plugin"
-        govulncheck ./... || bad_dependency=true
+        make vulncheck || bad_dependency=true
         if $bad_dependency ; then
           exit 1
         fi
       command:
       - /bin/bash
-      image: registry.ci.openshift.org/ci/govulncheck:latest
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_govulncheck_latest
       imagePullPolicy: Always
       name: ""
       resources:
+        limits:
+          memory: 14Gi
         requests:
-          cpu: 100m
-          memory: 4Gi
+          cpu: 500m
+          memory: 11Gi

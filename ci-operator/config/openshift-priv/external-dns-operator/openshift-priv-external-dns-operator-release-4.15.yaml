@@ -7,10 +7,6 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: kube-rbac-proxy
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -21,10 +17,6 @@ canonical_go_repository: github.com/openshift/external-dns-operator
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: external-dns-operator
 operator:
   bundles:
@@ -70,7 +62,7 @@ tests:
     from: src
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
       OO_INDEX: ci-index-external-dns-operator-bundle
     env:
@@ -143,7 +135,8 @@ tests:
         export INFOBLOX_CONFIG_DIR=/var/run/infoblox-credentials
         make test-e2e
       credentials:
-      - mount_path: /var/run/infoblox-credentials
+      - collection: ""
+        mount_path: /var/run/infoblox-credentials
         name: infoblox-credentials
         namespace: test-credentials
       from: src

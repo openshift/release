@@ -461,7 +461,7 @@ spec:
         - --cookie-secret-file=/etc/tls/cookie-secret/cookie-secret
         - '--openshift-sar={"resource": "namespaces", "verb": "get"}'
         - '--openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
-        image: registry.redhat.io/openshift4/ose-oauth-proxy:latest
+        image: registry.redhat.io/openshift4/ose-oauth-proxy-rhel9:latest
         imagePullPolicy: IfNotPresent
         name: oauth-proxy
         ports:
@@ -514,7 +514,7 @@ $PROXYLINE
           name: shared-data
         image: quay.io/observatorium/token-refresher
       serviceAccountName: loki-promtail
-      terminationGracePeriodSeconds: 180
+      terminationGracePeriodSeconds: 30
       tolerations:
       - operator: Exists
       priorityClassName: system-cluster-critical

@@ -1,0 +1,66 @@
+base_images:
+  prcreator:
+    name: prcreator
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-e2e-base-ci
+images:
+- dockerfile_literal: |
+    FROM src
+    # Prcreator
+    ADD prcreator /usr/bin/prcreator
+    # Skopeo
+    RUN curl -sqL https://github.com/lework/skopeo-binary/releases/download/v1.21.0/skopeo-linux-amd64 -o /usr/local/bin/skopeo && \
+        chmod +x /usr/local/bin/skopeo && \
+        mkdir -p /etc/containers && \
+        echo '{"default":[{"type":"insecureAcceptAnything"}]}' > /etc/containers/policy.json
+    # ARO-HCP
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    ENV GOFLAGS='-mod=readonly'
+    ENV GOPATH=/opt/app-root
+    ENV GOCACHE=/opt/app-root/.cache
+    RUN mkdir -p $GOPATH/bin && \
+        make install-tools && \
+        make -C tooling/image-updater build && \
+        make -C tooling/templatize templatize && \
+        make -C tooling/yamlwrap && \
+        make all-tidy && \
+        go work vendor
+    # Ensure all tools are in PATH
+    ENV PATH="/usr/local/bin:$GOPATH/bin:$PATH"
+    # Ensure all files are writable
+    RUN chmod -R a+w /opt/app-root
+  from: src
+  inputs:
+    prcreator:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/prcreator
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/Azure/ARO-HCP
+  to: aro-hcp-automation-image-update
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- as: image-updater-tooling
+  cron: 0 */6 * * 1-5
+  steps:
+    env:
+      VERBOSITY: "0"
+    test:
+    - ref: aro-hcp-automation-image-update
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP
+  variant: image-updater

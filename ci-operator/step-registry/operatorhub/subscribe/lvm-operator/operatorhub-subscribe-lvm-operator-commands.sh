@@ -4,9 +4,42 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Check if a custom redhat-operators CatalogSource was created and use it
+if [[ -f "${SHARED_DIR}/redhat_operators_catalog_source_name" ]]; then
+  CUSTOM_CATALOG_SOURCE=$(cat "${SHARED_DIR}/redhat_operators_catalog_source_name")
+  echo "Found custom CatalogSource name from lvms-catalogsource step: ${CUSTOM_CATALOG_SOURCE}"
+  LVM_OPERATOR_SUB_SOURCE="${CUSTOM_CATALOG_SOURCE}"
+  
+  # Also derive the channel from the CatalogSource name if not explicitly set
+  # CatalogSource name format: redhat-operators-v4-20 -> extract version -> stable-4.20
+  if [[ -z "${LVM_OPERATOR_SUB_CHANNEL}" ]]; then
+    # Extract version from CatalogSource name (e.g., redhat-operators-v4-20 -> 4.20)
+    EXTRACTED_VERSION=$(echo "${CUSTOM_CATALOG_SOURCE}" | sed -n 's/.*-v\([0-9]*\)-\([0-9]*\)$/\1.\2/p')
+    if [[ -n "${EXTRACTED_VERSION}" ]]; then
+      LVM_OPERATOR_SUB_CHANNEL="stable-${EXTRACTED_VERSION}"
+      echo "Derived LVM_OPERATOR_SUB_CHANNEL from CatalogSource: ${LVM_OPERATOR_SUB_CHANNEL}"
+    fi
+  fi
+fi
+
+CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f1-2)
+
+# Auto-detect namespace based on cluster version if not explicitly set
 if [[ -z "${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
-  echo "ERROR: INSTALL_NAMESPACE is not defined"
-  exit 1
+  MINOR_VERSION=$(echo $CLUSTER_VERSION | cut -d. -f2)
+
+  echo "Detected OpenShift version: ${CLUSTER_VERSION}"
+
+  # For OpenShift 4.20+, use openshift-lvm-storage, otherwise use openshift-storage
+  if [[ ${MINOR_VERSION} -ge 20 ]]; then
+    LVM_OPERATOR_SUB_INSTALL_NAMESPACE="openshift-lvm-storage"
+  else
+    LVM_OPERATOR_SUB_INSTALL_NAMESPACE="openshift-storage"
+  fi
+
+  echo "Auto-detected namespace: ${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
+else
+  echo "Using explicitly set namespace: ${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
 fi
 
 if [[ -z "${LVM_OPERATOR_SUB_PACKAGE}" ]]; then
@@ -15,14 +48,20 @@ if [[ -z "${LVM_OPERATOR_SUB_PACKAGE}" ]]; then
 fi
 
 if [[ -z "${LVM_OPERATOR_SUB_CHANNEL}" ]]; then
-  echo "ERROR: CHANNEL is not defined"
-  exit 1
+  echo "CHANNEL is not defined, use the channel for current cluster version"
+  LVM_OPERATOR_SUB_CHANNEL="stable-${CLUSTER_VERSION}"
+  echo "Set LVM_OPERATOR_SUB_CHANNEL to: ${LVM_OPERATOR_SUB_CHANNEL}"
 fi
+
+if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_SUB_CHANNEL" ]]; then
+    LVM_OPERATOR_SUB_CHANNEL="$MULTISTAGE_PARAM_OVERRIDE_LVM_OPERATOR_SUB_CHANNEL"
+fi
+echo "$LVM_OPERATOR_SUB_CHANNEL"
 
 if [[ "${LVM_SUB_TARGET_NAMESPACES}" == "!install" ]]; then
   LVM_SUB_TARGET_NAMESPACES="${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
 fi
-echo "Installing ${LVM_OPERATOR_SUB_PACKAGE} from ${LVM_OPERATOR_SUB_CHANNEL} into ${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
+echo "Installing ${LVM_OPERATOR_SUB_PACKAGE} from channel: ${LVM_OPERATOR_SUB_CHANNEL} in source: ${LVM_OPERATOR_SUB_SOURCE} into ${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}"
 
 # create the install namespace
 oc apply -f - <<EOF

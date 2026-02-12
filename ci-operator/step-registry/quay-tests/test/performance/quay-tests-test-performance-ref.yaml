@@ -1,0 +1,40 @@
+ref:
+  as: quay-tests-test-performance
+  cli: latest
+  from_image:
+    name: quay-test-omr
+    namespace: ci
+    tag: latest
+  commands: quay-tests-test-performance-commands.sh
+  resources:
+    requests:
+      cpu: "1"
+      memory: 4Gi
+  timeout: 8h0m0s
+  grace_period: 15m0s
+  documentation: |-
+    Deploy Quay Performance test
+  credentials:
+  - namespace: test-credentials
+    name: quay-qe-elk-secret
+    mount_path: /var/run/quay-qe-elk-secret
+  env:
+  - name: QUAY_OPERATOR_CHANNEL
+    documentation: The quay operator channel
+    default: "stable-3.14"
+  - name: HITSIZE
+    documentation: The total amount of requests to hit the system with
+    default: "100"
+  - name: PUSH_PULL_NUMBERS
+    documentation: The amount of images to do push/pull operations on
+    default: "5000"
+  - name: CONCURRENCY
+    documentation: The rate at which the requests hits must happen in parallel
+    default: "15"   
+  - name: TEST_PHASES
+    documentation: Comma separated string containing list of phases. Valid phases are LOAD, RUN and DELETE
+    default: "LOAD,RUN"   
+  - name: ADDITIONAL_PARAMS
+    default: '{}'
+    documentation: |-
+      JSON value to upload additonal metadata to the fingerprint    

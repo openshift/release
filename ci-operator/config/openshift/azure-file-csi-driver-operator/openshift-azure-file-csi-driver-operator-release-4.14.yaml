@@ -3,10 +3,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
   tests-private:
     name: tests-private
     namespace: ci
@@ -17,10 +13,6 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: azure-file-csi-driver-operator
 - dockerfile_path: Dockerfile.test
   from: src
@@ -63,12 +55,12 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
-  timeout: 5h30m0s
 - as: e2e-azure-file-nfs-csi
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi-file-nfs
-- as: e2e-azure-file-csi-extended
+- always_run: false
+  as: e2e-azure-file-csi-extended
   optional: true
   steps:
     cluster_profile: azure-qe

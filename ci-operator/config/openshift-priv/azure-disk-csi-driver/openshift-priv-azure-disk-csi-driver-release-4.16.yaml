@@ -2,15 +2,7 @@ base_images:
   commitchecker:
     name: commitchecker
     namespace: ci
-    tag: "4.15"
-  ocp_4.16_base-rhel9:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
+    tag: latest
   tests-private:
     name: tests-private
     namespace: ci
@@ -20,13 +12,6 @@ build_root:
 canonical_go_repository: github.com/kubernetes-sigs/azuredisk-csi-driver
 images:
 - dockerfile_path: Dockerfile.openshift.rhel7
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: azure-disk-csi-driver
 promotion:
   to:
@@ -76,8 +61,8 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
-  timeout: 5h30m0s
-- as: e2e-azure-csi-extended
+- always_run: false
+  as: e2e-azure-csi-extended
   optional: true
   steps:
     cluster_profile: azure-qe

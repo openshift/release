@@ -1,17 +1,13 @@
 base_images:
-  ocp-4:
+  rosa-hcp:
     name: automation-flavors
     namespace: stackrox
-    tag: openshift-4-0.10.34
-  openshift_release_golang-1.22:
-    name: release
-    namespace: openshift
-    tag: golang-1.22
+    tag: rosa-stable
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-8-release-golang-1.23-openshift-4.20
   use_build_cache: true
 images:
 - dockerfile_path: Dockerfile
@@ -21,14 +17,8 @@ images:
       - destination_dir: ./
         source_path: /go/src/github.com/stackrox/acs-fleet-manager/.
   to: acs-fleet-manager
-- context_dir: dp-terraform/helm
-  dockerfile_path: Dockerfile
-  to: acs-fleetshard-operator
 - dockerfile_path: .openshift-ci/e2e-runtime/Dockerfile
   inputs:
-    openshift_release_golang-1.22:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.22
     src:
       paths:
       - destination_dir: ./
@@ -38,7 +28,7 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.15"
+      version: "4.20"
 resources:
   '*':
     requests:
@@ -49,7 +39,7 @@ tests:
 - as: e2e
   steps:
     env:
-      OCP_VERSION: ocp/fast-4.15
+      OCP_VERSION: 4.20.8
     test:
     - ref: ipi-install-rbac
     - as: test
@@ -60,20 +50,19 @@ tests:
           echo "No e2e configured, skipping."
         fi
       credentials:
-      - mount_path: /var/run/rhacs-ms-e2e-tests
+      - collection: ""
+        mount_path: /var/run/rhacs-ms-e2e-tests
         name: rhacs-ms-e2e-tests
         namespace: test-credentials
       dependencies:
       - env: FLEET_MANAGER_IMAGE
         name: acs-fleet-manager
-      - env: FLEETSHARD_OPERATOR_IMAGE
-        name: acs-fleetshard-operator
       from: e2e-runtime
       resources:
         requests:
           cpu: 2000m
           memory: 6000Mi
-    workflow: stackrox-automation-flavors-ocp-4-e2e
+    workflow: stackrox-automation-flavors-rosa-hcp-e2e
 zz_generated_metadata:
   branch: main
   org: stackrox

@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Unset environment variables which conflict with kuttl
+# Unset environment variables which conflict with Chainsaw
 unset NAMESPACE
 
 # setup proxy
@@ -18,6 +18,7 @@ cp -R /tmp/distributed-tracing-qe /tmp/distributed-tracing-tests && cd /tmp/dist
 
 # Execute Distributed Tracing tests
 chainsaw test \
+--quiet \
 --report-name "junit_distributed_tracing_disconnected" \
 --report-path "$ARTIFACT_DIR" \
 --report-format "XML" \

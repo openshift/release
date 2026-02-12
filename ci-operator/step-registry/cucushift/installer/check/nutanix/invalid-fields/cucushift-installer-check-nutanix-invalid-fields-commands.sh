@@ -8,6 +8,9 @@ check_result=0
 
 function run_install() {
   local ret
+  if [[ -f "${CLUSTER_PROFILE_DIR}/prismcentral.pem" ]]; then
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/prismcentral.pem"
+  fi
   echo "install-config.yaml"
   echo "-------------------"
   grep -v "password\|username\|pullSecret\|auth" <"${dir}"/install-config.yaml
@@ -169,6 +172,39 @@ if grep "configured subnet UUID does not correspond to a valid subnet in Prism" 
   echo "Pass: passed to check subnetUUIDs field"
 else
   echo "Fail: failed to check subnetUUIDs field"
+  check_result=$((check_result + 1))
+fi
+rm -rf "${dir:?}/"
+mkdir "${dir}/"
+
+# set invalid dataDisks
+cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
+
+CONFIG="${dir}/install-config.yaml"
+PATCH="${dir}/invalid-dataDisks.yaml.patch"
+
+cat >"${PATCH}" <<EOF
+compute:
+- name: worker
+  platform:
+    nutanix:
+      dataDisks:
+      - deviceProperties:
+          adapterType: SCSI
+          deviceIndex: 1
+          deviceType: Disk
+        storageConfig:
+          diskMode: Standard
+          storageContainer:
+            uuid: 04e10481-071a-4137-b1e9-f0490639cd80
+        diskSize: 1023Mi
+EOF
+yq-go m -x -i "${CONFIG}" "${PATCH}"
+run_install
+if grep "The minimum diskSize is 1Gi bytes" "${dir}"/.openshift_install.log; then
+  echo "Pass: passed to check dataDisks field"
+else
+  echo "Fail: failed to check dataDisks field"
   check_result=$((check_result + 1))
 fi
 rm -rf "${dir:?}/"

@@ -1,14 +1,9 @@
-base_images:
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.59.1
 binary_build_commands: make manager
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.21
+    tag: rhel-9-release-golang-1.24-openshift-4.20
 resources:
   '*':
     limits:
@@ -21,27 +16,7 @@ tests:
   commands: make gotest
   container:
     from: src
-- as: govet
-  commands: make govet
-  container:
-    from: src
-- as: golangci
-  commands: |
-    export GOCACHE=/tmp/
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    export GOPROXY=https://proxy.golang.org
-    golangci-lint run --verbose --timeout=5m0s
-  container:
-    clone: true
-    from: golangci-lint
-- as: golint
-  commands: make golint
-  container:
-    from: src
-- as: gofmt
-  commands: make gofmt || true
-  container:
-    from: src
+  skip_if_only_changed: ^renovate.json|^README.md
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators

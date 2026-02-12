@@ -126,9 +126,10 @@ FEATURE_USER_INITIALIZE: true
 PERMANENTLY_DELETE_TAGS: true
 RESET_CHILD_MANIFEST_EXPIRATION: true
 FEATURE_PROXY_STORAGE: true
-IGNORE_UNKNOWN_MEDIATYPES: true
+FEATURE_SUPERUSER_CONFIGDUMP: true
 FEATURE_UI_V2: true
 FEATURE_SUPERUSERS_FULL_ACCESS: true
+FEATURE_UI_MODELCARD: true
 SUPER_USERS:
   - quay
 USERFILES_LOCATION: default
@@ -153,11 +154,30 @@ AUTHENTICATION_TYPE: Database
 FEATURE_LISTEN_IP_VERSION: IPv4
 REPO_MIRROR_ROLLBACK: false
 AUTOPRUNE_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1
+FEATURE_IMAGE_EXPIRY_TRIGGER: true 
+NOTIFICATION_TASK_RUN_MINIMUM_INTERVAL_MINUTES: 1 
 DEFAULT_TAG_EXPIRATION: 2w
 TAG_EXPIRATION_OPTIONS:
   - 2w
+  - 4w
+  - 8w
   - 1d
+REDIS_FLUSH_INTERVAL_SECONDS: 30
+FEATURE_IMAGE_PULL_STATS: true
+PULL_METRICS_REDIS:
+        host: quay-quay-redis
+        port: 6379
+        db: 1
 EOF
+
+# Merge caller-provided extra config if set
+if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
+	echo "Merging extra Quay config into defaults..."
+	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
+	curl -sL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+		-o /tmp/yq && chmod +x /tmp/yq
+	/tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
+fi
 
 oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
 

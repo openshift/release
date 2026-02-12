@@ -3,14 +3,6 @@ base_images:
     name: tests-private-base
     namespace: ci
     tag: "4.11"
-  ci_tests-private-baseui_4.11:
-    name: tests-private-baseui
-    namespace: ci
-    tag: "4.11"
-  ci_tests-private-builder_4.11:
-    name: tests-private-builder
-    namespace: ci
-    tag: "4.11"
   cli:
     name: 4.11-priv
     namespace: ocp-private
@@ -29,10 +21,6 @@ canonical_go_repository: github.com/openshift/openshift-tests-private
 images:
 - dockerfile_path: images/Dockerfile.golang
   from: ci_tests-private-base_4.11
-  inputs:
-    ci_tests-private-builder_4.11:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-builder:4.11
   to: tests-private
 - dockerfile_literal: |
     FROM src AS builder
@@ -41,9 +29,6 @@ images:
     COPY --from=builder /go/src/github.com/openshift/openshift-tests-private /go/src/github.com/openshift/openshift-tests-private
     WORKDIR /go/src/github.com/openshift/openshift-tests-private
   inputs:
-    ci_tests-private-baseui_4.11:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-baseui:4.11
     src:
       as:
       - src
@@ -60,21 +45,6 @@ images:
     bin:
       as:
       - bin
-    ci_tests-private-base_4.11:
-      as:
-      - registry.ci.openshift.org/ci/tests-private-base:4.11
-  to: tests-private-newpr
-- dockerfile_literal: |
-    FROM bin
-    RUN sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" >/etc/yum.repos.d/azure-cli.repo' && \
-        PACKAGES="azure-cli openssh-clients httpd-tools skopeo java-11-openjdk-headless" && \
-        yum update -y && \
-        yum install --setopt=tsflags=nodocs -y $PACKAGES && yum clean all && rm -rf /var/cache/yum/* && \
-        chmod g+w /etc/passwd
-    RUN pip3 install --upgrade setuptools pip && pip3 install dotmap minio pyyaml==5.4.1 requests python-openstackclient
-    RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && unzip -q awscliv2.zip && ./aws/install -b /bin && rm -rf ./aws awscliv2.zip
-  from: bin
-  optional: true
   to: tests-private-pr
 promotion:
   to:
@@ -82,7 +52,6 @@ promotion:
     - tests-private
     - tests-private-ui
     - tests-private-pr
-    - tests-private-newpr
     name: 4.11-priv
     namespace: ocp-private
 releases:
@@ -102,16 +71,13 @@ resources:
     requests:
       cpu: "2"
       memory: 8Gi
-  e2e-aws:
-    requests:
-      cpu: "4"
-      memory: 4Gi
 test_binary_build_commands: make test
 tests:
 - as: title-check
   commands: make name-check
   container:
     from: src
+  skip_if_only_changed: OWNERS$
 - as: code-check
   commands: |
     unset GOFLAGS
@@ -120,11 +86,13 @@ tests:
     make check-code
   container:
     from: src
-- as: e2e-aws
+  skip_if_only_changed: OWNERS$
+- always_run: false
+  as: e2e-aws
   optional: true
-  skip_if_only_changed: (frontend/)|(images/)|(pipeline/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata)/)
   steps:
-    cluster_profile: aws
+    allow_skip_on_success: true
+    cluster_profile: aws-3
     test:
     - ref: enable-qe-catalogsource
     - as: pr-test
@@ -160,7 +128,7 @@ tests:
         fi
 
         python3 ./hack/pr.py
-      from: tests-private-newpr
+      from: tests-private-pr
       resources:
         limits:
           memory: 6Gi
@@ -168,7 +136,8 @@ tests:
           cpu: "1"
           memory: 1Gi
     workflow: ipi-aws
-- as: e2e-console
+- always_run: false
+  as: e2e-console
   optional: true
   run_if_changed: frontend/tests/.*.ts
   steps:
@@ -199,20 +168,6 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-ipi-private
-- as: debug-winc-aws-ipi
-  optional: true
-  run_if_changed: test/extended/winc/
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FORCE_SUCCESS_EXIT: "no"
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
-      TEST_SCENARIOS: Windows_Containers
-      TEST_TIMEOUT: "50"
-    test:
-    - ref: openshift-extended-test
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
 zz_generated_metadata:
   branch: release-4.11
   org: openshift-priv

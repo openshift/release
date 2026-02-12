@@ -74,6 +74,7 @@ env:
 - **`install_namespace`**: The namespace into which the operator and catalog will be installed. Example: `"mtr-namespace"`.
 - **`target_namespaces`**: A comma-separated list of namespaces the operator will target. If empty, all namespaces will be targeted. This value can be set to `"!install"` to use the `install_namespace` value. Example: `"mtr,ocm"`
 - **`config`**: (Optional) SubscriptionConfig contains configuration specified for a subscription. Example: `{"env": [{"name": "FIPS_MODE", "value": "disabled"}]}`. More fields can be found in the CRD/subscriptions.operators.coreos.com.
+- **`skip_checking`**: (Optional) For those cases where expected CRDs would be available in a later step. Example: `{"name": "topology-aware-lifecycle-manager", "source": "prega-operators", "channel": "!default", "install_namespace": "openshift-talm", "target_namespaces": "", "operator_group": "topology-aware-lifecycle-manager", "skip_checking": "true"}`
 
 ## Requirements
 

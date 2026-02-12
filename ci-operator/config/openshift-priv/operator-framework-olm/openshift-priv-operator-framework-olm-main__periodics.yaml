@@ -1,0 +1,38 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/operator-framework-olm
+images:
+- dockerfile_path: operator-lifecycle-manager.Dockerfile
+  to: operator-lifecycle-manager
+- dockerfile_path: operator-registry.Dockerfile
+  to: operator-registry
+- dockerfile_path: base.Dockerfile
+  from: src
+  to: ci-image
+promotion:
+  to:
+  - disabled: true
+    excluded_images:
+    - ci-image
+    name: 4.17-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.17-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.17-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift-priv
+  repo: operator-framework-olm
+  variant: periodics

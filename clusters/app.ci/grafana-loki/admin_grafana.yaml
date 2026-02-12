@@ -1,6 +1,8 @@
 kind: Namespace
 apiVersion: v1
 metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
   name: grafana-loki
 ---
 kind: RoleBinding
@@ -133,7 +135,9 @@ spec:
       restartPolicy: Always
       terminationGracePeriodSeconds: 30
       dnsPolicy: ClusterFirst
-      securityContext: {}
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 472
       schedulerName: default-scheduler
   strategy:
     type: RollingUpdate
@@ -206,7 +210,7 @@ spec:
         component: grafana-loki-redirect
     spec:
       containers:
-      - image: nginxinc/nginx-unprivileged:1.17
+      - image: docker.io/nginxinc/nginx-unprivileged:1.17
         name: nginx
         volumeMounts:
         - name: config

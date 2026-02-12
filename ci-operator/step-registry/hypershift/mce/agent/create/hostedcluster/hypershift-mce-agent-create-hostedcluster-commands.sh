@@ -10,17 +10,27 @@ debug() {
   oc logs -n hypershift -lapp=operator --tail=-1 -c operator | grep -v "info" > $ARTIFACT_DIR/hypershift-errorlog.txt
 }
 
+support_np_skew() {
+  local extra_flags=""
+  if [[ -n "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && "$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
+    curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+    # >= 2.7: "--render-sensitive --render", else: "--render"
+    if [[ "$(printf '%s\n' "2.7" "$MCE_VERSION" | sort -V | head -n1)" == "2.7" ]]; then
+      extra_flags+="--render-sensitive --render > /tmp/hc.yaml "
+    else
+      extra_flags+="--render > /tmp/hc.yaml "
+    fi
+    extra_flags+="&& /tmp/yq e -i '(select(.kind == \"NodePool\").spec.release.image) = \"$NODEPOOL_RELEASE_IMAGE_LATEST\"' /tmp/hc.yaml "
+    extra_flags+="&& oc apply -f /tmp/hc.yaml"
+  fi
+  echo "$extra_flags"
+}
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HYPERSHIFT_NAME=hcp
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-  echo "MCE version is less than 2.4"
-  HYPERSHIFT_NAME=hypershift
-fi
-
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
   downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
@@ -39,7 +49,7 @@ BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 echo "check HYPERSHIFT_HC_RELEASE_IMAGE, if not set, use mgmt-cluster playload image"
-RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
+RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$HOSTEDCLUSTER_RELEASE_IMAGE_LATEST}
 
 if [[ "${CLUSTER_TYPE}" == "equinix-ocp-metal-qe" ]]; then
   # This is a RDU2 lab cluster. RDU2 lab clusters deployed via step-registry/baremetal steps do not
@@ -74,48 +84,39 @@ if [[ "$DISCONNECTED" == "true" ]]; then
   source "${SHARED_DIR}/packet-conf.sh"
   # disconnected requires the additional trust bundle containing the local registry certificate
   scp "${SSHOPTS[@]}" "root@${IP}:/etc/pki/ca-trust/source/anchors/registry.2.crt" "${SHARED_DIR}/registry.2.crt"
-  EXTRA_ARGS+=" --additional-trust-bundle=${SHARED_DIR}/registry.2.crt --network-type=OVNKubernetes "
+  EXTRA_ARGS+=" --additional-trust-bundle=${SHARED_DIR}/registry.2.crt "
   EXTRA_ARGS+=" --olm-disable-default-sources "
   RELEASE_IMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
+fi
+
+if [[ -n "${HYPERSHIFT_NETWORK_TYPE}" ]]; then
+  EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE} "
 fi
 
 if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]; then
   cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
 fi
 
-/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
+echo "Create file for --image-content-sources"
+curl -L https://github.com/mikefarah/yq/releases/download/v4.50.1/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+# Give IDMS priority over ICSP by appending the ICSP to the IDMS file.
+if oc get imagedigestmirrorset &>/dev/null; then
+  oc get imagedigestmirrorset -oyaml | /tmp/yq '.items[].spec.imageDigestMirrors' > "${SHARED_DIR}/mgmt_icsp.yaml"
+fi
+if oc get imagecontentsourcepolicy &>/dev/null; then
+  oc get imagecontentsourcepolicy -oyaml | /tmp/yq '.items[].spec.repositoryDigestMirrors' >> "${SHARED_DIR}/mgmt_icsp.yaml"
+fi
+
+eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
-  --agent-namespace="${AGENT_NAMESPACE}" \
+  --agent-namespace=${AGENT_NAMESPACE} \
   --namespace local-cluster \
   --base-domain=${BASEDOMAIN} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
-  --image-content-sources "${SHARED_DIR}/mgmt_icsp.yaml" \
-  --ssh-key="${SHARED_DIR}/id_rsa.pub" \
-  --release-image ${RELEASE_IMAGE}
-
-if (( $(awk 'BEGIN {print ("'"$MCE_VERSION"'" < 2.4)}') )); then
-  echo "MCE version is less than 2.4"
-  oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
-  oc apply -f - <<EOF
-apiVersion: cluster.open-cluster-management.io/v1
-kind: ManagedCluster
-metadata:
-  annotations:
-    import.open-cluster-management.io/hosting-cluster-name: local-cluster
-    import.open-cluster-management.io/klusterlet-deploy-mode: Hosted
-    open-cluster-management/created-via: other
-  labels:
-    cloud: auto-detect
-    cluster.open-cluster-management.io/clusterset: default
-    name: ${CLUSTER_NAME}
-    vendor: OpenShift
-  name: ${CLUSTER_NAME}
-spec:
-  hubAcceptsClient: true
-  leaseDurationSeconds: 60
-EOF
-fi
+  --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
+  --ssh-key=${SHARED_DIR}/id_rsa.pub \
+  --release-image ${RELEASE_IMAGE} $(support_np_skew)"
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}

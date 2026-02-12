@@ -1,0 +1,50 @@
+base_images:
+  ocp_ubi-minimal_8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.22-openshift-4.17
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - $GO_BUILDER
+  to: net-istio-controller
+- dockerfile_path: openshift/ci-operator/knative-images/webhook/Dockerfile
+  inputs:
+    ocp_ubi-minimal_8:
+      as:
+      - $GO_RUNTIME
+    openshift_release_rhel-8-release-golang-1.22-openshift-4.17:
+      as:
+      - $GO_BUILDER
+  to: net-istio-webhook
+- dockerfile_path: openshift/ci-operator/source-image/Dockerfile
+  from: src
+  to: net-istio-source-image
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1Gi
+zz_generated_metadata:
+  branch: release-v1.16
+  org: openshift-knative
+  repo: net-istio
+  variant: "421"

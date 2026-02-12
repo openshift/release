@@ -1,0 +1,64 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
+images:
+- context_dir: openshift-ci/build-root/source-image
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: oc-bin-image
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: redhat-openshift-gitops-interop-aws
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "gitops-operator-tests", "failure_type": "pod_failure", "classification": "Test Execution", "group": {"name": "lp-tests", "priority": 1}, "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "gitops-operator-tests", "failure_type": "test_failure", "classification": "Test Failure", "group": {"name": "lp-tests", "priority": 1}, "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.21-lp","self-managed-lp","gitops-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: vab@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: GITOPS
+      MAP_TESTS: "true"
+      OCP_VERSION: "4.21"
+      OPERATORS: |
+        [
+            {"name": "openshift-gitops-operator", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-gitops-operator", "target_namespaces": "", "operator_group": "global-operators"}
+        ]
+      REPORTPORTAL_CMP: Gitops-lp-interop
+      USER_TAGS: |
+        scenario gitops
+    test:
+    - ref: install-operators
+    - ref: gitops-operator-tests
+    workflow: firewatch-ipi-aws-cr
+zz_generated_metadata:
+  branch: v1.18
+  org: redhat-developer
+  repo: gitops-operator
+  variant: gitops-ocp-4.21-lp-interop-cr

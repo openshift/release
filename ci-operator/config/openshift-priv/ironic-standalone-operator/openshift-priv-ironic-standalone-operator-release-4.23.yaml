@@ -1,0 +1,43 @@
+binary_build_commands: make build
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/ironic-standalone-operator
+images:
+- dockerfile_path: Dockerfile.ocp
+  to: ironic-standalone-operator
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: (^(docs|examples|config)/)|(\.md$)|((^|/)OWNERS$)
+- as: lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache make lint
+  container:
+    from: src
+  skip_if_only_changed: (^(docs|examples)/)|(\.md$)|((^|/)OWNERS$)
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: ironic-standalone-operator

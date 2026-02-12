@@ -43,6 +43,13 @@ echo "get ocp version: ${version}"
 rm pull-secret
 popd
 
+if [[ ! -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+  echo "Using default value: ${BASE_DOMAIN}"
+  AZURE_BASE_DOMAIN="${BASE_DOMAIN}"
+else
+  AZURE_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
+fi
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 REGION="${LEASED_RESOURCE}"
@@ -80,7 +87,7 @@ echo "Using compute node replicas: ${workers}"
 echo "Using controlPlane node replicas: ${master_replicas}"
 
 cat >> "${CONFIG}" << EOF
-baseDomain: ${BASE_DOMAIN}
+baseDomain: ${AZURE_BASE_DOMAIN}
 platform:
   azure:
     region: ${REGION}
@@ -103,7 +110,9 @@ EOF
 if [ -z "${OUTBOUND_TYPE}" ]; then
   echo "Outbound Type is not defined"
 else
-  if [ X"${OUTBOUND_TYPE}" == X"UserDefinedRouting" ] || [ X"${OUTBOUND_TYPE}" == X"NatGateway" ]; then
+  OUTBOUND_TYPE_VALUE="UserDefinedRouting NATGatewaySingleZone NATGatewayMultiZone NatGateway"
+  #shellcheck disable=SC2076
+  if [[ " ${OUTBOUND_TYPE_VALUE} " =~ " ${OUTBOUND_TYPE} " ]]; then
     echo "Writing 'outboundType: ${OUTBOUND_TYPE}' to install-config"
     PATCH="${SHARED_DIR}/install-config-outboundType.yaml.patch"
     cat > "${PATCH}" << EOF
@@ -113,7 +122,7 @@ platform:
 EOF
     yq-go m -x -i "${CONFIG}" "${PATCH}"
   else
-    echo "${OUTBOUND_TYPE} is not supported yet" || exit 1
+    echo "${OUTBOUND_TYPE} is not supported yet" && exit 1
   fi
 fi
 
@@ -151,3 +160,19 @@ EOF
 else
   echo "Omit baseDomainResourceGroupName for private cluster"
 fi
+
+if [[ "${USER_PROVISIONED_DNS}" == "yes" ]]; then
+  patch_user_provisioned_dns="${SHARED_DIR}/install-config-user-provisioned-dns.yaml.patch"
+  cat > "${patch_user_provisioned_dns}" << EOF
+platform:
+  azure:
+    userProvisionedDNS: Enabled
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_user_provisioned_dns}"
+fi
+
+# starting from 4.19, cluster sp only needs Contributor role
+#if (( minor_version > 18 && major_version == 4 )) && [[ -f "${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json" ]]; then
+#    echo "Copy Azure credential azure-sp-contributor.json to SHARED_DIR"
+#    cp ${CLUSTER_PROFILE_DIR}/azure-sp-contributor.json ${SHARED_DIR}/azure-sp-contributor.json
+#fi

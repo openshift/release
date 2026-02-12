@@ -3,31 +3,35 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
+  bip-orchestrate-vm:
+    name: bip-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ib-orchestrate-vm:
+    name: ib-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
   installer:
     name: "4.17"
     namespace: ocp
     tag: installer
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-8-release-golang-1.22-openshift-4.17
 images:
 - dockerfile_path: Dockerfile
   from: base
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: image-based-install-operator
+- dockerfile_literal: |
+    FROM placeholder
+  from: src
+  to: image-based-install-operator-code
 promotion:
   to:
   - name: "2.7"
@@ -56,6 +60,7 @@ tests:
   commands: HOME=/tmp make test
   container:
     from: src
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
 - as: integration
   cluster_claim:
     architecture: amd64
@@ -63,7 +68,8 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.14"
+    version: "4.17"
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -81,26 +87,36 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ibio
+  capabilities:
+  - intranet
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      IMG: image-based-install-operator
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
+      CLUSTERTYPE: assisted_medium_el9
       SEED_IMAGE_TAG: "4.17"
-    workflow: image-based-install-operator
+    workflow: image-based-install-operator-ofcir
 - as: e2e-ibio-periodic
-  cron: 00 00 * * 0-5
+  capabilities:
+  - intranet
+  cron: 0 4 * * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      IMG: image-based-install-operator
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
-      PACKET_PLAN: c3.medium.x86
       SEED_IMAGE_TAG: "4.17"
-    workflow: image-based-install-operator
+    workflow: image-based-install-operator-ofcir
 - as: publish
   postsubmit: true
   steps:

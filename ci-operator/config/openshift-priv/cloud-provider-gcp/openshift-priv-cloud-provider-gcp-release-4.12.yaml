@@ -3,24 +3,16 @@ base_images:
     name: 4.12-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
 binary_build_commands: go build ./cmd/cloud-controller-manager
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: rhel-8-release-golang-1.17-openshift-4.11
 canonical_go_repository: k8s.io/cloud-provider-gcp
 images:
 - dockerfile_path: openshift-hack/images/Dockerfile.openshift
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: gcp-cloud-controller-manager
 promotion:
   to:
@@ -48,7 +40,8 @@ tests:
   commands: gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/")
   container:
     from: src
-- as: e2e-gcp-ovn-ccm
+- always_run: false
+  as: e2e-gcp-ovn-ccm
   optional: true
   steps:
     cluster_profile: gcp
@@ -59,9 +52,9 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
-- as: openshift-e2e-gcp-ovn-techpreview-upgrade
+- always_run: false
+  as: openshift-e2e-gcp-ovn-techpreview-upgrade
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     env:

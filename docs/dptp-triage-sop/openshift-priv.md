@@ -3,7 +3,7 @@
 ## Unrelated histories
 
 A force-push in one of the repositories which has a counterpart in
-`openshfit-priv` will cause the job to fail to synchronize the repositories,
+`openshift-priv` will cause the job to fail to synchronize the repositories,
 e.g.:
 
 ```
@@ -42,4 +42,4 @@ To https://openshift-merge-robot@github.com/openshift-priv/cluster-api-provider-
  + 3bde969f...5e3a2bae public/release-4.13 -> release-4.13 (forced update)
 ```
 
-[private_org_sync_readme]: https://github.com/openshift/ci-tools/blob/master/cmd/private-org-sync/README.md
+[private_org_sync_readme]: https://github.com/openshift/ci-tools/blob/main/cmd/private-org-sync/README.md

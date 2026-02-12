@@ -36,12 +36,14 @@ fi
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
 # environment variables, as well as their lowercase equivalents (note
 # that libcurl doesn't recognize the uppercase variables).
-if test -f "${SHARED_DIR}/proxy-conf.sh"
-then
-	# shellcheck disable=SC1091
-	source "${SHARED_DIR}/proxy-conf.sh"
-	logger "INFO" "Loaded proxy configuration from ${SHARED_DIR}/proxy-conf.sh"
-fi
+
+# The proxy is used to access cluster api, while there is no access to cluster, remove thispart
+#if test -f "${SHARED_DIR}/proxy-conf.sh"
+#then
+#	# shellcheck disable=SC1091
+#	source "${SHARED_DIR}/proxy-conf.sh"
+#	logger "INFO" "Loaded proxy configuration from ${SHARED_DIR}/proxy-conf.sh"
+#fi
 
 GOOGLE_PROJECT_ID="$(<${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"

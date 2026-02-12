@@ -35,8 +35,9 @@ finished()
   echo "dev-scripts setup completed, fetching logs"
   ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs | tar -C "${ARTIFACT_DIR}" -xzf -
   echo "Removing REDACTED info from log..."
+  # Use '/auths/ s/.*/' instead of 's/.*auths.*/' to avoid regex backtracking on long lines
   sed -i '
-    s/.*auths.*/*** PULL_SECRET ***/g;
+    /auths/ s/.*/*** PULL_SECRET ***/;
     s/password: .*/password: REDACTED/;
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
@@ -185,9 +186,8 @@ EOF
 
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 
-
-
-timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+# Use '/auths/ s/.*/' instead of 's/.*auths.*/' to avoid regex backtracking on long log lines
+timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e '/auths/ s/.*/*** PULL_SECRET ***/'
 
 set -xeuo pipefail
 
@@ -309,7 +309,34 @@ test -f /usr/config && rm -f /usr/config || true
 # also the repo doesn't exist on equinix
 dnf config-manager --set-enabled extras-common || true
 
-dnf install -y git sysstat sos make podman python39 jq net-tools gcc
+# Packages to install
+PKGS="git sysstat sos make podman python39 jq net-tools gcc"
+
+# Number of attempts
+MAX_RETRIES=5
+# Delay between attempts (in seconds)
+DELAY=15
+
+attempt=1
+
+while (( attempt <= MAX_RETRIES )); do
+    if dnf install --nobest -y \$PKGS; then
+        echo "Packages installed successfully."
+        break
+    else
+        echo "Install failed (attempt \$attempt). Cleaning cache and retrying..."
+        dnf clean all
+        rm -rf /var/cache/dnf/*
+        sleep \$DELAY
+    fi
+
+    (( attempt++ ))
+done
+
+if (( attempt > MAX_RETRIES )); then
+    echo "ERROR: Failed to install packages after \$MAX_RETRIES attempts."
+    exit 1
+fi
 
 systemctl start sysstat
 
@@ -366,6 +393,12 @@ echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
 if [ "${AGENT_E2E_TEST_BOOT_MODE}" == "DISKIMAGE" ];
 then
   echo "export APPLIANCE_IMAGE=${APPLIANCE_IMAGE}" >> /root/dev-scripts/config_root.sh
+fi
+
+# Add AGENT_ISO_BUILDER_IMAGE only for OVE ISOBuilder e2e tests
+if [ "${AGENT_E2E_TEST_BOOT_MODE}" == "ISO_NO_REGISTRY" ];
+then
+  echo "export AGENT_ISO_BUILDER_IMAGE=${AGENT_ISO_BUILDER_IMAGE}" >> /root/dev-scripts/config_root.sh
 fi
 
 # If any extra manifests, then set ASSETS_EXTRA_FOLDER

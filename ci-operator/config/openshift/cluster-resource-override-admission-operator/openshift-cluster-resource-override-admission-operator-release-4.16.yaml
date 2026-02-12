@@ -1,38 +1,26 @@
-base_images:
-  ocp_4.14_base:
-    name: "4.14"
-    namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
-  openshift_release_golang-1.15:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/ci/Dockerfile
-  inputs:
-    ocp_4.14_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.14:base
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-resource-override-admission-operator
 - dockerfile_path: images/operator-registry/Dockerfile.registry.ci
-  inputs:
-    openshift_release_golang-1.15:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.15
   to: cluster-resource-override-admission-operator-registry
+operator:
+  bundles:
+  - as: cluster-resource-override-admission-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/placeholder/operator.*
+    with: pipeline:cluster-resource-override-admission-operator
+  - pullspec: quay.io/placeholder/operand.*
+    with: stable:cluster-resource-override-admission
 promotion:
   to:
-  - name: "4.16"
+  - additional_images:
+      cluster-resource-override-admission-operator-bundle: cluster-resource-override-admission-operator-bundle
+    name: "4.16"
     namespace: ocp
 releases:
   initial:
@@ -72,7 +60,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       cli: latest
@@ -92,7 +80,7 @@ tests:
 - as: e2e-aws-olm
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       cli: latest

@@ -1,25 +1,49 @@
 base_images:
   assisted-test-infra:
-    name: ocm-2.13
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-test-infra
+  bip-orchestrate-vm:
+    name: bip-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ib-orchestrate-vm:
+    name: ib-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
+  installer:
+    name: "4.22"
+    namespace: ocp
+    tag: installer
+  lifecycle-agent-operator-4-22:
+    name: "4.22"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator
+  lifecycle-agent-operator-bundle-4-21:
+    name: "4.21"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
+  lifecycle-agent-operator-bundle-4-22:
+    name: "4.22"
+    namespace: ocp-kni
+    tag: lifecycle-agent-operator-bundle
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.18"
+    tag: "4.22"
   upi-installer:
-    name: "4.18"
+    name: "4.22"
     namespace: ocp
     tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-9-release-golang-1.22-openshift-4.19
 images:
 - dockerfile_path: Dockerfile.prow
   to: recert-check
@@ -33,7 +57,7 @@ promotion:
 releases:
   latest:
     integration:
-      name: "4.18"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -43,27 +67,30 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: true
+- always_run: false
   as: cargo-check
   commands: cargo check
   container:
     from: recert-check
-- always_run: true
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+- always_run: false
   as: cargo-test
   commands: cargo test
   container:
     from: recert-check
-- always_run: true
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+- always_run: false
   as: cargo-clippy
   commands: cargo clippy
   container:
     from: recert-check
-- always_run: true
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+- always_run: false
   as: e2e-aws-ovn-single-node-recert-serial
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SKIPS: Managed cluster should grow and decrease when scaling different
         machineSets simultaneously
       TEST_SUITE: openshift/conformance/serial
@@ -71,12 +98,12 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-single-node-recert
-- always_run: true
+- always_run: false
   as: e2e-aws-ovn-single-node-recert-parallel
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SUITE: openshift/conformance/parallel
     observers:
       enable:
@@ -85,9 +112,8 @@ tests:
 - always_run: false
   as: e2e-aws-ovn-single-node-recert-openshift-e2e-test-qe
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-5
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       E2E_RUN_TAGS: '@level0'
       TEST_IMPORTANCE: LEVEL0
     observers:
@@ -104,7 +130,6 @@ tests:
     - ref: cucushift-e2e
     - ref: openshift-e2e-test-qe-report
     workflow: openshift-e2e-aws-single-node-recert
-  timeout: 8h0m0s
 - as: e2e-aws-ipi-sno-fips-recert
   cron: '@weekly'
   steps:
@@ -125,16 +150,197 @@ tests:
     - ref: cucushift-e2e
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-aws-ipi-sno
-- always_run: true
+- always_run: false
   as: baremetalds-sno-recert-cluster-rename
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
   steps:
-    cluster_profile: packet-sno
-    env:
-      PACKET_OS: rocky_9
+    cluster_profile: equinix-edge-enablement
     test:
     - ref: baremetalds-sno-rename
     - ref: baremetalds-sno-test
     workflow: baremetalds-sno
+- as: ibu-e2e-flow
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: recert
+      TARGET_LCA_REF: pipeline:lifecycle-agent-operator-bundle-4-21
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      OCP_TARGET_IMAGE_SOURCE: ci
+      OCP_TARGET_VERSION: "4.21"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+    workflow: openshift-image-based-upgrade-presubmit
+- always_run: false
+  as: ibu-e2e-flow-v4v6
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: recert
+      TARGET_LCA_REF: pipeline:lifecycle-agent-operator-bundle-4-21
+    env:
+      IP_STACK: v4v6
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      OCP_TARGET_IMAGE_SOURCE: ci
+      OCP_TARGET_VERSION: "4.21"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: v4v6
+    workflow: openshift-image-based-upgrade-presubmit
+- always_run: false
+  as: ibu-e2e-flow-v6v4
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: recert
+      TARGET_LCA_REF: pipeline:lifecycle-agent-operator-bundle-4-21
+    env:
+      IP_STACK: v6v4
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      OCP_TARGET_IMAGE_SOURCE: ci
+      OCP_TARGET_VERSION: "4.21"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: v6v4
+    workflow: openshift-image-based-upgrade-presubmit
+- as: ibi-e2e-flow
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: recert
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-install
+- always_run: false
+  as: ibi-e2e-flow-v4v6
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: pipeline:recert
+    env:
+      IP_STACK: v4v6
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: ibi-v4v6
+    workflow: openshift-image-based-install
+- always_run: false
+  as: ibi-e2e-flow-v6v4
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: pipeline:recert
+    env:
+      IP_STACK: v6v4
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: ibi-v6v4
+    workflow: openshift-image-based-install
+- as: ipc-e2e-flow
+  skip_if_only_changed: .*\.konflux/.*|\.tekton/.*
+  steps:
+    cluster_profile: aws-5
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: recert
+    env:
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: ibi
+    workflow: openshift-image-based-network-configuration
+- always_run: false
+  as: ipc-e2e-flow-v4v6
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: recert
+    env:
+      IP_STACK: v4v6
+      IPC_IPV4_ADDRESS: 192.168.128.80
+      IPC_IPV4_GATEWAY: 192.168.128.1
+      IPC_IPV4_MACHINE_NETWORK: 192.168.128.0/24
+      IPC_IPV6_ADDRESS: fd00:128::80
+      IPC_IPV6_GATEWAY: fd00:128::1
+      IPC_IPV6_MACHINE_NETWORK: fd00:128::/64
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: v4v6
+    workflow: openshift-image-based-network-configuration
+- always_run: false
+  as: ipc-e2e-flow-v6v4
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      INSTALLER_PULL_REF: pipeline:installer
+      LCA_PULL_REF: pipeline:lifecycle-agent-operator-4-22
+      OO_BUNDLE: pipeline:lifecycle-agent-operator-bundle-4-22
+      RECERT_IMAGE: recert
+    env:
+      IP_STACK: v6v4
+      IPC_IPV4_ADDRESS: 192.168.128.80
+      IPC_IPV4_GATEWAY: 192.168.128.1
+      IPC_IPV4_MACHINE_NETWORK: 192.168.128.0/24
+      IPC_IPV6_ADDRESS: fd00:128::80
+      IPC_IPV6_GATEWAY: fd00:128::1
+      IPC_IPV6_MACHINE_NETWORK: fd00:128::/64
+      OCP_BASE_IMAGE_SOURCE: ci
+      OCP_BASE_VERSION: "4.22"
+      SEED_IMAGE_TAG_FORMAT: presubmit
+      SEED_IMAGE_TAG_PREFIX: v6v4
+    workflow: openshift-image-based-network-configuration
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge

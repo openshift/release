@@ -19,8 +19,16 @@ if [ -n "${OPCT_DEV_EXTRA_CMD:-}" ]; then
     ${OPCT_CLI} run --watch ${OPCT_DEV_EXTRA_CMD:-}
 elif [ "${OPCT_RUN_MODE:-}" == "upgrade" ]; then
     echo "Running OPCT with upgrade mode"
-    ${OPCT_CLI} run --watch --mode=upgrade --upgrade-to-image="${TARGET_RELEASE_IMAGE}"
+    ${OPCT_CLI} run \
+        --watch \
+        --mode=upgrade \
+        --upgrade-to-image="${TARGET_RELEASE_IMAGE}" \
+        --validation-timeout=900 \
+        --validation-retry-interval=30
 else
     echo "Running OPCT with regular mode"
-    ${OPCT_CLI} run --watch
+    ${OPCT_CLI} run \
+        --watch \
+        --validation-timeout=900 \
+        --validation-retry-interval=30
 fi

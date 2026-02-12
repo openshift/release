@@ -7,24 +7,16 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.8
 binary_build_commands: hack/build-go.sh
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: rhel-8-release-golang-1.15-openshift-4.8
 canonical_go_repository: github.com/openshift/cluster-network-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: cluster-network-operator
 promotion:
   to:
@@ -62,15 +54,17 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-ovn-upgrade
+- always_run: false
+  as: e2e-gcp-ovn-upgrade
   optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-ovn
-- as: e2e-aws-upgrade
+- always_run: false
+  as: e2e-aws-upgrade
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-upgrade-aws
 - as: e2e-aws-sdn-multi
   steps:
@@ -78,18 +72,19 @@ tests:
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-ovn-step-registry
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-ovn
 - as: e2e-ovn-hybrid-step-registry
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-ovn-hybrid
 - as: e2e-ovn-ipsec-step-registry
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-ovn-ipsec
 - as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -98,7 +93,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6-ipsec
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -108,7 +104,7 @@ tests:
     workflow: baremetalds-e2e-ovn-ipsec
 - as: e2e-aws-ovn-windows
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
@@ -130,20 +126,8 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
-- as: e2e-openstack-kuryr
-  optional: true
-  steps:
-    cluster_profile: openstack-vh-mecha-az0
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-      TEST_SKIPS: NodePort \| session affinity \| Kubectl client Guestbook application
-        should create and stop a working application \| Services should be able to
-        change the type from ExternalName to ClusterIP
-      TEST_SUITE: kubernetes/conformance
-    workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack
+- always_run: false
+  as: e2e-openstack
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -152,7 +136,8 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-ovn
+- always_run: false
+  as: e2e-openstack-ovn
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -164,7 +149,7 @@ tests:
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-network-migration
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       TEST_SKIPS: Alerts shouldn't report any alerts in firing or pending state\|
         Prometheus when installed on the cluster shouldn't report any alerts in firing
@@ -175,7 +160,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-network-migration-rollback
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       TEST_SKIPS: Alerts shouldn't report any alerts in firing or pending state\|
         Prometheus when installed on the cluster shouldn't report any alerts in firing

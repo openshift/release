@@ -24,6 +24,11 @@ metadata:
     app: ci-scheduling-admission-webhook
   name: ci-scheduling-admission-webhook
   namespace: ci-scheduling-webhook
+  annotations:
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
 spec:
   # There is some state stored for assumed pods.
   # Prefer vertical to horizontal scaling.
@@ -42,7 +47,7 @@ spec:
           operator: Exists
       containers:
         # Temporary hosting location
-        - image: registry.ci.openshift.org/ci/ci-scheduling-webhook:latest
+        - image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-scheduling-webhook_latest
           command:
           - "/usr/bin/ci-scheduling-webhook"
           - "--port"

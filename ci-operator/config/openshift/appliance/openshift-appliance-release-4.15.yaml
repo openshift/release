@@ -7,20 +7,12 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  openshift_release_golang-1.19:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
 build_root:
   project_image:
     dockerfile_path: Dockerfile.openshift-appliance-build
 images:
 - dockerfile_path: Dockerfile.openshift-appliance
   from: coreos-centos-stream8
-  inputs:
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: agent-preinstall-image-builder
 promotion:
   to:
@@ -56,7 +48,7 @@ tests:
     from: test-bin
   run_if_changed: ^(cmd/.*|data/.*|hack/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
 - as: publish
-  cron: '@daily'
+  cron: 36 20 3 * *
   steps:
     dependencies:
       SOURCE_IMAGE_REF: agent-preinstall-image-builder
@@ -66,22 +58,23 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: e2e-compact-ipv4-static
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: ^(cmd/.*|data/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
   steps:
     allow_skip_on_success: true
     cluster_profile: packet-assisted
     workflow: agent-e2e-appliance-ipv4
-  timeout: 6h0m0s
-- as: e2e-sno-dualstack-dhcp
-  cluster: build05
+- always_run: false
+  as: e2e-sno-dualstack-dhcp
+  capabilities:
+  - intranet
   optional: true
   run_if_changed: ^(cmd/.*|data/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
   steps:
     allow_skip_on_success: true
     cluster_profile: packet-assisted
     workflow: agent-e2e-appliance-dualstack
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

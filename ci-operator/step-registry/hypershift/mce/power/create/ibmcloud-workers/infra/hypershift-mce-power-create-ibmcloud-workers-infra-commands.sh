@@ -114,12 +114,7 @@ set_power_configs() {
       POWERVS_VSI_SYS_TYPE=$(jq -r '.powervsVSISysType' "${AGENT_POWER_CREDENTIALS}/ibmcloud-resources.json")
   fi
 
-  MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
   HYPERSHIFT_CLI_NAME=hcp
-  if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
-  echo "MCE version is less than 2.4, use hypershift command"
-  HYPERSHIFT_CLI_NAME=hypershift
-  fi
 
   # Installing hypershift cli
   echo "$(date) Installing hypershift cli"
@@ -163,7 +158,7 @@ create_power_vms() {
   export IBMCLOUD_TRACE=true
 
   echo "$(date) Creating VSI in PowerVS instance"
-  ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE} --replicants ${HYPERSHIFT_NODE_COUNT} --replicant-scheme suffix --replicant-affinity-policy affinity
+  ibmcloud pi ins create ${POWERVS_VSI_NAME} --image ${POWERVS_IMAGE} --subnets ${POWERVS_NETWORK} --memory ${POWERVS_VSI_MEMORY} --processors ${POWERVS_VSI_PROCESSORS} --processor-type ${POWERVS_VSI_PROC_TYPE} --sys-type ${POWERVS_VSI_SYS_TYPE} --replicants ${HYPERSHIFT_NODE_COUNT} --replicant-scheme suffix --replicant-affinity-policy none
 
   # Adding sleep as it would take some time for VMs to get alive to retrieve the network interface details like ip and mac
   sleep 90s

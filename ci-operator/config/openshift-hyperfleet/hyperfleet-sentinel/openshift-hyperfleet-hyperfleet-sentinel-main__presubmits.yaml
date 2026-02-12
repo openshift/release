@@ -1,0 +1,62 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: openshift-build
+    namespace: jasee
+    tag: rhel-9-golang-1.25
+images:
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY src/ /opt/app-root/src
+    WORKDIR /opt/app-root/src/hyperfleet-sentinel
+    USER root
+    RUN dnf install -y make go
+    RUN dnf clean all
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-sentinel
+  to: podman-test
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: integration
+  capabilities:
+  - nested-podman
+  commands: |
+    # Start podman API service in background for testcontainers-go
+    # The nested-podman image provides podman but doesn't start the API service
+    podman system service --time=0 &
+    PODMAN_PID=$!
+    sleep 2
+    # Configure testcontainers-go to work with podman
+    # See: https://github.com/testcontainers/testcontainers-go/issues/2952
+    SOCKET_PATH=$(podman info --format '{{.Host.RemoteSocket.Path}}')
+    export DOCKER_HOST="unix://$SOCKET_PATH"
+    export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
+    export TESTCONTAINERS_RYUK_DISABLED=true
+    # Run integration tests
+    make generate
+    make test-integration
+    # Cleanup: stop podman service to allow job to complete
+    TEST_EXIT_CODE=$?
+    kill $PODMAN_PID 2>/dev/null || true
+    wait $PODMAN_PID 2>/dev/null || true
+    exit $TEST_EXIT_CODE
+  container:
+    from: podman-test
+  nested_podman: true
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-sentinel
+  variant: presubmits

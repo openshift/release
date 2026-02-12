@@ -1,22 +1,14 @@
 base_images:
-  ocp_4.19_base-rhel9:
-    name: 4.20-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.19
   operator-sdk:
-    name: "4.20"
+    name: "4.19"
     namespace: origin
     tag: operator-sdk
   previous-bundle:
-    name: 4.18-priv
+    name: 4.19-priv
     namespace: ocp-private
     tag: vertical-pod-autoscaler-operator-bundle
   previous-vpa-operator:
-    name: 4.18-priv
+    name: 4.19-priv
     namespace: ocp-private
     tag: vertical-pod-autoscaler-operator
   ubi-python-311:
@@ -34,13 +26,6 @@ images:
   - name: TARGETARCH
     value: amd64
   dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
   to: vertical-pod-autoscaler-operator
 - dockerfile_literal: |
     FROM ubi-python-311
@@ -124,7 +109,7 @@ tests:
 - as: e2e-aws-operator
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -166,7 +151,7 @@ tests:
 - as: e2e-aws-upgrade
   skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     test:
     - as: install
       cli: latest
@@ -234,6 +219,12 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: hypershift-hostedcluster-workflow
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

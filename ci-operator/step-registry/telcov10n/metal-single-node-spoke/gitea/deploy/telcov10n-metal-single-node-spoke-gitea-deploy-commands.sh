@@ -7,9 +7,17 @@ set -o pipefail
 echo "************ telcov10n Fix user IDs in a container ************"
 [ -e "${HOME}/fix_uid.sh" ] && "${HOME}/fix_uid.sh" || echo "${HOME}/fix_uid.sh was not found" >&2
 
+source ${SHARED_DIR}/common-telcov10n-bash-functions.sh
+
 function set_hub_cluster_kubeconfig {
   echo "************ telcov10n Set Hub kubeconfig from \${SHARED_DIR}/hub-kubeconfig location ************"
   export KUBECONFIG="${SHARED_DIR}/hub-kubeconfig"
+
+  if [ -n "${SOCKS5_PROXY}" ]; then
+    _curl="curl -x ${SOCKS5_PROXY}"
+  else
+    _curl="curl"
+  fi
 }
 
 function create_gitea_deployment {
@@ -36,6 +44,8 @@ helm_gitea_values=$(mktemp --dry-run)
 gitea_admin_pass="$(cat /var/run/telcov10n/ztp-left-shifting/gitea-admin-pass)"
 
 cat <<EOF > ${helm_gitea_values}
+replicaCount: 1
+
 image:
   registry: "${GITEA_REGISTRY}"
   repository: "${GITEA_REPO}"
@@ -80,20 +90,39 @@ EOF
   helm install gitea gitea-charts/gitea --version ${GITEA_HELM_VERSION} --values ${helm_gitea_values} -n ${gitea_project} --wait
   set +x
 
+  create_nodeport_extra_ssh_service
+
   setup_openshift_route
 
 }
 
-function wait_until_command_is_ok {
-  cmd=$1 ; shift
-  [ $# -gt 0 ] && sleep_for=${1} && shift && \
-  [ $# -gt 0 ] && max_attempts=${1}  && shift
+function create_nodeport_extra_ssh_service {
+
+  echo "************ telcov10n Create Extra Gitea Node Port service into the Hub cluster ************"
+
   set -x
-  for ((attempts = 0 ; attempts <  ${max_attempts:=10} ; attempts++)); do
-    eval "${cmd}" && { set +x ; return ; }
-    sleep ${sleep_for:='1m'}
-  done
-  exit 1
+  gitea_ssh_service_name=$(oc -n ${gitea_project} get svc -oname|grep 'ssh'|grep -v '\-np$'|cut -d'/' -f2)
+  set +x
+
+  cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gitea
+  name: ${gitea_ssh_service_name}-np
+  namespace: ${gitea_project}
+spec:
+  ports:
+  - name: ssh-np
+    protocol: TCP
+    port: $(oc -n ${gitea_project} get svc ${gitea_ssh_service_name} -ojsonpath='{.spec.ports[0].port}')
+    targetPort: $(oc -n ${gitea_project} get svc ${gitea_ssh_service_name} -ojsonpath='{.spec.ports[0].targetPort}')
+  selector:
+    app.kubernetes.io/instance: gitea
+    app.kubernetes.io/name: gitea
+  type: NodePort
+EOF
 }
 
 function setup_openshift_route {
@@ -126,7 +155,7 @@ EOF
   gitea_url="https://$(oc -n ${gitea_project} get route gitea -ojsonpath='{.spec.host}')"
   echo -n "${gitea_url}" > ${SHARED_DIR}/gitea-url.txt
   echo "Wait until Gitea endpoint is reachable via openshift route..."
-  wait_until_command_is_ok "curl -vIk ${gitea_url}"
+  wait_until_command_is_ok "${_curl} -sSIk -w %{http_code} ${gitea_url} | tail -1 | grep -w '200'"
 }
 
 function generate_gitea_ssh_keys {
@@ -135,14 +164,38 @@ function generate_gitea_ssh_keys {
 
   ssh_pri_key_file=${SHARED_DIR}/ssh-key-${gitea_project}
   ssh_pub_key_file="${ssh_pri_key_file}.pub"
-  ssh-keygen -N '' -f ${ssh_pri_key_file} -C "${gitea_project}-SSH-Public-Key"
-  chmod 0600 ${ssh_pri_key_file}*
+  if [[ ! -f ${ssh_pri_key_file} || ! -f ${ssh_pub_key_file} ]]; then
+    yes | ssh-keygen -N '' -f ${ssh_pri_key_file} -C "${gitea_project}-SSH-Public-Key"
+    chmod 0600 ${ssh_pri_key_file}*
 
-  cp -v ${ssh_pri_key_file}* ${ARTIFACT_DIR}/
+    cp -v ${ssh_pri_key_file}* ${ARTIFACT_DIR}/
 
-  echo
-  cat ${ssh_pri_key_file}
-  echo
+    echo
+    cat ${ssh_pri_key_file}
+    echo
+  else
+    echo
+    echo "Skipping SSH keys generation. Using available ones."
+    echo
+  fi
+}
+
+function use_shared_ssh_keys_from_vault {
+
+  echo "************ telcov10n use shared ssh keys from vault ************"
+
+  ssh_pri_key_file=${SHARED_DIR}/ssh-key-${gitea_project}
+  ssh_pub_key_file="${ssh_pri_key_file}.pub"
+
+  #### SSH Private key
+  cat /var/run/telcov10n/ansible-group-all/ansible_ssh_private_key >| ${ssh_pri_key_file}
+  chmod 0600 ${ssh_pri_key_file}
+
+  #### SSH Public key
+  cat /var/run/telcov10n/ansible-group-all/ssh_public_key >| ${ssh_pub_key_file}
+  chmod 0644 ${ssh_pub_key_file}
+
+  ls -lhtr ${ssh_pri_key_file}*
 }
 
 function upload_gitea_ssh_keys {
@@ -152,7 +205,7 @@ function upload_gitea_ssh_keys {
   ssh_key_json=$(mktemp --dry-run)
   echo '{"title":"Gitea ZTP SSH Pub key", "key":"'"$(cat ${ssh_pub_key_file})"'"}' > ${ssh_key_json}
   set -x
-  curl -vLk -X POST \
+  ${_curl} -vLk -X POST \
     -u ${GITEA_ADMIN_USERNAME}:${gitea_admin_pass} \
     -H "Content-Type: application/json" \
     -d @${ssh_key_json} \
@@ -166,12 +219,17 @@ function create_ztp_gitea_repo {
 
   repo_name="telcov10n"
   set -x
-  curl -vLk -X POST \
+  ${_curl} -vLk -X POST \
     -u ${GITEA_ADMIN_USERNAME}:${gitea_admin_pass} \
     -H "Content-Type: application/json" \
     -d '{"name":"'${repo_name}'"}' \
+    -o /tmp/repo-request.json \
     "$(cat ${SHARED_DIR}/gitea-url.txt)/api/v1/user/repos"
   set +x
+
+  new_repo_created="no"
+  cat /tmp/repo-request.json | \
+    grep 'The repository with the same name already exists.' || new_repo_created="yes"
 
   echo -n "${gitea_url_k8s_service}/${GITEA_ADMIN_USERNAME}/${repo_name}" > ${SHARED_DIR}/gitea-http-repo-uri.txt
 }
@@ -183,37 +241,13 @@ function generate_gitea_ssh_uri {
   gitea_ssh_host="gitea-ssh.${gitea_project}"
   gitea_ssh_port="2222"
   gitea_ssh_uri="ssh://git@${gitea_ssh_host}:${gitea_ssh_port}/${GITEA_ADMIN_USERNAME}/${repo_name}.git"
-
+  gitea_ssh_nodeport_host=$(oc get node -ojsonpath='{.items[0].status.addresses[?(.type=="InternalIP")].address}')
+  gitea_ssh_nodeport_service_name=$(oc -n ${gitea_project} get service -oname|grep 'ssh-np$'|cut -d'/' -f2)
+  gitea_ssh_nodeport_service_port=$(oc -n ${gitea_project} get service -ojsonpath='{.items[?(.metadata.name == "'${gitea_ssh_nodeport_service_name}'")].spec.ports[0].nodePort}')
+  gitea_ssh_nodeport_service="ssh://git@${gitea_ssh_nodeport_host}:${gitea_ssh_nodeport_service_port}/${GITEA_ADMIN_USERNAME}/${repo_name}.git"
   set -x
   echo -n "${gitea_ssh_uri}" > ${SHARED_DIR}/gitea-ssh-uri.txt
-  set +x
-}
-
-function run_script_in_the_hub_cluster {
-  local helper_img="${GITEA_HELPER_IMG}"
-  local script_file=$1
-  shift && local ns=$1
-  [ $# -gt 1 ] && shift && local pod_name="${1}"
-
-  set -x
-  if [[ "${pod_name:="--rm hub-script"}" != "--rm hub-script" ]]; then
-    oc -n ${ns} get pod ${pod_name} 2> /dev/null || {
-      oc -n ${ns} run ${pod_name} \
-        --image=${helper_img} --restart=Never -- sleep infinity ; \
-      oc -n ${ns} wait --for=condition=Ready pod/${pod_name} --timeout=10m ;
-    }
-    oc -n ${ns} exec -i ${pod_name} -- \
-      bash -s -- <<EOF
-$(cat ${script_file})
-EOF
-  [ $# -gt 1 ] && oc -n ${ns} delete pod ${pod_name}
-  else
-    oc -n ${ns} run -i ${pod_name} \
-      --image=${helper_img} --restart=Never -- \
-        bash -s -- <<EOF
-$(cat ${script_file})
-EOF
-  fi
+  echo -n "${gitea_ssh_nodeport_service}" > ${SHARED_DIR}/gitea-ssh-nodeport-uri.txt
   set +x
 }
 
@@ -234,30 +268,39 @@ chmod 0400 /tmp/ssh-prikey
 set -x
 nc -vz ${gitea_ssh_host} ${gitea_ssh_port}
 
-ztp_repo_dir=\$(mktemp -d)
-cd \${ztp_repo_dir}
-echo "# Telco Verification" > README.md
-echo "$(cat ${ssh_pri_key_file}.pub)" >> README.md
-echo "$(cat ${ssh_pri_key_file})" >> troubleshooting-info.md
-git config --global user.email "${gitea_project}@telcov10n.com"
-git config --global user.name "ZTP Gitea Telco Verification"
-git config --global init.defaultBranch main
-git init
-git checkout -b main
-git add README.md
-git add troubleshooting-info.md
-git commit -m "First commit"
-git remote add origin ${gitea_ssh_uri}
-GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push -u origin main
+if [[ "${new_repo_created}" == "yes" ]]; then
+
+  ztp_repo_dir=\$(mktemp -d)
+  cd \${ztp_repo_dir}
+  echo "# Telco Verification" > README.md
+  echo "$(cat ${ssh_pri_key_file}.pub)" >> README.md
+  echo "$(cat ${ssh_pri_key_file})" >> troubleshooting-info.md
+  git config --global user.email "${gitea_project}@telcov10n.com"
+  git config --global user.name "ZTP Gitea Telco Verification"
+  git config --global init.defaultBranch main
+  git init
+  git checkout -b main
+  git add README.md
+  git add troubleshooting-info.md
+  git commit -m "First commit by ${NAMESPACE}"
+  git remote add origin ${gitea_ssh_uri}
+  GIT_SSH_COMMAND="ssh -v -o StrictHostKeyChecking=no -i /tmp/ssh-prikey" git push -u origin main
+else
+    set +x
+    echo
+    echo "The ZTP GitOps repo '${repo_name}' already exist. Do nothing..."
+    echo
+fi
 EOF
 
-  run_script_in_the_hub_cluster ${run_script} ${gitea_project} "gitea-pod-helper"
+  run_script_on_ocp_cluster ${run_script} ${gitea_project} "${NAMESPACE}-helper"
 }
 
 function main {
   set_hub_cluster_kubeconfig
   create_gitea_deployment
-  generate_gitea_ssh_keys
+  # generate_gitea_ssh_keys
+  use_shared_ssh_keys_from_vault
   upload_gitea_ssh_keys
   create_ztp_gitea_repo
   generate_gitea_ssh_uri

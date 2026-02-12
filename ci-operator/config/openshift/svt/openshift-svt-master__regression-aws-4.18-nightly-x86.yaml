@@ -9,11 +9,24 @@ build_root:
     namespace: ci
     tag: latest
 releases:
+  initial:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.18.0-0
+        upper: 4.19.0-0
   latest:
     candidate:
       product: ocp
       stream: nightly
       version: "4.18"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.19"
 resources:
   '*':
     limits:
@@ -80,6 +93,39 @@ tests:
       SCRIPT: perfscale_regression_ci/scripts/network/network_policy_scalability.sh
     test:
     - ref: openshift-svt-regression
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: network-mixed-scenario-ocp-72791
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.12xlarge
+      ITERATIONS: "400"
+      MAX_UNAVAILABLE: "18"
+    test:
+    - ref: openshift-svt-network-mixed-scenario
+    - ref: openshift-qe-upgrade
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: storage-csi-in-tree-driver-ocp-63861
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+      ITERATIONS: "400"
+    test:
+    - ref: openshift-svt-storage-csi-intree-driver
     workflow: openshift-qe-installer-aws
 zz_generated_metadata:
   branch: master

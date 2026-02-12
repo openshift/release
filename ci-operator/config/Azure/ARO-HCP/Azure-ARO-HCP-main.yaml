@@ -1,0 +1,235 @@
+base_images:
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+binary_build_commands: make -C backend backend
+build_root:
+  image_stream_tag:
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-e2e-base-ci
+images:
+- dockerfile_literal: |
+    FROM nested-podman
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    USER root
+    # allow anyone to create content in GOPATH so we can go install stuff
+    RUN chmod 777 /opt/app-root
+    RUN dnf install -y git go make
+    RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+    RUN dnf install -y pass || true
+    RUN dnf install -y qrencode || true
+    RUN dnf install -y net-tools || true
+    RUN dnf install -y https://rpmfind.net/linux/centos-stream/9-stream/BaseOS/x86_64/os/Packages/tree-1.8.0-10.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/q/qrencode-libs-4.1.1-1.el9.x86_64.rpm https://dl.fedoraproject.org/pub/epel/9/Everything/x86_64/Packages/p/pass-1.7.4-16.el9.noarch.rpm || true
+    RUN dnf clean all
+  from: nested-podman
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/Azure/ARO-HCP
+  to: nested-podman-src
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: backend/Dockerfile
+  from: src
+  to: aro-hcp-backend
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: frontend/Dockerfile
+  from: src
+  to: aro-hcp-frontend
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: admin/Dockerfile
+  from: src
+  to: aro-hcp-admin-api
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: sessiongate/Dockerfile
+  from: src
+  to: aro-hcp-sessiongate
+- dockerfile_literal: |
+    FROM src
+    USER root
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    ENV GOBIN="/usr/local/bin"
+    ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
+    # Install Python for grafana tests
+    RUN dnf install -y python3 && curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3
+    RUN pip3 install black
+    ENV GOFLAGS='-mod=readonly'
+    RUN make install-tools && \
+        make -C tooling/templatize templatize && \
+        make -C test/ aro-hcp-tests prow-job-executor
+    RUN mkdir -p "$(go env GOROOT)" && chmod -R 777 "$(go env GOROOT)"
+    RUN mkdir -p "$(go env GOPATH)" && chmod -R 777 "$(go env GOPATH)"
+    RUN mkdir -p "$(go env GOCACHE)" && chmod -R 777 "$(go env GOCACHE)"
+    RUN mkdir -p "$(go env GOBIN)" && chmod -R 777 "$(go env GOBIN)"
+    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
+  from: src
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/Azure/ARO-HCP
+  to: aro-hcp-e2e-tools
+- dockerfile_literal: |
+    FROM src
+    USER root
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    # Install official Node.js binary from nodejs.org (pinned version)
+    RUN curl -fsSL https://nodejs.org/dist/v22.5.1/node-v22.5.1-linux-x64.tar.xz | \
+        tar -xJ -C /usr/local --strip-components=1 && \
+        node --version && npm --version
+    # Install npm dependencies
+    RUN cd api && npm ci --legacy-peer-deps
+  from: src
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/Azure/ARO-HCP
+  to: aro-hcp-api-tools
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: "3"
+      memory: 4Gi
+  aro-hcp-e2e-tools:
+    limits:
+      cpu: "8"
+      memory: 10Gi
+    requests:
+      cpu: "8"
+      memory: 10Gi
+test_binary_build_commands: make test-compile
+tests:
+- as: test-unit
+  steps:
+    test:
+    - ref: aro-hcp-test-unit
+- as: verify
+  steps:
+    test:
+    - ref: aro-hcp-verify
+- as: lint
+  steps:
+    test:
+    - ref: aro-hcp-lint
+- as: config-change-detection
+  steps:
+    test:
+    - ref: aro-hcp-config-change-detection
+- as: mega-linter
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  steps:
+    test:
+    - ref: aro-hcp-mega-lint
+- as: observability-prometheus
+  run_if_changed: ^observability/(alerts|prometheus)/
+  steps:
+    test:
+    - ref: aro-hcp-observability-prometheus
+- as: bicep-lint
+  run_if_changed: ^dev-infrastructure/
+  steps:
+    test:
+    - ref: aro-hcp-bicep-lint
+- as: api-validation
+  run_if_changed: ^api/
+  steps:
+    test:
+    - ref: aro-hcp-api-validation
+- always_run: true
+  as: integration
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  steps:
+    test:
+    - ref: aro-hcp-frontend-run-integration-tests
+- always_run: false
+  as: integration-e2e-parallel
+  optional: true
+  steps:
+    cluster_profile: aro-hcp-int
+    env:
+      ARO_HCP_SUITE_NAME: integration/parallel
+      LOCATION: uksouth
+    leases:
+    - count: 20
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-int
+    workflow: aro-hcp-e2e
+- always_run: false
+  as: stage-e2e-parallel
+  optional: true
+  steps:
+    cluster_profile: aro-hcp-stg
+    env:
+      ARO_HCP_SUITE_NAME: stage/parallel
+      LOCATION: uksouth
+    leases:
+    - count: 30
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-stg
+    workflow: aro-hcp-e2e
+- always_run: false
+  as: prod-e2e-parallel
+  optional: true
+  steps:
+    cluster_profile: aro-hcp-prod
+    env:
+      ARO_HCP_SUITE_NAME: prod/parallel
+      LOCATION: uksouth
+    leases:
+    - count: 15
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-prod
+    workflow: aro-hcp-e2e
+- always_run: true
+  as: e2e-parallel
+  skip_if_only_changed: ^(?:action\.yml|AGENTS\.md|CLAUDE\.md|CODEOWNERS|CONTRIBUTING\.md|\.bingo/|\.cursor/|\.devcontainer/|docs/|\.editorconfig|GEMINI\.md|generate-repo\.sh|generate-tag\.sh|get-digest\.sh|get-tag-sha\.sh|\.gitattributes|\.gitguardian\.yaml|\.github/|\.gitleaks\.toml|\.golangci\.yml|LICENSE|\.mega-linter\.yml|README\.md|SECURITY\.md|svc-deploy\.sh|\.vscode/|\.yamlfmt\.yaml|\.yamllint\.yml)$|\.md$
+  steps:
+    cluster_profile: aro-hcp-dev
+    env:
+      LOCATION: uksouth
+    workflow: aro-hcp-local-e2e
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP

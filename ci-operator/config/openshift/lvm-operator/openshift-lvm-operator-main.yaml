@@ -4,26 +4,22 @@ base_images:
     namespace: ocp
     tag: v1.31.0
   must-gather:
-    name: "4.19"
+    name: "4.21"
     namespace: ocp
     tag: must-gather
-  ocp_4.19_base-rhel9:
-    name: "4.19"
+  ocp_4.21_base-rhel9:
+    name: "4.21"
     namespace: ocp
     tag: base-rhel9
-  operator-sdk:
-    name: "4.19"
-    namespace: origin
-    tag: operator-sdk
 binary_build_commands: make build build-vgmanager
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: rhel-9-golang-1.24-openshift-4.21
 images:
 - dockerfile_literal: |-
-    FROM ocp_4.19_base-rhel9
+    FROM ocp_4.21_base-rhel9
     RUN dnf install -y make git python3 python3-pip patch
     RUN pip3 install pre-commit
 
@@ -47,7 +43,7 @@ images:
     RUN curl https://static.snyk.io/cli/latest/snyk-linux -o ${SNYK_DIR}/snyk
     RUN chmod +x ${SNYK_DIR}/snyk
     ENV PATH=$PATH:${SNYK_DIR}
-  from: ocp_4.19_base-rhel9
+  from: ocp_4.21_base-rhel9
   inputs:
     root:
       as:
@@ -55,7 +51,7 @@ images:
   to: lvms-pre-commit
 - dockerfile_path: Dockerfile
   inputs:
-    ocp_4.19_base-rhel9:
+    ocp_4.21_base-rhel9:
       as:
       - fedora:latest
   to: lvm-operator
@@ -63,6 +59,13 @@ images:
   dockerfile_path: Dockerfile
   from: must-gather
   to: lvms-must-gather
+- context_dir: .
+  dockerfile_path: test/integration/Dockerfile
+  inputs:
+    ocp_4.21_base-rhel9:
+      as:
+      - registry.access.redhat.com/ubi9/ubi-minimal:latest
+  to: lvm-operator-integration-test
 operator:
   bundles:
   - as: lvm-operator-bundle
@@ -76,25 +79,26 @@ promotion:
       lvm-operator-bundle: lvm-operator-bundle
     excluded_images:
     - lvms-pre-commit
+    - lvm-operator-integration-test
     namespace: lvms
     tag: latest
     tag_by_commit: true
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.21"
       namespace: ocp
   multi-latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.18"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -123,6 +127,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: post-unit-test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -133,6 +138,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: snyk-code
   commands: |
     SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-code
@@ -143,6 +149,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvms-snyk-token
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: snyk-deps
   commands: |
     SNYK_TOKEN=$(cat /tmp/secret/token) make vuln-scan-deps
@@ -153,20 +160,37 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvms-snyk-token
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
 - as: e2e-aws-single-node
   cron: '@daily'
   presubmit: true
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:
       OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: openshift-storage
+      OO_INSTALL_NAMESPACE: openshift-lvm-storage
     test:
     - as: e2e-test
       cli: latest
-      commands: make e2e
+      commands: DISK_INSTALL=true make e2e
+      dependencies:
+      - env: OO_BUNDLE
+        name: lvm-operator-bundle
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-gather
+      cli: latest
+      commands: |
+        oc adm must-gather --image="${GATHER_IMG}" --dest-dir=${ARTIFACT_DIR}/lvms-must-gather
+      dependencies:
+      - env: GATHER_IMG
+        name: lvms-must-gather
       from: test-bin
       resources:
         requests:
@@ -176,17 +200,33 @@ tests:
 - as: e2e-aws
   cron: '@daily'
   presubmit: true
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
     env:
       OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: openshift-storage
+      OO_INSTALL_NAMESPACE: openshift-lvm-storage
     test:
     - as: e2e-test
       cli: latest
       commands: DISK_INSTALL=true make e2e
+      dependencies:
+      - env: OO_BUNDLE
+        name: lvm-operator-bundle
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-gather
+      cli: latest
+      commands: |
+        oc adm must-gather --image="${GATHER_IMG}" --dest-dir=${ARTIFACT_DIR}/lvms-must-gather
+      dependencies:
+      - env: GATHER_IMG
+        name: lvms-must-gather
       from: test-bin
       resources:
         requests:
@@ -194,14 +234,16 @@ tests:
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-aws-hypershift
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-3
     dependencies:
       OO_BUNDLE: lvm-operator-bundle
       RELEASE_IMAGE_LATEST: release:multi-latest
     env:
+      HYPERSHIFT_SKIP_VERSION_VALIDATION: "true"
       OO_INSTALL_MODE: OwnNamespace
-      OO_INSTALL_NAMESPACE: openshift-storage
+      OO_INSTALL_NAMESPACE: openshift-lvm-storage
     test:
     - as: e2e-test
       cli: latest
@@ -211,7 +253,41 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    - as: e2e-gather
+      cli: latest
+      commands: |
+        oc adm must-gather --image="${GATHER_IMG}" --dest-dir=${ARTIFACT_DIR}/lvms-must-gather
+      dependencies:
+      - env: GATHER_IMG
+        name: lvms-must-gather
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-hypershift
+- as: e2e-aws-single-node-integration-tests
+  cron: '@weekly'
+  presubmit: true
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|release/.*|renovate.json|OWNERS|OWNERS_ALIASES|LICENSE|PROJECT)$
+  steps:
+    cluster_profile: aws-3
+    dependencies:
+      OO_BUNDLE: lvm-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-lvm-storage
+    test:
+    - as: lvms-sno-integration-test
+      cli: latest
+      commands: |
+        ./integration-test run-suite openshift/lvm-operator/test/integration/single-node
+      from: lvm-operator-integration-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws-sno
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.16"
+    name: "4.20"
     namespace: ocp
     tag: cli
 build_root:
@@ -10,22 +10,18 @@ build_root:
     tag: upstream-master
   use_build_cache: true
 releases:
-  arm64-latest:
-    release:
-      architecture: arm64
-      channel: stable
-      version: "4.16"
   latest:
     release:
+      architecture: multi
       channel: stable
-      version: "4.16"
+      version: "4.20"
 resources:
   '*':
     limits:
-      memory: 8Gi
+      memory: 16Gi
     requests:
-      cpu: "2"
-      memory: 2Gi
+      cpu: "4"
+      memory: 4Gi
 tests:
 - as: sync-upstream-istio-master
   commands: |
@@ -52,27 +48,31 @@ tests:
   secrets:
   - mount_path: /creds-github
     name: ossm-github-simple-job
-  timeout: 20m0s
-- as: istio-integration-pilot
+- as: lint
+  commands: |
+    make lint \
+    ARTIFACTS="${ARTIFACT_DIR:-}" \
+    BUILD_WITH_CONTAINER="0" \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache"
+  container:
+    from: src
+- as: gencheck
   steps:
     cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      XDG_CACHE_HOME: /tmp/cache
     test:
     - as: copy-src
       cli: latest
       commands: |
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
         oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-        oc cp `which oc` ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/bin
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -81,143 +81,244 @@ tests:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 10m0s
-    - as: integ-pilot-test-run
+      timeout: 20m0s
+    - as: gencheck
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
+          export BUILD_WITH_CONTAINER=0 && \
+          export GOBIN='/gobin' && \
+          export GOCACHE='/tmp/cache' && \
+          export GOMODCACHE='/tmp/cache' && \
+          export XDG_CACHE_HOME='/tmp/cache' && \
+          export ARTIFACTS='${ARTIFACT_DIR}' && \
           cd /work && \
           entrypoint \
-          prow/integ-suite-ocp.sh \
-          pilot 'TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge'"
-        # We are skipping failing tests for now, the progress is being tracked in https://issues.redhat.com/browse/OSSM-6316
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+          make gen-check"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 2h0m0s
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
+- as: unit
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: unit
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export BUILD_WITH_CONTAINER=0 && \
+          cd /work && \
+          entrypoint \
+          make -e T=-v build racetest binaries-test"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
+- as: istio-integration-pilot
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestPilotResourceFilter
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: pilot
+      TEST_SUITE_DESC: Istio Integration pilot
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-telemetry
   steps:
     cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      XDG_CACHE_HOME: /tmp/cache
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: telemetry
+      TEST_SUITE_DESC: Istio Integration telemetry
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-        oc cp `which oc` ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/bin
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: integ-telemetry-test-run
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export KUBECONFIG=/work/ci-kubeconfig && \
-          oc version && \
-          export ARTIFACT_DIR="${ARTIFACT_DIR}" && \
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')" && \
-          export BUILD_WITH_CONTAINER="0" && \
-          cd /work && \
-          entrypoint \
-          prow/integ-suite-ocp.sh \
-          telemetry"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
+    workflow: servicemesh-istio-e2e-hypershift
+- as: istio-integration-security
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: security
+      TEST_SUITE_DESC: Istio Integration security
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
+    workflow: servicemesh-istio-e2e-hypershift
+- as: istio-integration-ambient
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      AMBIENT: "true"
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      INSTALLATION_METHOD: helm
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestTCPRoute|TestTLSRoute|TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: ambient
+      TEST_SUITE_DESC: Istio Integration ambient
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 - as: istio-integration-helm
   steps:
     cluster_profile: ossm-aws
-    dependencies:
-      RELEASE_IMAGE_LATEST: release:latest
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.16.20-multi
+      INSTALLATION_METHOD: helm
       MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-      XDG_CACHE_HOME: /tmp/cache
+      REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestAmbientInstall|TestAmbientInstallMultiNamespace|TestCanaryUpgradeFromTwoMinorRelease|TestAmbientStableRevisionLabelsGatewayStatus|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease|TestZtunnelFromPreviousMinorRelease
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: helm
+      TEST_SUITE_DESC: Istio Integration helm
     test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
-        oc cp `which oc` ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/bin
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 10m0s
-    - as: integ-helm-test-run
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" <<EOF
-          export KUBECONFIG=/work/ci-kubeconfig
-          oc version
-          export ARTIFACT_DIR="${ARTIFACT_DIR}"
-          export DOCKER_INSECURE_REGISTRIES="default-route-openshift-image-registry.$(oc get routes -A -o jsonpath='{.items[0].spec.host}' | awk -F. '{print substr($0, index($0,$2))}')"
-          export BUILD_WITH_CONTAINER="0"
-          export VARIANT=distroless
-          export GCP_REGISTRIES=" "
-          cd /work
-          entrypoint prow/integ-suite-ocp.sh helm 'TestAmbientInstall|TestAmbientInstallMultiNamespace|TestCanaryUpgradeFromTwoMinorRelease|TestStableRevisionLabelsUpgradeFromPreviousMinorRelease|TestStableRevisionLabelsUpgradeFromTwoMinorRelease|TestAmbientInPlaceUpgradeFromPreviousMinorRelease|TestZtunnelFromPreviousMinorRelease'
-        EOF
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
+    workflow: servicemesh-istio-e2e-hypershift
+- as: istio-integration-sail-pilot
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      CONTROL_PLANE_SOURCE: sail
+      INSTALL_SAIL_OPERATOR: "true"
+      INSTALLATION_METHOD: sail
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestGatewayConformance|TestGateway/managed-owner|TestCNIVersionSkew|TestGateway|TestAuthZCheck|TestKubeInject|TestRevisionTags|TestUninstallByRevision|TestUninstallWithSetFlag|TestUninstallCustomFile|TestUninstallPurge|TestCNIRaceRepair|TestValidation|TestWebhook|TestMultiRevision|TestAnalysisWritesStatus|TestLocality|TestPreserveHTTPHeaderCaseConfiguration|TestPilotResourceFilter
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: pilot
+      TEST_SUITE_DESC: Istio Integration pilot
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
+    workflow: servicemesh-istio-e2e-hypershift
+- as: istio-integration-sail-telemetry
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      CONTROL_PLANE_SOURCE: sail
+      INSTALL_SAIL_OPERATOR: "true"
+      INSTALLATION_METHOD: sail
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestDashboard/pilot-dashboard.json
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: telemetry
+      TEST_SUITE_DESC: Istio Integration telemetry
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
+    workflow: servicemesh-istio-e2e-hypershift
+- as: istio-integration-sail-security
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      CONTROL_PLANE_SOURCE: sail
+      INSTALL_SAIL_OPERATOR: "true"
+      INSTALLATION_METHOD: sail
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_SUITES: external_ca|file_mounted_certs|policy_attachment_only
+      SKIPPED_TESTS: TestAuthz_CustomServer|TestGatewayAPIRequestAuthentication|TestNormalization|TestEgressGatewayTls/Mutual_TLS_origination_from_egress_gateway_to_https_endpoint|TestEgressGatewayTls/SIMPLE_TLS_origination_from_egress_gateway_to_https_endpoint|TestAuthz_MultipleCustomProviders_NonOverlapping|TestAuthz_MultipleCustomProviders_Overlapping
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: security
+      TEST_SUITE_DESC: Istio Integration security
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
+    workflow: servicemesh-istio-e2e-hypershift
+- as: istio-integration-sail-ambient
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      AMBIENT: "true"
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      CONTROL_PLANE_SOURCE: sail
+      INSTALL_SAIL_OPERATOR: "true"
+      INSTALLATION_METHOD: sail
+      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      REPORT_TO_REPORT_PORTAL: "true"
+      SKIPPED_TESTS: TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestAuthorizationGateway|TestTrafficWithEstablishedPodsIfCNIMissing|TestTaintsRemoved|TestTrafficWithCNIRepair|TestTCPRoute|TestTLSRoute|TestWaypointChanges|TestZtunnelRestart|TestZtunnelConfig|TestZtunnelSecureMetrics|TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy|TestWaypointAsEgressGatewayForWildcardEntries|TestZtunnelCRL
+      TEST_FILE_NAME: junit.xml
+      TEST_SUITE: ambient
+      TEST_SUITE_DESC: Istio Integration ambient
+    test:
+    - ref: servicemesh-sail-operator-copy-src
+    - ref: servicemesh-istio-int-tests
     workflow: servicemesh-istio-e2e-hypershift
 zz_generated_metadata:
   branch: master

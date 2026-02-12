@@ -21,14 +21,16 @@ if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
 fi
 MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
 
-openshift-tests images --to-repository "${MIRROR_REGISTRY_HOST}/e2e/tests" >> "${SHARED_DIR}/mirror-images-list.yaml"
+openshift-tests images --to-repository "${MIRROR_REGISTRY_HOST}/e2e/tests" | grep "${MIRROR_REGISTRY_HOST}/e2e/tests" >> "${SHARED_DIR}/mirror-images-list.yaml"
 # "registry.k8s.io/pause:XX" is excluded from the output of the "openshift-tests images" command as some of the layers
 # aren't compressed and this isn't supported by quay.io. So we need to mirror it from source bypassing quay.io.
 cat <<EOF >> "${SHARED_DIR}/mirror-images-list.yaml"
 registry.k8s.io/pause:3.9 ${MIRROR_REGISTRY_HOST}/e2e/tests:e2e-27-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
 registry.k8s.io/pause:3.9 ${MIRROR_REGISTRY_HOST}/e2e/tests:e2e-28-registry-k8s-io-pause-3-9-p9APyPDU5GsW02Rk
+registry.k8s.io/pause:3.10 ${MIRROR_REGISTRY_HOST}/e2e/tests:e2e-25-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY
 registry.k8s.io/pause:3.10 ${MIRROR_REGISTRY_HOST}/e2e/tests:e2e-27-registry-k8s-io-pause-3-10-b3MYAwZ_MelO9baY
 registry.k8s.io/e2e-test-images/agnhost:2.47 ${MIRROR_REGISTRY_HOST}/e2e/tests:e2e-1-registry-k8s-io-e2e-test-images-agnhost-2-47-LZRfusN51OgGfP9f
+registry.k8s.io/e2e-test-images/agnhost:2.52 ${MIRROR_REGISTRY_HOST}/e2e/tests:e2e-1-registry-k8s-io-e2e-test-images-agnhost-2-52-vo_U710PrYLetnfE
 EOF
 
 echo "${MIRROR_REGISTRY_HOST}/e2e/tests" > "${SHARED_DIR}/mirror-tests-image"

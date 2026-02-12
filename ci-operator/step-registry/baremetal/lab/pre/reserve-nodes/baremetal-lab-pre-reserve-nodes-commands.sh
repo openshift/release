@@ -18,6 +18,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 [ "${ADDITIONAL_WORKERS}" -gt 0 ] && [ -z "${ADDITIONAL_WORKER_ARCHITECTURE}" ] && { echo "\$ADDITIONAL_WORKER_ARCHITECTURE is not filled. Failing."; exit 1; }
 
 gnu_arch=$(echo "${architecture}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
+gnu_additional_arch=$(echo "${ADDITIONAL_WORKER_ARCHITECTURE}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
 
 # The hostname of nodes and the cluster names have limited length for BM.
 # Other profiles add to the cluster_name the suffix "-${UNIQUE_HASH}".
@@ -46,7 +47,7 @@ scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/tmp/${CLUSTER_NAME}.prow.en
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" "${JOB_URL}" \
-  "${ADDITIONAL_WORKERS}" "${ADDITIONAL_WORKER_ARCHITECTURE}" "${VENDOR}" << 'EOF'
+  "${ADDITIONAL_WORKERS:-0}" "${gnu_additional_arch:-x86_64}" "${VENDOR}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -58,8 +59,8 @@ N_WORKERS="${3}"
 REQUEST_BOOTSTRAP_HOST="${4}"
 ARCH="${5}"
 JOB_URL="${6}"
-ADDITIONAL_WORKERS="${7:-}"
-ADDITIONAL_WORKER_ARCHITECTURE="${8:-}"
+ADDITIONAL_WORKERS="${7}"
+ADDITIONAL_WORKER_ARCHITECTURE="${8}"
 VENDOR="${9:-}"
 
 systemd-cat -t "${BUILD_ID}" -p5 echo "Starting new job (${BUILD_ID}). Link: ${JOB_URL}"
@@ -92,6 +93,7 @@ VLAN_ID=$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")
 VLAN_ID=${VLAN_ID//*\./}
 echo "52:54:00:00:00:$(printf '%02x' "${VLAN_ID}")" > "${SHARED_DIR}/ipi_bootstrap_mac_address"
 echo "192.168.80.${VLAN_ID}" > "${SHARED_DIR}/ipi_bootstrap_ip_address"
+echo "fd99:2222:3456::3:${VLAN_ID}" > "${SHARED_DIR}/ipi_bootstrap_ipv6_address"
 # Example host element from the list in the hosts.yaml file:
 # - mac: 34:73:5a:9d:eb:e1 # The mac address of the interface connected to the baremetal network
 #  vendor: dell

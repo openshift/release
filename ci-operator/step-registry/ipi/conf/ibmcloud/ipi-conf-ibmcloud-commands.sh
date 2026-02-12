@@ -22,6 +22,9 @@ case "${SIZE_VARIANT}" in
     compact)
         master_type=bx2-8x32
         ;;
+    medium)
+        master_type=bx2-8x32
+        ;;
     default)
         master_type=""
         ;;
@@ -36,6 +39,7 @@ case "${SIZE_VARIANT}" in
 	exit 1
 	;;
 esac
+
 
 # Select zone(s) based on REGION and ZONE_COUNT
 REGION="${LEASED_RESOURCE}"

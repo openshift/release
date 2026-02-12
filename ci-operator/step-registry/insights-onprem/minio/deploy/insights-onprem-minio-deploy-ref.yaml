@@ -1,0 +1,38 @@
+ref:
+  as: insights-onprem-minio-deploy
+  from: src
+  commands: insights-onprem-minio-deploy-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: MINIO_NAMESPACE
+    default: "minio"
+    documentation: "Namespace where MinIO (storage layer) will be deployed"
+  - name: APP_NAMESPACE
+    default: "cost-onprem"
+    documentation: "Namespace where the application/helm chart will be deployed (where ODF credentials secret is created)"
+  - name: MINIO_ACCESS_KEY
+    default: "minioadmin"
+    documentation: "MinIO access key (username)"
+  - name: MINIO_SECRET_KEY
+    default: "minioadmin"
+    documentation: "MinIO secret key (password)"
+  - name: MINIO_STORAGE_SIZE
+    default: "10Gi"
+    documentation: "Size of the PVC for MinIO storage"
+  - name: ODF_CREDENTIALS_SECRET_NAME
+    default: "cost-onprem-odf-credentials"
+    documentation: "Name of the secret to create with S3 credentials in the app namespace"
+  documentation: |-
+    This step deploys MinIO as a lightweight S3-compatible object storage
+    solution. MinIO is deployed in its own namespace (like ODF uses
+    openshift-storage), while the ODF credentials secret is created in
+    the application namespace where the helm chart will be deployed.
+    
+    It creates:
+    - MinIO deployment, service, and route in MINIO_NAMESPACE
+    - Required buckets (ros-data, insights-upload-perma, koku-bucket)
+    - ODF credentials secret in APP_NAMESPACE for install-helm-chart.sh
+

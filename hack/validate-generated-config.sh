@@ -33,7 +33,7 @@ ERROR: This check enforces that Prow Job configuration YAML files are generated
 ERROR: correctly. We have automation in place that generates these configs and
 ERROR: new changes to these job configurations should occur from a re-generation.
 
-ERROR: Run the following command to re-generate the Prow jobs:
+ERROR: Try do a `git rebase ...` and then run the following command to re-generate the Prow jobs:
 ERROR: $ make jobs
 
 ERROR: The following errors were found:

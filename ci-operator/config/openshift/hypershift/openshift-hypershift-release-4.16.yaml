@@ -15,25 +15,10 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.16_base-rhel9:
-    name: "4.16"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.control-plane
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: hypershift
 promotion:
   to:
@@ -78,7 +63,7 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
@@ -86,7 +71,7 @@ tests:
 - as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
@@ -97,7 +82,8 @@ tests:
       ODF_OPERATOR_CHANNEL: stable-4.16
       SKIP_E2E_LOCAL: "true"
     workflow: hypershift-kubevirt-e2e-aws
-- as: e2e-kubevirt-aws-ovn
+- always_run: false
+  as: e2e-kubevirt-aws-ovn
   optional: true
   steps:
     cluster_profile: aws
@@ -110,7 +96,8 @@ tests:
       KUBEVIRT_CSI_INFRA: gp3-csi
       ODF_OPERATOR_CHANNEL: stable-4.16
     workflow: hypershift-kubevirt-e2e-aws
-- as: e2e-kubevirt-azure-ovn
+- always_run: false
+  as: e2e-kubevirt-azure-ovn
   optional: true
   steps:
     cluster_profile: azure4
@@ -124,20 +111,26 @@ tests:
       ODF_BACKEND_STORAGE_CLASS: managed-csi
       ODF_OPERATOR_CHANNEL: stable-4.16
     workflow: hypershift-kubevirt-e2e-azure
-- as: e2e-aws-metrics
+- always_run: false
+  as: e2e-aws-metrics
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-metrics
-- as: e2e-conformance
-  optional: true
+- always_run: false
+  as: e2e-conformance
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
+    env:
+      PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
-- as: e2e-kubevirt-metal-ovn-conformance
+- always_run: false
+  as: e2e-kubevirt-metal-ovn-conformance
+  capabilities:
+  - intranet
   optional: true
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: equinix-ocp-hcp
     env:
       HYPERSHIFT_NODE_COUNT: "2"
       ODF_OPERATOR_SUB_CHANNEL: stable-4.14

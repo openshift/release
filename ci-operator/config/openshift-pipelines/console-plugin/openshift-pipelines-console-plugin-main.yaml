@@ -1,25 +1,22 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: tectonic-console-builder-v28
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   to: console-pipelines-plugin
 promotion:
   to:
-  - name: "4.19"
+  - name: "4.22"
     namespace: ocp
 releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -50,11 +47,12 @@ tests:
     cloud: aws
     owner: rh-openshift-ecosystem
     product: ocp
-    timeout: 1h0m0s
+    timeout: 3h0m0s
     version: "4.18"
   steps:
     test:
     - as: e2e
+      cli: latest
       commands: ./test-prow-e2e.sh
       from: src
       resources:

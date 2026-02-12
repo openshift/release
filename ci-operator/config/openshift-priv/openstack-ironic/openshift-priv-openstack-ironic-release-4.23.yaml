@@ -1,0 +1,42 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/openstack-ironic
+images:
+- dockerfile_path: openstack-ironic-tester.Dockerfile
+  from: src
+  optional: true
+  to: ironic-tester
+promotion:
+  to:
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: HOME=`dirname .` tox -vv -e py3
+  container:
+    from: ironic-tester
+- as: pep8
+  commands: HOME=`dirname .` tox -vv -e pep8
+  container:
+    from: ironic-tester
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: openstack-ironic

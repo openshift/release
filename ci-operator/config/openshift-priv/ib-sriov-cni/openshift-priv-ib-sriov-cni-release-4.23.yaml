@@ -1,0 +1,54 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/ib-sriov-cni
+images:
+- dockerfile_path: Dockerfile.rhel7
+  to: sriov-infiniband-cni
+promotion:
+  to:
+  - disabled: true
+    name: sriov-4.23
+    namespace: origin
+  - name: 4.23-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.23-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.23-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws-2
+    workflow: openshift-e2e-aws
+- as: unit-test
+  commands: make test
+  container:
+    from: src
+- as: security
+  optional: true
+  steps:
+    env:
+      PROJECT_NAME: ib-sriov-cni
+      SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
+    workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.23
+  org: openshift-priv
+  repo: ib-sriov-cni

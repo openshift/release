@@ -1,0 +1,42 @@
+ref:
+  as: cucushift-hypershift-extended-enable-custom-image-registry
+  from_image:
+    namespace: ci
+    name: verification-tests
+    tag: latest
+  cli: latest
+  grace_period: 10m
+  timeout: 35m0s
+  env:
+  - name: DYNAMIC_IMAGE_REGISTRY_ENABLED
+    default: "false"
+  - name: REGISTRY_NAMESPACE
+    default: "test-registry"
+    documentation: "The Namespace where to create the image registry and it's needed resources"
+  - name: REGISTRY_IMAGE
+    default: "quay.io/openshifttest/registry:2"
+    documentation: "The image used for the image registry"
+  - name: REGISTRY_NAME
+    default: "my-registry"
+    documentation: "The image registry name."
+  - name: REGISTRY_USERNAME
+    default: "my-registry-user"
+    documentation: "The username for accessing the image registry"
+  - name: REGISTRY_PASSWORD
+    default: "my-registry-password"
+    documentation: "The password for accessing the image registry"
+  - name: TLS_SECRET_NAME
+    default: "my-registry-tls-secret"
+    documentation: "The TLS secret name which will be created from the PKI pair"
+  - name: SRC_IMG
+    default: "quay.io/openshifttest/busybox:51055"
+    documentation: "The image that will be mirrored to the new created image registry."
+  commands: cucushift-hypershift-extended-enable-custom-image-registry-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 500Mi
+  documentation: |-
+    Set up an image registry within the hosted cluster with authentication and tls certificates
+    It require that the "${SHARED_DIR}"/hc_ca.crt and "${SHARED_DIR}"/hc_ca.key exist
+

@@ -1,24 +1,13 @@
 base_images:
-  ocp_4.18_base-rhel9:
-    name: "4.18"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel7
-  inputs:
-    ocp_4.18_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: console-operator
 promotion:
   to:
@@ -50,7 +39,7 @@ tests:
     from: src
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       cli: latest
@@ -68,10 +57,9 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
-  timeout: 5h30m0s
 - as: e2e-aws-console
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     test:
     - as: test
       cli: latest
@@ -82,11 +70,18 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-aws
-- as: e2e-aws-ovn-single-node
+- always_run: false
+  as: e2e-aws-ovn-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws-single-node
+- always_run: false
+  as: e2e-hypershift-conformance
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-conformance
 zz_generated_metadata:
   branch: release-4.18
   org: openshift

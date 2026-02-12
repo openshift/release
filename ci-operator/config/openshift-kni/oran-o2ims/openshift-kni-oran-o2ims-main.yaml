@@ -28,18 +28,20 @@ operator:
     with: pipeline:oran-o2ims-operator
 promotion:
   to:
-  - name: "4.18"
+  - name: "4.22"
     namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.18"
+      name: "4.22"
       namespace: ocp
+      reference_policy: Local
   latest:
     integration:
       include_built_images: true
-      name: "4.18"
+      name: "4.22"
       namespace: ocp
+      reference_policy: Local
 resources:
   '*':
     limits:
@@ -54,7 +56,9 @@ tests:
   commands: make ci-job
   container:
     from: src
-- as: scorecard
+  skip_if_only_changed: ^\.tekton/.*|^\.konflux/.*|^docs/|LICENSE|OWNERS|\.md$|^hack$
+- always_run: false
+  as: scorecard
   run_if_changed: ^bundle/
   steps:
     allow_best_effort_post_steps: true

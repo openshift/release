@@ -39,6 +39,40 @@ function run_command() {
     eval "${CMD}"
 }
 
+function patch_clustercatalog_if_exists() {
+    local catalog_name="$1"
+    local retry_count=0
+    local max_retries=3
+
+    while [[ $retry_count -lt $max_retries ]]; do
+        set +e
+        error_output=$(oc get clustercatalog "$catalog_name" 2>&1)
+        get_exit_code=$?
+        set -e
+
+        if [[ $get_exit_code -eq 0 ]]; then
+            # Resource exists, patch it
+            run_command "oc patch clustercatalog $catalog_name -p '{\"spec\": {\"availabilityMode\": \"Unavailable\"}}' --type=merge"
+            return 0
+        elif echo "$error_output" | grep -qiE "(NotFound|not found|could not find)"; then
+            # Resource doesn't exist, this is expected in some versions
+            echo "$catalog_name clustercatalog does not exist, skipping..."
+            return 0
+        else
+            # Some other error occurred
+            retry_count=$((retry_count + 1))
+            if [[ $retry_count -lt $max_retries ]]; then
+                echo "Warning: failed to check $catalog_name clustercatalog (attempt $retry_count/$max_retries): $error_output"
+                echo "Retrying in 5 seconds..."
+                sleep 5
+            else
+                echo "Error: failed to check $catalog_name clustercatalog after $max_retries attempts: $error_output"
+                return 1
+            fi
+        fi
+    done
+}
+
 function check_mcp_status() {
     machineCount=$(oc get mcp worker -o=jsonpath='{.status.machineCount}')
     COUNTER=0
@@ -111,6 +145,18 @@ function disable_default_catalogsource () {
     else
         echo "!!! fail to disable default Catalog Source"
         return 1
+    fi
+    ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
+    major_version=$(echo ${ocp_version} | cut -d '.' -f1)
+    minor_version=$(echo ${ocp_version} | cut -d '.' -f2)
+    if [[ "X${major_version}" == "X4" && -n "${minor_version}" && "${minor_version}" -gt 17 ]]; then
+        echo "disable olmv1 default clustercatalog"
+        run_command "oc patch clustercatalog openshift-certified-operators -p '{\"spec\": {\"availabilityMode\": \"Unavailable\"}}' --type=merge"
+        run_command "oc patch clustercatalog openshift-redhat-operators -p '{\"spec\": {\"availabilityMode\": \"Unavailable\"}}' --type=merge"
+        # openshift-redhat-marketplace was removed in 4.22, so check if it exists first
+        patch_clustercatalog_if_exists "openshift-redhat-marketplace" || return 1
+        run_command "oc patch clustercatalog openshift-community-operators -p '{\"spec\": {\"availabilityMode\": \"Unavailable\"}}' --type=merge"
+        run_command "oc get clustercatalog"
     fi
 }
 
@@ -213,7 +259,7 @@ EOF
     insecure = true
 EOF
     run_command "cd $work_dir"
-    run_command "oc-mirror --config ${work_dir}/imageset-config.yaml docker://${MIRROR_REGISTRY_HOST} --oci-registries-config=${work_dir}/registry.conf --continue-on-error --skip-missing --dest-skip-tls --source-skip-tls"
+    run_command "oc-mirror --v1 --config ${work_dir}/imageset-config.yaml docker://${MIRROR_REGISTRY_HOST} --oci-registries-config=${work_dir}/registry.conf --continue-on-error --skip-missing --dest-skip-tls --source-skip-tls"
     echo "oc-mirror operators success"
 }
 
@@ -229,7 +275,12 @@ function set_CA_for_nodes () {
     fi
 
     # get the QE additional CA
-    QE_ADDITIONAL_CA_FILE="/var/run/vault/mirror-registry/client_ca.crt"
+    if [[ "${SELF_MANAGED_ADDITIONAL_CA}" == "true" ]]; then
+        QE_ADDITIONAL_CA_FILE="${CLUSTER_PROFILE_DIR}/mirror_registry_ca.crt"
+    else
+        QE_ADDITIONAL_CA_FILE="/var/run/vault/mirror-registry/client_ca.crt"
+    fi
+
     REGISTRY_HOST=`echo ${MIRROR_PROXY_REGISTRY} | cut -d \: -f 1`
     # Configuring additional trust stores for image registry access, details: https://docs.openshift.com/container-platform/4.11/registry/configuring-registry-operator.html#images-configuration-cas_configuring-registry-operator
     run_command "oc create configmap registry-config --from-file=\"${REGISTRY_HOST}..5000\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6001\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6002\"=${QE_ADDITIONAL_CA_FILE}  -n openshift-config"; ret=$?
@@ -257,7 +308,7 @@ function create_settled_icsp () {
     #we registry level proxy as below.In rosa cluster, registry level proxy may be rejected. 
     #as this ICSP/IDMS is used for QE Test images quay.io/openshifttest too. We don't use oc-mirror generated ICSP or IDMS
     if [[ $icsp_num -gt 0 || $kube_minor -lt 26 ]] ; then
-        cat <<EOF | oc create -f -
+        cat <<EOF | oc apply -f -
 apiVersion: operator.openshift.io/v1alpha1
 kind: ImageContentSourcePolicy
 metadata:
@@ -287,6 +338,8 @@ spec:
     source: registry-proxy.engineering.redhat.com
 EOF
     else
+        # Create both IDMS and ITMS together for digest-based and tag-based image references
+        # ITMS can coexist with IDMS (both are new APIs)
         cat <<EOF  | oc create -f -
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
@@ -315,26 +368,58 @@ spec:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY}
     source: registry-proxy.engineering.redhat.com
+---
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: image-policy-aosqe
+spec:
+  imageTagMirrors:
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/openshifttest
+    source: quay.io/openshifttest
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators
+    source: quay.io/openshift-qe-optional-operators
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/olmqe
+    source: quay.io/olmqe
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: brew.registry.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry.stage.redhat.io
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY}
+    source: registry-proxy.engineering.redhat.com
 EOF
     fi
 
     if [ $? == 0 ]; then
-        echo "create the ICSP/IDMS successfully" 
+        if [[ $icsp_num -gt 0 || $kube_minor -lt 26 ]] ; then
+            echo "create the ICSP successfully"
+        else
+            echo "create the IDMS and ITMS successfully"
+        fi
 	return 0
     else
-        echo "!!! fail to create the ICSP/IDMS"
+        echo "!!! fail to create the ICSP/IDMS/ITMS"
         return 1
     fi
 }
 
 function create_catalog_sources()
-{    
+{
     echo "create QE catalogsource: $CATALOGSOURCE_NAME"
     # get cluster Major.Minor version
     # since OCP 4.15, the official catalogsource use this way. OCP4.14=K8s1.27
     # details: https://issues.redhat.com/browse/OCPBUGS-31427
     if [[ ${kube_major} -gt 1 || ${kube_minor} -gt 27 ]]; then
-        echo "the index image as the initContainer cache image)" 
+        echo "the index image as the initContainer cache image)"
         cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -356,7 +441,7 @@ spec:
       interval: 15m
 EOF
     else
-        echo "the index image as the server image" 
+        echo "the index image as the server image"
         cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -388,7 +473,7 @@ EOF
     done
     if [[ $STATUS != "READY" ]]; then
         echo "!!! fail to create QE CatalogSource"
-        # ImagePullBackOff nothing with the imagePullSecrets 
+        # ImagePullBackOff nothing with the imagePullSecrets
         # run_command "oc get operatorgroup -n openshift-marketplace"
         # run_command "oc get sa qe-app-registry -n openshift-marketplace -o yaml"
         # run_command "oc -n openshift-marketplace get secret $(oc -n openshift-marketplace get sa qe-app-registry -o=jsonpath='{.secrets[0].name}') -o yaml"
@@ -521,7 +606,13 @@ set_CA_for_nodes
 #ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 kube_major=$(oc version -o json |jq -r '.serverVersion.major')
 kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
-origin_index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+
+if [[ $OO_INDEX == "" ]];then
+    origin_index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
+else
+    origin_index_image="$OO_INDEX"
+fi
+
 mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${kube_major}.${kube_minor}"
 echo "origin_index_image: ${origin_index_image}"
 echo "mirror_index_image: ${mirror_index_image}"
@@ -547,5 +638,5 @@ fi
 if [ $mirror -eq 1 ]; then
     echo "Mirror operator images as cluster is C2S or SC2S"
     mirror_optional_images
-fi 
+fi
 create_catalog_sources

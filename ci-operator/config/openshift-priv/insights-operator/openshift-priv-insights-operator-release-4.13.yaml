@@ -11,19 +11,11 @@ base_images:
     name: insights-operator-tests
     namespace: ci
     tag: "4.13"
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/insights-operator
 images:
 - from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: insights-operator
 promotion:
   to:
@@ -76,7 +68,8 @@ tests:
       cli: latest
       commands: pytest.sh -m "not ui"
       credentials:
-      - mount_path: /secrets
+      - collection: ""
+        mount_path: /secrets
         name: insights-qa
         namespace: test-credentials
       from: insights-operator-tests
@@ -86,9 +79,9 @@ tests:
     workflow: ipi-gcp
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
+  capabilities:
+  - intranet
   optional: true
-  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6

@@ -1,0 +1,115 @@
+binary_build_commands: GO_COMPLIANCE_INFO=0 make build
+build_root:
+  image_stream_tag:
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-e2e-base-ci
+images:
+- dockerfile_literal: |
+    FROM src
+    USER root
+    COPY /src /opt/app-root/src/github.com/Azure
+    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    RUN export GOPATH=/opt/app-root && \
+        mkdir -p $GOPATH/bin && \
+        export GOFLAGS='-mod=readonly' && \
+        make install-tools && \
+        make -C tooling/templatize templatize && \
+        make -C test/ aro-hcp-tests
+    # Ensure all tools are in PATH
+    ENV PATH="/usr/local/bin:/opt/app-root/bin:$PATH"
+  from: src
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/Azure/ARO-HCP
+  to: aro-hcp-e2e-tools
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    requests:
+      cpu: 1000m
+      memory: 4Gi
+tests:
+- as: delete-expired-kusto-role-assignments
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aro-hcp-dev
+    test:
+    - ref: aro-hcp-deprovision-kusto-role-assignments
+- as: delete-expired-development-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    cluster_profile: aro-hcp-dev
+    env:
+      CLEANUP_MODE: no-rp
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+- as: delete-expired-integration-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    cluster_profile: aro-hcp-int
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+- as: delete-expired-stage-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    cluster_profile: aro-hcp-stg
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+- as: delete-expired-prod-resource-groups
+  cron: 7,37 * * * *
+  steps:
+    cluster_profile: aro-hcp-prod
+    test:
+    - ref: aro-hcp-deprovision-expired-resource-groups
+- as: integration-e2e-parallel
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: aro-hcp-int
+    env:
+      ARO_HCP_SUITE_NAME: integration/parallel
+      LOCATION: uksouth
+    leases:
+    - count: 20
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-int
+    workflow: aro-hcp-e2e
+- as: stage-e2e-parallel
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: aro-hcp-stg
+    env:
+      ARO_HCP_SUITE_NAME: stage/parallel
+      LOCATION: uksouth
+    leases:
+    - count: 30
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-stg
+    workflow: aro-hcp-e2e
+- as: prod-e2e-parallel
+  cron: 0 2 * * *
+  steps:
+    cluster_profile: aro-hcp-prod
+    env:
+      ARO_HCP_SUITE_NAME: prod/parallel
+      LOCATION: uksouth
+    leases:
+    - count: 15
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-prod
+    workflow: aro-hcp-e2e
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP
+  variant: periodic

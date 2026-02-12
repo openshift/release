@@ -3,14 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-build_root:
-  image_stream_tag:
-    name: builder
-    namespace: stolostron
-    tag: go1.21-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
+  optional: true
   to: must-gather
 promotion:
   to:
@@ -37,7 +33,8 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make -f Makefile.prow osci/publish
       credentials:
-      - mount_path: /etc/github
+      - collection: ""
+        mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

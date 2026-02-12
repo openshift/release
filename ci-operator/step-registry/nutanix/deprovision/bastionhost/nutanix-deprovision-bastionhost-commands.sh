@@ -7,7 +7,7 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 function get_vm_uuid() {
-   BASTION_UUID=$(curl -X POST --header "Content-Type: application/json" \
+   BASTION_UUID=$(curl -k -X POST --header "Content-Type: application/json" \
       --header "Accept: application/json" \
       --header "Authorization: Basic ${ENCODED_CREDS}" \
       "https://${NUTANIX_HOST}:${NUTANIX_PORT}/api/nutanix/v3/vms/list" \
@@ -17,7 +17,7 @@ function get_vm_uuid() {
 
 function delete_vm() {
   get_vm_uuid
-  curl -X 'DELETE' --header "Content-Type: application/json" \
+  curl -k -X 'DELETE' --header "Content-Type: application/json" \
       --header "Accept: application/json" \
       --header "Authorization: Basic ${ENCODED_CREDS}" \
       "https://${NUTANIX_HOST}:${NUTANIX_PORT}/api/nutanix/v3/vms/${BASTION_UUID}"

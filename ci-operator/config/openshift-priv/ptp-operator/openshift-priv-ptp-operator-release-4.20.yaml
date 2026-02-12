@@ -3,27 +3,24 @@ base_images:
     name: 4.20-priv
     namespace: ocp-private
     tag: ptp
-  ocp_4.19_base-rhel9:
+  must_gather:
     name: 4.20-priv
     namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
+    tag: must-gather
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/ptp-operator
 images:
 - dockerfile_path: Dockerfile.ocp
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: ptp-operator
+- dockerfile_path: Dockerfile.ocp
+  from: must_gather
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ptp-operator/must-gather/.
+  to: ptp-operator-must-gather
 operator:
   bundles:
   - dockerfile_path: bundleci.Dockerfile
@@ -34,6 +31,9 @@ operator:
     with: pipeline:linuxptp-daemon
 promotion:
   to:
+  - disabled: true
+    name: ptp-4.20
+    namespace: origin
   - name: 4.20-priv
     namespace: ocp-private
 releases:
@@ -68,7 +68,7 @@ tests:
     from: src
 - as: e2e-aws-ovn
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     workflow: openshift-e2e-aws
 - as: operator-e2e
   steps:
@@ -97,6 +97,12 @@ tests:
       PROJECT_NAME: ptp-operator
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

@@ -1,0 +1,171 @@
+base_images:
+  bip-orchestrate-vm:
+    name: bip-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ib-orchestrate-vm:
+    name: ib-orchestrate-vm
+    namespace: edge-infrastructure
+    tag: latest
+  installer:
+    name: "4.21"
+    namespace: ocp
+    tag: installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.23
+images:
+- dockerfile_path: Dockerfile
+  to: image-based-install-operator
+- dockerfile_literal: |
+    FROM placeholder
+  from: src
+  to: image-based-install-operator-code
+promotion:
+  to:
+  - name: "2.11"
+    namespace: stolostron
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: build
+  commands: |
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    HOME=/tmp make build
+  container:
+    from: src
+  restrict_network_access: false
+  skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
+- as: unit-test
+  commands: HOME=/tmp make test
+  container:
+    from: src
+  restrict_network_access: false
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
+- as: integration
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  restrict_network_access: false
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: integration-deploy-and-run
+      cli: latest
+      commands: |
+        make run-integration-test
+      dependencies:
+      - env: IMG
+        name: image-based-install-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: e2e-ibio
+  capabilities:
+  - intranet
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      BMH_EXTERNALLY_PROVISIONED: "true"
+      CLUSTERTYPE: assisted_medium_el9
+      SEED_IMAGE_TAG: "4.21"
+    workflow: image-based-install-operator-ofcir
+- as: e2e-ibio-periodic
+  capabilities:
+  - intranet
+  cron: 0 22 * * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      BMH_EXTERNALLY_PROVISIONED: "true"
+      SEED_IMAGE_TAG: "4.21"
+    workflow: image-based-install-operator-ofcir
+- as: ibio-reinstall
+  capabilities:
+  - intranet
+  optional: true
+  skip_if_only_changed: (^docs/)|(\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      BMH_EXTERNALLY_PROVISIONED: "true"
+      CLUSTERTYPE: assisted_medium_el9
+      SEED_IMAGE_TAG: "4.21"
+    workflow: image-based-install-operator-ofcir-reinstall
+- as: ibio-reinstall-periodic
+  capabilities:
+  - intranet
+  cron: 45 22 * * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      BIP_ORCHESTRATE_VM_REF: pipeline:bip-orchestrate-vm
+      IB_ORCHESTRATE_VM_REF: pipeline:ib-orchestrate-vm
+      IBIO_CODE_IMAGE: image-based-install-operator-code
+      IBIO_IMAGE: image-based-install-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      BMH_EXTERNALLY_PROVISIONED: "true"
+      SEED_IMAGE_TAG: "4.21"
+    workflow: image-based-install-operator-ofcir-reinstall
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: image-based-install-operator
+    env:
+      IMAGE_REPO: image-based-install-operator
+      OSCI_ENV_CONFIG: |-
+        OSCI_PUBLISH_DELAY=0
+        OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        OSCI_PIPELINE_REPO=backplane-pipeline
+        OSCI_RELEASE_BRANCH=backplane-2.11
+      RELEASE_REF: backplane-2.11
+    workflow: ocm-ci-manifest-update
+zz_generated_metadata:
+  branch: backplane-2.11
+  org: openshift
+  repo: image-based-install-operator

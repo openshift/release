@@ -12,10 +12,6 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.ocp
   from: base
-  inputs:
-    ocp_builder_rhel-9-base-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.12
   to: ironic
 promotion:
   to:
@@ -45,13 +41,15 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-metal-ipi-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-virtualmedia-prevalidation
-  cluster: build05
+  capabilities:
+  - intranet
   run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal

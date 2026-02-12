@@ -17,7 +17,7 @@ EOF
   echo "Updated createFirewallRules in '${CONFIG}'."
 fi
 
-IFS=', ' read -r -a array <<< "${COMPUTE_NODES_TAGS}"
+IFS=', ' read -r -a array <<< "${NETWORK_TAGS_FOR_COMPUTE_NODES}"
 if [ "${#array[@]}" -gt 0 ]; then
   cat > "${PATCH}" << EOF
 compute:
@@ -34,7 +34,7 @@ EOF
   echo "Updated compute.platform.gcp.tags in '${CONFIG}'."
 fi
 
-IFS=', ' read -r -a array <<< "${CONTROL_PLANE_NODES_TAGS}"
+IFS=', ' read -r -a array <<< "${NETWORK_TAGS_FOR_CONTROL_PLANE_NODES}"
 if [[ "${#array[@]}" -gt 0 ]]; then
   cat > "${PATCH}" << EOF
 controlPlane:

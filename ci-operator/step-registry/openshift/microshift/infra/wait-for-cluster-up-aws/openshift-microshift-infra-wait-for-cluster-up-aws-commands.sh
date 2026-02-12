@@ -7,7 +7,6 @@ ci_script_prologue
 trap_subprocesses_on_term
 trap_install_status_exit_code $EXIT_CODE_WAIT_CLUSTER_FAILURE
 
-
 cat > "${HOME}"/start_microshift.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail

@@ -3,22 +3,6 @@ base_images:
     name: "4.16"
     namespace: ocp
     tag: cli
-  ocp_4.16_base-rhel9:
-    name: "4.16"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_4.16_installer-etcd-artifacts:
-    name: "4.16"
-    namespace: ocp
-    tag: installer-etcd-artifacts
-  ocp_4.16_installer-kube-apiserver-artifacts:
-    name: "4.16"
-    namespace: ocp
-    tag: installer-kube-apiserver-artifacts
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
 images:
@@ -26,19 +10,6 @@ images:
   - name: OPENSHIFT_INSTALL_CLUSTER_API
     value: "true"
   dockerfile_path: images/installer-altinfra/Dockerfile.ci
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_4.16_installer-etcd-artifacts:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:installer-etcd-artifacts
-    ocp_4.16_installer-kube-apiserver-artifacts:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:installer-kube-apiserver-artifacts
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: installer
 - dockerfile_literal: |
     FROM src
@@ -93,12 +64,11 @@ tests:
   as: e2e-aws-custom-security-groups
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-custom-security-groups
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn
   optional: true
@@ -113,7 +83,6 @@ tests:
         keyB valueB
         keyC valueC
     workflow: openshift-e2e-aws
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-fips
   optional: true
@@ -130,28 +99,25 @@ tests:
     test:
     - ref: openshift-e2e-test
     workflow: ipi-aws
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-imdsv2
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       AWS_METADATA_SERVICE_AUTH: Required
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-proxy
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-proxy
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-public-ipv4-pool
   optional: true
@@ -168,7 +134,6 @@ tests:
     - env: LEASED_RESOURCE
       resource_type: aws-3-quota-slice
     workflow: openshift-e2e-aws
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-shared-vpc
   optional: true
@@ -178,7 +143,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-sharednetwork
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-single-node
   optional: true
@@ -188,18 +152,16 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-single-node
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-localzones
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EDGE_ZONE_TYPES: local-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-edge-zones
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-wavelengthzones
   optional: true
@@ -210,7 +172,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-edge-zones
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-shared-vpc-local-zones
   optional: true
@@ -221,18 +182,16 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-aws-ovn-shared-vpc-wavelength-zones
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-3
     env:
       EDGE_ZONE_TYPES: wavelength-zone
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-aws-edge-zones-byo-vpc
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-azure-capi-ovn
   optional: true
@@ -242,7 +201,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-azure
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-gcp-capi-ovn
   optional: true
@@ -252,7 +210,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-gcp
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-gcp-ovn-byo-network-capi
   optional: true
@@ -262,7 +219,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-gcp-byo-vpc
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-gcp-ovn-xpn-capi
   optional: true
@@ -272,7 +228,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-gcp-xpn
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-gcp-ovn-secureboot-capi
   optional: true
@@ -282,7 +237,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-gcp-secureboot
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-ibmcloud-capi-ovn
   optional: true
@@ -292,7 +246,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-ibmcloud
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-powervs-capi-ovn
   cluster: build01
@@ -310,7 +263,6 @@ tests:
       INSTALLER: powervs
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-powervs-ipi
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-nutanix-capi-ovn
   cluster: build01
@@ -321,7 +273,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-nutanix-ovn
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-openstack-capi-ovn
   optional: true
@@ -334,7 +285,6 @@ tests:
       FEATURE_SET: CustomNoUpgrade
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-ipi
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-openstack-capi-dualstack-upi
   optional: true
@@ -351,7 +301,6 @@ tests:
         endpoints using hostNetwork
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-upi
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-openstack-capi-dualstack-v6primary
   optional: true
@@ -362,7 +311,6 @@ tests:
       FEATURE_GATES: ClusterAPIInstall=true
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-openstack-dualstack
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-openstack-capi-proxy
   optional: true
@@ -372,7 +320,6 @@ tests:
       FEATURE_GATES: ClusterAPIInstall=true
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-openstack-proxy
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-openstack-capi-dualstack
   optional: true
@@ -391,7 +338,6 @@ tests:
       FEATURE_GATES: ClusterAPIInstall=true
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-openstack-nfv-cgroupsv1
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-openstack-capi-externallb
   optional: true
@@ -401,7 +347,6 @@ tests:
       FEATURE_GATES: ClusterAPIInstall=true
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-openstack-external-lb
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-openstack-capi-ccpmso
   optional: true
@@ -423,30 +368,6 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-openstack-capi-ccpmso-zone
-  optional: true
-  steps:
-    cluster_profile: openstack-vh-mecha-az0
-    env:
-      FEATURE_GATES: ClusterAPIInstall=true
-      FEATURE_SET: CustomNoUpgrade
-    test:
-    - as: openstack-test-cpms
-      commands: |
-        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
-        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch main --depth=1 $dir
-        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
-        cd $dir
-        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
-        make e2e-presubmit
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: openshift-e2e-openstack-ipi
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-vsphere-capi-ovn
   optional: true
@@ -456,7 +377,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-vsphere
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-vsphere-capi-zones
   optional: true
@@ -466,7 +386,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-vsphere-zones
-  timeout: 6h0m0s
 - always_run: false
   as: e2e-vsphere-capi-static-ovn
   optional: true
@@ -476,7 +395,6 @@ tests:
       FEATURE_GATES: '["ClusterAPIInstall=true","VSphereStaticIPs=true"]'
       FEATURE_SET: CustomNoUpgrade
     workflow: openshift-e2e-vsphere-staticip
-  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.16
   org: openshift

@@ -1,6 +1,6 @@
 # ci-secret-generator
 
-The [ci-secret-generator](https://github.com/openshift/ci-tools/tree/master/cmd/ci-secret-generator) tool
+The [ci-secret-generator](https://github.com/openshift/ci-tools/tree/main/cmd/ci-secret-generator) tool
 populates secrets onto Vault based on the live data in our clusters.
 This directory contains [the config file](./_config.yaml) to run the tool.
 
@@ -27,5 +27,5 @@ All generated tokens are bound to a secret to facilitate rotation in case they
 are accidentally revealed.  See [`token-rotation.md`][token_rotation.md] for
 details.
 
-[oc_create_kubeconfig.sh]: https://github.com/openshift/ci-tools/blob/master/images/ci-secret-generator/oc_create_kubeconfig.sh
+[oc_create_kubeconfig.sh]: https://github.com/openshift/ci-tools/blob/main/images/ci-secret-generator/oc_create_kubeconfig.sh
 [token_rotation.md]: ../../docs/dptp-triage-sop/token-rotation.md

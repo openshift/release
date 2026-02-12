@@ -7,34 +7,12 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.12_base:
-    name: "4.12"
-    namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
 build_root:
   from_repository: true
 images:
 - dockerfile_path: build/Dockerfile.openshift
-  inputs:
-    ocp_4.12_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.12:base
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: kubernetes-nmstate-handler
 - dockerfile_path: build/Dockerfile.operator.openshift
-  inputs:
-    ocp_4.12_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.12:base
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: kubernetes-nmstate-operator
 - dockerfile_literal: |
     FROM src
@@ -99,7 +77,8 @@ tests:
   container:
     from: src
 - as: e2e-handler-sdn-ipv4
-  cluster: build05
+  capabilities:
+  - intranet
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -108,8 +87,10 @@ tests:
         NETWORK_TYPE="OpenShiftSDN"
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-handler
-- as: e2e-handler-ovn-ipv4
-  cluster: build05
+- always_run: false
+  as: e2e-handler-ovn-ipv4
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -119,8 +100,10 @@ tests:
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-handler
-- as: e2e-operator-ovn-ipv4
-  cluster: build05
+- always_run: false
+  as: e2e-operator-ovn-ipv4
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -131,8 +114,9 @@ tests:
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-operator
 - as: e2e-handler-sdn-ipv4-nightly-periodic
-  cluster: build05
-  cron: 51 20 10 * *
+  capabilities:
+  - intranet
+  cron: 7 23 13 4 *
   steps:
     cluster_profile: equinix-ocp-metal
     dependencies:
@@ -144,8 +128,9 @@ tests:
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-handler-ovn-ipv4-nightly-periodic
-  cluster: build05
-  cron: 53 5 7 * *
+  capabilities:
+  - intranet
+  cron: 14 9 22 11 *
   steps:
     cluster_profile: equinix-ocp-metal
     dependencies:

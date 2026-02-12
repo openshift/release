@@ -59,8 +59,8 @@ function wait_for_sriov_pods() {
 }
 
 function wait_for_sriov_network_node_state() {
-    # Wait up to 5 minutes for SriovNetworkNodeState to be succeeded
-    for _ in $(seq 1 10); do
+    # Wait up to 15 minutes for SriovNetworkNodeState to be succeeded
+    for _ in $(seq 1 30); do
         NODES_READY=$(oc get SriovNetworkNodeState --no-headers -n openshift-sriov-network-operator -o jsonpath='{.items[*].status.syncStatus}' | grep Succeeded | wc -l || true)
         if [ "${NODES_READY}" == "1" ]; then
             FOUND_NODE=1
@@ -71,7 +71,7 @@ function wait_for_sriov_network_node_state() {
     done
 
     if [ ! -n "${FOUND_NODE:-}" ] ; then
-        echo "SriovNetworkNodeState is not succeeded after 5 minutes"
+        echo "SriovNetworkNodeState is not succeeded after 15 minutes"
         oc get SriovNetworkNodeState -n openshift-sriov-network-operator -o yaml
         exit 1
     fi

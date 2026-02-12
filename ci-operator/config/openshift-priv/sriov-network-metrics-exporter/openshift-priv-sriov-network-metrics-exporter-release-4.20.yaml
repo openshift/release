@@ -1,8 +1,4 @@
 base_images:
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
   origin_scos-4.15_base-stream9:
     name: scos-4.15
     namespace: origin
@@ -14,10 +10,6 @@ canonical_go_repository: github.com/k8snetworkplumbingwg/sriov-network-metrics-e
 images:
 - dockerfile_path: Dockerfile.rhel
   from: origin_scos-4.15_base-stream9
-  inputs:
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: sriov-network-metrics-exporter
 promotion:
   to:
@@ -55,6 +47,12 @@ tests:
       PROJECT_NAME: sriov-network-metrics-exporter
       SNYK_CODE_ADDITIONAL_ARGS: --severity-threshold=high --policy-path=.snyk
     workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.20
   org: openshift-priv

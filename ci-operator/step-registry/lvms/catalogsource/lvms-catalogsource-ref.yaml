@@ -1,0 +1,50 @@
+ref:
+  as: lvms-catalogsource
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  cli: latest
+  grace_period: 10m
+  commands: lvms-catalogsource-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: IDMS_NAME
+    documentation: The name of ImageDigestMirrorSet
+    default: lvm-operator-idms
+  - name: LVM_CATALOG_SOURCE
+    documentation: The name of catalogsource which will be created for lvm
+    default: lvm-catalogsource
+  - name: MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE
+    documentation: |-
+      The var can be set when using the Gangway API, pass it as:
+      "pod_spec_options": {
+        "envs": {
+          "MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE": "quay.io/example/lvm-index:latest"
+        }
+      }
+    default: ""
+  - name: DISCONNECTED
+    documentation: Whether to run in disconnected mode.
+    default: "false"
+  - name: REDHAT_OPERATORS_INDEX_TAG
+    documentation: |-
+      When LVM_CATALOG_SOURCE is set to 'redhat-operators' and this variable is set,
+      the step will create a new CatalogSource named 'redhat-operators-<tag>' (e.g., redhat-operators-v4-20)
+      with the production image registry.redhat.io/redhat/redhat-operator-index:<tag>.
+      The CatalogSource name is written to SHARED_DIR/redhat_operators_catalog_source_name for use by
+      subsequent steps (LVM, ODF, MetalLB, Local Storage subscriptions). Example value: v4.20
+    default: ""
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  - namespace: test-credentials
+    name: dt-secrets
+    mount_path: /var/run/vault/dt-secrets
+  documentation: |-
+    Enable the LVM Operator catalogsource.
+    For disconnected environment, the mirror registry proxy must be set up. For example, in the step enable-qe-catalogsource-baremetalds-proxy-server.

@@ -16,7 +16,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"jira-lifecycle-plugin:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"server\")].image"}]'
+    keel.sh/policy: force
+    keel.sh/matchTag: "true"
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
   name: jira-lifecycle-plugin
   namespace: ci
 spec:
@@ -44,8 +47,13 @@ spec:
         - --jira-bearer-token-file=/etc/jira/token
         - --prow-config-path=/etc/prow-config/config.yaml
         - --supplemental-prow-config-dir=/etc/prow-config
-        image: jira-lifecycle-plugin:latest
+        - --enable-bigquery
+        - --bigquery-project-id=openshift-gce-devel
+        - --bigquery-dataset-id=github_analysis_us
+        - --bigquery-secret-file=/etc/bigquery/team-crt-bigquery-verified-wri.json
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_jira-lifecycle-plugin_latest
         name: server
+        imagePullPolicy: Always
         livenessProbe:
           httpGet:
             path: /healthz
@@ -75,6 +83,9 @@ spec:
         - name: prow-config
           mountPath: /etc/prow-config
           readOnly: true
+        - mountPath: /etc/bigquery
+          name: bigquery-token
+          readOnly: true
       volumes:
       - name: config
         configMap:
@@ -91,3 +102,6 @@ spec:
       - name: prow-config
         configMap:
           name: config
+      - name: bigquery-token
+        secret:
+          secretName: team-crt-bigquery-verified-wri-credentials

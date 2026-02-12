@@ -180,9 +180,6 @@ EOF
       then
         cat >>"${ARTIFACT_DIR}/junit_install_${HOST}.xml" <<EOF
         <testsuite name="cluster install" tests="2" failures="1">
-          <testcase name="install should succeed: host reachable">
-            <success message="">Host #${HOST} ($HOSTNAME) should be reachable and respond on the SSH port</success>
-          </testcase>
           <testcase name="install should succeed: host booted expected live image">
             <failure message="">Host #${HOST} ($HOSTNAME) should boot the expected live image</failure>
           </testcase>
@@ -195,12 +192,6 @@ EOF
       then
         cat >>"${ARTIFACT_DIR}/junit_install_${HOST}.xml" <<EOF
         <testsuite name="cluster install" tests="3" failures="1">
-          <testcase name="install should succeed: host reachable">
-            <success message="">Host #${HOST} ($HOSTNAME) should be reachable and respond on the SSH port</success>
-          </testcase>
-          <testcase name="install should succeed: host booted expected live image">
-            <success message="">Host #${HOST} ($HOSTNAME) should boot the expected live image</success>
-          </testcase>
           <testcase name="install should succeed: host installed CoreOS">
             <failure message="">Host #${HOST} ($HOSTNAME) should boot the installed OS from Disk</failure>
           </testcase>
@@ -212,18 +203,6 @@ EOF
     else
       cat >>"${ARTIFACT_DIR}/junit_install_${HOST}.xml" <<EOF
       <testsuite name="cluster install" tests="3" failures="0">
-          <testcase name="install should succeed: host reachable">
-            <success message="">Host #${HOST} ($HOSTNAME) should be reachable and respond on the SSH port</success>
-          </testcase>
-          <testcase name="install should succeed: host booted expected live image">
-            <success message="">Host #${HOST} ($HOSTNAME) should boot the expected live image</success>
-          </testcase>
-          <testcase name="install should succeed: host installed CoreOS">
-            <success message="">Host #${HOST} ($HOSTNAME) should boot the installed OS from Disk</success>
-          </testcase>
-          <testcase name="install should succeed: overall">
-            <success message="">openshift cluster install succeeded</success>
-          </testcase>
         </testsuite>
 EOF
     fi

@@ -3,19 +3,11 @@ base_images:
     name: 4.9-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-ingress-operator
 images:
 - from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: cluster-ingress-operator
 promotion:
   to:
@@ -49,7 +41,8 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-azure
+- always_run: false
+  as: e2e-azure
   optional: true
   steps:
     cluster_profile: azure4
@@ -66,7 +59,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-gcp-operator
+- always_run: false
+  as: e2e-gcp-operator
   optional: true
   steps:
     cluster_profile: gcp
@@ -79,7 +73,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-azure-operator
+- always_run: false
+  as: e2e-azure-operator
   optional: true
   steps:
     cluster_profile: azure4
@@ -100,10 +95,11 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-serial
-- as: e2e-aws-single-node
+- always_run: false
+  as: e2e-aws-single-node
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     workflow: openshift-e2e-aws-single-node
 zz_generated_metadata:
   branch: release-4.9
