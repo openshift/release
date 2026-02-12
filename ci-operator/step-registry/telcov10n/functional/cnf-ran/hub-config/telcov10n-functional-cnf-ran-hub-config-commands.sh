@@ -97,6 +97,14 @@ export ANSIBLE_HOST_KEY_CHECKING=False
 
 cd /eco-ci-cd/
 
+# mirror ose-kube-rbac-proxy workaround for 4.14
+if [[ "$VERSION" == "4.14" ]]; then
+    echo "Running ose-kube-rbac-proxy mirror workaround for version 4.14"
+    ansible-playbook playbooks/ran/mirror-ose-kube-rbac-proxy-wa.yml \
+        -i inventories/ocp-deployment/build-inventory.py \
+        --extra-vars "version=$VERSION"
+fi
+
 ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=$VERSION disconnected=$DISCONNECTED operators='$HUB_OPERATORS'"
 
