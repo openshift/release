@@ -7,12 +7,20 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/router
 images:
 - dockerfile_path: images/router/base/Dockerfile.rhel
   from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   optional: true
   to: haproxy-router-base
 - dockerfile_path: images/router/haproxy/Dockerfile.rhel8
