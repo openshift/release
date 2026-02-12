@@ -1,5 +1,5 @@
 ref:
-  as: openshift-qe-orion-udn-l3
+  as: openshift-qe-orion-udn-density
   from_image:
     namespace: ci
     name: ocp-qe-perfscale-ci
@@ -23,9 +23,9 @@ ref:
     documentation:
       Index which contains metadata about runs.
   - name: ACK_FILE
-    default: udn-l3_ack.yaml
+    default: udn-l2_ack.yaml
     documentation:
-      File will be prefixed with the version
+      File will be prefixed with the version. Automatically switched to udn-l3_ack.yaml when ENABLE_LAYER_3 is true.
   - name: ES_TYPE
     default: "qe"
     documentation: |-
@@ -55,9 +55,9 @@ ref:
     documentation:
       Determine if we should run Orion or not.
   - name: ORION_CONFIG
-    default: "examples/small-scale-udn-l3.yaml"
+    default: "examples/small-scale-udn-l2.yaml"
     documentation:
-      Var used to tell the step which workload is calling Orion, like cluster-density, node-density, etc.
+      Orion config for UDN workload. Automatically switched to examples/small-scale-udn-l3.yaml when ENABLE_LAYER_3 is true.
   - name: LOOKBACK_SIZE
     default: ""
     documentation:
@@ -74,7 +74,11 @@ ref:
     default: ""
     documentation:
       Display custom metadata fields, like ocpVirtVersion, osImage, etc.
-  commands: openshift-qe-orion-udn-l3-commands.sh
+  - name: ENABLE_LAYER_3
+    default: "false"
+    documentation: |-
+      When false (default), uses udn-l2 orion config and ack files. When true, switches to udn-l3 config and ack files for layer 3 baseline comparison.
+  commands: openshift-qe-orion-udn-density-commands.sh
   timeout: 6h
   credentials:
   - namespace: test-credentials # this entry injects the custom credential
@@ -88,4 +92,4 @@ ref:
       cpu: 100m
       memory: 100Mi
   documentation: >-
-    This step runs the perfscale configmap-scale workload in the deployed cluster
+    This step runs Orion change detection for the udn-density-pods workload. Supports both layer 2 and layer 3 UDN configurations via ENABLE_LAYER_3.
