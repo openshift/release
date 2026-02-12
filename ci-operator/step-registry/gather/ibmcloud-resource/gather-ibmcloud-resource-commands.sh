@@ -4,7 +4,7 @@ function debug_on_failure() {
     # Only sleep if the exit code is non-zero (failure)
     if [ $exit_code -ne 0 ]; then
         echo "Script failed with exit code $exit_code. Sleeping for debugging purposes."
-        sleep 2s
+        sleep 5s
     fi
 }
 
@@ -213,9 +213,6 @@ function run_command() {
 
 ssh_instances() {
   echo "==== Check the instances SSH connectivity ... ========="
-  local xtrace_state
-  xtrace_state=$(set +o | grep xtrace)
-  set +x
   local max_retries=3
   local sleep_time=30
   local ssh_user="core"
@@ -240,8 +237,6 @@ ssh_instances() {
       echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
     fi
   fi
-  eval "$(ssh-agent)"
-  ssh-add "$ssh_key"
 
   echo "Gathering instances from IBM Cloud..."
   local instances
@@ -264,20 +259,26 @@ ssh_instances() {
       continue
     fi
 
-    if [[ "$node_name" == "*bastion" ]]; then
+    if [[ "$node_name" == *bastion ]]; then
       printf "%-35s | %-15s | [SKIP - bastion node]\n" "$node_name" "$node_ip"
       continue
     fi
     local ssh_args=(-o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "$ssh_key")
-
+    
+    set +e
     # Add Jump Host if bastion exists
     if [[ -n "$proxy_ip" ]]; then
         ssh_args+=(-J "${bastion_user}@${proxy_ip}")
+        echo "Gathering journalctl logs from ${ip}"
+        ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${ssh_key} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_user}" core@$ip "sudo journalctl --no-pager" > "${RESOURCE_DUMP_DIR}/${node_name}/journal.log"
+        ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${ssh_key} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_user}" core@$ip "sudo /sbin/ip addr show" > "${RESOURCE_DUMP_DIR}/${node_name}/ip-addr-show.log"
+        ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${ssh_key} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_user}" core@$ip "sudo /sbin/ip route show" > "${RESOURCE_DUMP_DIR}/${node_name}/ip-route-show.log"
     fi
+    set -e
 
     local attempt=1
     local success=false
-    set +e
+    set -x 
     while [ $attempt -le $max_retries ]; do
       if ssh "${ssh_args[@]}" "${ssh_user}@${node_ip}" "exit 0" > /dev/null 2>&1; then
         success=true
@@ -288,16 +289,16 @@ ssh_instances() {
         ((attempt++))
       fi
     done
-    set -e
+    set +x
+
     if [ "$success" = true ]; then
       printf "%-35s | %-15s | [PASS]\n" "$node_name" "$node_ip"
     else
       printf "%-35s | %-15s | [FAIL]\n" "$node_name" "$node_ip"
     fi
 
-  done > "${RESOURCE_DUMP_DIR}/ssh_instances.txt"
-  eval "$xtrace_state" # Restore previous state
-  echo "------------------------------------------------------------------------------"
+  done | tee "${RESOURCE_DUMP_DIR}/ssh_instances.txt"
+  echo "==== SSH connectivity check completed. ========="
 }
 
 ibmcloud_login
