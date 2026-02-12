@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-echo "debug"
+
 function set-cluster-version-spec-update-service() {
     local payload_version
     local jsonpath_flag
@@ -234,6 +234,7 @@ function write_install_status() {
 }
 
 function prepare_next_steps() {
+  sleep 4h
   write_install_status
   set +e
   echo "Tear down the backgroup process of copying kube config"
