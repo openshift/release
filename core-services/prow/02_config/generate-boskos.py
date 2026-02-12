@@ -187,6 +187,11 @@ CONFIG = {
         'eastus': 8,
         'westus2': 8
     },
+    'azure-cnv-devops-quota-slice': {
+        'northcentralus': 10,
+        'southcentralus': 10,
+        'centralus': 10
+    },
     'azure-perfscale-quota-slice': {
         'northcentralus': 10,
         'southcentralus': 10,
@@ -247,16 +252,13 @@ CONFIG = {
         'default': 1,
     },
     'aro-hcp-stg-quota-slice': {
-        'default': 3,
+        'default': 5,
     },
     'aro-hcp-prod-quota-slice': {
-        'default': 2,
-    },
+        'default': 10
+  },
     'aro-hcp-dev-quota-slice': {
         'default': 15,
-    },
-    'aro-hcp-test-tenant-quota-slice': {
-        'default': 10,
     },
     'aro-hcp-test-msi-containers-dev': {},
     'aro-hcp-test-msi-containers-int': {},
@@ -626,6 +628,9 @@ CONFIG = {
         'us-east-1': 15,
         'us-east-2': 15,
     },
+    'amd-gpu-quota-slice': {
+        '10.1.178.14': 1,
+    },
 }
 
 for i in range(2,7):
@@ -641,6 +646,8 @@ del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
+# Reserve one for internal debugging use
+del CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-3']
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 
@@ -698,8 +705,9 @@ for i in range(4):
 for i in range(4):
     CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
 
-for i in range(150):
+for i in range(300):
     CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
+for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-int']['aro-hcp-test-msi-containers-int-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1

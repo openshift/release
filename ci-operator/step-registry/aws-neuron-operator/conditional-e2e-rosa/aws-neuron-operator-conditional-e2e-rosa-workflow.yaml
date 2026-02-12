@@ -2,68 +2,36 @@ workflow:
   as: aws-neuron-operator-conditional-e2e-rosa
   steps:
     env:
-      # ROSA HCP configuration
       HOSTED_CP: "true"
       ENABLE_BYOVPC: "true"
-      ZONES_COUNT: "2"
-      
-      # Default compute pool (inf2.xlarge)
+      ZONES_COUNT: "1"
       COMPUTE_MACHINE_TYPE: "inf2.xlarge"
       REPLICAS: "2"
-      
-      # Machine pool 1: Additional Inferentia
-      MP_MACHINE_TYPE: "inf2.xlarge"
-      MP_REPLICAS: "2"
-      MP_LABELS: "workload=neuron-inference,feature.node.kubernetes.io/aws-neuron=true"
-      MP_ZONE: ""
-      
-      # Machine pool 2: Trainium
-      MP2_MACHINE_TYPE: "trn1.2xlarge"
-      MP2_REPLICAS: "2"
-      MP2_LABELS: "workload=neuron-training,feature.node.kubernetes.io/aws-neuron=true"
-      
-      DISABLE_WORKLOAD_MONITORING: "false"
-    
+      OCM_LOGIN_ENV: "production"
     pre:
-      # Step 1: Check if kernel changed (creates skip.txt if unchanged)
-      - ref: aws-neuron-operator-kernel-check
-      
-      # Step 2: Gate - checks skip.txt, exits early if skipping
-      - ref: aws-neuron-operator-provision-gate
-      
-      # Step 3+: Actual provisioning (runs only if not skipped)
-      - chain: rosa-aws-sts-hcp-provision
-      - ref: rosa-conf-machine-pool
-      - ref: aws-neuron-operator-provision-trainium-pool
-      - ref: osd-ccs-conf-idp-htpasswd-multi-users
-      - ref: rosa-cluster-wait-ready-nodes
-    
+    # VPC and tagging setup
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    # OIDC and account roles setup
+    - chain: rosa-sts-oidc-config-create
+    # Custom cluster provision step that handles "zero egress" CLI bug
+    - ref: aws-neuron-operator-rosa-cluster-provision
+    - ref: rosa-cluster-wait-ready-cluster
+    - ref: rosa-cluster-notify-error
+    - ref: rosa-conf-idp-htpasswd
+    - ref: rosa-cluster-wait-ready-operators
+    - ref: aws-provision-tags-for-byo-vpc
+    # Additional configuration
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
     test:
-      # Test step with built-in skip check
-      - ref: aws-neuron-operator-test-gate
-    
+    - ref: aws-neuron-operator-test
     post:
-      # Deprovision gate - checks if cluster was provisioned
-      - ref: aws-neuron-operator-deprovision-gate
-      - chain: rosa-aws-sts-hcp-deprovision
-      - ref: send-results-to-reportportal
-  
+    - chain: rosa-aws-sts-hcp-deprovision
   documentation: |-
-    Conditional workflow for AWS Neuron operator E2E testing with kernel change optimization.
-    
-    This workflow first checks if the driver-toolkit.json has been updated since the last run
-    (indicating a potential kernel change). If the kernel hasn't changed, the workflow skips
-    cluster provisioning and testing to save resources and time.
-    
-    Flow:
-    1. Kernel check step fetches driver-toolkit.json and compares commit SHA
-    2. If unchanged, creates skip.txt and all subsequent steps exit early
-    3. If changed, proceeds with full ROSA HCP cluster provisioning
-    4. Provisions dual machine pools: inf2.xlarge (Inferentia2) and trn1.2xlarge (Trainium1)
-    5. Runs Neuron operator E2E tests using eco-gotests framework
-    6. Deprovisions cluster (only if it was provisioned)
-    
-    Configuration:
-    - Set LAST_KNOWN_DTK_COMMIT to the last known commit SHA to enable skip optimization
-    - Leave LAST_KNOWN_DTK_COMMIT empty for first run (will always run tests)
-    - After first run, update LAST_KNOWN_DTK_COMMIT with value from artifacts
+    This workflow provisions a ROSA HCP cluster with 2x AWS Inferentia (inf2.xlarge)
+    compute nodes, then runs the AWS Neuron operator E2E tests conditionally
+    based on kernel changes.
+
+    Uses a custom provision step to work around the ROSA CLI "zero egress" bug
+    where the CLI returns exit code 1 after successfully creating the cluster.

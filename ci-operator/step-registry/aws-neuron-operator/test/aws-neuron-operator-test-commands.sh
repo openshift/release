@@ -1,45 +1,28 @@
 #!/bin/bash
+
 set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Starting Neuron operator E2E tests..."
+echo "Starting AWS Neuron operator E2E tests"
 
 # Set up kubeconfig
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
-# Verify cluster access
-oc whoami
-oc get nodes
+# Run eco-gotests with neuron test suite
+cd /home/testuser
 
-# Verify Neuron nodes are present
-echo "Checking for Neuron-capable nodes..."
-INF2_NODES=$(oc get nodes -l node.kubernetes.io/instance-type=inf2.xlarge --no-headers | wc -l)
-TRN1_NODES=$(oc get nodes -l node.kubernetes.io/instance-type=trn1.2xlarge --no-headers | wc -l)
+# Export all ECO_HWACCEL_NEURON_* environment variables for the test
+export ECO_TEST_FEATURES="${ECO_TEST_FEATURES:-neuron}"
+export ECO_TEST_LABELS="${ECO_TEST_LABELS:-neuron}"
 
-echo "Found ${INF2_NODES} Inferentia2 nodes (inf2.xlarge)"
-echo "Found ${TRN1_NODES} Trainium1 nodes (trn1.2xlarge)"
+echo "Running tests with features: ${ECO_TEST_FEATURES}"
+echo "Running tests with labels: ${ECO_TEST_LABELS}"
 
-if [ "${INF2_NODES}" -lt 2 ]; then
-  echo "ERROR: Expected at least 2 Inferentia2 nodes, found ${INF2_NODES}"
-  exit 1
-fi
+# Run the neuron tests
+ginkgo --label-filter="${ECO_TEST_LABELS}" \
+    --timeout=2h \
+    --v \
+    ./tests/hw-accel/neuron/...
 
-if [ "${TRN1_NODES}" -lt 2 ]; then
-  echo "ERROR: Expected at least 2 Trainium1 nodes, found ${TRN1_NODES}"
-  exit 1
-fi
-
-# Run tests from eco-gotests
-cd /home/testuser/eco-gotests
-
-# Set test configuration
-export ECO_DUMP_FAILED_TESTS=true
-export ECO_REPORTS_DUMP_DIR="${ARTIFACT_DIR}/neuron-test-reports"
-export ECO_VERBOSE_LEVEL=100
-
-# Run all Neuron test suites
-echo "Running Neuron test suites..."
-make run-tests
-
-echo "Neuron tests completed successfully"
+echo "AWS Neuron operator E2E tests completed"

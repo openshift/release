@@ -252,10 +252,10 @@ retry_command "oc wait --for=condition=Available=True --timeout=5s deployment/$O
 # Install the Istio control plane
 if [ "${ISTIO_CONTROL_PLANE_MODE}" == "ambient" ]; then
     echo "Deploying Istio control plane in ambient mode"
-    BUILD_WITH_CONTAINER=0 make deploy-istio-with-ambient
+    CI=${CI:-true} BUILD_WITH_CONTAINER=0 make deploy-istio-with-ambient
 elif [ "${ISTIO_CONTROL_PLANE_MODE}" == "sidecar" ]; then
     echo "Deploying Istio control plane in sidecar mode"
-    BUILD_WITH_CONTAINER=0 make deploy-istio-with-cni
+    CI=${CI:-true} BUILD_WITH_CONTAINER=0 make deploy-istio-with-cni
 else
     echo "ERROR: Unsupported mode: ${ISTIO_CONTROL_PLANE_MODE}. Use 'ambient' or 'sidecar'."
     exit 1

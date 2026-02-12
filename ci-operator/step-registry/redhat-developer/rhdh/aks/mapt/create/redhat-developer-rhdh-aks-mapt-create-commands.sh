@@ -66,10 +66,15 @@ mapt azure aks create \
   --project-name "aks" \
   --backed-url "azblob://${AZURE_STORAGE_BLOB}/${CORRELATE_MAPT}" \
   --conn-details-output "${SHARED_DIR}" \
-  --version 1.33 \
+  --version 1.34 \
   --vmsize "Standard_D4as_v6" \
   --spot \
   --spot-eviction-tolerance "low" \
   --spot-excluded-regions "centralindia" \
-  --enable-app-routing && \
+  --enable-app-routing
+if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
+  echo "[ERROR] ❌ kubeconfig file not found at ${SHARED_DIR}/kubeconfig"
+  echo "[ERROR] ❌ Failed to create MAPT AKS cluster"
+  exit 1
+fi
 echo "[SUCCESS] ✅ MAPT AKS cluster created successfully"

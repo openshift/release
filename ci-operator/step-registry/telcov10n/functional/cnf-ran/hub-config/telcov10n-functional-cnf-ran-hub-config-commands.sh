@@ -88,17 +88,31 @@ VERSION_TAG=$(echo "${VERSION}" | tr '.' '-')
 export VERSION_TAG
 echo "VERSION_TAG=${VERSION_TAG}"
 
-# Substitute VERSION_TAG in OPERATORS variable for TALM operator configuration
-OPERATORS=$(echo "${OPERATORS}" | sed "s/\${VERSION_TAG}/${VERSION_TAG}/g")
-echo "OPERATORS after substitution: ${OPERATORS}"
+# Substitute VERSION_TAG in HUB_OPERATORS variable for TALM operator configuration
+HUB_OPERATORS=$(echo "${HUB_OPERATORS}" | sed "s/\${VERSION_TAG}/${VERSION_TAG}/g")
+echo "HUB_OPERATORS after substitution: ${HUB_OPERATORS}"
 
 export ANSIBLE_HOST_KEY_CHECKING=False
 # deploy ztp operators (acm, lso, gitops)
 
 cd /eco-ci-cd/
 
+# mirror ose-kube-rbac-proxy workaround for 4.14
+if [[ "$VERSION" == "4.14" ]]; then
+    echo "Running ose-kube-rbac-proxy mirror workaround for version 4.14"
+    ansible-playbook playbooks/ran/mirror-ose-kube-rbac-proxy-wa.yml \
+        -i inventories/ocp-deployment/build-inventory.py \
+        --extra-vars "version=$VERSION"
+fi
+
+# For 4.14, skip internal registry cleanup to preserve images mirrored by the ose-kube-rbac-proxy workaround
+SKIP_REGISTRY_CLEANUP=""
+if [[ "$VERSION" == "4.14" ]]; then
+    SKIP_REGISTRY_CLEANUP="ocp_operator_mirror_skip_internal_registry_cleanup=true"
+fi
+
 ansible-playbook ./playbooks/deploy-ocp-operators.yml -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=$VERSION disconnected=$DISCONNECTED operators='$OPERATORS'"
+    --extra-vars "kubeconfig=${KUBECONFIG_PATH} version=$VERSION disconnected=$DISCONNECTED operators='$HUB_OPERATORS' $SKIP_REGISTRY_CLEANUP"
 
 # configure lso 
 ansible-playbook playbooks/ran/hub-sno-configure-lvm-storage.yml -i ./inventories/ocp-deployment/build-inventory.py \

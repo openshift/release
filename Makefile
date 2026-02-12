@@ -171,7 +171,7 @@ python-validation:
 # You should not need to add new targets here.
 
 export RELEASE_URL=https://github.com/openshift/release.git
-export RELEASE_REF=master
+export RELEASE_REF=main
 export SKIP_PERMISSIONS_JOB=0
 
 # tide-config-manager verified mode settings
@@ -405,7 +405,7 @@ download_dp_crd:
 .PHONY: download_dp_crd
 
 download_crt_crd:
-	curl -o clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml https://raw.githubusercontent.com/openshift/release-controller/master/artifacts/release.openshift.io_releasepayloads.yaml
+	curl -o clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml https://raw.githubusercontent.com/openshift/release-controller/main/artifacts/release.openshift.io_releasepayloads.yaml
 .PHONY: download_crt_crd
 
 sed_cmd := sed
