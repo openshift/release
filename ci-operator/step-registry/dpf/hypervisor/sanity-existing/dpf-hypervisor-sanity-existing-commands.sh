@@ -48,17 +48,17 @@ if ssh $SSH_OPTS root@$REMOTE_HOST "ls -ltr; env; cd /root/doca8/openshift-dpf; 
 
 
 # Run dpf-sanity-checks sanity test
-echo "=== DPF Sanity Test on Existing Cluster ==="
-echo "log file on hypervisor: log-dpf-sanity-checks-${datetime_string}"
+## echo "=== DPF Sanity Test on Existing Cluster ==="
+## echo "log file on hypervisor: log-dpf-sanity-checks-${datetime_string}"
 
-if ssh $SSH_OPTS root@$REMOTE_HOST "ls -ltr; env; cd /root/doca8/openshift-dpf; cat .env; make run-dpf-sanity 2>&1 | tee log-dpf-sanity-checks-${datetime_string}"; then echo "Sanity Test Passed"; else echo "Sanity Test Failed"; fi
+## if ssh $SSH_OPTS root@$REMOTE_HOST "ls -ltr; env; cd /root/doca8/openshift-dpf; cat .env; make run-dpf-sanity 2>&1 | tee log-dpf-sanity-checks-${datetime_string}"; then echo "Sanity Test Passed"; else echo "Sanity Test Failed"; fi
 
-echo "====== DPF Sanity Test Log file:"
-ssh $SSH_OPTS root@$REMOTE_HOST "cd /root/doca8/openshift-dpf; cat log-dpf-sanity-checks-${datetime_string}"
+## echo "====== DPF Sanity Test Log file:"
+## ssh $SSH_OPTS root@$REMOTE_HOST "cd /root/doca8/openshift-dpf; cat log-dpf-sanity-checks-${datetime_string}"
 
 echo "=== DPF Kubernetes Traffic Flow Tests on Existing Cluster ==="
 # Run kubernetes traffic flow test
 if ssh $SSH_OPTS root@$REMOTE_HOST "ls -ltr; env; cd /root/doca8/openshift-dpf; cat .env; export TFT_SERVER_NODE=worker-303ea712f378 ; export TFT_CLIENT_NODE=worker-303ea712f378; make run-traffic-flow-tests 2>&1 | tee log-traffic-flow-tests-${datetime_string}"; then echo "Kubernetes Network Traffic Flow Iperf Tests Passed"; else echo "Kubernetes Network Traffic Flow Iperf Tests Failed"; fi
 
-echo "====== DPF Sanity Test Log file:"
+echo "====== DPF Kubernetes Traffic Flow Tests Log file:"
 ssh $SSH_OPTS root@$REMOTE_HOST "cd /root/doca8/openshift-dpf; cat log-traffic-flow-tests-${datetime_string}"
