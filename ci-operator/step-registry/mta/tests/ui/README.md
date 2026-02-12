@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Used to execute the Cypress [tackle-ui-tests](https://github.com/konveyor/tackle-ui-tests) using the provided arguments. All XML results will be combined into `$ARTIFACT_DIR/junit_tackle_ui_results.xml`
+Used to execute the Cypress [tackle2-ui](https://github.com/konveyor/tackle2-ui) tests using the provided arguments. All XML results will be combined into `$ARTIFACT_DIR/junit_tackle_ui_results.xml`
 
 ## Process
 
@@ -32,3 +32,6 @@ Used to execute the Cypress [tackle-ui-tests](https://github.com/konveyor/tackle
 - `CYPRESS_SPEC`
   - **Definition**: Value used for the `--spec` argument in the `cypress run` command.
   - **If left empty**: It will use `**/*.test.ts` by default.
+- `MAP_TESTS`
+  - **Definition**: Specify whether to update the test suite name for reporting tools.
+  - **If left empty**: It will use `false` as the default value.
