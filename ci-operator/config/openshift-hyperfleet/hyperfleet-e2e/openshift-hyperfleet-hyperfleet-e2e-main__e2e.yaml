@@ -1,0 +1,39 @@
+base_images:
+  ci_hyperfleet-credential-provider_latest:
+    name: hyperfleet-credential-provider
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.25-openshift-4.22
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ci_hyperfleet-credential-provider_latest:
+      as:
+      - registry.ci.openshift.org/ci/hyperfleet-credential-provider:latest
+  to: hyperfleet-e2e
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: hyperfleet-e2e-nightly
+  cron: 30 9 * * *
+  steps:
+    env:
+      GKE_CLUSTER_NAME: hyperfleet-dev-prow
+      LABEL_FILTER: tier0
+      NAMESPACE_NAME: prow-hyperfleet
+    test:
+    - ref: openshift-hyperfleet-e2e
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-e2e
+  variant: e2e

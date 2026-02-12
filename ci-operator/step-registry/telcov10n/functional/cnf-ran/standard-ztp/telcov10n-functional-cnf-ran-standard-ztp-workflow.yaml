@@ -1,0 +1,31 @@
+workflow:
+  as: telcov10n-functional-cnf-ran-standard-ztp
+  documentation: |-
+    Full ZTP workflow for CNF RAN testing:
+    1. Hub setup: deploy, configure, mirror operators
+    2. Standard cluster (kni-qe-100): create VMs, deploy via ZTP, run tests, report, cleanup
+    3. Compact cluster (kni-qe-101): create VMs, deploy via ZTP, run tests, report, cleanup
+  steps:
+    pre:
+    - ref: telcov10n-functional-cnf-network-schedule-job
+    # Hub cluster setup
+    - ref: telcov10n-functional-cnf-ran-hub-deploy
+    - ref: telcov10n-functional-cnf-ran-hub-config
+    - ref: telcov10n-functional-cnf-ran-mirror-spoke-operators
+    test:
+    # Phase 1: Standard cluster (kni-qe-100)
+    - ref: telcov10n-functional-cnf-ran-create-masters-vms-standard
+    - ref: telcov10n-functional-cnf-ran-deploy-spoke-standard
+    - ref: telcov10n-functional-cnf-ran-eco-gotests-standard
+    - ref: telcov10n-functional-cnf-ran-report-standard
+    - ref: telcov10n-functional-cnf-ran-cleanup-standard
+    # Phase 2: Compact cluster (kni-qe-101)
+    - ref: telcov10n-functional-cnf-ran-create-masters-vms-compact
+    - ref: telcov10n-functional-cnf-ran-deploy-spoke-compact
+    - ref: telcov10n-functional-cnf-ran-eco-gotests-compact
+    - ref: telcov10n-functional-cnf-ran-report-compact
+    - ref: telcov10n-functional-cnf-ran-cleanup-compact
+    # Send Slack notification
+    - ref: telcov10n-functional-cnf-ran-send-slack-notification
+    post: 
+    # - ref: wait

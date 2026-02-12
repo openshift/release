@@ -3,10 +3,6 @@ base_images:
     name: 4.11-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -14,10 +10,6 @@ canonical_go_repository: github.com/openshift/image-registry
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: docker-registry
 promotion:
   to:
@@ -70,7 +62,7 @@ tests:
 - as: e2e-agnostic-image-registry
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     test:
     - as: e2e-test
       commands: TEST_KUBECONFIG=${KUBECONFIG} JUNIT_REPORT=true make test-integration

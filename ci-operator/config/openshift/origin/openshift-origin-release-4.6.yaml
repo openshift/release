@@ -1,8 +1,4 @@
 base_images:
-  ocp_builder_rhel-8-golang-1.15-openshift-4.6:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.6
   tools:
     name: "4.6"
     namespace: ocp
@@ -12,14 +8,10 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.14
+    tag: rhel-8-release-golang-1.14-openshift-4.6
 images:
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: tools
-  inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.6:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6
   to: tests
 promotion:
   to:
@@ -87,7 +79,7 @@ tests:
   as: e2e-agnostic-cmd
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp-cmd
 - as: e2e-gcp-builds
   run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
@@ -108,7 +100,7 @@ tests:
 - as: e2e-gcp-image-ecosystem
   run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp-image-ecosystem
 - as: e2e-aws-image-registry
   run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)

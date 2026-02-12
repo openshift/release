@@ -1,6 +1,6 @@
 base_images:
-  ocp_ubi-python-311_9:
-    name: ubi-python-311
+  ocp_ubi-python-312_9:
+    name: ubi-python-312
     namespace: ocp
     tag: "9"
 build_root:
@@ -9,38 +9,13 @@ build_root:
 images:
 - dockerfile_path: org_tools/images/Dockerfile
   inputs:
-    ocp_ubi-python-311_9:
+    ocp_ubi-python-312_9:
       as:
-      - registry.ci.openshift.org/ocp/ubi-python-311:9
-  to: cyborg
-- dockerfile_path: org_tools/images/Dockerfile.validator
-  from: cyborg
-  to: org-validator
-- dockerfile_path: org_tools/images/Dockerfile.indexer
-  from: cyborg
-  to: org-indexer
-- dockerfile_path: org_tools/images/Dockerfile.team-tracking-spreadsheet
-  from: cyborg
-  to: team-tracking-spreadsheet-tool
-- dockerfile_path: org_tools/images/Dockerfile.peribolos-generator
-  from: cyborg
-  to: peribolos-generator
-- dockerfile_path: org_tools/images/Dockerfile.openshift-priv-peribolos-generator
-  from: cyborg
-  to: openshift-priv-peribolos-generator
+      - registry.ci.openshift.org/ocp/ubi-python-312:9
+  to: cyborg-cli
 promotion:
   to:
-  - excluded_images:
-    - openshift-priv-peribolos-generator
-    - peribolos-generator
-    - team-tracking-spreadsheet-tool
-    - org-validator
-    - org-indexer
-    namespace: continuous-release-jobs
-    tag: base
-  - excluded_images:
-    - cyborg
-    namespace: continuous-release-jobs
+  - namespace: continuous-release-jobs
     tag: latest
 resources:
   '*':
@@ -52,14 +27,19 @@ resources:
 tests:
 - as: lint
   commands: |
-    echo "Placeholder for lint job"
+    make ci-lint
   container:
-    from: src
+    from: cyborg-cli
+- as: typecheck
+  commands: |
+    make ci-typecheck
+  container:
+    from: cyborg-cli
 - as: tests
   commands: |
-    python -m pytest tests/ -v --cov=orglib
+    make ci-test
   container:
-    from: cyborg
+    from: cyborg-cli
 - as: security
   optional: true
   steps:

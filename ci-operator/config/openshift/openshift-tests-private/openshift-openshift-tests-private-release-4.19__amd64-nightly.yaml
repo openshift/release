@@ -3,6 +3,10 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: ansible
+  assisted-service-scripts:
+    name: ocm-2.14
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   aws-efs-csi-operator-create-efs:
     name: "4.19"
     namespace: ocp
@@ -11,6 +15,10 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: cli
+  cli-jq:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
   cluster-api-actuator-pkg-test:
     name: cluster-api-actuator-pkg-test
     namespace: ci
@@ -969,7 +977,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
@@ -1804,6 +1812,7 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_PUBLISHER: azureopenshift
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: aro_419
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: 419.6.20250523
+      HYPERSHIFT_DYNAMIC_DNS: hypershift-kas-dns.qe1.azure.devcluster.openshift.com
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
       TEST_TIMEOUT: "30"
     test:
@@ -1943,6 +1952,7 @@ tests:
     cluster_profile: azuremag-qe
     env:
       BASE_DOMAIN: qemag.azure.devcluster.openshift.com
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: disruptive&&!autoscaler&&!connected-only
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-azure-mag-ipi-fullyprivate
@@ -2085,7 +2095,7 @@ tests:
       FILTERS_ADDITIONAL: ""
       LVM_OPERATOR_SUB_CHANNEL: stable-4.19
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
-      TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&;Disruptive&
+      TEST_FILTERS: ~HyperShiftMGMT&;~StressTest&;~DEPRECATED&;Disruptive&
       TEST_SCENARIOS: Compliance_Operator
       TEST_TIMEOUT: "60"
     test:
@@ -2127,7 +2137,7 @@ tests:
       FILTERS_ADDITIONAL: ""
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
-      TEST_SCENARIOS: Security_Profiles_Operator
+      TEST_SCENARIOS: Security_Profiles_Operator|Node_Audit_Logging
     test:
     - ref: file-integrity-konflux-catalogsource
     - ref: openshift-extended-test
@@ -2324,9 +2334,26 @@ tests:
       CONTROL_PLANE_ON_HOST_MAINTENANCE: Terminate
       FIPS_ENABLED: "true"
       GCP_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      ON_HOST_MAINTENANCE: Terminate
+    post:
+    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    - ref: send-results-to-reportportal
+    pre:
+    - ref: gcp-provision-minimal-permission
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-gcp
+    - ref: ipi-conf-gcp-control-plane-node-type
+    - ref: ipi-conf-gcp-confidential-computing
+    - ref: storage-conf-storageclass-pre-set-default-gcp-hyperdisk
+    - chain: ipi-install
+    - ref: enable-qe-catalogsource
+    - ref: cucushift-installer-check-gcp-machine-type
+    - ref: cucushift-installer-check-gcp-confidential-computing
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-reportportal-marker
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-confidential-computing
 - as: gcp-ipi-confidential-secureboot-mini-perm-f14
   cron: 41 3 6,22 * *
   steps:
@@ -2531,12 +2558,47 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;Smokerun&
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
+- as: azure-ipi-ovn-winc-f14
+  cron: 12 12 16,30 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
+- as: vsphere-ipi-ovn-winc-f14
+  cron: 3 14 13,29 * *
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
+- as: nutanix-ipi-ovn-winc-f14
+  cron: 18 11 12,28 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-nutanix-ipi-ovn-winc
 - as: gcp-ipi-to-multiarch-mini-perm-f14
   cron: 33 22 16,30 * *
   steps:
@@ -2569,8 +2631,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-gcp-upi
-- as: ibmcloud-ipi-dedicatedhost-dynamic-f28
-  cron: 35 21 23 * *
+- as: ibmcloud-ipi-dedicatedhost-dynamic-f999
+  cron: 8 19 29 2 *
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -2636,8 +2698,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-ovn-ipsec
-- as: ibmcloud-ipi-ovn-mtu-migrate-f28
-  cron: 27 6 11 * *
+- as: ibmcloud-ipi-ovn-mtu-migrate-f999
+  cron: 8 19 29 2 *
   steps:
     cluster_profile: ibmcloud-qe
     test:
@@ -2721,6 +2783,7 @@ tests:
     cluster_profile: ibmcloud-qe
     env:
       RT_ENABLED: "true"
+      TEST_FILTERS_CLUSTERINFRASTRUCTURE: disruptive&&!autoscaler&&!connected-only
     test:
     - chain: openshift-e2e-test-clusterinfra-qe-longrun
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
@@ -3070,6 +3133,71 @@ tests:
     test:
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: vsphere-ipi-amd-f28-techpreview-nwevents-netobserv
+  cron: 41 15 13 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: "77894"
+      TEST_TIMEOUT: "55"
+    test:
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-virt-netobserv
+  capabilities:
+  - intranet
+  cron: 46 15 3 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: with VMs
+      TEST_TIMEOUT: "55"
+    test:
+    - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-ipv6-netobserv
+  capabilities:
+  - intranet
+  cron: 37 5 13 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: "53844"
+      TEST_TIMEOUT: "55"
+    test:
+    - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: vsphere-ipi-amd-f28-ipsec-netobserv
+  cron: 25 6 23 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: "82637"
+      TEST_TIMEOUT: "55"
+    test:
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
 - as: vsphere-ipi-longduration-mco-fips-proxy-g1-f14
   cron: 41 0 12,28 * *
   steps:
@@ -3927,6 +4055,25 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce
+- as: baremetalds-hypershift-agent-mce-lab-arm-mgmt-f28
+  capabilities:
+  - intranet
+  cron: 56 23 16 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:multi-latest
+      NODEPOOL_RELEASE_IMAGE_LATEST: release:multi-latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: arm64
+      AGENTSERVICECONFIG_CPU_ARCHITECTURE: arm64
+      EXTRA_ARGS: --arch=arm64
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.19
+      MCE_VERSION: "2.9"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-lab
 - as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-n1minor-mgmt-f28
   capabilities:
   - intranet

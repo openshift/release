@@ -134,9 +134,8 @@ if [[ $AKS_ADDONS == *azure-keyvault-secrets-provider* ]]; then
     az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.clientId -r > "${SHARED_DIR}/aks_keyvault_secrets_provider_client_id"
     # Grant MI required permissions to the KV which will be created in the same RG as the AKS cluster
     AKS_KV_SECRETS_PROVIDER_OBJECT_ID="$(az aks show -n "$CLUSTER" -g "$RESOURCEGROUP" | jq .addonProfiles.azureKeyvaultSecretsProvider.identity.objectId -r)"
+    echo "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" > "${SHARED_DIR}/kv-object-id"
 fi
-
-echo "$AKS_KV_SECRETS_PROVIDER_OBJECT_ID" > "${SHARED_DIR}/kv-object-id"
 
 echo "Building up the aks get-credentials command"
 AKS_GET_CREDS_COMMAND=(

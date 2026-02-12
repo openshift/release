@@ -23,6 +23,9 @@ if [[ "${GCP_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 elif [[ "${MINIMAL_PERMISSIONS_WITHOUT_ACT_AS}" == "yes" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Going to use the IAM service account of general minimal permissions, and without 'iam.serviceAccounts.actAs'"
   sa_filename="ipi-min-perm-without-actAs-sa.json"
+elif [[ "${MINIMAL_PERMISSIONS_WITHOUT_DNS}" == "yes" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Going to use the IAM service account of general minimal permissions, and without DNS permissions"
+  sa_filename="ipi-min-perm-no-dns-sa.json"
 elif [[ "${GCP_CCO_MANUAL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Going to use the IAM service account of minimal permissions for CCO in Manual mode"
   sa_filename="ipi-xpn-cco-manual-permissions.json"

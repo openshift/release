@@ -638,13 +638,12 @@ function defer-OCP-60397(){
 }
 
 function check_mcp_status() {
-    local machineCount updatedMachineCount counter
+    local machineCount updatedMachineCount counter=0 interval=120
     machineCount=$(oc get mcp $1 -o=jsonpath='{.status.machineCount}')
-    counter=0
-    while [ $counter -lt 1200 ]
+    while [ $counter -lt 1800 ]
     do
-        sleep 20
-        counter=`expr $counter + 20`
+        sleep ${interval}
+        counter=$((counter + interval))
         echo "waiting ${counter}s"
         updatedMachineCount=$(oc get mcp $1 -o=jsonpath='{.status.updatedMachineCount}')
         if [[ ${updatedMachineCount} = "${machineCount}" ]]; then
@@ -694,6 +693,11 @@ function pre-OCP-47160(){
     fs=$(oc get featuregate cluster -ojson|jq -r '.spec.featureSet')
     if [[ "${fs}" != "TechPreviewNoUpgrade" ]]; then
         echo "Fail to patch featuregate cluster!"
+        return 1
+    fi
+    echo "Wait for MCP rollout to start..."
+    if ! oc wait mcp --all --for condition=updating --timeout=300s; then
+        echo "The mcp rollout does not start in 5m!"
         return 1
     fi
     if ! check_mcp_status master || ! check_mcp_status worker ; then
@@ -789,6 +793,11 @@ function pre-OCP-47200(){
     fs_after=$(oc get featuregate cluster -ojson|jq -r '.spec.featureSet')
     if [[ "${fs_after}" != "CustomNoUpgrade" ]]; then
         echo "Fail to patch featuregate cluster!"
+        return 1
+    fi
+    echo "Wait for MCP rollout to start..."
+    if ! oc wait mcp --all --for condition=updating --timeout=300s; then
+        echo "The mcp rollout does not start in 5m!"
         return 1
     fi
     if ! check_mcp_status master || ! check_mcp_status worker ; then

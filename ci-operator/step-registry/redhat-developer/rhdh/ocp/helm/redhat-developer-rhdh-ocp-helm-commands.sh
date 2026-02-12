@@ -1,5 +1,18 @@
 #!/bin/bash
 
+echo "========== Repository, Branch, and PR Variables =========="
+GITHUB_ORG_NAME="redhat-developer"
+echo "GITHUB_ORG_NAME: $GITHUB_ORG_NAME"
+GITHUB_REPOSITORY_NAME="rhdh"
+echo "GITHUB_REPOSITORY_NAME: $GITHUB_REPOSITORY_NAME"
+RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
+echo "RELEASE_BRANCH_NAME: $RELEASE_BRANCH_NAME"
+GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
+echo "GIT_PR_NUMBER: $GIT_PR_NUMBER"
+TAG_NAME=""
+export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER TAG_NAME
+
+echo "========== Check for [skip-e2e] commit comments in the PR title =========="
 # Check for [skip-e2e] commit comments in the PR title
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
     PR_TITLE=$(curl -s "https://api.github.com/repos/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}/pulls/${GIT_PR_NUMBER}" | jq -r '.title')
@@ -82,17 +95,8 @@ echo "========== Cluster kubeadmin logout =========="
 oc logout
 
 echo "========== Git Repository Setup & Checkout =========="
-# Prepare to git checkout
-export GIT_PR_NUMBER GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME TAG_NAME
-GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
-echo "GIT_PR_NUMBER : $GIT_PR_NUMBER"
-GITHUB_ORG_NAME="redhat-developer"
-GITHUB_REPOSITORY_NAME="rhdh"
-
-export QUAY_REPO RELEASE_BRANCH_NAME
 QUAY_REPO="rhdh-community/rhdh"
-# Get the base branch name based on job.
-RELEASE_BRANCH_NAME=$(echo ${JOB_SPEC} | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo ${JOB_SPEC} | jq -r '.refs.base_ref')
+export QUAY_REPO
 
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
@@ -146,12 +150,12 @@ if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     fi
     echo "TAG_NAME: $TAG_NAME"
 elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
+    QUAY_REPO="rhdh-community/rhdh"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
-        QUAY_REPO="rhdh/rhdh-hub-rhel9"
-        # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
-        TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+        # Get branch version (e.g., 'release-1.5' becomes '1.5') and prefix with 'next-'
+        VERSION="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+        TAG_NAME="next-${VERSION}"
     else
-        QUAY_REPO="rhdh-community/rhdh"
         TAG_NAME="next"
     fi
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
@@ -159,7 +163,7 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
 else
     echo "Waiting for Docker image availability..."
     # Timeout configuration for waiting for Docker image availability
-    MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
+    MAX_WAIT_TIME_SECONDS=$((80*60))    # Maximum wait time: 1 hour 20 minutes
     POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
 
     ELAPSED_TIME=0

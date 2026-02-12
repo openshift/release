@@ -3,33 +3,15 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.17_base-rhel9:
-    name: 4.17-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/router
 images:
 - dockerfile_path: images/router/base/Dockerfile.rhel
-  inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: haproxy-router-base
 - dockerfile_path: images/router/haproxy/Dockerfile.rhel8
   from: haproxy-router-base
   to: haproxy-router
-- dockerfile_path: images/router/f5/Dockerfile
-  from: haproxy-router-base
-  to: f5-router
 promotion:
   to:
   - name: 4.17-priv
@@ -59,8 +41,9 @@ tests:
   container:
     from: src
 - as: e2e-agnostic
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-metal-ipi-ovn-ipv6
@@ -87,6 +70,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-aws-serial
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws-2
     workflow: openshift-e2e-aws-serial
@@ -146,8 +130,9 @@ tests:
     - ref: baremetalds-e2e-test
     workflow: baremetalds-e2e
 - as: e2e-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - always_run: false
   as: perfscale-aws-ingress-perf

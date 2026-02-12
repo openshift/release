@@ -48,7 +48,7 @@ RESOURCE_NAME_PREFIX="$(echo -n "$PROW_JOB_ID" | sha256sum | cut -c -15)"
 set -x
 
 echo "Creating Storage Account in its own RG"
-SA_RESOURCE_GROUP="${RESOURCE_NAME_PREFIX}-rg"
+SA_RESOURCE_GROUP="${NAMESPACE}-${UNIQUE_HASH}-sa-rg"
 az group create --name "$SA_RESOURCE_GROUP" --location "$AZURE_LOCATION"
 echo "$SA_RESOURCE_GROUP" > "${SHARED_DIR}/resourcegroup_sa"
 

@@ -15,26 +15,11 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.20_base-rhel9:
-    name: "4.20"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: cluster-network-operator
 promotion:
   to:
@@ -189,7 +174,7 @@ tests:
   as: e2e-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-azure-ovn
@@ -211,7 +196,7 @@ tests:
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-azure-ovn-upgrade
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -288,7 +273,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-hypershift-conformance
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: lint
   commands: |
@@ -303,7 +288,7 @@ tests:
   as: e2e-network-mtu-migration-ovn-ipv4
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       EXTRA_MG_ARGS: --host-network
       MTU_DECREASE: "400"
@@ -445,7 +430,7 @@ tests:
     workflow: openshift-ci-security
 - as: hypershift-e2e-aks
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aks
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"

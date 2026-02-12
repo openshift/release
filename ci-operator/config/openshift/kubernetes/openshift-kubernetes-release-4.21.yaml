@@ -43,18 +43,6 @@ base_images:
     name: "4.21"
     namespace: ocp
     tag: oc-rpms
-  ocp_4.21_base-rhel9:
-    name: "4.21"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_4.21_tools:
-    name: "4.21"
-    namespace: ocp
-    tag: tools
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
   rhel-coreos-base:
     name: "4.21"
     namespace: ocp
@@ -69,31 +57,10 @@ build_root:
 canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: hyperkube
 - dockerfile_path: openshift-hack/images/kube-proxy/Dockerfile.rhel
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: kube-proxy
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
-  inputs:
-    ocp_4.21_tools:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:tools
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: kubernetes-tests
 - dockerfile_literal: |
     # We want to test the PR using the code from it. Now, this repo ships RPMs
@@ -123,22 +90,8 @@ images:
   to: rhel-coreos
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: pod
 - dockerfile_path: openshift-hack/images/installer-kube-apiserver-artifacts/Dockerfile.rhel
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: installer-kube-apiserver-artifacts
 promotion:
   to:
@@ -320,7 +273,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-gcp
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-aws-ovn
@@ -348,7 +301,7 @@ tests:
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-agnostic-ovn-cmd
@@ -385,7 +338,7 @@ tests:
 - as: e2e-azure-ovn-upgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - as: e2e-aws-ovn-downgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
@@ -481,7 +434,7 @@ tests:
 - as: e2e-aws-ovn-hypershift
   run_if_changed: \.go$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - always_run: false
   as: e2e-aws-single-node

@@ -1,0 +1,355 @@
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.12"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-sdn
+  cron: 29 20 */12,25 * *
+  steps:
+    cluster_profile: aws-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn
+- as: e2e-aws-sdn-techpreview
+  cron: 28 5 */4,15 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn
+- as: e2e-aws-ovn
+  cron: 33 12 */1,15 * *
+  steps:
+    cluster_profile: aws-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-aws-sdn-serial
+  cron: 59 10 */8,19 * *
+  steps:
+    cluster_profile: aws-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn-serial
+- as: e2e-aws-ovn-serial
+  cron: 23 13 */1,12 * *
+  steps:
+    cluster_profile: aws-5
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-ovn-serial
+- as: e2e-aws-sdn-techpreview-serial
+  cron: 56 11 */5,19 * *
+  steps:
+    cluster_profile: aws-5
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn-serial
+- as: e2e-aws-sdn-multitenant
+  cron: 26 8 */4,18 * *
+  steps:
+    cluster_profile: aws-5
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn-multi
+- as: e2e-aws-sdn-upgrade
+  cluster: build01
+  cron: 57 17 */2,12 * *
+  steps:
+    cluster_profile: aws-5
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-sdn
+- as: e2e-aws-ovn-upgrade
+  cluster: build01
+  cron: 15 11 */1,10 * *
+  steps:
+    cluster_profile: aws-5
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-ovn
+- as: e2e-aws-cilium
+  cron: 15 10 */4,18 * *
+  steps:
+    cluster_profile: aws-4
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-cilium
+- as: e2e-aws-sdn-imdsv2
+  cron: 54 17 */3,13 * *
+  steps:
+    cluster_profile: aws-4
+    env:
+      AWS_METADATA_SERVICE_AUTH: Required
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn
+- as: e2e-azure-sdn
+  cron: 47 23 */13,26 * *
+  steps:
+    cluster_profile: azure-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-sdn
+- as: e2e-azure-sdn-techpreview
+  cron: 9 15 */3,13 * *
+  steps:
+    cluster_profile: azure-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-sdn
+- as: e2e-azure-sdn-serial
+  cron: 20 14 */6,20 * *
+  steps:
+    cluster_profile: azure-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-sdn-serial
+- as: e2e-azure-sdn-techpreview-serial
+  cron: 10 13 */3,13 * *
+  steps:
+    cluster_profile: azure-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-sdn-serial
+- as: e2e-azure-sdn-upgrade
+  cron: 19 13 */14,23 * *
+  steps:
+    cluster_profile: azure-2
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-sdn
+- as: e2e-azure-ovn-upgrade
+  cron: 30 3 */11,21 * *
+  steps:
+    cluster_profile: azure-2
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-azure-ovn
+- as: e2e-azure-cilium
+  cron: 6 4 */3,16 * *
+  steps:
+    cluster_profile: azure-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-cilium
+- as: e2e-azure-ovn
+  cron: 15 7 */2,15 * *
+  steps:
+    cluster_profile: azure-2
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-ovn
+- as: e2e-gcp-sdn
+  cron: 44 11 */4,15 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-sdn
+- as: e2e-gcp-sdn-techpreview
+  cron: 14 19 */1,12 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-sdn
+- as: e2e-gcp-ovn
+  cron: 18 3 */10,22 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-ovn-mount-ns-hiding
+  cron: 58 2 */14,24 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      FAIL_ON_CORE_DUMP: "true"
+      MOUNT_NS_HIDING_ENABLED: "true"
+      MOUNT_NS_HIDING_LOG: "2"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-mount-ns-hiding
+- as: e2e-gcp-sdn-serial
+  cron: 41 8 */11,20 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-sdn-serial
+- as: e2e-gcp-sdn-techpreview-serial
+  cron: 32 21 */10,19 * *
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-sdn-serial
+- as: e2e-gcp-sdn-upgrade
+  cron: 15 0 */10,20 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-gcp-sdn
+- as: e2e-gcp-cilium
+  cron: 46 22 */11,23 * *
+  steps:
+    cluster_profile: gcp
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-gcp-cilium
+- as: e2e-aws-sdn-upgrade-rollback
+  cron: 18 8 */14,28 * *
+  steps:
+    cluster_profile: aws-4
+    env:
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-sdn
+- as: e2e-aws-upgrade-ovn-single-node
+  cron: 59 23 */4,17 * *
+  steps:
+    cluster_profile: aws-4
+    env:
+      TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-upgrade-aws-single-node
+- as: e2e-aws-ovn-network-migration
+  cron: 23 5 */2,13 * *
+  steps:
+    cluster_profile: aws-4
+    env:
+      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
+        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
+        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: ovn-sdn-migration
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-sdn
+- as: e2e-network-migration-rollback
+  cron: 21 18 */13,26 * *
+  steps:
+    cluster_profile: aws-4
+    env:
+      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
+        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
+        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: ovn-sdn-migration
+    - ref: ovn-sdn-migration-rollback
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-sdn
+- as: e2e-aws-sdn-cgroupsv2
+  cron: 0 17 */2,15 * *
+  steps:
+    cluster_profile: aws-4
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn-cgroupsv2
+- as: e2e-aws-sdn-crun
+  cron: 20 4 */12,21 * *
+  steps:
+    cluster_profile: aws-4
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-sdn-crun
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: ci-4.12

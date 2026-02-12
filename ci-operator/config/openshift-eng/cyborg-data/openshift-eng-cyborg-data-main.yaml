@@ -12,40 +12,58 @@ build_root:
     dockerfile_literal: |
       FROM registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
 
-      # Pre-install Python 3.12 and tools
+      # Pre-install Python 3.12
       RUN dnf install -y python3.12 python3.12-pip python3.12-devel && \
-          python3.12 -m pip install --no-cache-dir pytest ruff && \
           dnf clean all
+
+      # Set default python interpreter for the container
+      ENV PYTHON=python3.12
+images:
+- dockerfile_literal: |
+    FROM src
+    # Install dependencies from pyproject.toml
+    RUN cd python && python3.12 -m pip install .[dev,gcs]
+  from: src
+  to: tests-image
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 1Gi
 tests:
-- as: lint
+- as: go-lint
   commands: cd go && HOME=/tmp golangci-lint run --timeout=20m
   container:
     from: golangci-lint
-- as: lint-python
+- as: python-lint
   commands: cd python && python3.12 -m ruff check .
   container:
-    from: src
+    from: tests-image
+- as: python-typing
+  commands: |
+    export HOME=/tmp
+    make python-typing
+  container:
+    from: tests-image
 - as: unit
   commands: |
-    # Set HOME to writable location for pip
     export HOME=/tmp
-    # Install python package in editable mode so tests can import it
-    cd python && python3.12 -m pip install -e ".[dev]"
     # Run all tests via root Makefile
-    cd .. && make test
+    make test
   container:
-    from: src
-- as: govulncheck
+    from: tests-image
+- as: validate-parity
+  commands: |
+    export HOME=/tmp
+    make validate-parity
+  container:
+    from: tests-image
+- as: go-vulncheck
   commands: cd go && GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck ./...
   container:
     from: govulncheck
   optional: true
-- as: verify
+- as: go-verify
   commands: |
     cd go
     go mod verify

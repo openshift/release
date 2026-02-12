@@ -1,11 +1,85 @@
 presubmits:
   redhat-performance/backstage-performance:
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/complex-rbac
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-rhdh-performance
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-performance-backstage-performance-main-complex-rbac
+    rerun_command: /test complex-rbac
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=complex-rbac
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(complex-rbac|remaining-required),?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -60,7 +134,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/list-catalog
     decorate: true
     decoration_config:
@@ -134,7 +208,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/list-catalog-empty
     decorate: true
     decoration_config:
@@ -208,7 +282,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/list-catalog-scalability
     decorate: true
     decoration_config:
@@ -282,7 +356,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp
     decorate: true
     decoration_config:
@@ -356,7 +430,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-catalog-size-api-scalability
     decorate: true
     decoration_config:
@@ -430,7 +504,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-catalog-size-api-scalability-20g
     decorate: true
     decoration_config:
@@ -504,7 +578,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-catalog-size-component-scalability
     decorate: true
     decoration_config:
@@ -578,7 +652,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-catalog-size-component-scalability-20g
     decorate: true
     decoration_config:
@@ -652,7 +726,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-helm
     decorate: true
     decoration_config:
@@ -726,7 +800,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-olm
     decorate: true
     decoration_config:
@@ -800,7 +874,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-profile
     decorate: true
     decoration_config:
@@ -874,7 +948,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-resources-scalability-cpu1000m
     decorate: true
     decoration_config:
@@ -948,7 +1022,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-resources-scalability-cpu2000m
     decorate: true
     decoration_config:
@@ -1022,7 +1096,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-resources-scalability-cpu250m
     decorate: true
     decoration_config:
@@ -1096,7 +1170,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-resources-scalability-cpu500m
     decorate: true
     decoration_config:
@@ -1170,7 +1244,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-rhdh-horizontal-scalability-1to5
     decorate: true
     decoration_config:
@@ -1244,7 +1318,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-rhdh-horizontal-scalability-6to10
     decorate: true
     decoration_config:
@@ -1318,7 +1392,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/mvp-scalability
     decorate: true
     decoration_config:
@@ -1392,7 +1466,81 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
+    context: ci/prow/orchestrator
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-rhdh-performance
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-performance-backstage-performance-main-orchestrator
+    rerun_command: /test orchestrator
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=orchestrator
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(orchestrator|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
     context: ci/prow/search-catalog
     decorate: true
     decoration_config:
@@ -1466,7 +1614,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build09
+    cluster: build10
     context: ci/prow/search-catalog-scalability
     decorate: true
     decoration_config:

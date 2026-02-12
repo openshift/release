@@ -239,7 +239,7 @@ else
 
     # Upload the rhcos image to the source volume
     echo "Uploading rhcos image to source volume..."
-    ${VIRSH} vol-upload \
+    ${VIRSH} -k 60 -K 5 vol-upload \
       --vol ${VOLUME_NAME} \
       --pool ${POOL_NAME} \
       ${INSTALL_DIR}/${VOLUME_NAME}
@@ -255,6 +255,20 @@ NODE_TUNING_YAML="${SHARED_DIR}/99-sysctl-worker.yaml"
 if [ -f "${NODE_TUNING_YAML}" ]; then
   echo "Saving ${NODE_TUNING_YAML} to the install directory..."
   cp ${NODE_TUNING_YAML} "${INSTALL_DIR}/manifests"
+fi
+
+# Sets up the chrony machineconfig for the worker nodes
+CHRONY_WORKER_YAML="${SHARED_DIR}/99-chrony-worker.yaml"
+if [ -f "${CHRONY_WORKER_YAML}" ]; then
+  echo "Saving ${CHRONY_WORKER_YAML} to the install directory..."
+  cp ${CHRONY_WORKER_YAML} "${INSTALL_DIR}/manifests"
+fi
+
+# Sets up the chrony machineconfig for the master nodes
+CHRONY_MASTER_YAML="${SHARED_DIR}/99-chrony-master.yaml"
+if [ -f "${CHRONY_MASTER_YAML}" ]; then
+  echo "Saving ${CHRONY_MASTER_YAML} to the install directory..."
+  cp ${CHRONY_MASTER_YAML} "${INSTALL_DIR}/manifests"
 fi
 
 # Check for the etcd on ramdisk yaml config, and save it in the installation directory

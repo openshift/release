@@ -3,20 +3,12 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
 binary_build_commands: go build cmd/cluster-cloud-controller-manager-operator/main.go
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: cluster-cloud-controller-manager-operator
 promotion:
   to:
@@ -94,7 +86,7 @@ tests:
   as: e2e-azure-ovn-upgrade
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - always_run: false
   as: e2e-azure-ovn-ccm
@@ -106,7 +98,7 @@ tests:
   as: e2e-azure-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-azure

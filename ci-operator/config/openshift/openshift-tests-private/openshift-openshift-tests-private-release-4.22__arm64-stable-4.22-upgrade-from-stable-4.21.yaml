@@ -1,0 +1,108 @@
+base_images:
+  ansible:
+    name: "4.21"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
+  tools:
+    name: "4.21"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+releases:
+  arm64-latest:
+    release:
+      architecture: arm64
+      channel: candidate
+      version: "4.21"
+  arm64-target:
+    prerelease:
+      architecture: arm64
+      product: ocp
+      version_bounds:
+        lower: 4.22.0-0
+        stream: 4-dev-preview
+        upper: 4.23.0-0
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "4.21"
+  target:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.22.0-0
+        stream: 4-dev-preview
+        upper: 4.23.0-0
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi-disc-priv-sts-ep-f28
+  cron: 34 8 11 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      ENABLE_OTA_TEST: OCP-30832
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      OCP_ARCH: arm64
+      UPGRADE_CCO_MANUAL_MODE: oidc
+    test:
+    - chain: openshift-upgrade-qe-sanity-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
+- as: azure-ipi-disc-fullyprivate-f28
+  cron: 40 23 5 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      ENABLE_OTA_TEST: OCP-27986
+      OCP_ARCH: arm64
+    test:
+    - chain: openshift-upgrade-qe-sanity-disconnected
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
+zz_generated_metadata:
+  branch: release-4.22
+  org: openshift
+  repo: openshift-tests-private
+  variant: arm64-stable-4.22-upgrade-from-stable-4.21
