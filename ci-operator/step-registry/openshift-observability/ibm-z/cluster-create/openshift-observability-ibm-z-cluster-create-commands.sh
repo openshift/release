@@ -6,7 +6,7 @@ set -o pipefail
 cd /tmp
 
 # --- SETUP AND VARIABLES ---
-SECRET_DIR="/tmp/vault/ibmz-ci-creds"
+SECRET_DIR="/tmp/vault/ibmz-ci-creds/ssh-creds-dt"
 PRIVATE_KEY_FILE="${SECRET_DIR}/IPI_SSH_KEY"
 IP_JUMPHOST=128.168.131.115
 CLUSTER_VARS_PATH="/root/ocp-cluster-ibmcloud/ibmcloud-openshift-provisioning/cluster-vars"
