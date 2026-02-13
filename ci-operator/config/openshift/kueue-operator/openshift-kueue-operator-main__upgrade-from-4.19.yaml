@@ -1,0 +1,141 @@
+base_images:
+  cli:
+    name: "4.20"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-9-base-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.19
+  ocp_builder_rhel-9-golang-1.25-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.21
+  operator-sdk:
+    name: "4.17"
+    namespace: origin
+    tag: operator-sdk
+  upi-installer:
+    name: "4.19"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.19:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.19
+    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
+  to: kueue-operator
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install -y jq skopeo git && dnf clean all
+  from: src
+  to: kueue-operator-src
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN wget -qO /usr/local/bin/jq https://github.com/jqlang/jq/releases/latest/download/jq-linux64 && chmod +x /usr/local/bin/jq
+    RUN dnf install -y skopeo git podman && dnf clean all
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-with-oc-and-kubectl
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: "4"
+      memory: 4Gi
+tests:
+- as: e2e-upgrade-4-19-to-4-20-kueue-1-1
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-1-1
+      OPERAND_COMPONENT: kueue-operand-1-1
+      OPERATOR_COMPONENT: kueue-operator-1-1
+      TEST_TYPE: upgrade
+    post:
+    - as: kueue-must-gather
+      best_effort: true
+      cli: latest
+      commands: |
+        source "${SHARED_DIR}/env"
+        make run-must
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+      timeout: 20m0s
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - ref: kueue-operator-image-env-setup
+    - ref: cert-manager-install-operator
+    - ref: kueue-operator-test-upgrade-install
+    test:
+    - ref: openshift-e2e-test
+    - chain: kueue-operator-test-upgrade
+- as: e2e-upgrade-4-19-to-4-20-kueue-1-2
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BUNDLE_COMPONENT: kueue-bundle-1-2
+      OPERAND_COMPONENT: kueue-operand-1-2
+      OPERATOR_COMPONENT: kueue-operator-1-2
+      TEST_TYPE: upgrade
+    post:
+    - as: kueue-must-gather
+      best_effort: true
+      cli: latest
+      commands: |
+        source "${SHARED_DIR}/env"
+        make run-must
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+      timeout: 20m0s
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - ref: kueue-operator-image-env-setup
+    - ref: cert-manager-install-operator
+    - ref: kueue-operator-test-upgrade-install
+    test:
+    - ref: openshift-e2e-test
+    - chain: kueue-operator-test-upgrade
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: kueue-operator
+  variant: upgrade-from-4.19
