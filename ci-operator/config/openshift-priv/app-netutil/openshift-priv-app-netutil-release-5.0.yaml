@@ -1,0 +1,43 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: "7"
+binary_build_commands: make
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.25-openshift-4.23
+canonical_go_repository: github.com/openshift/app-netutil
+promotion:
+  to:
+  - name: 5.0-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 5.0-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 5.0-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make testpod
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift-priv
+  repo: app-netutil
