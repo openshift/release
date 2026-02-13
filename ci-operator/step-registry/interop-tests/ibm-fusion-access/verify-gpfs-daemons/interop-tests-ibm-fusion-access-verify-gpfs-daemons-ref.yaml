@@ -1,0 +1,36 @@
+ref:
+  as: interop-tests-ibm-fusion-access-verify-gpfs-daemons
+  from: cli
+  commands: interop-tests-ibm-fusion-access-verify-gpfs-daemons-commands.sh
+  timeout: 15m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: FA__SCALE__NAMESPACE
+    documentation: The namespace for IBM Storage Scale resources
+    default: "ibm-spectrum-scale"
+  - name: FA__GPFS_TIMEOUT
+    documentation: Timeout in seconds waiting for GPFS daemons to become active
+    default: "600"
+  documentation: |-
+    Verify GPFS daemon state after pod restart.
+    
+    After restarting GPFS daemon pods, this step waits for all nodes to report
+    an 'active' state via mmgetstate -a. This is critical because:
+    
+    1. LocalDisk resources cannot transition to Ready until GPFS daemons are active
+    2. Filesystem creation will fail if NSDs aren't available
+    3. Storage provisioning depends on an established filesystem
+    
+    The step polls mmgetstate every 15 seconds until:
+    - All nodes show 'active' state, OR
+    - Timeout is reached (default 10 minutes)
+    
+    On failure, logs are collected from the daemon pods for debugging.
+    
+    Prerequisites:
+    - restart-daemon-pods step completed
+    - KMM kernel modules loaded on all worker nodes
+    - lxtrace files present at /usr/lpp/mmfs/bin/

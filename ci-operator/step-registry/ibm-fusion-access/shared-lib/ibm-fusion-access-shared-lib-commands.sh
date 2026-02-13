@@ -1,27 +1,7 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-# ============================================================================
-# IBM Fusion Access Shared Library Generator
-# ============================================================================
-# This script generates a shared library of bash functions for JUnit XML
-# test result reporting, used across all IBM Fusion Access test steps.
-#
-# Purpose:
-#   - Centralize JUnit XML reporting functions
-#   - Ensure consistent test reporting across all IBM Fusion Access tests
-#   - Reduce code duplication and improve maintainability
-#   - Follow OCP CI best practices for test result reporting
-#
-# Output:
-#   - ${SHARED_DIR}/common-fusion-access-bash-functions.sh
-#
-# References:
-#   - OCP CI JUnit XML Test Results Patterns
-#   - JUnit XML Schema: https://www.ibm.com/docs/en/developer-for-zos/9.1.1?topic=formats-junit-xml-format
-# ============================================================================
-
-echo "************ IBM Fusion Access Generating Shared Functions ************"
+: 'Generating IBM Fusion Access shared functions'
 
 FUNCTIONS_PATH="${SHARED_DIR}/common-fusion-access-bash-functions.sh"
 
@@ -169,7 +149,6 @@ add_test_result() {
 generate_junit_xml() {
   local total_duration=$(($(date +%s) - TEST_START_TIME))
   
-  # Ensure parent directory exists for JUnit results file
   mkdir -p "$(dirname "${JUNIT_RESULTS_FILE}")"
   
   cat > "${JUNIT_RESULTS_FILE}" <<EOF
@@ -181,24 +160,15 @@ ${TEST_CASES}
 </testsuites>
 EOF
   
-  echo ""
-  echo "📊 Test Results Summary:"
-  echo "  Total Tests: ${TESTS_TOTAL}"
-  echo "  Passed: ${TESTS_PASSED}"
-  echo "  Failed: ${TESTS_FAILED}"
-  echo "  Duration: ${total_duration}s"
-  echo "  Results File: ${JUNIT_RESULTS_FILE}"
+  : "Test Results: Total=${TESTS_TOTAL} Passed=${TESTS_PASSED} Failed=${TESTS_FAILED} Duration=${total_duration}s Results=${JUNIT_RESULTS_FILE}"
   
-  # Copy to SHARED_DIR for data router reporter (if available)
   if [[ -n "${SHARED_DIR:-}" ]] && [[ -d "${SHARED_DIR}" ]]; then
     cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}/$(basename ${JUNIT_RESULTS_FILE})"
-    echo "  ✅ Results copied to SHARED_DIR"
+    : 'Results copied to SHARED_DIR'
   fi
   
-  # Exit with failure if any tests failed (optional behavior)
   if [[ ${TESTS_FAILED} -gt 0 ]] && [[ "${JUNIT_EXIT_ON_FAILURE:-true}" == "true" ]]; then
-    echo ""
-    echo "❌ Test suite failed: ${TESTS_FAILED} test(s) failed"
+    : "Test suite failed: ${TESTS_FAILED} test(s) failed"
     exit 1
   fi
 }
@@ -209,9 +179,5 @@ EO-SHARED-FUNCTION
 
 cat "${FUNCTIONS_PATH}"
 
-echo ""
-echo "✅ Generated shared functions at '${SHARED_DIR}/$(basename ${FUNCTIONS_PATH})'"
-echo ""
+: "Generated shared functions at '${SHARED_DIR}/$(basename ${FUNCTIONS_PATH})'"
 ls -l "${FUNCTIONS_PATH}"
-echo ""
-

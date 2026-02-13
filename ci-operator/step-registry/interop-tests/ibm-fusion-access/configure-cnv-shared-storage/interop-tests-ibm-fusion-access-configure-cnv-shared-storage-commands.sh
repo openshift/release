@@ -1,297 +1,306 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-echo "🔧 Configuring CNV for IBM Storage Scale shared storage..."
+: 'Configuring CNV for IBM Storage Scale shared storage'
 
 # Set default values
-CNV_NAMESPACE="${CNV_NAMESPACE:-openshift-cnv}"
-SHARED_STORAGE_CLASS="${SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
-STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
-STORAGE_SCALE_CLUSTER_NAME="${STORAGE_SCALE_CLUSTER_NAME:-ibm-spectrum-scale}"
+FA__CNV__NAMESPACE="${FA__CNV__NAMESPACE:-openshift-cnv}"
+FA__CNV__SHARED_STORAGE_CLASS="${FA__CNV__SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
+FA__SCALE__NAMESPACE="${FA__SCALE__NAMESPACE:-ibm-spectrum-scale}"
+FA__SCALE__CLUSTER_NAME="${FA__SCALE__CLUSTER_NAME:-ibm-spectrum-scale}"
 
 # JUnit XML test results
-JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_configure_cnv_shared_storage_tests.xml"
-TEST_START_TIME=$SECONDS
-TESTS_TOTAL=0
-TESTS_FAILED=0
-TESTS_PASSED=0
-TEST_CASES=""
+junitResultsFile="${ARTIFACT_DIR}/junit_configure_cnv_shared_storage_tests.xml"
+testStartTime=$SECONDS
+testsTotal=0
+testsFailed=0
+testsPassed=0
+testCases=""
 
 # Function to escape XML special characters
-escape_xml() {
+EscapeXml() {
   local text="$1"
   # Escape XML special characters: & must be first to avoid double-escaping
   echo "$text" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'\''/\&apos;/g'
 }
 
 # Function to add test result to JUnit XML
-add_test_result() {
-  local test_name="$1"
-  local test_status="$2"  # "passed" or "failed"
-  local test_duration="$3"
-  local test_message="${4:-}"
-  local test_classname="${5:-CNVSharedStorageConfigurationTests}"
+AddTestResult() {
+  local testName="$1"
+  local testStatus="$2"  # "passed" or "failed"
+  local testDuration="$3"
+  local testMessage="${4:-}"
+  local testClassName="${5:-CNVSharedStorageConfigurationTests}"
   
   # Escape XML special characters in user-provided strings
-  test_name=$(escape_xml "$test_name")
-  test_message=$(escape_xml "$test_message")
-  test_classname=$(escape_xml "$test_classname")
+  testName=$(EscapeXml "$testName")
+  testMessage=$(EscapeXml "$testMessage")
+  testClassName=$(EscapeXml "$testClassName")
   
-  TESTS_TOTAL=$((TESTS_TOTAL + 1))
+  testsTotal=$((testsTotal + 1))
   
-  if [[ "$test_status" == "passed" ]]; then
-    TESTS_PASSED=$((TESTS_PASSED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\"/>"
+  if [[ "$testStatus" == "passed" ]]; then
+    testsPassed=$((testsPassed + 1))
+    testCases="${testCases}
+    <testcase name=\"${testName}\" classname=\"${testClassName}\" time=\"${testDuration}\"/>"
   else
-    TESTS_FAILED=$((TESTS_FAILED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\">
-      <failure message=\"Test failed\">${test_message}</failure>
+    testsFailed=$((testsFailed + 1))
+    testCases="${testCases}
+    <testcase name=\"${testName}\" classname=\"${testClassName}\" time=\"${testDuration}\">
+      <failure message=\"Test failed\">${testMessage}</failure>
     </testcase>"
   fi
 }
 
 # Function to generate JUnit XML report
-generate_junit_xml() {
-  local total_duration=$((SECONDS - TEST_START_TIME))
+GenerateJunitXml() {
+  local totalDuration=$((SECONDS - testStartTime))
   
-  cat > "${JUNIT_RESULTS_FILE}" <<EOF
+  cat > "${junitResultsFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="CNV Shared Storage Configuration Tests" tests="${TESTS_TOTAL}" failures="${TESTS_FAILED}" errors="0" time="${total_duration}">
-${TEST_CASES}
+  <testsuite name="CNV Shared Storage Configuration Tests" tests="${testsTotal}" failures="${testsFailed}" errors="0" time="${totalDuration}">
+${testCases}
   </testsuite>
 </testsuites>
 EOF
   
-  echo ""
-  echo "📊 Test Results Summary:"
-  echo "  Total Tests: ${TESTS_TOTAL}"
-  echo "  Passed: ${TESTS_PASSED}"
-  echo "  Failed: ${TESTS_FAILED}"
-  echo "  Duration: ${total_duration}s"
-  echo "  Results File: ${JUNIT_RESULTS_FILE}"
+  : "Test Results Summary: Total=${testsTotal} Passed=${testsPassed} Failed=${testsFailed} Duration=${totalDuration}s Results=${junitResultsFile}"
   
   # Copy to SHARED_DIR for data router reporter (if available)
   if [[ -n "${SHARED_DIR:-}" ]] && [[ -d "${SHARED_DIR}" ]]; then
-    cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}/junit_configure_cnv_shared_storage_tests.xml"
-    echo "  ✅ Results copied to SHARED_DIR"
+    cp "${junitResultsFile}" "${SHARED_DIR}/junit_configure_cnv_shared_storage_tests.xml"
+    : 'Results copied to SHARED_DIR'
   fi
 }
 
-start_test() {
-  local test_description="$1"
-  : "🧪 ${test_description}..."
+StartTest() {
+  local testDescription="$1"
+  : "🧪 ${testDescription}..."
   echo "$SECONDS"
 }
 
 # Helper function to record test result (eliminates repetitive duration calculation)
-record_test() {
-  local test_start="$1"
-  local test_name="$2"
-  local test_status="$3"
-  local test_message="${4:-}"
+RecordTest() {
+  local testStart="$1"
+  local testName="$2"
+  local testStatus="$3"
+  local testMessage="${4:-}"
   
-  local test_duration=$((SECONDS - test_start))
-  add_test_result "$test_name" "$test_status" "$test_duration" "$test_message"
+  local testDuration=$((SECONDS - testStart))
+  AddTestResult "$testName" "$testStatus" "$testDuration" "$testMessage"
 }
 
 # Trap to ensure JUnit XML is generated even on failure
-trap generate_junit_xml EXIT
+trap GenerateJunitXml EXIT
 
-echo "📋 Configuration:"
-echo "  CNV Namespace: ${CNV_NAMESPACE}"
-echo "  Shared Storage Class: ${SHARED_STORAGE_CLASS}"
-echo "  Storage Scale Namespace: ${STORAGE_SCALE_NAMESPACE}"
-echo "  Storage Scale Cluster: ${STORAGE_SCALE_CLUSTER_NAME}"
-echo ""
+: "Configuration: CNV_NS=${FA__CNV__NAMESPACE} SC=${FA__CNV__SHARED_STORAGE_CLASS} SCALE_NS=${FA__SCALE__NAMESPACE} SCALE_CLUSTER=${FA__SCALE__CLUSTER_NAME}"
 
 # Check if CNV is ready
-test_start=$(start_test "Checking CNV status")
-test_status="failed"
-test_message=""
+testStart=$(StartTest "Checking CNV status")
+testStatus="failed"
+testMessage=""
 
-if oc get hyperconverged kubevirt-hyperconverged -n "${CNV_NAMESPACE}" >/dev/null; then
-  CNV_STATUS=$(oc get hyperconverged kubevirt-hyperconverged -n "${CNV_NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || echo "Unknown")
-  echo "  ✅ CNV HyperConverged found (Status: ${CNV_STATUS})"
-  test_status="passed"
+if oc get hyperconverged kubevirt-hyperconverged -n "${FA__CNV__NAMESPACE}" >/dev/null; then
+  cnvStatus=$(oc get hyperconverged kubevirt-hyperconverged -n "${FA__CNV__NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Available")].status}')
+  : "CNV HyperConverged found (Status: ${cnvStatus})"
+  testStatus="passed"
 else
-  echo "  ❌ CNV HyperConverged not found"
-  echo "  Please ensure CNV is installed before running this step"
-  test_message="CNV HyperConverged not found"
+  : 'CNV HyperConverged not found - ensure CNV is installed before running this step'
+  testMessage="CNV HyperConverged not found"
 fi
 
-record_test "$test_start" "test_cnv_availability" "$test_status" "$test_message"
+RecordTest "$testStart" "test_cnv_availability" "$testStatus" "$testMessage"
 
 # Check if IBM Storage Scale is ready
-echo ""
-test_start=$(start_test "Checking IBM Storage Scale status")
-test_status="failed"
-test_message=""
+testStart=$(StartTest "Checking IBM Storage Scale status")
+testStatus="failed"
+testMessage=""
 
-if oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null; then
-  SCALE_STATUS=$(oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Success")].status}' 2>/dev/null || echo "Unknown")
-  echo "  ✅ IBM Storage Scale Cluster found (Status: ${SCALE_STATUS})"
-  test_status="passed"
+if oc get cluster "${FA__SCALE__CLUSTER_NAME}" -n "${FA__SCALE__NAMESPACE}" >/dev/null; then
+  scaleStatus=$(oc get cluster "${FA__SCALE__CLUSTER_NAME}" -n "${FA__SCALE__NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Success")].status}')
+  : "IBM Storage Scale Cluster found (Status: ${scaleStatus})"
+  testStatus="passed"
 else
-  echo "  ❌ IBM Storage Scale Cluster not found"
-  echo "  Please ensure IBM Storage Scale is deployed before running this step"
-  test_message="IBM Storage Scale Cluster not found"
+  : 'IBM Storage Scale Cluster not found - ensure it is deployed before running this step'
+  testMessage="IBM Storage Scale Cluster not found"
 fi
 
-record_test "$test_start" "test_storage_scale_cluster_availability" "$test_status" "$test_message"
+RecordTest "$testStart" "test_storage_scale_cluster_availability" "$testStatus" "$testMessage"
 
 # Check if shared filesystem exists
-echo ""
-test_start=$(start_test "Checking IBM Storage Scale filesystem")
-test_status="failed"
-test_message=""
+testStart=$(StartTest "Checking IBM Storage Scale filesystem")
+testStatus="failed"
+testMessage=""
 
-if oc get filesystem shared-filesystem -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null; then
-  FS_STATUS=$(oc get filesystem shared-filesystem -n "${STORAGE_SCALE_NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Success")].status}' 2>/dev/null || echo "Unknown")
-  echo "  ✅ Shared filesystem found (Status: ${FS_STATUS})"
-  test_status="passed"
+if oc get filesystem shared-filesystem -n "${FA__SCALE__NAMESPACE}" >/dev/null; then
+  fsStatus=$(oc get filesystem shared-filesystem -n "${FA__SCALE__NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Success")].status}')
+  : "Shared filesystem found (Status: ${fsStatus})"
+  testStatus="passed"
 else
-  echo "  ❌ Shared filesystem not found"
-  echo "  Please ensure IBM Storage Scale filesystem is created before running this step"
-  test_message="IBM Storage Scale filesystem not found"
+  : 'Shared filesystem not found - ensure it is created before running this step'
+  testMessage="IBM Storage Scale filesystem not found"
 fi
 
-record_test "$test_start" "test_storage_scale_filesystem_availability" "$test_status" "$test_message"
+RecordTest "$testStart" "test_storage_scale_filesystem_availability" "$testStatus" "$testMessage"
 
 # Create shared storage class for CNV
-echo ""
-test_start=$(start_test "Creating shared storage class for CNV")
-test_status="failed"
-test_message=""
+testStart=$(StartTest "Creating shared storage class for CNV")
+testStatus="failed"
+testMessage=""
 
-if oc get storageclass "${SHARED_STORAGE_CLASS}" >/dev/null; then
-  echo "  ✅ Storage class ${SHARED_STORAGE_CLASS} already exists"
-  test_status="passed"
+if oc get storageclass "${FA__CNV__SHARED_STORAGE_CLASS}" >/dev/null; then
+  : "Storage class ${FA__CNV__SHARED_STORAGE_CLASS} already exists"
+  testStatus="passed"
 else
-  echo "  📝 Creating storage class ${SHARED_STORAGE_CLASS}..."
+  csiClusterId=$(oc get csiscaleoperator ibm-spectrum-scale-csi -n ibm-spectrum-scale-csi \
+    -o jsonpath='{.spec.clusters[0].id}')
+
+  if [[ -z "${csiClusterId}" ]]; then
+    : 'WARNING: Could not read CSI cluster ID from CSIScaleOperator, falling back to cluster name'
+    csiClusterId="${FA__SCALE__CLUSTER_NAME}"
+  fi
+
   if oc apply -f - <<EOF
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: ${SHARED_STORAGE_CLASS}
+  name: ${FA__CNV__SHARED_STORAGE_CLASS}
   annotations:
     storageclass.kubernetes.io/is-default-class: "false"
 provisioner: spectrumscale.csi.ibm.com
 parameters:
   volBackendFs: "shared-filesystem"
-  clusterId: "${STORAGE_SCALE_CLUSTER_NAME}"
+  clusterId: "${csiClusterId}"
   permissions: "755"
   uid: "0"
   gid: "0"
-  fsType: "gpfs"
-volumeBindingMode: WaitForFirstConsumer
+volumeBindingMode: Immediate
 allowVolumeExpansion: true
 reclaimPolicy: Delete
 EOF
   then
-    echo "  ✅ Storage class created successfully"
-    test_status="passed"
+    : "Storage class created with clusterId=${csiClusterId}"
+    testStatus="passed"
   else
-    echo "  ❌ Failed to create storage class"
-    test_message="Failed to create storage class"
+    : 'Failed to create storage class'
+    testMessage="Failed to create storage class"
   fi
 fi
 
-record_test "$test_start" "test_storage_class_creation" "$test_status" "$test_message"
+if [[ "${testStatus}" == "passed" ]]; then
+  oc annotate storageclass "${FA__CNV__SHARED_STORAGE_CLASS}" \
+    storageclass.kubevirt.io/is-default-virt-class="true" --overwrite
+fi
+
+RecordTest "$testStart" "test_storage_class_creation" "$testStatus" "$testMessage"
 
 # Configure CNV to use shared storage
-echo ""
-test_start=$(start_test "Configuring CNV to use shared storage")
-test_status="failed"
-test_message=""
+testStart=$(StartTest "Configuring CNV to use shared storage")
+testStatus="failed"
+testMessage=""
 
-CURRENT_STORAGE_CLASS=$(oc get hco kubevirt-hyperconverged -n "${CNV_NAMESPACE}" -o jsonpath='{.spec.storage.defaultStorageClass}' 2>/dev/null || echo "")
-if [[ "${CURRENT_STORAGE_CLASS}" == "${SHARED_STORAGE_CLASS}" ]]; then
-  echo "  ✅ CNV already configured for shared storage"
-  test_status="passed"
+currentStorageClass=$(oc get hco kubevirt-hyperconverged -n "${FA__CNV__NAMESPACE}" -o jsonpath='{.spec.storage.defaultStorageClass}')
+if [[ "${currentStorageClass}" == "${FA__CNV__SHARED_STORAGE_CLASS}" ]]; then
+  : 'CNV already configured for shared storage'
+  testStatus="passed"
 else
-  echo "  📝 Setting CNV default storage class to ${SHARED_STORAGE_CLASS}..."
-  if oc patch hco kubevirt-hyperconverged -n "${CNV_NAMESPACE}" --type=merge -p '{
+  : "Setting CNV default storage class to ${FA__CNV__SHARED_STORAGE_CLASS}"
+  if oc patch hco kubevirt-hyperconverged -n "${FA__CNV__NAMESPACE}" --type=merge -p '{
     "spec": {
       "storage": {
-        "defaultStorageClass": "'${SHARED_STORAGE_CLASS}'"
+        "defaultStorageClass": "'${FA__CNV__SHARED_STORAGE_CLASS}'"
       }
     }
-  }' 2>/dev/null; then
-    echo "  ✅ CNV configured for shared storage"
-    test_status="passed"
+  }'; then
+    : 'CNV configured for shared storage'
+    testStatus="passed"
   else
-    echo "  ❌ Failed to configure CNV for shared storage"
-    test_message="Failed to patch HyperConverged resource"
+    : 'Failed to configure CNV for shared storage'
+    testMessage="Failed to patch HyperConverged resource"
   fi
 fi
 
-record_test "$test_start" "test_cnv_storage_configuration" "$test_status" "$test_message"
+RecordTest "$testStart" "test_cnv_storage_configuration" "$testStatus" "$testMessage"
+
+# Wait for CSI driver to be operational before PVC test
+testStart=$(StartTest "Waiting for CSI driver readiness")
+testStatus="failed"
+testMessage=""
+
+if oc wait --for=condition=Ready pod \
+    -l app.kubernetes.io/name=ibm-spectrum-scale-csi-operator \
+    -n ibm-spectrum-scale-csi --timeout=300s && \
+   oc wait --for=condition=Ready pod \
+    -l app=ibm-spectrum-scale-csi \
+    -n ibm-spectrum-scale-csi --timeout=300s; then
+  : 'CSI operator and node pods are ready'
+  testStatus="passed"
+else
+  testMessage="CSI driver not ready within 300s"
+  oc get pods -n ibm-spectrum-scale-csi --ignore-not-found
+fi
+
+RecordTest "$testStart" "test_csi_driver_readiness" "$testStatus" "$testMessage"
 
 # Test shared storage with a PVC
-echo ""
-test_start=$(start_test "Testing shared storage with PVC")
-test_status="failed"
-test_message=""
+testStart=$(StartTest "Testing shared storage with PVC")
+testStatus="failed"
+testMessage=""
 
 if oc apply -f - <<EOF
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: test-shared-storage-pvc
-  namespace: ${CNV_NAMESPACE}
+  namespace: ${FA__CNV__NAMESPACE}
 spec:
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   resources:
     requests:
       storage: 1Gi
-  storageClassName: ${SHARED_STORAGE_CLASS}
+  storageClassName: ${FA__CNV__SHARED_STORAGE_CLASS}
 EOF
 then
-  echo "  ✅ Test PVC created successfully"
+  : 'Test PVC created successfully'
   
   # Wait for PVC to be bound
-  echo "  ⏳ Waiting for PVC to be bound..."
-  if oc wait pvc test-shared-storage-pvc -n "${CNV_NAMESPACE}" --for=condition=Bound --timeout=5m; then
-    echo "  ✅ PVC bound successfully to shared storage"
+  : 'Waiting for PVC to be bound'
+  if oc wait pvc test-shared-storage-pvc -n "${FA__CNV__NAMESPACE}" --for=jsonpath='{.status.phase}'=Bound --timeout=15m; then
+    : 'PVC bound successfully to shared storage'
     
     # Check PVC status
-    PVC_STATUS=$(oc get pvc test-shared-storage-pvc -n "${CNV_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-    echo "  📊 PVC Status: ${PVC_STATUS}"
+    pvcStatus=$(oc get pvc test-shared-storage-pvc -n "${FA__CNV__NAMESPACE}" -o jsonpath='{.status.phase}')
+    : "PVC Status: ${pvcStatus}"
     
-    test_status="passed"
+    testStatus="passed"
     
     # Clean up test PVC
-    echo "  🧹 Cleaning up test PVC..."
-    oc delete pvc test-shared-storage-pvc -n "${CNV_NAMESPACE}" --ignore-not-found
-    echo "  ✅ Test PVC cleaned up"
+    : 'Cleaning up test PVC'
+    oc delete pvc test-shared-storage-pvc -n "${FA__CNV__NAMESPACE}" --ignore-not-found
+    : 'Test PVC cleaned up'
   else
-    echo "  ⚠️  PVC not bound within timeout, checking status..."
-    oc get pvc test-shared-storage-pvc -n "${CNV_NAMESPACE}" -o yaml
-    test_message="PVC not bound within 5m timeout"
-    echo "  🧹 Cleaning up test PVC..."
-    oc delete pvc test-shared-storage-pvc -n "${CNV_NAMESPACE}" --ignore-not-found
+    : 'PVC not bound within timeout, checking status'
+    oc get pvc test-shared-storage-pvc -n "${FA__CNV__NAMESPACE}" -o yaml
+    testMessage="PVC not bound within 15m timeout"
+    : 'Cleaning up test PVC'
+    oc delete pvc test-shared-storage-pvc -n "${FA__CNV__NAMESPACE}" --ignore-not-found
   fi
 else
-  echo "  ❌ Failed to create test PVC"
-  test_message="Failed to create test PVC"
+  : 'Failed to create test PVC'
+  testMessage="Failed to create test PVC"
 fi
 
-record_test "$test_start" "test_pvc_binding_with_shared_storage" "$test_status" "$test_message"
+RecordTest "$testStart" "test_pvc_binding_with_shared_storage" "$testStatus" "$testMessage"
 
 # Verify configuration
-echo ""
-echo "🔍 Verifying CNV configuration..."
-echo "  📊 CNV HyperConverged status:"
-oc get hco kubevirt-hyperconverged -n "${CNV_NAMESPACE}" -o custom-columns="NAME:.metadata.name,AVAILABLE:.status.conditions[?(@.type=='Available')].status,STORAGE:.spec.storage.defaultStorageClass"
+: 'Verifying CNV configuration'
+: 'CNV HyperConverged status'
+oc get hco kubevirt-hyperconverged -n "${FA__CNV__NAMESPACE}" -o custom-columns="NAME:.metadata.name,AVAILABLE:.status.conditions[?(@.type=='Available')].status,STORAGE:.spec.storage.defaultStorageClass"
 
-echo "  📊 Storage class configuration:"
-oc get storageclass "${SHARED_STORAGE_CLASS}" -o custom-columns="NAME:.metadata.name,PROVISIONER:.provisioner,VOLUMEBINDINGMODE:.volumeBindingMode"
+: 'Storage class configuration'
+oc get storageclass "${FA__CNV__SHARED_STORAGE_CLASS}" -o custom-columns="NAME:.metadata.name,PROVISIONER:.provisioner,VOLUMEBINDINGMODE:.volumeBindingMode"
 
-echo ""
-echo "✅ CNV shared storage configuration completed successfully!"
-echo "   CNV is now configured to use IBM Storage Scale shared storage"
-echo "   VMs and DataVolumes will use the shared storage infrastructure"
+: 'CNV shared storage configuration completed successfully'
+

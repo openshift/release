@@ -1,27 +1,27 @@
 #!/bin/bash
+set -eux -o pipefail; shopt -s inherit_errexit
 
-set -o nounset
-set -o errexit
-set -o pipefail
-
-echo "🔍 Starting IBM Spectrum Scale must-gather collection..."
+: '🔍 Starting IBM Spectrum Scale must-gather collection...'
 
 # Set default values from environment variables
-MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-pipeline:ibm-must-gather}"
+FA__MUST_GATHER_IMAGE="${FA__MUST_GATHER_IMAGE:-pipeline:ibm-must-gather}"
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 
-echo "Must-gather image: ${MUST_GATHER_IMAGE}"
-echo "Artifact directory: ${ARTIFACT_DIR}"
+: "Must-gather image: ${FA__MUST_GATHER_IMAGE}"
+: "Artifact directory: ${ARTIFACT_DIR}"
 
 # Check if we're using a pipeline image (pre-pulled) or external image
-if [[ "$MUST_GATHER_IMAGE" == pipeline:* ]]; then
-  echo "Using pre-pulled pipeline image: ${MUST_GATHER_IMAGE}"
-  AUTHFILE=""
+if [[ "$FA__MUST_GATHER_IMAGE" == pipeline:* ]]; then
+  : "Using pre-pulled pipeline image: ${FA__MUST_GATHER_IMAGE}"
+  authFile=""
 else
-  echo "Using external image: ${MUST_GATHER_IMAGE}"
+  : "Using external image: ${FA__MUST_GATHER_IMAGE}"
   # Create authfile for IBM registry
-  AUTHFILE="/tmp/authfile"
-  echo "Creating authfile for IBM registry..."
+  authFile="/tmp/authfile"
+  : 'Creating authfile for IBM registry...'
+
+  # Disable tracing due to credential handling
+  set +x
 
   # Get IBM entitlement key from standard location
   IBM_ENTITLEMENT_KEY=""
@@ -29,15 +29,11 @@ else
 
   # Check the standard credential location
   if [[ -f "$IBM_ENTITLEMENT_KEY_PATH" ]]; then
-    echo "✅ IBM entitlement key found at: $IBM_ENTITLEMENT_KEY_PATH"
     IBM_ENTITLEMENT_KEY="$(cat "$IBM_ENTITLEMENT_KEY_PATH")"
-  else
-    echo "❌ IBM entitlement key not found at: $IBM_ENTITLEMENT_KEY_PATH"
   fi
 
   if [[ -n "$IBM_ENTITLEMENT_KEY" ]]; then
-    echo "Creating authfile for IBM registry..."
-    cat > "$AUTHFILE" <<EOF
+    cat > "$authFile" <<EOF
 {
   "auths": {
     "icr.io": {
@@ -46,28 +42,19 @@ else
   }
 }
 EOF
-    echo "Authfile created successfully"
   else
-    echo "WARNING: IBM entitlement key not found, proceeding without authentication"
-    AUTHFILE=""
+    authFile=""
   fi
+
+  # Re-enable tracing
+  set -x
 fi
 
-# Create artifact directory
-mkdir -p "${ARTIFACT_DIR}/ibm-must-gather"
+mkdir -p /tmp/ibm-must-gather
 
-# Run must-gather with IBM image or fallback to standard must-gather
-echo "Running must-gather..."
+oc adm must-gather --image="${FA__MUST_GATHER_IMAGE}" --dest-dir="/tmp/ibm-must-gather"
 
-echo "Using pre-pulled IBM Spectrum Scale must-gather image..."
-oc adm must-gather --image="${MUST_GATHER_IMAGE}" --dest-dir="${ARTIFACT_DIR}/ibm-must-gather"
+tar -czf "${ARTIFACT_DIR}/ibm-must-gather.tar.gz" -C /tmp ibm-must-gather
 
-# Archive results
-echo "Archiving must-gather results..."
-tar -czf "${ARTIFACT_DIR}/ibm-must-gather.tar.gz" -C "${ARTIFACT_DIR}" ibm-must-gather
+: 'IBM Spectrum Scale must-gather completed successfully'
 
-# List artifacts
-echo "Must-gather artifacts:"
-ls -la "${ARTIFACT_DIR}/"
-
-echo "IBM Spectrum Scale must-gather completed successfully"

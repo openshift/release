@@ -1,27 +1,39 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+set -eux -o pipefail; shopt -s inherit_errexit
 
-STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
+FA__SCALE__NAMESPACE="${FA__SCALE__NAMESPACE:-ibm-spectrum-scale}"
+FA__FILESYSTEM_TIMEOUT="${FA__FILESYSTEM_TIMEOUT:-3600}"
+FA__LOCALDISK_NAME="${FA__LOCALDISK_NAME:-shared-san-disk}"
 
-echo "🗂️  Creating IBM Storage Scale Filesystem..."
+: 'Creating IBM Storage Scale Filesystem on shared SAN storage (shared SAN architecture)'
 
-# Create Filesystem resource referencing LocalDisk resources
+if ! oc get localdisk "${FA__LOCALDISK_NAME}" -n ${FA__SCALE__NAMESPACE} >/dev/null; then
+  : "ERROR: LocalDisk ${FA__LOCALDISK_NAME} not found"
+  : 'Available LocalDisks:'
+  oc get localdisk -n ${FA__SCALE__NAMESPACE} --ignore-not-found
+  exit 1
+fi
+
+localdiskStatus=$(oc get localdisk "${FA__LOCALDISK_NAME}" -n ${FA__SCALE__NAMESPACE} \
+  -o jsonpath='{.status.status}')
+
+: "LocalDisk ${FA__LOCALDISK_NAME} status: ${localdiskStatus}"
+
+: 'Creating Filesystem resource...'
+
 oc apply -f=- <<EOF
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: Filesystem
 metadata:
   name: shared-filesystem
-  namespace: ${STORAGE_SCALE_NAMESPACE}
+  namespace: ${FA__SCALE__NAMESPACE}
 spec:
   local:
     blockSize: 4M
     pools:
     - name: system
       disks:
-      - shared-ebs-disk-1
-      - shared-ebs-disk-2
+      - ${FA__LOCALDISK_NAME}
     replication: 1-way
     type: shared
   seLinuxOptions:
@@ -31,9 +43,37 @@ spec:
     user: system_u
 EOF
 
-echo "✅ Filesystem resource created"
-oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE}
+: 'Filesystem resource created'
+: "Waiting for Filesystem to become Established (up to $((FA__FILESYSTEM_TIMEOUT/60)) minutes)..."
 
-echo ""
-echo "Note: Filesystem initialization may take up to 1 hour"
-echo "Check filesystem status with: oc get filesystem shared-filesystem -n ${STORAGE_SCALE_NAMESPACE}"
+if oc wait --for=condition=Success \
+    filesystem/shared-filesystem -n "${FA__SCALE__NAMESPACE}" --timeout="${FA__FILESYSTEM_TIMEOUT}s"; then
+  : 'Filesystem is Established'
+else
+  : 'ERROR: Timeout waiting for Filesystem to become Established'
+  oc get filesystem shared-filesystem -n "${FA__SCALE__NAMESPACE}" -o yaml --ignore-not-found
+  exit 1
+fi
+
+: 'Waiting for Filesystem to become Healthy...'
+
+if oc wait --for=condition=Healthy \
+    filesystem/shared-filesystem -n "${FA__SCALE__NAMESPACE}" --timeout=600s; then
+  : 'Filesystem is Healthy'
+else
+  : 'WARNING: Filesystem Established but not Healthy within 600s'
+  : 'Continuing -- CSI driver may still work with an Established filesystem'
+fi
+
+: 'Waiting for CSI driver to be ready...'
+
+if oc wait --for=condition=Ready pod -l app=ibm-spectrum-scale-csi \
+    -n ibm-spectrum-scale-csi --timeout=300s; then
+  : 'CSI driver pods are running'
+else
+  : 'WARNING: CSI driver pods not detected within 300s'
+  oc get pods -n ibm-spectrum-scale-csi --ignore-not-found
+fi
+
+oc get filesystem shared-filesystem -n ${FA__SCALE__NAMESPACE}
+

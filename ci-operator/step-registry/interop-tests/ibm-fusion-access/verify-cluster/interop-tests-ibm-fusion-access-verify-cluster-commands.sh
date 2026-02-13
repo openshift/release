@@ -1,144 +1,139 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+set -eux -o pipefail; shopt -s inherit_errexit
 
-STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
-STORAGE_SCALE_CLUSTER_NAME="${STORAGE_SCALE_CLUSTER_NAME:-ibm-spectrum-scale}"
+FA__SCALE__NAMESPACE="${FA__SCALE__NAMESPACE:-ibm-spectrum-scale}"
+FA__SCALE__CLUSTER_NAME="${FA__SCALE__CLUSTER_NAME:-ibm-spectrum-scale}"
 
 # JUnit XML test results configuration
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
-JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_verify_cluster_tests.xml"
-TEST_START_TIME=$(date +%s)
-TESTS_TOTAL=0
-TESTS_FAILED=0
-TESTS_PASSED=0
-TEST_CASES=""
+junitResultsFile="${ARTIFACT_DIR}/junit_verify_cluster_tests.xml"
+testStartTime=$(date +%s)
+testsTotal=0
+testsFailed=0
+testsPassed=0
+testCases=""
 
 # Function to add test result to JUnit XML
-add_test_result() {
-  local test_name="$1"
-  local test_status="$2"  # "passed" or "failed"
-  local test_duration="$3"
-  local test_message="${4:-}"
-  local test_classname="${5:-VerifyClusterTests}"
+AddTestResult() {
+  local testName="$1"
+  local testStatus="$2"  # "passed" or "failed"
+  local testDuration="$3"
+  local testMessage="${4:-}"
+  local testClassName="${5:-VerifyClusterTests}"
   
-  TESTS_TOTAL=$((TESTS_TOTAL + 1))
+  testsTotal=$((testsTotal + 1))
   
-  if [[ "$test_status" == "passed" ]]; then
-    TESTS_PASSED=$((TESTS_PASSED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\"/>"
+  if [[ "$testStatus" == "passed" ]]; then
+    testsPassed=$((testsPassed + 1))
+    testCases="${testCases}
+    <testcase name=\"${testName}\" classname=\"${testClassName}\" time=\"${testDuration}\"/>"
   else
-    TESTS_FAILED=$((TESTS_FAILED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\">
-      <failure message=\"Test failed\">${test_message}</failure>
+    testsFailed=$((testsFailed + 1))
+    testCases="${testCases}
+    <testcase name=\"${testName}\" classname=\"${testClassName}\" time=\"${testDuration}\">
+      <failure message=\"Test failed\">${testMessage}</failure>
     </testcase>"
   fi
 }
 
 # Function to generate JUnit XML report
-generate_junit_xml() {
-  local total_duration=$(($(date +%s) - TEST_START_TIME))
+GenerateJunitXml() {
+  local totalDuration=$(($(date +%s) - testStartTime))
   
-  cat > "${JUNIT_RESULTS_FILE}" <<EOF
+  cat > "${junitResultsFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="Verify Cluster Tests" tests="${TESTS_TOTAL}" failures="${TESTS_FAILED}" errors="0" time="${total_duration}">
-${TEST_CASES}
+  <testsuite name="Verify Cluster Tests" tests="${testsTotal}" failures="${testsFailed}" errors="0" time="${totalDuration}">
+${testCases}
   </testsuite>
 </testsuites>
 EOF
   
-  echo ""
-  echo "📊 Test Results Summary:"
-  echo "  Total Tests: ${TESTS_TOTAL}"
-  echo "  Passed: ${TESTS_PASSED}"
-  echo "  Failed: ${TESTS_FAILED}"
-  echo "  Duration: ${total_duration}s"
-  echo "  Results File: ${JUNIT_RESULTS_FILE}"
+  : '📊 Test Results Summary:'
+  : "  Total Tests: ${testsTotal}"
+  : "  Passed: ${testsPassed}"
+  : "  Failed: ${testsFailed}"
+  : "  Duration: ${totalDuration}s"
+  : "  Results File: ${junitResultsFile}"
   
   # Copy to SHARED_DIR for data router reporter (if available)
   if [[ -n "${SHARED_DIR:-}" ]] && [[ -d "${SHARED_DIR}" ]]; then
-    cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}/$(basename ${JUNIT_RESULTS_FILE})"
-    echo "  ✅ Results copied to SHARED_DIR"
+    cp "${junitResultsFile}" "${SHARED_DIR}/$(basename ${junitResultsFile})"
+    : '  ✅ Results copied to SHARED_DIR'
   fi
 }
 
 # Trap to ensure JUnit XML is generated even on failure
-trap generate_junit_xml EXIT
+trap GenerateJunitXml EXIT
 
-echo "🔍 Verifying IBM Storage Scale Cluster..."
+: '🔍 Verifying IBM Storage Scale Cluster...'
 
 # Test 1: Verify cluster exists
-echo ""
-echo "🧪 Test 1: Verify cluster exists..."
-test_start=$(date +%s)
-test_status="failed"
-test_message=""
+: '🧪 Test 1: Verify cluster exists...'
+testStart=$(date +%s)
+testStatus="failed"
+testMessage=""
 
-if oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
-  echo "  ✅ Cluster ${STORAGE_SCALE_CLUSTER_NAME} exists"
-  test_status="passed"
+if oc get cluster "${FA__SCALE__CLUSTER_NAME}" -n "${FA__SCALE__NAMESPACE}" >/dev/null; then
+  : "  ✅ Cluster ${FA__SCALE__CLUSTER_NAME} exists"
+  testStatus="passed"
 else
-  echo "  ❌ Cluster ${STORAGE_SCALE_CLUSTER_NAME} not found"
-  test_message="Cluster ${STORAGE_SCALE_CLUSTER_NAME} not found in namespace ${STORAGE_SCALE_NAMESPACE}"
+  : "  ❌ Cluster ${FA__SCALE__CLUSTER_NAME} not found"
+  testMessage="Cluster ${FA__SCALE__CLUSTER_NAME} not found in namespace ${FA__SCALE__NAMESPACE}"
 fi
 
-test_duration=$(($(date +%s) - test_start))
-add_test_result "test_cluster_exists" "$test_status" "$test_duration" "$test_message"
+testDuration=$(($(date +%s) - testStart))
+AddTestResult "test_cluster_exists" "$testStatus" "$testDuration" "$testMessage"
 
 # Test 2: Check cluster conditions
-echo ""
-echo "🧪 Test 2: Check cluster conditions..."
-test_start=$(date +%s)
-test_status="failed"
-test_message=""
+: '🧪 Test 2: Check cluster conditions...'
+testStart=$(date +%s)
+testStatus="failed"
+testMessage=""
 
-echo "  Cluster conditions:"
-oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" \
+: '  Cluster conditions:'
+oc get cluster "${FA__SCALE__CLUSTER_NAME}" -n "${FA__SCALE__NAMESPACE}" \
   -o jsonpath='{range .status.conditions[*]}    {.type}: {.status} - {.message}{"\n"}{end}'
 
 # Check if cluster has Success condition with status True
-SUCCESS_STATUS=$(oc get cluster "${STORAGE_SCALE_CLUSTER_NAME}" -n "${STORAGE_SCALE_NAMESPACE}" \
-  -o jsonpath='{.status.conditions[?(@.type=="Success")].status}' 2>/dev/null || echo "Unknown")
+successStatus=$(oc get cluster "${FA__SCALE__CLUSTER_NAME}" -n "${FA__SCALE__NAMESPACE}" \
+  -o jsonpath='{.status.conditions[?(@.type=="Success")].status}')
 
-if [[ "${SUCCESS_STATUS}" == "True" ]]; then
-  echo "  ✅ Cluster condition Success=True"
-  test_status="passed"
+if [[ "${successStatus}" == "True" ]]; then
+  : '  ✅ Cluster condition Success=True'
+  testStatus="passed"
 else
-  echo "  ⚠️  Cluster condition Success=${SUCCESS_STATUS}"
-  test_message="Cluster Success condition is ${SUCCESS_STATUS}, expected True"
+  : "  ⚠️  Cluster condition Success=${successStatus}"
+  testMessage="Cluster Success condition is ${successStatus}, expected True"
 fi
 
-test_duration=$(($(date +%s) - test_start))
-add_test_result "test_cluster_success_condition" "$test_status" "$test_duration" "$test_message"
+testDuration=$(($(date +%s) - testStart))
+AddTestResult "test_cluster_success_condition" "$testStatus" "$testDuration" "$testMessage"
 
 # Test 3: Check pods are running
-echo ""
-echo "🧪 Test 3: Check IBM Storage Scale pods..."
-test_start=$(date +%s)
-test_status="failed"
-test_message=""
+: '🧪 Test 3: Check IBM Storage Scale pods...'
+testStart=$(date +%s)
+testStatus="failed"
+testMessage=""
 
-echo "  IBM Storage Scale pods:"
-oc get pods -n "${STORAGE_SCALE_NAMESPACE}"
+: '  IBM Storage Scale pods:'
+oc get pods -n "${FA__SCALE__NAMESPACE}"
 
 # Count running pods
-RUNNING_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
-TOTAL_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" --no-headers 2>/dev/null | wc -l)
+runningPods=$(oc get pods -n "${FA__SCALE__NAMESPACE}" --field-selector=status.phase=Running --no-headers | wc -l)
+totalPods=$(oc get pods -n "${FA__SCALE__NAMESPACE}" --no-headers | wc -l)
 
-if [[ $RUNNING_PODS -gt 0 ]] && [[ $RUNNING_PODS -eq $TOTAL_PODS ]]; then
-  echo "  ✅ All ${TOTAL_PODS} pods are running"
-  test_status="passed"
-elif [[ $RUNNING_PODS -gt 0 ]]; then
-  echo "  ⚠️  ${RUNNING_PODS} of ${TOTAL_PODS} pods are running"
-  test_message="${RUNNING_PODS} of ${TOTAL_PODS} pods are running"
+if [[ $runningPods -gt 0 ]] && [[ $runningPods -eq $totalPods ]]; then
+  : "  ✅ All ${totalPods} pods are running"
+  testStatus="passed"
+elif [[ $runningPods -gt 0 ]]; then
+  : "  ⚠️  ${runningPods} of ${totalPods} pods are running"
+  testMessage="${runningPods} of ${totalPods} pods are running"
 else
-  echo "  ❌ No running pods found"
-  test_message="No running pods found in namespace ${STORAGE_SCALE_NAMESPACE}"
+  : '  ❌ No running pods found'
+  testMessage="No running pods found in namespace ${FA__SCALE__NAMESPACE}"
 fi
 
-test_duration=$(($(date +%s) - test_start))
-add_test_result "test_cluster_pods_running" "$test_status" "$test_duration" "$test_message"
+testDuration=$(($(date +%s) - testStart))
+AddTestResult "test_cluster_pods_running" "$testStatus" "$testDuration" "$testMessage"
+

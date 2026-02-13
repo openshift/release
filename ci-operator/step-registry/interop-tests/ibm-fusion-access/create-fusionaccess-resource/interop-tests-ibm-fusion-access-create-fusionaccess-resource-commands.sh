@@ -1,16 +1,14 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+set -eux -o pipefail; shopt -s inherit_errexit
 
-FUSION_ACCESS_NAMESPACE="${FUSION_ACCESS_NAMESPACE:-ibm-fusion-access}"
-FUSION_ACCESS_STORAGE_SCALE_VERSION="${FUSION_ACCESS_STORAGE_SCALE_VERSION:-5.2.3.1}"
+FA__NAMESPACE="${FA__NAMESPACE:-ibm-fusion-access}"
+FA__STORAGE_SCALE_VERSION="${FA__STORAGE_SCALE_VERSION:-v5.2.3.5}"
 
-echo "🚀 Creating FusionAccess resource..."
+: '🚀 Creating FusionAccess resource...'
 
 # Check if FusionAccess resource already exists (idempotent)
-if oc get fusionaccess fusionaccess-object -n "${FUSION_ACCESS_NAMESPACE}" >/dev/null 2>&1; then
-  echo "✅ FusionAccess resource already exists"
+if oc get fusionaccess fusionaccess-object -n "${FA__NAMESPACE}" >/dev/null; then
+  : '✅ FusionAccess resource already exists'
 else
   # Create FusionAccess resource
   oc apply -f=- <<EOF
@@ -18,19 +16,20 @@ apiVersion: fusion.storage.openshift.io/v1alpha1
 kind: FusionAccess
 metadata:
   name: fusionaccess-object
-  namespace: ${FUSION_ACCESS_NAMESPACE}
+  namespace: ${FA__NAMESPACE}
 spec:
-  storageScaleVersion: ${FUSION_ACCESS_STORAGE_SCALE_VERSION}
+  storageScaleVersion: ${FA__STORAGE_SCALE_VERSION}
   storageDeviceDiscovery:
     create: true
 EOF
   
-  echo "Waiting for FusionAccess resource to be created..."
-  oc wait --for=jsonpath='{.metadata.name}'=fusionaccess-object fusionaccess/fusionaccess-object -n ${FUSION_ACCESS_NAMESPACE} --timeout=600s
+  : 'Waiting for FusionAccess resource to be created...'
+  oc wait --for=jsonpath='{.metadata.name}'=fusionaccess-object fusionaccess/fusionaccess-object -n ${FA__NAMESPACE} --timeout=600s
   
-  echo "✅ FusionAccess resource created successfully"
+  : '✅ FusionAccess resource created successfully'
 fi
 
 # Show resource status
-echo "FusionAccess resource status:"
-oc get fusionaccess fusionaccess-object -n "${FUSION_ACCESS_NAMESPACE}"
+: 'FusionAccess resource status:'
+oc get fusionaccess fusionaccess-object -n "${FA__NAMESPACE}"
+

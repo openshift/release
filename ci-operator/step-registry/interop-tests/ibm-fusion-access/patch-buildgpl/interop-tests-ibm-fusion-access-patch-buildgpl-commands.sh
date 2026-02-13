@@ -1,57 +1,55 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+set -eux -o pipefail; shopt -s inherit_errexit
 
-STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
+FA__SCALE__NAMESPACE="${FA__SCALE__NAMESPACE:-ibm-spectrum-scale}"
+FA__NAMESPACE="${FA__NAMESPACE:-ibm-fusion-access}"
 
-echo "🔧 Patching buildgpl ConfigMap for RHCOS compatibility..."
-echo "NOTE: IBM Storage Scale v5.2.3.1 manifests create a broken buildgpl script"
-echo "This step fixes the script to work on RHCOS"
-echo ""
+: 'Checking if KMM is managing kernel module builds'
 
-# Wait for buildgpl ConfigMap to be created by operator (may take up to 15 minutes)
-echo "Waiting for buildgpl ConfigMap to be created (timeout: 15 minutes)..."
-COUNTER=0
-MAX_WAIT=900  # 15 minutes
+# If the operator created the KMM Dockerfile ConfigMap, KMM is managing module builds
+if oc get configmap kmm-dockerfile -n "${FA__NAMESPACE}" >/dev/null; then
+  : 'KMM is managing kernel module builds via gpfs-module - buildgpl workaround not needed'
+  exit 0
+fi
 
-while [ $COUNTER -lt $MAX_WAIT ]; do
-  if oc get configmap buildgpl -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
-    echo "✅ buildgpl ConfigMap found after ${COUNTER}s"
+: 'KMM not detected, waiting for buildgpl ConfigMap for RHCOS compatibility'
+counter=0
+maxWait=900  # 15 minutes
+
+while [ $counter -lt $maxWait ]; do
+  # Check if KMM became active during the wait
+  if oc get configmap kmm-dockerfile -n "${FA__NAMESPACE}" >/dev/null; then
+    : "KMM detected after ${counter}s - buildgpl workaround not needed"
+    exit 0
+  fi
+  if oc get configmap buildgpl -n "${FA__SCALE__NAMESPACE}" >/dev/null; then
+    : "buildgpl ConfigMap found after ${counter}s"
     break
   fi
-  sleep 30
-  COUNTER=$((COUNTER + 30))
-  if [ $((COUNTER % 120)) -eq 0 ]; then
-    echo "  Still waiting... ${COUNTER}s elapsed"
+  if ! oc wait --for=jsonpath='{.metadata.name}'=buildgpl configmap/buildgpl \
+    -n "${FA__SCALE__NAMESPACE}" --timeout=30s >/dev/null; then
+    : "ConfigMap not yet available, continuing poll..."
+  fi
+  counter=$((counter + 30))
+  if [ $((counter % 120)) -eq 0 ]; then
+    : "Still waiting... ${counter}s elapsed"
   fi
 done
 
-if ! oc get configmap buildgpl -n "${STORAGE_SCALE_NAMESPACE}" >/dev/null 2>&1; then
-  echo "⚠️  buildgpl ConfigMap not created after ${MAX_WAIT}s"
-  echo "   This may indicate:"
-  echo "   - Operator is using a different kernel module build method"
-  echo "   - KMM is being used instead of buildgpl (ideal)"
-  echo "   - Pods may already be running successfully"
-  echo ""
-  echo "Checking pod status..."
-  RUNNING_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" -l app.kubernetes.io/name=core --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
-  if [ "$RUNNING_PODS" -gt 0 ]; then
-    echo "✅ ${RUNNING_PODS} daemon pods are already running"
-    echo "   buildgpl ConfigMap not needed - skipping patch"
+if ! oc get configmap buildgpl -n "${FA__SCALE__NAMESPACE}" >/dev/null; then
+  : "WARNING: buildgpl ConfigMap not created after ${maxWait}s"
+  runningPods=$(oc get pods -n "${FA__SCALE__NAMESPACE}" -l app.kubernetes.io/name=core --field-selector=status.phase=Running --no-headers | wc -l)
+  if [ "$runningPods" -gt 0 ]; then
+    : "${runningPods} daemon pods already running - buildgpl not needed"
     exit 0
   else
-    echo "⚠️  No daemon pods running and no buildgpl ConfigMap found"
-    echo "   This may indicate an issue with cluster creation"
-    exit 0  # Don't fail the test - let verify step catch it
+    : 'WARNING: No daemon pods running and no buildgpl ConfigMap found'
+    exit 0
   fi
 fi
 
-echo ""
-echo "Patching buildgpl script to fix compatibility issues..."
-
 # Apply the patch using a here-document with YAML format (avoids JSON newline escaping issues)
-if oc patch configmap buildgpl -n "${STORAGE_SCALE_NAMESPACE}" --type=merge -p "$(cat <<EOF
+if oc patch configmap buildgpl -n "${FA__SCALE__NAMESPACE}" --type=merge -p "$(cat <<EOF
 data:
   buildgpl: |
     #!/bin/sh
@@ -76,34 +74,29 @@ data:
     exit 0
 EOF
 )"; then
-  echo "✅ buildgpl ConfigMap patched successfully"
+  : 'buildgpl ConfigMap patched successfully'
   
   # Check if daemon pods already exist
-  DAEMON_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" -l app.kubernetes.io/instance=ibm-spectrum-scale,app.kubernetes.io/name=core --no-headers 2>/dev/null | wc -l)
+  daemonPods=$(oc get pods -n "${FA__SCALE__NAMESPACE}" -l app.kubernetes.io/instance=ibm-spectrum-scale,app.kubernetes.io/name=core --no-headers | wc -l)
   
-  if [ "$DAEMON_PODS" -gt 0 ]; then
-    echo ""
-    echo "Daemon pods exist - deleting to apply fixed buildgpl script..."
+  if [ "$daemonPods" -gt 0 ]; then
+    : 'Deleting daemon pods to apply fixed buildgpl script'
     oc delete pods -l app.kubernetes.io/instance=ibm-spectrum-scale,app.kubernetes.io/name=core \
-      -n "${STORAGE_SCALE_NAMESPACE}" --ignore-not-found
+      -n "${FA__SCALE__NAMESPACE}" --ignore-not-found
     
-    echo "Waiting for pods to recreate (30 seconds)..."
-    sleep 30
-    
-    RUNNING_PODS=$(oc get pods -n "${STORAGE_SCALE_NAMESPACE}" -l app.kubernetes.io/name=core --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
-    echo "✅ ${RUNNING_PODS} daemon pods recreated"
-  else
-    echo "ℹ️  No daemon pods exist yet - they will use fixed buildgpl when created"
+    if oc wait --for=condition=Ready pod -l app.kubernetes.io/name=core \
+        -n "${FA__SCALE__NAMESPACE}" --timeout=120s; then
+      runningPods=$(oc get pods -n "${FA__SCALE__NAMESPACE}" -l app.kubernetes.io/name=core --field-selector=status.phase=Running --no-headers | wc -l)
+      : "${runningPods} daemon pods recreated"
+    else
+      : 'WARNING: Daemon pods not ready within timeout'
+      oc get pods -n "${FA__SCALE__NAMESPACE}" -l app.kubernetes.io/name=core
+    fi
   fi
 else
-  echo "❌ Failed to patch buildgpl ConfigMap"
+  : 'ERROR: Failed to patch buildgpl ConfigMap'
   exit 1
 fi
 
-echo ""
-echo "✅ buildgpl ConfigMap patched for RHCOS compatibility"
-echo "   Fixed issues:"
-echo "   - Removed broken lsmod check"
-echo "   - Creates kernel-specific lxtrace file"
-echo "   - Gracefully handles missing lxtrace source files"
+: 'buildgpl ConfigMap patched for RHCOS compatibility'
 
