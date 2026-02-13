@@ -1,0 +1,46 @@
+binary_build_commands: make build
+build_root:
+  from_repository: true
+canonical_go_repository: sigs.k8s.io/cluster-capacity
+images:
+- dockerfile_path: images/cluster-capacity/Dockerfile.ocp
+  to: cluster-capacity
+promotion:
+  to:
+  - name: 5.0-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 5.0-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 5.0-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: OS_GOFLAGS='-race' make build
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: test-bin
+- as: security
+  optional: true
+  steps:
+    workflow: openshift-ci-security
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift-priv
+  repo: cluster-capacity
