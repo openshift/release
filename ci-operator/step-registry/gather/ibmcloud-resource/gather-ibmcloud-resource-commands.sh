@@ -4,7 +4,9 @@ function debug_on_failure() {
     # Only sleep if the exit code is non-zero (failure)
     if [ $exit_code -ne 0 ]; then
         echo "Script failed with exit code $exit_code. Sleeping for debugging purposes."
-        sleep 5s
+        sleep 5h
+    else
+        sleep 5h
     fi
 }
 
@@ -47,7 +49,7 @@ function command_retry {
             command_successful=true
 	    break
         fi
-	sleep "${RETRY_SLEEP}"
+	    sleep "${RETRY_SLEEP}"
     done
 
     # Restore exit on error setting
