@@ -1,7 +1,6 @@
 #!/bin/bash
 # Run MTA Cypress UI tests. Requires SHARED_DIR (with console.url) and ARTIFACT_DIR from the step framework.
-set -euxo pipefail
-shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 
 # Env used by CleanupCollect/yq; defaults match step ref so they are always set (for trap and subprocesses).
 export MAP_TESTS="${MAP_TESTS:-false}"
@@ -28,12 +27,11 @@ function CleanupCollect() {
     InstallYq || true
 
     while IFS= read -r -d '' resultFile; do
-        [[ "$(basename "${resultFile}")" == "${mergedFN}" ]] && continue
         grep -qE '<testsuites?\b' "${resultFile}" && xmlFiles+=("${resultFile}") || true
-    done < <(find "${ARTIFACT_DIR}" -maxdepth 1 -type f -iname "*.xml" -print0)
+    done < <(find "${ARTIFACT_DIR}" -maxdepth 1 -type f -iname "*.xml" ! -name "${mergedFN}" -print0)
 
     ((${#xmlFiles[@]})) || {
-        echo "Warning: No JUnit XML file found to process" >&2
+        : 'Warning: No JUnit XML file found to process'
         true
         return
     }
@@ -59,7 +57,7 @@ function CleanupCollect() {
     ' "${xmlFiles[@]}" 1> "${ARTIFACT_DIR}/${mergedFN}"
 
     # Archive the original jUnit XMLs so Prow does not see duplicated results.
-    tar zcf "${ARTIFACT_DIR}/jUnit-original.tgz" -C "${ARTIFACT_DIR}/" "${xmlFiles[@]#${ARTIFACT_DIR}/}"
+    tar zcf "${ARTIFACT_DIR}/jUnit-original.tgz" -C "${ARTIFACT_DIR%/}/" "${xmlFiles[@]#${ARTIFACT_DIR%/}/}"
     rm -f "${xmlFiles[@]}"
 
     cp "${ARTIFACT_DIR}/${mergedFN}" "${SHARED_DIR}/"
@@ -107,7 +105,8 @@ fi
 export CYPRESS_SPEC="${CYPRESS_SPEC:-e2e/tests/**/*.test.ts}"
 
 # Reduce OOM risk: cap Node heap at 4Gi so Chromium has room; numTestsKeptInMemory=0 below keeps test data minimal.
-export NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=4096"
+NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=4096"
+export NODE_OPTIONS="${NODE_OPTIONS# }"
 
 # Use test repo's .env.example so dotenvx has a .env; CYPRESS_BASE_URL export overrides.
 if [ -f .env.example ]; then
@@ -125,7 +124,7 @@ npx dotenvx run -- npx cypress run \
 # Merge per-spec JUnit XML into one file (package.json: mergereports → jrm ./run/report/junitreport.xml ./run/report/junit/*.xml).
 npm run mergereports
 
-# jrm output path is relative to cwd (image WORKDIR e.g. /tmp/tackle-ui-tests).
+# jrm output path is relative to cwd (image WORKDIR is /tmp/tackle-ui-tests per Dockerfile).
 junit_report="${PWD}/run/report/junitreport.xml"
 if [[ -f "${junit_report}" ]]; then
     cp -- "${junit_report}" "${ARTIFACT_DIR}/junit_tackle_ui_results.xml"
@@ -144,7 +143,5 @@ for screenshots_src in "/tmp/tackle-ui-tests/run/screenshots" "run/screenshots";
     fi
 done
 
-# Produce one merged JUnit XML for Data Router (runs here and on EXIT via trap).
-CleanupCollect junit--mta__tests__ui--mta-tests-ui.xml
-
+# Merged JUnit XML for Data Router is produced once by the EXIT trap (CleanupCollect).
 true
