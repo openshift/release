@@ -232,7 +232,10 @@ if ! tar -xzf /tmp/operator-pr-code.tar.gz -C "${HOME}"; then
 fi
 
 # Rename extracted directory to operator-pr-code (in case it has a different name)
+# Temporarily disable pipefail to avoid SIGPIPE from head closing the pipe early
+set +o pipefail
 EXTRACTED_DIR=$(tar -tzf /tmp/operator-pr-code.tar.gz | head -1 | cut -d/ -f1)
+set -o pipefail
 if [ "${EXTRACTED_DIR}" != "operator-pr-code" ] && [ -d "${HOME}/${EXTRACTED_DIR}" ]; then
   mv "${HOME}/${EXTRACTED_DIR}" "${PR_CODE_DIR}"
 fi
@@ -362,7 +365,10 @@ cd "${WORK_DIR}"
 
 echo "[SUCCESS] Using operator code at ${WORK_DIR}"
 echo "[INFO] Working directory contents:"
+# Temporarily disable pipefail to avoid SIGPIPE from head closing the pipe early
+set +o pipefail
 ls -la | head -15
+set -o pipefail
 
 # Verify Local Registry
 echo "[INFO] Verifying local registry is accessible..."
@@ -479,7 +485,10 @@ echo "[INFO] Adding SSH keys to agent..."
 if ssh-add </dev/null 2>&1; then
   echo "[SUCCESS] SSH keys added successfully"
   echo "[INFO] Loaded keys:"
+  # Temporarily disable pipefail to avoid SIGPIPE from head closing the pipe early
+  set +o pipefail
   ssh-add -l 2>&1 | head -3 | sed 's/^/  /'
+  set -o pipefail
 else
   # ssh-add might fail if no default keys exist, which is OK
   # The agent will still work for SSH connections using key files directly
@@ -569,7 +578,10 @@ if [ -n "${TEST_NAMESPACES}" ]; then
 
       # Show what was collected
       echo "[INFO] Collected diagnostics:"
+      # Temporarily disable pipefail to avoid SIGPIPE from head closing the pipe early
+      set +o pipefail
       find "${MUST_GATHER_DIR}" -type f 2>/dev/null | sed 's/^/    /' | head -20
+      set -o pipefail
       FILE_COUNT=$(find "${MUST_GATHER_DIR}" -type f 2>/dev/null | wc -l)
       [ ${FILE_COUNT} -gt 20 ] && echo "    ... and $((FILE_COUNT - 20)) more files"
     else
