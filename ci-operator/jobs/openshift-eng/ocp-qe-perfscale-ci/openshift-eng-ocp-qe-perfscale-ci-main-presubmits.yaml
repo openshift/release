@@ -237,6 +237,84 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build10
+    context: ci/prow/aws-4.20-nightly-x86-etcd-perf-3nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: aws-4.20-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.20-nightly-x86-etcd-perf-3nodes
+    rerun_command: /test aws-4.20-nightly-x86-etcd-perf-3nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=etcd-perf-3nodes
+        - --variant=aws-4.20-nightly-x86
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(aws-4.20-nightly-x86-etcd-perf-3nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
     context: ci/prow/aws-4.20-nightly-x86-node-density-cni-3nodes
     decorate: true
     decoration_config:
@@ -616,6 +694,84 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(aws-4.21-nightly-x86-control-plane-3nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/aws-4.21-nightly-x86-etcd-perf-3nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 8h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
+      ci-operator.openshift.io/variant: aws-4.21-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.21-nightly-x86-etcd-perf-3nodes
+    rerun_command: /test aws-4.21-nightly-x86-etcd-perf-3nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=etcd-perf-3nodes
+        - --variant=aws-4.21-nightly-x86
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(aws-4.21-nightly-x86-etcd-perf-3nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -4241,559 +4397,6 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build05
-    context: ci/prow/metal-4.18-nightly-multi-baremetal-sno-agent-ipv4-static-connected-fips-f7
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 6h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-      ci-operator.openshift.io/cluster: build05
-      ci-operator.openshift.io/variant: metal-4.18-nightly-multi
-      ci.openshift.io/generator: prowgen
-      job-release: "4.18"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.18-nightly-multi-baremetal-sno-agent-ipv4-static-connected-fips-f7
-    rerun_command: /test metal-4.18-nightly-multi-baremetal-sno-agent-ipv4-static-connected-fips-f7
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=baremetal-sno-agent-ipv4-static-connected-fips-f7
-        - --variant=metal-4.18-nightly-multi
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(metal-4.18-nightly-multi-baremetal-sno-agent-ipv4-static-connected-fips-f7|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/metal-4.18-nightly-multi-control-plane-3nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 6h0m0s
-    labels:
-      capability/intranet: intranet
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-      ci-operator.openshift.io/variant: metal-4.18-nightly-multi
-      ci.openshift.io/generator: prowgen
-      job-release: "4.18"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.18-nightly-multi-control-plane-3nodes
-    rerun_command: /test metal-4.18-nightly-multi-control-plane-3nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=control-plane-3nodes
-        - --variant=metal-4.18-nightly-multi
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(metal-4.18-nightly-multi-control-plane-3nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/metal-4.18-nightly-multi-network-perf-3nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 6h0m0s
-    labels:
-      capability/intranet: intranet
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-      ci-operator.openshift.io/variant: metal-4.18-nightly-multi
-      ci.openshift.io/generator: prowgen
-      job-release: "4.18"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.18-nightly-multi-network-perf-3nodes
-    rerun_command: /test metal-4.18-nightly-multi-network-perf-3nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=network-perf-3nodes
-        - --variant=metal-4.18-nightly-multi
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(metal-4.18-nightly-multi-network-perf-3nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/metal-4.18-nightly-multi-node-density-heavy-3nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 6h0m0s
-    labels:
-      capability/intranet: intranet
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-      ci-operator.openshift.io/variant: metal-4.18-nightly-multi
-      ci.openshift.io/generator: prowgen
-      job-release: "4.18"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.18-nightly-multi-node-density-heavy-3nodes
-    rerun_command: /test metal-4.18-nightly-multi-node-density-heavy-3nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=node-density-heavy-3nodes
-        - --variant=metal-4.18-nightly-multi
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(metal-4.18-nightly-multi-node-density-heavy-3nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/metal-4.19-nightly-multi-baremetal-sno-agent-ipv4-static-connected-fips-f7
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 6h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-      ci-operator.openshift.io/cluster: build05
-      ci-operator.openshift.io/variant: metal-4.19-nightly-multi
-      ci.openshift.io/generator: prowgen
-      job-release: "4.19"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.19-nightly-multi-baremetal-sno-agent-ipv4-static-connected-fips-f7
-    rerun_command: /test metal-4.19-nightly-multi-baremetal-sno-agent-ipv4-static-connected-fips-f7
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=baremetal-sno-agent-ipv4-static-connected-fips-f7
-        - --variant=metal-4.19-nightly-multi
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(metal-4.19-nightly-multi-baremetal-sno-agent-ipv4-static-connected-fips-f7|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/metal-4.19-nightly-multi-control-plane-3nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 6h0m0s
-    labels:
-      capability/intranet: intranet
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-      ci-operator.openshift.io/variant: metal-4.19-nightly-multi
-      ci.openshift.io/generator: prowgen
-      job-release: "4.19"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.19-nightly-multi-control-plane-3nodes
-    rerun_command: /test metal-4.19-nightly-multi-control-plane-3nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=control-plane-3nodes
-        - --variant=metal-4.19-nightly-multi
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(metal-4.19-nightly-multi-control-plane-3nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/metal-4.19-nightly-multi-node-density-heavy-3nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 6h0m0s
-    labels:
-      capability/intranet: intranet
-      ci-operator.openshift.io/cloud: equinix-ocp-metal
-      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
-      ci-operator.openshift.io/variant: metal-4.19-nightly-multi
-      ci.openshift.io/generator: prowgen
-      job-release: "4.19"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.19-nightly-multi-node-density-heavy-3nodes
-    rerun_command: /test metal-4.19-nightly-multi-node-density-heavy-3nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=node-density-heavy-3nodes
-        - --variant=metal-4.19-nightly-multi
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(metal-4.19-nightly-multi-node-density-heavy-3nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build05
     context: ci/prow/metal-4.19-nightly-x86-daily-virt-6nodes
     decorate: true
     decoration_config:
@@ -5200,6 +4803,318 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )(metal-4.19-nightly-x86-weekly-6nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/metal-4.20-nightly-x86-deploy-sno
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: metal-perfscale-cpt
+      ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
+      ci-operator.openshift.io/variant: metal-4.20-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.20-nightly-x86-deploy-sno
+    rerun_command: /test metal-4.20-nightly-x86-deploy-sno
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=deploy-sno
+        - --variant=metal-4.20-nightly-x86
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(metal-4.20-nightly-x86-deploy-sno|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/metal-4.20-nightly-x86-netperf-external-sno
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: metal-perfscale-cpt
+      ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
+      ci-operator.openshift.io/variant: metal-4.20-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.20-nightly-x86-netperf-external-sno
+    rerun_command: /test metal-4.20-nightly-x86-netperf-external-sno
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=netperf-external-sno
+        - --variant=metal-4.20-nightly-x86
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(metal-4.20-nightly-x86-netperf-external-sno|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/metal-4.21-nightly-x86-deploy-sno
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: metal-perfscale-cpt
+      ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
+      ci-operator.openshift.io/variant: metal-4.21-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.21-nightly-x86-deploy-sno
+    rerun_command: /test metal-4.21-nightly-x86-deploy-sno
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=deploy-sno
+        - --variant=metal-4.21-nightly-x86
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(metal-4.21-nightly-x86-deploy-sno|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/metal-4.21-nightly-x86-netperf-external-sno
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: metal-perfscale-cpt
+      ci-operator.openshift.io/cloud-cluster-profile: metal-perfscale-cpt
+      ci-operator.openshift.io/variant: metal-4.21-nightly-x86
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-metal-4.21-nightly-x86-netperf-external-sno
+    rerun_command: /test metal-4.21-nightly-x86-netperf-external-sno
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=netperf-external-sno
+        - --variant=metal-4.21-nightly-x86
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(metal-4.21-nightly-x86-netperf-external-sno|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -8826,7 +8741,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: vsphere02
-    context: ci/prow/vsphere-4.17-nightly-x86-cluster-density-v2-24nodes
+    context: ci/prow/vsphere-4.20-nightly-x86-control-plane-24nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -8834,89 +8749,11 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.17-nightly-x86
+      ci-operator.openshift.io/variant: vsphere-4.20-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.17"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.17-nightly-x86-cluster-density-v2-24nodes
-    rerun_command: /test vsphere-4.17-nightly-x86-cluster-density-v2-24nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=cluster-density-v2-24nodes
-        - --variant=vsphere-4.17-nightly-x86
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.17-nightly-x86-cluster-density-v2-24nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: vsphere02
-    context: ci/prow/vsphere-4.17-nightly-x86-control-plane-24nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.17-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.17-nightly-x86-control-plane-24nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.20-nightly-x86-control-plane-24nodes
     reporter_config:
       slack:
         channel: '#ocp-qe-scale-ci-results'
@@ -8928,7 +8765,7 @@ presubmits:
           *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
           :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
           <{{.Status.URL}}|View logs> :warning: {{end}}'
-    rerun_command: /test vsphere-4.17-nightly-x86-control-plane-24nodes
+    rerun_command: /test vsphere-4.20-nightly-x86-control-plane-24nodes
     spec:
       containers:
       - args:
@@ -8938,7 +8775,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=control-plane-24nodes
-        - --variant=vsphere-4.17-nightly-x86
+        - --variant=vsphere-4.20-nightly-x86
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -8986,504 +8823,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.17-nightly-x86-control-plane-24nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(vsphere-4.20-nightly-x86-control-plane-24nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: vsphere02
-    context: ci/prow/vsphere-4.17-nightly-x86-control-plane-3nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.17-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.17-nightly-x86-control-plane-3nodes
-    rerun_command: /test vsphere-4.17-nightly-x86-control-plane-3nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=control-plane-3nodes
-        - --variant=vsphere-4.17-nightly-x86
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.17-nightly-x86-control-plane-3nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: vsphere02
-    context: ci/prow/vsphere-4.17-nightly-x86-control-plane-sno-reg
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 3h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.17-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.17-nightly-x86-control-plane-sno-reg
-    rerun_command: /test vsphere-4.17-nightly-x86-control-plane-sno-reg
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=control-plane-sno-reg
-        - --variant=vsphere-4.17-nightly-x86
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.17-nightly-x86-control-plane-sno-reg|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: vsphere02
-    context: ci/prow/vsphere-4.17-nightly-x86-ingress-perf-3nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.17-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.17-nightly-x86-ingress-perf-3nodes
-    rerun_command: /test vsphere-4.17-nightly-x86-ingress-perf-3nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=ingress-perf-3nodes
-        - --variant=vsphere-4.17-nightly-x86
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.17-nightly-x86-ingress-perf-3nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: vsphere02
-    context: ci/prow/vsphere-4.17-nightly-x86-ingress-perf-9nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.17-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.17-nightly-x86-ingress-perf-9nodes
-    rerun_command: /test vsphere-4.17-nightly-x86-ingress-perf-9nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=ingress-perf-9nodes
-        - --variant=vsphere-4.17-nightly-x86
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.17-nightly-x86-ingress-perf-9nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: vsphere02
-    context: ci/prow/vsphere-4.17-nightly-x86-node-density-heavy-24nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.17-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.17"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.17-nightly-x86-node-density-heavy-24nodes
-    reporter_config:
-      slack:
-        channel: '#ocp-qe-scale-ci-results'
-        job_states_to_report:
-        - success
-        - failure
-        - error
-        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
-          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-          <{{.Status.URL}}|View logs> :warning: {{end}}'
-    rerun_command: /test vsphere-4.17-nightly-x86-node-density-heavy-24nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=node-density-heavy-24nodes
-        - --variant=vsphere-4.17-nightly-x86
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.17-nightly-x86-node-density-heavy-24nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: vsphere02
-    context: ci/prow/vsphere-4.18-nightly-x86-control-plane-24nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.18-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.18"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.18-nightly-x86-control-plane-24nodes
-    reporter_config:
-      slack:
-        channel: '#ocp-qe-scale-ci-results'
-        job_states_to_report:
-        - success
-        - failure
-        - error
-        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
-          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-          <{{.Status.URL}}|View logs> :warning: {{end}}'
-    rerun_command: /test vsphere-4.18-nightly-x86-control-plane-24nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=control-plane-24nodes
-        - --variant=vsphere-4.18-nightly-x86
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.18-nightly-x86-control-plane-24nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: vsphere02
-    context: ci/prow/vsphere-4.18-nightly-x86-control-plane-3nodes
+    context: ci/prow/vsphere-4.20-nightly-x86-control-plane-3nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -9491,12 +8838,12 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.18-nightly-x86
+      ci-operator.openshift.io/variant: vsphere-4.20-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.18-nightly-x86-control-plane-3nodes
-    rerun_command: /test vsphere-4.18-nightly-x86-control-plane-3nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.20-nightly-x86-control-plane-3nodes
+    rerun_command: /test vsphere-4.20-nightly-x86-control-plane-3nodes
     spec:
       containers:
       - args:
@@ -9506,7 +8853,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=control-plane-3nodes
-        - --variant=vsphere-4.18-nightly-x86
+        - --variant=vsphere-4.20-nightly-x86
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -9554,14 +8901,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.18-nightly-x86-control-plane-3nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(vsphere-4.20-nightly-x86-control-plane-3nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: vsphere02
-    context: ci/prow/vsphere-4.18-nightly-x86-control-plane-sno-reg
+    context: ci/prow/vsphere-4.20-nightly-x86-control-plane-sno-reg
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -9569,12 +8916,12 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.18-nightly-x86
+      ci-operator.openshift.io/variant: vsphere-4.20-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.18-nightly-x86-control-plane-sno-reg
-    rerun_command: /test vsphere-4.18-nightly-x86-control-plane-sno-reg
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.20-nightly-x86-control-plane-sno-reg
+    rerun_command: /test vsphere-4.20-nightly-x86-control-plane-sno-reg
     spec:
       containers:
       - args:
@@ -9584,7 +8931,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=control-plane-sno-reg
-        - --variant=vsphere-4.18-nightly-x86
+        - --variant=vsphere-4.20-nightly-x86
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -9632,14 +8979,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.18-nightly-x86-control-plane-sno-reg|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(vsphere-4.20-nightly-x86-control-plane-sno-reg|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: vsphere02
-    context: ci/prow/vsphere-4.18-nightly-x86-ingress-perf-3nodes
+    context: ci/prow/vsphere-4.20-nightly-x86-ingress-perf-3nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -9647,12 +8994,12 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.18-nightly-x86
+      ci-operator.openshift.io/variant: vsphere-4.20-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.18-nightly-x86-ingress-perf-3nodes
-    rerun_command: /test vsphere-4.18-nightly-x86-ingress-perf-3nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.20-nightly-x86-ingress-perf-3nodes
+    rerun_command: /test vsphere-4.20-nightly-x86-ingress-perf-3nodes
     spec:
       containers:
       - args:
@@ -9662,7 +9009,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=ingress-perf-3nodes
-        - --variant=vsphere-4.18-nightly-x86
+        - --variant=vsphere-4.20-nightly-x86
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -9710,14 +9057,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.18-nightly-x86-ingress-perf-3nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(vsphere-4.20-nightly-x86-ingress-perf-3nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: vsphere02
-    context: ci/prow/vsphere-4.18-nightly-x86-ingress-perf-9nodes
+    context: ci/prow/vsphere-4.20-nightly-x86-ingress-perf-9nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -9725,12 +9072,12 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.18-nightly-x86
+      ci-operator.openshift.io/variant: vsphere-4.20-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.18-nightly-x86-ingress-perf-9nodes
-    rerun_command: /test vsphere-4.18-nightly-x86-ingress-perf-9nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.20-nightly-x86-ingress-perf-9nodes
+    rerun_command: /test vsphere-4.20-nightly-x86-ingress-perf-9nodes
     spec:
       containers:
       - args:
@@ -9740,7 +9087,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=ingress-perf-9nodes
-        - --variant=vsphere-4.18-nightly-x86
+        - --variant=vsphere-4.20-nightly-x86
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -9788,14 +9135,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.18-nightly-x86-ingress-perf-9nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(vsphere-4.20-nightly-x86-ingress-perf-9nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: vsphere02
-    context: ci/prow/vsphere-4.18-nightly-x86-node-density-heavy-24nodes
+    context: ci/prow/vsphere-4.20-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -9803,11 +9150,11 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.18-nightly-x86
+      ci-operator.openshift.io/variant: vsphere-4.20-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.18"
+      job-release: "4.20"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.18-nightly-x86-node-density-heavy-24nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.20-nightly-x86-node-density-heavy-24nodes
     reporter_config:
       slack:
         channel: '#ocp-qe-scale-ci-results'
@@ -9819,7 +9166,7 @@ presubmits:
           *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
           :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
           <{{.Status.URL}}|View logs> :warning: {{end}}'
-    rerun_command: /test vsphere-4.18-nightly-x86-node-density-heavy-24nodes
+    rerun_command: /test vsphere-4.20-nightly-x86-node-density-heavy-24nodes
     spec:
       containers:
       - args:
@@ -9829,7 +9176,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=node-density-heavy-24nodes
-        - --variant=vsphere-4.18-nightly-x86
+        - --variant=vsphere-4.20-nightly-x86
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -9877,248 +9224,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.18-nightly-x86-node-density-heavy-24nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(vsphere-4.20-nightly-x86-node-density-heavy-24nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: vsphere02
-    context: ci/prow/vsphere-4.18-nightly-x86-vcenter-1-control-plane-24nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-      ci-operator.openshift.io/variant: vsphere-4.18-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.18"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.18-nightly-x86-vcenter-1-control-plane-24nodes
-    rerun_command: /test vsphere-4.18-nightly-x86-vcenter-1-control-plane-24nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=vcenter-1-control-plane-24nodes
-        - --variant=vsphere-4.18-nightly-x86
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.18-nightly-x86-vcenter-1-control-plane-24nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: vsphere02
-    context: ci/prow/vsphere-4.18-nightly-x86-vcenter-1-control-plane-3nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-      ci-operator.openshift.io/variant: vsphere-4.18-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.18"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.18-nightly-x86-vcenter-1-control-plane-3nodes
-    rerun_command: /test vsphere-4.18-nightly-x86-vcenter-1-control-plane-3nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=vcenter-1-control-plane-3nodes
-        - --variant=vsphere-4.18-nightly-x86
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.18-nightly-x86-vcenter-1-control-plane-3nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: vsphere02
-    context: ci/prow/vsphere-4.18-nightly-x86-vcenter-1-ipv4ipv6dual-control-plane-3nodes
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 5h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
-      ci-operator.openshift.io/variant: vsphere-4.18-nightly-x86
-      ci.openshift.io/generator: prowgen
-      job-release: "4.18"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.18-nightly-x86-vcenter-1-ipv4ipv6dual-control-plane-3nodes
-    rerun_command: /test vsphere-4.18-nightly-x86-vcenter-1-ipv4ipv6dual-control-plane-3nodes
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=vcenter-1-ipv4ipv6dual-control-plane-3nodes
-        - --variant=vsphere-4.18-nightly-x86
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.18-nightly-x86-vcenter-1-ipv4ipv6dual-control-plane-3nodes|remaining-required),?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: vsphere02
-    context: ci/prow/vsphere-4.19-nightly-x86-control-plane-24nodes
+    context: ci/prow/vsphere-4.21-nightly-x86-control-plane-24nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -10126,11 +9239,11 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.19-nightly-x86
+      ci-operator.openshift.io/variant: vsphere-4.21-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.19-nightly-x86-control-plane-24nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.21-nightly-x86-control-plane-24nodes
     reporter_config:
       slack:
         channel: '#ocp-qe-scale-ci-results'
@@ -10142,7 +9255,7 @@ presubmits:
           *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
           :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
           <{{.Status.URL}}|View logs> :warning: {{end}}'
-    rerun_command: /test vsphere-4.19-nightly-x86-control-plane-24nodes
+    rerun_command: /test vsphere-4.21-nightly-x86-control-plane-24nodes
     spec:
       containers:
       - args:
@@ -10152,7 +9265,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=control-plane-24nodes
-        - --variant=vsphere-4.19-nightly-x86
+        - --variant=vsphere-4.21-nightly-x86
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -10200,14 +9313,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.19-nightly-x86-control-plane-24nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(vsphere-4.21-nightly-x86-control-plane-24nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: vsphere02
-    context: ci/prow/vsphere-4.19-nightly-x86-control-plane-3nodes
+    context: ci/prow/vsphere-4.21-nightly-x86-control-plane-3nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -10215,12 +9328,12 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.19-nightly-x86
+      ci-operator.openshift.io/variant: vsphere-4.21-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.19-nightly-x86-control-plane-3nodes
-    rerun_command: /test vsphere-4.19-nightly-x86-control-plane-3nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.21-nightly-x86-control-plane-3nodes
+    rerun_command: /test vsphere-4.21-nightly-x86-control-plane-3nodes
     spec:
       containers:
       - args:
@@ -10230,7 +9343,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=control-plane-3nodes
-        - --variant=vsphere-4.19-nightly-x86
+        - --variant=vsphere-4.21-nightly-x86
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -10278,14 +9391,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.19-nightly-x86-control-plane-3nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(vsphere-4.21-nightly-x86-control-plane-3nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: vsphere02
-    context: ci/prow/vsphere-4.19-nightly-x86-control-plane-sno-reg
+    context: ci/prow/vsphere-4.21-nightly-x86-control-plane-sno-reg
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -10293,12 +9406,12 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.19-nightly-x86
+      ci-operator.openshift.io/variant: vsphere-4.21-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.19-nightly-x86-control-plane-sno-reg
-    rerun_command: /test vsphere-4.19-nightly-x86-control-plane-sno-reg
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.21-nightly-x86-control-plane-sno-reg
+    rerun_command: /test vsphere-4.21-nightly-x86-control-plane-sno-reg
     spec:
       containers:
       - args:
@@ -10308,7 +9421,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=control-plane-sno-reg
-        - --variant=vsphere-4.19-nightly-x86
+        - --variant=vsphere-4.21-nightly-x86
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -10356,14 +9469,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.19-nightly-x86-control-plane-sno-reg|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(vsphere-4.21-nightly-x86-control-plane-sno-reg|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: vsphere02
-    context: ci/prow/vsphere-4.19-nightly-x86-ingress-perf-3nodes
+    context: ci/prow/vsphere-4.21-nightly-x86-ingress-perf-3nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -10371,12 +9484,12 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.19-nightly-x86
+      ci-operator.openshift.io/variant: vsphere-4.21-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.19-nightly-x86-ingress-perf-3nodes
-    rerun_command: /test vsphere-4.19-nightly-x86-ingress-perf-3nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.21-nightly-x86-ingress-perf-3nodes
+    rerun_command: /test vsphere-4.21-nightly-x86-ingress-perf-3nodes
     spec:
       containers:
       - args:
@@ -10386,7 +9499,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=ingress-perf-3nodes
-        - --variant=vsphere-4.19-nightly-x86
+        - --variant=vsphere-4.21-nightly-x86
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -10434,14 +9547,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.19-nightly-x86-ingress-perf-3nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(vsphere-4.21-nightly-x86-ingress-perf-3nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: vsphere02
-    context: ci/prow/vsphere-4.19-nightly-x86-ingress-perf-9nodes
+    context: ci/prow/vsphere-4.21-nightly-x86-ingress-perf-9nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -10449,12 +9562,12 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.19-nightly-x86
+      ci-operator.openshift.io/variant: vsphere-4.21-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.19-nightly-x86-ingress-perf-9nodes
-    rerun_command: /test vsphere-4.19-nightly-x86-ingress-perf-9nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.21-nightly-x86-ingress-perf-9nodes
+    rerun_command: /test vsphere-4.21-nightly-x86-ingress-perf-9nodes
     spec:
       containers:
       - args:
@@ -10464,7 +9577,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=ingress-perf-9nodes
-        - --variant=vsphere-4.19-nightly-x86
+        - --variant=vsphere-4.21-nightly-x86
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -10512,14 +9625,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.19-nightly-x86-ingress-perf-9nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(vsphere-4.21-nightly-x86-ingress-perf-9nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: vsphere02
-    context: ci/prow/vsphere-4.19-nightly-x86-node-density-heavy-24nodes
+    context: ci/prow/vsphere-4.21-nightly-x86-node-density-heavy-24nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -10527,11 +9640,11 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
-      ci-operator.openshift.io/variant: vsphere-4.19-nightly-x86
+      ci-operator.openshift.io/variant: vsphere-4.21-nightly-x86
       ci.openshift.io/generator: prowgen
-      job-release: "4.19"
+      job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.19-nightly-x86-node-density-heavy-24nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-vsphere-4.21-nightly-x86-node-density-heavy-24nodes
     reporter_config:
       slack:
         channel: '#ocp-qe-scale-ci-results'
@@ -10543,7 +9656,7 @@ presubmits:
           *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
           :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
           <{{.Status.URL}}|View logs> :warning: {{end}}'
-    rerun_command: /test vsphere-4.19-nightly-x86-node-density-heavy-24nodes
+    rerun_command: /test vsphere-4.21-nightly-x86-node-density-heavy-24nodes
     spec:
       containers:
       - args:
@@ -10553,7 +9666,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=node-density-heavy-24nodes
-        - --variant=vsphere-4.19-nightly-x86
+        - --variant=vsphere-4.21-nightly-x86
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -10601,4 +9714,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(vsphere-4.19-nightly-x86-node-density-heavy-24nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(vsphere-4.21-nightly-x86-node-density-heavy-24nodes|remaining-required),?($|\s.*)
