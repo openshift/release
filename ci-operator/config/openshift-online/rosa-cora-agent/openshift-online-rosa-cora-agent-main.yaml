@@ -1,6 +1,6 @@
 base_images:
   ubi-python:
-    name: ubi-python-311
+    name: ubi-python-312
     namespace: ocp
     tag: "9"
 build_root:
@@ -11,14 +11,17 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM ubi-python
+    USER 0
 
-    # Install uv package manager
-    RUN dnf install -y python3-pip git && \
+    # Install uv package manager and create symlinks
+    RUN dnf install -y git && \
+        ln -sf /usr/bin/python3.12 /usr/bin/python && \
+        ln -sf /usr/bin/pip3.12 /usr/bin/pip && \
         pip install --no-cache-dir uv && \
         dnf clean all
 
     COPY . /workspace/
-    WORKDIR /workspace
+    WORKDIR /workspace/rosa-cora-agent
 
     # Install dependencies using uv (--system flag for non-venv)
     RUN uv pip install --system .
@@ -43,6 +46,7 @@ tests:
     pytest -v test/
   container:
     from: python-test-runner
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: lint
   commands: |
     ruff check .
@@ -50,6 +54,7 @@ tests:
   container:
     from: python-test-runner
   optional: true
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 zz_generated_metadata:
   branch: main
   org: openshift-online
