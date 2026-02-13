@@ -1,11 +1,25 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+  stolostron_builder_go1.24-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.24-linux
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.25-openshift-4.21
+    name: builder
+    namespace: stolostron
+    tag: go1.23-linux
 images:
-- dockerfile_path: Dockerfile.Konflux
-  to: multicluster-observability-addon
+- dockerfile_path: Dockerfile.prow
+  from: base
+  inputs:
+    stolostron_builder_go1.24-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
+  to: thanos-receive-controller
 promotion:
   to:
   - name: "2.17"
@@ -17,30 +31,30 @@ resources:
     requests:
       cpu: 100m
       memory: 1Gi
-test_binary_build_commands: "true"
 tests:
-- as: pr-image-mirror-multicluster-observability-addon
+- as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-observability-addon
+      SOURCE_IMAGE_REF: thanos-receive-controller
     env:
-      IMAGE_REPO: multicluster-observability-addon
+      IMAGE_REPO: thanos-receive-controller
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: publish-multicluster-observability-addon
+- as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-observability-addon
+      SOURCE_IMAGE_REF: thanos-receive-controller
     env:
-      IMAGE_REPO: multicluster-observability-addon
+      IMAGE_REPO: thanos-receive-controller
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
         export SELF="make -f /opt/build-harness/Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
-        export OSCI_COMPONENT_NAME="multicluster-observability-addon"
+        export OSCI_COMPONENT_NAME="thanos-receive-controller"
+        export OSCI_COMPONENT_VERSION="2.13.0"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
       - collection: ""
@@ -53,13 +67,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-ci-image-mirror
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.17
-    workflow: ocm-ci-fastforward
 zz_generated_metadata:
-  branch: main
+  branch: release-2.17
   org: stolostron
-  repo: multicluster-observability-addon
+  repo: thanos-receive-controller
