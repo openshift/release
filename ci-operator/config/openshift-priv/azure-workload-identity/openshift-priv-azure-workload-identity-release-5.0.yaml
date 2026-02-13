@@ -1,0 +1,42 @@
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/azure/azure-workload-identity
+images:
+- dockerfile_path: Dockerfile.ocp
+  to: azure-workload-identity-webhook
+promotion:
+  to:
+  - name: 5.0-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 5.0-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 5.0-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-azure
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift-priv
+  repo: azure-workload-identity
