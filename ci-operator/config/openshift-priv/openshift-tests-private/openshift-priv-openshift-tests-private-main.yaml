@@ -241,7 +241,22 @@ tests:
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
-    - ref: openshift-extended-test
+    - as: openshift-extended-test
+      from: tests-private-pr
+      cli: latest
+      commands: openshift-extended-test-commands.sh
+      grace_period: 10m
+      timeout: 8h0m0s
+      credentials:
+      - namespace: test-credentials
+        name: tests-private-account
+        mount_path: /var/run/vault/tests-private-account
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+        limits:
+          memory: 6Gi
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-winc
 zz_generated_metadata:
   branch: main
