@@ -1,11 +1,20 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.25-openshift-4.21:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.21
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.25-openshift-4.21
 images:
-- dockerfile_path: Dockerfile.Konflux
-  to: multicluster-observability-addon
+- dockerfile_path: Containerfile.prom-operator
+  inputs:
+    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
+      as:
+      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.25
+  to: obo-prometheus-operator
 promotion:
   to:
   - name: "2.17"
@@ -19,28 +28,28 @@ resources:
       memory: 1Gi
 test_binary_build_commands: "true"
 tests:
-- as: pr-image-mirror-multicluster-observability-addon
+- as: pr-image-mirror-obo-prometheus-operator
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-observability-addon
+      SOURCE_IMAGE_REF: obo-prometheus-operator
     env:
-      IMAGE_REPO: multicluster-observability-addon
+      IMAGE_REPO: obo-prometheus-operator
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: publish-multicluster-observability-addon
+- as: publish-obo-prometheus-operator
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-observability-addon
+      SOURCE_IMAGE_REF: obo-prometheus-operator
     env:
-      IMAGE_REPO: multicluster-observability-addon
+      IMAGE_REPO: obo-prometheus-operator
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
         export SELF="make -f /opt/build-harness/Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
-        export OSCI_COMPONENT_NAME="multicluster-observability-addon"
+        export OSCI_COMPONENT_NAME="obo-prometheus-operator"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
       - collection: ""
@@ -54,6 +63,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.17
   org: stolostron
-  repo: multicluster-observability-addon
+  repo: obo-prometheus-operator
