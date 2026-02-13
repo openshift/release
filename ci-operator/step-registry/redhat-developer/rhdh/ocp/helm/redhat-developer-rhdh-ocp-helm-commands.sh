@@ -197,6 +197,8 @@ fi
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
 echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
+IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${QUAY_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
+echo "Image SHA: ${IMAGE_SHA}"
 
 echo "========== Test Execution =========="
 echo "Executing openshift-ci-tests.sh"
