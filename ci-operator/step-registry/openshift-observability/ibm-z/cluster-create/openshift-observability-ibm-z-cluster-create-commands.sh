@@ -2,6 +2,9 @@
 
 set -o errexit
 set -o pipefail
+export HOME=/tmp
+mkdir -p "$HOME/.ssh"
+chmod 700 "$HOME/.ssh"
 
 cd /tmp
 
