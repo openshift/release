@@ -228,7 +228,52 @@ tests:
       TEST_SCENARIOS: Windows_Containers
       TEST_TIMEOUT: "50"
     test:
-    - ref: openshift-extended-test
+    - as: openshift-extended-test
+      cli: latest
+      commands: openshift-extended-test-commands.sh
+      credentials:
+      - collection: ""
+        mount_path: /var/run/vault/tests-private-account
+        name: tests-private-account
+        namespace: test-credentials
+      env:
+      - default: ""
+        name: TEST_SCENARIOS
+      - default: ""
+        name: TEST_FILTERS
+      - default: "15"
+        name: TEST_TIMEOUT
+      - default: "yes"
+        name: FORCE_SUCCESS_EXIT
+      - default: ""
+        name: TEST_IMPORTANCE
+      - default: "6"
+        name: TEST_PARALLEL
+      - default: ""
+        name: TEST_ADDITIONAL
+      - default: ""
+        name: FILTERS_ADDITIONAL
+      - default: ""
+        name: MODULE_FILTERS
+      - default: staging
+        name: TEST_ROSA_LOGIN_ENV
+      - default: "true"
+        name: IS_ACTIVE_CLUSTER_OPENSHIFT
+      - default: "false"
+        name: KUBEADMIN_REMOVED
+      - default: ""
+        name: SHARD_ARGS
+      - default: ""
+        name: MULTISTAGE_PARAM_OVERRIDE_NETOBSERV_CS_IMAGE
+      from: tests-private-pr
+      grace_period: 10m0s
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      timeout: 8h0m0s
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-winc
 - as: debug-winc-vsphere-ipi
   optional: true
