@@ -269,11 +269,11 @@ ssh_instances() {
     # Add Jump Host if bastion exists
     if [[ -n "$proxy_ip" ]]; then
         proxy_args="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${proxy_ip}"
-        if ssh ${ssh_args} ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "exit 0" > /dev/null 2>&1; then
+        if ssh "${ssh_args[@]}" ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "exit 0" > /dev/null 2>&1; then
           printf "%-35s | %-15s | [PASS]\n" "$node_name" "$node_ip"
-          ssh ${ssh_args} ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo journalctl --no-pager" > "${RESOURCE_DUMP_DIR}/${node_name}_journal.log"
-          ssh ${ssh_args} ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo /sbin/ip addr show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-addr-show.log"
-          ssh ${ssh_args} ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo /sbin/ip route show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-route-show.log"
+          ssh "${ssh_args[@]}" ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo journalctl --no-pager" > "${RESOURCE_DUMP_DIR}/${node_name}_journal.log"
+          ssh "${ssh_args[@]}" ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo /sbin/ip addr show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-addr-show.log"
+          ssh "${ssh_args[@]}" ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo /sbin/ip route show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-route-show.log"
         else
           printf "%-35s | %-15s | [FAIL]\n" "$node_name" "$node_ip"
         fi        
