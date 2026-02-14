@@ -271,10 +271,9 @@ ssh_instances() {
     # Add Jump Host if bastion exists
     if [[ -n "$proxy_ip" ]]; then
         ssh_args+=(-J "${bastion_user}@${proxy_ip}")
-        echo "Gathering journalctl logs from ${node_ip}"
         ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${ssh_key} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_user}" core@$node_ip "sudo journalctl --no-pager" > "${RESOURCE_DUMP_DIR}/${node_name}_journal.log"
-        ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${ssh_key} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_user}" core@$node_ip "sudo /sbin/ip addr show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-addr-show.log"
-        ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${ssh_key} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_user}" core@$node_ip "sudo /sbin/ip route show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-route-show.log"
+        #ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${ssh_key} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_user}" core@$node_ip "sudo /sbin/ip addr show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-addr-show.log"
+        #ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${ssh_key} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_user}" core@$node_ip "sudo /sbin/ip route show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-route-show.log"
     fi
     set -e
 
