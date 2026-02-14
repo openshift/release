@@ -247,7 +247,7 @@ ssh_instances() {
     echo "No instances found in the resource group."
     return 0
   fi
-
+  local ssh_args=(-i "${ssh_key}" -o StrictHostKeyChecking=no -o)
   for entry in $instances; do
     local node_name node_ip status
     node_name=$(echo "$entry" | cut -d'|' -f1)
@@ -268,31 +268,18 @@ ssh_instances() {
     set -x 
     # Add Jump Host if bastion exists
     if [[ -n "$proxy_ip" ]]; then
-        if ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${proxy_ip}" ${ssh_user}@$node_ip "exit 0" > /dev/null 2>&1; then
+        proxy_args="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${proxy_ip}"
+        if ssh ${ssh_args} ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "exit 0" > /dev/null 2>&1; then
           printf "%-35s | %-15s | [PASS]\n" "$node_name" "$node_ip"
-          ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${proxy_ip}" ${ssh_user}@$node_ip "sudo journalctl --no-pager" > "${RESOURCE_DUMP_DIR}/${node_name}_journal.log"
-          ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${proxy_ip}" ${ssh_user}@$node_ip "sudo /sbin/ip addr show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-addr-show.log"
-          ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${proxy_ip}" ${ssh_user}@$node_ip "sudo /sbin/ip route show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-route-show.log"
+          ssh ${ssh_args} ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo journalctl --no-pager" > "${RESOURCE_DUMP_DIR}/${node_name}_journal.log"
+          ssh ${ssh_args} ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo /sbin/ip addr show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-addr-show.log"
+          ssh ${ssh_args} ProxyCommand="${proxy_args}" ${ssh_user}@$node_ip "sudo /sbin/ip route show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-route-show.log"
         else
           printf "%-35s | %-15s | [FAIL]\n" "$node_name" "$node_ip"
         fi        
     fi
     set -e
-
-    local attempt=1
-    local success=false
-
-    while [ $attempt -le $max_retries ]; do
-
-    done
-    set +x
-
-    if [ "$success" = true ]; then
-      
-    else
-      
-    fi
-
+    
   done | tee "${RESOURCE_DUMP_DIR}/ssh_instances.txt"
   echo "==== SSH connectivity check completed. ========="
 }
