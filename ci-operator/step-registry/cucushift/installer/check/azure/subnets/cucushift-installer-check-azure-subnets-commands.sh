@@ -71,7 +71,15 @@ subnets_json_array=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.subnets' -j)
 
 if [[ -z "${subnets_json_array}" ]]; then
     # No byo subnets, installer creates them
-    subnets_json_array="[{\"name\": \"${INFRA_ID}-master-subnet\",\"role\": \"control-plane\"},{\"name\": \"${INFRA_ID}-worker-subnet\",\"role\": \"node\"}]"
+    cp_subnet=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.controlPlaneSubnet')
+    compute_subnet=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.computeSubnet')
+    if [[ -z "${cp_subnet}" ]]; then
+        cp_subnet="${INFRA_ID}-master-subnet"
+    fi
+    if [[ -z "${compute_subnet}" ]]; then
+        compute_subnet="${INFRA_ID}-worker-subnet"
+    fi
+    subnets_json_array="[{\"name\": \"${cp_subnet}\",\"role\": \"control-plane\"},{\"name\": \"${compute_subnet}\",\"role\": \"node\"}]"
     if [[ "${OUTBOUND_TYPE}" == "NATGatewayMultiZone" ]]; then
         region_display_name="$(az account list-locations --query "[?name=='${REGION}'].displayName" --output tsv)"
         zone_number="$(az provider show --namespace Microsoft.Network --query "resourceTypes[?resourceType=='natGateways'].zoneMappings[] | [?location=='${region_display_name}'].zones | [0]" --output tsv | wc -l)"
@@ -181,7 +189,7 @@ for machineset in ${worker_machinesets}; do
             fi
         fi
     else
-        echo "ERROR: worker machienset ${machineset} check failed! subnet in machineset is ${machineset_subnet}, expect subnets are {subnets_json_array}!"
+        echo "ERROR: worker machienset ${machineset} check failed! subnet in machineset is ${machineset_subnet}, expect subnets are ${subnets_json_array}!"
         check_result=1
     fi
 done
