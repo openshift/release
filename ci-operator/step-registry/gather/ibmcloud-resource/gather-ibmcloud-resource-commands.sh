@@ -4,9 +4,9 @@ function debug_on_failure() {
     # Only sleep if the exit code is non-zero (failure)
     if [ $exit_code -ne 0 ]; then
         echo "Script failed with exit code $exit_code. Sleeping for debugging purposes."
-        sleep 5h
+        sleep 5s
     else
-        sleep 5h
+        sleep 5s
     fi
 }
 
@@ -215,8 +215,6 @@ function run_command() {
 
 ssh_instances() {
   echo "==== Check the instances SSH connectivity ... ========="
-  local max_retries=3
-  local sleep_time=30
   local ssh_user="core"
   local bastion_user="core"
   local ssh_key="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
@@ -265,37 +263,34 @@ ssh_instances() {
       printf "%-35s | %-15s | [SKIP - bastion node]\n" "$node_name" "$node_ip"
       continue
     fi
-    local ssh_args=(-o BatchMode=yes -o StrictHostKeyChecking=no -o ConnectTimeout=10 -i "$ssh_key")
-    
+       
     set +e
+    set -x 
     # Add Jump Host if bastion exists
     if [[ -n "$proxy_ip" ]]; then
-        ssh_args+=(-J "${bastion_user}@${proxy_ip}")
-        ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${ssh_key} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_user}" core@$node_ip "sudo journalctl --no-pager" > "${RESOURCE_DUMP_DIR}/${node_name}_journal.log"
-        #ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${ssh_key} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_user}" core@$node_ip "sudo /sbin/ip addr show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-addr-show.log"
-        #ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${ssh_key} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${bastion_user}" core@$node_ip "sudo /sbin/ip route show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-route-show.log"
+        if ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${proxy_ip}" ${ssh_user}@$node_ip "exit 0" > /dev/null 2>&1; then
+          printf "%-35s | %-15s | [PASS]\n" "$node_name" "$node_ip"
+          ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${proxy_ip}" ${ssh_user}@$node_ip "sudo journalctl --no-pager" > "${RESOURCE_DUMP_DIR}/${node_name}_journal.log"
+          ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${proxy_ip}" ${ssh_user}@$node_ip "sudo /sbin/ip addr show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-addr-show.log"
+          ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${proxy_ip}" ${ssh_user}@$node_ip "sudo /sbin/ip route show" > "${RESOURCE_DUMP_DIR}/${node_name}_ip-route-show.log"
+        else
+          printf "%-35s | %-15s | [FAIL]\n" "$node_name" "$node_ip"
+        fi        
     fi
     set -e
 
     local attempt=1
     local success=false
-    set -x 
+
     while [ $attempt -le $max_retries ]; do
-      if ssh "${ssh_args[@]}" "${ssh_user}@${node_ip}" "exit 0" > /dev/null 2>&1; then
-        success=true
-        break
-      else
-        #echo "  (Attempt $attempt/$max_retries failed for $node_name, retrying in ${sleep_time}s...)" >&2
-        sleep $sleep_time
-        ((attempt++))
-      fi
+
     done
     set +x
 
     if [ "$success" = true ]; then
-      printf "%-35s | %-15s | [PASS]\n" "$node_name" "$node_ip"
+      
     else
-      printf "%-35s | %-15s | [FAIL]\n" "$node_name" "$node_ip"
+      
     fi
 
   done | tee "${RESOURCE_DUMP_DIR}/ssh_instances.txt"
