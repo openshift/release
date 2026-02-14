@@ -55,8 +55,9 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ${ocp_minor_version} < 14 )); then
+if (( ocp_major_version == 4 && ocp_minor_version < 14 )); then
     echo "CPMS failureDomain check is only available on 4.14+ cluster, skip the check!"
     exit 0
 fi
@@ -110,7 +111,7 @@ if [[ "${platform_value}" != "null" ]]; then
     fi
 else
     # On 4.15+, no failureDomain object is set when installing on singel zone or region without avaiable zone support.
-    if (( ${ocp_minor_version} > 14 )); then
+    if (( ocp_major_version == 4 && ocp_minor_version > 14 )) || (( ocp_major_version > 4 )); then
         failure_domain_value=$(oc get controlplanemachineset cluster -n openshift-machine-api -ojson | jq -r '.spec.template."machines_v1beta1_machine_openshift_io".failureDomains')
         if [[ "${failure_domain_value}" == "null" ]] && [[ -z "${expected_platform}" ]]; then
             echo "INFO: detect single zone or region without avaiable zone support on 4.15+, get expected behavior that no failureDomain object is set in cpms spec!"

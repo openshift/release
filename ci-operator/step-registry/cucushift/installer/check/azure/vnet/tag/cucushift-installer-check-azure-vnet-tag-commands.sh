@@ -67,8 +67,9 @@ fi
 
 critical_check_result=0
 #nsg rule 'apiserver_in' check
+ocp_major_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
-if (( ${ocp_minor_version} < 15 )); then
+if (( ocp_major_version == 4 && ocp_minor_version < 15 )); then
     echo "Shared Tags on vnet checking is only applicable on 4.15+, skip the check!"
     exit 0
 else

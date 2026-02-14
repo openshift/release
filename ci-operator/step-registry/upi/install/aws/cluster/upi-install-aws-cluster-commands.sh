@@ -406,7 +406,7 @@ add_param_to_json InternalApiTargetGroupArn "${INTERNAL_API_TARGET_GROUP}" "${cf
 add_param_to_json InternalServiceTargetGroupArn "${INTERNAL_SERVICE_TARGET_GROUP}" "${cf_params_bootstrap}"
 
 # For OCP <= 4.9, there is no BootstrapInstanceType param in UPI template
-if (( ocp_minor_version >= 10 && ocp_major_version >= 4 )); then
+if (( ocp_major_version == 4 && ocp_minor_version >= 10 )) || (( ocp_major_version > 4 )); then
   add_param_to_json BootstrapInstanceType "${BOOTSTRAP_INSTANCE_TYPE}" "${cf_params_bootstrap}"
 fi
 

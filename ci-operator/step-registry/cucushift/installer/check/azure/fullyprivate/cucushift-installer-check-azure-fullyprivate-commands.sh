@@ -54,6 +54,8 @@ then
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
+
+ocp_major_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f1)
 ocp_minor_version=$(oc version -ojson | jq -r '.openshiftVersion' | cut -d '.' -f2)
 
 INSTALL_CONFIG="${SHARED_DIR}/install-config.yaml"
@@ -78,7 +80,7 @@ else
 fi
 
 #public lb should not be created on 4.11+
-if (( ocp_minor_version >= 11 )); then
+if (( ocp_major_version == 4 && ocp_minor_version >= 11 )) || (( ocp_major_version > 4 )); then
     echo "Check that no public load balancer created on fully private cluster..."
     [[ -n "${public_lb}" ]] && echo "ERROR: Found public load balancer ${public_lb} on fully private cluster!" && no_critical_check_result=1
 fi
