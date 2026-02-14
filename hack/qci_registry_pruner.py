@@ -28,25 +28,48 @@
 # The pruner manages preservation of release payload component images through
 # cooperation with the release controller.
 #
-# Release Controller Responsibilities:
-# 1. When creating a release payload, the release controller pushes a tag with the pattern:
-#    rc_payload__{payload_version}
-#    Example: rc_payload__4.4.0-0.nightly-s390x-2021-03-16-171946
+# Historically, the release controller has mirrored CI (and nightly) payloads to quay.io/openshift-release-dev/dev-release
+# which is a public repository to make release controller created payloads available via quay.io. CI payloads pointed to images on
+# registry.ci.openshift.org. With the move to QCI, CI payloads will begin to refer to images
+# in via quay-proxy.openshift.ci.org .  As soon as this occurs, it is possible for the pruner to remove
+# the QCI component images well before the CI payload has been pruned from the release controller. This means
+# something like an upgrade job attempting to use a CI payload may try to install it and for referenced
+# component images to be missing in QCI.
+# To address this, the release controller will continue to mirror to quay.io/openshift-release-dev/dev-release,
+# but it will also mirror the same release payloads to QCI for informational purposes so that the pruner
+# can avoid pruning components that are still referenced by extant CI payloads.
+# Only the release controller knows when these CI payloads are no longer needed. When that occurs,
+# it will create another informational tag in QCI that informs the pruner that it is safe to
+# remove preservation tags for component images. Once those tags are removed, assuming the normal
+# prune & app.ci istag tags no longer refer to a digest, the component should be garbage collected.
 #
-# 2. When the release controller wants to remove a payload, it pushes a removal request tag:
-#    remove__rc_payload__{payload_version}
-#    Example: remove__rc_payload__4.4.0-0.nightly-s390x-2021-03-16-171946
+# Release Controller Responsibilities:
+# 1. When creating a release payload, the release controller mirrors the release payload
+#    to its normal location in quay.io/openshift-release-dev/dev-release:{payload_version}
+#
+# 2. If it is a CI payload, it will also mirror the release payload to a tag with the
+#    pattern: quay.io/openshift/ci:rc_payload__{payload_version}
+#    Example: rc_payload__4.22.0-0.ci-2026-01-30-070825
+#
+# 3. When the release controller wants to remove a payload, it pushes a removal request tag:
+#    remove__rc_payload__{payload_version} . The content of this manifest is not important --
+#    only the name of the tag is important.
+#    Example: remove__rc_payload__4.22.0-0.ci-2026-01-30-070825
+#
+# Note: Pushing these tags to QCI is only required for CI payloads. Nightly payloads
+# are pushed to quay.io/openshift-release-dev/dev-release but reference ART
+# created component images permanently stored in quay.io/openshift-release-dev/ocp-v4.0-art-dev .
 #
 # Pruner Responsibilities:
 # 1. During tag iteration, the pruner discovers all rc_payload__ tags pushed by the release
-#    controller and checks if they have a corresponding __preserved marker tag.
+#    controller into QCI and checks if they have a corresponding __preserved marker tag.
 #
-# 2. For unpreserved payloads (those without a preserved__ marker), the pruner:
+# 2. For new payloads in QCI (those without a preserved__ marker yet), the pruner:
 #    a. Runs 'oc adm release info' to extract component image references from the payload
 #    b. Creates preservation tags for each component from quay.io/openshift/ci:
 #       rc_payload__{payload_version}__component__{component_name}
-#    c. After successfully preserving all components, creates a marker tag:
-#       preserved__rc_payload__{payload_version}
+#    c. After successfully creating a tag for each component image, it creates a marker tag:
+#       preserved__rc_payload__{payload_version} for the release payload.
 #    This marker prevents re-processing the same payload on subsequent pruner runs.
 #
 # 3. When a remove__rc_payload__ tag is found, the pruner:
@@ -72,10 +95,13 @@ import argparse
 import urllib.request
 import subprocess
 import logging
+import base64
 from typing import Optional, Set, Dict, List
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
 QUAY_OAUTH_TOKEN_ENV_NAME = "QUAY_OAUTH_TOKEN"
+QUAY_DOCKERCONFIGJSON_PATH_ENV_NAME = "QUAY_DOCKERCONFIGJSON_PATH"
 
 # Repository and registry constants
 QUAY_CI_REPO = "openshift/ci"
@@ -134,8 +160,8 @@ def create_tag(repository: str, tag: str, manifest_digest: str, token: str):
         return False
 
 
-def delete_tag(repository: str, tag: str, token: str):
-    """Delete a tag from a quay.io repository"""
+def delete_tag(repository: str, tag: str, token: str) -> bool:
+    """Delete a tag from a quay.io repository. Returns True on success, False on failure."""
     delete_url = f"https://quay.io/api/v1/repository/{repository}/tag/{tag}"
     headers = {
         "Authorization": f"Bearer {token}"
@@ -148,18 +174,22 @@ def delete_tag(repository: str, tag: str, token: str):
     try:
         with urllib.request.urlopen(request) as response:
             response_data = response.read()
-            if response.status != 204:
-                logging.error("Failed to delete tag '%s': %d %s", tag, response.status, response_data)
+            if response.status == 204:
+                logging.info('Successfully deleted %s', tag)
+                return True
+            logging.error("Failed to delete tag '%s': %d %s", tag, response.status, response_data)
+            return False
     except Exception:  # pylint: disable=broad-except
         logging.exception('Failed to delete tag "%s"', tag)
+        return False
 
 
-def fetch_tags(repository: str, token: str, page: int = 1, like: Optional[str] = None):
-    """Fetch tags from the quay.io repository with pagination"""
-    like_adder = ''
-    if like:
-        like_adder = f'&filter_tag_name=like:{like}'
-    tags_url = f"https://quay.io/api/v1/repository/{repository}/tag/?page={page}&limit=100&onlyActiveTags=true" + like_adder
+def fetch_tags(repository: str, token: str, last_tag: Optional[str] = None):
+    """Fetch tags from the quay.io repository with keyset-based pagination using Link header"""
+    namespace, repo = repository.split('/')
+    tags_url = f"https://quay.io/v2/{namespace}/{repo}/tags/list?n=100"
+    if last_tag:
+        tags_url += f"&last={urllib.request.quote(last_tag)}"
     headers = {
         "Authorization": f"Bearer {token}"
     }
@@ -172,8 +202,15 @@ def fetch_tags(repository: str, token: str, page: int = 1, like: Optional[str] =
         response_data = response.read()
         if response.status == 200:
             data = json.loads(response_data)
-            tags = data.get("tags", [])
-            has_more = data.get("has_additional", False)
+            tag_names = data.get("tags", [])
+            tags = [{"name": tag} for tag in tag_names]
+
+            has_more = False
+            link_header = response.headers.get("Link") or response.headers.get("link")
+            if link_header:
+                if 'rel="next"' in link_header or "rel='next'" in link_header:
+                    has_more = True
+
             return tags, has_more
         raise IOError(f"Failed to fetch tags: {response.status} {response_data}")
 
@@ -207,6 +244,9 @@ def get_release_component_images(payload_pullspec: str) -> List[Dict[str, str]]:
     components = []
 
     try:
+        # Note that this logic will not work for multiarch release payloads.
+        # For that, we would need to get image info for all architectures.
+        # Here, we assume a single manifest.
         cmd = ["oc", "adm", "release", "info", "--output=json", payload_pullspec]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=300)
 
@@ -310,15 +350,39 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
         logging.error('OAuth token is required')
         sys.exit(1)
 
+    dockerconfigjson_path = os.getenv(QUAY_DOCKERCONFIGJSON_PATH_ENV_NAME)
+    v2_token = token
+    if dockerconfigjson_path:
+        try:
+            with open(dockerconfigjson_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            auth_string = config.get("auths", {}).get("quay.io/openshift/ci", {}).get("auth", "")
+            if auth_string:
+                decoded = base64.b64decode(auth_string).decode('utf-8')
+                parts = decoded.split(':', 1)
+                if len(parts) == 2:
+                    username, password = parts
+                    auth_url = "https://quay.io/v2/auth?service=quay.io&scope=repository:openshift/ci:pull"
+                    credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+                    request = urllib.request.Request(auth_url, method='GET')
+                    request.add_header("Authorization", f"Basic {credentials}")
+                    try:
+                        with urllib.request.urlopen(request) as response:
+                            if response.status == 200:
+                                data = json.loads(response.read())
+                                v2_token = data.get("token") or token
+                    except Exception:  # pylint: disable=broad-except
+                        pass
+        except Exception:  # pylint: disable=broad-except
+            pass
+
     confirm = args.confirm
     ttl_days = args.ttl_days
 
-    # Fetch all tags with pagination
-    page = 1
+    last_tag = None
     has_more = True
 
     prune_target_tags = set()
-    pruned_tags = set()
     tag_count = 0
     mod_by = 5
 
@@ -328,11 +392,15 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
     remove_requests: Set[str] = set()  # versions to remove
     component_tags: Dict[str, List[str]] = {}  # version -> list of component tag names
 
+    # Executor for concurrent tag deletions (up to 100 simultaneous requests)
+    delete_executor = ThreadPoolExecutor(max_workers=100)
+    delete_futures = []  # List of futures
+
     while has_more:
         retries = 5
         while True:
             try:
-                tags, has_more = fetch_tags(QUAY_CI_REPO, token, page)
+                tags, has_more = fetch_tags(QUAY_CI_REPO, v2_token, last_tag)
                 break
             except Exception:  # pylint: disable=broad-except
                 logging.exception("Error retrieving tags")
@@ -394,16 +462,24 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                 if days_difference > ttl_days and image_tag not in prune_target_tags:
                     prune_target_tags.add(image_tag)
                     if confirm:
-                        try:
-                            delete_tag(QUAY_CI_REPO, tag=image_tag, token=token)
-                            logging.debug('Removed %s', image_tag)
-                            pruned_tags.add(image_tag)
-                        except Exception:  # pylint: disable=broad-except
-                            logging.exception('Error while trying to delete tag %s', image_tag)
+                        delete_futures.append(delete_executor.submit(delete_tag, QUAY_CI_REPO, image_tag, token))
                     else:
                         logging.debug('Would have removed %s', image_tag)
 
-        page += 1
+        # Update last_tag for keyset pagination (use the last tag name from current batch)
+        if tags:
+            last_tag = tags[-1]['name']
+        else:
+            has_more = False
+
+    # Wait for all prune delete operations to complete
+    prune_success_count = 0
+    if delete_futures:
+        logging.info('Waiting for %d prune delete operations to complete...', len(delete_futures))
+        for future in delete_futures:
+            if future.result():  # Returns True on success
+                prune_success_count += 1
+        delete_futures.clear()
 
     # Process release payload preservation
     logging.info("Processing release payload preservation...")
@@ -429,8 +505,8 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
 
     # Process removal requests
     removal_requests_processed = 0
-    removal_tags_removed = 0
     removal_tags_target = 0
+    removal_success_count = 0
 
     if remove_requests:
         logging.info("Processing %d removal requests...", len(remove_requests))
@@ -461,12 +537,7 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                 # Remove all related tags
                 if confirm:
                     for tag_to_remove in tags_to_remove:
-                        try:
-                            delete_tag(QUAY_CI_REPO, tag_to_remove, token)
-                            logging.info("Removed tag: %s", tag_to_remove)
-                            removal_tags_removed += 1
-                        except Exception:  # pylint: disable=broad-except
-                            logging.exception("Error removing tag %s", tag_to_remove)
+                        delete_futures.append(delete_executor.submit(delete_tag, QUAY_CI_REPO, tag_to_remove, token))
                 else:
                     for tag_to_remove in tags_to_remove:
                         logging.info("Would remove tag: %s", tag_to_remove)
@@ -477,30 +548,36 @@ def run(args, start_time):  # pylint: disable=too-many-statements,redefined-oute
                 removal_tags_target += 1
 
                 if confirm:
-                    try:
-                        delete_tag(QUAY_CI_REPO, remove_tag, token)
-                        logging.info("Removed removal request tag: %s", remove_tag)
-                        removal_tags_removed += 1
-                    except Exception:  # pylint: disable=broad-except
-                        logging.exception("Error removing request tag %s", remove_tag)
+                    delete_futures.append(delete_executor.submit(delete_tag, QUAY_CI_REPO, remove_tag, token))
                 else:
                     logging.info("Would remove request tag: %s", remove_tag)
+
+        # Wait for all removal delete operations to complete
+        if delete_futures:
+            logging.info('Waiting for %d removal delete operations to complete...', len(delete_futures))
+            for future in delete_futures:
+                if future.result():  # Returns True on success
+                    removal_success_count += 1
+            delete_futures.clear()
 
     finish_time = datetime.now()
     logging.info('Duration: %s', finish_time - start_time)
     logging.info('Total tags scanned: %d', tag_count)
-    logging.info('Tags pruned (if --confirm): %d', len(prune_target_tags))
-    logging.info('Tags actually pruned: %d', len(pruned_tags))
+    logging.info('Tags targeted for pruning: %d', len(prune_target_tags))
+    if confirm:
+        logging.info('Tags successfully pruned: %d', prune_success_count)
     logging.info('Release payloads needing preservation: %d', payloads_needing_preservation)
     if confirm:
         logging.info('Release payloads preserved: %d', payloads_preserved)
     else:
         logging.info('Release payloads that would be preserved: %d', payloads_needing_preservation)
     logging.info('Removal requests processed: %d', removal_requests_processed)
+    logging.info('Release payload tags targeted for removal: %d', removal_tags_target)
     if confirm:
-        logging.info('Release payload tags removed: %d', removal_tags_removed)
-    else:
-        logging.info('Release payload tags that would be removed: %d', removal_tags_target)
+        logging.info('Release payload tags successfully removed: %d', removal_success_count)
+
+    # Cleanup executor
+    delete_executor.shutdown(wait=False)
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%dT%H:%M:%S')
 

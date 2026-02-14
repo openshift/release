@@ -23,14 +23,6 @@ base_images:
     name: 4.9-priv
     namespace: ocp-private
     tag: oc-rpms
-  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.8
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
   tools:
     name: 4.9-priv
     namespace: ocp-private
@@ -45,20 +37,9 @@ canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   from: tools
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
   from: base
@@ -73,10 +54,6 @@ images:
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.16-openshift-4.9:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.9
   to: pod
 promotion:
   to:
@@ -210,7 +187,7 @@ tests:
     from: src
 - as: k8s-e2e-gcp
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-kubernetes-e2e-gcp
 - as: k8s-e2e-gcp-five-control-plane-replicas
   steps:
@@ -238,7 +215,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-gcp
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-aws-ovn

@@ -14,12 +14,12 @@ base_images:
   oadp-e2e-qe:
     name: oadp-e2e-qe
     namespace: oadp-qe
-    tag: master
+    tag: release-v1.5
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.20
+    tag: rhel-9-release-golang-1.20-openshift-4.17
 images:
 - context_dir: .
   dockerfile_path: dockerfiles/testing/interop/Dockerfile
@@ -55,6 +55,7 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      CNV_VERSION: "4.21"
       COMPUTE_NODE_TYPE: c5n.metal
       EXECUTE_KUBEVIRT_TESTS: "true"
       FIREWATCH_CONFIG: |
@@ -66,6 +67,7 @@ tests:
               {"step": "oadp-execute-tests", "failure_type": "test_failure", "classification": "Test Failure", "group": {"name": "lp-tests", "priority": 2}, "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/cr/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.21-lp","self-managed-lp","oadp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: talayan@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: OADP
@@ -73,9 +75,9 @@ tests:
       MAP_TESTS: "true"
       OADP_TEST_FOCUS: interop
       OCP_VERSION: "4.21"
-      ODF_OPERATOR_CHANNEL: stable-4.19
+      ODF_OPERATOR_CHANNEL: stable-4.20
       ODF_STORAGE_CLUSTER_NAME: odf-operator
-      ODF_VERSION_MAJOR_MINOR: "4.19"
+      ODF_VERSION_MAJOR_MINOR: "4.20"
       OPERATORS: |
         [
           {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group":"oadp-operator-group"}
@@ -90,7 +92,6 @@ tests:
     - ref: interop-tests-deploy-cnv
     - ref: interop-tests-deploy-odf
     - ref: oadp-execute-tests
-    - ref: mpiit-data-router-reporter
     workflow: oadp-ipi-aws
 zz_generated_metadata:
   branch: oadp-1.5

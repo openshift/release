@@ -7,26 +7,22 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   hypershift-operator-init:
     name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
     namespace: hypershift
     tag: latest
   manila-csi-driver-operator-test:
     name: 4.21-priv
     namespace: ocp-private
     tag: manila-csi-driver-operator-test
-  ocp_4.21_base-rhel9:
-    name: 4.21-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
-  openshift_release_rhel-9-release-golang-1.24-openshift-4.21:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.21
   openstack-cinder-csi-driver-operator-test:
     name: 4.21-priv
     namespace: ocp-private
@@ -36,26 +32,8 @@ build_root:
   use_build_cache: true
 canonical_go_repository: github.com/openshift/hypershift
 images:
-- inputs:
-    openshift_release_rhel-9-release-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.21
-  to: hypershift-operator
 - dockerfile_path: Dockerfile.control-plane
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: hypershift
-- dockerfile_path: Dockerfile.e2e
-  inputs:
-    openshift_release_rhel-9-release-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.24-openshift-4.21
-  to: hypershift-tests
 - dockerfile_literal: |
     FROM base
     RUN dnf install -y python3-pip
@@ -86,11 +64,6 @@ releases:
       include_built_images: true
       name: 4.21-priv
       namespace: ocp-private
-  latest-416:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.16"
   latest-417:
     candidate:
       product: ocp
@@ -144,6 +117,13 @@ resources:
     requests:
       cpu: 4000m
       memory: 2.5Gi
+  verify:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 4000m
+      memory: 8Gi
 tests:
 - as: verify
   commands: make verify
@@ -158,7 +138,7 @@ tests:
 - as: e2e-aks
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aks
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
@@ -173,26 +153,10 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
     workflow: hypershift-azure-aks-e2e
-- as: e2e-aks-4-20
-  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
-  steps:
-    cluster_profile: hypershift
-    dependencies:
-      OCP_IMAGE_LATEST: release:latest-420
-      OCP_IMAGE_N1: release:latest-419
-      OCP_IMAGE_N2: release:latest-418
-      OCP_IMAGE_N3: release:latest-417
-      OCP_IMAGE_N4: release:latest-416
-      OCP_IMAGE_PREVIOUS: release:initial-420
-    env:
-      AUTH_THROUGH_CERTS: "true"
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      HYPERSHIFT_AZURE_LOCATION: centralus
-    workflow: hypershift-azure-aks-e2e
 - as: e2e-aks-override
   run_if_changed: (/overrides\.yaml$)
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aks
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
@@ -204,7 +168,7 @@ tests:
   - build-tmpfs
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
@@ -218,7 +182,7 @@ tests:
   as: e2e-aws-minimal
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
@@ -233,7 +197,7 @@ tests:
   as: e2e-aws-techpreview
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor
@@ -249,7 +213,7 @@ tests:
   - build-tmpfs
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     dependencies:
       HYPERSHIFT_RELEASE_LATEST: hypershift-operator-init
     env:
@@ -262,33 +226,16 @@ tests:
   - build-tmpfs
   run_if_changed: (/overrides\.yaml$)
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TEST_CPO_OVERRIDE: "1"
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-4-20
-  capabilities:
-  - build-tmpfs
-  run_if_changed: ^(test/e2e|hypershift-operator)
-  steps:
-    cluster_profile: hypershift
-    dependencies:
-      OCP_IMAGE_LATEST: release:latest-420
-      OCP_IMAGE_N1: release:latest-419
-      OCP_IMAGE_N2: release:latest-418
-      OCP_IMAGE_N3: release:latest-417
-      OCP_IMAGE_N4: release:latest-416
-      OCP_IMAGE_PREVIOUS: release:initial-420
-    env:
-      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      REQUEST_SERVING_COMPONENT_TEST: "true"
-    workflow: hypershift-aws-e2e-external
 - as: e2e-kubevirt-aws-ovn-reduced
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
@@ -313,7 +260,7 @@ tests:
   as: e2e-kubevirt-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: Standard_D16as_v5
@@ -327,18 +274,20 @@ tests:
   as: e2e-aws-metrics
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-metrics
 - always_run: false
   as: e2e-conformance
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       PUBLIC_ONLY: "true"
     workflow: hypershift-aws-conformance
 - always_run: false
   as: e2e-kubevirt-metal-conformance
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-ocp-hcp
@@ -350,7 +299,7 @@ tests:
   as: e2e-azure-aks-ovn-conformance
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aks
     workflow: hypershift-azure-aks-conformance
 - as: security
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
@@ -363,7 +312,7 @@ tests:
   as: e2e-openstack-aws
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       TECH_PREVIEW_NO_UPGRADE: "true"
@@ -377,7 +326,7 @@ tests:
   as: e2e-openstack-aws-nfv
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-nfv
       NFV_NODEPOOLS: "true"
@@ -390,7 +339,7 @@ tests:
   as: e2e-openstack-aws-conformance
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
       TECH_PREVIEW_NO_UPGRADE: "true"
@@ -402,7 +351,7 @@ tests:
   as: e2e-openstack-aws-csi-cinder
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
       TECH_PREVIEW_NO_UPGRADE: "true"
@@ -416,7 +365,7 @@ tests:
   as: e2e-openstack-aws-csi-manila
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
       TECH_PREVIEW_NO_UPGRADE: "true"
@@ -430,7 +379,7 @@ tests:
   as: e2e-aws-autonode
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     dependencies:
       OCP_IMAGE_N1: release:n1minor
       OCP_IMAGE_N2: release:n2minor

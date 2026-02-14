@@ -1,6 +1,6 @@
 base_images:
   assisted-test-infra:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -15,18 +15,6 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.16_base-rhel9:
-    name: "4.22"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
   tools:
     name: "4.22"
     namespace: ocp
@@ -37,22 +25,8 @@ build_root:
 images:
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: tools
-  inputs:
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: hello-openshift
 promotion:
   to:
@@ -129,7 +103,7 @@ tests:
   optional: true
   shard_count: 2
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       FIPS_ENABLED: "true"
       TEST_SUITE: openshift/conformance/serial
@@ -177,7 +151,7 @@ tests:
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     observers:
       enable:
       - observers-resource-watch
@@ -268,7 +242,7 @@ tests:
 - always_run: false
   as: e2e-gcp-ovn-upgrade
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     observers:
       enable:
       - observers-resource-watch
@@ -277,7 +251,7 @@ tests:
   as: e2e-gcp-ovn-rt-upgrade
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     observers:
       enable:
       - observers-resource-watch
@@ -683,7 +657,7 @@ tests:
   as: e2e-azure-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-e2e-azure-etcd-scaling
 - always_run: false
   as: e2e-vsphere-ovn-etcd-scaling
@@ -692,16 +666,13 @@ tests:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
 - always_run: false
-  as: e2e-vsphere-ovn-dualstack-primaryv6
+  as: e2e-openstack-dualstack-v6primary
   optional: true
   steps:
-    cluster_profile: vsphere-elastic
+    cluster_profile: openstack-hwoffload
     env:
-      IP_FAMILIES: DualStackIPv6Primary
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-vsphere-ovn-dualstack
+      CONFIG_TYPE: dualstack-v6primary
+    workflow: openshift-e2e-openstack-dualstack
 - always_run: false
   as: e2e-aws-etcd-recovery
   optional: true
@@ -722,7 +693,7 @@ tests:
   as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -746,7 +717,7 @@ tests:
   as: e2e-gcp-ovn-usernamespace
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/usernamespace
@@ -837,7 +808,7 @@ tests:
   as: e2e-hypershift-conformance
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 zz_generated_metadata:
   branch: release-4.22

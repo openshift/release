@@ -27,26 +27,11 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.18_base-rhel9:
-    name: "4.18"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.18
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
-  inputs:
-    ocp_4.18_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.18:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.18:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.18
   to: cluster-etcd-operator
 promotion:
   to:
@@ -162,7 +147,7 @@ tests:
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-gcp
@@ -207,7 +192,6 @@ tests:
     cluster_profile: aws
     workflow: openshift-perfscale-e2e-configmap-scale
 - as: e2e-aws-ovn-serial
-  shard_count: 2
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
@@ -227,7 +211,7 @@ tests:
   as: e2e-azure-ovn-etcd-scaling
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-e2e-azure-etcd-scaling
 - always_run: false
   as: e2e-vsphere-ovn-etcd-scaling

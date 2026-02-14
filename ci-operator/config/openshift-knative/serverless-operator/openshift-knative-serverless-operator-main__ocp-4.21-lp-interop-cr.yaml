@@ -27,12 +27,12 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.23-openshift-4.19
-  origin_scos-4.20_cli-artifacts:
-    name: scos-4.20
+  origin_scos-4.22_cli-artifacts:
+    name: scos-4.22
     namespace: origin
     tag: cli-artifacts
-  origin_scos-4.20_operator-registry:
-    name: scos-4.20
+  origin_scos-4.22_operator-registry:
+    name: scos-4.22
     namespace: origin
     tag: operator-registry
 build_root:
@@ -62,9 +62,9 @@ images:
     ocp_ubi-minimal_9:
       as:
       - registry.access.redhat.com/ubi9/ubi-minimal
-    origin_scos-4.20_operator-registry:
+    origin_scos-4.22_operator-registry:
       as:
-      - registry.ci.openshift.org/origin/scos-4.20:operator-registry
+      - registry.ci.openshift.org/origin/scos-4.22:operator-registry
   to: serverless-index
 - dockerfile_path: olm-catalog/serverless-operator/Dockerfile
   inputs:
@@ -96,9 +96,9 @@ images:
     openshift_knative-serving-src_knative-v1.17:
       as:
       - registry.ci.openshift.org/openshift/knative-serving-src:knative-v1.17
-    origin_scos-4.20_cli-artifacts:
+    origin_scos-4.22_cli-artifacts:
       as:
-      - registry.ci.openshift.org/origin/scos-4.20:cli-artifacts
+      - registry.ci.openshift.org/origin/scos-4.22:cli-artifacts
   to: serverless-source-image
 - dockerfile_path: serving/ingress/Dockerfile
   inputs:
@@ -143,11 +143,11 @@ tests:
         {
           "failure_rules":
             [
-              {"step": "knative-eventing-kafka-broker-e2e", "failure_type": "test_failure", "classification": "knative-eventing-kafka-broker-e2e Test Failure", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "knative-serving-eventing-e2e", "failure_type": "test_failure", "classification": "knative-serving-eventing-e2e Test Failure", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "operator-e2e", "failure_type": "test_failure", "classification": "operator-e2e Test Failure", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "knative-*", "failure_type": "pod_failure", "classification": "knative Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
-              {"step": "operator-e2e", "failure_type": "pod_failure", "classification": "operator-e2e Test Execution", "jira_additional_labels": ["!default","interop-tests"]}
+              {"step": "knative-eventing-kafka-broker-e2e", "failure_type": "test_failure", "classification": "knative-eventing-kafka-broker-e2e Test Failure", "jira_additional_labels": ["!default","interop-tests"], "jira_assignee": "!default"},
+              {"step": "knative-serving-eventing-e2e", "failure_type": "test_failure", "classification": "knative-serving-eventing-e2e Test Failure", "jira_additional_labels": ["!default","interop-tests"], "jira_assignee": "!default"},
+              {"step": "operator-e2e", "failure_type": "test_failure", "classification": "operator-e2e Test Failure", "jira_additional_labels": ["!default","interop-tests"], "jira_assignee": "!default"},
+              {"step": "knative-*", "failure_type": "pod_failure", "classification": "knative Test Execution", "jira_additional_labels": ["!default","interop-tests"], "jira_assignee": "!default"},
+              {"step": "operator-e2e", "failure_type": "pod_failure", "classification": "operator-e2e Test Execution", "jira_additional_labels": ["!default","interop-tests"], "jira_assignee": "!default"}
             ]
         }
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.21-lp","self-managed-lp","serverless-lp"]'
@@ -161,7 +161,7 @@ tests:
     test:
     - as: operator-e2e
       commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
-        make test-e2e-with-kafka
+        MAP_TESTS=true make test-e2e-with-kafka
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -188,7 +188,7 @@ tests:
           memory: 200Mi
     - as: knative-serving-eventing-e2e
       commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
-        make test-upstream-e2e-no-upgrade
+        MAP_TESTS=true make test-upstream-e2e-no-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -215,7 +215,7 @@ tests:
           memory: 200Mi
     - as: knative-eventing-kafka-broker-e2e
       commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin SKIP_MESH_AUTH_POLICY_GENERATION=true
-        make test-upstream-e2e-kafka-no-upgrade
+        MAP_TESTS=true make test-upstream-e2e-kafka-no-upgrade
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator

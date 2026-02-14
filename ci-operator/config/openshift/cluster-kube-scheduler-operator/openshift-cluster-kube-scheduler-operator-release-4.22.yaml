@@ -1,24 +1,8 @@
-base_images:
-  ocp_4.21_base-rhel9:
-    name: "4.22"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cluster-kube-scheduler-operator
 promotion:
   to:
@@ -97,6 +81,28 @@ tests:
   optional: true
   steps:
     workflow: openshift-ci-security
+- always_run: false
+  as: e2e-aws-operator-serial-ote
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SUITE: openshift/cluster-kube-scheduler-operator/operator/serial
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+  timeout: 8h0m0s
+- always_run: false
+  as: e2e-aws-operator-parallel-ote
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SUITE: openshift/cluster-kube-scheduler-operator/operator/parallel
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

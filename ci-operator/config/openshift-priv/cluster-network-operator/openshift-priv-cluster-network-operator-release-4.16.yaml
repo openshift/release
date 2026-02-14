@@ -11,27 +11,12 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.16_base-rhel9:
-    name: 4.16-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-network-operator
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cluster-network-operator
 promotion:
   to:
@@ -176,7 +161,7 @@ tests:
   as: e2e-azure-ovn
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn
 - always_run: false
   as: e2e-azure-ovn-dualstack
@@ -192,7 +177,7 @@ tests:
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-azure-ovn-upgrade
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
@@ -295,7 +280,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-ovn-hypershift-conformance
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: lint
   commands: |
@@ -310,7 +295,7 @@ tests:
   as: e2e-network-mtu-migration-ovn-ipv4
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       MTU_DECREASE: "400"
       MTU_INCREASE: "200"

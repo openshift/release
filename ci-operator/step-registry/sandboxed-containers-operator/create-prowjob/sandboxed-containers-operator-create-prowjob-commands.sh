@@ -16,44 +16,6 @@ set -o pipefail
 GANGWAY_API_ENDPOINT="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions"
 ARO_CLUSTER_VERSION="${ARO_CLUSTER_VERSION:-4.17}"
 
-# Function to get latest OSC catalog tag
-get_latest_osc_catalog_tag() {
-    local apiurl="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
-    local page=1
-    local max_pages=20
-    local test_pattern="^[0-9]+\.[0-9]+(\.[0-9]+)?-[0-9]+$"
-    local latest_tag=""
-
-    while [[ ${page} -le ${max_pages} ]]; do
-        local resp
-        if ! resp=$(curl -sf "${apiurl}/tag/?limit=100&page=${page}"); then
-            break
-        fi
-
-        if ! jq -e '.tags | length > 0' <<< "${resp}" >/dev/null; then
-            break
-        fi
-
-        latest_tag=$(echo "${resp}" | \
-            jq -r --arg test_string "${test_pattern}" \
-            '.tags[]? | select(.name | test($test_string)) | "\(.start_ts) \(.name)"' | \
-            sort -nr | head -n1 | awk '{print $2}')
-
-        if [[ -n "${latest_tag}" ]]; then
-            break
-        fi
-
-        ((page++))
-    done
-
-    if [[ -z "${latest_tag}" ]]; then
-        echo "  ERROR: No matching OSC catalog tag found, using default fallback"
-        latest_tag="latest"
-    fi
-
-    echo "${latest_tag}"
-}
-
 get_expected_version() {
     # Extract expected version from catalog tag
     # If catalog tag is in X.Y.Z-[0-9]+ format, returns X.Y.Z portion
@@ -113,14 +75,6 @@ validate_and_set_defaults() {
 
     # OCP version to test
     OCP_VERSION="${OCP_VERSION:-4.19}"
-    # Validate OCP version format (X.Y or X.Y.Z)
-    if [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
-        echo "ERROR: Invalid OCP_VERSION format. Expected format: X.Y or X.Y.Z (e.g., 4.19 or 4.20.6)"
-        exit 1
-    fi
-
-    # UPI installer version - always X.Y (major.minor only)
-    UPI_INSTALLER_VERSION=$(echo "${OCP_VERSION}" | cut -d'.' -f1,2)
 
     # OCP release channel (stable, fast, candidate, eus)
     OCP_CHANNEL="${OCP_CHANNEL:-fast}"
@@ -130,8 +84,27 @@ validate_and_set_defaults() {
         exit 1
     fi
 
-    # If a specific patch version (X.Y.Z) is requested, verify it exists in the channel
-    if [[ "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    # Validate OCP version format
+    # - X.Y (e.g., 4.19) - latest from channel
+    # - X.Y.Z (e.g., 4.20.6) - specific GA version
+    # - X.Y.Z-rc.N or X.Y.Z-ec.N (e.g., 4.21.0-rc.0) - pre-release, only with OCP_CHANNEL candidate
+    if [[ "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(rc|ec)\.[0-9]+$ ]]; then
+        # RC/EC version - require candidate channel
+        if [[ "${OCP_CHANNEL}" != "candidate" ]]; then
+            echo "ERROR: RC/EC versions (${OCP_VERSION}) require OCP_CHANNEL=candidate. Got: ${OCP_CHANNEL}"
+            exit 1
+        fi
+    elif [[ ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+        echo "ERROR: Invalid OCP_VERSION format. Expected: X.Y, X.Y.Z, or X.Y.Z-rc.N/ec.N (with candidate channel)"
+        echo "Examples: 4.19, 4.20.6, 4.21.0-rc.0"
+        exit 1
+    fi
+
+    # UPI installer version - always X.Y (major.minor only)
+    UPI_INSTALLER_VERSION=$(echo "${OCP_VERSION}" | cut -d'.' -f1,2)
+
+    # If a specific version (X.Y.Z or X.Y.Z-rc.N/ec.N) is requested, verify it exists in the channel
+    if [[ "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(rc|ec)\.[0-9]+)?$ ]]; then
         if ! check_version_in_channel "${OCP_VERSION}" "${OCP_CHANNEL}"; then
             exit 1
         fi
@@ -227,13 +200,10 @@ validate_and_set_defaults() {
 
     # Set catalog source variables based on TEST_RELEASE_TYPE
     if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
-      # OSC Catalog Configuration - get latest or use provided
-      if [[ -z "${OSC_CATALOG_TAG:-}" ]]; then
-          OSC_CATALOG_TAG=$(get_latest_osc_catalog_tag)
-
-      else
-          echo "Using provided OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
-      fi
+      # OSC Catalog Configuration - always use :latest tag
+      # The env-cm step will resolve the actual latest tag at runtime
+      OSC_CATALOG_TAG="${OSC_CATALOG_TAG:-latest}"
+      echo "Using OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
 
       # Extract expected OSC version from catalog tag if it matches X.Y.Z-[0-9]+ format
       extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
@@ -266,8 +236,9 @@ show_usage() {
     echo ""
     echo "Environment variables for 'create' command:"
     echo "  ARO_CLUSTER_VERSION            - ARO cluster version (default: ${ARO_CLUSTER_VERSION})"
-    echo "  OCP_VERSION                    - OpenShift version (default: 4.19)"
+    echo "  OCP_VERSION                    - OpenShift version: X.Y, X.Y.Z, or X.Y.Z-rc.N/ec.N (default: 4.19)"
     echo "  OCP_CHANNEL                    - Release channel: stable, fast, candidate, eus (default: fast)"
+    echo "                                   Note: RC/EC versions require OCP_CHANNEL=candidate"
     echo "  TEST_RELEASE_TYPE              - Test release type: Pre-GA or GA (default: Pre-GA)"
     echo "  EXPECTED_OSC_VERSION           - Expected OSC version (default: 1.10.1)"
     echo "  INSTALL_KATA_RPM               - Install Kata RPM: true or false (default: true)"
@@ -280,7 +251,7 @@ show_usage() {
     echo "  MUST_GATHER_ON_FAILURE_ONLY    - Must-gather on failure only: true or false (default: true)"
     echo "  AWS_REGION_OVERRIDE            - AWS region (default: us-east-2)"
     echo "  CUSTOM_AZURE_REGION            - Azure region (default: eastus)"
-    echo "  OSC_CATALOG_TAG                - OSC catalog tag (auto-detected if not provided)"
+    echo "  OSC_CATALOG_TAG                - OSC catalog tag (default: latest, resolved at runtime by env-cm step)"
     echo "  TRUSTEE_URL                    - Trustee URL (default: empty)"
     echo "  INITDATA                       - Initdata from Trustee(default: empty) The gzipped and base64 encoded initdata.toml file from Trustee"
 }

@@ -1,8 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
-set -u
-set -o pipefail
+set -euo pipefail
 
 function timestamp() {
     date -u --rfc-3339=seconds
@@ -32,16 +30,16 @@ function wait_for_state() {
 
     echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to exist..."
     for _ in {1..30}; do
-        oc get ${object} --selector="${selector}" -n=${namespace} |& grep -ivE "(no resources found|not found)" && break || sleep 5
+        oc get "${object}" --selector="${selector}" -n="${namespace}" |& grep -ivE "(no resources found|not found)" && break || sleep 5
     done
 
     echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to become '${state}'..."
-    oc wait --for=${state} --timeout=${timeout} ${object} --selector="${selector}" -n="${namespace}"
+    oc wait --for="${state}" --timeout="${timeout}" "${object}" --selector="${selector}" -n="${namespace}"
     return $?
 }
 
 function check_cm_operator() {
-    echo "Checking the persence of the cert-manager Operator as prerequisite..."
+    echo "Checking the presence of the cert-manager Operator as prerequisite..."
     if ! oc wait deployment/cert-manager-operator-controller-manager -n cert-manager-operator --for=condition=Available --timeout=0; then
         echo "The cert-manager Operator is not installed or unavailable. Skipping rest of steps..."
         exit 0

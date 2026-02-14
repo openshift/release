@@ -1,0 +1,61 @@
+base_images:
+  ubi-python:
+    name: ubi-python-312
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.18
+images:
+- dockerfile_literal: |
+    FROM ubi-python
+    USER 0
+
+    # Install uv package manager and create symlinks
+    RUN dnf install -y git && \
+        ln -sf /usr/bin/python3.12 /usr/bin/python && \
+        ln -sf /usr/bin/pip3.12 /usr/bin/pip && \
+        pip install --no-cache-dir uv && \
+        dnf clean all
+
+    COPY . /workspace/
+    WORKDIR /workspace/rosa-cora-agent
+
+    # Install dependencies using uv (--system flag for non-venv)
+    RUN uv pip install --system .
+    RUN uv pip install --system pytest pytest-asyncio ruff mypy
+  from: ubi-python
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift-online/rosa-cora-agent
+  to: python-test-runner
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 512Mi
+tests:
+- as: unit
+  commands: |
+    pytest -v test/
+  container:
+    from: python-test-runner
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: lint
+  commands: |
+    ruff check .
+    mypy main.py --ignore-missing-imports
+  container:
+    from: python-test-runner
+  optional: true
+  skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-cora-agent

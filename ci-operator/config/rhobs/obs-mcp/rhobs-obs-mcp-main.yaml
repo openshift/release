@@ -1,0 +1,70 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.22
+images:
+- context_dir: .
+  dockerfile_path: Containerfile
+  to: obs-mcp
+promotion:
+  to:
+  - excluded_images:
+    - obs-mcp
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-obs-mcp
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: gcp-observability
+    test:
+    - as: deploy-obs-mcp
+      cli: latest
+      commands: IMAGE=${IMAGE_OBS_MCP} make test-e2e-openshift-deploy
+      dependencies:
+      - env: IMAGE_OBS_MCP
+        name: obs-mcp
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 400Mi
+    - ref: rhobs-obs-mcp-e2e-tests
+    workflow: ipi-gcp
+- as: e2e-obs-mcp-gcp
+  optional: true
+  steps:
+    cluster_profile: gcp-observability
+    test:
+    - as: deploy-obs-mcp
+      cli: latest
+      commands: IMAGE=${IMAGE_OBS_MCP} make test-e2e-openshift-deploy
+      dependencies:
+      - env: IMAGE_OBS_MCP
+        name: obs-mcp
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 400Mi
+    - ref: rhobs-obs-mcp-e2e-tests
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: main
+  org: rhobs
+  repo: obs-mcp

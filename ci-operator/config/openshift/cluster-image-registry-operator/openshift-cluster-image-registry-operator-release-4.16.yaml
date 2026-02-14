@@ -7,25 +7,10 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.16_base-rhel9:
-    name: "4.16"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: cluster-image-registry-operator
 promotion:
   to:
@@ -85,7 +70,7 @@ tests:
   optional: true
   run_if_changed: ^(.*gcs.*|vendor/(cloud\.google\.com|google\.golang\.org)/.*)\.go$
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-gcp-operator
@@ -120,7 +105,7 @@ tests:
   optional: true
   run_if_changed: ^(.*azure.*|vendor/github\.com/Azure/.*)\.go$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     test:
     - as: test
       cli: latest
@@ -168,11 +153,11 @@ tests:
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-hypershift
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - as: e2e-hypershift-conformance
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 zz_generated_metadata:
   branch: release-4.16

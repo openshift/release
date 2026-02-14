@@ -1,21 +1,12 @@
-base_images:
-  origin_4.14_artifacts:
-    name: "4.14"
-    namespace: origin
-    tag: artifacts
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
 - dockerfile_path: Dockerfile.ci
   to: layering-build
 - dockerfile_path: Dockerfile.rpms
-  inputs:
-    origin_4.14_artifacts:
-      as:
-      - registry.ci.openshift.org/origin/4.14:artifacts
   to: okd-rpms
 - dockerfile_path: Dockerfile.generated
   inputs:
@@ -56,7 +47,7 @@ tests:
   as: e2e-gcp
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-aws-ovn
   steps:
@@ -70,7 +61,7 @@ tests:
     workflow: openshift-e2e-ovirt-minimal
 - as: e2e-gcp-upgrade
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     workflow: openshift-upgrade-gcp
 - always_run: false
   as: e2e-aws-crun

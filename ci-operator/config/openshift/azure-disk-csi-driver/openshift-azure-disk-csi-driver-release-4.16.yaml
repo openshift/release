@@ -3,14 +3,6 @@ base_images:
     name: commitchecker
     namespace: ci
     tag: latest
-  ocp_4.16_base-rhel9:
-    name: "4.16"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
   tests-private:
     name: tests-private
     namespace: ci
@@ -20,13 +12,6 @@ build_root:
 canonical_go_repository: github.com/kubernetes-sigs/azuredisk-csi-driver
 images:
 - dockerfile_path: Dockerfile.openshift.rhel7
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: azure-disk-csi-driver
 promotion:
   to:
@@ -70,11 +55,11 @@ tests:
     workflow: openshift-e2e-azure
 - as: e2e-azure-csi
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-e2e-azure-csi
 - as: e2e-azure-ovn-upgrade
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - always_run: false
   as: e2e-azure-csi-extended
@@ -88,7 +73,7 @@ tests:
   as: e2e-azure-manual-oidc
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: verify-commits
   commands: |

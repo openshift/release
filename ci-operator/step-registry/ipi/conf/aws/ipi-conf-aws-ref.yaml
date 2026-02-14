@@ -27,7 +27,7 @@ ref:
   - name: CONTROL_PLANE_INSTANCE_TYPE
     default: ""
     documentation: |-
-      The instance type to use for control plane nodes (e.g. AWS https://aws.amazon.com/ec2/instance-types/). 
+      The instance type to use for control plane nodes (e.g. AWS https://aws.amazon.com/ec2/instance-types/).
       When "" (default), the step uses m6a.${CONTROL_PLANE_INSTANCE_SIZE} if it's available in the region, otherwise uses m6i.${CONTROL_PLANE_INSTANCE_SIZE}.
   - name: COMPUTE_NODE_TYPE
     default: ""
@@ -69,6 +69,10 @@ ref:
     default: "yes"
     documentation: |-
       Add AZs to the install-config.yaml
+  - name: AWS_REGION_OVERWRITE
+    default: ""
+    documentation: |-
+      Overwrite the region used for the cluster.
   - name: BASE_DOMAIN
     default: "origin-ci-int-aws.dev.rhcloud.com"
     documentation: |-
@@ -80,9 +84,9 @@ ref:
       More info:
       https://github.com/openshift/enhancements/blob/master/enhancements/machine-api/aws-imds-v2-support.md
       https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
-      
+
       Valid values are:
-      * "" (default) - corresponds to "Optional" behaviour. 
+      * "" (default) - corresponds to "Optional" behaviour.
       * "Required" - sets IMDSv2 to Required for all machines in install-config, metadata service is not accessible without auth procedure.
       * "Optional" - auth procedure on metadata service is optional
   - name: COMPUTE_ARCH
@@ -107,10 +111,21 @@ ref:
     documentation: |-
       Experimental feature allowing jobs to use NAT instances instead of NAT gateways, in certain accounts, for cost
       reduction purposes.
+  - name: RELEASE_CONTROLLER_JOB
+    default: "false"
+    documentation: |-
+      Set to true by the release controller if the job was triggered by the release controller. Allows for different behaviors
+      for release-controller launches.
   - name: DEDICATED_HOST
     default: "no"
     documentation: |-
       Allows users to enable configuration of dedicated hosts for compute nodes.  Valid options are "yes" and "no".  When "yes", the
       configuration will create a dedicated host for each zone the "worker" compute pool has configured.
+  - name: IP_FAMILY
+    default: ""
+    documentation: |-
+      IP family configuration for dual-stack. Valid values: DualStackIPv4Primary, DualStackIPv6Primary.
+      When set, configures both IPv4 and IPv6 network stacks for AWS clusters using the ipFamily field.
+      When "" (default), dual-stack is not configured.
   documentation: |-
     The IPI AWS configure step generates the AWS-specific install-config.yaml contents based on the cluster profile and optional input files.

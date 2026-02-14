@@ -1,53 +1,38 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.21_base-rhel9:
-    name: 4.23-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-kube-apiserver-operator
 images:
 - dockerfile_path: Dockerfile.rhel7
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cluster-kube-apiserver-operator
 promotion:
   to:
@@ -101,7 +86,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-gcp-operator
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
@@ -143,6 +128,25 @@ tests:
       cli: latest
       commands: |
         make test-e2e-encryption-aesgcm JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-operator-encryption-kms
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
       from: src
       resources:
         requests:
@@ -294,7 +298,7 @@ tests:
   optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
@@ -450,12 +454,12 @@ tests:
   as: e2e-short-cert-rotation-azure
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     workflow: openshift-e2e-cert-rotation-short-azure
 - as: e2e-gcp-operator-serial-ote
   optional: true
   steps:
-    cluster_profile: gcp-3
+    cluster_profile: gcp
     env:
       TEST_SUITE: openshift/cluster-kube-apiserver-operator/operator/serial
     test:

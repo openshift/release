@@ -69,24 +69,8 @@ chmod 600 "/tmp/temp_ssh_key"
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${ECO_CI_CD_INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${ECO_CI_CD_INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
 
-echo "Archive must gather"
-# Temporarily disable set -e to capture SSH exit code
-set +e
-timeout -s 9 "${ECO_GOTESTS_SSH_TIMEOUT}" ssh \
-    -o ServerAliveInterval=60 \
-    -o ServerAliveCountMax=3 \
-    -o StrictHostKeyChecking=no \
-    "${BASTION_USER}@${BASTION_IP}" -i /tmp/temp_ssh_key bash -s -- << 'EOF'
-set -o nounset
-set -o errexit
-set -o pipefail
-
-tar -czvf /artifacts/must-gather.tar.gz /must-gather 
-
-EOF
-
 echo "Copy must gather to artifacts directory"
 
 scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/temp_ssh_key \
-  "${BASTION_USER}@${BASTION_IP}":/artifacts/must-gather.tar.gz "${ARTIFACT_DIR}/must-gather.tar.gz"
+  "${BASTION_USER}@${BASTION_IP}":/tmp/artifacts/must-gather.tar.gz "${ARTIFACT_DIR}/must-gather.tar.gz"
 

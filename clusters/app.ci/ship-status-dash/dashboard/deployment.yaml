@@ -22,6 +22,20 @@ spec:
     spec:
       serviceAccountName: ship-status
       initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
       - name: db-migration
         image: quay-proxy.ci.openshift.org/openshift/ci:ship-status-dash_migrate_latest
         command: ["./migrate"]
@@ -34,6 +48,24 @@ spec:
                 name: postgres
                 key: dsn
       containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --ref=main
+        - --period=30s
+        - --root=/tmp/git-sync
+        - --max-failures=3
+        - --link=release
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
       - name: oauth-proxy
         image: quay.io/openshift/origin-oauth-proxy:4.20
         args:
@@ -76,11 +108,13 @@ spec:
         image: quay-proxy.ci.openshift.org/openshift/ci:ship-status-dash_dashboard_latest
         command: ["./dashboard"]
         args:
-          - "--config=/app/config/config.yaml"
+          - "--config=/var/repo/release/core-services/ship-status/dashboard-config.yaml"
           - "--dsn=$(DATABASE_DSN)"
           - "--port=8080"
           - "--hmac-secret-file=/etc/secrets/hmac-secret/hmac"
           - "--cors-origin=https://ship-status.ci.openshift.org"
+          - "--slack-base-url=https://ship-status.ci.openshift.org/"
+          - "--slack-workspace-url=https://redhat-internal.slack.com/"
         ports:
           - containerPort: 8080
             protocol: TCP
@@ -90,9 +124,15 @@ spec:
               secretKeyRef:
                 name: postgres
                 key: dsn
+          - name: SLACK_BOT_TOKEN
+            valueFrom:
+              secretKeyRef:
+                #TODO(sgoeddel): replace with custom SHIP Status bot when available
+                name: slack-credentials-dptp-bot
+                key: oauth_token
         volumeMounts:
-          - name: config
-            mountPath: /app/config
+          - name: release
+            mountPath: /var/repo
             readOnly: true
           - name: hmac-secret
             mountPath: /etc/secrets/hmac-secret
@@ -119,9 +159,8 @@ spec:
           timeoutSeconds: 3
           failureThreshold: 3
       volumes:
-        - name: config
-          configMap:
-            name: dashboard-config
+        - name: release
+          emptyDir: {}
         - name: oauth-proxy-cookie-secret
           secret:
             secretName: oauth-proxy-cookie-secret

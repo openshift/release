@@ -17,6 +17,19 @@ fi
 function gather() {
   oc get InfraEnv -n ${AGENT_NAMESPACE} ${CLUSTER_NAME} -o yaml > "${ARTIFACT_DIR}/InfraEnv.yaml"
   oc get BareMetalHost -n ${AGENT_NAMESPACE} -o yaml > "${ARTIFACT_DIR}/extra_baremetalhosts.yaml"
+
+  # Dump the network configuration
+  ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- << 'EOF' > /tmp/net-dump.xml
+/usr/bin/virsh net-dumpxml ostestbm
+EOF
+
+  # Get the list of worker IPs and check the systemd status of each worker
+  while read -r worker_ip; do
+    ssh "${SSHOPTS[@]}" "root@${IP}" bash -sx -- "${worker_ip}" << 'EOF' > "${ARTIFACT_DIR}/worker-${worker_ip}-systemctl-failed.txt"
+ip=$1
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@${ip} systemctl --failed
+EOF
+  done < <(grep extraworker /tmp/net-dump.xml | grep "ip='[^']*\." | sed -n "s/.*ip='\([^']*\)'.*/\1/p")
 }
 
 trap gather EXIT
@@ -43,6 +56,19 @@ metadata:
   name: ${CLUSTER_NAME}
   namespace: ${AGENT_NAMESPACE}
 spec:
+  ignitionConfigOverride: |
+    {
+      "ignition": {"version": "3.2.0"},
+      "systemd": {
+        "units": [{
+          "name": "NetworkManager-wait-online.service",
+          "dropins": [{
+            "name": "timeout.conf",
+            "contents": "[Service]\nEnvironment=NM_ONLINE_TIMEOUT=600\n"
+          }]
+        }]
+      }
+    }
   cpuArchitecture: x86_64
   pullSecretRef:
     name: pull-secret
