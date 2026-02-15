@@ -87,6 +87,14 @@ cp "${ARTIFACT_DIR}"/*.xml "${SHARED_DIR}"
 
 if [ "${exit_code:-0}" -ne 0 ]; then
     echo "deploy_test failed with exit code $exit_code"
+    if [[ -n "${CNV_WAIT_FOR_LIVE_DEBUG:-}" ]]; then
+        echo "Waiting to allow interactive debugging"
+        if ((CNV_WAIT_FOR_LIVE_DEBUG > 0)); then
+            sleep "${CNV_WAIT_FOR_LIVE_DEBUG}"
+        else
+            sleep inf
+        fi
+    fi
     exit "${exit_code}"
 else
     echo "deploy_test succeeded"
