@@ -55,9 +55,11 @@ done
 echo "Create host_vars directory"
 mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
 
-echo "Copy host inventory files from SHARED_DIR (populated by hub-deploy step)"
-cp ${SHARED_DIR}/bastion /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
-cp ${SHARED_DIR}/master0 /eco-ci-cd/inventories/ocp-deployment/host_vars/master0
+echo "Process host inventory files from vault credentials"
+find /var/host_variables/ -mindepth 2 -maxdepth 2 -type d 2>/dev/null | while read -r dir; do
+    echo "Process host inventory file: ${dir}"
+    process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
+done
 
 echo "Set CLUSTER_NAME env var"
 if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
