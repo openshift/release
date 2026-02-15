@@ -3,17 +3,20 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x
 
 function info {
   echo "[$(date +'%Y-%m-%dT%H:%M:%S%z')]: $*"
 }
 
 function gather_recert_logs {
+  mkdir -p "${ARTIFACT_DIR}/ssh-bastion-gather"
+
   info "Adding systemd recert.service log to ${ARTIFACT_DIR}/recert.log ..."
   ssh -i "${KUBE_SSH_KEY_PATH}" "${SSH_OPTS[@]}" core@"${SINGLE_NODE_IP}" "sudo journalctl -u recert.service" > "${ARTIFACT_DIR}/recert.log"
 
-  info "Adding recert_summary_clean.yaml to ${ARTIFACT_DIR}/ssh-bastion/gather/ ..."
-  scp -i "${KUBE_SSH_KEY_PATH}" "${SSH_OPTS[@]}" core@"${SINGLE_NODE_IP}":/etc/kubernetes/recert_summary_clean.yaml "${ARTIFACT_DIR}/"
+  info "Adding recert_summary_clean.yaml to ${ARTIFACT_DIR}/ssh-bastion-gather/ ..."
+  scp -i "${KUBE_SSH_KEY_PATH}" "${SSH_OPTS[@]}" core@"${SINGLE_NODE_IP}":/etc/kubernetes/recert_summary_clean.yaml "${ARTIFACT_DIR}/ssh-bastion-gather/recert_summary_clean.yaml"
 }
 
 KUBE_SSH_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
@@ -29,15 +32,27 @@ if oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}" >/
       INGRESS_HOST="$(oc get service --all-namespaces -l run=ssh-bastion -o go-template='{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}')"
   fi
   bastion_user="core"
-elif [ -f $SHARED_DIR/bastion_public_address ]; then
-  info "No service ssh-bastion found, using AUX_HOST as bastion host for equinix metal..."
-  if [ -z "${SINGLE_NODE_IP:-}" ]; then
-      SINGLE_NODE_IP="$(oc get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')"
+elif [[ -s "${SHARED_DIR}/bastion_public_address" ]]; then
+  info "Found external bastion host address in ${SHARED_DIR}/bastion_public_address, configuring SSH ProxyCommand..."
+
+  if [[ -z "${SINGLE_NODE_IP:-}" ]]; then
+      SINGLE_NODE_IP="$(oc --insecure-skip-tls-verify get machines -n openshift-machine-api -o 'jsonpath={.items[*].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)"
+      if [[ -z "${SINGLE_NODE_IP:-}" ]]; then
+          SINGLE_NODE_IP="$(oc --insecure-skip-tls-verify get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')"
+      fi
   fi
-  if [ -z "${INGRESS_HOST:-}" ]; then
-      INGRESS_HOST=$(cat $SHARED_DIR/bastion_public_address)
+
+  if [[ -z "${INGRESS_HOST:-}" ]]; then
+      INGRESS_HOST="$(head -n 1 "${SHARED_DIR}/bastion_public_address")"
   fi
-  bastion_user="root"
+
+  # AWS-provisioned bastion host writes the SSH user to SHARED_DIR.
+  # Other platforms may reuse bastion_public_address but require a different user (e.g. root).
+  if [[ -s "${SHARED_DIR}/bastion_ssh_user" ]]; then
+      bastion_user="$(head -n 1 "${SHARED_DIR}/bastion_ssh_user")"
+  else
+      bastion_user="root"
+  fi
 else
   info "No any bastion host found, skip log collection..."
   no_bastion=true
@@ -65,6 +80,9 @@ recert_script=$(cat << EOF
 #!/usr/bin/env bash
 
 set -euoE pipefail
+
+trap 'rc=\$?; if [[ "\${rc}" -ne 0 ]]; then touch /var/recert.failed; fi' EXIT
+rm -f /var/recert.failed
 
 export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/localhost.kubeconfig
 function wait_for_api {
@@ -199,6 +217,8 @@ EOF
 # Base64 encode the script for use in the MachineConfig.
 b64_script=$(echo "${recert_script}" | base64 -w 0)
 
+sleep 7200
+
 machineconfig=$(oc create -f - -o jsonpath='{.metadata.name}' << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
@@ -234,6 +254,7 @@ spec:
         name: recert.service
 EOF
 )
+
 info "Created \"${machineconfig}\" MachineConfig"
 
 info "Waiting for master MachineConfigPool to have condition=updating..."
@@ -242,18 +263,27 @@ oc wait --for=condition=updating machineconfigpools master --timeout 2m
 # Make sure there is a bastion there, otherwise skip waiting for recert completion logging
 if [[ "$no_bastion" = false && "X${SINGLE_NODE_IP}" != "X" && "X${INGRESS_HOST}" != "X" ]]; then
   info "Waiting for recert to be completed..."
-  while true; do
-    if ssh "${SSH_OPTS[@]}" "core@${SINGLE_NODE_IP}" test -e /var/recert.done; then
+  RECERT_WAIT_ATTEMPTS="${RECERT_WAIT_ATTEMPTS:-360}" # 360 * 5s = ~30 minutes
+  recert_completed="false"
+  for attempt in $(seq 1 "${RECERT_WAIT_ATTEMPTS}"); do
+    if timeout 20s ssh "${SSH_OPTS[@]}" "core@${SINGLE_NODE_IP}" test -e /var/recert.done; then
       info "Recert completed successfully"
+      recert_completed="true"
       break
-    elif ssh "${SSH_OPTS[@]}" "core@${SINGLE_NODE_IP}" test -e /var/recert.failed; then
+    elif timeout 20s ssh "${SSH_OPTS[@]}" "core@${SINGLE_NODE_IP}" test -e /var/recert.failed; then
       info "Recert failed"
       exit 1
     else
-      info "Waiting for recert to be completed..."
+      info "Waiting for recert to be completed... (${attempt}/${RECERT_WAIT_ATTEMPTS})"
       sleep 5
     fi
   done
+
+  if [[ "${recert_completed}" != "true" ]]; then
+    info "Timed out waiting for recert completion marker files on node (${RECERT_WAIT_ATTEMPTS} attempts)"
+    gather_recert_logs || true
+    exit 1
+  fi
 fi
 
 info "Waiting for master MachineConfigPool to have condition=updated..."
