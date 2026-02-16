@@ -62,8 +62,8 @@ function wait_mcp_ready () {
 
 }
 #create image content source policy
-#https://docs.redhat.com/en/documentation/openshift_container_platform/4.12/html/images/image-configuration
-#ImageContentSourcePolicy is deprecated, will replace with ImageDigestMirrorSet with OCP 4.12 EOL(January 17, 2027)
+#https://docs.redhat.com/en/documentation/openshift_container_platform/4.13/html/images/image-configuration
+#ImageContentSourcePolicy is deprecated, will change to ImageDigestMirrorSet after 4.12 EOL
 function create_icsp () {
   cat <<EOF | oc apply -f -
 apiVersion: operator.openshift.io/v1alpha1
@@ -94,7 +94,6 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-14
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-15
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-16
-    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-operator-bundle-v3-17
     source: registry.redhat.io/quay/quay-operator-bundle
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-9
@@ -105,7 +104,6 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-14
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-15
     - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-16
-    - quay.io/redhat-user-workloads/quay-eng-tenant/container-security-operator-bundle-v3-17
     source: registry.redhat.io/quay/quay-container-security-operator-bundle
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-9
@@ -116,7 +114,6 @@ spec:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-14
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-15
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-16
-    - quay.io/redhat-user-workloads/quay-eng-tenant/quay-bridge-operator-bundle-v3-17
     source: registry.redhat.io/quay/quay-bridge-operator-bundle
   - mirrors:
     - quay.io/redhat-user-workloads/quay-eng-tenant/quay-quay-v3-9
@@ -191,7 +188,7 @@ spec:
     source: registry-proxy.engineering.redhat.com
 EOF
   if [ $? == 0 ]; then
-    echo "Create the ICSP successfully"
+    echo "Create the ICSP successfully" 
   else
     echo "!!! Fail to create the ICSP"
     return 1
