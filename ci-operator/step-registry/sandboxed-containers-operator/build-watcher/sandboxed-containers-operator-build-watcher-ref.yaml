@@ -1,0 +1,30 @@
+ref:
+  as: sandboxed-containers-operator-build-watcher
+  from: cli
+  commands: sandboxed-containers-operator-build-watcher-commands.sh
+  credentials:
+    - namespace: test-credentials
+      name: osc-build-watcher-secrets
+      mount_path: /var/run/osc-secrets
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Watches for new accepted OCP releases via Cincinnati API and triggers
+    OpenShift Sandboxed Containers test jobs via Gangway API.
+
+    This step:
+    - Queries Cincinnati API for latest accepted releases (4.17-4.22)
+    - Checks Prow Deck API to avoid duplicate testing within 7 days
+    - Triggers downstream-release jobs via Gangway API for new versions
+
+    Required secrets in Vault (namespace: test-credentials, name: osc-build-watcher-secrets):
+    - gangway-api-token: Token obtained from DPTP team for Gangway API access
+
+    Jobs triggered (per OCP version):
+    - periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-release-azure-ipi-kata
+    - periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-release-azure-ipi-peerpods
+    - periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-release-azure-ipi-coco
+    - periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-release-aws-ipi-peerpods
+    - periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-release-aws-ipi-coco
