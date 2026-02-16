@@ -279,7 +279,7 @@ spec:
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
-          whenUnsatisfiable: DoNotSchedule
+          whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
               app: nap-placeholder
@@ -296,6 +296,13 @@ EOF
     echo "Creating placeholder deployment to trigger NAP node provisioning"
     echo "$PLACEHOLDER_YAML" | oc apply -f -
 
+    collect_nap_artifacts() {
+        echo "Collecting NAP artifacts"
+        oc get nodepool.karpenter.sh -o yaml > "${ARTIFACT_DIR}/karpenter-nodepools.yaml" 2>&1 || true
+        oc get aksnodeclass -o yaml > "${ARTIFACT_DIR}/karpenter-aksnodeclasses.yaml" 2>&1 || true
+        oc get nodes -o custom-columns='NAME:.metadata.name,ZONE:.metadata.labels.topology\.kubernetes\.io/zone,INSTANCE-TYPE:.metadata.labels.node\.kubernetes\.io/instance-type,READY:.status.conditions[-1:].status' > "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>&1 || true
+    }
+
     echo "Waiting for NAP to provision nodes"
     # Wait for the desired number of Ready nodes (NAP-provisioned + system pool)
     DESIRED_NODES=$((${AKS_NODE_COUNT:-9} + 3))
@@ -311,6 +318,7 @@ EOF
             echo "ERROR: Timed out waiting for NAP nodes. Only $READY_NODES/$DESIRED_NODES ready."
             oc get nodes || true
             oc get nodepool.karpenter.sh -o yaml || true
+            collect_nap_artifacts
             exit 1
         fi
         echo "Waiting for NAP nodes: $READY_NODES/$DESIRED_NODES ready (${NAP_ELAPSED}s/${NAP_TIMEOUT}s)..."
@@ -318,10 +326,7 @@ EOF
         NAP_ELAPSED=$((NAP_ELAPSED + 30))
     done
 
-    echo "Collecting NAP artifacts"
-    oc get nodepool.karpenter.sh -o yaml > "${ARTIFACT_DIR}/karpenter-nodepools.yaml" 2>&1 || true
-    oc get aksnodeclass -o yaml > "${ARTIFACT_DIR}/karpenter-aksnodeclasses.yaml" 2>&1 || true
-    oc get nodes -o custom-columns='NAME:.metadata.name,ZONE:.metadata.labels.topology\.kubernetes\.io/zone,INSTANCE-TYPE:.metadata.labels.node\.kubernetes\.io/instance-type,READY:.status.conditions[-1:].status' > "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>&1 || true
+    collect_nap_artifacts
 
     echo "Cleaning up placeholder deployment"
     oc delete deployment nap-placeholder -n default --ignore-not-found
