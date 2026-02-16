@@ -859,22 +859,26 @@ tests:
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
-- as: azure-ipi-fullyprivate-proxy-f60-security-profiles
-  cron: 2 17 25 1,3,5,7,9,11 *
+- as: azure-ipi-f60-security-profiles
+  cron: 17 13 18 1,3,5,7,9,11 *
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       CATALOG_SOURCE_NAME: security-profiles-operator
+      E2E_RUN_TAGS: '@spo'
       FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      MULTISTAGE_PARAM_OVERRIDE_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-isc-tenant/security-profiles-operator-fbc-4-13@sha256:5e6ebbdbbdd2277a2d517a67e30269a6e55826c3ec75db9f10b14e247216bf1d
       TEST_FILTERS: ~HyperShiftMGMT&;~DEPRECATED&
       TEST_PARALLEL: "3"
       TEST_SCENARIOS: Security_Profiles_Operator|Node_Audit_Logging
     test:
     - ref: file-integrity-konflux-catalogsource
     - ref: openshift-extended-test
+    - ref: openshift-extended-web-tests
     - ref: openshift-e2e-test-qe-report
-    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: baremetalds-ipi-ovn-ipv4-fips-f60
   capabilities:
   - intranet
