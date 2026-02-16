@@ -122,8 +122,21 @@ function stop_containers {
   echo "Stopping kubelet.service..."
   systemctl stop kubelet.service
 
+  # kube-apiserver will log when its previous instance has been shut down
+  # forcefully, which it detects through the existence of a termination
+  # indication file. There's a conformance test ("kubelet terminates
+  # kube-apiserver gracefully extended") that fails when it notices that log
+  # line in the kube-apiserver pod logs. To avoid that test failing, we tell
+  # cri-o to give containers a grace period through the crictl timeout CLI flag
+  # before forcing them to stop. This should give kube-apiserver enough time to
+  # shut down gracefully and avoid this failure. However we don't want to wait
+  # indefinitely so we set a timeout of 3 minutes, which should be more than
+  # enough for kube-apiserver to shut down gracefully but we will still
+  # forcefully stop containers which are not stopping for whatever reason but
+  # we also probably don't care about them shutting down non-gracefully.
+
   echo "Stopping all containers..."
-  until crictl ps -q | xargs --no-run-if-empty --max-args 1 --max-procs 10 crictl stop --timeout 5 &> /dev/null
+  until crictl ps -q | xargs --no-run-if-empty --max-args 1 --max-procs 10 crictl stop --timeout 180 &> /dev/null
   do
     sleep 2
   done
