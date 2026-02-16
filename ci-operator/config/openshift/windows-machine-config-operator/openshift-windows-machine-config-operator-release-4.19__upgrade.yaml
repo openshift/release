@@ -1,0 +1,197 @@
+base_images:
+  4-19-bundle:
+    name: "4.19"
+    namespace: ocp
+    tag: windows-machine-config-operator-bundle
+  4-19-wmco:
+    name: "4.19"
+    namespace: ocp
+    tag: windows-machine-config-operator-test
+  4-20-bundle:
+    name: "4.20"
+    namespace: ocp
+    tag: windows-machine-config-operator-bundle
+  4-20-wmco:
+    name: "4.20"
+    namespace: ocp
+    tag: windows-machine-config-operator-test
+  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
+  ocp_builder_rhel-9-golang-1.24-openshift-4.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.19
+  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.19
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: make build
+build_root:
+  from_repository: true
+  use_build_cache: true
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.19"
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.20"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 400Mi
+tests:
+- as: 4-20-upgrade
+  cron: 46 8 * * 0
+  steps:
+    cluster_profile: azure-2
+    test:
+    - as: install
+      cli: initial
+      commands: |
+        export WMCO_NS=openshift-windows-machine-config-operator
+        oc create namespace $WMCO_NS
+        oc label --overwrite=true ns $WMCO_NS openshift.io/cluster-monitoring=true \
+        pod-security.kubernetes.io/enforce=privileged
+
+        operator-sdk run bundle --timeout=15m --security-context-config restricted -n $WMCO_NS "$WMCO_BUNDLE" \
+        || oc get csv -n $WMCO_NS | awk '{print $1}' | tail -n1 | xargs oc patch csv -n $WMCO_NS --type='json' \
+        -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\": \"$WMCO_OPERATOR\"}]"
+
+        sleep 10
+        oc delete deployment -n $WMCO_NS windows-machine-config-operator
+
+        retries=0
+        while ! oc get -n $WMCO_NS deployment windows-machine-config-operator; do
+          if [[ $retries -eq 10 ]]; then
+            echo max retries hit
+            exit 1
+          fi
+          sleep 1m
+          retries=$((retries+1))
+        done
+        oc wait --timeout=10m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      dependencies:
+      - env: WMCO_BUNDLE
+        name: 4-19-bundle
+      - env: WMCO_OPERATOR
+        name: 4-19-wmco
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test-setup
+      cli: initial
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        oc create secret generic cloud-private-key --from-file=private-key.pem="${KUBE_SSH_KEY_PATH}" -n openshift-windows-machine-config-operator
+        make upgrade-test-setup
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: upgrade
+      cli: initial
+      commands: |
+        export WMCO_NS="openshift-windows-machine-config-operator"
+        CATALOG_NAME="windows-machine-config-operator-catalog"
+        export UPGRADE_VERSION="v10.20.1"
+        export UPGRADE_DIR="/tmp/wmco-v10.20.1"
+
+        echo "Upgrading cluster to 4.20..."
+        oc adm upgrade \
+          --force \
+          --allow-explicit-upgrade \
+          --to-image="$UPGRADE_IMAGE"
+
+        echo "Waiting for cluster upgrade to complete..."
+        oc wait clusterversion version \
+          --for=condition=Available=True \
+          --for=condition=Progressing=False \
+          --timeout=120m
+
+        for i in {1..20}; do
+          UPGRADEABLE=$(oc get operatorcondition -n $WMCO_NS -o jsonpath='{.items[0].status.conditions[?(@.type=="Upgradeable")].status}')
+          if [[ "$UPGRADEABLE" == "True" ]]; then
+            break
+          fi
+          sleep 60
+        done
+
+        echo "Cluster upgrade successful!"
+
+        echo "Running WMCO upgrade to v10.20.1..."
+
+        operator-sdk run bundle-upgrade \
+          --security-context-config restricted \
+          --skip-tls-verify \
+          -n $WMCO_NS \
+          "$NEXT_WMCO_BUNDLE" \
+          || { CSV_NAME=$(oc get csv -n $WMCO_NS -o jsonpath='{.items[-1].metadata.name}'); \
+               oc patch csv "$CSV_NAME" -n $WMCO_NS --type='json' \
+               -p="[{\"op\": \"replace\", \"path\": \"/spec/install/spec/deployments/0/spec/template/spec/containers/0/image\", \"value\":\"$NEXT_WMCO_OPERATOR\"}]"; }
+
+        NEW_CSV="windows-machine-config-operator.v10.20.1"
+        for i in {1..10}; do
+          CSV_PHASE=$(oc get csv $NEW_CSV -n $WMCO_NS -o jsonpath='{.status.phase}')
+          if [[ "$CSV_PHASE" == "Succeeded" ]]; then
+            break
+          fi
+          sleep 60
+        done
+
+        retries=0
+        while ! oc get -n $WMCO_NS deployment windows-machine-config-operator; do
+          if [[ $retries -eq 30 ]]; then
+            echo max retries hit
+            exit 1
+          fi
+          sleep 1m
+          retries=$((retries+1))
+        done
+        oc wait --timeout=10m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
+      dependencies:
+      - env: UPGRADE_IMAGE
+        name: release:latest
+      - env: NEXT_WMCO_BUNDLE
+        name: 4-20-bundle
+      - env: NEXT_WMCO_OPERATOR
+        name: 4-20-wmco
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        make upgrade-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    workflow: ipi-azure-ovn-hybrid
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: release-4.19
+  org: openshift
+  repo: windows-machine-config-operator
+  variant: upgrade
