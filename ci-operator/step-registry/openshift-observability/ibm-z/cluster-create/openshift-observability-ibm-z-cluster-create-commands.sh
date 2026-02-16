@@ -22,6 +22,13 @@ if [[ ! -f "$PRIVATE_KEY_FILE" ]]; then
     exit 1
 fi
 
+# Ensure the private key file ends with a newline (some parsers expect it)
+if [[ -s "$PRIVATE_KEY_FILE" ]]; then
+    if [[ "$(tail -c1 "$PRIVATE_KEY_FILE")" != $'\n' ]]; then
+        printf '\n' >> "$PRIVATE_KEY_FILE"
+    fi
+fi
+
 # --- PREPARE SSH KEY ---
 cp -f "$PRIVATE_KEY_FILE" "$SSH_KEY_PATH"
 chmod 400 "$SSH_KEY_PATH"
