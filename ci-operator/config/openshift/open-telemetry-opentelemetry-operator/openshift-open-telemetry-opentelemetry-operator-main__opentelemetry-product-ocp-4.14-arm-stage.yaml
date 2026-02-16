@@ -45,10 +45,12 @@ tests:
 - as: opentelemetry-stage-tests
   cron: 0 0 30 2 *
   steps:
-    cluster_profile: gcp-observability
+    cluster_profile: azure-observability
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
       OPERATORS: |
         [
@@ -71,7 +73,7 @@ tests:
         operator-sdk run bundle --timeout=5m --security-context-config restricted -n openshift-opentelemetry-operator "$MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE"
         oc wait --for condition=Available -n openshift-opentelemetry-operator deployment opentelemetry-operator-controller-manager
       env:
-      - default: ""
+      - default: quay.io/redhat-user-workloads/rhosdt-tenant/otel/opentelemetry-bundle@sha256:08e2cd159611810df6eab4813bb858fcf32908effaaa65a2f643e4627eb90774
         name: MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE
       from: operator-sdk
       resources:
@@ -80,7 +82,7 @@ tests:
           memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-opentelemetry-stage
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

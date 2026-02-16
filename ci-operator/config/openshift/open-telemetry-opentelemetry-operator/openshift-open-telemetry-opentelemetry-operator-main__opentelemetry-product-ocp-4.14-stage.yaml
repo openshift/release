@@ -1,10 +1,10 @@
 base_images:
   cli:
-    name: "4.12"
+    name: "4.14"
     namespace: ocp
     tag: cli
   upi-installer:
-    name: "4.12"
+    name: "4.14"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -22,7 +22,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -35,6 +35,7 @@ tests:
     cluster_profile: azure-observability
     env:
       BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      MULTISTAGE_PARAM_OVERRIDE_OTEL_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1105402
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-tempo-operator", "target_namespaces": "", "operator_group": "openshift-tempo-operator"},
@@ -42,7 +43,7 @@ tests:
             {"name": "amq-streams", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""}
         ]
       SKIP_TESTS: tests/e2e/smoke-ip-families tests/e2e-otel/*aws* tests/e2e-otel/google*
-        tests/e2e-openshift/export-to-cluster-logging-lokistack tests/e2e-openshift/kafka
+        tests/e2e-openshift/export-to-cluster-logging-lokistack
     test:
     - ref: distributed-tracing-install-otel-konflux-catalogsource
     - ref: install-operators
@@ -52,4 +53,4 @@ zz_generated_metadata:
   branch: main
   org: openshift
   repo: open-telemetry-opentelemetry-operator
-  variant: opentelemetry-product-ocp-4.12-stage
+  variant: opentelemetry-product-ocp-4.14-stage
