@@ -22,15 +22,16 @@ if [[ ! -f "$PRIVATE_KEY_FILE" ]]; then
     exit 1
 fi
 
-# Ensure the private key file ends with a newline (some parsers expect it)
-if [[ -s "$PRIVATE_KEY_FILE" ]]; then
-    if [[ "$(tail -c1 "$PRIVATE_KEY_FILE")" != $'\n' ]]; then
-        printf '\n' >> "$PRIVATE_KEY_FILE"
-    fi
-fi
 
 # --- PREPARE SSH KEY ---
+# Copy the (read-only) secret to a writable location, then normalize it there
 cp -f "$PRIVATE_KEY_FILE" "$SSH_KEY_PATH"
+# Ensure the copied key ends with a newline (some parsers expect it)
+if [[ -s "$SSH_KEY_PATH" ]]; then
+    if [[ "$(tail -c1 "$SSH_KEY_PATH")" != $'\n' ]]; then
+        printf '\n' >> "$SSH_KEY_PATH"
+    fi
+fi
 chmod 400 "$SSH_KEY_PATH"
 
 # --- SSH CONFIGURATION ---
