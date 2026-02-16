@@ -63,7 +63,8 @@ datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
 
 # Start deployment with logging
 ## DEPLOYMENT_LOG="${REMOTE_WORK_DIR}/logs/make_all_$(date +%Y%m%d_%H%M%S).log"
-DEPLOYMENT_LOG="${REMOTE_WORK_DIR}/logs/make_all_${datetime_string}.log"
+## uncomment later:
+## DEPLOYMENT_LOG="${REMOTE_WORK_DIR}/logs/make_all_${datetime_string}.log"
 
 # Git clone the dpf-openshift repo on hypervisor
 if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; env; cd ${REMOTE_WORK_DIR}; mkdir -p openshift-dpf-${datetime_string}; cd openshift-dpf-${datetime_string}; git clone -b ${OPENSHIFT_DPF_BRANCH} ${OPENSHIFT_DPF_GITHUB_REPO_URL}"; then
