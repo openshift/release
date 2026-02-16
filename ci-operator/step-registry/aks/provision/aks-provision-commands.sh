@@ -276,6 +276,13 @@ spec:
       labels:
         app: nap-placeholder
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: nap-placeholder
       containers:
         - name: pause
           image: registry.k8s.io/pause:3.9
@@ -310,6 +317,11 @@ EOF
         sleep 30
         NAP_ELAPSED=$((NAP_ELAPSED + 30))
     done
+
+    echo "Collecting NAP artifacts"
+    oc get nodepool.karpenter.sh -o yaml > "${ARTIFACT_DIR}/karpenter-nodepools.yaml" 2>&1 || true
+    oc get aksnodeclass -o yaml > "${ARTIFACT_DIR}/karpenter-aksnodeclasses.yaml" 2>&1 || true
+    oc get nodes -o custom-columns='NAME:.metadata.name,ZONE:.metadata.labels.topology\.kubernetes\.io/zone,INSTANCE-TYPE:.metadata.labels.node\.kubernetes\.io/instance-type,READY:.status.conditions[-1:].status' > "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>&1 || true
 
     echo "Cleaning up placeholder deployment"
     oc delete deployment nap-placeholder -n default --ignore-not-found
