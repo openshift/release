@@ -20,6 +20,7 @@ presubmits:
       - args:
         - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=test-credentials
@@ -35,6 +36,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
@@ -46,6 +50,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - configMap:
+          name: gsm-config
+        name: gsm-config
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
