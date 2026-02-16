@@ -985,7 +985,7 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-hyperfleet-e2e
-    namespace: ci
+    namespace: test-credentials
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-aws-quay-qe
@@ -1176,6 +1176,22 @@ secret_configs:
     namespace: ci
   - cluster_groups:
     - non_app_ci
+    name: cluster-secrets-aro-classic-int
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aro-classic-stg
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aro-classic-prod
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aro-classic-dev
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
     name: cluster-secrets-aro-hcp-int
     namespace: ci
   - cluster_groups:
@@ -1189,6 +1205,10 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-aro-hcp-dev
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-rosa-regional-platform-int
     namespace: ci
 - from:
     pull-secret:
@@ -1796,10 +1816,6 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-openstack-vh-mecha-central
-    namespace: ci
-  - cluster_groups:
-    - non_app_ci
-    name: cluster-secrets-openstack-vh-mecha-az0
     namespace: ci
   - cluster_groups:
     - non_app_ci
@@ -4583,6 +4599,9 @@ secret_configs:
   - cluster: app.ci
     name: slack-credentials-dptp-bot
     namespace: ci
+  - cluster: app.ci
+    name: slack-credentials-dptp-bot
+    namespace: ship-status
 - from:
     app_id:
       field: app_id
@@ -4641,9 +4660,6 @@ secret_configs:
       - auth_field: auth
         item: quay-io-push-credentials
         registry_url: quay.io/openshift/ci
-      - auth_field: auth
-        item: quayio-ci-read-only-robot
-        registry_url: quay-proxy.ci.openshift.org
   to:
   - cluster: app.ci
     name: registry-push-credentials-ci-images-mirror
@@ -4785,6 +4801,39 @@ secret_configs:
     namespace: test-credentials
     type: kubernetes.io/dockerconfigjson
   - cluster: app.ci
+    name: registry-pull-credentials
+    namespace: keel
+    type: kubernetes.io/dockerconfigjson
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/network-edge-testing
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: qci-pull-through-cache-us-east-1-ci.apps.ci.l2s4.p1.openshiftapps.com
+  to:
+  - cluster: hosted-mgmt
     name: registry-pull-credentials
     namespace: keel
     type: kubernetes.io/dockerconfigjson
@@ -5449,6 +5498,114 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-hypershift
+    namespace: ci
+- from:
+    .awscred:
+      field: .awscred
+      item: openshift-ci-aws-credentials
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+    ssh-privatekey:
+      field: ssh-privatekey
+      item: openshift-ci-aws-credentials
+    ssh-publickey:
+      field: ssh-publickey
+      item: openshift-ci-aws-credentials
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-hypershift-aws
+    namespace: ci
+- from:
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-hypershift-aks
+    namespace: ci
+- from:
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        item: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-hypershift-gcp
     namespace: ci
 - from:
     vault-secret-manager-id:
@@ -7064,7 +7221,7 @@ secret_configs:
         registry_url: quay.io
   to:
   - cluster: build06
-    name: multi-arch-builder-controller-build06-registry-credentials
+    name: multi-arch-builder-controller-registry-credentials
     namespace: ci
     type: kubernetes.io/dockerconfigjson
 - from:
@@ -7327,7 +7484,7 @@ secret_configs:
         registry_url: quay.io
   to:
   - cluster: build11
-    name: multi-arch-builder-controller-build11-registry-credentials
+    name: multi-arch-builder-controller-registry-credentials
     namespace: ci
     type: kubernetes.io/dockerconfigjson
 - from:
@@ -7476,7 +7633,7 @@ secret_configs:
         registry_url: quay.io
   to:
   - cluster: build07
-    name: multi-arch-builder-controller-build07-registry-credentials
+    name: multi-arch-builder-controller-registry-credentials
     namespace: ci
     type: kubernetes.io/dockerconfigjson
 - from:
@@ -7625,7 +7782,7 @@ secret_configs:
         registry_url: quay.io
   to:
   - cluster: build10
-    name: multi-arch-builder-controller-build10-registry-credentials
+    name: multi-arch-builder-controller-registry-credentials
     namespace: ci
     type: kubernetes.io/dockerconfigjson
 - from:
@@ -7786,12 +7943,36 @@ secret_configs:
         registry_url: registry.master.ci.openshift.org
   to:
   - cluster: core-ci
+    name: multi-arch-builder-controller-registry-credentials
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: core-ci
     name: manifest-tool-local-pusher
     namespace: ci
     type: kubernetes.io/dockerconfigjson
   - cluster: core-ci
     name: manifest-tool-local-pusher
     namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_field: token_image-pusher_build01_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_field: token_multi-arch-builder-controller_build01_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.multi-build01.arm-build.devcluster.openshift.com
+      - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: token_image-pusher_quay.io_reg_auth_value.txt
+        item: build_farm
+        registry_url: quay.io
+  to:
+  - cluster: build01
+    name: multi-arch-builder-controller-registry-credentials
+    namespace: ci
     type: kubernetes.io/dockerconfigjson
 - from:
     .dockerconfigjson:
@@ -7899,7 +8080,7 @@ secret_configs:
         registry_url: quay.io
   to:
   - cluster: build03
-    name: multi-arch-builder-controller-build03-registry-credentials
+    name: multi-arch-builder-controller-registry-credentials
     namespace: ci
     type: kubernetes.io/dockerconfigjson
 - from:
@@ -8048,7 +8229,7 @@ secret_configs:
         registry_url: quay.io
   to:
   - cluster: build09
-    name: multi-arch-builder-controller-build09-registry-credentials
+    name: multi-arch-builder-controller-registry-credentials
     namespace: ci
     type: kubernetes.io/dockerconfigjson
 - from:
@@ -8108,7 +8289,7 @@ secret_configs:
         registry_url: quay.io
   to:
   - cluster: build02
-    name: multi-arch-builder-controller-build02-registry-credentials
+    name: multi-arch-builder-controller-registry-credentials
     namespace: ci
     type: kubernetes.io/dockerconfigjson
 - from:
@@ -8214,7 +8395,7 @@ secret_configs:
         registry_url: registry.ci.openshift.org
   to:
   - cluster: build08
-    name: multi-arch-builder-controller-build08-registry-credentials
+    name: multi-arch-builder-controller-registry-credentials
     namespace: ci
     type: kubernetes.io/dockerconfigjson
 - from:
@@ -8376,7 +8557,7 @@ secret_configs:
         registry_url: registry.ci.openshift.org
   to:
   - cluster: build05
-    name: multi-arch-builder-controller-build05-registry-credentials
+    name: multi-arch-builder-controller-registry-credentials
     namespace: ci
     type: kubernetes.io/dockerconfigjson
 - from:

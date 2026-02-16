@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build11
   cron: 0 18 * * 1
   decorate: true
   extra_refs:
@@ -37,13 +37,13 @@ periodics:
         bad_dependency=false
         # work dir is release-controller
         echo "Checking release-controller"
-        govulncheck ./... || bad_dependency=true
+        make vulncheck || bad_dependency=true
         cd ../ci-chat-bot
         echo "Checking ci-chat-bot"
-        govulncheck ./... || bad_dependency=true
+        make vulncheck || bad_dependency=true
         cd ../../openshift-eng/jira-lifecycle-plugin
         echo "Checking jira-lifecycle-plugin"
-        govulncheck ./... || bad_dependency=true
+        make vulncheck || bad_dependency=true
         if $bad_dependency ; then
           exit 1
         fi
@@ -53,6 +53,8 @@ periodics:
       imagePullPolicy: Always
       name: ""
       resources:
+        limits:
+          memory: 14Gi
         requests:
-          cpu: 100m
-          memory: 4Gi
+          cpu: 500m
+          memory: 11Gi

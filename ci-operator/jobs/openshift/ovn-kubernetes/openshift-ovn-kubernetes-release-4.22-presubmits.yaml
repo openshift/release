@@ -5,11 +5,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-agent-compact-ipv4
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -84,8 +82,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -158,8 +154,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-clusternetwork-cidr-expansion
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -233,8 +227,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-edge-zones
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -307,8 +299,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-fdp-qe
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -378,14 +368,12 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-hypershift
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: hypershift
-      ci-operator.openshift.io/cloud-cluster-profile: hypershift
+      ci-operator.openshift.io/cloud: hypershift-aws
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-release-4.22-e2e-aws-ovn-hypershift
@@ -455,8 +443,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-local-gateway
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -529,8 +515,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-local-to-shared-gateway-mode-migration
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -596,6 +580,78 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-local-to-shared-gateway-mode-migration,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.22$
+    - ^release-4\.22-
+    cluster: build09
+    context: ci/prow/e2e-aws-ovn-microshift
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-4
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-release-4.22-e2e-aws-ovn-microshift
+    rerun_command: /test e2e-aws-ovn-microshift
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-microshift
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(e2e-aws-ovn-microshift|remaining-required),?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.22$
@@ -603,8 +659,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-3
@@ -677,8 +731,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-serial-ipsec
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -752,8 +804,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-shared-to-local-gateway-mode-migration
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -826,8 +876,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-single-node-techpreview
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-2
@@ -901,8 +949,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-techpreview
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-2
@@ -976,8 +1022,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -1050,8 +1094,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-upgrade-ipsec
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -1125,8 +1167,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-upgrade-local-gateway
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -1199,8 +1239,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-aws-ovn-windows
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -1270,11 +1308,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build05
     context: ci/prow/e2e-azure-ovn
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure4
@@ -1345,11 +1381,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build05
     context: ci/prow/e2e-azure-ovn-techpreview
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure4
@@ -1420,11 +1454,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build05
     context: ci/prow/e2e-azure-ovn-upgrade
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure4
@@ -1497,8 +1529,6 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-ovn
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
@@ -1571,8 +1601,6 @@ presubmits:
     cluster: build08
     context: ci/prow/e2e-gcp-ovn-techpreview
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
@@ -1642,11 +1670,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-metal-ipi-ovn-bgp-virt-dualstack
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -1718,11 +1744,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -1794,11 +1818,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -1869,11 +1891,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -1944,11 +1964,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-bgp-local-gw
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2019,11 +2037,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-local-gateway
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2095,11 +2111,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-local-gateway-techpreview
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2171,11 +2185,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-metal-ipi-ovn-dualstack-techpreview
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2247,11 +2259,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-metal-ipi-ovn-ipv4
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2323,11 +2333,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2398,11 +2406,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-metal-ipi-ovn-ipv6-techpreview
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2474,11 +2480,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build11
     context: ci/prow/e2e-metal-ipi-ovn-techpreview
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       capability/intranet: intranet
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2554,7 +2558,6 @@ presubmits:
     context: ci/prow/e2e-metal-ovn-fdp-qe-ipv6
     decorate: true
     decoration_config:
-      skip_cloning: true
       timeout: 6h0m0s
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2629,8 +2632,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-openstack-ovn
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
@@ -2704,8 +2705,6 @@ presubmits:
     cluster: build09
     context: ci/prow/e2e-ovn-hybrid-step-registry
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
@@ -2779,8 +2778,6 @@ presubmits:
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
@@ -2854,8 +2851,6 @@ presubmits:
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn-techpreview
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
@@ -2929,8 +2924,6 @@ presubmits:
     cluster: vsphere02
     context: ci/prow/e2e-vsphere-windows
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
@@ -3001,11 +2994,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build05
     context: ci/prow/gofmt
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3056,11 +3047,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build05
     context: ci/prow/images
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3111,11 +3100,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build05
     context: ci/prow/lint
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -3169,8 +3156,6 @@ presubmits:
     cluster: build08
     context: ci/prow/openshift-e2e-gcp-ovn-techpreview-upgrade
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
@@ -3244,8 +3229,6 @@ presubmits:
     cluster: build09
     context: ci/prow/ovncore-perfscale-aws-ovn-large-cluster-density-v2
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
@@ -3260,10 +3243,26 @@ presubmits:
         - success
         - failure
         - error
-        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
-          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-          <{{.Status.URL}}|View logs> :warning: {{end}}'
+        - triggered
+        report_template: |-
+          {{- $link := "" }}
+          {{- $ref := "" }}
+          {{- if .Spec.Refs.Pulls }}
+            {{- $pull := index .Spec.Refs.Pulls 0 }}
+            {{- $link = $pull.Link }}
+            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+          {{- else }}
+            {{- $link = .Spec.Refs.BaseLink }}
+            {{- $ref = .Spec.Refs.BaseRef }}
+          {{- end }}
+
+          {{- if eq .Status.State "success" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{- else if eq .Status.State "triggered" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+          {{- else -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+          {{- end -}}
     rerun_command: /test ovncore-perfscale-aws-ovn-large-cluster-density-v2
     spec:
       containers:
@@ -3330,8 +3329,6 @@ presubmits:
     cluster: build09
     context: ci/prow/ovncore-perfscale-aws-ovn-large-node-density-cni
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
@@ -3346,10 +3343,26 @@ presubmits:
         - success
         - failure
         - error
-        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
-          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-          <{{.Status.URL}}|View logs> :warning: {{end}}'
+        - triggered
+        report_template: |-
+          {{- $link := "" }}
+          {{- $ref := "" }}
+          {{- if .Spec.Refs.Pulls }}
+            {{- $pull := index .Spec.Refs.Pulls 0 }}
+            {{- $link = $pull.Link }}
+            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+          {{- else }}
+            {{- $link = .Spec.Refs.BaseLink }}
+            {{- $ref = .Spec.Refs.BaseRef }}
+          {{- end }}
+
+          {{- if eq .Status.State "success" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{- else if eq .Status.State "triggered" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+          {{- else -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+          {{- end -}}
     rerun_command: /test ovncore-perfscale-aws-ovn-large-node-density-cni
     spec:
       containers:
@@ -3416,8 +3429,6 @@ presubmits:
     cluster: build09
     context: ci/prow/ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
@@ -3432,10 +3443,26 @@ presubmits:
         - success
         - failure
         - error
-        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
-          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-          <{{.Status.URL}}|View logs> :warning: {{end}}'
+        - triggered
+        report_template: |-
+          {{- $link := "" }}
+          {{- $ref := "" }}
+          {{- if .Spec.Refs.Pulls }}
+            {{- $pull := index .Spec.Refs.Pulls 0 }}
+            {{- $link = $pull.Link }}
+            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+          {{- else }}
+            {{- $link = .Spec.Refs.BaseLink }}
+            {{- $ref = .Spec.Refs.BaseRef }}
+          {{- end }}
+
+          {{- if eq .Status.State "success" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{- else if eq .Status.State "triggered" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+          {{- else -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+          {{- end -}}
     rerun_command: /test ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
     spec:
       containers:
@@ -3502,8 +3529,6 @@ presubmits:
     cluster: build09
     context: ci/prow/ovncore-perfscale-aws-ovn-xlarge-node-density-cni
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-ovn-perfscale
@@ -3518,10 +3543,26 @@ presubmits:
         - success
         - failure
         - error
-        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
-          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-          <{{.Status.URL}}|View logs> :warning: {{end}}'
+        - triggered
+        report_template: |-
+          {{- $link := "" }}
+          {{- $ref := "" }}
+          {{- if .Spec.Refs.Pulls }}
+            {{- $pull := index .Spec.Refs.Pulls 0 }}
+            {{- $link = $pull.Link }}
+            {{- $ref = printf "PR %d by %s" $pull.Number $pull.Author }}
+          {{- else }}
+            {{- $link = .Spec.Refs.BaseLink }}
+            {{- $ref = .Spec.Refs.BaseRef }}
+          {{- end }}
+
+          {{- if eq .Status.State "success" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+          {{- else if eq .Status.State "triggered" -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* was triggered.
+          {{- else -}}
+            :ovn: <{{ printf "%s" $link }}|{{.Spec.Refs.Org}}/{{.Spec.Refs.Repo}} [{{ printf "%s" $ref }}]> Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :warning:
+          {{- end -}}
     rerun_command: /test ovncore-perfscale-aws-ovn-xlarge-node-density-cni
     spec:
       containers:
@@ -3588,8 +3629,6 @@ presubmits:
     cluster: build09
     context: ci/prow/perfscale-aws-ovn-medium-cluster-density-v2
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
@@ -3661,85 +3700,8 @@ presubmits:
     - ^release-4\.22$
     - ^release-4\.22-
     cluster: build09
-    context: ci/prow/perfscale-aws-ovn-medium-node-density-cni
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-release-4.22-perfscale-aws-ovn-medium-node-density-cni
-    optional: true
-    rerun_command: /test perfscale-aws-ovn-medium-node-density-cni
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=perfscale-aws-ovn-medium-node-density-cni
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )perfscale-aws-ovn-medium-node-density-cni,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.22$
-    - ^release-4\.22-
-    cluster: build09
     context: ci/prow/perfscale-aws-ovn-small-cluster-density-v2
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
@@ -3813,8 +3775,6 @@ presubmits:
     cluster: build09
     context: ci/prow/perfscale-aws-ovn-small-node-density-cni
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
@@ -3881,15 +3841,13 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )perfscale-aws-ovn-small-node-density-cni,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
     cluster: build09
     context: ci/prow/qe-perfscale-aws-ovn-small-udn-density-churn-l3
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
@@ -3956,15 +3914,13 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )qe-perfscale-aws-ovn-small-udn-density-churn-l3,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
     cluster: build09
     context: ci/prow/qe-perfscale-aws-ovn-small-udn-density-l2
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
@@ -4038,8 +3994,6 @@ presubmits:
     cluster: build09
     context: ci/prow/qe-perfscale-aws-ovn-small-udn-density-l3
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
@@ -4113,8 +4067,6 @@ presubmits:
     cluster: build09
     context: ci/prow/qe-perfscale-payload-control-plane-6nodes
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale-qe
@@ -4184,11 +4136,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build05
     context: ci/prow/security
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -4247,11 +4197,9 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build09
+    cluster: build05
     context: ci/prow/unit
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"

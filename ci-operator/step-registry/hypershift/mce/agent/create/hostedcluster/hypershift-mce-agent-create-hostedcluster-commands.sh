@@ -97,6 +97,16 @@ if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publi
   cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
 fi
 
+echo "Create file for --image-content-sources"
+curl -L https://github.com/mikefarah/yq/releases/download/v4.50.1/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+# Give IDMS priority over ICSP by appending the ICSP to the IDMS file.
+if oc get imagedigestmirrorset &>/dev/null; then
+  oc get imagedigestmirrorset -oyaml | /tmp/yq '.items[].spec.imageDigestMirrors' > "${SHARED_DIR}/mgmt_icsp.yaml"
+fi
+if oc get imagecontentsourcepolicy &>/dev/null; then
+  oc get imagecontentsourcepolicy -oyaml | /tmp/yq '.items[].spec.repositoryDigestMirrors' >> "${SHARED_DIR}/mgmt_icsp.yaml"
+fi
+
 eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \

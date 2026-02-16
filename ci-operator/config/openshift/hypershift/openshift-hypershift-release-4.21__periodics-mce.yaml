@@ -66,7 +66,9 @@ tests:
       MCE_VERSION: "2.11"
     workflow: hypershift-mce-aws-conformance
 - as: e2e-agent-connected-ovn-ipv4-manual-conformance
-  minimum_interval: 168h
+  capabilities:
+  - intranet
+  cron: 0 23 * * 0
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -74,46 +76,63 @@ tests:
       MCE_VERSION: "2.11"
     workflow: hypershift-mce-agent-manual-conformance
 - as: e2e-agent-connected-ovn-ipv4-metal-conformance
-  minimum_interval: 72h
+  capabilities:
+  - intranet
+  cron: 0 6 * * 0
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
+        WORKER_MEMORY=24576
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
+        NUM_WORKERS=4
         PROVISIONING_NETWORK_PROFILE=Disabled
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       MCE_VERSION: "2.11"
-      PACKET_METRO: dc
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-agent-connected-ovn-dualstack-metal-conformance
-  minimum_interval: 72h
+  capabilities:
+  - intranet
+  cron: 0 6 * * 0
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         NETWORK_TYPE=OVNKubernetes
+        WORKER_MEMORY=24576
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
+        NUM_WORKERS=4
         PROVISIONING_NETWORK_PROFILE=Disabled
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       IP_STACK: v4v6
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       MCE_VERSION: "2.11"
-      PACKET_METRO: dc
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
+    test:
+    - ref: hypershift-mce-agent-custom-ingress-operator
+    - chain: hypershift-conformance
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-agent-connected-ovn-ipv4-metal-compact-conformance
-  minimum_interval: 72h
+  capabilities:
+  - intranet
+  cron: 0 6 * * 0
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -130,13 +149,17 @@ tests:
         NUM_EXTRA_WORKERS=3
         PROVISIONING_NETWORK_PROFILE=Disabled
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       MCE_VERSION: "2.11"
-      PACKET_METRO: dc
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-agent-disconnected-ovn-ipv6-metal-conformance
-  minimum_interval: 72h
+  capabilities:
+  - intranet
+  cron: 0 23 * * 0
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -148,19 +171,23 @@ tests:
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=500G
         NUM_EXTRA_WORKERS=3
+        NUM_WORKERS=4
         PROVISIONING_NETWORK_PROFILE=Disabled
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       MCE_VERSION: "2.11"
     workflow: hypershift-mce-agent-disconnected-conformance
 - as: e2e-agent-disconnected-ovn-dualstack-metal-conformance
-  minimum_interval: 72h
+  capabilities:
+  - intranet
+  cron: 0 12 * * 0
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         MIRROR_IMAGES=true
+        NUM_WORKERS=4
         NETWORK_TYPE=OVNKubernetes
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
@@ -173,14 +200,16 @@ tests:
       MCE_VERSION: "2.11"
     workflow: hypershift-mce-agent-disconnected-conformance
 - as: e2e-agent-connected-ovn-ipv4-metal-oadp
-  minimum_interval: 72h
+  capabilities:
+  - intranet
+  cron: 0 18 * * 0
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
-        NUM_WORKERS=3
+        NUM_WORKERS=4
         WORKER_MEMORY=32768
         WORKER_VCPU=8
         VM_EXTRADISKS=true
@@ -189,20 +218,24 @@ tests:
         NUM_EXTRA_WORKERS=3
         PROVISIONING_NETWORK_PROFILE=Disabled
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       MCE_VERSION: "2.11"
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
       OADP_OPERATOR_SUB_CHANNEL: stable-1.4
       OADP_OPERATOR_SUB_SOURCE: qe-app-registry
     test:
     - ref: hypershift-mce-agent-minio
     - ref: operatorhub-subscribe-oadp-operator
     - ref: hypershift-mce-agent-oadp-v2
-    - ref: hypershift-mce-agent-info
     - chain: hypershift-conformance
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-kubevirt-metal-ovn
-  minimum_interval: 72h
+  capabilities:
+  - intranet
+  cron: 0 12 * * 0
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -227,7 +260,9 @@ tests:
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-mce-kubevirt-azure-conformance
 - as: e2e-kubevirt-metal-ovn-multinet
-  minimum_interval: 168h
+  capabilities:
+  - intranet
+  cron: 0 12 * * 0
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -240,7 +275,9 @@ tests:
       REDHAT_OPERATORS_INDEX_TAG: v4.20
     workflow: hypershift-mce-kubevirt-baremetalds-conformance
 - as: e2e-kubevirt-metal-ovn-multinet-default-net
-  minimum_interval: 168h
+  capabilities:
+  - intranet
+  cron: 0 18 * * 0
   steps:
     cluster_profile: equinix-ocp-hcp
     env:
@@ -309,15 +346,20 @@ tests:
     - chain: hypershift-conformance
     workflow: hypershift-mce-aws-conformance
 - as: e2e-agent-critical
-  cron: 0 0 29 2 *
+  capabilities:
+  - intranet
+  cron: 0 18 * * 0
   steps:
     cluster_profile: equinix-ocp-hcp
     dependencies:
       HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:421-latest
     env:
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       MCE_VERSION: "2.11"
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
       TEST_SUITE: openshift/conformance/parallel/minimal
     test:
     - ref: hypershift-mce-multi-version-test-info
@@ -331,6 +373,14 @@ tests:
       CLUSTER_VERSION: "4.21"
       MCE_VERSION: "2.11"
     workflow: hypershift-mce-ibmz-conformance-s390xmgmt
+- as: e2e-ibmz-s390x-mgmt-ovn-conformance-virt
+  cluster: build01
+  cron: 0 4 * * *
+  steps:
+    env:
+      CLUSTER_VERSION: "4.21"
+      MCE_VERSION: "2.11"
+    workflow: hypershift-mce-ibmz-conformance-s390xmgmt-kubevirt
 zz_generated_metadata:
   branch: release-4.21
   org: openshift

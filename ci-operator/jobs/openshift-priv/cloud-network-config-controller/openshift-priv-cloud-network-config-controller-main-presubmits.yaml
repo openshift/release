@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build09
     context: ci/prow/e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -87,7 +87,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build09
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     decoration_config:
@@ -170,7 +170,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -252,7 +252,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/e2e-azure-serial-1of2
     decorate: true
     decoration_config:
@@ -335,7 +335,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/e2e-azure-serial-2of2
     decorate: true
     decoration_config:
@@ -500,7 +500,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build06
+    cluster: build09
     context: ci/prow/e2e-openstack-ovn-serial-e2e-only
     decorate: true
     decoration_config:
@@ -583,7 +583,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/hypershift-e2e-aks
     decorate: true
     decoration_config:
@@ -592,8 +592,8 @@ presubmits:
         name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
-      ci-operator.openshift.io/cloud: hypershift
-      ci-operator.openshift.io/cloud-cluster-profile: hypershift
+      ci-operator.openshift.io/cloud: hypershift-aks
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-cloud-network-config-controller-main-hypershift-e2e-aks
@@ -665,7 +665,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -728,7 +728,70 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
+    context: ci/prow/lint
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-cloud-network-config-controller-main-lint
+    path_alias: openshift/cloud-network-config-controller
+    rerun_command: /test lint
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=lint
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )lint,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
     context: ci/prow/security
     decorate: true
     decoration_config:
@@ -799,7 +862,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -862,7 +925,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build10
     context: ci/prow/verify-deps
     decorate: true
     decoration_config:

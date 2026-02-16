@@ -24,7 +24,7 @@ function join_by { local IFS="$1"; shift; echo "$*"; }
 # aws_source_region: for non-C2S/SC2S cluster, it's the same as REGION, for C2S/SC2S it's the source region that emulator runs on.
 #             e.g. for instance, if installing a cluster on a C2S (us-iso-east-1) region and its emulator runs on us-east-1:
 #                  so the REGION is us-iso-east-1, and aws_source_region is us-east-1
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 aws_source_region="${REGION}"
 
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
@@ -224,18 +224,10 @@ else
 fi
 
 # See if we can use NAT instances as a cost reduction method.
-# OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY is set to false by the release controller (i.e. do not use NAT instances
-# release controller jobs.
 if [[ "${CI_NAT_REPLACE:-false}" == 'auto' ]]; then
   # Enable the option for jobs using the shared aws cluster profiles unless they use a different install topology.
-  # 4.21 is currently excluded as we approach GA.
-  if [[ "${RELEASE_CONTROLLER_JOB:-false}" == "true" ]]; then
-    # Release controller jobs set RELEASE_CONTROLLER_JOB explicitly to true
-    CI_NAT_REPLACE='false_release_controller_job'
-  elif [[ "${CLUSTER_PROFILE_NAME}" != "aws" && ! "${CLUSTER_PROFILE_NAME}" =~ ^aws-[0-9]+$ ]]; then
+  if [[ "${CLUSTER_PROFILE_NAME}" != "aws" && ! "${CLUSTER_PROFILE_NAME}" =~ ^aws-[0-9]+$ ]]; then
     CI_NAT_REPLACE='false_CLUSTER_PROFILE_NAME_is_not_a_testplatform_aws_profile'
-  elif [[ "${JOB_NAME}" == *'microshift'* || "${JOB_NAME}" == *'hypershift'* || "${JOB_NAME}" == *'vpc'* || "${JOB_NAME}" == *'single-node'* ]]; then
-    CI_NAT_REPLACE='false_job_uses_non_standalone_install_topology'
   else
     CI_NAT_REPLACE='true'
   fi
@@ -457,4 +449,54 @@ EOF
   echo "Patching install-config.yaml for dedicated hosts."
   yq-go m -x -i ${CONFIG} ${patch_dedicated_host}
   cp "${patch_dedicated_host}" "${ARTIFACT_DIR}/"
+fi
+
+# Configure dual-stack networking if IP_FAMILY is set
+if [[ -n "${IP_FAMILY:-}" ]]; then
+  echo "Configuring AWS dual-stack networking with ipFamily: ${IP_FAMILY}"
+  patch_dualstack="${SHARED_DIR}/install-config-dualstack.yaml.patch"
+
+  # For IPv6Primary, IPv6 addresses must be listed first
+  if [[ "${IP_FAMILY}" == "DualStackIPv6Primary" ]]; then
+    cat > "${patch_dualstack}" << EOF
+platform:
+  aws:
+    ipFamily: ${IP_FAMILY}
+networking:
+  networkType: OVNKubernetes
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+  clusterNetwork:
+  - cidr: fd01::/48
+    hostPrefix: 64
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  serviceNetwork:
+  - fd02::/112
+  - 172.30.0.0/16
+EOF
+  else
+    # DualStackIPv4Primary or default - IPv4 addresses listed first
+    cat > "${patch_dualstack}" << EOF
+platform:
+  aws:
+    ipFamily: ${IP_FAMILY}
+networking:
+  networkType: OVNKubernetes
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  - cidr: fd01::/48
+    hostPrefix: 64
+  serviceNetwork:
+  - 172.30.0.0/16
+  - fd02::/112
+EOF
+  fi
+
+  yq-go m -a -x -i "${CONFIG}" "${patch_dualstack}"
+  cp "${patch_dualstack}" "${ARTIFACT_DIR}/"
+  echo "Dual-stack networking configuration added to install-config.yaml"
 fi

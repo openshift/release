@@ -14,10 +14,18 @@ ref:
     default: "default"
     documentation: |-
       Override the kube burner version
-  - name: EXTRA_FLAGS
+  - name: CD_V2_EXTRA_FLAGS
     default: "--churn-duration=20m --timeout=5h"
     documentation: |-
       Default is Churn Duration for 20 minutes
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resouce
+  - name: GC_METRICS
+    default: "true"
+    documentation: |-
+      Default is true, which means collect metrics, you can set it to false to skip that.
   - name: PROFILE_TYPE
     default: "both"
     documentation: |-
@@ -26,10 +34,14 @@ ref:
     default: "true"
     documentation: |-
       Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resource
-  - name: ITERATION_MULTIPLIER_ENV
-    default: "9"
+  - name: CDV2_ITERATION_MULTIPLIER
+    default: ""
     documentation: |-
-      The number of iterations per worker nodes to create
+      The number of iterations per worker nodes to create for cluster-density-v2 workload
+  - name: ITERATION_MULTIPLIER_ENV
+    default: ""
+    documentation: |-
+      Deprecated: use CDV2_ITERATION_MULTIPLIER instead. Kept for backward compatibility.
   - name: ENABLE_LOCAL_INDEX
     default: "false"
     documentation: |-
@@ -53,9 +65,6 @@ ref:
   commands: openshift-qe-cluster-density-v2-commands.sh
   timeout: 8h
   credentials:
-  - namespace: test-credentials
-    name: ocp-perfscale-prod-es-creds
-    mount_path: /prod-secret
   - namespace: test-credentials # this entry injects the custom credential
     name: ocp-qe-perfscale-es
     mount_path: /secret

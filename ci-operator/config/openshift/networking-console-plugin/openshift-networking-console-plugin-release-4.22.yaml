@@ -1,26 +1,10 @@
-base_images:
-  ocp_4.19_base-rhel9:
-    name: "4.22"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-base-nodejs-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-base-nodejs-openshift-4.19
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: console-plugin-test-cypress-v18
+    tag: tectonic-console-builder-v29
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-base-nodejs-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.19
   to: networking-console-plugin
 promotion:
   to:
@@ -49,7 +33,7 @@ tests:
   steps:
     test:
     - as: lint
-      commands: yarn install && yarn run lint && yarn build
+      commands: npm ci && npm run lint && npm run build
       from: src
       resources:
         requests:
@@ -57,7 +41,7 @@ tests:
           memory: 300Mi
     - as: i18n
       commands: |
-        yarn install && yarn i18n
+        npm ci && npm run i18n
         GIT_STATUS="$(git status --short --untracked-files locales)"
         if [ -n "$GIT_STATUS" ]; then
           echo "i18n files are not up to date. Commit them to fix."

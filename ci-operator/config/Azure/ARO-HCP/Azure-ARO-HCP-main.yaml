@@ -1,8 +1,4 @@
 base_images:
-  aro-hcp-e2e-base-image:
-    name: aro-hcp-e2e-base
-    namespace: rh_ee_ves
-    tag: v1.0
   nested-podman:
     name: nested-podman
     namespace: ci
@@ -10,9 +6,9 @@ base_images:
 binary_build_commands: make -C backend backend
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-e2e-base-ci
 images:
 - dockerfile_literal: |
     FROM nested-podman
@@ -55,18 +51,46 @@ images:
   dockerfile_path: frontend/Dockerfile
   from: src
   to: aro-hcp-frontend
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: admin/Dockerfile
+  from: src
+  to: aro-hcp-admin-api
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  - name: ARO_HCP_REVISION
+    value: ci-sha
+  - name: ARO_HCP_IMAGE_TAG
+    value: ci-test-img
+  dockerfile_path: sessiongate/Dockerfile
+  from: src
+  to: aro-hcp-sessiongate
 - dockerfile_literal: |
-    FROM aro-hcp-e2e-base-image
+    FROM src
     USER root
     COPY /src /opt/app-root/src/github.com/Azure
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-    ENV GOBIN="$(go env GOPATH)/bin"
+    ENV GOBIN="/usr/local/bin"
     ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
-    RUN export GOFLAGS='-mod=readonly' && \
-        make install-tools && \
+    # Install Python for grafana tests
+    RUN dnf install -y python3 && curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3
+    RUN pip3 install black
+    ENV GOFLAGS='-mod=readonly'
+    RUN make install-tools && \
         make -C tooling/templatize templatize && \
         make -C test/ aro-hcp-tests prow-job-executor
-  from: aro-hcp-e2e-base-image
+    RUN mkdir -p "$(go env GOROOT)" && chmod -R 777 "$(go env GOROOT)"
+    RUN mkdir -p "$(go env GOPATH)" && chmod -R 777 "$(go env GOPATH)"
+    RUN mkdir -p "$(go env GOCACHE)" && chmod -R 777 "$(go env GOCACHE)"
+    RUN mkdir -p "$(go env GOBIN)" && chmod -R 777 "$(go env GOBIN)"
+    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
+  from: src
   inputs:
     src:
       paths:
@@ -74,28 +98,23 @@ images:
         source_path: /go/src/github.com/Azure/ARO-HCP
   to: aro-hcp-e2e-tools
 - dockerfile_literal: |
-    FROM aro-hcp-e2e-base-image
+    FROM src
     USER root
     COPY /src /opt/app-root/src/github.com/Azure
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-    ENV GOBIN="/usr/local/bin"
-    ENV PATH="/usr/local/bin:/usr/bin:$PATH"
-    RUN mkdir -p "$(go env GOROOT)" && chmod 777 "$(go env GOROOT)"
-    RUN mkdir -p "$(go env GOPATH)" && chmod 777 "$(go env GOPATH)"
-    RUN mkdir -p "$(go env GOCACHE)" && chmod 777 "$(go env GOCACHE)"
-    RUN mkdir -p "$(go env GOBIN)" && chmod 777 "$(go env GOBIN)"
-    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
-    RUN curl -sfLo - https://github.com/prometheus/prometheus/releases/download/v3.2.1/prometheus-3.2.1.linux-amd64.tar.gz | tar xzf - && \
-        mv prometheus-3.2.1.linux-amd64/promtool /usr/local/bin/promtool && \
-        chmod +x /usr/local/bin/promtool && \
-        rm -rf prometheus-3.2.1.linux-amd64
-  from: aro-hcp-e2e-base-image
+    # Install official Node.js binary from nodejs.org (pinned version)
+    RUN curl -fsSL https://nodejs.org/dist/v22.5.1/node-v22.5.1-linux-x64.tar.xz | \
+        tar -xJ -C /usr/local --strip-components=1 && \
+        node --version && npm --version
+    # Install npm dependencies
+    RUN cd api && npm ci --legacy-peer-deps
+  from: src
   inputs:
     src:
       paths:
       - destination_dir: src
         source_path: /go/src/github.com/Azure/ARO-HCP
-  to: aro-hcp-tools
+  to: aro-hcp-api-tools
 releases:
   latest:
     release:
@@ -110,10 +129,11 @@ resources:
       memory: 4Gi
   aro-hcp-e2e-tools:
     limits:
+      cpu: "8"
       memory: 10Gi
     requests:
       cpu: "8"
-      memory: 8Gi
+      memory: 10Gi
 test_binary_build_commands: make test-compile
 tests:
 - as: test-unit
@@ -139,14 +159,29 @@ tests:
   steps:
     test:
     - ref: aro-hcp-mega-lint
+- as: observability-prometheus
+  run_if_changed: ^observability/(alerts|prometheus)/
+  steps:
+    test:
+    - ref: aro-hcp-observability-prometheus
+- as: bicep-lint
+  run_if_changed: ^dev-infrastructure/
+  steps:
+    test:
+    - ref: aro-hcp-bicep-lint
+- as: api-validation
+  run_if_changed: ^api/
+  steps:
+    test:
+    - ref: aro-hcp-api-validation
 - always_run: true
-  as: frontend-simulation
+  as: integration
   capabilities:
   - nested-podman
   nested_podman: true
   steps:
     test:
-    - ref: aro-hcp-frontend-run-simulation-tests
+    - ref: aro-hcp-frontend-run-integration-tests
 - always_run: false
   as: integration-e2e-parallel
   optional: true
@@ -155,6 +190,10 @@ tests:
     env:
       ARO_HCP_SUITE_NAME: integration/parallel
       LOCATION: uksouth
+    leases:
+    - count: 20
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-int
     workflow: aro-hcp-e2e
 - always_run: false
   as: stage-e2e-parallel
@@ -164,6 +203,10 @@ tests:
     env:
       ARO_HCP_SUITE_NAME: stage/parallel
       LOCATION: uksouth
+    leases:
+    - count: 30
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-stg
     workflow: aro-hcp-e2e
 - always_run: false
   as: prod-e2e-parallel
@@ -173,6 +216,10 @@ tests:
     env:
       ARO_HCP_SUITE_NAME: prod/parallel
       LOCATION: uksouth
+    leases:
+    - count: 15
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-prod
     workflow: aro-hcp-e2e
 - always_run: true
   as: e2e-parallel
@@ -180,7 +227,7 @@ tests:
   steps:
     cluster_profile: aro-hcp-dev
     env:
-      LOCATION: westus3
+      LOCATION: uksouth
     workflow: aro-hcp-local-e2e
 zz_generated_metadata:
   branch: main

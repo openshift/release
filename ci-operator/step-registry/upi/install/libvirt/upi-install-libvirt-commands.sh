@@ -62,7 +62,11 @@ echo "Extracting openshift-install from the payload..."
 oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_TARGET}" \
   --command=openshift-install --to="${INSTALL_DIR}"
 
-CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+if [ "${USE_EXTERNAL_DNS:-false}" == "true" ]; then
+  CLUSTER_NAME="${LEASED_RESOURCE}"
+else
+  CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
+fi
 OCPINSTALL="${INSTALL_DIR}/openshift-install"
 # All virsh commands need to be run on the hypervisor
 LIBVIRT_CONNECTION="qemu+tcp://${HOSTNAME}/system"
@@ -239,7 +243,7 @@ else
 
     # Upload the rhcos image to the source volume
     echo "Uploading rhcos image to source volume..."
-    ${VIRSH} vol-upload \
+    ${VIRSH} -k 60 -K 5 vol-upload \
       --vol ${VOLUME_NAME} \
       --pool ${POOL_NAME} \
       ${INSTALL_DIR}/${VOLUME_NAME}

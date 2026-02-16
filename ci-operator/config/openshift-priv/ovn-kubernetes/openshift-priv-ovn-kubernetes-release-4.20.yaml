@@ -7,18 +7,6 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.20_base-rhel9:
-    name: 4.20-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.20
-  ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
   tests-private:
     name: tests-private
     namespace: ci
@@ -27,31 +15,16 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-9-release-golang-1.22-openshift-4.19
 canonical_go_repository: github.com/openshift/ovn-kubernetes
 images:
 - dockerfile_path: Dockerfile.base
-  inputs:
-    ocp_4.20_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.20:base-rhel9
   to: ovn-kubernetes-base
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-8-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.20
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-9-golang-1.24-openshift-4.20:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.20
   to: ovn-kubernetes-microshift
 promotion:
   to:
@@ -308,7 +281,7 @@ tests:
     workflow: baremetalds-e2e-ovn-bgp-dualstack-local-gw
 - as: e2e-aws-ovn-hypershift
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: unit
   commands: |
@@ -357,38 +330,21 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      CDV2_ITERATION_MULTIPLIER: "15"
       COMPUTE_NODE_REPLICAS: "6"
+      ENABLE_LAYER_3: "false"
       ENABLE_LOCAL_INDEX: "true"
       ES_TYPE: qe
       EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s
-      ITERATION_MULTIPLIER_ENV: "15"
       OUTPUT_FORMAT: JUNIT
       RUN_ORION: "true"
+      UDN_ITERATION_MULTIPLIER: "12"
       VERSION: "4.20"
       ZONES_COUNT: "3"
     test:
     - chain: openshift-qe-control-plane
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
-- always_run: false
-  as: qe-perfscale-aws-ovn-small-udn-density-churn-l3
-  optional: true
-  steps:
-    cluster_profile: aws-perfscale-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "24"
-      COMPUTE_NODE_TYPE: m5.xlarge
-      EXTRA_FLAGS: --churn-duration=30m --churn-percent=25
-      ITERATION_MULTIPLIER_ENV: "3"
-      RUN_ORION: "true"
-      VERSION: "4.20"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-udn-density-pods
 - always_run: false
   as: qe-perfscale-aws-ovn-small-udn-density-l3
   optional: true
@@ -398,8 +354,9 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge
-      ITERATION_MULTIPLIER_ENV: "3"
+      ENABLE_LAYER_3: "true"
       RUN_ORION: "true"
+      UDN_ITERATION_MULTIPLIER: "3"
       VERSION: "4.20"
     post:
     - chain: ipi-aws-post
@@ -417,8 +374,8 @@ tests:
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge
       ENABLE_LAYER_3: "false"
-      ITERATION_MULTIPLIER_ENV: "3"
       RUN_ORION: "true"
+      UDN_ITERATION_MULTIPLIER: "3"
       VERSION: "4.20"
     post:
     - chain: ipi-aws-post
@@ -448,7 +405,7 @@ tests:
   as: e2e-aws-ovn-hypershift-conformance-techpreview
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     env:
       GUEST_FEATURE_SET: TechPreviewNoUpgrade
     workflow: hypershift-aws-conformance
@@ -570,9 +527,9 @@ tests:
     cluster_profile: aws-perfscale
     env:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency
       COMPUTE_NODE_REPLICAS: "24"
       COMPUTE_NODE_TYPE: m5.xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.xlarge
       PROFILE_TYPE: both
       SET_ENV_BY_PLATFORM: custom
@@ -604,9 +561,9 @@ tests:
     cluster_profile: aws-perfscale
     env:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency
       COMPUTE_NODE_TYPE: m5.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency
       PROFILE_TYPE: both
       WORKER_REPLICA_COUNT: "120"
       ZONES_COUNT: "3"
@@ -627,7 +584,7 @@ tests:
       BASE_DOMAIN: perfscale.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency
+      ND_CNI_EXTRA_FLAGS: --churn-duration=20m --service-latency
       PROFILE_TYPE: both
       WORKER_REPLICA_COUNT: "120"
       ZONES_COUNT: "3"
@@ -646,11 +603,15 @@ tests:
     cluster_profile: aws-ovn-perfscale
     env:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency
+      CDV2_ITERATION_MULTIPLIER: "6"
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false
-      ITERATION_MULTIPLIER_ENV: "6"
+      GC: "false"
+      GC_METRICS: "false"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
+      PPROF: "false"
       PROFILE_TYPE: both
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "501"
@@ -672,8 +633,11 @@ tests:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.8xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false
+      GC: "false"
+      GC_METRICS: "false"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.8xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
+      PPROF: "false"
       PROFILE_TYPE: both
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "501"
@@ -693,13 +657,18 @@ tests:
     cluster_profile: aws-ovn-perfscale
     env:
       BASE_DOMAIN: core.ovn.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --service-latency --timeout=8h
+      CDV2_ITERATION_MULTIPLIER: "6"
       CLUSTER_NETWORK_CIDR: 20.0.0.0/8
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false --gc=false  --timeout=8h
-      ITERATION_MULTIPLIER_ENV: "6"
+      GC: "false"
+      GC_METRICS: "false"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
+      PPROF: "false"
       PROFILE_TYPE: both
+      SERVICE_NETWORK_CIDR: 172.0.0.0/12
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "750"
       ZONES_COUNT: "6"
@@ -724,9 +693,13 @@ tests:
       CLUSTER_NETWORK_CIDR: 20.0.0.0/8
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
-      EXTRA_FLAGS: --churn-duration=20m --service-latency --check-health=false --gc=false
+      GC: "false"
+      GC_METRICS: "false"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 200Gi
+      PPROF: "false"
       PROFILE_TYPE: both
+      SERVICE_NETWORK_CIDR: 172.0.0.0/12
       SET_ENV_BY_PLATFORM: custom
       WORKER_REPLICA_COUNT: "750"
       ZONES_COUNT: "6"

@@ -155,7 +155,7 @@ def _add_origin_resources(gendoc):
                                 "command": ["/git-sync"],
                                 "args": [
                                     "--repo=https://github.com/openshift/release.git",
-                                    "--ref=master",
+                                    "--ref=main",
                                     "--root=/tmp/git-sync",
                                     "--one-time=true",
                                     "--depth=1"
@@ -181,7 +181,7 @@ def _add_origin_resources(gendoc):
                                 "command": ["/git-sync"],
                                 "args": [
                                     "--repo=https://github.com/openshift/release.git",
-                                    "--ref=master",
+                                    "--ref=main",
                                     "--period=30s",
                                     "--root=/tmp/git-sync",
                                     "--max-failures=3"
@@ -244,9 +244,6 @@ def _add_origin_resources(gendoc):
                             }
                         ],
                         "serviceAccountName": "release-controller",
-                        "imagePullSecrets": [{
-                            "name": "registry-pull-credentials"
-                        }],
                         "volumes": get_rc_volumes(context)
                     }
                 }
@@ -316,9 +313,6 @@ def _add_origin_resources(gendoc):
                             }
                         ],
                         "serviceAccountName": "release-controller",
-                        "imagePullSecrets": [{
-                            "name": "registry-pull-credentials"
-                        }],
                         "volumes": get_rcapi_volumes(context, secret_name=context.secret_name_tls_api)
                     }
                 }

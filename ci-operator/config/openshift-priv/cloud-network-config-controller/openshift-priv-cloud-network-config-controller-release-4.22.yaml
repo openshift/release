@@ -1,4 +1,8 @@
 base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v2.3.1
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -7,27 +11,12 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.21_base-rhel9:
-    name: 4.22-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
 binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: openshift/cloud-network-config-controller
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cloud-network-config-controller
 promotion:
   to:
@@ -47,7 +36,7 @@ releases:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -103,12 +92,20 @@ tests:
     workflow: openshift-ci-security
 - as: hypershift-e2e-aks
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aks
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       HYPERSHIFT_AZURE_LOCATION: centralus
     workflow: hypershift-azure-aks-e2e
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    make lint
+  container:
+    clone: true
+    from: golangci-lint
 - as: verify-deps
   steps:
     env:
