@@ -1,25 +1,25 @@
-presubmits:
+postsubmits:
   opendatahub-io/vllm-gaudi:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^vllm-gaudi-0\.14\.1$
-    - ^vllm-gaudi-0\.14\.1-
+    - ^v0\.14\.1$
     cluster: build01
-    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-vllm-gaudi-vllm-gaudi-0.14.1-images
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-vllm-gaudi-v0.14.1-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -40,6 +40,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -51,25 +54,24 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^vllm-gaudi-0\.14\.1$
-    - ^vllm-gaudi-0\.14\.1-
+    - ^v0\.14\.1$
     cluster: build01
-    context: ci/prow/vllm-gaudi-0-14-1-pr-image-mirror
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-opendatahub-io-vllm-gaudi-vllm-gaudi-0.14.1-vllm-gaudi-0-14-1-pr-image-mirror
-    rerun_command: /test vllm-gaudi-0-14-1-pr-image-mirror
+    max_concurrency: 1
+    name: branch-ci-opendatahub-io-vllm-gaudi-v0.14.1-vllm-gaudi-0-14-1-fast-image-mirror
     spec:
       containers:
       - args:
@@ -77,7 +79,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=vllm-gaudi-0-14-1-pr-image-mirror
+        - --target=vllm-gaudi-0-14-1-fast-image-mirror
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -116,4 +118,3 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )vllm-gaudi-0-14-1-pr-image-mirror,?($|\s.*)
