@@ -49,7 +49,7 @@ workerSgJson=$(aws ec2 describe-security-groups \
     "Name=tag:Name,Values=${infraId}-*" \
   --query 'SecurityGroups[0]' \
   --output json \
-  --no-cli-pager)
+ )
 
 if [[ -z "${workerSgJson}" ]] || [[ "${workerSgJson}" == "null" ]]; then
   : 'ERROR: Could not find worker security group'
@@ -86,8 +86,8 @@ echo "${workerSgId}" > "${SHARED_DIR}/worker_sg_id"
 
 # Function to add ingress rule with retry
 AddIngressRule() {
-  local portSpec=$1
-  local description=$2
+  typeset portSpec="${1}"; (($#)) && shift
+  typeset description="${1}"; (($#)) && shift
   
   : "Adding rule: ${description} (${portSpec})"
   
@@ -97,8 +97,8 @@ AddIngressRule() {
     --protocol tcp \
     --port "${portSpec}" \
     --source-group "${workerSgId}" \
-    --group-owner "$(aws sts get-caller-identity --query Account --output text --no-cli-pager)" \
-    --no-cli-pager; then
+    --group-owner "$(aws sts get-caller-identity --query Account --output text)" \
+   ; then
     : "  ✅ Added: ${description}"
     return 0
   else
@@ -108,7 +108,7 @@ AddIngressRule() {
       --filters "Name=group-id,Values=${workerSgId}" \
       --query "SecurityGroupRules[?ToPort==\`${portSpec%%[-:]*}\` && IpProtocol=='tcp']" \
       --output text \
-      --no-cli-pager | grep -q "${workerSgId}"; then
+      | grep -q "${workerSgId}"; then
       : "  ℹ️  Rule already exists: ${description}"
       return 0
     else
@@ -116,6 +116,8 @@ AddIngressRule() {
       return 1
     fi
   fi
+
+  true
 }
 
 # Add GPFS admin port (1191)
@@ -139,3 +141,4 @@ AddIngressRule "60000-61000" "TSC command port range"
 : '  ✅ TCP 60000-61000 (TSC commands)'
 : 'All traffic between worker nodes on these ports is now allowed.'
 
+true

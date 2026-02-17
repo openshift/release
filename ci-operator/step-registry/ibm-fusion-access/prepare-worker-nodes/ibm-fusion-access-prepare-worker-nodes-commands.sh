@@ -3,14 +3,14 @@ set -eux -o pipefail; shopt -s inherit_errexit
 
 : 'Preparing worker nodes for IBM Storage Scale...'
 
-WORKER_NODES=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | awk '{print $1}')
-WORKER_COUNT=$(echo "$WORKER_NODES" | wc -l)
+workerNodes=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | awk '{print $1}')
+workerCount=$(echo "$workerNodes" | wc -l)
 
-: "Found $WORKER_COUNT worker nodes"
+: "Found $workerCount worker nodes"
 
 CreateDirectoryOnNode() {
-  local node=$1
-  local dir=$2
+  typeset node="${1}"; (($#)) && shift
+  typeset dir="${1}"; (($#)) && shift
   
   if oc debug -n default node/"$node" -- chroot /host mkdir -p "$dir" >/dev/null; then
     : "  $dir created on $node"
@@ -19,9 +19,11 @@ CreateDirectoryOnNode() {
     : "  Failed to create $dir on $node"
     return 1
   fi
+
+  true
 }
 
-for node in $WORKER_NODES; do
+for node in $workerNodes; do
   : "Processing node: $node"
   
   if ! CreateDirectoryOnNode "$node" "/var/lib/firmware"; then
@@ -46,3 +48,5 @@ for node in $WORKER_NODES; do
 done
 
 : 'Worker node preparation complete'
+
+true

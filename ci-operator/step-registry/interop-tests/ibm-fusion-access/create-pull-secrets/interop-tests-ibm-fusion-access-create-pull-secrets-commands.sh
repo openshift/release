@@ -204,8 +204,8 @@ print(json.dumps(current))
   : 'Creating ibm-entitlement-key secrets in IBM Storage Scale namespaces...'
   
   # Function to create ibm-entitlement-key secret in a namespace
-  create_entitlement_secret_in_namespace() {
-    local targetNamespace=$1
+  CreateEntitlementSecretInNamespace() {
+    typeset targetNamespace="${1}"; (($#)) && shift
     
     # Check if namespace exists first
     if ! oc get namespace "${targetNamespace}" >/dev/null; then
@@ -248,11 +248,13 @@ EOF
       : "${targetNamespace}: Failed to create secret"
       return 1
     fi
+
+    true
   }
   
   # Create in specific namespaces that may explicitly reference the secret
   for ns in "${FA__SCALE__NAMESPACE}" "${FA__SCALE__DNS_NAMESPACE}" "${FA__SCALE__CSI_NAMESPACE}" "${FA__SCALE__OPERATOR_NAMESPACE}"; do
-    create_entitlement_secret_in_namespace "$ns"
+    CreateEntitlementSecretInNamespace "$ns"
   done
   
   : 'IBM entitlement key configured globally and in specific namespaces'
@@ -367,3 +369,5 @@ if oc get secret fusion-pullsecret-extra -n "${FA__NAMESPACE}" >/dev/null; then
 fi
 
 : 'All Fusion Access pull secrets creation completed'
+
+true

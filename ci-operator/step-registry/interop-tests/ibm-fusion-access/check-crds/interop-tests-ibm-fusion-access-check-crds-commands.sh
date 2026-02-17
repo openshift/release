@@ -2,7 +2,6 @@
 set -eux -o pipefail; shopt -s inherit_errexit
 
 # JUnit XML test results configuration
-ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 junitResultsFile="${ARTIFACT_DIR}/junit_check_crds_tests.xml"
 testStartTime=$SECONDS
 testsTotal=0
@@ -12,11 +11,11 @@ testCases=""
 
 # Function to add test result to JUnit XML
 AddTestResult() {
-  local testName="$1"
-  local testStatus="$2"  # "passed" or "failed"
-  local testDuration="$3"
-  local testMessage="${4:-}"
-  local testClassName="${5:-CheckCRDsTests}"
+  typeset testName="${1}"; (($#)) && shift
+  typeset testStatus="${1}"; (($#)) && shift  # "passed" or "failed"
+  typeset testDuration="${1}"; (($#)) && shift
+  typeset testMessage="${1:-}"; (($#)) && shift
+  typeset testClassName="${1:-CheckCRDsTests}"; (($#)) && shift
   
   testsTotal=$((testsTotal + 1))
   
@@ -31,11 +30,13 @@ AddTestResult() {
       <failure message=\"Test failed\">${testMessage}</failure>
     </testcase>"
   fi
+
+  true
 }
 
 # Function to generate JUnit XML report
 GenerateJunitXml() {
-  local totalDuration=$((SECONDS - testStartTime))
+  typeset totalDuration=$((SECONDS - testStartTime))
   
   cat > "${junitResultsFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -58,6 +59,8 @@ EOF
     cp "${junitResultsFile}" "${SHARED_DIR}/$(basename ${junitResultsFile})"
     : '  ✅ Results copied to SHARED_DIR'
   fi
+
+  true
 }
 
 # Trap to ensure JUnit XML is generated even on failure
@@ -82,3 +85,4 @@ fi
 testDuration=$((SECONDS - testStart))
 AddTestResult "test_storage_scale_crds_established" "$testStatus" "$testDuration" "$testMessage"
 
+true

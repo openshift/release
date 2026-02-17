@@ -9,7 +9,6 @@ FA__SCALE__STORAGE_CPU="${FA__SCALE__STORAGE_CPU:-2}"
 FA__SCALE__STORAGE_MEMORY="${FA__SCALE__STORAGE_MEMORY:-8Gi}"
 
 # JUnit XML test results configuration
-ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 junitResultsFile="${ARTIFACT_DIR}/junit_create_cluster_tests.xml"
 testStartTime=$(date +%s)
 testsTotal=0
@@ -19,41 +18,43 @@ testCases=""
 
 # Function to add test result to JUnit XML
 AddTestResult() {
-  local test_name="$1"
-  local test_status="$2"  # "passed" or "failed"
-  local test_duration="$3"
-  local test_message="${4:-}"
-  local test_classname="${5:-ClusterCreationTests}"
+  typeset testName="${1}"; (($#)) && shift
+  typeset testStatus="${1}"; (($#)) && shift  # "passed" or "failed"
+  typeset testDuration="${1}"; (($#)) && shift
+  typeset testMessage="${1:-}"; (($#)) && shift
+  typeset testClassName="${1:-ClusterCreationTests}"; (($#)) && shift
   
   testsTotal=$((testsTotal + 1))
   
-  if [[ "$test_status" == "passed" ]]; then
+  if [[ "$testStatus" == "passed" ]]; then
     testsPassed=$((testsPassed + 1))
     testCases="${testCases}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\"/>"
+    <testcase name=\"${testName}\" classname=\"${testClassName}\" time=\"${testDuration}\"/>"
   else
     testsFailed=$((testsFailed + 1))
     testCases="${testCases}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\">
-      <failure message=\"Test failed\">${test_message}</failure>
+    <testcase name=\"${testName}\" classname=\"${testClassName}\" time=\"${testDuration}\">
+      <failure message=\"Test failed\">${testMessage}</failure>
     </testcase>"
   fi
+
+  true
 }
 
 # Function to generate JUnit XML report
 GenerateJunitXml() {
-  local total_duration=$(($(date +%s) - testStartTime))
+  typeset totalDuration=$(($(date +%s) - testStartTime))
   
   cat > "${junitResultsFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="Create Cluster Tests" tests="${testsTotal}" failures="${testsFailed}" errors="0" time="${total_duration}">
+  <testsuite name="Create Cluster Tests" tests="${testsTotal}" failures="${testsFailed}" errors="0" time="${totalDuration}">
 ${testCases}
   </testsuite>
 </testsuites>
 EOF
   
-  : "Test Results Summary: Total=${testsTotal} Passed=${testsPassed} Failed=${testsFailed} Duration=${total_duration}s"
+  : "Test Results Summary: Total=${testsTotal} Passed=${testsPassed} Failed=${testsFailed} Duration=${totalDuration}s"
   
   # Copy to SHARED_DIR for data router reporter (if available)
   if [[ -n "${SHARED_DIR:-}" ]] && [[ -d "${SHARED_DIR}" ]]; then
@@ -66,6 +67,8 @@ EOF
     : "Test suite failed: ${testsFailed} test(s) failed"
     exit 1
   fi
+
+  true
 }
 
 # Trap to ensure JUnit XML is generated even on failure
@@ -217,3 +220,4 @@ fi
 
 : 'Cluster created with bypassDiscovery: false (auto-discovery mode)'
 
+true

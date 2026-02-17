@@ -6,104 +6,108 @@ set -eux -o pipefail; shopt -s inherit_errexit
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-REGION="${LEASED_RESOURCE}"
-export REGION
+region="${LEASED_RESOURCE}"
+export region
 
 : "AWS credentials file: ${AWS_SHARED_CREDENTIALS_FILE}"
-: "AWS region: ${REGION}"
+: "AWS region: ${region}"
 
-CLUSTER_NAME="fusion-access-test"
-INFRA_ID=""
+clusterName="fusion-access-test"
+infraId=""
 
 if [[ -f "${SHARED_DIR}/CLUSTER_NAME" ]]; then
-  CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
+  clusterName="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 fi
 
 if [[ -f "${SHARED_DIR}/metadata.json" ]]; then
-  INFRA_ID=$(jq -r '.infraID' "${SHARED_DIR}/metadata.json")
-  : "Infrastructure ID: ${INFRA_ID}"
+  infraId=$(jq -r '.infraID' "${SHARED_DIR}/metadata.json")
+  : "Infrastructure ID: ${infraId}"
 else
   : 'ERROR: metadata.json not found'
   exit 1
 fi
 
-: "Cluster name: ${CLUSTER_NAME}"
+: "Cluster name: ${clusterName}"
 
 # See: https://www.ibm.com/docs/en/scalecontainernative/5.2.2?topic=aws-red-hat-openshift-configuration
 : 'Step 1: Finding worker security group...'
 
-WORKER_SG_JSON=$(aws ec2 describe-security-groups \
-  --region "${REGION}" \
+workerSgJson=$(aws ec2 describe-security-groups \
+  --region "${region}" \
   --filters \
     "Name=tag:sigs.k8s.io/cluster-api-provider-aws/role,Values=node" \
-    "Name=tag:Name,Values=${INFRA_ID}-*" \
+    "Name=tag:Name,Values=${infraId}-*" \
   --query 'SecurityGroups[0]' \
   --output json \
-  --no-cli-pager)
+ )
 
-if [[ -z "${WORKER_SG_JSON}" ]] || [[ "${WORKER_SG_JSON}" == "null" ]]; then
+if [[ -z "${workerSgJson}" ]] || [[ "${workerSgJson}" == "null" ]]; then
   : 'ERROR: Could not find worker security group'
-  : "Searched for tags: sigs.k8s.io/cluster-api-provider-aws/role=node, Name=${INFRA_ID}-*"
+  : "Searched for tags: sigs.k8s.io/cluster-api-provider-aws/role=node, Name=${infraId}-*"
   exit 1
 fi
 
-WORKER_SG_ID=$(echo "${WORKER_SG_JSON}" | jq -r '.GroupId')
-WORKER_SG_NAME=$(echo "${WORKER_SG_JSON}" | jq -r '.GroupName')
-WORKER_SG_DESC=$(echo "${WORKER_SG_JSON}" | jq -r '.Description')
+workerSgId=$(echo "${workerSgJson}" | jq -r '.GroupId')
+workerSgName=$(echo "${workerSgJson}" | jq -r '.GroupName')
+workerSgDesc=$(echo "${workerSgJson}" | jq -r '.Description')
 
-if [[ -z "${WORKER_SG_ID}" ]] || [[ "${WORKER_SG_ID}" == "null" ]]; then
+if [[ -z "${workerSgId}" ]] || [[ "${workerSgId}" == "null" ]]; then
   : 'ERROR: Failed to extract worker security group ID'
   exit 1
 fi
 
 : 'Found worker security group:'
-: "  ID: ${WORKER_SG_ID}"
-: "  Name: ${WORKER_SG_NAME}"
-: "  Description: ${WORKER_SG_DESC}"
+: "  ID: ${workerSgId}"
+: "  Name: ${workerSgName}"
+: "  Description: ${workerSgDesc}"
 
-echo "${WORKER_SG_ID}" > "${SHARED_DIR}/worker_sg_id"
+echo "${workerSgId}" > "${SHARED_DIR}/worker_sg_id"
 : "Security group ID saved to: ${SHARED_DIR}/worker_sg_id"
 
 # Matching playbook: https://raw.githubusercontent.com/openshift-storage-scale/aws-ibm-gpfs-playground/6e712d7c8261d5330ab74b1aa4a60f5279a38298/playbooks/install.yml
 : 'Step 2: Adding IBM Storage Scale ports to worker security group...'
 
-add_ingress_rule() {
-  local port_spec=$1
-  local description=$2
+AddIngressRule() {
+  typeset portSpec="${1}"; (($#)) && shift
+  typeset desc="${1}"; (($#)) && shift
   
-  : "Adding rule: ${description} (${port_spec})"
+  : "Adding rule: ${desc} (${portSpec})"
   
   if aws ec2 authorize-security-group-ingress \
-    --region "${REGION}" \
-    --group-id "${WORKER_SG_ID}" \
+    --region "${region}" \
+    --group-id "${workerSgId}" \
     --protocol tcp \
-    --port "${port_spec}" \
-    --source-group "${WORKER_SG_ID}" \
-    --group-owner "$(aws sts get-caller-identity --query Account --output text --no-cli-pager)" \
-    --no-cli-pager; then
-    : "  Added: ${description}"
+    --port "${portSpec}" \
+    --source-group "${workerSgId}" \
+    --group-owner "$(aws sts get-caller-identity --query Account --output text)" \
+   ; then
+    : "  Added: ${desc}"
     return 0
   else
     if aws ec2 describe-security-group-rules \
-      --region "${REGION}" \
-      --filters "Name=group-id,Values=${WORKER_SG_ID}" \
-      --query "SecurityGroupRules[?ToPort==\`${port_spec%%[-:]*}\` && IpProtocol=='tcp']" \
+      --region "${region}" \
+      --filters "Name=group-id,Values=${workerSgId}" \
+      --query "SecurityGroupRules[?ToPort==\`${portSpec%%[-:]*}\` && IpProtocol=='tcp']" \
       --output text \
-      --no-cli-pager | grep -q "${WORKER_SG_ID}"; then
-      : "  Rule already exists: ${description}"
+      | grep -q "${workerSgId}"; then
+      : "  Rule already exists: ${desc}"
       return 0
     else
-      : "  Failed to add: ${description}"
+      : "  Failed to add: ${desc}"
       return 1
     fi
   fi
+
+  true
 }
 
-add_ingress_rule "1191" "GPFS admin communication"
-add_ingress_rule "12345" "GPFS daemon communication"
-add_ingress_rule "60000-61000" "TSC command port range"
+AddIngressRule "1191" "GPFS admin communication"
+AddIngressRule "12345" "GPFS daemon communication"
+AddIngressRule "60000-61000" "TSC command port range"
 
 : 'Security group configuration completed successfully'
-: "  Worker Security Group ID: ${WORKER_SG_ID}"
-: "  Region: ${REGION}"
-: "  Infrastructure ID: ${INFRA_ID}"
+: "  Worker Security Group ID: ${workerSgId}"
+: "  Region: ${region}"
+: "  Infrastructure ID: ${infraId}"
+
+true

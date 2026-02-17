@@ -20,16 +20,16 @@ ${SHARED_DIR}/common-fusion-access-bash-functions.sh
 
 ## Functions Provided
 
-### 1. `add_test_result()`
+### 1. `AddTestResult()`
 
 Adds a test case result to the JUnit XML output.
 
 **Parameters:**
-- `$1` - `test_name`: Name of the test case (use snake_case, e.g., `test_operator_installation`)
-- `$2` - `test_status`: Test result, must be `"passed"` or `"failed"`
-- `$3` - `test_duration`: Duration in seconds (integer)
-- `$4` - `test_message`: Error message for failed tests (optional, provide detailed failure reason)
-- `$5` - `test_classname`: Test class name (optional, defaults to `"FusionAccessTests"`, use PascalCase)
+- `$1` - `testName`: Name of the test case (use snake_case, e.g., `test_operator_installation`)
+- `$2` - `testStatus`: Test result, must be `"passed"` or `"failed"`
+- `$3` - `testDuration`: Duration in seconds (integer)
+- `$4` - `testMessage`: Error message for failed tests (optional, provide detailed failure reason)
+- `$5` - `testClassName`: Test class name (optional, defaults to `"FusionAccessTests"`, use PascalCase)
 
 **Global Variables Modified:**
 - `TESTS_TOTAL`: Incremented by 1
@@ -52,10 +52,10 @@ else
 fi
 
 TEST1_DURATION=$(($(date +%s) - TEST1_START))
-add_test_result "test_operation" "$TEST1_STATUS" "$TEST1_DURATION" "$TEST1_MESSAGE" "FusionAccessOperatorTests"
+AddTestResult "test_operation" "$TEST1_STATUS" "$TEST1_DURATION" "$TEST1_MESSAGE" "FusionAccessOperatorTests"
 ```
 
-### 2. `generate_junit_xml()`
+### 2. `GenerateJunitXml()`
 
 Generates the final JUnit XML test results report. Should be called at the end of test execution (typically via a trap on EXIT).
 
@@ -124,7 +124,7 @@ TEST_CASES=""
 **CRITICAL**: The trap must be set AFTER sourcing the shared library:
 
 ```bash
-trap generate_junit_xml EXIT
+trap GenerateJunitXml EXIT
 ```
 
 ### 5. Use in test cases
@@ -148,7 +148,7 @@ fi
 
 # Record result
 TEST1_DURATION=$(($(date +%s) - TEST1_START))
-add_test_result "test_example_action" "$TEST1_STATUS" "$TEST1_DURATION" "$TEST1_MESSAGE"
+AddTestResult "test_example_action" "$TEST1_STATUS" "$TEST1_DURATION" "$TEST1_MESSAGE"
 ```
 
 ## Complete Example
@@ -175,7 +175,7 @@ TESTS_PASSED=0
 TEST_CASES=""
 
 # Set trap to generate XML on exit
-trap generate_junit_xml EXIT
+trap GenerateJunitXml EXIT
 
 # Test 1: Check operator installation
 echo ""
@@ -193,7 +193,7 @@ else
 fi
 
 TEST1_DURATION=$(($(date +%s) - TEST1_START))
-add_test_result "test_operator_installation" "$TEST1_STATUS" "$TEST1_DURATION" "$TEST1_MESSAGE"
+AddTestResult "test_operator_installation" "$TEST1_STATUS" "$TEST1_DURATION" "$TEST1_MESSAGE"
 
 # Test 2: Check CRDs
 echo ""
@@ -211,9 +211,9 @@ else
 fi
 
 TEST2_DURATION=$(($(date +%s) - TEST2_START))
-add_test_result "test_crd_installation" "$TEST2_STATUS" "$TEST2_DURATION" "$TEST2_MESSAGE"
+AddTestResult "test_crd_installation" "$TEST2_STATUS" "$TEST2_DURATION" "$TEST2_MESSAGE"
 
-# The trap will automatically call generate_junit_xml on exit
+# The trap will automatically call GenerateJunitXml on exit
 ```
 
 ## Integration Points

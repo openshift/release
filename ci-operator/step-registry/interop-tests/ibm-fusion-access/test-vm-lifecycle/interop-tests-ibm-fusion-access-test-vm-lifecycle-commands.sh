@@ -21,18 +21,20 @@ testCases=""
 
 # Function to escape XML special characters
 EscapeXml() {
-  local text="$1"
+  typeset text="${1}"; (($#)) && shift
   # Escape XML special characters: & must be first to avoid double-escaping
   echo "$text" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'\''/\&apos;/g'
+
+  true
 }
 
 # Function to add test result to JUnit XML
 AddTestResult() {
-  local testName="$1"
-  local testStatus="$2"  # "passed" or "failed"
-  local testDuration="$3"
-  local testMessage="${4:-}"
-  local testClassName="${5:-VMLifecycleTests}"
+  typeset testName="${1}"; (($#)) && shift
+  typeset testStatus="${1}"; (($#)) && shift  # "passed" or "failed"
+  typeset testDuration="${1}"; (($#)) && shift
+  typeset testMessage="${1:-}"; (($#)) && shift
+  typeset testClassName="${1:-VMLifecycleTests}"; (($#)) && shift
   
   # Escape XML special characters in user-provided strings
   testName=$(EscapeXml "$testName")
@@ -52,11 +54,13 @@ AddTestResult() {
       <failure message=\"Test failed\">${testMessage}</failure>
     </testcase>"
   fi
+
+  true
 }
 
 # Function to generate JUnit XML report
 GenerateJunitXml() {
-  local totalDuration=$((SECONDS - testStartTime))
+  typeset totalDuration=$((SECONDS - testStartTime))
   
   cat > "${junitResultsFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -74,23 +78,29 @@ EOF
     cp "${junitResultsFile}" "${SHARED_DIR}/junit_vm_lifecycle_tests.xml"
     : 'Results copied to SHARED_DIR'
   fi
+
+  true
 }
 
 StartTest() {
-  local testDescription="$1"
+  typeset testDescription="${1}"; (($#)) && shift
   : "🧪 ${testDescription}..."
   echo "$SECONDS"
+
+  true
 }
 
 # Helper function to record test result (eliminates repetitive duration calculation)
 RecordTest() {
-  local testStart="$1"
-  local testName="$2"
-  local testStatus="$3"
-  local testMessage="${4:-}"
+  typeset testStart="${1}"; (($#)) && shift
+  typeset testName="${1}"; (($#)) && shift
+  typeset testStatus="${1}"; (($#)) && shift
+  typeset testMessage="${1:-}"; (($#)) && shift
   
-  local testDuration=$((SECONDS - testStart))
+  typeset testDuration=$((SECONDS - testStart))
   AddTestResult "$testName" "$testStatus" "$testDuration" "$testMessage"
+
+  true
 }
 
 # Trap to ensure JUnit XML is generated even on failure
@@ -362,3 +372,4 @@ oc delete namespace "${FA__CNV__TEST_NAMESPACE}" --ignore-not-found
 
 : 'VM lifecycle operations with IBM Storage Scale shared storage completed'
 
+true

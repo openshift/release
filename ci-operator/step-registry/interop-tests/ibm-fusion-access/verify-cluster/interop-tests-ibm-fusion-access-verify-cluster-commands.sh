@@ -5,7 +5,6 @@ FA__SCALE__NAMESPACE="${FA__SCALE__NAMESPACE:-ibm-spectrum-scale}"
 FA__SCALE__CLUSTER_NAME="${FA__SCALE__CLUSTER_NAME:-ibm-spectrum-scale}"
 
 # JUnit XML test results configuration
-ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 junitResultsFile="${ARTIFACT_DIR}/junit_verify_cluster_tests.xml"
 testStartTime=$(date +%s)
 testsTotal=0
@@ -15,11 +14,11 @@ testCases=""
 
 # Function to add test result to JUnit XML
 AddTestResult() {
-  local testName="$1"
-  local testStatus="$2"  # "passed" or "failed"
-  local testDuration="$3"
-  local testMessage="${4:-}"
-  local testClassName="${5:-VerifyClusterTests}"
+  typeset testName="${1}"; (($#)) && shift
+  typeset testStatus="${1}"; (($#)) && shift  # "passed" or "failed"
+  typeset testDuration="${1}"; (($#)) && shift
+  typeset testMessage="${1:-}"; (($#)) && shift
+  typeset testClassName="${1:-VerifyClusterTests}"; (($#)) && shift
   
   testsTotal=$((testsTotal + 1))
   
@@ -34,11 +33,13 @@ AddTestResult() {
       <failure message=\"Test failed\">${testMessage}</failure>
     </testcase>"
   fi
+
+  true
 }
 
 # Function to generate JUnit XML report
 GenerateJunitXml() {
-  local totalDuration=$(($(date +%s) - testStartTime))
+  typeset totalDuration=$(($(date +%s) - testStartTime))
   
   cat > "${junitResultsFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -61,6 +62,8 @@ EOF
     cp "${junitResultsFile}" "${SHARED_DIR}/$(basename ${junitResultsFile})"
     : '  ✅ Results copied to SHARED_DIR'
   fi
+
+  true
 }
 
 # Trap to ensure JUnit XML is generated even on failure
@@ -137,3 +140,4 @@ fi
 testDuration=$(($(date +%s) - testStart))
 AddTestResult "test_cluster_pods_running" "$testStatus" "$testDuration" "$testMessage"
 
+true

@@ -7,7 +7,6 @@ FA__KMM__REGISTRY_ORG="${FA__KMM__REGISTRY_ORG:-}"
 FA__KMM__REGISTRY_REPO="${FA__KMM__REGISTRY_REPO:-gpfs-compat-kmod}"
 
 # JUnit XML test results configuration
-ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 junitResultsFile="${ARTIFACT_DIR}/junit_configure_kmm_registry_tests.xml"
 testStartTime=$(date +%s)
 testsTotal=0
@@ -17,11 +16,11 @@ testCases=""
 
 # Function to add test result to JUnit XML
 AddTestResult() {
-  local testName="$1"
-  local testStatus="$2"  # "passed" or "failed"
-  local testDuration="$3"
-  local testMessage="${4:-}"
-  local testClassName="${5:-ConfigureKMMRegistryTests}"
+  typeset testName="${1}"; (($#)) && shift
+  typeset testStatus="${1}"; (($#)) && shift  # "passed" or "failed"
+  typeset testDuration="${1}"; (($#)) && shift
+  typeset testMessage="${1:-}"; (($#)) && shift
+  typeset testClassName="${1:-ConfigureKMMRegistryTests}"; (($#)) && shift
   
   testsTotal=$((testsTotal + 1))
   
@@ -36,11 +35,13 @@ AddTestResult() {
       <failure message=\"Test failed\">${testMessage}</failure>
     </testcase>"
   fi
+
+  true
 }
 
 # Function to generate JUnit XML report
 GenerateJunitXml() {
-  local totalDuration=$(($(date +%s) - testStartTime))
+  typeset totalDuration=$(($(date +%s) - testStartTime))
   
   cat > "${junitResultsFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -69,6 +70,8 @@ EOF
     : "❌ Test suite failed: ${testsFailed} test(s) failed"
     exit 1
   fi
+
+  true
 }
 
 # Trap to ensure JUnit XML is generated even on failure
@@ -205,3 +208,4 @@ AddTestResult "test_create_kmm_config_in_scale_operator_namespace" "$test4Status
 : '⚠️  NOTE: IBM Storage Scale v5.2.3.1 manifests have limited KMM support.'
 : '   The operator may still fall back to kernel header compilation.'
 
+true

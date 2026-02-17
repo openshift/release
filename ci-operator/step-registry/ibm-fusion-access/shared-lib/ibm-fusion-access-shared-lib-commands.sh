@@ -3,9 +3,9 @@ set -eux -o pipefail; shopt -s inherit_errexit
 
 : 'Generating IBM Fusion Access shared functions'
 
-FUNCTIONS_PATH="${SHARED_DIR}/common-fusion-access-bash-functions.sh"
+functionsPath="${SHARED_DIR}/common-fusion-access-bash-functions.sh"
 
-cat <<'EO-SHARED-FUNCTION' > "${FUNCTIONS_PATH}"
+cat <<'EO-SHARED-FUNCTION' > "${functionsPath}"
 ########################################################################
 # IBM Fusion Access Shared Test Functions
 ########################################################################
@@ -19,8 +19,8 @@ cat <<'EO-SHARED-FUNCTION' > "${FUNCTIONS_PATH}"
 # Usage:
 #   1. Source this file in your test script
 #   2. Initialize required variables
-#   3. Set trap for generate_junit_xml
-#   4. Use add_test_result for each test case
+#   3. Set trap for GenerateJunitXml
+#   4. Use AddTestResult for each test case
 #
 # References:
 #   - OCP CI JUnit XML Test Results Patterns
@@ -28,24 +28,24 @@ cat <<'EO-SHARED-FUNCTION' > "${FUNCTIONS_PATH}"
 ########################################################################
 
 # ----------------------------------------------------------------------
-# add_test_result
+# AddTestResult
 # ----------------------------------------------------------------------
 # Adds a test case result to the JUnit XML output.
 #
 # This function accumulates test results in the TEST_CASES variable,
-# which is later used by generate_junit_xml() to create the final
+# which is later used by GenerateJunitXml() to create the final
 # JUnit XML report.
 #
 # Parameters:
-#   $1 - test_name: Name of the test case (use snake_case)
-#                   Example: "test_operator_installation"
-#   $2 - test_status: Test result, must be "passed" or "failed"
-#   $3 - test_duration: Duration in seconds (integer)
-#                       Example: $(($(date +%s) - TEST_START))
-#   $4 - test_message: Error message for failed tests (optional)
-#                      Provide detailed failure reason for debugging
-#   $5 - test_classname: Test class name (optional, defaults to "FusionAccessTests")
-#                        Use PascalCase, e.g. "FusionAccessOperatorTests"
+#   $1 - testName: Name of the test case (use snake_case)
+#                  Example: "test_operator_installation"
+#   $2 - testStatus: Test result, must be "passed" or "failed"
+#   $3 - testDuration: Duration in seconds (integer)
+#                      Example: $(($(date +%s) - TEST_START))
+#   $4 - testMessage: Error message for failed tests (optional)
+#                     Provide detailed failure reason for debugging
+#   $5 - testClassName: Test class name (optional, defaults to "FusionAccessTests")
+#                       Use PascalCase, e.g. "FusionAccessOperatorTests"
 #
 # Global Variables Modified:
 #   - TESTS_TOTAL: Incremented by 1
@@ -65,33 +65,35 @@ cat <<'EO-SHARED-FUNCTION' > "${FUNCTIONS_PATH}"
 #   fi
 #   
 #   TEST1_DURATION=$(($(date +%s) - TEST1_START))
-#   add_test_result "test_operation" "$TEST1_STATUS" "$TEST1_DURATION" "$TEST1_MESSAGE"
+#   AddTestResult "test_operation" "$TEST1_STATUS" "$TEST1_DURATION" "$TEST1_MESSAGE"
 # ----------------------------------------------------------------------
 
-add_test_result() {
-  local test_name="$1"
-  local test_status="$2"  # "passed" or "failed"
-  local test_duration="$3"
-  local test_message="${4:-}"
-  local test_classname="${5:-FusionAccessTests}"
+AddTestResult() {
+  typeset testName="${1}"; (($#)) && shift
+  typeset testStatus="${1}"; (($#)) && shift  # "passed" or "failed"
+  typeset testDuration="${1}"; (($#)) && shift
+  typeset testMessage="${1:-}"; (($#)) && shift
+  typeset testClassName="${1:-FusionAccessTests}"; (($#)) && shift
   
   TESTS_TOTAL=$((TESTS_TOTAL + 1))
   
-  if [[ "$test_status" == "passed" ]]; then
+  if [[ "$testStatus" == "passed" ]]; then
     TESTS_PASSED=$((TESTS_PASSED + 1))
     TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\"/>"
+    <testcase name=\"${testName}\" classname=\"${testClassName}\" time=\"${testDuration}\"/>"
   else
     TESTS_FAILED=$((TESTS_FAILED + 1))
     TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\">
-      <failure message=\"Test failed\">${test_message}</failure>
+    <testcase name=\"${testName}\" classname=\"${testClassName}\" time=\"${testDuration}\">
+      <failure message=\"Test failed\">${testMessage}</failure>
     </testcase>"
   fi
+
+  true
 }
 
 # ----------------------------------------------------------------------
-# generate_junit_xml
+# GenerateJunitXml
 # ----------------------------------------------------------------------
 # Generates the final JUnit XML test results report.
 #
@@ -143,24 +145,24 @@ add_test_result() {
 #   TESTS_PASSED=0
 #   TEST_CASES=""
 #   
-#   trap generate_junit_xml EXIT
+#   trap GenerateJunitXml EXIT
 # ----------------------------------------------------------------------
 
-generate_junit_xml() {
-  local total_duration=$(($(date +%s) - TEST_START_TIME))
+GenerateJunitXml() {
+  typeset totalDuration=$(($(date +%s) - TEST_START_TIME))
   
   mkdir -p "$(dirname "${JUNIT_RESULTS_FILE}")"
   
   cat > "${JUNIT_RESULTS_FILE}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="${JUNIT_SUITE_NAME:-IBM Fusion Access Tests}" tests="${TESTS_TOTAL}" failures="${TESTS_FAILED}" errors="0" time="${total_duration}">
+  <testsuite name="${JUNIT_SUITE_NAME:-IBM Fusion Access Tests}" tests="${TESTS_TOTAL}" failures="${TESTS_FAILED}" errors="0" time="${totalDuration}">
 ${TEST_CASES}
   </testsuite>
 </testsuites>
 EOF
   
-  : "Test Results: Total=${TESTS_TOTAL} Passed=${TESTS_PASSED} Failed=${TESTS_FAILED} Duration=${total_duration}s Results=${JUNIT_RESULTS_FILE}"
+  : "Test Results: Total=${TESTS_TOTAL} Passed=${TESTS_PASSED} Failed=${TESTS_FAILED} Duration=${totalDuration}s Results=${JUNIT_RESULTS_FILE}"
   
   if [[ -n "${SHARED_DIR:-}" ]] && [[ -d "${SHARED_DIR}" ]]; then
     cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}/$(basename ${JUNIT_RESULTS_FILE})"
@@ -171,13 +173,17 @@ EOF
     : "Test suite failed: ${TESTS_FAILED} test(s) failed"
     exit 1
   fi
+
+  true
 }
 
 # ----------------------------------------------------------------------
 
 EO-SHARED-FUNCTION
 
-cat "${FUNCTIONS_PATH}"
+cat "${functionsPath}"
 
-: "Generated shared functions at '${SHARED_DIR}/$(basename ${FUNCTIONS_PATH})'"
-ls -l "${FUNCTIONS_PATH}"
+: "Generated shared functions at '${SHARED_DIR}/$(basename ${functionsPath})'"
+ls -l "${functionsPath}"
+
+true

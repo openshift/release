@@ -27,7 +27,7 @@ if [ -d "/var/run/secrets" ]; then
   fi
   for file in "ibm-entitlement-key" "fusion-pullsecret-extra"; do
     if [ -f "/var/run/secrets/$file" ] || [ -L "/var/run/secrets/$file" ]; then
-      size=$(stat -c%s "/var/run/secrets/$file" || echo "unknown")
+      stat -c%s "/var/run/secrets/${file}" || true
     fi
   done
 fi
@@ -152,8 +152,8 @@ print(json.dumps(current))
   set -x
   
   # Function to create ibm-entitlement-key secret in a namespace
-  create_entitlement_secret_in_namespace() {
-    local targetNamespace=$1
+  CreateEntitlementSecretInNamespace() {
+    typeset targetNamespace="${1}"; (($#)) && shift
     
     # Check if namespace exists first
     if ! oc get namespace "${targetNamespace}" >/dev/null; then
@@ -192,11 +192,13 @@ EOF
       set -x
       return 1
     fi
+
+    true
   }
   
   # Create in specific namespaces that may explicitly reference the secret
   for ns in "${FA__SCALE__NAMESPACE}" "${FA__SCALE__DNS_NAMESPACE}" "${FA__SCALE__CSI_NAMESPACE}" "${FA__SCALE__OPERATOR_NAMESPACE}"; do
-    create_entitlement_secret_in_namespace "$ns"
+    CreateEntitlementSecretInNamespace "$ns"
   done
   
   # Verify the secret was created
@@ -293,3 +295,4 @@ fi
 
 : '✅ All IBM Fusion Access pull secrets creation completed'
 
+true

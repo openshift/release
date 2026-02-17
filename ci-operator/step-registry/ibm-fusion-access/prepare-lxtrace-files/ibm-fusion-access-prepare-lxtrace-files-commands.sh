@@ -3,17 +3,17 @@ set -eux -o pipefail; shopt -s inherit_errexit
 
 : 'Creating lxtrace dummy files on worker nodes...'
 
-WORKER_NODES=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | awk '{print $1}')
-WORKER_COUNT=$(echo "$WORKER_NODES" | wc -l)
+workerNodes=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | awk '{print $1}')
+workerCount=$(echo "$workerNodes" | wc -l)
 
-if [[ -z "${WORKER_NODES}" ]] || [[ "${WORKER_COUNT}" -eq 0 ]]; then
+if [[ -z "${workerNodes}" ]] || [[ "${workerCount}" -eq 0 ]]; then
   : 'ERROR: No worker nodes found'
   exit 1
 fi
 
-: "Found $WORKER_COUNT worker nodes"
+: "Found $workerCount worker nodes"
 
-for node in $WORKER_NODES; do
+for node in $workerNodes; do
   : "Processing node: $node"
   
   oc debug -n default node/$node -- chroot /host bash -c 'touch /var/lib/firmware/lxtrace-dummy && chmod 644 /var/lib/firmware/lxtrace-dummy' 2>&1 | \
@@ -28,3 +28,5 @@ for node in $WORKER_NODES; do
 done
 
 : 'lxtrace dummy files created on all worker nodes'
+
+true

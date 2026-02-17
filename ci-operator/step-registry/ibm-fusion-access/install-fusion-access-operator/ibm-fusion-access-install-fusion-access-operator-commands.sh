@@ -67,13 +67,15 @@ EOF
 oc wait --for=jsonpath='{.status.state}'=AtLatestKnown subscription/openshift-fusion-access-operator -n ${fusionAccessNamespace} --timeout=600s
 
 : 'Waiting for ClusterServiceVersion...'
-CSV_NAME=$(oc get subscription openshift-fusion-access-operator -n ${fusionAccessNamespace} -o jsonpath='{.status.installedCSV}')
-if [[ -n "${CSV_NAME}" ]]; then
-  : "Waiting for CSV ${CSV_NAME}..."
-  oc wait --for=jsonpath='{.status.phase}'=Succeeded csv/${CSV_NAME} -n ${fusionAccessNamespace} --timeout=600s
+csvName=$(oc get subscription openshift-fusion-access-operator -n ${fusionAccessNamespace} -o jsonpath='{.status.installedCSV}')
+if [[ -n "${csvName}" ]]; then
+  : "Waiting for CSV ${csvName}..."
+  oc wait --for=jsonpath='{.status.phase}'=Succeeded csv/${csvName} -n ${fusionAccessNamespace} --timeout=600s
 else
   : 'CSV name not found in subscription status, waiting for any CSV...'
   oc wait --for=jsonpath='{.status.phase}'=Succeeded csv -l operators.coreos.com/openshift-fusion-access-operator.${fusionAccessNamespace} -n ${fusionAccessNamespace} --timeout=600s
 fi
 
 : 'IBM Fusion Access Operator installation completed'
+
+true
