@@ -1,54 +1,96 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+set -eux -o pipefail; shopt -s inherit_errexit
 
-STORAGE_SCALE_NAMESPACE="${STORAGE_SCALE_NAMESPACE:-ibm-spectrum-scale}"
+FA__SCALE__NAMESPACE="${FA__SCALE__NAMESPACE:-ibm-spectrum-scale}"
+FA__LOCALDISK_NAME="${FA__LOCALDISK_NAME:-shared-san-disk}"
 
-echo "💾 Creating IBM Storage Scale LocalDisk resources..."
+: 'Creating IBM Storage Scale LocalDisk resource (shared SAN architecture)'
 
-# Get first worker node for LocalDisk creation
-# Use jsonpath to avoid SIGPIPE issues with pipefail
-FIRST_WORKER=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}')
+workers=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[*].metadata.name}')
 
-# Validate that we have a worker node
-if [[ -z "${FIRST_WORKER}" ]]; then
-  echo "❌ ERROR: No worker nodes found"
+if [[ -z "${workers}" ]]; then
+  : 'ERROR: No worker nodes found'
   oc get nodes
   exit 1
 fi
 
-echo "✅ Using worker node: ${FIRST_WORKER}"
+read -ra workerArray <<< "${workers}"
+workerCount=${#workerArray[@]}
+firstWorker=${workerArray[0]}
 
-# Create LocalDisk resources for EBS volumes (device names vary by instance type)
-DEVICES=("nvme2n1" "nvme3n1")
-DISK_COUNT=1
+: "Found ${workerCount} worker nodes"
+: "Using ${firstWorker} as discovery node (shared disk visible to all workers)"
 
-for device in "${DEVICES[@]}"; do
-  LOCALDISK_NAME="shared-ebs-disk-${DISK_COUNT}"
-  
-  oc apply -f=- <<EOF
+if [[ -f "${SHARED_DIR}/ebs-device-path" ]]; then
+  byIdPath=$(cat "${SHARED_DIR}/ebs-device-path")
+elif [[ -f "${SHARED_DIR}/multiattach-volume-id" ]]; then
+  volumeId=$(cat "${SHARED_DIR}/multiattach-volume-id")
+  volumeIdClean="${volumeId//-/}"
+  byIdPath="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${volumeIdClean}"
+else
+  : 'ERROR: No device path or volume ID found in SHARED_DIR'
+  : 'This step requires create-aws-multiattach-ebs to run first'
+  ls -la "${SHARED_DIR}/"
+  exit 1
+fi
+
+devicePath=$(oc debug -n default node/"${firstWorker}" --quiet -- \
+  chroot /host readlink -f "${byIdPath}" 2>&1 \
+  | grep -v "Starting\|Removing\|To use")
+
+if [[ -z "${devicePath}" || "${devicePath}" != /dev/* ]]; then
+  : "ERROR: Failed to resolve device symlink on ${firstWorker}"
+  : "  by-id path: ${byIdPath}"
+  : "  resolved:   ${devicePath}"
+  if ! oc debug -n default node/"${firstWorker}" --quiet -- \
+      chroot /host ls -la "${byIdPath}"; then
+    : 'Device NOT found'
+  fi
+  exit 1
+fi
+
+: "Creating shared LocalDisk: ${FA__LOCALDISK_NAME}"
+oc apply -f=- <<EOF
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: LocalDisk
 metadata:
-  name: ${LOCALDISK_NAME}
-  namespace: ${STORAGE_SCALE_NAMESPACE}
+  name: ${FA__LOCALDISK_NAME}
+  namespace: ${FA__SCALE__NAMESPACE}
 spec:
-  device: /dev/${device}
-  node: ${FIRST_WORKER}
+  device: ${devicePath}
+  node: ${firstWorker}
   nodeConnectionSelector:
     matchExpressions:
     - key: node-role.kubernetes.io/worker
       operator: Exists
   existingDataSkipVerify: true
 EOF
-  
-  oc wait --for=jsonpath='{.metadata.name}'=${LOCALDISK_NAME} localdisk/${LOCALDISK_NAME} -n ${STORAGE_SCALE_NAMESPACE} --timeout=300s
-  echo "✅ LocalDisk ${LOCALDISK_NAME} created"
-  
-  ((DISK_COUNT++))
-done
 
-echo "✅ Created ${#DEVICES[@]} LocalDisk resources"
-oc get localdisk -n ${STORAGE_SCALE_NAMESPACE}
+: "Waiting for LocalDisk ${FA__LOCALDISK_NAME} to become Ready..."
 
+if oc wait --for=condition=Ready \
+    localdisk/"${FA__LOCALDISK_NAME}" -n "${FA__SCALE__NAMESPACE}" --timeout=300s; then
+  : "LocalDisk ${FA__LOCALDISK_NAME} is Ready"
+else
+  : 'ERROR: Timeout waiting for LocalDisk to become Ready'
+  : 'Diagnostic information'
+  : "Expected device path: ${devicePath}"
+  : "Checking device visibility on ${firstWorker}..."
+  if ! oc debug -n default node/"${firstWorker}" --quiet -- chroot /host ls -la "${devicePath}"; then
+    : "Device NOT found at ${devicePath}"
+  fi
+  : "Available NVMe devices on ${firstWorker}:"
+  if ! oc debug -n default node/"${firstWorker}" --quiet -- chroot /host ls -la /dev/disk/by-id/ | grep -i nvme; then
+    : 'No NVMe devices found'
+  fi
+  : 'LocalDisk status:'
+  oc get localdisk "${FA__LOCALDISK_NAME}" -n "${FA__SCALE__NAMESPACE}" -o yaml
+  exit 1
+fi
+
+: 'LocalDisk configuration:'
+oc get localdisk -n "${FA__SCALE__NAMESPACE}"
+
+: 'Shared LocalDisk created successfully'
+
+true

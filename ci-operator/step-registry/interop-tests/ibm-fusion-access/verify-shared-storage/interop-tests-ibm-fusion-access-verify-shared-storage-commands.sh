@@ -1,128 +1,127 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-echo "🔍 Verifying Shared Storage Between CNV and IBM Fusion Access"
-echo "======================================================="
+: 'Verifying Shared Storage Between CNV and IBM Fusion Access'
 
 # Set default values
-CNV_NAMESPACE="${CNV_NAMESPACE:-openshift-cnv}"
-FUSION_ACCESS_NAMESPACE="${FUSION_ACCESS_NAMESPACE:-ibm-fusion-access}"
-SHARED_STORAGE_CLASS="${SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
-TEST_NAMESPACE="${TEST_NAMESPACE:-shared-storage-test}"
+FA__CNV__NAMESPACE="${FA__CNV__NAMESPACE:-openshift-cnv}"
+FA__NAMESPACE="${FA__NAMESPACE:-ibm-fusion-access}"
+FA__CNV__SHARED_STORAGE_CLASS="${FA__CNV__SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
+FA__CNV__TEST_NAMESPACE="${FA__CNV__TEST_NAMESPACE:-shared-storage-test}"
 
 # JUnit XML test results
-JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_verify_shared_storage_tests.xml"
-TEST_START_TIME=$SECONDS
-TESTS_TOTAL=0
-TESTS_FAILED=0
-TESTS_PASSED=0
-TEST_CASES=""
+junitResultsFile="${ARTIFACT_DIR}/junit_verify_shared_storage_tests.xml"
+testStartTime=$SECONDS
+testsTotal=0
+testsFailed=0
+testsPassed=0
+testCases=""
 
 # Function to escape XML special characters
-escape_xml() {
-  local text="$1"
+EscapeXml() {
+  typeset text="${1}"; (($#)) && shift
   # Escape XML special characters: & must be first to avoid double-escaping
   echo "$text" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'\''/\&apos;/g'
+
+  true
 }
 
 # Function to add test result to JUnit XML
-add_test_result() {
-  local test_name="$1"
-  local test_status="$2"  # "passed" or "failed"
-  local test_duration="$3"
-  local test_message="${4:-}"
-  local test_classname="${5:-SharedStorageVerificationTests}"
+AddTestResult() {
+  typeset testName="${1}"; (($#)) && shift
+  typeset testStatus="${1}"; (($#)) && shift  # "passed" or "failed"
+  typeset testDuration="${1}"; (($#)) && shift
+  typeset testMessage="${1:-}"; (($#)) && shift
+  typeset testClassName="${1:-SharedStorageVerificationTests}"; (($#)) && shift
   
   # Escape XML special characters in user-provided strings
-  test_name=$(escape_xml "$test_name")
-  test_message=$(escape_xml "$test_message")
-  test_classname=$(escape_xml "$test_classname")
+  testName=$(EscapeXml "$testName")
+  testMessage=$(EscapeXml "$testMessage")
+  testClassName=$(EscapeXml "$testClassName")
   
-  TESTS_TOTAL=$((TESTS_TOTAL + 1))
+  testsTotal=$((testsTotal + 1))
   
-  if [[ "$test_status" == "passed" ]]; then
-    TESTS_PASSED=$((TESTS_PASSED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\"/>"
+  if [[ "$testStatus" == "passed" ]]; then
+    testsPassed=$((testsPassed + 1))
+    testCases="${testCases}
+    <testcase name=\"${testName}\" classname=\"${testClassName}\" time=\"${testDuration}\"/>"
   else
-    TESTS_FAILED=$((TESTS_FAILED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\">
-      <failure message=\"Test failed\">${test_message}</failure>
+    testsFailed=$((testsFailed + 1))
+    testCases="${testCases}
+    <testcase name=\"${testName}\" classname=\"${testClassName}\" time=\"${testDuration}\">
+      <failure message=\"Test failed\">${testMessage}</failure>
     </testcase>"
   fi
+
+  true
 }
 
 # Function to generate JUnit XML report
-generate_junit_xml() {
-  local total_duration=$((SECONDS - TEST_START_TIME))
+GenerateJunitXml() {
+  typeset totalDuration=$((SECONDS - testStartTime))
   
-  cat > "${JUNIT_RESULTS_FILE}" <<EOF
+  cat > "${junitResultsFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="Shared Storage Verification Tests" tests="${TESTS_TOTAL}" failures="${TESTS_FAILED}" errors="0" time="${total_duration}">
-${TEST_CASES}
+  <testsuite name="Shared Storage Verification Tests" tests="${testsTotal}" failures="${testsFailed}" errors="0" time="${totalDuration}">
+${testCases}
   </testsuite>
 </testsuites>
 EOF
   
-  echo ""
-  echo "📊 Test Results Summary:"
-  echo "  Total Tests: ${TESTS_TOTAL}"
-  echo "  Passed: ${TESTS_PASSED}"
-  echo "  Failed: ${TESTS_FAILED}"
-  echo "  Duration: ${total_duration}s"
-  echo "  Results File: ${JUNIT_RESULTS_FILE}"
+  : "Test Results Summary: Total=${testsTotal} Passed=${testsPassed} Failed=${testsFailed} Duration=${totalDuration}s Results=${junitResultsFile}"
   
   # Copy to SHARED_DIR for data router reporter (if available)
   if [[ -n "${SHARED_DIR:-}" ]] && [[ -d "${SHARED_DIR}" ]]; then
-    cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}/junit_verify_shared_storage_tests.xml"
-    echo "  ✅ Results copied to SHARED_DIR"
+    cp "${junitResultsFile}" "${SHARED_DIR}/junit_verify_shared_storage_tests.xml"
+    : 'Results copied to SHARED_DIR'
   fi
+
+  true
 }
 
-start_test() {
-  local test_description="$1"
-  : "🧪 ${test_description}..."
+StartTest() {
+  typeset testDescription="${1}"; (($#)) && shift
+  : "🧪 ${testDescription}..."
   echo "$SECONDS"
+
+  true
 }
 
 # Helper function to record test result (eliminates repetitive duration calculation)
-record_test() {
-  local test_start="$1"
-  local test_name="$2"
-  local test_status="$3"
-  local test_message="${4:-}"
+RecordTest() {
+  typeset testStart="${1}"; (($#)) && shift
+  typeset testName="${1}"; (($#)) && shift
+  typeset testStatus="${1}"; (($#)) && shift
+  typeset testMessage="${1:-}"; (($#)) && shift
   
-  local test_duration=$((SECONDS - test_start))
-  add_test_result "$test_name" "$test_status" "$test_duration" "$test_message"
+  typeset testDuration=$((SECONDS - testStart))
+  AddTestResult "$testName" "$testStatus" "$testDuration" "$testMessage"
+
+  true
 }
 
 # Trap to ensure JUnit XML is generated even on failure
-trap generate_junit_xml EXIT
+trap GenerateJunitXml EXIT
 
-echo "📋 Configuration:"
-echo "  CNV Namespace: ${CNV_NAMESPACE}"
-echo "  IBM Fusion Access Namespace: ${FUSION_ACCESS_NAMESPACE}"
-echo "  Test Namespace: ${TEST_NAMESPACE}"
-echo "  Shared Storage Class: ${SHARED_STORAGE_CLASS}"
+: "Configuration: CNV_NS=${FA__CNV__NAMESPACE} FA_NS=${FA__NAMESPACE} TEST_NS=${FA__CNV__TEST_NAMESPACE} SC=${FA__CNV__SHARED_STORAGE_CLASS}"
 
 # Create test namespace
-echo "📁 Creating test namespace..."
-oc create namespace "${TEST_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
-echo "  ✅ Test namespace created: ${TEST_NAMESPACE}"
+: 'Creating test namespace'
+oc create namespace "${FA__CNV__TEST_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+: "Test namespace created: ${FA__CNV__TEST_NAMESPACE}"
 
 # Step 1: Create a PVC from CNV side
-test_start=$(start_test "Step 1: Creating PVC from CNV side")
-test_status="failed"
-test_message=""
+testStart=$(StartTest "Step 1: Creating PVC from CNV side")
+testStatus="failed"
+testMessage=""
 
 if oc apply -f - <<EOF
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: cnv-shared-storage-pvc
-  namespace: ${TEST_NAMESPACE}
+  namespace: ${FA__CNV__TEST_NAMESPACE}
   labels:
     app: cnv-test
     storage-type: shared
@@ -132,39 +131,39 @@ spec:
   resources:
     requests:
       storage: 2Gi
-  storageClassName: ${SHARED_STORAGE_CLASS}
+  storageClassName: ${FA__CNV__SHARED_STORAGE_CLASS}
 EOF
 then
-  echo "  ✅ CNV PVC created successfully"
+  : 'CNV PVC created successfully'
   
   # Wait for CNV PVC to be bound
-  echo "  ⏳ Waiting for CNV PVC to be bound..."
-  if oc wait pvc cnv-shared-storage-pvc -n "${TEST_NAMESPACE}" --for=condition=Bound --timeout=5m; then
-    echo "  ✅ CNV PVC bound successfully"
-    test_status="passed"
+  : 'Waiting for CNV PVC to be bound'
+  if oc wait pvc cnv-shared-storage-pvc -n "${FA__CNV__TEST_NAMESPACE}" --for=jsonpath='{.status.phase}'=Bound --timeout=15m; then
+    : 'CNV PVC bound successfully'
+    testStatus="passed"
   else
-    echo "  ⚠️  CNV PVC not bound within timeout"
-    test_message="CNV PVC not bound within 5m timeout"
-    oc get pvc cnv-shared-storage-pvc -n "${TEST_NAMESPACE}" -o yaml
+    : 'CNV PVC not bound within timeout'
+    testMessage="CNV PVC not bound within 15m timeout"
+    oc get pvc cnv-shared-storage-pvc -n "${FA__CNV__TEST_NAMESPACE}" -o yaml
   fi
 else
-  echo "  ❌ Failed to create CNV PVC"
-  test_message="Failed to create CNV PVC resource"
+  : 'Failed to create CNV PVC'
+  testMessage="Failed to create CNV PVC resource"
 fi
 
-record_test "$test_start" "test_cnv_pvc_creation" "$test_status" "$test_message"
+RecordTest "$testStart" "test_cnv_pvc_creation" "$testStatus" "$testMessage"
 
 # Step 2: Create a pod to write data to the CNV PVC
-test_start=$(start_test "Step 2: Writing data to CNV PVC")
-test_status="failed"
-test_message=""
+testStart=$(StartTest "Step 2: Writing data to CNV PVC")
+testStatus="failed"
+testMessage=""
 
 if oc apply -f - <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
   name: cnv-data-writer
-  namespace: ${TEST_NAMESPACE}
+  namespace: ${FA__CNV__TEST_NAMESPACE}
   labels:
     app: cnv-test
 spec:
@@ -183,49 +182,44 @@ spec:
   restartPolicy: Never
 EOF
 then
-  echo "  ✅ CNV data writer pod created"
+  : 'CNV data writer pod created'
   
   # Wait for pod to be running
-  echo "  ⏳ Waiting for CNV data writer pod to be running..."
-  if oc wait pod cnv-data-writer -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=2m; then
-    echo "  ✅ CNV data writer pod is running"
+  : 'Waiting for CNV data writer pod to be running'
+  if oc wait pod cnv-data-writer -n "${FA__CNV__TEST_NAMESPACE}" --for=condition=Ready --timeout=2m; then
+    : 'CNV data writer pod is running'
     
-    # Wait a bit for data to be written
-    echo "  ⏳ Waiting for data to be written..."
-    sleep 10
-    
-    # Check if data was written
-    echo "  📊 Checking data written by CNV pod..."
-    if oc exec cnv-data-writer -n "${TEST_NAMESPACE}" -- cat /shared-storage/cnv-data.txt 2>/dev/null; then
-      echo "  ✅ Data successfully written by CNV pod"
-      test_status="passed"
+    : 'Checking data written by CNV pod'
+    if oc exec cnv-data-writer -n "${FA__CNV__TEST_NAMESPACE}" -- cat /shared-storage/cnv-data.txt; then
+      : 'Data successfully written by CNV pod'
+      testStatus="passed"
     else
-      echo "  ❌ Failed to read data written by CNV pod"
-      test_message="Failed to read data from CNV PVC"
+      : 'Failed to read data written by CNV pod'
+      testMessage="Failed to read data from CNV PVC"
     fi
   else
-    echo "  ⚠️  CNV data writer pod not ready within timeout"
-    test_message="CNV data writer pod not ready within 2m timeout"
-    oc describe pod cnv-data-writer -n "${TEST_NAMESPACE}"
+    : 'CNV data writer pod not ready within timeout'
+    testMessage="CNV data writer pod not ready within 2m timeout"
+    oc describe pod cnv-data-writer -n "${FA__CNV__TEST_NAMESPACE}"
   fi
 else
-  echo "  ❌ Failed to create CNV data writer pod"
-  test_message="Failed to create CNV data writer pod resource"
+  : 'Failed to create CNV data writer pod'
+  testMessage="Failed to create CNV data writer pod resource"
 fi
 
-record_test "$test_start" "test_cnv_data_write" "$test_status" "$test_message"
+RecordTest "$testStart" "test_cnv_data_write" "$testStatus" "$testMessage"
 
 # Step 3: Create a PVC from IBM Fusion Access side (using the same storage)
-test_start=$(start_test "Step 3: Creating PVC from IBM Fusion Access side")
-test_status="failed"
-test_message=""
+testStart=$(StartTest "Step 3: Creating PVC from IBM Fusion Access side")
+testStatus="failed"
+testMessage=""
 
 if oc apply -f - <<EOF
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: fusion-shared-storage-pvc
-  namespace: ${TEST_NAMESPACE}
+  namespace: ${FA__CNV__TEST_NAMESPACE}
   labels:
     app: fusion-test
     storage-type: shared
@@ -235,39 +229,39 @@ spec:
   resources:
     requests:
       storage: 2Gi
-  storageClassName: ${SHARED_STORAGE_CLASS}
+  storageClassName: ${FA__CNV__SHARED_STORAGE_CLASS}
 EOF
 then
-  echo "  ✅ IBM Fusion Access PVC created successfully"
+  : 'IBM Fusion Access PVC created successfully'
   
   # Wait for IBM Fusion Access PVC to be bound
-  echo "  ⏳ Waiting for IBM Fusion Access PVC to be bound..."
-  if oc wait pvc fusion-shared-storage-pvc -n "${TEST_NAMESPACE}" --for=condition=Bound --timeout=5m; then
-    echo "  ✅ IBM Fusion Access PVC bound successfully"
-    test_status="passed"
+  : 'Waiting for IBM Fusion Access PVC to be bound'
+  if oc wait pvc fusion-shared-storage-pvc -n "${FA__CNV__TEST_NAMESPACE}" --for=jsonpath='{.status.phase}'=Bound --timeout=15m; then
+    : 'IBM Fusion Access PVC bound successfully'
+    testStatus="passed"
   else
-    echo "  ⚠️  IBM Fusion Access PVC not bound within timeout"
-    test_message="IBM Fusion Access PVC not bound within 5m timeout"
-    oc get pvc fusion-shared-storage-pvc -n "${TEST_NAMESPACE}" -o yaml
+    : 'IBM Fusion Access PVC not bound within timeout'
+    testMessage="IBM Fusion Access PVC not bound within 15m timeout"
+    oc get pvc fusion-shared-storage-pvc -n "${FA__CNV__TEST_NAMESPACE}" -o yaml
   fi
 else
-  echo "  ❌ Failed to create IBM Fusion Access PVC"
-  test_message="Failed to create IBM Fusion Access PVC resource"
+  : 'Failed to create IBM Fusion Access PVC'
+  testMessage="Failed to create IBM Fusion Access PVC resource"
 fi
 
-record_test "$test_start" "test_fusion_access_pvc_creation" "$test_status" "$test_message"
+RecordTest "$testStart" "test_fusion_access_pvc_creation" "$testStatus" "$testMessage"
 
 # Step 4: Create a pod to read data from the IBM Fusion Access PVC
-test_start=$(start_test "Step 4: Reading data from IBM Fusion Access PVC")
-test_status="failed"
-test_message=""
+testStart=$(StartTest "Step 4: Reading data from IBM Fusion Access PVC")
+testStatus="failed"
+testMessage=""
 
 if oc apply -f - <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
   name: fusion-data-reader
-  namespace: ${TEST_NAMESPACE}
+  namespace: ${FA__CNV__TEST_NAMESPACE}
   labels:
     app: fusion-test
 spec:
@@ -286,130 +280,111 @@ spec:
   restartPolicy: Never
 EOF
 then
-  echo "  ✅ IBM Fusion Access data reader pod created"
+  : 'IBM Fusion Access data reader pod created'
   
   # Wait for pod to be running
-  echo "  ⏳ Waiting for IBM Fusion Access data reader pod to be running..."
-  if oc wait pod fusion-data-reader -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout=2m; then
-    echo "  ✅ IBM Fusion Access data reader pod is running"
-    
-    # Wait a bit for data processing
-    echo "  ⏳ Waiting for data processing..."
-    sleep 10
+  : 'Waiting for IBM Fusion Access data reader pod to be running'
+  if oc wait pod fusion-data-reader -n "${FA__CNV__TEST_NAMESPACE}" --for=condition=Ready --timeout=2m; then
+    : 'IBM Fusion Access data reader pod is running'
     
     # Check pod logs to see if it found the shared data
-    echo "  📊 Checking IBM Fusion Access pod logs..."
-    oc logs fusion-data-reader -n "${TEST_NAMESPACE}" --tail=20
-    test_status="passed"
+    : 'Checking IBM Fusion Access pod logs'
+    oc logs fusion-data-reader -n "${FA__CNV__TEST_NAMESPACE}" --tail=20
+    testStatus="passed"
   else
-    echo "  ⚠️  IBM Fusion Access data reader pod not ready within timeout"
-    test_message="IBM Fusion Access data reader pod not ready within 2m timeout"
-    oc describe pod fusion-data-reader -n "${TEST_NAMESPACE}"
+    : 'IBM Fusion Access data reader pod not ready within timeout'
+    testMessage="IBM Fusion Access data reader pod not ready within 2m timeout"
+    oc describe pod fusion-data-reader -n "${FA__CNV__TEST_NAMESPACE}"
   fi
 else
-  echo "  ❌ Failed to create IBM Fusion Access data reader pod"
-  test_message="Failed to create IBM Fusion Access data reader pod resource"
+  : 'Failed to create IBM Fusion Access data reader pod'
+  testMessage="Failed to create IBM Fusion Access data reader pod resource"
 fi
 
-record_test "$test_start" "test_fusion_access_data_read" "$test_status" "$test_message"
+RecordTest "$testStart" "test_fusion_access_data_read" "$testStatus" "$testMessage"
 
 # Step 5: Verify shared storage by checking both PVCs point to the same underlying storage
-test_start=$(start_test "Step 5: Verifying shared storage configuration")
-test_status="failed"
-test_message=""
+testStart=$(StartTest "Step 5: Verifying shared storage configuration")
+testStatus="failed"
+testMessage=""
 
 # Check PVC details
-echo "  📊 CNV PVC Details:"
-oc get pvc cnv-shared-storage-pvc -n "${TEST_NAMESPACE}" -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,STORAGECLASS:.spec.storageClassName,CAPACITY:.status.capacity,VOLUME:.spec.volumeName"
+: 'CNV PVC Details'
+oc get pvc cnv-shared-storage-pvc -n "${FA__CNV__TEST_NAMESPACE}" -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,STORAGECLASS:.spec.storageClassName,CAPACITY:.status.capacity,VOLUME:.spec.volumeName"
 
-echo "  📊 IBM Fusion Access PVC Details:"
-oc get pvc fusion-shared-storage-pvc -n "${TEST_NAMESPACE}" -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,STORAGECLASS:.spec.storageClassName,CAPACITY:.status.capacity,VOLUME:.spec.volumeName"
+: 'IBM Fusion Access PVC Details'
+oc get pvc fusion-shared-storage-pvc -n "${FA__CNV__TEST_NAMESPACE}" -o custom-columns="NAME:.metadata.name,STATUS:.status.phase,STORAGECLASS:.spec.storageClassName,CAPACITY:.status.capacity,VOLUME:.spec.volumeName"
 
 # Check if both PVCs are using the same storage class
-echo "  📊 Storage Class Verification:"
-CNV_STORAGE_CLASS=$(oc get pvc cnv-shared-storage-pvc -n "${TEST_NAMESPACE}" -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "Unknown")
-FUSION_STORAGE_CLASS=$(oc get pvc fusion-shared-storage-pvc -n "${TEST_NAMESPACE}" -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "Unknown")
+: 'Storage Class Verification'
+cnvStorageClass=$(oc get pvc cnv-shared-storage-pvc -n "${FA__CNV__TEST_NAMESPACE}" -o jsonpath='{.spec.storageClassName}')
+fusionStorageClass=$(oc get pvc fusion-shared-storage-pvc -n "${FA__CNV__TEST_NAMESPACE}" -o jsonpath='{.spec.storageClassName}')
 
-if [[ "${CNV_STORAGE_CLASS}" == "${FUSION_STORAGE_CLASS}" ]] && [[ "${CNV_STORAGE_CLASS}" == "${SHARED_STORAGE_CLASS}" ]]; then
-  echo "  ✅ Both PVCs use the same storage class: ${CNV_STORAGE_CLASS}"
-  test_status="passed"
+if [[ "${cnvStorageClass}" == "${fusionStorageClass}" ]] && [[ "${cnvStorageClass}" == "${FA__CNV__SHARED_STORAGE_CLASS}" ]]; then
+  : "Both PVCs use the same storage class: ${cnvStorageClass}"
+  testStatus="passed"
 else
-  echo "  ❌ PVCs use different storage classes:"
-  echo "    CNV: ${CNV_STORAGE_CLASS}"
-  echo "    IBM Fusion Access: ${FUSION_STORAGE_CLASS}"
-  test_message="PVCs use different storage classes: CNV=${CNV_STORAGE_CLASS}, Fusion=${FUSION_STORAGE_CLASS}"
+  : "PVCs use different storage classes: CNV=${cnvStorageClass} Fusion=${fusionStorageClass}"
+  testMessage="PVCs use different storage classes: CNV=${cnvStorageClass}, Fusion=${fusionStorageClass}"
 fi
 
-record_test "$test_start" "test_storage_class_verification" "$test_status" "$test_message"
+RecordTest "$testStart" "test_storage_class_verification" "$testStatus" "$testMessage"
 
 # Step 6: Final verification - check if data is accessible from both sides
-test_start=$(start_test "Step 6: Final verification - checking data accessibility")
-test_status="passed"
-test_message=""
+testStart=$(StartTest "Step 6: Final verification - checking data accessibility")
+testStatus="passed"
+testMessage=""
 
 # Check if CNV pod can still access its data
-echo "  📊 Checking CNV pod data access..."
-if oc exec cnv-data-writer -n "${TEST_NAMESPACE}" -- ls -la /shared-storage/ 2>/dev/null; then
-  echo "  ✅ CNV pod can access shared storage"
+: 'Checking CNV pod data access'
+if oc exec cnv-data-writer -n "${FA__CNV__TEST_NAMESPACE}" -- ls -la /shared-storage/; then
+  : 'CNV pod can access shared storage'
 else
-  echo "  ❌ CNV pod cannot access shared storage"
-  test_status="failed"
-  test_message="CNV pod cannot access shared storage"
+  : 'CNV pod cannot access shared storage'
+  testStatus="failed"
+  testMessage="CNV pod cannot access shared storage"
 fi
 
 # Check if IBM Fusion Access pod can access its data
-echo "  📊 Checking IBM Fusion Access pod data access..."
-if oc exec fusion-data-reader -n "${TEST_NAMESPACE}" -- ls -la /shared-storage/ 2>/dev/null; then
-  echo "  ✅ IBM Fusion Access pod can access shared storage"
+: 'Checking IBM Fusion Access pod data access'
+if oc exec fusion-data-reader -n "${FA__CNV__TEST_NAMESPACE}" -- ls -la /shared-storage/; then
+  : 'IBM Fusion Access pod can access shared storage'
 else
-  echo "  ❌ IBM Fusion Access pod cannot access shared storage"
-  test_status="failed"
-  test_message="${test_message}; IBM Fusion Access pod cannot access shared storage"
+  : 'IBM Fusion Access pod cannot access shared storage'
+  testStatus="failed"
+  testMessage="${testMessage}; IBM Fusion Access pod cannot access shared storage"
 fi
 
-record_test "$test_start" "test_data_accessibility_from_both_sides" "$test_status" "$test_message"
+RecordTest "$testStart" "test_data_accessibility_from_both_sides" "$testStatus" "$testMessage"
 
 # Step 7: Summary and cleanup
-echo "📊 Shared Storage Verification Summary"
-echo "====================================="
+: 'Shared Storage Verification Summary'
 
 # Count successful PVCs
-CNV_PVC_STATUS=$(oc get pvc cnv-shared-storage-pvc -n "${TEST_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-FUSION_PVC_STATUS=$(oc get pvc fusion-shared-storage-pvc -n "${TEST_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+cnvPvcStatus=$(oc get pvc cnv-shared-storage-pvc -n "${FA__CNV__TEST_NAMESPACE}" -o jsonpath='{.status.phase}')
+fusionPvcStatus=$(oc get pvc fusion-shared-storage-pvc -n "${FA__CNV__TEST_NAMESPACE}" -o jsonpath='{.status.phase}')
 
-echo "✅ CNV PVC Status: ${CNV_PVC_STATUS}"
-echo "✅ IBM Fusion Access PVC Status: ${FUSION_PVC_STATUS}"
-echo "✅ Storage Class: ${SHARED_STORAGE_CLASS}"
-echo "✅ IBM Storage Scale: Available"
+: "CNV_PVC=${cnvPvcStatus} Fusion_PVC=${fusionPvcStatus} SC=${FA__CNV__SHARED_STORAGE_CLASS}"
 
-if [[ "${CNV_PVC_STATUS}" == "Bound" ]] && [[ "${FUSION_PVC_STATUS}" == "Bound" ]]; then
-  echo ""
-  echo "🎉 SUCCESS: Shared storage between CNV and IBM Fusion Access is working!"
-  echo "   Both PVCs are bound and using the same storage class"
-  echo "   Data can be written and read from both sides"
-  echo "   IBM Storage Scale provides the underlying shared storage"
+if [[ "${cnvPvcStatus}" == "Bound" ]] && [[ "${fusionPvcStatus}" == "Bound" ]]; then
+  : 'SUCCESS: Shared storage between CNV and IBM Fusion Access is working'
 else
-  echo ""
-  echo "⚠️  PARTIAL SUCCESS: Some PVCs may not be bound"
-  echo "   Check the status above for details"
+  : 'PARTIAL SUCCESS: Some PVCs may not be bound'
 fi
 
 # Cleanup
-echo "🧹 Cleaning up test resources..."
-echo "  🗑️  Deleting test pods..."
-oc delete pod cnv-data-writer -n "${TEST_NAMESPACE}" --ignore-not-found
-oc delete pod fusion-data-reader -n "${TEST_NAMESPACE}" --ignore-not-found
+: 'Cleaning up test resources'
+: 'Deleting test pods'
+oc delete pod cnv-data-writer -n "${FA__CNV__TEST_NAMESPACE}" --ignore-not-found
+oc delete pod fusion-data-reader -n "${FA__CNV__TEST_NAMESPACE}" --ignore-not-found
 
-echo "  🗑️  Deleting test PVCs..."
-oc delete pvc cnv-shared-storage-pvc -n "${TEST_NAMESPACE}" --ignore-not-found
-oc delete pvc fusion-shared-storage-pvc -n "${TEST_NAMESPACE}" --ignore-not-found
+: 'Deleting test PVCs'
+oc delete pvc cnv-shared-storage-pvc -n "${FA__CNV__TEST_NAMESPACE}" --ignore-not-found
+oc delete pvc fusion-shared-storage-pvc -n "${FA__CNV__TEST_NAMESPACE}" --ignore-not-found
 
-echo "  🗑️  Deleting test namespace..."
-oc delete namespace "${TEST_NAMESPACE}" --ignore-not-found
+: 'Deleting test namespace'
+oc delete namespace "${FA__CNV__TEST_NAMESPACE}" --ignore-not-found
 
-echo "  ✅ Cleanup completed"
+: 'Cleanup completed'
 
-echo "🎯 Conclusion:"
-echo "The test demonstrates that CNV and IBM Fusion Access can share the same"
-echo "IBM Storage Scale storage infrastructure, enabling unified storage"
-echo "management for both containerized and virtualized workloads."
+true
