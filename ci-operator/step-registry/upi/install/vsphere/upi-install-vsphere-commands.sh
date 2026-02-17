@@ -77,6 +77,14 @@ function gather_console_and_bootstrap() {
 
     # list all the virtual machines in the folder/rp
     clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${cluster_name}")
+    if [[ -z "$clustervms" ]]; then
+        clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${infra_id}")
+    fi
+    if [[ -z "$clustervms" ]]; then
+        echo "Did not find out the cluster virtual machines, skipping gather logs steps"
+        return 1
+    fi
+
     GATHER_BOOTSTRAP_ARGS=()
     for ipath in $clustervms; do
       # split on /
@@ -117,6 +125,8 @@ function gather_console_and_bootstrap() {
     openshift-install --log-level debug --dir="${installer_dir}" gather bootstrap --key "${SSH_PRIV_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS[@]}"
     mv "${installer_dir}/terraform.tfstate.backup" "${installer_dir}/terraform.tfstate"
 
+    echo "$(date -u --rfc-3339=seconds) - Copy log-bundle to artifacts directory..."
+    cp --verbose "${installer_dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}"
 }
 
 function approve_csrs() {
@@ -269,15 +279,14 @@ wait "$!"
 ret="$?"
 set -e
 
+set +e
+# always gather bootstrap logs.
+echo "$(date -u --rfc-3339=seconds) - gathering bootstrap logs..."
+gather_console_and_bootstrap
+sed 's/password: .*/password: REDACTED/' "${installer_dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
+set -e
+
 if [ $ret -ne 0 ]; then
-  set +e
-  # Attempt to gather bootstrap logs.
-  echo "$(date -u --rfc-3339=seconds) - Bootstrap failed, attempting to gather bootstrap logs..."
-  gather_console_and_bootstrap
-  sed 's/password: .*/password: REDACTED/' "${installer_dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
-  echo "$(date -u --rfc-3339=seconds) - Copy log-bundle to artifacts directory..."
-  cp --verbose "${installer_dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}"
-  set -e
   exit "$ret"
 fi
 
