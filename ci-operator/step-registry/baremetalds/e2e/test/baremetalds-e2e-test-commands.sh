@@ -304,8 +304,13 @@ function upgrade() {
 }
 
 function suite() {
+    HYPERVISOR_ARGS=()
+    if [[ -n "${HYPERVISOR_IP:-}" ]]; then
+        HYPERVISOR_ARGS=("--with-hypervisor-json={\"hypervisorIP\":\"${HYPERVISOR_IP}\", \"sshUser\":\"${HYPERVISOR_SSH_USER}\", \"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}")
+    fi
+
     if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/auth/external-oidc" || "${TEST_SUITE}" ==  "openshift/two-node") ]]; then
-        TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
+        TESTS="$(openshift-tests run "${TEST_SUITE}" --dry-run --provider "${TEST_PROVIDER}" "${HYPERVISOR_ARGS[@]}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
         echo "Skipping tests:" &&
         echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
@@ -314,18 +319,11 @@ function suite() {
     fi
 
     set -x
-    if [[ -n "${HYPERVISOR_IP:-}" ]]; then
-        openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
-            --provider "${TEST_PROVIDER:-}" \
-            --with-hypervisor-json="{\"hypervisorIP\":\"${HYPERVISOR_IP}\", \"sshUser\":\"${HYPERVISOR_SSH_USER}\", \"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}" \
-            -o "${ARTIFACT_DIR}/e2e.log" \
-            --junit-dir "${ARTIFACT_DIR}/junit"
-    else
-        openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
-            --provider "${TEST_PROVIDER:-}" \
-            -o "${ARTIFACT_DIR}/e2e.log" \
-            --junit-dir "${ARTIFACT_DIR}/junit"
-    fi
+    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+        --provider "${TEST_PROVIDER:-}" \
+        "${HYPERVISOR_ARGS[@]}" \
+        -o "${ARTIFACT_DIR}/e2e.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit"
     set +x
 }
 
