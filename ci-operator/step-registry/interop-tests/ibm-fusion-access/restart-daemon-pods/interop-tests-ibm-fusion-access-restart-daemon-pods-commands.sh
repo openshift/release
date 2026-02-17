@@ -28,3 +28,4 @@ fi
 
 : 'GPFS daemon pod restart complete'
 
+true

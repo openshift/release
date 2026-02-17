@@ -16,3 +16,4 @@ oc wait --for=jsonpath='{.status.phase}'=Active namespace/"${FA__SCALE__NAMESPAC
 
 : 'Namespace creation completed successfully'
 
+true

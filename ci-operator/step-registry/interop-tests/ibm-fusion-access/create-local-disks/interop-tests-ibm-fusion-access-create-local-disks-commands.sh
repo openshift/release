@@ -14,7 +14,7 @@ if [[ -z "${workers}" ]]; then
   exit 1
 fi
 
-workerArray=($workers)
+read -ra workerArray <<< "${workers}"
 workerCount=${#workerArray[@]}
 firstWorker=${workerArray[0]}
 
@@ -93,3 +93,4 @@ oc get localdisk -n "${FA__SCALE__NAMESPACE}"
 
 : 'Shared LocalDisk created successfully'
 
+true

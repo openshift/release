@@ -28,3 +28,5 @@ EOF
 fi
 
 oc get fusionaccess fusionaccess-object -n "${fusionAccessNamespace}"
+
+true

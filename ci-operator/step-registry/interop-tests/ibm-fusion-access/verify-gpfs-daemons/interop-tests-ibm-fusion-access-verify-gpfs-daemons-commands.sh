@@ -68,3 +68,4 @@ fi
 
 : 'GPFS daemon verification complete - all nodes active'
 
+true

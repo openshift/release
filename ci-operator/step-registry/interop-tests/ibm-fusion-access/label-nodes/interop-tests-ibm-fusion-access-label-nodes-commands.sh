@@ -17,3 +17,4 @@ fi
 : "✅ Labeled $labeledCount worker nodes for IBM Storage Scale"
 oc get nodes -l scale.spectrum.ibm.com/role=storage
 
+true

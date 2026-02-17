@@ -97,3 +97,4 @@ oc wait --for=jsonpath='{.status.conditions[?(@.type=="Ready")].status}'=True \
 
 : '✅ IBM Storage Scale Cluster is ready'
 
+true

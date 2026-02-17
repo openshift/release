@@ -38,3 +38,5 @@ oc wait --for=jsonpath='{.status.conditions[?(@.type=="Success")].status}'=True 
   --timeout=3600s
 
 : 'Filesystem is ready'
+
+true

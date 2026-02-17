@@ -33,3 +33,4 @@ fi
 : 'FusionAccess resource status:'
 oc get fusionaccess fusionaccess-object -n "${FA__NAMESPACE}"
 
+true

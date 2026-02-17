@@ -81,3 +81,4 @@ fi
 
 : '✅ buildgpl ConfigMap patched for RHCOS compatibility'
 
+true

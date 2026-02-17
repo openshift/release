@@ -36,3 +36,4 @@ done
 
 : 'lxtrace files prepared on all worker nodes'
 
+true

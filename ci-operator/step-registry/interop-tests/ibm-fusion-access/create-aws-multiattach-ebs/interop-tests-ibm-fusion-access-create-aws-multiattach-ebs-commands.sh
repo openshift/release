@@ -21,7 +21,7 @@ else
   nodes=$(oc get nodes --no-headers -l "node-role.kubernetes.io/${FA__NODE_ROLE}" | awk '{print $1}')
 fi
 
-nodeArray=($nodes)
+read -ra nodeArray <<< "${nodes}"
 nodeCount=${#nodeArray[@]}
 
 if [[ $nodeCount -lt 1 ]]; then
@@ -162,3 +162,4 @@ fi
 
 : 'Multi-attach EBS volume setup complete'
 
+true

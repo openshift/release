@@ -74,3 +74,4 @@ fi
 
 : '✅ Fusion Access Operator installation completed!'
 
+true

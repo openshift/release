@@ -77,3 +77,4 @@ fi
 
 oc get filesystem shared-filesystem -n ${FA__SCALE__NAMESPACE}
 
+true

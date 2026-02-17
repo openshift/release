@@ -199,3 +199,4 @@ fi
 : 'The kernel module'\''s call_usermodehelper() to mmfsd_path=/var/gpfs/bin/'
 : 'will now succeed, allowing GPFS daemon startup.'
 
+true

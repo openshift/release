@@ -36,3 +36,4 @@ oc create rolebinding kmm-builder-push \
 : "  - ${FA__SCALE__NAMESPACE}: $(oc get namespace "${FA__SCALE__NAMESPACE}" -o jsonpath='{.status.phase}')"
 : "  - ${FA__SCALE__OPERATOR_NAMESPACE}: $(oc get namespace "${FA__SCALE__OPERATOR_NAMESPACE}" -o jsonpath='{.status.phase}')"
 
+true
