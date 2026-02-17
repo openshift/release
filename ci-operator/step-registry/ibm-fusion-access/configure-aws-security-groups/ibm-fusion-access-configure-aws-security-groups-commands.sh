@@ -70,32 +70,23 @@ echo "${workerSgId}" > "${SHARED_DIR}/worker_sg_id"
 AddIngressRule() {
   typeset portSpec="${1}"; (($#)) && shift
   typeset desc="${1}"; (($#)) && shift
-  
-  : "Adding rule: ${desc} (${portSpec})"
-  
-  if aws ec2 authorize-security-group-ingress \
+  typeset stderr
+
+  if stderr=$({ aws ec2 authorize-security-group-ingress \
     --region "${region}" \
     --group-id "${workerSgId}" \
     --protocol tcp \
     --port "${portSpec}" \
     --source-group "${workerSgId}" \
     --group-owner "$(aws sts get-caller-identity --query Account --output text)" \
-   ; then
+    2>&1 1>&3; } 3>&1); then
     : "  Added: ${desc}"
-    return 0
+  elif [[ "${stderr}" == *'InvalidPermission.Duplicate'* ]]; then
+    : "  Rule already exists: ${desc}"
   else
-    if aws ec2 describe-security-group-rules \
-      --region "${region}" \
-      --filters "Name=group-id,Values=${workerSgId}" \
-      --query "SecurityGroupRules[?ToPort==\`${portSpec%%[-:]*}\` && IpProtocol=='tcp']" \
-      --output text \
-      | grep -q "${workerSgId}"; then
-      : "  Rule already exists: ${desc}"
-      return 0
-    else
-      : "  Failed to add: ${desc}"
-      return 1
-    fi
+    : "  Failed to add: ${desc}"
+    printf '%s\n' "${stderr}" >&2
+    return 1
   fi
 
   true
