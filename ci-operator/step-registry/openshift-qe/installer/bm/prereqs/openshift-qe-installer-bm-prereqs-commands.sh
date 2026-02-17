@@ -33,69 +33,6 @@ elif [[ "$TYPE" == "sno" ]]; then
 fi
 echo "Hosts to be prepared: $HOSTS"
 
-# IDRAC reset and check for readiness
-if [[ "$PRE_RESET_IDRAC" == "true" ]]; then
-  echo "Resetting IDRACs ..."
-  for i in $HOSTS; do
-    echo "Resetting IDRAC of server $i ..."
-    podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PWD --racreset
-  done
-
-  # Wait for all IDRACs to become ready
-  echo "Waiting for IDRACs to become ready..."
-  for i in $HOSTS; do
-    echo "Checking IDRAC readiness for server $i ..."
-    max_attempts=30  # Maximum number of attempts (adjust as needed)
-    attempt=1
-    sleep_interval=10  # Seconds between attempts
-
-    # First, expect IDRAC to become unreachable during reset
-    echo "Expecting IDRAC for server $i to become unreachable during reset..."
-    unreachable_attempts=1
-    max_unreachable_attempts=10
-
-    while [ $unreachable_attempts -lt $max_unreachable_attempts ]; do
-      echo "Attempt $unreachable_attempts/$max_unreachable_attempts for server $i"
-      if [[ "$(podman run quay.io/quads/badfish -H mgmt-$i -u $USER -p $PWD --power-state --output json 2>&1  | jq -r '.error' 2>/dev/null)" == "true" ]]; then
-        echo "✓ IDRAC for server $i became unreachable after reset"
-        break
-      else
-        echo "IDRAC for server $i is still reachable, waiting..."
-        sleep 5
-        ((unreachable_attempts+=1))
-      fi
-    done
-
-    if [ $unreachable_attempts -eq $max_unreachable_attempts ]; then
-      echo "Warning: IDRAC for server $i did not become unreachable during reset"
-    fi
-
-    # Now wait for IDRAC to become ready again
-    while [ $attempt -le $max_attempts ]; do
-      echo "Attempt $attempt/$max_attempts for server $i"
-
-      if podman run quay.io/quads/badfish -H mgmt-$i -u $USER -p $PWD --power-state; then
-        echo "✓ IDRAC for server $i is ready"
-        break
-      else
-        if [ $attempt -eq $max_attempts ]; then
-          echo "✗ IDRAC for server $i failed to become ready after $max_attempts attempts"
-          echo "Consider checking the server manually or increasing max_attempts"
-          # Optionally exit here if you want to fail fast
-          # exit 1
-        else
-          echo "IDRAC for server $i is still rebooting, waiting ${sleep_interval}s..."
-          sleep $sleep_interval
-        fi
-      fi
-
-      ((attempt++))
-    done
-  done
-
-  echo "IDRAC reset and readiness check completed"
-fi
-
 if [[ "$PRE_PXE_LOADER" == "true" ]]; then
   echo "Modifying PXE loaders ..."
   for i in $HOSTS; do
@@ -113,13 +50,6 @@ if [[ "$PRE_PXE_LOADER" == "true" ]]; then
           --operatingsystem "$FOREMAN_OS" \
           --pxe-loader "PXELinux BIOS" \
           --build 1
-  done
-fi
-if [[ "$PRE_CLEAR_JOB_QUEUE" == "true" ]]; then
-  echo "Clearing job queue ..."
-  for i in $HOSTS; do
-    echo "Clear job queue of server $i ..."
-    podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PWD --clear-jobs --force
   done
 fi
 if [[ "$PRE_BOOT_ORDER" == "true" ]]; then
@@ -153,7 +83,7 @@ if [[ "$PRE_UEFI" == "true" ]]; then
   done
 fi
 EOF
-envsubst '${FOREMAN_OS},${LAB},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_CLEAR_JOB_QUEUE},${PRE_PXE_LOADER},${PRE_RESET_IDRAC},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
+envsubst '${FOREMAN_OS},${LAB},${LAB_CLOUD},${NUM_WORKER_NODES},${PRE_BOOT_ORDER},${PRE_PXE_LOADER},${PRE_UEFI},${QUADS_INSTANCE},${TYPE}' < /tmp/prereqs.sh > /tmp/prereqs-updated.sh
 
 # Generate the foreman_config.yml file
 if [[ "$PRE_PXE_LOADER" == "true" ]]; then
