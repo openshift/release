@@ -17,8 +17,9 @@ case ${KUBECONFIG_ORIGIN} in
         scp -q ${SSH_ARGS} root@${bastion}:/$KUBECONFIG_PATH/kubeconfig ${SHARED_DIR}/kubeconfig
     fi
 
-    # Create proxy configuration for private VLAN deployments
-    if [[ ${PUBLIC_VLAN} == "false" ]]; then
+    # Detect if cluster is on a private network by checking the API server domain
+    CLUSTER_SERVER=$(KUBECONFIG="${SHARED_DIR}/kubeconfig" oc config view --minify -o jsonpath='{.clusters[0].cluster.server}')
+    if [[ "${CLUSTER_SERVER}" == *"example.com"* ]]; then
       cat > ${SHARED_DIR}/proxy-conf.sh << 'PROXY_EOF'
 #!/bin/bash
 
