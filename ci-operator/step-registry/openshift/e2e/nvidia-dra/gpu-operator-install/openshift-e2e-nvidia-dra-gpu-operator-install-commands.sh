@@ -9,6 +9,16 @@ echo "NVIDIA GPU Operator Installation"
 echo "========================================="
 echo ""
 
+# Install jq if not available (needed for JSON manipulation)
+if ! command -v jq &> /dev/null; then
+  echo "Installing jq..."
+  JQ_VERSION="1.7.1"
+  curl -sL "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux-amd64" -o /tmp/jq
+  chmod +x /tmp/jq
+  export PATH="/tmp:${PATH}"
+  echo "jq installed to /tmp/jq"
+fi
+
 # Export kubeconfig
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
