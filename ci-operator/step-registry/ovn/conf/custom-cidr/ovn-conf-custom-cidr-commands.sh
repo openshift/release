@@ -4,11 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-CLUSTER_NETWORK_CIDR=${CLUSTER_NETWORK_CIDR:-10.128.0.0/20}
+CLUSTER_NETWORK_CIDR=${CLUSTER_NETWORK_CIDR:-10.217.0.0/16}
 CLUSTER_NETWORK_HOST_PREFIX=${CLUSTER_NETWORK_HOST_PREFIX:-23}
 SERVICE_NETWORK_CIDR=${SERVICE_NETWORK_CIDR:-172.30.0.0/16}
+HYBRID_CLUSTER_NETWORK_CIDR=${HYBRID_CLUSTER_NETWORK_CIDR:-10.95.0.0/16}
+HYBRID_CLUSTER_NETWORK_HOST_PREFIX=${HYBRID_CLUSTER_NETWORK_HOST_PREFIX:-23}
 
-echo "default is to update cidr to 20 w/ hostPrefix of 23 so that max nodes num is 8"
+echo "clusterNetwork: $CLUSTER_NETWORK_CIDR/$CLUSTER_NETWORK_HOST_PREFIX"
+echo "hybridClusterNetwork: $HYBRID_CLUSTER_NETWORK_CIDR/$HYBRID_CLUSTER_NETWORK_HOST_PREFIX"
 echo "\nsee below for actual values used\n--------------------------------\n"
 
 # Patch the existing networking section instead of appending a second "networking:" key
@@ -32,5 +35,30 @@ else
     -o /tmp/yq && chmod +x /tmp/yq
   /tmp/yq m -x -i "${CONFIG}" "${PATCH}"
 fi
+
+# Create cluster-network manifest with clusterNetwork and hybridOverlayConfig for install
+cat > "${SHARED_DIR}/manifest_cluster-network-03-config.yml" << EOF
+apiVersion: operator.openshift.io/v1
+kind: Network
+metadata:
+  creationTimestamp: null
+  name: cluster
+spec:
+  clusterNetwork:
+  - cidr: $CLUSTER_NETWORK_CIDR
+    hostPrefix: $CLUSTER_NETWORK_HOST_PREFIX
+  externalIP:
+    policy: {}
+  networkType: OVNKubernetes
+  serviceNetwork:
+  - $SERVICE_NETWORK_CIDR
+  defaultNetwork:
+    type: OVNKubernetes
+    ovnKubernetesConfig:
+      hybridOverlayConfig:
+        hybridClusterNetwork:
+        - cidr: $HYBRID_CLUSTER_NETWORK_CIDR
+          hostPrefix: $HYBRID_CLUSTER_NETWORK_HOST_PREFIX
+EOF
 
 cat "${SHARED_DIR}/install-config.yaml"

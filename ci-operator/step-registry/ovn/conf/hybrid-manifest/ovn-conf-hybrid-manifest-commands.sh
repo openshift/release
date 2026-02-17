@@ -11,6 +11,8 @@ fi
 
 CLUSTER_NETWORK_CIDR=${CLUSTER_NETWORK_CIDR:-10.128.0.0/14}
 CLUSTER_NETWORK_HOST_PREFIX=${CLUSTER_NETWORK_HOST_PREFIX:-23}
+HYBRID_CLUSTER_NETWORK_CIDR=${HYBRID_CLUSTER_NETWORK_CIDR:-10.95.0.0/16}
+HYBRID_CLUSTER_NETWORK_HOST_PREFIX=${HYBRID_CLUSTER_NETWORK_HOST_PREFIX:-23}
 
 cat >> "${SHARED_DIR}/manifest_cluster-network-03-config.yml" << EOF
 apiVersion: operator.openshift.io/v1
@@ -33,6 +35,6 @@ spec:
       hybridOverlayConfig:
         hybridOverlayVXLANPort: ${VXLAN_PORT}
         hybridClusterNetwork:
-        - cidr: 10.132.0.0/14
-          hostPrefix: 23
+        - cidr: ${HYBRID_CLUSTER_NETWORK_CIDR}
+          hostPrefix: ${HYBRID_CLUSTER_NETWORK_HOST_PREFIX}
 EOF
