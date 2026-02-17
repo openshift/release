@@ -13,25 +13,25 @@ ref:
     default: "ibm-spectrum-scale"
   documentation: |-
     Restart GPFS daemon pods to pick up lxtrace and kernel module changes.
-    
+
     After the KMM Module is created and lxtrace files are copied to the host
     filesystem at /usr/lpp/mmfs/bin, the GPFS daemon pods need to be restarted
     to pick up these changes.
-    
+
     This step:
     1. Deletes all GPFS daemon pods (app.kubernetes.io/name=core)
     2. Waits for pods to restart and become ready
     3. Verifies GPFS state with mmgetstate -a
-    
+
     The GPFS kernel module parameter mmfsd_path points to /usr/lpp/mmfs/bin/
     on the host filesystem. Without the lxtrace binary in this location, the
     mmfsd daemon will fail with "rc -1 code 2" errors.
-    
+
     Prerequisites:
     - Fusion Access operator deployed (handles KMM, kernel modules loaded)
     - prepare-lxtrace-files step completed (lxtrace in /usr/lpp/mmfs/bin)
-    
+
     Note: The Fusion Access operator (v0.0.19+) handles KMM automatically.
-    
+
     RHCOS Compatibility: Essential for RHCOS because /usr is read-only and
     the lxtrace files must be copied via usroverlay before the daemons start.
