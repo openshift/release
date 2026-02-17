@@ -9,16 +9,33 @@ ref:
       cpu: 100m
       memory: 200Mi
   env:
-  - name: STORAGE_SCALE_NAMESPACE
+  - name: FA__SCALE__NAMESPACE
     documentation: The namespace for IBM Storage Scale
     default: "ibm-spectrum-scale"
-  - name: STORAGE_SCALE_CLUSTER_NAME
+  - name: FA__SCALE__CLUSTER_NAME
     documentation: The name of the IBM Storage Scale cluster
     default: "ibm-spectrum-scale"
+  - name: FA__FILESYSTEM_TIMEOUT
+    documentation: Timeout in seconds waiting for filesystem to become Established
+    default: "3600"
+  - name: FA__LOCALDISK_NAME
+    documentation: Name of the shared LocalDisk resource to use
+    default: "shared-san-disk"
   documentation: |-
-    Create IBM Storage Scale EBS Filesystem for shared storage.
-    This optional step creates the IBM Storage Scale Filesystem resource using
-    direct EBS volume configuration for multi-node access. It includes comprehensive
-    error handling, filesystem readiness verification, and StorageClass creation
-    monitoring. The step requires an existing IBM Storage Scale Cluster to be
-    available before execution.
+    Create IBM Storage Scale Filesystem on shared SAN storage.
+
+    This step creates a Filesystem resource following IBM's documented SAN
+    architecture using a single shared LocalDisk (multi-attach EBS).
+
+    Configuration:
+    - Uses single shared LocalDisk referenced by LOCALDISK_NAME
+    - 1-way replication (appropriate for SAN where data is on shared storage)
+    - Type: shared (all nodes access same physical disk)
+
+    This follows IBM's recommendation for SAN deployments where the storage
+    backend provides hardware-level redundancy rather than GPFS replication.
+
+    Prerequisites:
+    - Shared LocalDisk created with nodeConnectionSelector for all workers
+    - GPFS daemons active on all nodes
+    - IBM Storage Scale cluster ready (bypassDiscovery: true)
