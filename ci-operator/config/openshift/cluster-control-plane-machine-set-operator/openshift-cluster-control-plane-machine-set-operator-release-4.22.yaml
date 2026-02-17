@@ -8,6 +8,31 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   to: cluster-control-plane-machine-set-operator
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22 AS builder
+    WORKDIR /app
+    RUN git clone --depth=1 --branch=main https://github.com/openshift/tls-scanner.git . && \
+        make
+
+    FROM registry.ci.openshift.org/ocp/4.22:base-rhel9
+    ARG OC_VERSION=latest
+    ARG UMOCI_VERSION=latest
+    RUN dnf -y update && \
+        dnf install -y binutils file go podman runc jq skopeo nmap tar lsof && \
+        dnf clean all
+    RUN wget -O "openshift-client-linux-${OC_VERSION}.tar.gz" "https://mirror.openshift.com/pub/openshift-v4/amd64/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz" && \
+        tar -C /usr/local/bin -xzvf "openshift-client-linux-$OC_VERSION.tar.gz" oc && \
+        rm -f "openshift-client-linux-$OC_VERSION.tar.gz"
+    RUN curl --fail --retry 3 -LJO https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/latest-4.14/opm-linux.tar.gz && \
+        tar -xzf opm-linux.tar.gz && \
+        mv ./opm /usr/local/bin/ && \
+        rm -f opm-linux.tar.gz
+    RUN wget -O /usr/local/bin/umoci "https://github.com/opencontainers/umoci/releases/$UMOCI_VERSION/download/umoci.linux.amd64" && \
+        chmod +x /usr/local/bin/umoci
+    COPY --from=builder /app/bin/tls-scanner /usr/local/bin/tls-scanner
+    ENTRYPOINT ["/usr/local/bin/tls-scanner"]
+    LABEL com.redhat.component="tls-scanner"
+  to: tls-scanner-tool
 promotion:
   to:
   - additional_images:
@@ -225,6 +250,25 @@ tests:
           cpu: 100m
       timeout: 6h0m0s
     workflow: ipi-gcp
+- as: tls13-scan-cpmso
+  steps:
+    cluster_profile: aws-5
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build07.ci.openshift.org/ci-ln-ns2brxt/release:latest
+      SCAN_NAMESPACE: openshift-machine-api
+    test:
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-aws-ovn-tls-13
+- as: tls-profile-switching-cma
+  optional: true
+  steps:
+    cluster_profile: aws-4
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build07.ci.openshift.org/ci-ln-ns2brxt/release:latest
+      SCAN_NAMESPACE: openshift-machine-api
+    test:
+    - ref: tls-scanner-run-with-profile-switching
+    workflow: openshift-e2e-aws
 - always_run: false
   as: e2e-gcp-periodic-pre-techpreview
   optional: true
