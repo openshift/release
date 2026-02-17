@@ -1,41 +1,14 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-FA__SCALE__NAMESPACE="${FA__SCALE__NAMESPACE:-ibm-spectrum-scale}"
-FA__SCALE__CLUSTER_NAME="${FA__SCALE__CLUSTER_NAME:-ibm-spectrum-scale}"
-FA__SCALE__CLIENT_CPU="${FA__SCALE__CLIENT_CPU:-2}"
-FA__SCALE__CLIENT_MEMORY="${FA__SCALE__CLIENT_MEMORY:-4Gi}"
-FA__SCALE__STORAGE_CPU="${FA__SCALE__STORAGE_CPU:-2}"
-FA__SCALE__STORAGE_MEMORY="${FA__SCALE__STORAGE_MEMORY:-8Gi}"
+: 'Creating IBM Storage Scale Cluster'
 
-echo "🏗️  Creating IBM Storage Scale Cluster..."
+workerCount=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | wc -l)
 
-# Check if cluster already exists (idempotent)
-if oc get cluster "${FA__SCALE__CLUSTER_NAME}" -n "${FA__SCALE__NAMESPACE}" >/dev/null; then
-  echo "✅ Cluster already exists, skipping creation"
-  exit 0
-fi
-
-echo "Cluster does not exist, creating..."
-
-# Determine quorum configuration based on worker count
-WORKER_COUNT=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | wc -l)
-
-if [[ $WORKER_COUNT -ge 3 ]]; then
-  QUORUM_CONFIG="quorum:
-    autoAssign: true"
-else
-  echo "⚠️  Only $WORKER_COUNT worker nodes (3 recommended for quorum)"
-  QUORUM_CONFIG=""
-fi
-
-# Create cluster with /dev/disk/by-id/* pattern for automatic EBS volume discovery
-if cat <<EOF | oc apply -f -
+cat > /tmp/cluster-skeleton.yaml <<'SKELETON'
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: Cluster
-metadata:
-  name: ${FA__SCALE__CLUSTER_NAME}
-  namespace: ${FA__SCALE__NAMESPACE}
+metadata: {}
 spec:
   license:
     accept: true
@@ -55,60 +28,39 @@ spec:
       enforceFilesetQuotaOnRoot: "yes"
       ignorePrefetchLUNCount: "yes"
       initPrefetchBuffers: "128"
-      maxblocksize: 16M
+      maxblocksize: "16M"
       prefetchPct: "25"
       prefetchTimeout: "30"
-    roles:
-    - name: client
-      resources:
-        cpu: "${FA__SCALE__CLIENT_CPU}"
-        memory: ${FA__SCALE__CLIENT_MEMORY}
-    - name: storage
-      resources:
-        cpu: "${FA__SCALE__STORAGE_CPU}"
-        memory: ${FA__SCALE__STORAGE_MEMORY}
-  ${QUORUM_CONFIG}
-EOF
-then
-  echo "✅ Cluster resource created successfully"
-else
-  echo "❌ Failed to create Cluster resource"
-  exit 1
-fi
+    roles: []
+SKELETON
 
-# Verify cluster was created
-if ! oc get cluster "${FA__SCALE__CLUSTER_NAME}" -n "${FA__SCALE__NAMESPACE}" >/dev/null; then
-  echo "❌ Cluster resource not found after creation"
-  exit 1
-fi
+yq -o json /tmp/cluster-skeleton.yaml | \
+  jq \
+    --arg ns "${FA__SCALE__NAMESPACE}" \
+    --arg name "${FA__SCALE__CLUSTER_NAME}" \
+    --arg clientCpu "${FA__SCALE__CLIENT_CPU}" \
+    --arg clientMem "${FA__SCALE__CLIENT_MEMORY}" \
+    --arg storageCpu "${FA__SCALE__STORAGE_CPU}" \
+    --arg storageMem "${FA__SCALE__STORAGE_MEMORY}" \
+    --argjson quorum "$(( workerCount >= 3 ? 1 : 0 ))" \
+    '
+      .metadata.name = $name |
+      .metadata.namespace = $ns |
+      .spec.daemon.roles = [
+        { name: "client", resources: { cpu: $clientCpu, memory: $clientMem } },
+        { name: "storage", resources: { cpu: $storageCpu, memory: $storageMem } }
+      ] |
+      if $quorum == 1 then .spec.quorum = { autoAssign: true } else . end
+    ' | oc apply -f -
 
-# Verify device pattern is configured correctly
-DEVICE_PATH=$(oc get cluster "${FA__SCALE__CLUSTER_NAME}" -n "${FA__SCALE__NAMESPACE}" \
-  -o jsonpath='{.spec.daemon.nsdDevicesConfig.localDevicePaths[0].devicePath}')
-
-if [[ "$DEVICE_PATH" == "/dev/disk/by-id/*" ]]; then
-  echo "✅ Cluster configured with /dev/disk/by-id/* device pattern"
-else
-  echo "⚠️  Cluster has device path: ${DEVICE_PATH} (expected: /dev/disk/by-id/*)"
-fi
-
-# Display cluster status
-echo ""
-echo "📊 Cluster Status:"
 oc get cluster "${FA__SCALE__CLUSTER_NAME}" -n "${FA__SCALE__NAMESPACE}"
 
-echo ""
-echo "Waiting for cluster to be ready..."
-echo "This may take 10-15 minutes for daemon pods to start and kernel modules to build"
+: 'Waiting for cluster to be ready (may take 10-15 minutes)'
 oc wait --for=jsonpath='{.status.conditions[?(@.type=="Ready")].status}'=True \
   cluster/"${FA__SCALE__CLUSTER_NAME}" \
   -n "${FA__SCALE__NAMESPACE}" \
-  --timeout=1800s || {
-    echo "⚠️  Cluster not ready within timeout (will be verified in later steps)"
-    oc get cluster "${FA__SCALE__CLUSTER_NAME}" -n "${FA__SCALE__NAMESPACE}" -o yaml
-  }
+  --timeout="${FA__SCALE__CLUSTER_READY_TIMEOUT}"
 
-echo ""
-echo "✅ IBM Storage Scale Cluster is ready"
-echo "Daemon pods are using /dev/disk/by-id/* pattern to discover EBS volumes"
-echo "KMM has built kernel modules using Driver Toolkit"
+: '✅ IBM Storage Scale Cluster is ready'
+
+true
