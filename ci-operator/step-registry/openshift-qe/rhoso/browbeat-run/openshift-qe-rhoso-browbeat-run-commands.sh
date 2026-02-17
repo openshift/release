@@ -30,6 +30,7 @@ ssh root@${bastion} "
   export PULL_NUMBER=\"${PULL_NUMBER:-}\"
   export ES_SERVER=\"${es_host}\"
   export KUBECONFIG=\"${kubeconfig}\"
+  export BENCHMARK=\"${WORKLOAD:-}\"
   JOB_START=\\\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
   rm -rf cpt-browbeat-config
   git clone https://gitlab.cee.redhat.com/eng/openstack/team/performance-and-scale/cpt-browbeat-configs.git
