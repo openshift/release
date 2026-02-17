@@ -147,33 +147,34 @@ orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLA
 orion_exit_status=$?
 set -e
 
-cp *.csv *.xml *.json *.txt "${ARTIFACT_DIR}/" 2>/dev/null || true
+process_change_point() {
 
-if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
+    [[ -z "${CHANGE_POINT_REPOS}" ]] && return
+
     GCS_BUCKET="gs://test-platform-results"
     GCS_PATH=""
 
     # Determine the path to prowjob.json based on prow ENV variables
     case "${JOB_TYPE:-}" in
         presubmit)
-        if [[ -n "${ORG_REPO:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
-            GCS_PATH="pr-logs/pull/${ORG_REPO}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/prowjob.json"
-        fi
-        ;;
+            if [[ -n "${REPO_OWNER:-}" && -n "${REPO_NAME:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+                GCS_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/prowjob.json"
+            fi
+            ;;
         periodic)
-        if [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
-            GCS_PATH="logs/${JOB_NAME}/${BUILD_ID}/prowjob.json"
-        fi
-        ;;
+            if [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+                GCS_PATH="logs/${JOB_NAME}/${BUILD_ID}/prowjob.json"
+            fi
+            ;;
         *)
-        exit 0
-        ;;
+            return
+            ;;
     esac
 
-    [[ -z "$GCS_PATH" ]] && exit 0
+    [[ -z "$GCS_PATH" ]] && return
 
     echo "Fetching prowjob.json from $GCS_BUCKET/$GCS_PATH"
-    gsutil -m cp -r "${GCS_BUCKET}/${GCS_PATH}" .
+    gsutil -m cp -r "${GCS_BUCKET}/${GCS_PATH}" . || return
 
     # Extract trigger repos from prowjob.json
     repos=$(jq -r '
@@ -184,12 +185,12 @@ if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
         else
             empty
         end
-        ' prowjob.json)
+    ' prowjob.json) || return
 
     OWNERS_FILE=owners.txt
     : > "$OWNERS_FILE"
 
-    # Iterate over each url to fetch OWNERS
+    # Iterate over each repo to fetch OWNERS
     for repo in $repos; do
         org="${repo%%/*}"
         name="${repo##*/}"
@@ -204,46 +205,44 @@ if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
             || echo "OWNERS not found for $repo"
     done
 
-    # dedupe at the end
     sort -u "$OWNERS_FILE" -o "$OWNERS_FILE"
 
-    # Load owners list as a JSON array (skip blank lines)
-    OWNERS_JSON=$(jq -R -s -c 'split("\n") | map(select(length > 0))' owners.txt)
+    OWNERS_JSON=$(jq -R -s -c 'split("\n") | map(select(length > 0))' "$OWNERS_FILE") || return
 
-    # Check if owners.json is loaded correctly
     echo "Owners loaded as JSON array: $OWNERS_JSON"
 
-    # Loop over each junit*.json file in current directory
     for f in junit*.json; do
-        # Skip if no matching files found
-        [ -e "$f" ] || { echo "No junit*.json files found"; break; }
+        [ -e "$f" ] || { echo "No junit*.json files found"; return; }
 
         echo "Processing file: $f"
 
-        # Apply jq filter and overwrite the file safely
         jq --argjson owners "$OWNERS_JSON" '
         map(
             if .is_changepoint != true then
-            .
+                .
             else
-            .github_context.repositories |=
-                with_entries(
-                .value.commits.items |=
-                    map(
-                        select(
-                            (.commit_author.email // "" | ascii_downcase | contains($owners[]))
-                            or
-                            (.commit_author.name // "" | ascii_downcase | contains($owners[]))
-                        )
+                .github_context.repositories |=
+                    with_entries(
+                        .value.commits.items |=
+                            map(
+                                select(
+                                    (.commit_author.email // "" | ascii_downcase | contains($owners[]))
+                                    or
+                                    (.commit_author.name // "" | ascii_downcase | contains($owners[]))
+                                )
+                            )
+                        | .value.commits.count = (.value.commits.items | length)
                     )
-                | .value.commits.count = (.value.commits.items | length)
-                )
             end
         )
-        ' "$f" > "${f}.tmp" && mv "${f}.tmp" "$f"
+        ' "$f" > "${f}.tmp" && mv "${f}.tmp" "$f" || return
+
         echo "Updated $f"
     done
-fi
+}
+process_change_point
+
+cp *.csv *.xml *.json *.txt "${ARTIFACT_DIR}/" 2>/dev/null || true
 
 if [ $orion_exit_status -eq 3 ]; then
   echo "Orion returned exit code 3, which means there are no results to analyze."
