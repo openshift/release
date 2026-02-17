@@ -1,106 +1,22 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-echo "🔄 Testing CNV VM lifecycle operations with IBM Storage Scale shared storage..."
+eval "$(curl -fsSL \
+    https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/\
+libs/bash/ci-operator/interop/common/TestReport--JunitXml.sh
+)"
 
-# Set default values
+LP_IO__TR__RESULTS_FILE="${ARTIFACT_DIR}/junit_vm_lifecycle_tests.xml"
+LP_IO__TR__SUITE_NAME="VM Lifecycle Tests"
+LP_IO__TR__START_TIME="${SECONDS}"
+trap 'TestReport--GenerateJunitXml' EXIT
+
 CNV_NAMESPACE="${CNV_NAMESPACE:-openshift-cnv}"
 SHARED_STORAGE_CLASS="${SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
 TEST_NAMESPACE="${TEST_NAMESPACE:-cnv-lifecycle-test}"
 VM_NAME="${VM_NAME:-test-lifecycle-vm}"
 VM_CPU_REQUEST="${VM_CPU_REQUEST:-1}"
 VM_MEMORY_REQUEST="${VM_MEMORY_REQUEST:-1Gi}"
-
-# JUnit XML test results
-JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_vm_lifecycle_tests.xml"
-TEST_START_TIME=$SECONDS
-TESTS_TOTAL=0
-TESTS_FAILED=0
-TESTS_PASSED=0
-TEST_CASES=""
-
-# Function to escape XML special characters
-escape_xml() {
-  local text="$1"
-  # Escape XML special characters: & must be first to avoid double-escaping
-  echo "$text" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'\''/\&apos;/g'
-}
-
-# Function to add test result to JUnit XML
-add_test_result() {
-  local test_name="$1"
-  local test_status="$2"  # "passed" or "failed"
-  local test_duration="$3"
-  local test_message="${4:-}"
-  local test_classname="${5:-VMLifecycleTests}"
-  
-  # Escape XML special characters in user-provided strings
-  test_name=$(escape_xml "$test_name")
-  test_message=$(escape_xml "$test_message")
-  test_classname=$(escape_xml "$test_classname")
-  
-  TESTS_TOTAL=$((TESTS_TOTAL + 1))
-  
-  if [[ "$test_status" == "passed" ]]; then
-    TESTS_PASSED=$((TESTS_PASSED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\"/>"
-  else
-    TESTS_FAILED=$((TESTS_FAILED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\">
-      <failure message=\"Test failed\">${test_message}</failure>
-    </testcase>"
-  fi
-}
-
-# Function to generate JUnit XML report
-generate_junit_xml() {
-  local total_duration=$((SECONDS - TEST_START_TIME))
-  
-  cat > "${JUNIT_RESULTS_FILE}" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuites>
-  <testsuite name="VM Lifecycle Tests" tests="${TESTS_TOTAL}" failures="${TESTS_FAILED}" errors="0" time="${total_duration}">
-${TEST_CASES}
-  </testsuite>
-</testsuites>
-EOF
-  
-  echo ""
-  echo "📊 Test Results Summary:"
-  echo "  Total Tests: ${TESTS_TOTAL}"
-  echo "  Passed: ${TESTS_PASSED}"
-  echo "  Failed: ${TESTS_FAILED}"
-  echo "  Duration: ${total_duration}s"
-  echo "  Results File: ${JUNIT_RESULTS_FILE}"
-  
-  # Copy to SHARED_DIR for data router reporter (if available)
-  if [[ -n "${SHARED_DIR:-}" ]] && [[ -d "${SHARED_DIR}" ]]; then
-    cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}/junit_vm_lifecycle_tests.xml"
-    echo "  ✅ Results copied to SHARED_DIR"
-  fi
-}
-
-start_test() {
-  local test_description="$1"
-  : "🧪 ${test_description}..."
-  echo "$SECONDS"
-}
-
-# Helper function to record test result (eliminates repetitive duration calculation)
-record_test() {
-  local test_start="$1"
-  local test_name="$2"
-  local test_status="$3"
-  local test_message="${4:-}"
-  
-  local test_duration=$((SECONDS - test_start))
-  add_test_result "$test_name" "$test_status" "$test_duration" "$test_message"
-}
-
-# Trap to ensure JUnit XML is generated even on failure
-trap generate_junit_xml EXIT
 
 echo "📋 Configuration:"
 echo "  CNV Namespace: ${CNV_NAMESPACE}"
@@ -227,208 +143,129 @@ else
   exit 1
 fi
 
-# Test 1: Start VM
-test_start=$(start_test "FA-CNV-1011 Prerequisite: Starting VM")
-test_status="failed"
-test_message=""
+testStart="${SECONDS}"
+testStatus="failed"
+testMessage=""
 
-echo "  🚀 Starting VM by setting spec.running=true..."
 if oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}'; then
-  echo "  ✅ VM start command sent"
-  
-  # Wait for VMI to be created
-  echo "  ⏳ Waiting for VMI to be created (5m timeout)..."
-  TIMEOUT=300
-  ELAPSED=0
-  VMI_FOUND=false
-  
-  while [[ $ELAPSED -lt $TIMEOUT ]]; do
+  elapsed=0
+  vmiFound=false
+
+  while [[ "${elapsed}" -lt 300 ]]; do
     if oc get vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      VMI_FOUND=true
+      vmiFound=true
       break
     fi
     sleep 5
-    ELAPSED=$((ELAPSED + 5))
+    elapsed=$((elapsed + 5))
   done
-  
-  if [[ "$VMI_FOUND" == "true" ]]; then
-    echo "  ✅ VMI created successfully"
-    
-    # Wait for VMI to be running
-    echo "  ⏳ Waiting for VMI to be running (5m timeout)..."
+
+  if [[ "${vmiFound}" == "true" ]]; then
     if timeout 300 bash -c "until oc get vmi ${VM_NAME} -n ${TEST_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null | grep -q 'Running'; do sleep 5; done"; then
-      echo "  ✅ VMI is running"
-      
-      # Get VM status
-      VM_STATUS=$(oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "Unknown")
-      echo "  📊 VM Status: ${VM_STATUS}"
-      
-      test_status="passed"
+      testStatus="passed"
     else
-      echo "  ⚠️  VMI not running within timeout"
-      test_message="VMI not running within 5m timeout"
+      testMessage="VMI not running within 5m timeout"
       oc describe vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" || true
     fi
   else
-    echo "  ⚠️  VMI not created within timeout"
-    test_message="VMI not created within 5m timeout"
+    testMessage="VMI not created within 5m timeout"
     oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o yaml || true
   fi
 else
-  echo "  ❌ Failed to start VM"
-  test_message="Failed to patch VM spec.running=true"
+  testMessage="Failed to patch VM spec.running=true"
 fi
 
-record_test "$test_start" "fa_cnv_1011_prerequisite_start_vm" "$test_status" "$test_message"
+TestReport--AddCase "fa_cnv_1011_prerequisite_start_vm" "${testStatus}" "$((SECONDS - testStart))" "${testMessage}"
 
-# If VM didn't start, we can't continue with remaining tests
-if [[ "$test_status" != "passed" ]]; then
+if [[ "${testStatus}" != "passed" ]]; then
   echo ""
   echo "❌ VM failed to start - cannot continue with lifecycle tests"
   exit 1
 fi
 
-# Test 2: FA-CNV-1011 - Stop VM
-test_start=$(start_test "FA-CNV-1011: Stopping VM with shared storage")
-test_status="failed"
-test_message=""
+testStart="${SECONDS}"
+testStatus="failed"
+testMessage=""
 
-echo "  🛑 Stopping VM by setting spec.running=false..."
 if oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":false}}'; then
-  echo "  ✅ VM stop command sent"
-  
-  # Wait for VMI to be deleted
-  echo "  ⏳ Waiting for VMI to be deleted (5m timeout)..."
-  TIMEOUT=300
-  ELAPSED=0
-  VMI_DELETED=false
-  
-  while [[ $ELAPSED -lt $TIMEOUT ]]; do
+  elapsed=0
+  vmiDeleted=false
+
+  while [[ "${elapsed}" -lt 300 ]]; do
     if ! oc get vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      VMI_DELETED=true
+      vmiDeleted=true
       break
     fi
     sleep 5
-    ELAPSED=$((ELAPSED + 5))
+    elapsed=$((elapsed + 5))
   done
-  
-  if [[ "$VMI_DELETED" == "true" ]]; then
-    echo "  ✅ VMI deleted successfully"
-    
-    # Verify VM status shows Stopped
-    VM_STATUS=$(oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "Unknown")
-    echo "  📊 VM Status after stop: ${VM_STATUS}"
-    
-    if [[ "$VM_STATUS" == "Stopped" ]]; then
-      echo "  ✅ VM status is Stopped"
-      test_status="passed"
+
+  if [[ "${vmiDeleted}" == "true" ]]; then
+    vmStatus=$(oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "Unknown")
+
+    if [[ "${vmStatus}" == "Stopped" ]]; then
+      testStatus="passed"
     else
-      echo "  ⚠️  VM status is not Stopped (status: ${VM_STATUS})"
-      test_message="VM status not 'Stopped' after VMI deletion (status: ${VM_STATUS})"
+      testMessage="VM status not 'Stopped' after VMI deletion (status: ${vmStatus})"
     fi
   else
-    echo "  ⚠️  VMI not deleted within timeout"
-    test_message="VMI not deleted within 5m timeout"
+    testMessage="VMI not deleted within 5m timeout"
     oc describe vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" || true
   fi
 else
-  echo "  ❌ Failed to stop VM"
-  test_message="Failed to patch VM spec.running=false"
+  testMessage="Failed to patch VM spec.running=false"
 fi
 
-record_test "$test_start" "fa_cnv_1011_stop_vm_with_shared_storage" "$test_status" "$test_message"
+TestReport--AddCase "fa_cnv_1011_stop_vm_with_shared_storage" "${testStatus}" "$((SECONDS - testStart))" "${testMessage}"
 
-# Test 3: FA-CNV-1012 - Restart VM
-test_start=$(start_test "FA-CNV-1012: Restarting VM with shared storage")
-test_status="failed"
-test_message=""
+testStart="${SECONDS}"
+testStatus="failed"
+testMessage=""
 
-echo "  🔄 Restarting VM by setting spec.running=true..."
 if oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}'; then
-  echo "  ✅ VM restart command sent"
-  
-  # Wait for new VMI to be created
-  echo "  ⏳ Waiting for new VMI to be created (5m timeout)..."
-  TIMEOUT=300
-  ELAPSED=0
-  VMI_FOUND=false
-  
-  while [[ $ELAPSED -lt $TIMEOUT ]]; do
+  elapsed=0
+  vmiFound=false
+
+  while [[ "${elapsed}" -lt 300 ]]; do
     if oc get vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      VMI_FOUND=true
+      vmiFound=true
       break
     fi
     sleep 5
-    ELAPSED=$((ELAPSED + 5))
+    elapsed=$((elapsed + 5))
   done
-  
-  if [[ "$VMI_FOUND" == "true" ]]; then
-    echo "  ✅ New VMI created successfully"
-    
-    # Wait for VMI to be running
-    echo "  ⏳ Waiting for VMI to be running (5m timeout)..."
+
+  if [[ "${vmiFound}" == "true" ]]; then
     if timeout 300 bash -c "until oc get vmi ${VM_NAME} -n ${TEST_NAMESPACE} -o jsonpath='{.status.phase}' 2>/dev/null | grep -q 'Running'; do sleep 5; done"; then
-      echo "  ✅ VMI is running after restart"
-      
-      # Get VM status
-      VM_STATUS=$(oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.printableStatus}' 2>/dev/null || echo "Unknown")
-      echo "  📊 VM Status after restart: ${VM_STATUS}"
-      
-      # Verify PVC is still bound (data persistence check)
-      PVC_STATUS=$(oc get pvc "${VM_NAME}-dv" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-      echo "  📊 PVC Status: ${PVC_STATUS}"
-      
-      if [[ "$PVC_STATUS" == "Bound" ]]; then
-        echo "  ✅ PVC still bound - data persistence verified"
-        test_status="passed"
+      pvcStatus=$(oc get pvc "${VM_NAME}-dv" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+
+      if [[ "${pvcStatus}" == "Bound" ]]; then
+        testStatus="passed"
       else
-        echo "  ⚠️  PVC not bound (status: ${PVC_STATUS})"
-        test_message="PVC not bound after VM restart (status: ${PVC_STATUS})"
+        testMessage="PVC not bound after VM restart (status: ${pvcStatus})"
       fi
     else
-      echo "  ⚠️  VMI not running within timeout"
-      test_message="VMI not running within 5m timeout after restart"
+      testMessage="VMI not running within 5m timeout after restart"
       oc describe vmi "${VM_NAME}" -n "${TEST_NAMESPACE}" || true
     fi
   else
-    echo "  ⚠️  VMI not created within timeout"
-    test_message="VMI not created within 5m timeout after restart"
+    testMessage="VMI not created within 5m timeout after restart"
     oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" -o yaml || true
   fi
 else
-  echo "  ❌ Failed to restart VM"
-  test_message="Failed to patch VM spec.running=true for restart"
+  testMessage="Failed to patch VM spec.running=true for restart"
 fi
 
-record_test "$test_start" "fa_cnv_1012_restart_vm_with_shared_storage" "$test_status" "$test_message"
+TestReport--AddCase "fa_cnv_1012_restart_vm_with_shared_storage" "${testStatus}" "$((SECONDS - testStart))" "${testMessage}"
 
-# Cleanup
-echo ""
-echo "🧹 Cleaning up test resources..."
-echo "  🗑️  Stopping VM..."
 if oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
   oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":false}}' || true
   sleep 10
 fi
 
-echo "  🗑️  Deleting VM..."
 oc delete vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --ignore-not-found
-
-echo "  🗑️  Deleting DataVolume..."
 oc delete datavolume "${VM_NAME}-dv" -n "${TEST_NAMESPACE}" --ignore-not-found
-
-echo "  🗑️  Deleting test namespace..."
 oc delete namespace "${TEST_NAMESPACE}" --ignore-not-found
 
-echo "  ✅ Cleanup completed"
-
-echo ""
-echo "📊 VM Lifecycle Test Summary"
-echo "============================"
-echo "✅ FA-CNV-1011: VM stop operation tested"
-echo "✅ FA-CNV-1012: VM restart operation tested"
-echo "✅ Data persistence verified across VM lifecycle"
-echo ""
-echo "🎉 VM lifecycle operations with IBM Storage Scale shared storage completed!"
-
+true
 
