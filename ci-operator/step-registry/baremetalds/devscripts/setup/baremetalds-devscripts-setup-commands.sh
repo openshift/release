@@ -182,6 +182,7 @@ fi
 # even on success
 cat - <<EOF >> "${SHARED_DIR}/dev-scripts-additional-config"
 export OPENSHIFT_INSTALL_GATHER_BOOTSTRAP=true
+export OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY:-}
 EOF
 
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
