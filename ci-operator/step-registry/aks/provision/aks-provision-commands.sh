@@ -301,6 +301,11 @@ EOF
         oc get nodepool.karpenter.sh -o yaml > "${ARTIFACT_DIR}/karpenter-nodepools.yaml" 2>&1 || true
         oc get aksnodeclass -o yaml > "${ARTIFACT_DIR}/karpenter-aksnodeclasses.yaml" 2>&1 || true
         oc get nodes -o custom-columns='NAME:.metadata.name,ZONE:.metadata.labels.topology\.kubernetes\.io/zone,INSTANCE-TYPE:.metadata.labels.node\.kubernetes\.io/instance-type,READY:.status.conditions[-1:].status' > "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>&1 || true
+
+        echo "NAP node zone distribution:"
+        cat "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>/dev/null || true
+        echo "Zone summary:"
+        awk 'NR>1 && $2 != "<none>" { zones[$2]++ } END { for (z in zones) printf "  %s: %d nodes\n", z, zones[z] }' "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>/dev/null || true
     }
 
     echo "Waiting for NAP to provision nodes"
