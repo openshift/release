@@ -73,7 +73,26 @@ tests:
       commands: |
         oc create namespace openshift-gitops-operator
         oc get ns openshift-gitops-operator -o yaml
-        operator-sdk run bundle --security-context-config restricted -n openshift-gitops-operator "$OO_BUNDLE" --timeout 10m
+        if ! operator-sdk run bundle --security-context-config restricted -n openshift-gitops-operator "$OO_BUNDLE" --timeout 10m; then
+          echo "=== Operator installation failed, gathering diagnostics ==="
+          echo "=== CSV Status ==="
+          oc get csv -n openshift-gitops-operator -o yaml || true
+          echo "=== CSV Describe ==="
+          oc describe csv -n openshift-gitops-operator || true
+          echo "=== Operator Pods ==="
+          oc get pods -n openshift-gitops-operator || true
+          echo "=== Operator Pod Describe ==="
+          oc describe pods -n openshift-gitops-operator || true
+          echo "=== Operator Pod Logs ==="
+          oc logs -n openshift-gitops-operator -l control-plane=controller-manager --tail=100 || true
+          echo "=== Events ==="
+          oc get events -n openshift-gitops-operator --sort-by='.lastTimestamp' || true
+          echo "=== Deployment Status ==="
+          oc get deployment -n openshift-gitops-operator -o yaml || true
+          echo "=== Image being used ==="
+          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.spec.template.spec.containers[0].image}' || true
+          exit 1
+        fi
         oc wait --for condition=Available -n openshift-gitops-operator deployment openshift-gitops-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
@@ -109,7 +128,26 @@ tests:
       commands: |
         oc create namespace openshift-gitops-operator
         oc get ns openshift-gitops-operator -o yaml
-        operator-sdk run bundle --security-context-config restricted -n openshift-gitops-operator "$OO_BUNDLE" --timeout 10m
+        if ! operator-sdk run bundle --security-context-config restricted -n openshift-gitops-operator "$OO_BUNDLE" --timeout 10m; then
+          echo "=== Operator installation failed, gathering diagnostics ==="
+          echo "=== CSV Status ==="
+          oc get csv -n openshift-gitops-operator -o yaml || true
+          echo "=== CSV Describe ==="
+          oc describe csv -n openshift-gitops-operator || true
+          echo "=== Operator Pods ==="
+          oc get pods -n openshift-gitops-operator || true
+          echo "=== Operator Pod Describe ==="
+          oc describe pods -n openshift-gitops-operator || true
+          echo "=== Operator Pod Logs ==="
+          oc logs -n openshift-gitops-operator -l control-plane=controller-manager --tail=100 || true
+          echo "=== Events ==="
+          oc get events -n openshift-gitops-operator --sort-by='.lastTimestamp' || true
+          echo "=== Deployment Status ==="
+          oc get deployment -n openshift-gitops-operator -o yaml || true
+          echo "=== Image being used ==="
+          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.spec.template.spec.containers[0].image}' || true
+          exit 1
+        fi
         oc wait --for condition=Available -n openshift-gitops-operator deployment openshift-gitops-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
