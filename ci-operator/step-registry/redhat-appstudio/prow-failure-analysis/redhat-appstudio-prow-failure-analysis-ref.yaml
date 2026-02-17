@@ -21,7 +21,7 @@ ref:
     documentation: |-
       The LLM provider to use for analysis. Defaults to gemini (Google Gemini).
   - name: LLM_MODEL
-    default: "gemini-2.5-flash-lite"
+    default: "gemini-2.5-flash"
     documentation: |-
       The LLM model to use for analysis. Defaults to gemini-2.5-flash-lite.
   - name: LLM_API_KEY_PATH
@@ -53,9 +53,13 @@ ref:
     documentation: |-
       Comma-separated list of step name patterns to ignore during analysis. Defaults to ignoring AppStudio report steps.
   - name: INCLUDED_ARTIFACTS
-    default: "appstudio-e2e-tests/redhat-appstudio-gather/artifacts/*"
+    default: "appstudio-e2e-tests/gather-extra/artifacts/events.json,appstudio-e2e-tests/gather-extra/artifacts/deployments.json,appstudio-e2e-tests/gather-extra/artifacts/pods/*,appstudio-e2e-tests/redhat-appstudio-e2e/artifacts/e2e-report.*,appstudio-e2e-tests/redhat-appstudio-e2e/build-log.txt,appstudio-e2e-tests/redhat-appstudio-health-check/*,appstudio-e2e-tests/redhat-appstudio-gather/artifacts/pipelineruns.json,appstudio-e2e-tests/redhat-appstudio-gather/artifacts/taskruns.json"
     documentation: |-
-      Glob patterns for additional artifacts to include in analysis. Defaults to AppStudio gather artifacts.
+      Comma-separated glob patterns for additional artifacts to include in analysis. Includes gather artifacts, events, deployments, pod logs, e2e reports, health check results, pipelineruns, and taskruns.
+  - name: EXCLUDED_ARTIFACTS
+    default: "cert-manager*,knative-eventing*,openshift-*,!openshift-pipelines_pipelines-as-code-controller*,product-kubearchive*,caching_squid*,crossplane-system*,tempo-operator*,project-controller*,chains-e2e-*,image-controller_*,kueue-external-admission*,*_previous.log"
+    documentation: |-
+      Comma-separated glob patterns for artifacts to exclude from the included set. Patterns are matched against each individual path component of the artifact's relative path (pod directory names are formatted as namespace_podname, e.g. openshift-pipelines_tekton-chains-controller-abc123). Prefix a pattern with '!' to create a keep-exception that overrides exclusion. If unset or empty, no filtering is applied.
   - name: CORDON_DEVICE
     default: "cpu"
     documentation: |-
