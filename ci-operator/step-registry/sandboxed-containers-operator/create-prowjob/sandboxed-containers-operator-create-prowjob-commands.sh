@@ -15,18 +15,17 @@ set -o pipefail
 # used to interact with Prow via REST API
 GANGWAY_API_ENDPOINT="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions"
 ARO_CLUSTER_VERSION="${ARO_CLUSTER_VERSION:-4.17}"
+DEFAULT_EXPECTED_OSC_VERSION="1.11.2"
 
 get_expected_version() {
     # Extract expected version from catalog tag
-    # If catalog tag is in X.Y.Z-[0-9]+ format, returns X.Y.Z portion
-    # If input is "latest", returns "0.0.0"
+    # If catalog tag is in X.Y.Z-epoch format (e.g. 1.10.1-1766149846), returns X.Y.Z portion
+    # If input is "latest", returns empty string (caller should use EXPECTED_OSC_VERSION)
     # Otherwise returns empty string
     local catalog_tag="$1"
 
     if [[ "${catalog_tag}" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-[0-9]+$ ]]; then
         echo "${BASH_REMATCH[1]}"
-    elif [[ "${catalog_tag}" == "latest" ]]; then
-        echo "0.0.0"
     else
         echo ""
     fi
@@ -116,8 +115,8 @@ validate_and_set_defaults() {
     # Azure Region Configuration
     CUSTOM_AZURE_REGION="${CUSTOM_AZURE_REGION:-eastus}"
 
-    # OSC Version Configuration
-    EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.1}"
+    # OSC Version Configuration: default applied in Pre-GA/GA block so catalog tag can drive it when applicable
+    # (when tag is X.Y.Z-epoch we derive from tag; when tag is latest we use EXPECTED_OSC_VERSION from env or default)
 
     # Kata RPM Configuration
     INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-false}"
@@ -205,16 +204,24 @@ validate_and_set_defaults() {
       OSC_CATALOG_TAG="${OSC_CATALOG_TAG:-latest}"
       echo "Using OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
 
-      # Extract expected OSC version from catalog tag if it matches X.Y.Z-[0-9]+ format
-      extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
-      if [[ -n "${extracted_version}" ]]; then
-          EXPECTED_OSC_VERSION="${extracted_version}"
-          echo "Extracted EXPECTED_OSC_VERSION from OSC_CATALOG_TAG: ${EXPECTED_OSC_VERSION}"
+      # EXPECTED_OSC_VERSION: env overrides. If unset, derive from catalog tag when X.Y.Z-epoch else use default.
+      if [[ -n "${EXPECTED_OSC_VERSION:-}" ]]; then
+          echo "Using EXPECTED_OSC_VERSION from env: ${EXPECTED_OSC_VERSION}"
+      else
+          extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
+          if [[ -n "${extracted_version}" ]]; then
+              EXPECTED_OSC_VERSION="${extracted_version}"
+              echo "Extracted EXPECTED_OSC_VERSION from OSC_CATALOG_TAG: ${EXPECTED_OSC_VERSION}"
+          else
+              EXPECTED_OSC_VERSION="${DEFAULT_EXPECTED_OSC_VERSION}"
+              echo "Using EXPECTED_OSC_VERSION (default): ${EXPECTED_OSC_VERSION}"
+          fi
       fi
 
       CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:${OSC_CATALOG_TAG}}"
       CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-brew-catalog}"
     else # GA
+      EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-${DEFAULT_EXPECTED_OSC_VERSION}}"
       CATALOG_SOURCE_NAME="redhat-operators"
       CATALOG_SOURCE_IMAGE=""
     fi
@@ -240,7 +247,7 @@ show_usage() {
     echo "  OCP_CHANNEL                    - Release channel: stable, fast, candidate, eus (default: fast)"
     echo "                                   Note: RC/EC versions require OCP_CHANNEL=candidate"
     echo "  TEST_RELEASE_TYPE              - Test release type: Pre-GA or GA (default: Pre-GA)"
-    echo "  EXPECTED_OSC_VERSION           - Expected OSC version (default: 1.10.1)"
+    echo "  EXPECTED_OSC_VERSION           - Expected OSC version (default: ${DEFAULT_EXPECTED_OSC_VERSION})"
     echo "  INSTALL_KATA_RPM               - Install Kata RPM: true or false (default: true)"
     echo "  KATA_RPM_VERSION               - Kata RPM version (default: 3.17.0-3.rhaos4.19.el9)"
     echo "  SLEEP_DURATION                 - Sleep duration after tests (default: 0h)"
