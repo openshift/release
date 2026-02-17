@@ -5,14 +5,30 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
+# Get current worker count (excluding infra and workload nodes)
+current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
+echo "Current worker count: $current_worker_count"
+
+# Determine scale prefix based on worker count
+if [[ $current_worker_count -ge 200 ]]; then
+    scale_prefix="large-scale"
+elif [[ $current_worker_count -ge 100 ]]; then
+    scale_prefix="med-scale"
+elif [[ $current_worker_count -ge 20 ]]; then
+    scale_prefix="small-scale"
+else
+    scale_prefix="trt-external-payload"
+fi
+
 # Select orion config and ack file based on UDN layer mode
 if [[ "${ENABLE_LAYER_3}" == "false" ]]; then
-    export ORION_CONFIG="examples/small-scale-udn-l2.yaml"
+    export ORION_CONFIG="examples/${scale_prefix}-udn-l2.yaml"
     export ACK_FILE="udn-l2_ack.yaml"
 else
-    export ORION_CONFIG="examples/small-scale-udn-l3.yaml"
+    export ORION_CONFIG="examples/${scale_prefix}-udn-l3.yaml"
     export ACK_FILE="udn-l3_ack.yaml"
 fi
+echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
 
 python --version
 pushd /tmp
