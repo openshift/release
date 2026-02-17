@@ -1,0 +1,36 @@
+ref:
+  as: interop-tests-ibm-fusion-access-create-aws-multiattach-ebs
+  from: upi-installer
+  cli: latest
+  commands: interop-tests-ibm-fusion-access-create-aws-multiattach-ebs-commands.sh
+  timeout: 30m0s
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: FA__NODE_ROLE
+    default: "worker"
+    documentation: |-
+      The role of nodes to attach the multi-attach EBS volume to.
+  - name: FA__EXTRA_DISKS_SIZE
+    default: "100"
+    documentation: |-
+      The size (unit is GiB) of the multi-attach EBS volume.
+  - name: FA__EXTRA_DISKS_IOPS
+    default: "3000"
+    documentation: |-
+      The provisioned IOPS for the io2 volume (minimum 100, maximum 64000).
+  documentation: |-
+    Creates a single io2 EBS volume with multi-attach enabled and attaches
+    it to all worker nodes in the cluster.
+
+    This provides shared block storage suitable for IBM Storage Scale Container
+    Native deployments that require a shared LUN accessible from all nodes.
+
+    Requirements:
+    - All target nodes must be in the same availability zone
+    - io2 volume type supports multi-attach
+    - Volume is tagged for automatic cleanup with cluster deletion
+
+    The volume ID is saved to SHARED_DIR/multiattach-volume-id for reference.
