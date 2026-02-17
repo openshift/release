@@ -1,8 +1,6 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-FA__SCALE__NAMESPACE="${FA__SCALE__NAMESPACE:-ibm-spectrum-scale}"
-
 : 'Creating IBM Storage Scale Filesystem...'
 
 oc apply -f=- <<EOF
@@ -29,12 +27,12 @@ spec:
 EOF
 
 : 'Filesystem resource created'
-oc get filesystem shared-filesystem -n ${FA__SCALE__NAMESPACE}
+oc get filesystem shared-filesystem -n "${FA__SCALE__NAMESPACE}"
 
 : 'Waiting for filesystem to be ready (may take up to 1 hour)...'
 oc wait --for=jsonpath='{.status.conditions[?(@.type=="Success")].status}'=True \
   filesystem/shared-filesystem \
-  -n ${FA__SCALE__NAMESPACE} \
+  -n "${FA__SCALE__NAMESPACE}" \
   --timeout=3600s
 
 : 'Filesystem is ready'

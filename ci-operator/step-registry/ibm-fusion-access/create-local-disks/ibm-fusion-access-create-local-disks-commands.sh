@@ -1,8 +1,6 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-FA__SCALE__NAMESPACE="${FA__SCALE__NAMESPACE:-ibm-spectrum-scale}"
-
 : 'Creating IBM Storage Scale LocalDisk resources...'
 
 firstWorker=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].metadata.name}')
@@ -37,13 +35,13 @@ spec:
   existingDataSkipVerify: true
 EOF
   
-  oc wait --for=jsonpath='{.metadata.name}'=${localdiskName} localdisk/${localdiskName} -n ${FA__SCALE__NAMESPACE} --timeout=300s
+  oc wait --for=jsonpath='{.metadata.name}'="${localdiskName}" localdisk/"${localdiskName}" -n "${FA__SCALE__NAMESPACE}" --timeout=300s
   : "LocalDisk ${localdiskName} created"
   
   ((diskCount++))
 done
 
 : "Created ${#devices[@]} LocalDisk resources"
-oc get localdisk -n ${FA__SCALE__NAMESPACE}
+oc get localdisk -n "${FA__SCALE__NAMESPACE}"
 
 true
