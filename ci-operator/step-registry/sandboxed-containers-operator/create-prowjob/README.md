@@ -11,7 +11,7 @@ The `sandboxed-containers-operator-create-prowjob-commands.sh` script creates pr
 The script supports the following commands:
 
 - `create` - Create prowjob configuration files
-- `run` - Run prowjobs from YAML configuration
+- `run` - Run one prowjob from YAML (requires job YAML file and exactly one job name)
 
 ### Command Usage
 
@@ -161,25 +161,22 @@ The `create-prowjob` script uses `:latest` as the default tag. The actual latest
 
 ## Run Command
 
-The `run` command allows you to trigger ProwJobs from a generated YAML configuration file. This command requires a valid Prow API token.
+The `run` command triggers a single ProwJob from a generated YAML configuration file. You must specify exactly one job name (the `as` value from the tests in the YAML, e.g. `azure-ipi-kata`, `aws-ipi-peerpods`). This command requires a valid Prow API token.
 
 ### Run Command Usage
 
 ```bash
-# Run all jobs from a YAML file
-./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml
-
-# Run specific jobs from a YAML file
-./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml azure-ipi-kata aws-ipi-peerpods
+# Run one job from a YAML file (exactly one job name required)
+./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml azure-ipi-kata
 ```
 
 ### Run Command Features
 
-- **Job Name Generation**: Automatically constructs job names using the pattern `periodic-ci-{org}-{repo}-{branch}-{variant}-{job_suffix}`
-- **Metadata Extraction**: Extracts organization, repository, branch, and variant from the YAML file's `zz_generated_metadata` section
-- **API Integration**: Uses the Prow/Gangway API to trigger jobs
-- **Job Status Monitoring**: Provides job IDs and status information
-- **Flexible Job Selection**: Can run all jobs or specific jobs by name
+- **Exactly one job**: You must provide the job YAML file and exactly one job name; neither more nor fewer are allowed.
+- **Job Name Generation**: Constructs the full job name as `periodic-ci-{org}-{repo}-{branch}-{variant}-{job_name}`.
+- **Metadata Extraction**: Extracts organization, repository, branch, and variant from the YAML file's `zz_generated_metadata` section.
+- **API Integration**: Uses the Prow/Gangway API to trigger the job.
+- **Job Status Monitoring**: Provides job ID and status information.
 
 ### Run Command Environment Variables
 

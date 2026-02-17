@@ -233,12 +233,11 @@ show_usage() {
     echo ""
     echo "Commands:"
     echo "  create            Create prowjob configuration files"
-    echo "  run               Run prowjobs from YAML configuration"
+    echo "  run               Run one prowjob from YAML (requires job_yaml_file and exactly one job name)"
 	echo "  update_templates  Regenerate the ci-operator/config/openshift/sandboxed-containers-operator templates using default values (unless overridden)"
     echo ""
     echo "Examples:"
     echo "  $0 create"
-    echo "  $0 run /path/to/job_yaml.yaml"
     echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata"
     echo ""
     echo "Environment variables for 'create' command:"
@@ -485,10 +484,7 @@ EOF
     echo "1. Set your Prow API token:"
     echo "   export PROW_API_TOKEN=your_token_here"
     echo ""
-    echo "2. Run all jobs from the generated file:"
-    echo "   ./sandboxed-containers-operator-create-prowjob-commands.sh run ${OUTPUT_FILE}"
-    echo ""
-    echo "3. Or run specific jobs:"
+    echo "2. Run one job from the generated file (specify exactly one job name):"
     echo "   ./sandboxed-containers-operator-create-prowjob-commands.sh run ${OUTPUT_FILE} azure-ipi-kata"
     echo ""
     echo "Option B - Submit configuration to CI:"
@@ -511,25 +507,30 @@ EOF
 # Function to run prowjobs
 command_run() {
     echo "=========================================="
-    echo "Sandboxed Containers Operator - Run Prowjobs"
+    echo "Sandboxed Containers Operator - Run Prowjob"
     echo ""
 
-    # Check if job_yaml file is provided
-    if [[ $# -eq 0 ]]; then
-        echo "ERROR: No job YAML file specified"
+    # Require exactly two arguments: job_yaml_file and one job name
+    if [[ $# -lt 2 ]]; then
+        echo "ERROR: Exactly one job must be specified"
         echo ""
-        echo "Usage: $0 run <job_yaml_file> [job_names...]"
+        echo "Usage: $0 run <job_yaml_file> <job_name>"
         echo ""
-        echo "Examples:"
-        echo "  $0 run /path/to/job_yaml.yaml"
+        echo "Example:"
         echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata"
-        echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata azure-ipi-peerpods"
         echo ""
+        echo "Valid job names are the 'as' values from the tests in the YAML (e.g. azure-ipi-kata, aws-ipi-peerpods)."
+        exit 1
+    fi
+    if [[ $# -gt 2 ]]; then
+        echo "ERROR: Exactly one job must be specified (got $(( $# - 1 )) job names)"
+        echo ""
+        echo "Usage: $0 run <job_yaml_file> <job_name>"
         exit 1
     fi
 
     JOB_YAML_FILE="$1"
-    shift
+    JOB_SUFFIX="$2"
 
     # Check if job_yaml file exists
     if [[ ! -f "${JOB_YAML_FILE}" ]]; then
@@ -538,6 +539,7 @@ command_run() {
     fi
 
     echo "Job YAML file: ${JOB_YAML_FILE}"
+    echo "Job: ${JOB_SUFFIX}"
 
     # Extract metadata from job_yaml
     ORG=$(yq eval '.zz_generated_metadata.org' "${JOB_YAML_FILE}")
@@ -553,30 +555,8 @@ command_run() {
 
     # Generate job name prefix
     JOB_PREFIX="periodic-ci-${ORG}-${REPO}-${BRANCH}-${VARIANT}"
-    echo "Job name prefix: ${JOB_PREFIX}"
-
-    # Determine job names to run
-    if [[ $# -eq 0 ]]; then
-        # No specific jobs provided, extract all 'as' values from tests
-        echo "No specific jobs provided, extracting all jobs from YAML..."
-        mapfile -t JOB_NAMES < <(yq eval '.tests[].as' "${JOB_YAML_FILE}")
-    else
-        # Use provided job names
-        echo "Using provided job names: $*"
-        JOB_NAMES=("$@")
-    fi
-
-    if [[ ${#JOB_NAMES[@]} -eq 0 ]]; then
-        echo "ERROR: No jobs found to run"
-        exit 1
-    fi
-
-    echo ""
-    echo "Jobs to run:"
-    for job_suffix in "${JOB_NAMES[@]}"; do
-        full_job_name="${JOB_PREFIX}-${job_suffix}"
-        echo "  - ${full_job_name}"
-    done
+    full_job_name="${JOB_PREFIX}-${JOB_SUFFIX}"
+    echo "Full job name: ${full_job_name}"
 
     echo ""
     echo "Preparing job execution..."
@@ -598,61 +578,54 @@ command_run() {
     fi
     echo "✓ Job configuration converted to JSON"
 
-    # Trigger jobs
+    # Trigger job
     echo ""
-    echo "Triggering jobs..."
+    echo "Triggering job: ${full_job_name}"
 
-    for job_suffix in "${JOB_NAMES[@]}"; do
-        full_job_name="${JOB_PREFIX}-${job_suffix}"
-        echo ""
-        echo "Triggering job: ${full_job_name}"
+    # Create payload
+    UNRESOLVED_SPEC=$(cat config.json)
+    payload=$(jq -n --arg job "${full_job_name}" \
+       --argjson config "${UNRESOLVED_SPEC}" \
+       '{
+           "job_name": $job,
+           "job_execution_type": "1",
+           "pod_spec_options": {
+              "envs": {
+                 "UNRESOLVED_CONFIG": $config
+               },
+            }
+        }')
 
-        # Create payload
-        UNRESOLVED_SPEC=$(cat config.json)
-        payload=$(jq -n --arg job "${full_job_name}" \
-           --argjson config "${UNRESOLVED_SPEC}" \
-           '{
-               "job_name": $job,
-               "job_execution_type": "1",
-               "pod_spec_options": {
-                  "envs": {
-                     "UNRESOLVED_CONFIG": $config
-                   },
-                }
-            }')
+    # Make API call
+    echo "Making API call to trigger job..."
+    if curl -s -X POST -H "Authorization: Bearer ${PROW_API_TOKEN}" \
+        -H "Content-Type: application/json" -d "${payload}" \
+        "${GANGWAY_API_ENDPOINT}" > "output_${JOB_SUFFIX}.json"; then
 
-        # Make API call
-        echo "Making API call to trigger job..."
-        if curl -s -X POST -H "Authorization: Bearer ${PROW_API_TOKEN}" \
-            -H "Content-Type: application/json" -d "${payload}" \
-            "${GANGWAY_API_ENDPOINT}" > "output_${job_suffix}.json"; then
+        # Extract job ID
+        job_id=$(jq -r '.id' "output_${JOB_SUFFIX}.json")
+        if [[ "${job_id}" != "null" && -n "${job_id}" ]]; then
+            echo "✓ Job triggered successfully!"
+            echo "  Job ID: ${job_id}"
+            echo "  Output saved to: output_${JOB_SUFFIX}.json"
 
-            # Extract job ID
-            job_id=$(jq -r '.id' "output_${job_suffix}.json")
-            if [[ "${job_id}" != "null" && -n "${job_id}" ]]; then
-                echo "✓ Job triggered successfully!"
-                echo "  Job ID: ${job_id}"
-                echo "  Output saved to: output_${job_suffix}.json"
-
-                # Get job status
-                echo "Fetching job status..."
-                curl -s -X GET -H "Authorization: Bearer ${PROW_API_TOKEN}" \
-                    "${GANGWAY_API_ENDPOINT}/${job_id}" > "status_${job_suffix}.json"
-                echo "  Status saved to: status_${job_suffix}.json"
-            else
-                echo "✗ Failed to get job ID from response"
-                echo "Response content:"
-                cat "output_${job_suffix}.json"
-            fi
+            # Get job status
+            echo "Fetching job status..."
+            curl -s -X GET -H "Authorization: Bearer ${PROW_API_TOKEN}" \
+                "${GANGWAY_API_ENDPOINT}/${job_id}" > "status_${JOB_SUFFIX}.json"
+            echo "  Status saved to: status_${JOB_SUFFIX}.json"
         else
-            echo "✗ Failed to trigger job"
-            echo "Check output_${job_suffix}.json for details"
+            echo "✗ Failed to get job ID from response"
+            echo "Response content:"
+            cat "output_${JOB_SUFFIX}.json"
         fi
-    done
+    else
+        echo "✗ Failed to trigger job"
+        echo "Check output_${JOB_SUFFIX}.json for details"
+    fi
 
     echo ""
-    echo "Job triggering completed!"
-    echo "Check the output_*.json and status_*.json files for details"
+    echo "Job triggering completed."
 }
 
 command_update_templates() {
