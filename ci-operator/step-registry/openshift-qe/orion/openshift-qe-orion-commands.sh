@@ -5,6 +5,7 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
+
 python --version
 pushd /tmp
 python -m virtualenv ./venv_qe
@@ -93,6 +94,8 @@ if [[ -n "$ORION_CONFIG" ]]; then
     fi
 fi
 
+VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+export VERSION
 if [[ -n "$ACK_FILE" ]]; then
     if [[ "$ACK_FILE" =~ ^https?:// ]]; then
         ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
