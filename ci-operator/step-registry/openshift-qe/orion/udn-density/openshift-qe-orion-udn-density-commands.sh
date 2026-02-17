@@ -20,13 +20,11 @@ else
     scale_prefix="trt-external-payload"
 fi
 
-# Select orion config and ack file based on UDN layer mode
+# Select orion config based on UDN layer mode
 if [[ "${ENABLE_LAYER_3}" == "false" ]]; then
     export ORION_CONFIG="examples/${scale_prefix}-udn-l2.yaml"
-    export ACK_FILE="udn-l2_ack.yaml"
 else
     export ORION_CONFIG="examples/${scale_prefix}-udn-l3.yaml"
-    export ACK_FILE="udn-l3_ack.yaml"
 fi
 echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
 
