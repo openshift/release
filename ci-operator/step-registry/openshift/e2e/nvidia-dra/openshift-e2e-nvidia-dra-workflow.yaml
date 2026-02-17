@@ -1,0 +1,42 @@
+workflow:
+  as: openshift-e2e-nvidia-dra
+  documentation: |-
+    Provisions an AWS OpenShift cluster with GPU worker nodes and runs NVIDIA DRA tests.
+
+    This workflow:
+    1. Provisions an AWS IPI cluster with GPU instance type specified by COMPUTE_NODE_TYPE
+    2. Installs NVIDIA GPU Operator via OLM with CDI enabled
+    3. Runs NVIDIA DRA extended tests (openshift-tests)
+    4. Cleans up GPU stack components
+    5. Destroys the cluster
+
+    Supported GPU instance types:
+    - g4dn.xlarge: Basic testing (1x Tesla T4, Turing) - $0.526/hr (default)
+    - g4dn.2xlarge: Basic testing (1x Tesla T4, Turing) - $0.752/hr
+    - g4dn.12xlarge: Multi-GPU testing (4x Tesla T4) - $3.912/hr
+    - g5.xlarge: Advanced features (1x A10G, Ampere) - $1.006/hr
+    - g5.2xlarge: Advanced features (1x A10G, Ampere) - $1.212/hr
+    - g5.12xlarge: Multi-GPU testing (4x A10G) - $5.672/hr
+    - p4d.24xlarge: MIG testing (8x A100, Ampere) - $32.77/hr
+    - p5.48xlarge: H100 testing (8x H100, Hopper) - $98.32/hr
+
+    Environment variables:
+    - COMPUTE_NODE_TYPE: GPU instance type (default: g4dn.xlarge)
+    - COMPUTE_NODE_REPLICAS: Number of GPU worker nodes (default: 1)
+    - DRA_TEST_SUITE: Which tests to run (default: basic)
+    - GPU_TYPE: GPU hardware type for validation (tesla-t4, a10g, a100, h100)
+    - GPU_ARCHITECTURE: NVIDIA architecture (turing, ampere, hopper)
+    - GPU_MIG_CAPABLE: Whether GPU supports MIG (true/false)
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: "${COMPUTE_NODE_TYPE}"
+      COMPUTE_NODE_REPLICAS: "${COMPUTE_NODE_REPLICAS}"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: openshift-e2e-nvidia-dra-gpu-operator-install
+    test:
+    - ref: openshift-e2e-nvidia-dra-test
+    post:
+    - ref: openshift-e2e-nvidia-dra-cleanup
+    - chain: ipi-aws-post
