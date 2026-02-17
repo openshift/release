@@ -170,6 +170,17 @@ The `run` command triggers a single ProwJob from a generated YAML configuration 
 ./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml azure-ipi-kata
 ```
 
+### Create Yaml for Run
+Use the **create** command to create a yaml file in the current directory.  Modify it for your case.  Follow Option A in the output directions
+
+### Viewing the Run in Spyglass
+Go to [Prow configured jobs](https://prow.ci.openshift.org/configured-jobs/)
+Scroll down to *sandboxed-containers-operator* and click on it
+Search for the prow job you specified (ex aws-ipi-peerpods) and click on _Details_
+Click on _History_
+You will be taken to a list of the **Build** numbers, etc.  Your job should be at the top.  Clicking on that will show you the Spyglass of your job with the build log, artifacts, etc.
+This URL is used by **dig&shift** for reporting and analysis
+
 ### Run Command Features
 
 - **Exactly one job**: You must provide the job YAML file and exactly one job name; neither more nor fewer are allowed.
