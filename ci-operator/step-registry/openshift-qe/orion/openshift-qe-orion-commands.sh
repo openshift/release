@@ -198,7 +198,7 @@ process_change_point() {
         org="${repo%%/*}"
         name="${repo##*/}"
 
-        url="https://raw.githubusercontent.com/openshift/release/master/ci-operator/jobs/${org}/${name}/OWNERS"
+        url="https://raw.githubusercontent.com/openshift/release/main/ci-operator/jobs/${org}/${name}/OWNERS"
 
         echo "Fetching OWNERS for $repo"
 
