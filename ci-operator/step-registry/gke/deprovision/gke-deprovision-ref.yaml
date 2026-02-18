@@ -1,0 +1,30 @@
+ref:
+  as: gke-deprovision
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  commands: gke-deprovision-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 30m0s
+  grace_period: 10m0s
+  documentation: |-
+    This step destroys the GKE cluster and cleans up GCP projects created by gke-provision.
+
+    Cleanup order:
+    1. Delete Hosted Cluster project (removes cross-project PSC references)
+    2. Delete GKE cluster with async polling (prevents liens on Control Plane project)
+    3. Delete Control Plane project
+
+    GKE clusters can place liens on their project, blocking deletion. By explicitly
+    deleting the cluster first and waiting for completion, we ensure the Control Plane
+    project can be deleted cleanly.
+
+    Reads from ${SHARED_DIR}:
+    - control-plane-project-id: Control Plane project ID
+    - hosted-cluster-project-id: Hosted Cluster project ID (optional)
+    - cluster-name: GKE cluster name
+    - gcp-region: GCP region
