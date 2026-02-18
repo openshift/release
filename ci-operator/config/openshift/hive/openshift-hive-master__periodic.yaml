@@ -1,6 +1,6 @@
 base_images:
   openstack-installer:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: openstack-installer
 binary_build_commands: GO_COMPLIANCE_INFO=0 make build
@@ -8,12 +8,12 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-9-release-golang-1.24-openshift-4.21
+    tag: rhel-9-release-golang-1.24-openshift-4.22
 images:
 - dockerfile_literal: |
     FROM ubi9-minimal
     RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-21-rhel9.ocp.svc > /etc/yum.repos.d/base-4-21-rhel9.repo
+    RUN curl http://base-4-20-rhel9.ocp.svc > /etc/yum.repos.d/base-4-20-rhel9.repo
   to: ubi9-minimal-entitled
 - build_args:
   - name: DNF
@@ -26,7 +26,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "4.22"
 resources:
   '*':
     requests:
@@ -54,6 +54,7 @@ tests:
     - as: test
       cli: latest
       commands: |
+        # DNM: trigger rehearsals
         # Creds for the `ci` user in the cluster-control-plane cluster
         export AWS_ACCESS_KEY_ID=$(cat /tmp/secret/hiveci-aws-creds/AWS_ACCESS_KEY_ID)
         export AWS_SECRET_ACCESS_KEY=$(cat /tmp/secret/hiveci-aws-creds/AWS_SECRET_ACCESS_KEY)
@@ -136,7 +137,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: CLOUD=gcp make test-e2e
+      commands: CLOUD=gcp DNM=rehearse make test-e2e
       dependencies:
       - env: HIVE_IMAGE
         name: hive
