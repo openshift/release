@@ -1,0 +1,96 @@
+base_images:
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  initial:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.21.0-0
+        upper: 4.22.0-0
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: desch-duplicates-profile-ocp-66355
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6i.large
+      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+      KUBE_BURNER_VERSION: default
+      PARAMETERS: aws
+      SCRIPT: perfscale_regression_ci/scripts/scalability/descheduler/duplicates_profile.sh
+    pre:
+    - ref: openshift-qe-install-kube-descheduler-operator
+    test:
+    - ref: openshift-svt-regression
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: desch-node-mem-util-ocp-67198
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "8"
+      COMPUTE_NODE_TYPE: m6i.large
+      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+      KUBE_BURNER_VERSION: default
+      PARAMETERS: aws
+      SCRIPT: perfscale_regression_ci/scripts/scalability/descheduler/node_mem_utilization_large.sh
+    pre:
+    - ref: openshift-qe-install-kube-descheduler-operator
+    test:
+    - ref: openshift-svt-regression
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: desch-affinity-taint-ocp-66655
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6i.large
+      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+      KUBE_BURNER_VERSION: default
+      PARAMETERS: aws
+      SCRIPT: perfscale_regression_ci/scripts/scalability/descheduler/affinity_taint.sh
+    pre:
+    - ref: openshift-qe-install-kube-descheduler-operator
+    test:
+    - ref: openshift-svt-regression
+    workflow: openshift-qe-installer-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: svt
+  variant: regression-aws-4.21-nightly-x86
