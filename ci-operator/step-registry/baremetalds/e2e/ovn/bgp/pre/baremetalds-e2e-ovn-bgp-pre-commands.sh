@@ -5,7 +5,7 @@ set -o pipefail
 
 # Fetch packet basic configuration
 source "${SHARED_DIR}/packet-conf.sh"
-ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << 'EOFTOP'
+ssh "${SSHOPTS[@]}" "root@${IP}" "FRR_IMAGE='$FRR_IMAGE'" bash -x - << 'EOFTOP'
 #!/bin/bash
 set -o nounset
 set -o errexit
@@ -276,6 +276,27 @@ echo "Waiting for all deployments in openshift-frr-k8s namespace to be created..
 until oc wait -n openshift-frr-k8s deployment --all --for condition=Available --timeout 2m &> /dev/null; do
   sleep 5
 done
+
+# Override FRR-K8s frr and reloader containers only (CNO uses one image for all containers;
+# upstream FRR image works only for frr/reloader). Make CNO Unmanaged and set those images.
+# This is used while waiting for OCP builds with FRR 10.
+# This will be removed once OCP builds with FRR 10 are available.
+if [ -n "${FRR_IMAGE:-}" ]; then
+  echo "Overriding FRR-K8s frr and reloader containers with custom FRR image..."
+
+  $KCLI patch Network.operator.openshift.io cluster --type='merge' \
+    -p='{"spec":{"managementState":"Unmanaged"}}'
+
+  # Update the FRR and reloader container images
+  $KCLI set image daemonset/frr-k8s -n openshift-frr-k8s \
+    frr="${FRR_IMAGE}" \
+    reloader="${FRR_IMAGE}"
+
+  echo "Waiting for daemonset 'frr-k8s' to rollout with new image..."
+  until $KCLI rollout status daemonset -n openshift-frr-k8s frr-k8s --timeout 2m &> /dev/null; do
+    sleep 5
+  done
+fi
 
 # set up BGP peering of the cluster with the external FRR instance container
 # peer is setup on the default VRF and also on each extra network VRF
