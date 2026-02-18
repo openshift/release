@@ -14,7 +14,7 @@ debug_on_exit() {
   local exit_code=$?
   local end_time=$SECONDS
   local execution_time=$((end_time - start_time))
-  local debug_threshold=1200 # 20 minutes in seconds
+  local debug_threshold=720 # 12 minutes in seconds
   local hco_namespace=openshift-cnv
 
   if [[ (${execution_time} -lt ${debug_threshold}) || ${exit_code} -ne 0 ]]; then
@@ -39,7 +39,7 @@ debug_on_exit() {
     # Use file flag so loop can be interrupted by removing the file
     touch /tmp/debug_marker
     while [[ -f /tmp/debug_marker ]]; do
-        sleep 60
+        sleep 120
     done
   fi
 
