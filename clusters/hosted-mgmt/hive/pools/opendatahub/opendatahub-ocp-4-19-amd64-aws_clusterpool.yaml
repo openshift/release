@@ -1,0 +1,47 @@
+# Cluster pool for main branch E2E jobs (OCP 4.19).
+# The imageSetRef is auto-bumped by DPTP tooling via version_lower/version_upper labels.
+#
+# Sizing rationale:
+#   size: 3    - keep 3 warm clusters ready; covers typical load instantly
+#   maxSize: 20 - burst capacity for peak (10+ concurrent PRs * 2 E2E jobs each)
+#   vCPU budget: 20 clusters * ~36 vCPUs = 720 vCPUs (2,350 available in account)
+apiVersion: hive.openshift.io/v1
+kind: ClusterPool
+metadata:
+  creationTimestamp: null
+  labels:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    region: us-east-1
+    version: "4.19"
+    version_lower: 4.19.0-0
+    version_upper: 4.20.0-0
+  name: opendatahub-ocp-4-19-amd64-aws
+  namespace: opendatahub-cluster-pool
+spec:
+  baseDomain: openshift-ci-aws.rhaiseng.com
+  hibernationConfig:
+    resumeTimeout: 30m0s
+  imageSetRef:
+    name: ocp-release-4.19.24-x86-64-for-4.19.0-0-to-4.20.0-0
+  installAttemptsLimit: 1
+  installConfigSecretTemplateRef:
+    name: opendatahub-install-config-aws
+  labels:
+    tp.openshift.io/owner: opendatahub
+  maxSize: 20
+  platform:
+    aws:
+      credentialsSecretRef:
+        name: opendatahub-aws-credentials
+      region: us-east-1
+  pullSecretRef:
+    name: pull-secret
+  size: 3
+  skipMachinePools: true
+status:
+  ready: 0
+  size: 0
+  standby: 0
