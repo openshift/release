@@ -15,7 +15,7 @@ function InstallYq() {
     export PATH="${PATH}:/tmp/bin"
     typeset arch=""
     arch="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
-    curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${arch}" \
+    curl -L "https://github.com/mikefarah/yq/releases/download/v4.52.4/yq_linux_${arch}" \
         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
     /tmp/bin/yq --version || export MAP_TESTS=false
 }
@@ -40,7 +40,7 @@ function CleanupCollect() {
     }
 
     # Prepare one jUnit XML: collect -> map suite name and merge
-    yq eval-all -px -ox -I2 '
+    yq eval-all --input-format xml --output-format xml -I2 '
         {
             "+p_xml": "version=\"1.0\" encoding=\"UTF-8\"",
             "testsuites": {"testsuite": [
