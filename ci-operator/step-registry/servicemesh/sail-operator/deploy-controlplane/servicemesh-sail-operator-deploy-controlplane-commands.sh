@@ -214,7 +214,7 @@ retry_command "oc get installplan -n openshift-operators --no-headers | grep -q 
 
 # Check InstallPlan status
 echo "Step 2: Waiting for InstallPlan approval and completion..."
-retry_command "oc get installplan -n openshift-operators -o jsonpath='{.items[?(@.spec.clusterServiceVersionNames[*]==\"sailoperator*\")].status.phase}' | grep -q Installed" "InstallPlan completion"
+retry_command "oc get installplan -n openshift-operators -l operators.coreos.com/sailoperator.openshift-operators -o jsonpath='{.items[*].status.phase}' | grep -q Complete" "InstallPlan completion"
 
 # Wait for CSV to be created and ready
 echo "Step 3: Waiting for ClusterServiceVersion (CSV) to be ready..."
