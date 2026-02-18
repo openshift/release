@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.18-openshift-4.12
+    tag: rhel-9-release-golang-1.23-openshift-4.20
 releases:
   latest:
     candidate:
@@ -104,7 +104,7 @@ tests:
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.8xlarge
       ODF_OPERATOR_CHANNEL: stable-4.20
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-20@sha256:3b11114931866d68213ac0a554fce551619903bb76d0b71b1f4e74b497ae787f
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-20@sha256:575c55ea7cab7b59c3ea1daec879b5a5f292bdaed8b0e1a50f716f43fe7c5e97
       QUAY_OPERATOR_CHANNEL: stable-3.16
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_VERSION: "3.16"
@@ -126,8 +126,8 @@ tests:
       COMPUTE_NODE_TYPE: m5.8xlarge
       NEW_UI_TESTING_COVERAGE: builder
       ODF_OPERATOR_CHANNEL: stable-4.20
-      QUAY_BUILDER_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-16@sha256:854ff5453e5d2dacfe58018b222c606b88cc08af7bf3ddc82a6c03a735657dfa
-      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-20@sha256:3b11114931866d68213ac0a554fce551619903bb76d0b71b1f4e74b497ae787f
+      QUAY_BUILDER_IMAGE: quay.io/redhat-user-workloads/quay-eng-tenant/quay-builder-v3-16@sha256:b5760ea6d11d83abcaa75ef6964772a997997d678ab7c2b0a851c1f67c2c8ec7
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-16-v4-20@sha256:575c55ea7cab7b59c3ea1daec879b5a5f292bdaed8b0e1a50f716f43fe7c5e97
       QUAY_OLD_UI_DISABLED: "true"
       QUAY_OPERATOR_CHANNEL: stable-3.16
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
@@ -141,6 +141,29 @@ tests:
     - ref: quay-tests-quay-deploy-registry-builder
     - ref: quay-tests-test-quay-api
     - ref: quay-tests-test-quay-newui
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: quay-acs-violations-check-quay317
+  cron: 0 22 24 * *
+  steps:
+    cluster_profile: aws-quay-qe
+    env:
+      ACS_OPERATOR_CHANNEL: stable
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      ODF_OPERATOR_CHANNEL: stable-4.20
+      QUAY_INDEX_IMAGE_BUILD: quay.io/redhat-user-workloads/quay-eng-tenant/stable-3-17-v4-20@sha256:de2a1dd966fa00a0fffae29f964b0d3720c802d4de1b5a5bc23e24f98114213f
+      QUAY_OPERATOR_CHANNEL: stable-3.17
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      QUAY_VERSION: "3.17"
+    test:
+    - ref: quay-tests-enable-quay-catalogsource
+    - ref: quay-tests-resource-provisioning-storage-odf
+    - ref: quay-tests-quay-deploy-operator
+    - ref: quay-tests-quay-deploy-registry-noobaa
+    - ref: quay-tests-quay-acs
+    - ref: quay-tests-test-quay-api
     - ref: quay-tests-test-quay-e2e
     workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:

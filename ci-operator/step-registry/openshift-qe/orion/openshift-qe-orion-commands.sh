@@ -5,6 +5,7 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
+
 python --version
 pushd /tmp
 python -m virtualenv ./venv_qe
@@ -58,6 +59,16 @@ esac
 export ES_SERVER
 
 pip install .
+
+# Print Orion version
+orion_version=$(orion --version 2>&1)
+orion_version_exit=$?
+if [ "$orion_version_exit" -ne 0 ]; then
+  echo "orion version prior to v0.1.7"
+else
+  echo "Orion version: $orion_version"
+fi
+
 EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
@@ -83,6 +94,8 @@ if [[ -n "$ORION_CONFIG" ]]; then
     fi
 fi
 
+VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+export VERSION
 if [[ -n "$ACK_FILE" ]]; then
     if [[ "$ACK_FILE" =~ ^https?:// ]]; then
         ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"

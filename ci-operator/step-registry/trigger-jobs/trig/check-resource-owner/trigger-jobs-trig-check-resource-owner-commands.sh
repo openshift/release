@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+typeset jobDescFile="${CLUSTER_PROFILE_DIR}/${JT__TRIG_JOB_LIST}"
 typeset trigCondStep='' trigCondPars=''
 typeset trigCondName=trigger-jobs-trig-check-resource-owner
 typeset -i trigCondFlgs=0
@@ -21,9 +22,13 @@ PATH="$(exec 3>&1 1>&2
     }
 echo "${binDir}" 1>&3):${PATH}"
 
+: "INPUT:"
+jq -c '.[]' "${jobDescFile}"
+
 while IFS=$'\t' read -r trigCondFlgs trigCondStep trigCondPars; do
+    : "Processing: ${trigCondFlgs@Q} ${trigCondStep@Q} ${trigCondPars@Q}"
     typeset trigCondFlag='' expOwnerName=''
-    : "trigCondFlgs=${trigCondFlgs}; JT__TRIG_COND_EXEC_FLGS=${JT__TRIG_COND_EXEC_FLGS}"
+    : "$(printf 'trigCondFlgs=0x%08x; JT__TRIG_COND_EXEC_FLGS=0x%08x' ${trigCondFlgs} "${JT__TRIG_COND_EXEC_FLGS}")"
     ((trigCondFlgs & JT__TRIG_COND_EXEC_FLGS)) || continue
     [ "${trigCondStep}" = "${trigCondName}" ] || continue
     IFS=$'\t' read -r trigCondFlag expOwnerName 0< <(jq -cr \
@@ -41,6 +46,6 @@ done 0< <(jq -cr '
     .[] |
     [.trigCondFlgs//0, .trigCondStep//"", (.trigCondPars//{} | @json)] |
     @tsv
-' "${CLUSTER_PROFILE_DIR}/${JT__TRIG_JOB_LIST}")
+' "${jobDescFile}")
 
 true

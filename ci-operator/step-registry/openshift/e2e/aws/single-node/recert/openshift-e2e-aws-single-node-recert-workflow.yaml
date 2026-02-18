@@ -2,11 +2,18 @@ workflow:
   as: openshift-e2e-aws-single-node-recert
   steps:
     pre:
-    - chain: ipi-conf-aws
+    - ref: ipi-conf
+    - ref: aws-provision-vpc-shared
+    - chain: aws-provision-bastionhost
+    - ref: aws-provision-security-group
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-custom-security-groups
+    - ref: proxy-config-generate
+    - chain: aws-provision-iam-user-minimal-permission
     - ref: single-node-conf-aws
     - ref: single-node-conf-e2e
     - chain: ipi-install
-    - ref: ssh-bastion
     - ref: single-node-recert
     test:
     - ref: single-node-e2e-test

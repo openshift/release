@@ -48,6 +48,10 @@ if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_SAMPLING:-} ]]; then
     PARAMETERS+=" EBPFSamplingRate=${MULTISTAGE_PARAM_OVERRIDE_SAMPLING}"
 fi
 
+if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_FEATURES:-} ]]; then
+    PARAMETERS+=" EBPFeatures=${MULTISTAGE_PARAM_OVERRIDE_FEATURES}"
+fi
+
 if [[ -n ${MULTISTAGE_PARAM_OVERRIDE_LOKI_ENABLE:-} ]] || [[ ${LOKI_OPERATOR:-} == "None" ]]; then
     PARAMETERS+=" LokiEnable=false"
 fi
@@ -81,10 +85,12 @@ if [[ ${DEPLOYMENT_MODEL:-} == "Kafka" ]]; then
     KAFKA_RELEASE=$(oc get sub -n openshift-operators amq-streams  -o jsonpath="{.status.currentCSV}")
 fi
 
+SAMPLING=$(oc get flowcollector/cluster -o jsonpath='{.spec.agent.ebpf.sampling}')
+
 opm --help
 NOO_BUNDLE_INFO=$(scripts/build_info.sh)
 
-export METADATA="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$LOKI_RELEASE\", \"kafka_version\": \"$KAFKA_RELEASE\", \"deployment_model\": \"$DEPLOYMENT_MODEL\", \"noo_bundle_info\":\"$NOO_BUNDLE_INFO\"}"
+export METADATA="{\"release\": \"$NETOBSERV_RELEASE\", \"loki_version\": \"$LOKI_RELEASE\", \"kafka_version\": \"$KAFKA_RELEASE\", \"deployment_model\": \"$DEPLOYMENT_MODEL\", \"noo_bundle_info\":\"$NOO_BUNDLE_INFO\", \"sampling\":\"$SAMPLING\"}"
 
 echo "$METADATA" >> "$SHARED_DIR/additional_params.json"
 cp "$SHARED_DIR/additional_params.json" "$ARTIFACT_DIR/additional_params.json"

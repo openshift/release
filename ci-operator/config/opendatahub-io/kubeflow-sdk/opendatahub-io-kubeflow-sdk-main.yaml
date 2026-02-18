@@ -1,0 +1,24 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/ubi
+      RUN dnf install -y --nodocs git python3.12 python3-pip
+      RUN pip3.12 install --upgrade pip
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: |
+    python3 -m pip install --upgrade pip # minimal tests here as we have other PR checks already
+    python3 -m pip install .
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: kubeflow-sdk
