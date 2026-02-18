@@ -36,9 +36,15 @@ sudo systemctl restart sshd
 
 # Setup squid proxy for accessing cluster
 cat <<SQUID>\$HOME/squid.conf
-acl cluster dstdomain .metalkube.org .test-infra-cluster.redhat.com .ocpci.eng.rdu2.redhat.com .okd.on.massopen.cloud .p1.openshiftapps.com sso.redhat.com
-http_access allow cluster
+acl cluster dstdomain .metalkube.org .test-infra-cluster.redhat.com .ocpci.eng.rdu2.redhat.com .p1.openshiftapps.com sso.redhat.com
+
+acl allowed_ssl_ports port 443 6443
+acl CONNECT method CONNECT
+
+http_access deny CONNECT !allowed_ssl_ports
+http_access allow CONNECT cluster
 http_access deny all
+
 http_port 8213
 debug_options ALL,2
 coredump_dir /var/spool/squid
