@@ -118,8 +118,9 @@ if [[ -n "$ORION_CONFIG" ]]; then
         fi
     fi
 fi
-
-VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+if [[ -z "$VERSION" ]]; then
+    VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+fi
 export VERSION
 if [[ -n "$ACK_FILE" ]]; then
     if [[ "$ACK_FILE" =~ ^https?:// ]]; then
