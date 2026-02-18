@@ -9,7 +9,7 @@ function install_yq() {
       echo "Installing yq"
       mkdir -p /tmp/bin
       export PATH=$PATH:/tmp/bin/
-      curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+      curl -L "https://github.com/mikefarah/yq/releases/download/v4.52.4/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
        -o /tmp/bin/yq && chmod +x /tmp/bin/yq
 
       # Verify installation
@@ -29,7 +29,7 @@ function mapTestsForComponentReadiness() {
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
             echo "Mapping Test Suite Name To: ACSLatest-lp-interop"
-            /tmp/bin/yq eval -ox -iI0 '.testsuite."+@name" = "ACSLatest-lp-interop"' "$results_file" || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+            /tmp/bin/yq eval --output-format xml -iI0 '.testsuite."+@name" = "ACSLatest-lp-interop"' "$results_file" || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
