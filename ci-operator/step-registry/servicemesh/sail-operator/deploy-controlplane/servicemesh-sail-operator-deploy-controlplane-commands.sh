@@ -225,8 +225,11 @@ echo "Step 4: Identifying and waiting for operator deployment..."
 OPERATOR_DEPLOYMENT=""
 attempt=1
 while [ "$attempt" -le "$MAX_ATTEMPTS" ]; do
-    # Get deployment name from CSV
-    OPERATOR_DEPLOYMENT=$(oc get csv -n openshift-operators -o jsonpath='{.items[?(@.metadata.name=~"sailoperator.*")].spec.install.spec.deployments[0].name}' 2>/dev/null || true)
+    # Get deployment name from CSV via the subscription's installedCSV reference
+    CSV_NAME=$(oc get subscription sailoperator -n openshift-operators -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
+    if [ -n "$CSV_NAME" ]; then
+        OPERATOR_DEPLOYMENT=$(oc get csv "$CSV_NAME" -n openshift-operators -o jsonpath='{.spec.install.spec.deployments[0].name}' 2>/dev/null || true)
+    fi
 
     if [ -n "$OPERATOR_DEPLOYMENT" ]; then
         echo "Found operator deployment: $OPERATOR_DEPLOYMENT"
