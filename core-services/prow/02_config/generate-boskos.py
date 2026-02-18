@@ -407,6 +407,9 @@ CONFIG = {
     'hypershift-aks-quota-slice': {
         'default': 20,
     },
+    'hypershift-azure-quota-slice': {
+        'default': 20,
+    },
     'hypershift-gcp-quota-slice': {
         'default': 10,
     },
