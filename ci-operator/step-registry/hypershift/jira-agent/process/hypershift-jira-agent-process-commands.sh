@@ -225,8 +225,59 @@ while IFS= read -r line; do
   echo "Claude processing complete. Full output saved to /tmp/claude-${ISSUE_KEY}-output.json"
 
   if [ $EXIT_CODE -eq 0 ]; then
-    # Parse PR URL from result if available
-    PR_URL=$(echo "$RESULT" | grep -oP 'https://github.com/openshift/hypershift/pull/[0-9]+' | head -1 || echo "")
+    # Extract the PR URL created by Claude. Strategy 1 (primary): parse the
+    # structured JSONL output to find tool_result content for "gh pr create"
+    # Bash tool calls. This is deterministic and avoids extra GitHub API calls.
+    # Strategy 2 (fallback): verify candidate URLs via gh pr view (costs N API
+    # calls but handles schema changes or missing JSONL output).
+    PR_URL=""
+    OUTPUT_FILE="/tmp/claude-${ISSUE_KEY}-output.json"
+
+    if [ -f "$OUTPUT_FILE" ]; then
+      # Extract tool_use IDs for "gh pr create" Bash commands.
+      # grep '^{' skips non-JSON stderr lines (from 2>&1).
+      IDS=$(grep '^{' "$OUTPUT_FILE" | jq -rs '
+        [.[] |
+         select(.type == "assistant") |
+         .message.content[]? |
+         select(.type == "tool_use" and .name == "Bash" and
+                (.input.command | tostring | contains("gh pr create"))) |
+         .id
+        ]' 2>/dev/null || echo '[]')
+
+      # If we found gh pr create calls, get the PR URL from matching results
+      if [ "$IDS" != "[]" ] && [ -n "$IDS" ]; then
+        PR_URL=$(grep '^{' "$OUTPUT_FILE" | jq -rs --argjson ids "$IDS" '
+          [.[] |
+           select(.type == "user") |
+           .message.content[]? |
+           select(.type == "tool_result" and (.tool_use_id | IN($ids[]))) |
+           .content |
+           if type == "array" then .[].text // empty
+           elif type == "string" then .
+           else empty end
+          ] |
+          map(capture("(?<url>https://github\\.com/[^/]+/[^/]+/pull/[0-9]+)").url) |
+          last // empty
+        ' 2>/dev/null || echo "")
+      fi
+    fi
+
+    # Fallback: verify candidate URLs via gh pr view if JSONL parsing found nothing
+    if [ -z "$PR_URL" ]; then
+      CANDIDATE_URLS=$(echo "$RESULT" | grep -oP 'https://github.com/openshift/hypershift/pull/[0-9]+' | sort -u || true)
+      if [ -n "$CANDIDATE_URLS" ]; then
+        while IFS= read -r url; do
+          PR_JSON=$(gh pr view "$url" --json title,author 2>/dev/null || true)
+          PR_TITLE=$(echo "$PR_JSON" | jq -r '.title // empty' 2>/dev/null || true)
+          PR_AUTHOR=$(echo "$PR_JSON" | jq -r '.author.login // empty' 2>/dev/null || true)
+          if [[ "$PR_TITLE" == "${ISSUE_KEY}"* ]] && [[ "$PR_AUTHOR" == *"hypershift-jira-solve-ci"* ]]; then
+            PR_URL="$url"
+            break
+          fi
+        done <<< "$CANDIDATE_URLS"
+      fi
+    fi
 
     echo "✅ Successfully processed $ISSUE_KEY"
     if [ -n "$PR_URL" ]; then
