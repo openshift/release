@@ -94,18 +94,20 @@ echo ""
 FAILED=0
 PASSED=0
 SKIPPED=0
+TEST_NUM=0
 
 for test in "${TESTS[@]}"; do
+  TEST_NUM=$((TEST_NUM + 1))
   echo "========================================="
-  echo "Running: ${test}"
+  echo "Running test ${TEST_NUM}/${#TESTS[@]}: ${test}"
   echo "========================================="
 
   # Run test and capture exit code
   set +e
-  openshift-tests run-test \
-      -n "${test}" \
-      -o "${ARTIFACT_DIR}/nvidia-dra/test-output.log" \
-      --junit-dir="${ARTIFACT_DIR}/nvidia-dra/junit"
+  echo "${test}" | openshift-tests run \
+      -o "${ARTIFACT_DIR}/nvidia-dra/test-${TEST_NUM}-output.log" \
+      --junit-dir="${ARTIFACT_DIR}/nvidia-dra/junit" \
+      -f -
   EXIT_CODE=$?
   set -e
 
