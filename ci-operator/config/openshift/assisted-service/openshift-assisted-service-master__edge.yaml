@@ -1,30 +1,30 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   cluster-api-provider-agent:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: cluster-api-provider-agent
   dev-scripts:
@@ -112,7 +112,7 @@ operator:
     with: postgresql-13-c9s
 promotion:
   to:
-  - name: ocm-2.16
+  - name: ocm-2.17
     namespace: edge-infrastructure
 releases:
   latest:
@@ -1247,7 +1247,7 @@ tests:
         LOAD_BALANCER_TYPE=user-managed
       PLATFORM: vsphere
     workflow: assisted-vsphere-external-lb
-- as: e2e-metal-assisted-virtualization-4-19
+- as: e2e-metal-assisted-virtualization-4-20
   capabilities:
   - intranet
   run_if_changed: ^(internal/operators/.*\.go)$
@@ -1256,7 +1256,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_BUNDLES=virtualization
-        OPENSHIFT_VERSION=4.19
+        OPENSHIFT_VERSION=4.20
         MASTER_MEMORY=18700
         MASTER_CPU=10
         MASTER_DISK_COUNT=2
@@ -1311,7 +1311,7 @@ tests:
         NUM_WORKERS=0
         NUM_MASTERS=3
     workflow: assisted-ofcir-baremetal
-- as: e2e-metal-assisted-openshift-ai-4-18
+- as: e2e-metal-assisted-openshift-ai-4-20
   capabilities:
   - intranet
   run_if_changed: ^(internal/operators/.*\.go)$
@@ -1320,7 +1320,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_BUNDLES=openshift-ai
-        OPENSHIFT_VERSION=4.18
+        OPENSHIFT_VERSION=4.20
         NUM_WORKERS=3
         WORKER_MEMORY=65536
         WORKER_CPU=20
@@ -1341,6 +1341,35 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.20
         STATIC_IPS_VLAN=true
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-tna-4-21
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.21
+        TNA_CLUSTERS_SUPPORT=true
+        NUM_MASTERS=2
+        NUM_ARBITERS=1
+        NUM_WORKERS=0
+    workflow: assisted-ofcir-baremetal
+- always_run: false
+  as: e2e-metal-assisted-kube-api-tna-4-21
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
+        ENABLE_KUBE_API=true
+        OPENSHIFT_VERSION=4.21
+        TNA_CLUSTERS_SUPPORT=true
+        NUM_MASTERS=2
+        NUM_ARBITERS=1
+        NUM_WORKERS=0
     workflow: assisted-ofcir-baremetal
 zz_generated_metadata:
   branch: master

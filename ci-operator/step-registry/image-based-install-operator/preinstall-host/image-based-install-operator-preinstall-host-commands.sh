@@ -84,6 +84,7 @@ export IBI_INSTALLATION_DISK="/dev/sda"
 export IBI_VM_NAME=$(virsh --connect=${LIBVIRT_DEFAULT_URI} domname ${IBI_UUID})
 export LIBVIRT_IMAGE_PATH=/home/libvirt-images
 export IBI_DHCP=true
+export IP_STACK=${IP_STACK}
 if [ ! -d "${LIBVIRT_IMAGE_PATH}" ]; then
   mkdir -p "${LIBVIRT_IMAGE_PATH}"
 fi

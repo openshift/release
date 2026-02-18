@@ -170,6 +170,15 @@ PULL_METRICS_REDIS:
         db: 1
 EOF
 
+# Merge caller-provided extra config if set
+if [[ -n "${QUAY_EXTRA_CONFIG:-}" ]]; then
+	echo "Merging extra Quay config into defaults..."
+	echo "${QUAY_EXTRA_CONFIG}" >extra_config.yaml
+	curl -sL "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+		-o /tmp/yq && chmod +x /tmp/yq
+	/tmp/yq eval-all -i 'select(fileIndex == 0) *+ select(fileIndex == 1)' config.yaml extra_config.yaml
+fi
+
 oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
 
 echo "Creating Quay registry..." >&2
