@@ -12,7 +12,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-FRR_K8S_VERSION=v0.0.14
+FRR_K8S_VERSION=v0.0.21
 FRR_TMP_DIR=$(mktemp -d -u)
 
 AGNHOST_SUBNET_V4=172.20.0.0/16
