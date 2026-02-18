@@ -310,10 +310,17 @@ function suite() {
     fi
 
     if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/auth/external-oidc" || "${TEST_SUITE}" ==  "openshift/two-node") ]]; then
-        TESTS="$(openshift-tests run "${TEST_SUITE}" --dry-run --provider "${TEST_PROVIDER}" "${HYPERVISOR_ARGS[@]}")" &&
-        echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
+        # Normalize TEST_SKIPS: collapse newlines and split on \| so we get one pattern per line (supports both single-line and multi-line YAML).
+        # Use grep -F -f for fixed-string matching so we match test names reliably regardless of [ ] ( ) in names.
+        TEST_SKIPS_FILE=$(mktemp)
+        trap 'rm -f "$TEST_SKIPS_FILE"' EXIT
+        printf '%s' "${TEST_SKIPS}" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g' | sed 's/\\|/\n/g' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$' > "${TEST_SKIPS_FILE}"
+        TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
+        echo "${TESTS}" | grep -vF -f "${TEST_SKIPS_FILE}" >/tmp/tests &&
         echo "Skipping tests:" &&
-        echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
+        SKIPPED=$(echo "${TESTS}" | grep -F -f "${TEST_SKIPS_FILE}") &&
+        echo "${SKIPPED}" &&
+        [[ -n "${SKIPPED}" ]] || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS patterns:'; cat "${TEST_SKIPS_FILE}"; return "${exit_code:-1}"; } &&
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
         scp "${SSHOPTS[@]}" /tmp/tests "root@${IP}:/tmp/tests"
     fi
