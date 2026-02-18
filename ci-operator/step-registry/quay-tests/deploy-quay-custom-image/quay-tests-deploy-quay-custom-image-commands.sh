@@ -71,6 +71,10 @@ echo "Found quay-app deployment: ${QUAY_DEPLOY}"
 # Patch the container image
 oc -n "${NAMESPACE}" set image "deployment/${QUAY_DEPLOY}" "quay-app=${QUAY_CI_IMAGE}"
 
+# Switch entrypoint from registry-nomigrate to registry so the new image
+# runs alembic migrations before starting (the operator default skips them).
+oc -n "${NAMESPACE}" set env "deployment/${QUAY_DEPLOY}" QUAYENTRY=registry
+
 # Wait for rollout
 echo "Waiting for rollout of deployment/${QUAY_DEPLOY}..."
 if ! oc -n "${NAMESPACE}" rollout status "deployment/${QUAY_DEPLOY}" --timeout=600s; then
