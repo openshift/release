@@ -27,6 +27,7 @@ $WAS_TRACING && set -x
 # REACT_QUAY_APP_API_URL: backend API URL (same as UI on OCP)
 export PLAYWRIGHT_BASE_URL="${QUAY_ROUTE}"
 export REACT_QUAY_APP_API_URL="${QUAY_ROUTE}"
+export PLAYWRIGHT_JUNIT_OUTPUT_NAME="${ARTIFACT_DIR}/junit_playwright.xml"
 export PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 export QUAY_USERNAME
 export QUAY_PASSWORD
