@@ -13,6 +13,10 @@ NVIDIA DRA testing validates the Kubernetes Dynamic Resource Allocation (DRA) AP
 
 ```
 nvidia-dra/
+├── nfd-install/                         # NFD Operator installation via OLM
+│   ├── openshift-e2e-nvidia-dra-nfd-install-ref.yaml
+│   ├── openshift-e2e-nvidia-dra-nfd-install-commands.sh
+│   └── OWNERS
 ├── gpu-operator-install/                # GPU Operator installation via OLM
 │   ├── openshift-e2e-nvidia-dra-gpu-operator-install-ref.yaml
 │   ├── openshift-e2e-nvidia-dra-gpu-operator-install-commands.sh
@@ -37,7 +41,7 @@ nvidia-dra/
 Provisions an AWS cluster with GPU worker nodes and tests NVIDIA DRA functionality.
 
 **Workflow Steps:**
-1. **Pre**: Provision AWS IPI cluster with GPU nodes → Install GPU Operator via OLM (with CDI enabled)
+1. **Pre**: Provision AWS IPI cluster with GPU nodes → Install NFD Operator via OLM → Install GPU Operator via OLM (with CDI enabled)
 2. **Test**: Install DRA Driver (via Helm) → Run basic DRA extended tests
 3. **Post**: Cleanup DRA Driver and test resources → Destroy cluster
 
@@ -116,10 +120,14 @@ This configuration provides cost-effective basic DRA validation suitable for PR 
 ## Prerequisites
 
 The workflow automatically installs:
+- **Node Feature Discovery (NFD) Operator** (via OLM from redhat operators catalog)
+  - Installed in the `pre` phase first to label GPU nodes
+  - Creates NodeFeatureDiscovery CR instance
+  - Ensures nodes are labeled with `nvidia.com/gpu.present=true` before GPU operator installation
 - **NVIDIA GPU Operator** (via OLM from certified operators catalog)
-  - Installed in the `pre` phase before tests run
+  - Installed in the `pre` phase after NFD installation
   - ClusterPolicy configured with `cdi.enabled=true` (REQUIRED for DRA)
-  - Includes Node Feature Discovery for GPU node labeling
+  - Depends on NFD for proper GPU node labeling
 - **NVIDIA DRA Driver** (via Helm, installed by test step)
   - Installed automatically during test execution if not present
   - Latest version from nvidia.github.io/gpu-operator Helm repository
@@ -132,7 +140,8 @@ All prerequisites are idempotent - they skip installation if already present (de
 The cleanup step removes:
 - NVIDIA DRA Driver Helm release
 - NVIDIA GPU Operator Helm release
-- Associated namespaces (nvidia-dra-driver-gpu, nvidia-gpu-operator)
+- Node Feature Discovery Operator (subscription and CR)
+- Associated namespaces (nvidia-dra-driver-gpu, nvidia-gpu-operator, openshift-nfd)
 - ClusterRoleBindings for SCC permissions
 - Test resources (DeviceClasses, ResourceClaims, test namespaces)
 

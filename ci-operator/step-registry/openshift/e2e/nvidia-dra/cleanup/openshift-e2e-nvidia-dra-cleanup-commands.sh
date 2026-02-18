@@ -63,6 +63,22 @@ fi
 echo "Deleting nvidia-gpu-operator namespace..."
 oc delete namespace nvidia-gpu-operator --ignore-not-found=true --wait=false 2>/dev/null || true
 
+# Delete NodeFeatureDiscovery CR
+echo "Deleting NodeFeatureDiscovery CR..."
+oc delete nodefeaturediscovery --all -n openshift-nfd --ignore-not-found=true --wait=false 2>/dev/null || true
+
+# Delete NFD Operator subscription and CSV
+echo "Deleting NFD Operator subscription and CSV..."
+oc delete subscription nfd -n openshift-nfd --ignore-not-found=true 2>/dev/null || true
+NFD_CSV=$(oc get csv -n openshift-nfd -o name 2>/dev/null | grep -i nfd | head -1 || true)
+if [ -n "$NFD_CSV" ]; then
+  oc delete "$NFD_CSV" -n openshift-nfd --ignore-not-found=true 2>/dev/null || true
+fi
+
+# Delete NFD namespace
+echo "Deleting openshift-nfd namespace..."
+oc delete namespace openshift-nfd --ignore-not-found=true --wait=false 2>/dev/null || true
+
 # Clean up test resources
 echo "Cleaning up test resources..."
 

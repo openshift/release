@@ -5,10 +5,11 @@ workflow:
 
     This workflow:
     1. Provisions an AWS IPI cluster with GPU instance type specified by COMPUTE_NODE_TYPE
-    2. Installs NVIDIA GPU Operator via OLM with CDI enabled
-    3. Runs NVIDIA DRA extended tests (openshift-tests)
-    4. Cleans up GPU stack components
-    5. Destroys the cluster
+    2. Installs Node Feature Discovery (NFD) Operator to label GPU nodes
+    3. Installs NVIDIA GPU Operator via OLM with CDI enabled
+    4. Runs NVIDIA DRA extended tests (openshift-tests)
+    5. Cleans up GPU stack components
+    6. Destroys the cluster
 
     Supported GPU instance types:
     - g4dn.xlarge: Basic testing (1x Tesla T4, Turing) - $0.526/hr (default)
@@ -34,6 +35,7 @@ workflow:
       COMPUTE_NODE_REPLICAS: "${COMPUTE_NODE_REPLICAS}"
     pre:
     - chain: ipi-aws-pre
+    - ref: openshift-e2e-nvidia-dra-nfd-install
     - ref: openshift-e2e-nvidia-dra-gpu-operator-install
     test:
     - ref: openshift-e2e-nvidia-dra-test
