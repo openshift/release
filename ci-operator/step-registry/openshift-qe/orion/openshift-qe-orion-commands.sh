@@ -170,7 +170,7 @@ if [[ -n "${DEBUG+x}" && ${DEBUG} == true ]]; then
 fi
 
 
-cat $CONFIG
+cat $ORION_CONFIG
 set +e
 set -o pipefail
 FILENAME=$(basename ${ORION_CONFIG} | awk -F. '{print $1}')
