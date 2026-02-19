@@ -1,4 +1,8 @@
 base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
   cli:
     name: "4.22"
     namespace: ocp
@@ -19,6 +23,14 @@ base_images:
     name: ocp-qe-perfscale-ci
     namespace: ci
     tag: latest
+build_root:
+  from_repository: true
+images:
+- dockerfile_literal: |-
+    FROM cerberus.prow
+    RUN ls
+  from: cerberus.prow
+  to: perfscale-observer
 releases:
   latest:
     candidate:
@@ -65,6 +77,10 @@ tests:
       VERSION: "4.22"
       WORKLOAD: node-density-heavy
       ZONES_COUNT: "3"
+      WAIT_EXPRESSION: "oc get flowcollector cluster --no-headers 2>/dev/null | grep -c 'Ready'"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     post:
     - chain: netobserv-perf-test-post
     test:
