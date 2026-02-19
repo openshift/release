@@ -6,12 +6,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_PATH="$SCRIPT_DIR/gcp-secret-manager/gcp-secrets-venv"
 GCLOUD_CONFIG_PATH="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-gcloud"
 
+if [ "${1:-}" = "clean" ]; then
+    echo "Removing virtual environment and cached credentials..."
+    rm -rf "$VENV_PATH" "$GCLOUD_CONFIG_PATH"
+    echo "Done. Run the 'login' command to re-authenticate."
+    exit 0
+fi
+
 (
     if [ ! -d "$VENV_PATH" ]; then
-        python3 -m venv "$VENV_PATH"
+        echo "Setting up environment..."
+        python3 -m venv "$VENV_PATH" >/dev/null 2>&1
         source "$VENV_PATH/bin/activate"
-        pip install --upgrade pip
-        if ! pip install --quiet -r "$SCRIPT_DIR/gcp-secret-manager/requirements.txt"; then
+        if ! pip install --quiet --upgrade pip -r "$SCRIPT_DIR/gcp-secret-manager/requirements.txt" 2>&1; then
             rm -rf "$VENV_PATH"
             echo "" >&2
             echo "Failed to install dependencies. This can happen when your Python version" >&2
@@ -20,6 +27,7 @@ GCLOUD_CONFIG_PATH="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-gcloud"
             echo "it appears first in your PATH, then try again." >&2
             exit 1
         fi
+        echo "Environment setup complete."
     else
         source "$VENV_PATH/bin/activate"
     fi
