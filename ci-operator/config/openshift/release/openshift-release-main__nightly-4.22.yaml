@@ -507,21 +507,39 @@ tests:
       TEST_SKIPS: \[OCPFeatureGate:GatewayAPIController\]\[Feature:Router\]
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node
-- as: e2e-metal-ovn-two-node-arbiter
+- as: e2e-metal-ovn-tna
   capabilities:
   - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
-- as: e2e-agent-ovn-two-node-arbiter
+- as: e2e-metal-ovn-tna-rhcos10
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-arbiter
+- as: e2e-agent-ovn-tna
   capabilities:
   - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: agent-e2e-two-node-arbiter-ipv4
-- as: e2e-agent-ovn-two-node-arbiter-ipv6
+- as: e2e-agent-ovn-tna-rhcos10
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
+    workflow: agent-e2e-two-node-arbiter-ipv4
+- as: e2e-agent-ovn-tna-ipv6
   capabilities:
   - intranet
   cron: '@daily'
@@ -531,7 +549,18 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV6"
     workflow: agent-e2e-two-node-arbiter-ipv4
-- as: e2e-agent-ovn-two-node-arbiter-dualstack
+- as: e2e-agent-ovn-tna-rhcos10-ipv6
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO="TNA_IPV6"
+      OSSTREAM: rhel-10
+    workflow: agent-e2e-two-node-arbiter-ipv4
+- as: e2e-agent-ovn-tna-dualstack
   capabilities:
   - intranet
   cron: '@daily'
@@ -541,33 +570,80 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO="TNA_IPV4V6"
     workflow: agent-e2e-two-node-arbiter-ipv4
-- as: e2e-metal-ovn-two-node-arbiter-upgrade
+- as: e2e-agent-ovn-tna-rhcos10-dualstack
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO="TNA_IPV4V6"
+      OSSTREAM: rhel-10
+    workflow: agent-e2e-two-node-arbiter-ipv4
+- as: e2e-metal-ovn-tna-upgrade
   capabilities:
   - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-upgrade
-- as: e2e-metal-ovn-two-node-arbiter-upgrade-workers
+- as: e2e-metal-ovn-tna-rhcos10-upgrade
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-arbiter-upgrade
+- as: e2e-metal-ovn-tna-upgrade-workers
   capabilities:
   - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-upgrade-workers
-- as: e2e-metal-ovn-two-node-arbiter-upgrade-day-2-workers
+- as: e2e-metal-ovn-tna-rhcos10-upgrade-workers
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-arbiter-upgrade-workers
+- as: e2e-metal-ovn-tna-upgrade-day-2-workers
   capabilities:
   - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-upgrade-day-2-workers
-- as: e2e-metal-ovn-two-node-arbiter-techpreview
+- as: e2e-metal-ovn-tna-rhcos10-upgrade-day-2-workers
   capabilities:
   - intranet
   cron: '@daily'
   steps:
     cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-arbiter-upgrade-day-2-workers
+- as: e2e-metal-ovn-tna-techpreview
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-arbiter-techpreview
+- as: e2e-metal-ovn-tna-rhcos10-techpreview
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
     workflow: baremetalds-two-node-arbiter-techpreview
 - as: e2e-metal-ovn-two-node-fencing-dualstack-techpreview
   capabilities:
@@ -758,12 +834,21 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-upgrade
-- as: e2e-metal-ovn-two-node-arbiter-workload-partitioning
+- as: e2e-metal-ovn-tna-workload-partitioning
   capabilities:
   - intranet
   cron: 0 2 * * 1
   steps:
     cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-arbiter-workload-partitioning
+- as: e2e-metal-ovn-tna-rhcos10-workload-partitioning
+  capabilities:
+  - intranet
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
     workflow: baremetalds-two-node-arbiter-workload-partitioning
 - as: e2e-metal-ovn-two-node-fencing-recovery-techpreview
   capabilities:
@@ -806,12 +891,21 @@ tests:
         NUM_MASTERS=2
         NUM_WORKERS=0
     workflow: baremetalds-two-node-fencing-recovery
-- as: e2e-metal-ovn-two-node-arbiter-openshift-test-private-tests
+- as: e2e-metal-ovn-tna-openshift-test-private-tests
   capabilities:
   - intranet
   cron: 0 2 * * 1
   steps:
     cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
+- as: e2e-metal-ovn-tna-rhcos10-openshift-test-private-tests
+  capabilities:
+  - intranet
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
     workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
 - as: e2e-metal-ovn-two-node-fencing-extended-techpreview
   capabilities:
