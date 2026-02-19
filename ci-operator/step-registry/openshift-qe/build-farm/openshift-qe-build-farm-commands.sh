@@ -33,7 +33,7 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+="${BUILD_FARM_EXTRA_FLAGS} --gc-metrics=true --profile-type=${PROFILE_TYPE}"
 
 if [[ -n "${USER_METADATA}" ]]; then
   echo "${USER_METADATA}" > user-metadata.yaml
