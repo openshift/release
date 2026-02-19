@@ -569,7 +569,7 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-techpreview
-- as: e2e-metal-ovn-two-node-fencing-dualstack-techpreview
+- as: e2e-metal-ovn-tnf-dualstack-techpreview
   capabilities:
   - intranet
   cron: 17 3,15 * * *
@@ -585,7 +585,24 @@ tests:
         FEATURE_SET="TechPreviewNoUpgrade"
         BMC_DRIVER=redfish
     workflow: baremetalds-two-node-fencing-techpreview
-- as: e2e-metal-ovn-two-node-fencing-ipv6-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-dualstack-techpreview
+  capabilities:
+  - intranet
+  cron: 17 3,15 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
+        BMC_DRIVER=redfish
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-fencing-techpreview
+- as: e2e-metal-ovn-tnf-ipv6-techpreview
   capabilities:
   - intranet
   cron: 23 5,13 * * *
@@ -601,7 +618,24 @@ tests:
         FEATURE_SET="TechPreviewNoUpgrade"
         BMC_DRIVER=redfish
     workflow: baremetalds-two-node-fencing-techpreview
-- as: e2e-metal-ovn-two-node-fencing-etcd-certrotation-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-ipv6-techpreview
+  capabilities:
+  - intranet
+  cron: 23 5,13 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+        FEATURE_SET="TechPreviewNoUpgrade"
+        BMC_DRIVER=redfish
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-fencing-techpreview
+- as: e2e-metal-ovn-tnf-etcd-certrotation-techpreview
   capabilities:
   - intranet
   cron: 31 1,11 * * *
@@ -610,7 +644,17 @@ tests:
     env:
       TEST_SUITE: openshift/etcd/certrotation
     workflow: baremetalds-two-node-fencing-techpreview
-- as: e2e-metal-two-node-fencing-ipv6-certrotation-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-etcd-certrotation-techpreview
+  capabilities:
+  - intranet
+  cron: 31 1,11 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
+      TEST_SUITE: openshift/etcd/certrotation
+    workflow: baremetalds-two-node-fencing-techpreview
+- as: e2e-metal-tnf-ipv6-certrotation-techpreview
   capabilities:
   - intranet
   cron: 31 7,18 * * *
@@ -626,7 +670,7 @@ tests:
         BMC_DRIVER="redfish"
       TEST_SUITE: openshift/etcd/certrotation
     workflow: baremetalds-two-node-fencing-techpreview
-- as: e2e-metal-two-node-fencing-dualstack-certrotation-techpreview
+- as: e2e-metal-tnf-dualstack-certrotation-techpreview
   capabilities:
   - intranet
   cron: 31 3,14 * * *
@@ -642,14 +686,23 @@ tests:
         BMC_DRIVER="redfish"
       TEST_SUITE: openshift/etcd/certrotation
     workflow: baremetalds-two-node-fencing-techpreview
-- as: e2e-metal-ovn-two-node-fencing-techpreview
+- as: e2e-metal-ovn-tnf-techpreview
   capabilities:
   - intranet
   cron: 37 7,17 * * *
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing
-- as: e2e-metal-ovn-two-node-fencing-validation-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-techpreview
+  capabilities:
+  - intranet
+  cron: 37 7,17 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-fencing
+- as: e2e-metal-ovn-tnf-validation-techpreview
   capabilities:
   - intranet
   cron: 41 4,14 * * *
@@ -668,7 +721,27 @@ tests:
       DISRUPTIVE_FENCING: "true"
       FENCING_VALIDATION: "true"
     workflow: baremetalds-two-node-fencing-post-install-validation
-- as: e2e-metal-ovn-two-node-fencing-degraded-tn-suite-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-validation-techpreview
+  capabilities:
+  - intranet
+  cron: 41 4,14 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BMC_DRIVER=redfish
+        FEATURE_SET="TechPreviewNoUpgrade"
+        IP_STACK=v4
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        MASTER_VCPU=8
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+      DISRUPTIVE_FENCING: "true"
+      FENCING_VALIDATION: "true"
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-fencing-post-install-validation
+- as: e2e-metal-ovn-tnf-degraded-tn-suite-techpreview
   capabilities:
   - intranet
   cron: 47 6,16 * * *
@@ -690,7 +763,30 @@ tests:
         --run=.*\[Degraded\].* --disable-monitor=etcd-log-analyzer,node-lifecycle,on-prem-haproxy,on-prem-keepalived,initial-and-final-operator-log-scraper,apiserver-incluster-availability,kubelet-log-collector,audit-log-analyzer,metrics-endpoints-down,alert-summary-serializer,cpu-metric-collector,pod-network-avalibility,service-type-load-balancer-availability,ingress-availability,pathological-event-analyzer,legacy-test-framework-invariants,operator-state-analyzer,legacy-cvo-invariants,apiserver-external-availability,azure-metrics-collector,etcd-disk-metrics-intervals --cluster-stability=Disruptive
       TEST_SUITE: openshift/two-node
     workflow: baremetalds-two-node-fencing
-- as: e2e-metal-ovn-two-node-fencing-degraded-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-degraded-tn-suite-techpreview
+  capabilities:
+  - intranet
+  cron: 47 6,16 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEGRADED_NODE: "true"
+      DEVSCRIPTS_CONFIG: |
+        BMC_DRIVER=redfish
+        FEATURE_SET="TechPreviewNoUpgrade"
+        IP_STACK=v4
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        MASTER_VCPU=8
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+      OSSTREAM: rhel-10
+      SKIP_READINESS_CHECKS: "true"
+      TEST_ARGS: |
+        --run=.*\[Degraded\].* --disable-monitor=etcd-log-analyzer,node-lifecycle,on-prem-haproxy,on-prem-keepalived,initial-and-final-operator-log-scraper,apiserver-incluster-availability,kubelet-log-collector,audit-log-analyzer,metrics-endpoints-down,alert-summary-serializer,cpu-metric-collector,pod-network-avalibility,service-type-load-balancer-availability,ingress-availability,pathological-event-analyzer,legacy-test-framework-invariants,operator-state-analyzer,legacy-cvo-invariants,apiserver-external-availability,azure-metrics-collector,etcd-disk-metrics-intervals --cluster-stability=Disruptive
+      TEST_SUITE: openshift/two-node
+    workflow: baremetalds-two-node-fencing
+- as: e2e-metal-ovn-tnf-degraded-techpreview
   capabilities:
   - intranet
   cron: 53 8,18 * * *
@@ -707,7 +803,25 @@ tests:
         NUM_MASTERS=2
         NUM_WORKERS=0
     workflow: baremetalds-two-node-fencing-degraded
-- as: e2e-metal-ovn-two-node-fencing-ipv6-degraded-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-degraded-techpreview
+  capabilities:
+  - intranet
+  cron: 53 8,18 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BMC_DRIVER=redfish
+        FEATURE_SET="TechPreviewNoUpgrade"
+        IP_STACK=v4
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        MASTER_VCPU=8
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-fencing-degraded
+- as: e2e-metal-ovn-tnf-ipv6-degraded-techpreview
   capabilities:
   - intranet
   cron: 53 5,15 * * *
@@ -724,7 +838,25 @@ tests:
         NUM_MASTERS=2
         NUM_WORKERS=0
     workflow: baremetalds-two-node-fencing-degraded
-- as: e2e-metal-ovn-two-node-fencing-dualstack-degraded-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-ipv6-degraded-techpreview
+  capabilities:
+  - intranet
+  cron: 53 5,15 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BMC_DRIVER=redfish
+        FEATURE_SET="TechPreviewNoUpgrade"
+        IP_STACK=v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        MASTER_VCPU=8
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-fencing-degraded
+- as: e2e-metal-ovn-tnf-dualstack-degraded-techpreview
   capabilities:
   - intranet
   cron: 53 2,12 * * *
@@ -741,7 +873,25 @@ tests:
         NUM_MASTERS=2
         NUM_WORKERS=0
     workflow: baremetalds-two-node-fencing-degraded
-- as: e2e-metal-ovn-two-node-fencing-serial-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-dualstack-degraded-techpreview
+  capabilities:
+  - intranet
+  cron: 53 2,12 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BMC_DRIVER=redfish
+        FEATURE_SET="TechPreviewNoUpgrade"
+        IP_STACK=v4v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        MASTER_VCPU=8
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-fencing-degraded
+- as: e2e-metal-ovn-tnf-serial-techpreview
   capabilities:
   - intranet
   cron: 7 2,12 * * *
@@ -751,12 +901,32 @@ tests:
       TEST_SUITE: openshift/conformance/serial
     workflow: baremetalds-two-node-fencing
   timeout: 5h0m0s
-- as: e2e-metal-ovn-two-node-fencing-upgrade-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-serial-techpreview
+  capabilities:
+  - intranet
+  cron: 7 2,12 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
+      TEST_SUITE: openshift/conformance/serial
+    workflow: baremetalds-two-node-fencing
+  timeout: 5h0m0s
+- as: e2e-metal-ovn-tnf-upgrade-techpreview
   capabilities:
   - intranet
   cron: 13 9,19 * * *
   steps:
     cluster_profile: equinix-edge-enablement
+    workflow: baremetalds-two-node-fencing-upgrade
+- as: e2e-metal-ovn-tnf-rhcos10-upgrade-techpreview
+  capabilities:
+  - intranet
+  cron: 13 9,19 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
     workflow: baremetalds-two-node-fencing-upgrade
 - as: e2e-metal-ovn-two-node-arbiter-workload-partitioning
   capabilities:
@@ -765,14 +935,23 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-workload-partitioning
-- as: e2e-metal-ovn-two-node-fencing-recovery-techpreview
+- as: e2e-metal-ovn-tnf-recovery-techpreview
   capabilities:
   - intranet
   cron: 19 10,20 * * *
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-recovery
-- as: e2e-metal-ovn-two-node-fencing-ipv6-recovery-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-recovery-techpreview
+  capabilities:
+  - intranet
+  cron: 19 10,20 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-fencing-recovery
+- as: e2e-metal-ovn-tnf-ipv6-recovery-techpreview
   capabilities:
   - intranet
   cron: 19 10,20 * * *
@@ -789,7 +968,25 @@ tests:
         NUM_MASTERS=2
         NUM_WORKERS=0
     workflow: baremetalds-two-node-fencing-recovery
-- as: e2e-metal-ovn-two-node-fencing-dualstack-recovery-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-ipv6-recovery-techpreview
+  capabilities:
+  - intranet
+  cron: 19 10,20 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BMC_DRIVER=redfish
+        FEATURE_SET="TechPreviewNoUpgrade"
+        IP_STACK=v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        MASTER_VCPU=8
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-fencing-recovery
+- as: e2e-metal-ovn-tnf-dualstack-recovery-techpreview
   capabilities:
   - intranet
   cron: 19 7,17 * * *
@@ -806,6 +1003,24 @@ tests:
         NUM_MASTERS=2
         NUM_WORKERS=0
     workflow: baremetalds-two-node-fencing-recovery
+- as: e2e-metal-ovn-tnf-rhcos10-dualstack-recovery-techpreview
+  capabilities:
+  - intranet
+  cron: 19 7,17 * * *
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        BMC_DRIVER=redfish
+        FEATURE_SET="TechPreviewNoUpgrade"
+        IP_STACK=v4v6
+        MASTER_DISK=100
+        MASTER_MEMORY=32768
+        MASTER_VCPU=8
+        NUM_MASTERS=2
+        NUM_WORKERS=0
+      OSSTREAM: rhel-10
+    workflow: baremetalds-two-node-fencing-recovery
 - as: e2e-metal-ovn-two-node-arbiter-openshift-test-private-tests
   capabilities:
   - intranet
@@ -813,14 +1028,14 @@ tests:
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter-e2e-openshift-test-private-tests
-- as: e2e-metal-ovn-two-node-fencing-extended-techpreview
+- as: e2e-metal-ovn-tnf-extended-techpreview
   capabilities:
   - intranet
   cron: 29 0,10 * * *
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-fencing-extended
-- as: e2e-metal-ovn-two-node-fencing-rhcos10-extended-techpreview
+- as: e2e-metal-ovn-tnf-rhcos10-extended-techpreview
   capabilities:
   - intranet
   cron: 0 4 * * *
