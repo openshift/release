@@ -22,7 +22,7 @@ The performance job has specific cluster and resource requirements:
       COMPUTE_NODE_TYPE: m6i.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6i.xlarge
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c6i.4xlarge
-      SAIL_OPERATOR_CHANNEL: 1.28-nightly
+      SAIL_OPERATOR_CHANNEL: 1.29-nightly
       SET_ENV_BY_PLATFORM: custom
       ZONES_COUNT: "1"
     test:
