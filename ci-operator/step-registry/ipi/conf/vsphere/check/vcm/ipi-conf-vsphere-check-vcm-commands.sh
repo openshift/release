@@ -569,7 +569,7 @@ export vsphere_resource_pool=${resource_pool}
 export GOVC_RESOURCE_POOL=${resource_pool}
 export cloud_where_run=IBM
 export GOVC_USERNAME="${pool_usernames[${GOVC_URL}]}"
-export GOVC_PASSWORD="${pool_passwords[${GOVC_URL}]}"
+export GOVC_PASSWORD='${pool_passwords[${GOVC_URL}]}'
 export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 export SSL_CERT_FILE=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 EOF
