@@ -1,0 +1,92 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.23-openshift-4.18:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.18
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
+  redhat-base-ubi9:
+    name: ubi-micro
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.22
+canonical_go_repository: github.com/openshift/instaslice-operator
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN dnf install -y skopeo git jq && dnf clean all
+  from: src
+  to: instaslice-base-src
+- dockerfile_path: Dockerfile.ocp
+  from: redhat-base-ubi9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.18:
+      as:
+      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23
+  to: instaslice-operator
+- dockerfile_path: Dockerfile.daemonset.ocp
+  from: redhat-base-ubi9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.18:
+      as:
+      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23
+  to: das-daemonset
+- dockerfile_path: Dockerfile.scheduler.ocp
+  from: redhat-base-ubi9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.18:
+      as:
+      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23
+  to: das-scheduler
+- dockerfile_path: Dockerfile.webhook.ocp
+  from: redhat-base-ubi9
+  inputs:
+    ocp_builder_rhel-9-golang-1.23-openshift-4.18:
+      as:
+      - brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23
+  to: das-webhook
+operator:
+  bundles:
+  - as: das-operator-bundle
+    context_dir: .
+    dockerfile_path: bundle-ocp.Dockerfile
+  substitutions:
+  - pullspec: quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-operator-next:latest
+    with: pipeline:instaslice-operator
+  - pullspec: quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-daemonset-next:latest
+    with: pipeline:das-daemonset
+  - pullspec: quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-webhook-next:latest
+    with: pipeline:das-webhook
+  - pullspec: quay.io/redhat-user-workloads/dynamicacceleratorsl-tenant/instaslice-scheduler-next:latest
+    with: pipeline:das-scheduler
+promotion:
+  to:
+  - name: 4.18-priv
+    namespace: ocp-private
+releases:
+  initial:
+    release:
+      channel: fast
+      version: "4.18"
+  latest:
+    release:
+      channel: fast
+      version: "4.18"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 2000m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: next
+  org: openshift-priv
+  repo: instaslice-operator
+  variant: 4.18-periodics

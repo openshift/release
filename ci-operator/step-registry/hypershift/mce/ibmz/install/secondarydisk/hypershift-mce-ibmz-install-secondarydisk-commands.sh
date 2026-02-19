@@ -121,9 +121,7 @@ else
     exit 1
 fi
 
-echo
 echo "Processing nodes for cluster type: $cluster_type"
-echo
 
 # -----------------------------
 # Process Nodes
@@ -136,11 +134,9 @@ while read -r VSI_NAME VSI_ID VSI_ZONE; do
       continue
   fi
 
-  echo "--------------------------------------------"
   echo "Node: $VSI_NAME"
   echo "ID:   $VSI_ID"
   echo "Zone: $VSI_ZONE"
-  echo "--------------------------------------------"
 
   # Generate volume name
   VOL_NAME="bsv-${VSI_NAME}"
@@ -165,15 +161,11 @@ while read -r VSI_NAME VSI_ID VSI_ZONE; do
 
   echo "Validating attachment..."
   ibmcloud is instance-volume-attachments "$VSI_ID"
-  echo
 
 done <<< "$nodes"
 
-echo
-echo "===================================================="
 echo "Volumes created and attached successfully."
 echo "Cluster type: $cluster_type"
-echo "===================================================="
 
 
 

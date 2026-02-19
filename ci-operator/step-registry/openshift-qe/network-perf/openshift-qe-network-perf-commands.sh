@@ -39,6 +39,7 @@ fi
 
 #If vm mode enable, generate a new ssh key to access the VM
 if [ ${VM} == "true" ]; then
+  mkdir -p ~/.ssh
   ssh-keygen -t rsa -b 4096 -N "" -f ~/.ssh/id_rsa
 fi
 

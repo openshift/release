@@ -1,0 +1,2054 @@
+presubmits:
+  openshift/release:
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/check-cluster-profiles-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-check-cluster-profiles-config
+    optional: true
+    rerun_command: /test check-cluster-profiles-config
+    run_if_changed: ^ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml$
+    spec:
+      automountServiceAccountToken: true
+      containers:
+      - args:
+        - --config-path=./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+        command:
+        - check-cluster-profiles-config
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-cluster-profiles-config_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: check-cluster-profiles
+    trigger: (?m)^/test( | .* )check-cluster-profiles-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/prow/check-gh-automation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-check-gh-automation
+    rerun_command: /test check-gh-automation
+    run_if_changed: ^ci-operator/config/.*
+    spec:
+      containers:
+      - args:
+        - --bot=openshift-merge-robot
+        - --bot=openshift-ci-robot
+        - --app=openshift-ci
+        - --app-check-mode=standard
+        - --candidate-path=.
+        - --config-path=./core-services/prow/02_config/_config.yaml
+        - --supplemental-prow-config-dir=./core-services/prow/02_config
+        - --plugin-config=./core-services/prow/02_config/_plugins.yaml
+        - --supplemental-plugin-config-dir=./core-services/prow/02_config
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --ignore=openshift/multiarch
+        - --ignore=kata-containers/kata-containers
+        - --ignore=containers/gvisor-tap-vsock
+        - --ignore=containers/podman-py
+        - --ignore=CSPI-QE
+        - --ignore=redhat-openshift-ecosystem/certified-operators-prod
+        - --ignore=redhat-openshift-ecosystem/preflight
+        - --ignore=redhat-openshift-ecosystem/cvp
+        - --ignore=insights-qe/iqe-cost-management-plugin
+        - --ignore=ansible/tower-qa
+        - --ignore=rh-openjdk/jdkContainerOcpTests
+        - --ignore=jws-qe/interop-ocp-ci
+        - --ignore=ran-telco5g/kpi-results
+        - --ignore=openshift-logging/extended-logging-tests-interop
+        - --ignore=Azure/ARO-HCP
+        command:
+        - ./hack/check-gh-automation.sh
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              key: appid
+              name: openshift-prow-github-app
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: github-app-credentials
+          readOnly: true
+      volumes:
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
+    trigger: (?m)^/test( | .* )check-gh-automation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/prow/check-gh-automation-tide
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-check-gh-automation-tide
+    rerun_command: /test check-gh-automation-tide
+    run_if_changed: ^core-services/prow/02_config/.*
+    spec:
+      containers:
+      - args:
+        - --app=openshift-merge-bot
+        - --app-check-mode=tide
+        - --candidate-path=.
+        - --config-path=./core-services/prow/02_config/_config.yaml
+        - --supplemental-prow-config-dir=./core-services/prow/02_config
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --check-branch-protection=false
+        - --ignore=openshift/multiarch
+        - --ignore=kata-containers/kata-containers
+        - --ignore=containers/gvisor-tap-vsock
+        - --ignore=containers/podman-py
+        - --ignore=CSPI-QE
+        - --ignore=redhat-openshift-ecosystem/certified-operators-prod
+        - --ignore=redhat-openshift-ecosystem/preflight
+        - --ignore=redhat-openshift-ecosystem/cvp
+        - --ignore=insights-qe/iqe-cost-management-plugin
+        - --ignore=ansible/tower-qa
+        - --ignore=rh-openjdk/jdkContainerOcpTests
+        - --ignore=jws-qe/interop-ocp-ci
+        - --ignore=Azure/ARO-HCP
+        command:
+        - ./hack/check-gh-automation.sh
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              key: appid
+              name: openshift-merge-bot
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_check-gh-automation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: github-app-credentials
+          readOnly: true
+      volumes:
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-merge-bot
+    trigger: (?m)^/test( | .* )check-gh-automation-tide,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/image-mirroring-config-validation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-ci-image-mirroring-config-validation
+    rerun_command: /test image-mirroring-config-validation
+    run_if_changed: ^core-services/image-mirroring/_config.yaml
+    spec:
+      containers:
+      - args:
+        - --release-repo-git-sync-path=.
+        - --registry-config=/etc/pull/.dockerconfigjson
+        - --config=./core-services/image-mirroring/_config.yaml
+        - --validate-config-only=true
+        command:
+        - /bin/ci-images-mirror
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-images-mirror_latest
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+        volumeMounts:
+        - mountPath: /etc/pull
+          name: pull-credentials
+          readOnly: true
+      volumes:
+      - name: pull-credentials
+        secret:
+          secretName: registry-pull-credentials
+    trigger: (?m)^/test( | .* )image-mirroring-config-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/prow/ci-secret-bootstrap-config-validation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-ci-secret-bootstrap-config-validation
+    rerun_command: /test ci-secret-bootstrap-config-validation
+    run_if_changed: ^(core-services/ci-secret-bootstrap/_config.yaml|core-services/ci-secret-generator/_config.yaml)
+    spec:
+      containers:
+      - command:
+        - ./hack/validate-ci-secret-boostrap.sh
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-bootstrap_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: secret-bootstrap
+    trigger: (?m)^/test( | .* )ci-secret-bootstrap-config-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/clusterimageset-validate
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-clusterimageset-validate
+    rerun_command: /test clusterimageset-validate
+    run_if_changed: ^clusters/hosted-mgmt/hive/pools/.*
+    spec:
+      containers:
+      - args:
+        - --pools
+        - ./clusters/hosted-mgmt/hive/pools
+        - --imagesets
+        - ./clusters/hosted-mgmt/hive/pools
+        command:
+        - clusterimageset-updater
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_clusterimageset-updater_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )clusterimageset-validate,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/app-ci-config-dry
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-app-ci-config-dry
+    rerun_command: /test app-ci-config-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/app.ci
+        - --confirm=false
+        - --as=
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: PAGERDUTY_INTEGRATION_KEY
+          valueFrom:
+            secretKeyRef:
+              key: integration_key
+              name: pagerduty
+        - name: SLACK_API_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )app-ci-config-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/boskos-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-boskos-config
+    rerun_command: /test boskos-config
+    run_if_changed: ^core-services/prow/02_config/_boskos.yaml
+    spec:
+      containers:
+      - args:
+        - --config
+        - core-services/prow/02_config/_boskos.yaml
+        command:
+        - /app
+        image: quay.io/openshift/ci:ci_checkconfig_latest
+        imagePullPolicy: IfNotPresent
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )boskos-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/boskos-config-generation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-boskos-config-generation
+    rerun_command: /test boskos-config-generation
+    run_if_changed: ^core-services/prow/02_config/.*
+    spec:
+      containers:
+      - command:
+        - hack/validate-boskos.sh
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )boskos-config-generation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/build01-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build01
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build01-dry
+    rerun_command: /test build01-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build01
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build01_id
+          valueFrom:
+            secretKeyRef:
+              key: build01-id
+              name: build01-dex-oidc
+        - name: slack_api_url
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build01.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build01-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/build02-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build02
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build02-dry
+    rerun_command: /test build02-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build02
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build02_id
+          valueFrom:
+            secretKeyRef:
+              key: build02-id
+              name: build02-dex-oidc
+        - name: slack_api_url
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build02.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build02-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/build03-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build03
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build03-dry
+    rerun_command: /test build03-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build03
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build03_id
+          valueFrom:
+            secretKeyRef:
+              key: build03-id
+              name: build03-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build03.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build03-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/build04-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build04
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build04-dry
+    rerun_command: /test build04-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build04
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build04_id
+          valueFrom:
+            secretKeyRef:
+              key: build04-id
+              name: build04-dex-oidc
+        - name: slack_api_url
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build04.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build04-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/build05-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build05
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build05-dry
+    rerun_command: /test build05-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build05
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build05_id
+          valueFrom:
+            secretKeyRef:
+              key: build05-id
+              name: build05-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build05.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build05-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/build06-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build06
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build06-dry
+    rerun_command: /test build06-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build06
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build06_id
+          valueFrom:
+            secretKeyRef:
+              key: build06-id
+              name: build06-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build06.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build06-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/build07-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build07
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build07-dry
+    rerun_command: /test build07-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build07
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build07_id
+          valueFrom:
+            secretKeyRef:
+              key: build07-id
+              name: build07-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build07.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build07-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/build08-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build08
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build08-dry
+    rerun_command: /test build08-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build08
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build08_id
+          valueFrom:
+            secretKeyRef:
+              key: build08-id
+              name: build08-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build08.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build08-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/build09-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build09
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build09-dry
+    rerun_command: /test build09-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build09
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build09_id
+          valueFrom:
+            secretKeyRef:
+              key: build09-id
+              name: build09-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build09.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build09-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/build10-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build10
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build10-dry
+    rerun_command: /test build10-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build10
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build10_id
+          valueFrom:
+            secretKeyRef:
+              key: build10-id
+              name: build10-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build10.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build10-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/build11-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build11
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-build11-dry
+    rerun_command: /test build11-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build11
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: build11_id
+          valueFrom:
+            secretKeyRef:
+              key: build11-id
+              name: build11-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build11.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build11-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/ci-operator-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-ci-operator-config
+    rerun_command: /test ci-operator-config
+    run_if_changed: ^ci-operator/(config/|step-registry/).*
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - ./ci-operator/config/
+        - --registry
+        - ./ci-operator/step-registry/
+        - --cluster-profiles-config
+        - ./ci-operator/step-registry/cluster-profiles/cluster-profiles-config.yaml
+        - --cluster-claim-owners-config
+        - ./core-services/cluster-pools/_config.yaml
+        command:
+        - ci-operator-checkconfig
+        image: quay.io/openshift/ci-public:ci_ci-operator-checkconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )ci-operator-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/ci-operator-config-metadata
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-ci-operator-config-metadata
+    rerun_command: /test ci-operator-config-metadata
+    run_if_changed: ^ci-operator/config/.*
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-ci-operator-config.sh
+        image: quay.io/openshift/ci-public:ci_determinize-ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test ci-operator-config-metadata,?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/ci-operator-registry
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-ci-operator-registry
+    rerun_command: /test ci-operator-registry
+    run_if_changed: ^ci-operator/(config/|step-registry/).*
+    spec:
+      automountServiceAccountToken: true
+      containers:
+      - args:
+        - --config
+        - ./ci-operator/config/
+        - --registry
+        - ./ci-operator/step-registry/
+        - --validate-only
+        command:
+        - ci-operator-configresolver
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator-configresolver_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )ci-operator-registry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/ci-testgrid-allow-list
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-ci-testgrid-allow-list
+    rerun_command: /test ci-testgrid-allow-list
+    run_if_changed: ^core-services/(testgrid-config-generator/_allow-list.yaml|release-controller/_releases/.*)
+    spec:
+      containers:
+      - args:
+        - --validate=true
+        - --allow-list
+        - ./core-services/testgrid-config-generator/_allow-list.yaml
+        - --release-config
+        - ./core-services/release-controller/_releases
+        command:
+        - testgrid-config-generator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_testgrid-config-generator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )ci-testgrid-allow-list,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/prow/config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-config
+    rerun_command: /test config
+    run_if_changed: ^(core-services/prow/02_config/|ci-operator/jobs/).*
+    spec:
+      containers:
+      - args:
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --config-path
+        - ./core-services/prow/02_config/_config.yaml
+        - --supplemental-prow-config-dir
+        - core-services/prow/02_config
+        - --job-config-path
+        - ./ci-operator/jobs/
+        - --plugin-config
+        - ./core-services/prow/02_config/_plugins.yaml
+        - --supplemental-plugin-config-dir
+        - core-services/prow/02_config
+        - --strict
+        - --exclude-warning
+        - long-job-names
+        - --exclude-warning
+        - mismatched-tide-lenient
+        command:
+        - /ko-app/checkconfig
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              key: appid
+              name: openshift-prow-github-app
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20260217-999e46ca7
+        imagePullPolicy: IfNotPresent
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: github-app-credentials
+          readOnly: true
+      volumes:
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
+    trigger: (?m)^/test( | .* )config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/core-ci-config-dry
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-core-ci-config-dry
+    rerun_command: /test core-ci-config-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/core-ci
+        - --confirm=false
+        - --as=
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: PAGERDUTY_INTEGRATION_KEY
+          valueFrom:
+            secretKeyRef:
+              key: integration_key
+              name: pagerduty
+        - name: SLACK_API_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: ci-slack-api-url
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )core-ci-config-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/core-valid
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-core-valid
+    rerun_command: /test core-valid
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=core-valid
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )core-valid,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/generated-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-generated-config
+    rerun_command: /test generated-config
+    run_if_changed: ^ci-operator/(config|jobs)/.*
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-generated-config.sh
+        image: quay.io/openshift/ci-public:ci_ci-operator-prowgen_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test generated-config,?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/generated-dashboards
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-generated-dashboards
+    rerun_command: /test generated-dashboards
+    run_if_changed: ^(clusters/app.ci/openshift-user-workload-monitoring/.*)
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-generated-dashboards.sh
+        image: quay.io/openshift/ci-public:ci_dashboards-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test generated-dashboards,?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/hosted-mgmt-dry
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-hosted-mgmt-dry
+    rerun_command: /test hosted-mgmt-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - clusters/hosted-mgmt
+        - --kubeconfig
+        - /etc/build-farm-credentials/kubeconfig
+        - --as=
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        - name: hosted_mgmt_id
+          valueFrom:
+            secretKeyRef:
+              key: hosted-mgmt-id
+              name: hosted-mgmt-dex-oidc
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.hosted-mgmt.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )hosted-mgmt-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/jira-lifecycle-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-jira-lifecycle-config
+    rerun_command: /test jira-lifecycle-config
+    run_if_changed: ^core-services/jira-lifecycle-plugin/config.yaml
+    spec:
+      containers:
+      - args:
+        - --validate-config=core-services/jira-lifecycle-plugin/config.yaml
+        command:
+        - jira-lifecycle-plugin
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_jira-lifecycle-plugin_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )jira-lifecycle-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/labels
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-labels
+    rerun_command: /test labels
+    run_if_changed: ^core-services/prow/02_config/_labels\.yaml$
+    spec:
+      containers:
+      - command:
+        - hack/validate-labels.py
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )labels,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/ordered-prow-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-ordered-prow-config
+    rerun_command: /test ordered-prow-config
+    run_if_changed: ^(ci-operator/(config|jobs)/.*|core-services/sanitize-prow-jobs/_config.yaml)
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-prow-job-ordering.sh
+        image: quay.io/openshift/ci-public:ci_sanitize-prow-jobs_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )ordered-prow-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/owners
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-owners
+    rerun_command: /test owners
+    spec:
+      containers:
+      - args:
+        - ./
+        - ./hack/missing-owners-whitelist
+        command:
+        - hack/validate-owners.sh
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_centos_7
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )owners,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/prow-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-prow-config
+    rerun_command: /test prow-config
+    run_if_changed: ^core-services/prow/02_config/.*
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-prow-config-formatting.sh
+        image: quay.io/openshift/ci-public:ci_determinize-prow-config_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test prow-config,?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/prow-config-filenames
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-prow-config-filenames
+    rerun_command: /test prow-config-filenames
+    run_if_changed: ^ci-operator/config/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - ./ci-operator/config
+        command:
+        - hack/validate-ci-operator-config-filename.py
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )prow-config-filenames,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/prow-config-semantics
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-prow-config-semantics
+    rerun_command: /test prow-config-semantics
+    run_if_changed: ^ci-operator/jobs/.*
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-prow-job-semantics.py
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )prow-config-semantics,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/release-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-release-config
+    rerun_command: /test release-config
+    run_if_changed: ^core-services/release-controller/_releases/.*
+    spec:
+      containers:
+      - args:
+        - --validate-configs=core-services/release-controller/_releases
+        - --release-qualifiers-config-path=core-services/release-controller/release-qualifiers.yaml
+        command:
+        - release-controller
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )release-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/release-controller-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-release-controller-config
+    rerun_command: /test release-controller-config
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-release-controller-config.sh
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )release-controller-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/secret-generator-config-valid
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-secret-generator-config-valid
+    rerun_command: /test secret-generator-config-valid
+    run_if_changed: ^core-services/(ci-secret-generator|ci-secret-bootstrap)/_config.yaml
+    spec:
+      containers:
+      - args:
+        - --config=core-services/ci-secret-generator/_config.yaml
+        - --bootstrap-config=core-services/ci-secret-bootstrap/_config.yaml
+        - --validate-only=true
+        command:
+        - /usr/bin/ci-secret-generator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-generator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )secret-generator-config-valid,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/services-valid
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-services-valid
+    rerun_command: /test services-valid
+    run_if_changed: ^services/.*
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=services-valid
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )services-valid,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/stackrox-stackrox-stackrox-stackrox-check
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: stackrox-stackrox
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-stackrox-stackrox-stackrox-stackrox-check
+    rerun_command: /test stackrox-stackrox-stackrox-stackrox-check
+    run_if_changed: ci-operator/(config|jobs)/stackrox/stackrox
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=stackrox-stackrox-check
+        - --variant=stackrox-stackrox
+        command:
+        - ci-operator
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )stackrox-stackrox-stackrox-stackrox-check,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/step-registry-metadata
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-step-registry-metadata
+    rerun_command: /test step-registry-metadata
+    run_if_changed: ^ci-operator/step-registry/.*
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-registry-metadata.sh
+        image: quay.io/openshift/ci-public:ci_generate-registry-metadata_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test step-registry-metadata,?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/step-registry-shellcheck
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-step-registry-shellcheck
+    rerun_command: /test step-registry-shellcheck
+    run_if_changed: ^ci-operator/step-registry/.*
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-registry-commands.sh
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_shellcheck_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )step-registry-shellcheck,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/verified-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-verified-config
+    rerun_command: /test verified-config
+    run_if_changed: ^core-services/verified/.*
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-verified-config.sh
+        image: quay.io/openshift/ci-public:ci_tide-config-manager_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )verified-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/build-farm/vsphere02-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: vsphere02
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-vsphere02-dry
+    rerun_command: /test vsphere02-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/vsphere02
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        image: quay.io/openshift/ci-public:ci_applyconfig_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.vsphere02.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )vsphere02-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/openshift-image-mirror-mappings
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-openshift-image-mirror-mappings
+    rerun_command: /test openshift-image-mirror-mappings
+    spec:
+      containers:
+      - args:
+        - -c
+        - |
+          set -o errexit
+          set -o nounset
+          set -o pipefail
+          /usr/bin/promoted-image-governor --ci-operator-config-path=ci-operator/config --release-controller-mirror-config-dir=core-services/release-controller/_releases --openshift-mapping-dir=core-services/image-mirroring/openshift --openshift-mapping-config=core-services/image-mirroring/openshift/_config.yaml --dry-run=true
+          git add -N .
+          if ! git diff --exit-code; then
+            >&2 echo "ERROR: run 'make openshift-image-mirror-mappings' if the promote tags to the ocp or origin namespaces are changed in the pull request"
+            exit 1
+          fi
+        command:
+        - /bin/bash
+        image: quay.io/openshift/ci-public:ci_promoted-image-governor_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: "1"
+    trigger: (?m)^/test( | .* )openshift-image-mirror-mappings,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/prow/pr-reminder-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-pr-reminder-config
+    rerun_command: /test pr-reminder-config
+    run_if_changed: ^core-services/pr-reminder/_config.yaml
+    spec:
+      containers:
+      - args:
+        - -c
+        - |
+          tar -C /tmp -xvzf /etc/github-mapping/users.yaml.tar.gz
+          /usr/bin/pr-reminder \
+            --config-path=core-services/pr-reminder/_config.yaml \
+            --github-users-file=/tmp/users.yaml \
+            --slack-token-path=/etc/slack/oauth_token \
+            --validate-only=true
+        command:
+        - /bin/bash
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_pr-reminder_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github-mapping
+          name: github-mapping
+          readOnly: true
+        - mountPath: /etc/slack
+          name: slack
+          readOnly: true
+      volumes:
+      - configMap:
+          name: sync-rover-groups
+        name: github-mapping
+      - name: slack
+        secret:
+          secretName: slack-credentials-dptp-bot
+    trigger: (?m)^/test( | .* )pr-reminder-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/pylint
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-pylint
+    rerun_command: /test pylint
+    run_if_changed: ^hack/.*\.py$
+    spec:
+      containers:
+      - args:
+        - --rcfile=hack/.pylintrc
+        - --ignore=lib,image-mirroring
+        - --persistent=n
+        - hack
+        command:
+        - pylint
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )pylint,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/prow/rover-groups-config-validation
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-rover-groups-config-validation
+    rerun_command: /test rover-groups-config-validation
+    run_if_changed: ^core-services/sync-rover-groups/_config.yaml
+    spec:
+      containers:
+      - command:
+        - ./hack/validate-rover-groups.sh
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_sync-rover-groups_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )rover-groups-config-validation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/sync-rover-groups
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-sync-rover-groups
+    rerun_command: /test sync-rover-groups
+    run_if_changed: ^(clusters/.*)|^(core-services/sync-rover-groups/.*)
+    spec:
+      containers:
+      - args:
+        - --manifest-dir
+        - clusters
+        - --config-file
+        - core-services/sync-rover-groups/_config.yaml
+        - --log-level
+        - debug
+        - --validate-subjects
+        command:
+        - sync-rover-groups
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_sync-rover-groups_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )sync-rover-groups,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build07
+    context: ci/prow/yamllint
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-yamllint
+    rerun_command: /test yamllint
+    run_if_changed: ^.*\.(yaml|yml)$
+    spec:
+      containers:
+      - args:
+        - clusters
+        - core-services
+        - OWNERS_ALIASES
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          # Run our comprehensive YAML validation (includes indentation, syntax, structure)
+          export GIT_DIFF=1
+          hack/validate-yaml-indentation.sh . --use-yamllint
+          # Also run yamllint on specific directories for additional checks (if available)
+          if command -v yamllint &> /dev/null; then
+            yamllint --strict -d '{extends: default, rules: {indentation: disable, document-start: disable, comments: disable, line-length: disable}}' clusters core-services OWNERS_ALIASES
+          fi
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: "1"
+    trigger: (?m)^/test( | .* )yamllint,?($|\s.*)

@@ -1,8 +1,3 @@
-base_images:
-  stolostron_builder_go1.25-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.25-linux
 build_root:
   image_stream_tag:
     name: builder
@@ -10,16 +5,12 @@ build_root:
     tag: go1.23-linux
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    stolostron_builder_go1.25-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.25-linux
   to: hypershift-addon-operator
 - dockerfile_path: Dockerfile.canary
   to: hypershift-addon-operator-canary-test
 promotion:
   to:
-  - name: "2.11"
+  - name: "2.17"
     namespace: stolostron
 resources:
   '*':
@@ -31,7 +22,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: backplane-2.11
+      DESTINATION_BRANCH: backplane-2.17
     workflow: ocm-ci-fastforward
 - as: unit-tests
   commands: make test

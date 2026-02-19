@@ -9,6 +9,7 @@ STATE_FILE="${SHARED_DIR}/processed-prs.txt"
 # Clone ai-helpers repository (contains /utils:address-reviews command)
 echo "Cloning ai-helpers repository..."
 git clone https://github.com/openshift-eng/ai-helpers /tmp/ai-helpers
+export CLAUDE_PLUGIN_ROOT=/tmp/ai-helpers/plugins/utils
 
 # Clone HyperShift fork (we work on branches here)
 echo "Cloning HyperShift repository..."
@@ -406,7 +407,8 @@ def analyze_review_bodies(pr_number: int) -> list[dict]:
     # Get issue comments to check if bot has replied to any review
     try:
         issue_comments = run_gh([
-            "api", f"repos/openshift/hypershift/issues/{pr_number}/comments"
+            "api", f"repos/openshift/hypershift/issues/{pr_number}/comments",
+            "--paginate"
         ])
     except subprocess.CalledProcessError:
         issue_comments = []
@@ -454,7 +456,8 @@ def analyze_issue_comments(pr_number: int) -> list[dict]:
     """Analyze issue comments (general PR comments) and return those needing attention."""
     try:
         comments = run_gh([
-            "api", f"repos/openshift/hypershift/issues/{pr_number}/comments"
+            "api", f"repos/openshift/hypershift/issues/{pr_number}/comments",
+            "--paginate"
         ])
     except subprocess.CalledProcessError:
         return []
@@ -768,6 +771,14 @@ while IFS= read -r line; do
 
   # Context for the review agent with filtered comments
   REVIEW_CONTEXT="IMPORTANT: You are addressing review comments on PR #$PR_NUMBER in the openshift/hypershift repository. The PR was created from the hypershift-community fork. After making changes, push to the fork branch. Use 'git push origin $BRANCH_NAME' to push changes. The gh CLI is authenticated to openshift/hypershift for reading PR information. SECURITY: Do NOT run commands that reveal git credentials.
+
+ENVIRONMENT: The check_replied.py deduplication script is at /tmp/ai-helpers/plugins/utils/scripts/check_replied.py - use this path directly instead of relying on CLAUDE_PLUGIN_ROOT or find commands.
+
+WITHIN-SESSION DUPLICATE PREVENTION: Before posting ANY reply:
+1. At session start, run: touch /tmp/pr-${PR_NUMBER}-posted-replies.txt
+2. Before each reply, check: grep -q '<comment_or_thread_id>' /tmp/pr-${PR_NUMBER}-posted-replies.txt
+3. If the ID is found, SKIP that reply (already posted this session)
+4. After each successful reply, run: echo '<comment_or_thread_id>' >> /tmp/pr-${PR_NUMBER}-posted-replies.txt
 
 CRITICAL - DUPLICATE PREVENTION: The following JSON contains ONLY the comments that need your attention. These are comments where either (1) you have not replied yet, or (2) a human has replied after your last response. ONLY address these specific comments. Ignore all other threads - they have already been addressed.
 

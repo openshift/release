@@ -143,14 +143,14 @@ An optional presubmit job allows processing a specific PR on-demand:
 
 ```yaml
 - always_run: false
-  as: review-agent-single-pr
+  as: address-review-comments
   optional: true
   skip_if_only_changed: .*
   steps:
     workflow: hypershift-review-agent
 ```
 
-**Usage**: Run `/test review-agent-single-pr` on any PR in openshift/hypershift. The job will process reviews for that specific PR using the `PULL_NUMBER` environment variable provided by Prow.
+**Usage**: Run `/test address-review-comments` on any PR in openshift/hypershift. The job will process reviews for that specific PR using the `PULL_NUMBER` environment variable provided by Prow.
 
 This is useful for:
 - Testing the review agent on a specific PR

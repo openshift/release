@@ -30,6 +30,12 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+# Make sure POOLS and POOL_COUNT are not both configured
+if [[ "${POOL_COUNT}" != "1" && "${POOLS}" != "" ]]; then
+  echo "Cannot set both POOL_COUNT and POOLS"
+  exit 1
+fi
+
 export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 
 # only used in zonal and vsphere environments with
@@ -247,6 +253,22 @@ if [[ "${PROW_JOB_TYPE}" == "presubmit" ]]; then
     git-pr: \"${GIT_PR}\""
 fi
 
+# Handle POOL_SELECTOR if provided (parse once and use for all leases)
+poolSelector=""
+if [ -n "${POOL_SELECTOR:-}" ]; then
+  # Parse POOL_SELECTOR in format "key=value"
+  if [[ "${POOL_SELECTOR}" =~ ^([^=]+)=([^=]+)$ ]]; then
+    selector_key="${BASH_REMATCH[1]}"
+    selector_value="${BASH_REMATCH[2]}"
+    poolSelector="poolSelector:
+    ${selector_key}: \"${selector_value}\""
+    log "setting poolSelector with ${selector_key}=${selector_value}"
+  else
+    log "ERROR: POOL_SELECTOR must be in format 'key=value', got: ${POOL_SELECTOR}"
+    exit 1
+  fi
+fi
+
 if [[ -n "${VSPHERE_BASTION_LEASED_RESOURCE:-}" ]]; then
   log "creating bastion lease resource ${VSPHERE_BASTION_LEASED_RESOURCE}"
 
@@ -269,6 +291,7 @@ spec:
   memory: 0
   network-type: \"${NETWORK_TYPE}\"
   requiresPool: \"${VSPHERE_BASTION_LEASED_RESOURCE}\"
+  ${poolSelector}
   networks: 1" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
 fi
 
@@ -354,7 +377,9 @@ spec:
   vcpus: ${OPENSHIFT_REQUIRED_CORES}
   memory: ${OPENSHIFT_REQUIRED_MEMORY}
   network-type: \"${NETWORK_TYPE}\"
+  pool-count: ${POOL_COUNT}
   ${requiredPool}
+  ${poolSelector}
   networks: $networks_number" | oc create --kubeconfig "${SA_KUBECONFIG}" -o json -f - | jq -r '.metadata.name')")
 done
 
@@ -544,7 +569,7 @@ export vsphere_resource_pool=${resource_pool}
 export GOVC_RESOURCE_POOL=${resource_pool}
 export cloud_where_run=IBM
 export GOVC_USERNAME="${pool_usernames[${GOVC_URL}]}"
-export GOVC_PASSWORD="${pool_passwords[${GOVC_URL}]}"
+export GOVC_PASSWORD='${pool_passwords[${GOVC_URL}]}'
 export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 export SSL_CERT_FILE=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
 EOF

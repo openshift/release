@@ -125,6 +125,13 @@ resources:
     requests:
       cpu: 4000m
       memory: 2.5Gi
+  verify:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 4000m
+      memory: 8Gi
 tests:
 - as: verify
   commands: make verify
@@ -143,8 +150,9 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
-- as: e2e-aks
-  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+- always_run: false
+  as: e2e-aks
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift-aks
     dependencies:
@@ -161,8 +169,9 @@ tests:
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_SKU: ""
       HYPERSHIFT_AZURE_MARKETPLACE_IMAGE_VERSION: ""
     workflow: hypershift-azure-aks-e2e
-- as: e2e-aks-4-21
-  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+- always_run: false
+  as: e2e-aks-4-21
+  pipeline_run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift-aks
     dependencies:
@@ -187,10 +196,11 @@ tests:
       HYPERSHIFT_AZURE_LOCATION: centralus
       TEST_CPO_OVERRIDE: "1"
     workflow: hypershift-azure-aks-e2e
-- as: e2e-aws
+- always_run: false
+  as: e2e-aws
   capabilities:
   - build-tmpfs
-  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift-aws
     dependencies:
@@ -204,7 +214,7 @@ tests:
     workflow: hypershift-aws-e2e-external
 - always_run: false
   as: e2e-v2-aws
-  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-v2
@@ -238,10 +248,11 @@ tests:
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-upgrade-hypershift-operator
+- always_run: false
+  as: e2e-aws-upgrade-hypershift-operator
   capabilities:
   - build-tmpfs
-  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift-aws
     dependencies:
@@ -262,10 +273,11 @@ tests:
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TEST_CPO_OVERRIDE: "1"
     workflow: hypershift-aws-e2e-external
-- as: e2e-aws-4-21
+- always_run: false
+  as: e2e-aws-4-21
   capabilities:
   - build-tmpfs
-  run_if_changed: ^(test/e2e|hypershift-operator)
+  pipeline_run_if_changed: ^(test/e2e|hypershift-operator)
   steps:
     cluster_profile: hypershift-aws
     dependencies:
@@ -279,8 +291,9 @@ tests:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
       REQUEST_SERVING_COMPONENT_TEST: "true"
     workflow: hypershift-aws-e2e-external
-- as: e2e-kubevirt-aws-ovn-reduced
-  skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+- always_run: false
+  as: e2e-kubevirt-aws-ovn-reduced
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift-aws
     env:
@@ -438,8 +451,7 @@ tests:
       REQUEST_SERVING_COMPONENT_TEST: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
     workflow: hypershift-aws-e2e-external
-- always_run: false
-  as: verify-deps
+- as: verify-deps
   steps:
     env:
       CHECK_MOD_LIST: "false"
@@ -456,7 +468,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-421
     workflow: hypershift-aws-reqserving-e2e
 - always_run: false
-  as: review-agent-single-pr
+  as: address-review-comments
   optional: true
   skip_if_only_changed: .*
   steps:
