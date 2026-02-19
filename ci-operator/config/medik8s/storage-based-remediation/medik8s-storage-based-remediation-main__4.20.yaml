@@ -1,0 +1,107 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: stream9
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: os
+  to: storage-based-remediation
+operator:
+  bundles:
+  - as: my-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/medik8s/sbd-operator:.*
+    with: pipeline:storage-based-remediation
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- as: openshift-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: medik8s-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      OPERATOR_NAMESPACE: sbr-install
+      OPERATOR_RELEASED_VERSION: 0.2.0
+    test:
+    - as: install-last-operator-version
+      cli: latest
+      commands: |
+        make create-ns
+
+        # workaround for OLM pod not running with restricted PSA
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$OPERATOR_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+
+        # OPERATOR_NAMESPACE variable is used by bundle-run and bundle-run-update
+        BUNDLE_IMG=quay.io/medik8s/sbd-operator-bundle:v"$OPERATOR_RELEASED_VERSION" make bundle-run
+      env:
+      - name: OPERATOR_NAMESPACE
+      - name: OPERATOR_RELEASED_VERSION
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: set-odf-on-cluster
+      cli: latest
+      commands: |
+        # Force ODF setup binary to use test-cluster admin kubeconfig (it prefers
+        # InClusterConfig() otherwise, which may not have namespace create permission).
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        unset KUBERNETES_SERVICE_HOST KUBERNETES_SERVICE_PORT
+
+        make setup-odf-storage
+        make run-setup-odf-storage-retry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: upgrade-operator-latest
+      cli: latest
+      commands: BUNDLE_IMG="$OO_BUNDLE" make bundle-run-update
+      dependencies:
+      - env: OO_BUNDLE
+        name: my-bundle
+      env:
+      - name: OPERATOR_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test-command
+      cli: latest
+      commands: |
+        which kubectl || { mkdir -p /tmp/bin && ln -s "$(which oc)" /tmp/bin/kubectl && export PATH="/tmp/bin:${PATH}"; }
+        export OPERATOR_NS="$OPERATOR_NAMESPACE" && make test-e2e
+      env:
+      - name: OPERATOR_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: storage-based-remediation
+  variant: "4.20"
