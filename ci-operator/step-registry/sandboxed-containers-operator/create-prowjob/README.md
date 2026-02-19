@@ -179,7 +179,7 @@ Scroll down to *sandboxed-containers-operator* and click on it
 Search for the prow job you specified (ex aws-ipi-peerpods) and click on _Details_
 Click on _History_
 You will be taken to a list of the **Build** numbers, etc.  Your job should be at the top.  Clicking on that will show you the Spyglass of your job with the build log, artifacts, etc.
-This URL is used by **dig&shift** for reporting and analysis
+This URL is used by **dig&shift** for reporting and analysis.  It will look something like [this](https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/openshift_release/75051/rehearse-75051-periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate421-azure-ipi-kata/2024178159888371712)
 
 ### Run Command Features
 
