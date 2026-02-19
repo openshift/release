@@ -36,11 +36,11 @@ chmod +x /tmp/iso.sh
 # To clone a private branch for testing cross-repository source changes, comment
 # out the 'ci_clone_src' function call and add the following commands instead.
 #
-# GUSR=myuser
-# GBRN=mybranch
-# git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
+GUSR=vanhalenar
+GBRN=dual-lane
+git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
 #
-ci_clone_src
+# ci_clone_src
 
 download_brew_rpms() {
     # See BREW_RPM_SOURCE variable definition in test/bin/common.sh
