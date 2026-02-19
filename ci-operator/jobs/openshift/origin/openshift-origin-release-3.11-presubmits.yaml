@@ -51,7 +51,7 @@ presubmits:
     branches:
     - ^release-3\.11$
     - ^release-3\.11-
-    cluster: build02
+    cluster: build08
     context: ci/prow/e2e-gcp
     decorate: true
     labels:
@@ -72,6 +72,10 @@ presubmits:
         env:
         - name: CLUSTER_TYPE
           value: gcp
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         - name: JOB_NAME_SAFE
           value: e2e-gcp
         - name: TEST_COMMAND
@@ -80,6 +84,9 @@ presubmits:
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -191,9 +198,17 @@ presubmits:
         - --target=integration
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -244,9 +259,17 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -297,9 +320,17 @@ presubmits:
         - --target=verify
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

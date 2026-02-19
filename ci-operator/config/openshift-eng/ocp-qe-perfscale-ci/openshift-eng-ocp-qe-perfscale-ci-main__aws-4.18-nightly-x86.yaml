@@ -1,0 +1,100 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.18"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: conc-builds-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-conc-builds
+    - chain: openshift-qe-run-api-apf-customized-flowcontrol
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: compact-cp-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    workflow: openshift-qe-installer-aws-compact
+- always_run: false
+  as: router-perf-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-router-perf
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: control-plane-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CDV2_ITERATION_MULTIPLIER: "9"
+      COMPUTE_NODE_REPLICAS: "3"
+      ENABLE_LAYER_3: "false"
+      UDN_ITERATION_MULTIPLIER: "24"
+    test:
+    - chain: openshift-qe-control-plane
+    - chain: cucushift-installer-check-cluster-health
+    - ref: capi-conf-apply-feature-gate
+    - ref: capi-migration-check
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: node-density-cni-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: 70130-cu-test
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build07.ci.openshift.org/ci-ln-qmgjvfk/release:latest
+      TIMEOUT: +23 hours
+    test:
+    - ref: wait
+    workflow: openshift-qe-installer-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: aws-4.18-nightly-x86
