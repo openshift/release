@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.6.2"
+	TAG="v0.9.2"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
 	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
@@ -247,11 +247,10 @@ function dump_resources() {
 			watch-create \
 			--cloud "${CLOUD}" \
 			--baseDomain "ipi-ppc64le.cis.ibm.net" \
-			--cisInstanceCRN "${CRN}" \
 			--metadata "${DIR}/metadata.json" \
+			--kubeconfig "${DIR}/auth/kubeconfig" \
 			--bastionUsername "cloud-user" \
 			--bastionRsa "${SSH_PRIV_KEY_FILE}" \
-			--kubeconfig "${DIR}/auth/kubeconfig" \
 			--shouldDebug false
 	else
 		echo "Could not find ${DIR}/metadata.json for watch-create"
