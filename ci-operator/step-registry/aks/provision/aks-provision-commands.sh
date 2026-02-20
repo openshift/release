@@ -331,6 +331,29 @@ EOF
         NAP_ELAPSED=$((NAP_ELAPSED + 30))
     done
 
+    # Wait for zone labels to propagate on NAP nodes.
+    # Karpenter-provisioned nodes are named aks-default-* while system pool
+    # nodes are aks-nodepool1-*.  Zone labels may not be present immediately
+    # after a node reaches Ready.
+    echo "Waiting for zone labels on NAP nodes"
+    ZONE_TIMEOUT=120
+    ZONE_ELAPSED=0
+    while true; do
+        UNLABELED=$(oc get nodes --no-headers -o custom-columns='NAME:.metadata.name,ZONE:.metadata.labels.topology\.kubernetes\.io/zone' 2>/dev/null \
+            | awk '/^aks-default-/ && $2 == "<none>" { count++ } END { print count+0 }')
+        if [[ "$UNLABELED" -eq 0 ]]; then
+            echo "All NAP nodes have zone labels"
+            break
+        fi
+        if [[ "$ZONE_ELAPSED" -ge "$ZONE_TIMEOUT" ]]; then
+            echo "WARNING: $UNLABELED NAP node(s) still missing zone labels after ${ZONE_TIMEOUT}s"
+            break
+        fi
+        echo "Waiting for zone labels: $UNLABELED NAP node(s) without zone label (${ZONE_ELAPSED}s/${ZONE_TIMEOUT}s)..."
+        sleep 10
+        ZONE_ELAPSED=$((ZONE_ELAPSED + 10))
+    done
+
     collect_nap_artifacts
 
     echo "Cleaning up placeholder deployment"
