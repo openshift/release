@@ -305,7 +305,7 @@ EOF
         echo "NAP node zone distribution:"
         cat "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>/dev/null || true
         echo "Zone summary:"
-        awk 'NR>1 && $2 != "<none>" { zones[$2]++ } END { for (z in zones) printf "  %s: %d nodes\n", z, zones[z] }' "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>/dev/null || true
+        awk 'NR>1 && $2 ~ /[a-z]+-[0-9]+$/ { zones[$2]++ } END { for (z in zones) printf "  %s: %d nodes\n", z, zones[z] }' "${ARTIFACT_DIR}/nap-node-zone-distribution.txt" 2>/dev/null || true
     }
 
     echo "Waiting for NAP to provision nodes"
