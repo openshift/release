@@ -150,7 +150,7 @@ while IFS= read -r line; do
     ISSUE_TOTAL_CACHE_CREATE=$((ISSUE_TOTAL_CACHE_CREATE + P_CACHE_CREATE))
 
     if [ "$P_INPUT" -gt 0 ] || [ "$P_OUTPUT" -gt 0 ]; then
-      TOKEN_ROWS="${TOKEN_ROWS}<tr><td>${PHASE_LABEL}</td><td>$(format_number "$P_INPUT")</td><td>$(format_number "$P_OUTPUT")</td><td>$(format_number "$P_CACHE_READ")</td><td>${P_COST}</td></tr>"
+      TOKEN_ROWS="${TOKEN_ROWS}<tr><td>${PHASE_LABEL}</td><td>$(format_number "$P_INPUT")</td><td>$(format_number "$P_OUTPUT")</td><td>$(format_number "$P_CACHE_READ")</td><td>$(format_number "$P_CACHE_CREATE")</td><td>${P_COST}</td></tr>"
     fi
   done
 
@@ -168,10 +168,10 @@ while IFS= read -r line; do
     TOKEN_TABLE="
   <h3>Token Usage &amp; Cost</h3>
   <table class=\"token-table\">
-  <thead><tr><th>Phase</th><th>Input Tokens</th><th>Output Tokens</th><th>Cache Read</th><th>Est. Cost</th></tr></thead>
+  <thead><tr><th>Phase</th><th>Input Tokens</th><th>Output Tokens</th><th>Cache Read</th><th>Cache Create</th><th>Est. Cost</th></tr></thead>
   <tbody>
   ${TOKEN_ROWS}
-  <tr class=\"total-row\"><td><strong>Total</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_INPUT")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_OUTPUT")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_CACHE_READ")</strong></td><td><strong>${ISSUE_COST}</strong></td></tr>
+  <tr class=\"total-row\"><td><strong>Total</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_INPUT")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_OUTPUT")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_CACHE_READ")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_CACHE_CREATE")</strong></td><td><strong>${ISSUE_COST}</strong></td></tr>
   </tbody>
   </table>
   <p class=\"model-info\">Model: ${MODEL}</p>"
@@ -237,7 +237,7 @@ cat > "$REPORT_FILE" <<EOF
   details summary { cursor: pointer; color: #666; font-size: 0.9em; }
   details pre { background: #f6f8fa; padding: 1em; border-radius: 4px; font-size: 0.8em; overflow-x: auto; }
   .timestamp { color: #666; font-size: 0.9em; }
-  .token-table { width: auto; min-width: 500px; }
+  .token-table { width: auto; min-width: 600px; }
   .token-table td, .token-table th { text-align: right; }
   .token-table td:first-child, .token-table th:first-child { text-align: left; }
   .total-row td { border-top: 2px solid #333; }
