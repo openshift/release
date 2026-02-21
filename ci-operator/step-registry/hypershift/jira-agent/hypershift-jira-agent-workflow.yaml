@@ -10,7 +10,10 @@ workflow:
 
     This workflow:
     1. Setup: Verifies Claude Code CLI is available
-    2. Process: Queries Jira for labeled issues, runs /jira-solve for each, creates PRs
+    2. Process: For each Jira issue, runs a three-phase pipeline:
+       a. Phase 1 - Solve: Runs /jira-solve to implement, commit, and push changes
+       b. Phase 2 - Review: Runs /code-review:pre-commit-review to review and fix code quality issues
+       c. Phase 3 - PR: Creates a draft PR after review is complete
 
-    The workflow uses the /jira-solve command in non-interactive mode.
+    The workflow uses /jira-solve and /code-review:pre-commit-review in non-interactive mode.
     Issues are queried from Jira with: project in (OCPBUGS, CNTRLPLANE) AND status in (New, "To Do") AND labels = issue-for-agent

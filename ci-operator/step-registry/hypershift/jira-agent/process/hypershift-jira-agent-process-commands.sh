@@ -19,6 +19,14 @@ echo "Setting up Claude commands..."
 mkdir -p /tmp/hypershift/.claude/commands
 cp /tmp/ai-helpers/plugins/jira/commands/solve.md /tmp/hypershift/.claude/commands/jira-solve.md
 
+# Check if code-review plugin is available for Phase 2
+REVIEW_PLUGIN_DIR="/tmp/ai-helpers/plugins/code-review"
+if [ ! -d "${REVIEW_PLUGIN_DIR}/.claude-plugin" ]; then
+  echo "ERROR: code-review plugin not found at ${REVIEW_PLUGIN_DIR}/.claude-plugin"
+  exit 1
+fi
+echo "Code-review plugin found"
+
 cd /tmp/hypershift
 
 # Configure git
@@ -188,6 +196,10 @@ while IFS= read -r line; do
     echo "Reached maximum issues limit ($MAX_ISSUES). Stopping."
     break
   fi
+  # Reset to main branch for clean state between issues
+  git checkout main 2>/dev/null || true
+  git reset --hard origin/main 2>/dev/null || true
+
   ISSUE_KEY=$(echo "$line" | awk '{print $1}')
   ISSUE_SUMMARY=$(echo "$line" | cut -d' ' -f2-)
 
@@ -208,7 +220,7 @@ while IFS= read -r line; do
 
   # Additional context for fork-based workflow
   # Git push uses fork token (configured via credential helper), gh CLI uses upstream token (GITHUB_TOKEN env var)
-  FORK_CONTEXT="IMPORTANT: You are working in a fork (hypershift-community/hypershift). Git push is pre-configured to work with the fork. After pushing the branch, you MUST create the PR by running: gh pr create --repo openshift/hypershift --head hypershift-community:<branch-name> --no-maintainer-edit --draft --title '<title>' --body '<body>'. The PR body MUST end with the following disclaimer on its own line: 'Always review AI generated responses prior to use.' The gh CLI is authenticated to openshift/hypershift. Do NOT skip PR creation - this is a required step. SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
+  FORK_CONTEXT="IMPORTANT: You are working in a fork (hypershift-community/hypershift). Git push is pre-configured to work with the fork. After creating commits on your feature branch, push the branch to origin. Do NOT create a Pull Request - the PR will be created in a subsequent automated step after code review. SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
 
   set +e  # Don't exit on error for individual issues
   echo "Starting Claude processing with streaming output..."
@@ -225,79 +237,113 @@ while IFS= read -r line; do
   echo "Claude processing complete. Full output saved to /tmp/claude-${ISSUE_KEY}-output.json"
 
   if [ $EXIT_CODE -eq 0 ]; then
-    # Extract the PR URL created by Claude. Strategy 1 (primary): parse the
-    # structured JSONL output to find tool_result content for "gh pr create"
-    # Bash tool calls. This is deterministic and avoids extra GitHub API calls.
-    # Strategy 2 (fallback): verify candidate URLs via gh pr view (costs N API
-    # calls but handles schema changes or missing JSONL output).
+    echo "✅ Phase 1 (jira-solve) completed for $ISSUE_KEY"
+    echo ""
+    echo "--- Claude jira-solve output for $ISSUE_KEY ---"
+    echo "$RESULT"
+    echo "--- End Claude jira-solve output ---"
+    echo ""
+
+    # Check if code changes were made (branch changed from main)
+    BRANCH_NAME=$(git branch --show-current)
+    HAS_CODE_CHANGES=false
     PR_URL=""
-    OUTPUT_FILE="/tmp/claude-${ISSUE_KEY}-output.json"
 
-    if [ -f "$OUTPUT_FILE" ]; then
-      # Extract tool_use IDs for "gh pr create" Bash commands.
-      # grep '^{' skips non-JSON stderr lines (from 2>&1).
-      IDS=$(grep '^{' "$OUTPUT_FILE" | jq -rs '
-        [.[] |
-         select(.type == "assistant") |
-         .message.content[]? |
-         select(.type == "tool_use" and .name == "Bash" and
-                (.input.command | tostring | contains("gh pr create"))) |
-         .id
-        ]' 2>/dev/null || echo '[]')
-
-      # If we found gh pr create calls, get the PR URL from matching results
-      if [ "$IDS" != "[]" ] && [ -n "$IDS" ]; then
-        PR_URL=$(grep '^{' "$OUTPUT_FILE" | jq -rs --argjson ids "$IDS" '
-          [.[] |
-           select(.type == "user") |
-           .message.content[]? |
-           select(.type == "tool_result" and (.tool_use_id | IN($ids[]))) |
-           .content |
-           if type == "array" then .[].text // empty
-           elif type == "string" then .
-           else empty end
-          ] |
-          map(capture("(?<url>https://github\\.com/[^/]+/[^/]+/pull/[0-9]+)").url) |
-          last // empty
-        ' 2>/dev/null || echo "")
+    if [ "$BRANCH_NAME" != "main" ] && [ "$BRANCH_NAME" != "master" ] && [ -n "$BRANCH_NAME" ]; then
+      DIFF_FILES=$(git diff main...HEAD --name-only 2>/dev/null || echo "")
+      if [ -n "$DIFF_FILES" ]; then
+        HAS_CODE_CHANGES=true
+        echo "Code changes detected on branch '$BRANCH_NAME':"
+        echo "$DIFF_FILES" | sed 's/^/  /' | head -20
       fi
     fi
 
-    # Fallback: verify candidate URLs via gh pr view if JSONL parsing found nothing
-    if [ -z "$PR_URL" ]; then
-      CANDIDATE_URLS=$(echo "$RESULT" | grep -oP 'https://github.com/openshift/hypershift/pull/[0-9]+' | sort -u || true)
-      if [ -n "$CANDIDATE_URLS" ]; then
-        while IFS= read -r url; do
-          PR_JSON=$(gh pr view "$url" --json title,author 2>/dev/null || true)
-          PR_TITLE=$(echo "$PR_JSON" | jq -r '.title // empty' 2>/dev/null || true)
-          PR_AUTHOR=$(echo "$PR_JSON" | jq -r '.author.login // empty' 2>/dev/null || true)
-          if [[ "$PR_TITLE" == "${ISSUE_KEY}"* ]] && [[ "$PR_AUTHOR" == *"hypershift-jira-solve-ci"* ]]; then
-            PR_URL="$url"
-            break
-          fi
-        done <<< "$CANDIDATE_URLS"
-      fi
-    fi
+    if [ "$HAS_CODE_CHANGES" = true ]; then
+      # === Phase 2: Pre-commit quality review ===
+      echo ""
+      echo "=========================================="
+      echo "Phase 2: Pre-commit quality review for $ISSUE_KEY"
+      echo "=========================================="
 
-    echo "✅ Successfully processed $ISSUE_KEY"
-    if [ -n "$PR_URL" ]; then
-      echo "   PR: $PR_URL"
-      # Add /auto-cc comment to assign reviewers
-      echo "   Adding /auto-cc comment to assign reviewers..."
-      if gh pr comment "$PR_URL" --body "/auto-cc"; then
-        echo "   /auto-cc comment added successfully"
+      REVIEW_PROMPT="/code-review:pre-commit-review --language go --profile hypershift"
+
+      set +e
+      REVIEW_RESULT=$(claude -p "$REVIEW_PROMPT" \
+        --plugin-dir "${REVIEW_PLUGIN_DIR}" \
+        --append-system-prompt "SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'." \
+        --allowedTools "Bash Read Write Edit Grep Glob Task" \
+        --max-turns 75 \
+        --model "$CLAUDE_MODEL" \
+        --verbose \
+        --output-format stream-json \
+        2>&1 | tee "/tmp/claude-${ISSUE_KEY}-review.json")
+      REVIEW_EXIT_CODE=$?
+      set -e
+
+      echo ""
+      echo "--- Claude review output for $ISSUE_KEY ---"
+      echo "$REVIEW_RESULT"
+      echo "--- End Claude review output ---"
+      echo ""
+
+      if [ $REVIEW_EXIT_CODE -eq 0 ]; then
+        echo "✅ Phase 2 (pre-commit review) completed for $ISSUE_KEY"
       else
-        echo "   Warning: Failed to add /auto-cc comment"
+        echo "⚠️ Phase 2 (pre-commit review) failed for $ISSUE_KEY (exit code: $REVIEW_EXIT_CODE)"
+        echo "Continuing with PR creation despite review failure..."
+      fi
+
+      # === Phase 3: Create Pull Request ===
+      echo ""
+      echo "=========================================="
+      echo "Phase 3: Creating Pull Request for $ISSUE_KEY"
+      echo "=========================================="
+
+      PR_PROMPT="Create a draft pull request for the changes on branch '${BRANCH_NAME}'. Details:
+- Jira issue: ${ISSUE_KEY}
+- Jira summary: ${ISSUE_SUMMARY}
+- Jira URL: https://issues.redhat.com/browse/${ISSUE_KEY}
+- Read the PR template at .github/PULL_REQUEST_TEMPLATE.md and use it to structure the PR body.
+- Use 'git log main..HEAD' to understand what changed and write a meaningful description.
+- PR title must start with '${ISSUE_KEY}: '.
+- The PR body MUST end with the following two lines:
+  Always review AI generated responses prior to use.
+  Generated with [Claude Code](https://claude.com/claude-code) via \`/jira:solve ${ISSUE_KEY}\`
+- Create the PR by running: gh pr create --repo openshift/hypershift --head hypershift-community:${BRANCH_NAME} --no-maintainer-edit --draft --title '<title>' --body '<body>'
+- After creating the PR, add a comment '/auto-cc' on the PR to assign reviewers.
+- SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
+
+      set +e
+      PR_RESULT=$(claude -p "$PR_PROMPT" \
+        --allowedTools "Bash Read Grep Glob" \
+        --max-turns 15 \
+        --model "$CLAUDE_MODEL" \
+        --verbose \
+        --output-format stream-json \
+        2>&1 | tee "/tmp/claude-${ISSUE_KEY}-pr.json")
+      PR_EXIT_CODE=$?
+      set -e
+
+      echo ""
+      echo "--- Claude PR creation output for $ISSUE_KEY ---"
+      echo "$PR_RESULT"
+      echo "--- End Claude PR creation output ---"
+      echo ""
+
+      if [ $PR_EXIT_CODE -eq 0 ]; then
+        PR_URL=$(echo "$PR_RESULT" | grep -oP 'https://github.com/openshift/hypershift/pull/[0-9]+' | head -1 || echo "")
+        if [ -n "$PR_URL" ]; then
+          echo "✅ PR created: $PR_URL"
+        else
+          echo "⚠️ Phase 3 completed but no PR URL found in output"
+        fi
+      else
+        echo "❌ Phase 3 (PR creation) failed for $ISSUE_KEY (exit code: $PR_EXIT_CODE)"
+        PR_URL=""
       fi
     else
-      echo "   Note: No PR URL found in output. Claude may have encountered an issue creating the PR."
+      echo "No code changes detected for $ISSUE_KEY, skipping review and PR creation"
     fi
-
-    echo ""
-    echo "--- Claude output for $ISSUE_KEY ---"
-    echo "$RESULT"
-    echo "--- End Claude output ---"
-    echo ""
 
     # Add 'agent-processed' label to mark issue as handled
     if [ -n "$JIRA_TOKEN" ]; then
