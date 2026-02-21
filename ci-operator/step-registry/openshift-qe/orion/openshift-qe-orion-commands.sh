@@ -163,11 +163,11 @@ set +e
 set -o pipefail
 FILENAME=$(basename ${ORION_CONFIG} | awk -F. '{print $1}')
 export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" 
-orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/${FILENAME}.txt
+orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} --viz | tee ${ARTIFACT_DIR}/${FILENAME}.txt
 orion_exit_status=$?
 set -e
 
-cp *.csv *.xml *.json *.txt "${ARTIFACT_DIR}/" 2>/dev/null || true
+cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
 
 if [ $orion_exit_status -eq 3 ]; then
   echo "Orion returned exit code 3, which means there are no results to analyze."
