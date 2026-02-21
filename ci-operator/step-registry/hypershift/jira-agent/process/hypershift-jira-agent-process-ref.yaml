@@ -38,10 +38,12 @@ ref:
     mount_path: /var/run/claude-code-service-account
   documentation: |-
     Process step for the HyperShift Jira agent periodic job.
-    This step runs a three-phase pipeline for each issue:
+    This step runs a four-phase pipeline for each issue:
     Phase 1 - Solve: Runs /jira-solve to implement changes, commit, and push the branch (no PR created)
-    Phase 2 - Review: Runs /code-review:pre-commit-review to review code quality and fix issues
-    Phase 3 - PR Creation: Creates a draft PR via gh CLI after review is complete
+    Phase 2 - Review: Runs /code-review:pre-commit-review to review code quality (read-only)
+    Phase 3 - Fix: Addresses review findings by editing code, committing, and pushing fixes
+    Phase 4 - PR Creation: Creates a draft PR via gh CLI after review is complete
+    Token usage (input/output) is extracted per phase and saved for reporting.
     Post-processing: Adds 'agent-processed' label, transitions issue status, sets assignee
     - Queries Jira for issues with label 'issue-for-agent' (excluding 'agent-processed')
     - Failed issues are retried on subsequent runs
