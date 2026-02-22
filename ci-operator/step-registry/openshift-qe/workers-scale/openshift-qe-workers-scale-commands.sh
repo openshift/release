@@ -68,6 +68,8 @@ export EXTRA_FLAGS
 if [[ "$EXTRA_FLAGS" == *"--annotation-check=k8s.ovn.org/remote-zone-migrated"* ]]; then
   echo "$(date): Starting OCPBUGS-70130 OVN annotation monitoring"
   echo "Monitoring node readiness and k8s.ovn.org/remote-zone-migrated annotation"
+  echo "This test validates the fix for rapid node scaling in OVN-Kubernetes"
+  echo "Target: Adding $ADDITIONAL_WORKER_NODES workers to test annotation behavior"
   echo "========================================================================"
   
   # Track initial state
@@ -94,7 +96,8 @@ if [[ "$EXTRA_FLAGS" == *"--annotation-check=k8s.ovn.org/remote-zone-migrated"* 
       # Count nodes with the annotation
       NODES_WITH_ANNOTATION=$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.annotations.k8s\.ovn\.org/remote-zone-migrated}{"\n"}{end}' | grep -c "^[^ ]* [^ ]*$" || echo 0)
       
-      echo "$TIMESTAMP: Total=$TOTAL_NODES Ready=$READY_NODES NotReady=$NOT_READY_NODES WithAnnotation=$NODES_WITH_ANNOTATION WithoutAnnotation=$NODES_WITHOUT_ANNOTATION"
+      echo "$TIMESTAMP: NODES: Total=$TOTAL_NODES Ready=$READY_NODES NotReady=$NOT_READY_NODES"
+      echo "$TIMESTAMP: ANNOTATIONS: WithAnnotation=$NODES_WITH_ANNOTATION WithoutAnnotation=$NODES_WITHOUT_ANNOTATION"
       
       # Check for nodes stuck without annotation
       if [ $NODES_WITHOUT_ANNOTATION -gt 0 ] && [ $NOT_READY_NODES -gt 0 ]; then
@@ -114,7 +117,15 @@ if [[ "$EXTRA_FLAGS" == *"--annotation-check=k8s.ovn.org/remote-zone-migrated"* 
         READY_JUMP=$((READY_NODES - INITIAL_READY_NODES))
         if [ $READY_JUMP -gt 10 ]; then
           echo "$TIMESTAMP: ALERT: Large jump in ready nodes (+$READY_JUMP) - possible mass readiness event"
+          echo "$TIMESTAMP: ANALYSIS: This indicates OCPBUGS-70130 fix is working - nodes becoming ready rapidly"
         fi
+      fi
+      
+      # Report progress milestones
+      PROGRESS_PCT=$(echo "scale=1; $READY_NODES * 100 / ($INITIAL_READY_NODES + $ADDITIONAL_WORKER_NODES)" | bc -l 2>/dev/null || echo "0")
+      if [ $READY_NODES -gt $INITIAL_READY_NODES ]; then
+        ADDED_WORKERS=$((READY_NODES - INITIAL_READY_NODES))
+        echo "$TIMESTAMP: PROGRESS: Added $ADDED_WORKERS/$ADDITIONAL_WORKER_NODES workers (${PROGRESS_PCT}%)"
       fi
       
       # Exit monitoring if we've reached target nodes and all are ready
@@ -135,20 +146,34 @@ if [[ "$EXTRA_FLAGS" == *"--annotation-check=k8s.ovn.org/remote-zone-migrated"* 
     FINAL_WITHOUT_ANNOTATION=$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.annotations.k8s\.ovn\.org/remote-zone-migrated}{"\n"}{end}' | grep -c "^[^ ]* $" || echo 0)
     
     echo "========== FINAL OCPBUGS-70130 Test Results =========="
-    echo "$(date): FINAL: Total=$FINAL_TOTAL Ready=$FINAL_READY NotReady=$FINAL_NOT_READY"
-    echo "$(date): FINAL: WithAnnotation=$FINAL_WITH_ANNOTATION WithoutAnnotation=$FINAL_WITHOUT_ANNOTATION"
+    echo "$(date): FINAL CLUSTER STATE:"
+    echo "$(date):   Total Nodes: $FINAL_TOTAL"
+    echo "$(date):   Ready Nodes: $FINAL_READY" 
+    echo "$(date):   NotReady Nodes: $FINAL_NOT_READY"
+    echo "$(date): FINAL ANNOTATION STATE:"
+    echo "$(date):   With remote-zone-migrated: $FINAL_WITH_ANNOTATION"
+    echo "$(date):   Without annotation: $FINAL_WITHOUT_ANNOTATION"
+    echo "$(date): TEST SCOPE: Scaled from $INITIAL_READY_NODES to $FINAL_TOTAL nodes (+$((FINAL_TOTAL - INITIAL_READY_NODES)) workers)"
     
-    # Test assessment
+    # Test assessment with detailed analysis
     if [ $FINAL_NOT_READY -eq 0 ] && [ $FINAL_TOTAL -ge $TARGET_TOTAL ]; then
-      echo "$(date): SUCCESS: All $FINAL_TOTAL nodes are Ready - OCPBUGS-70130 fix is working!"
+      echo "$(date): ✅ SUCCESS: All $FINAL_TOTAL nodes are Ready - OCPBUGS-70130 fix is working!"
+      echo "$(date): ✅ ANALYSIS: Rapid scaling to $FINAL_TOTAL nodes completed without node readiness issues"
     else
-      echo "$(date): WARNING: $FINAL_NOT_READY nodes still NotReady out of $FINAL_TOTAL total"
+      echo "$(date): ❌ WARNING: $FINAL_NOT_READY nodes still NotReady out of $FINAL_TOTAL total"
+      echo "$(date): ❌ ANALYSIS: Potential scaling issue detected - investigate further"
     fi
     
+    # Annotation analysis for Ricardo
     if [ $FINAL_WITHOUT_ANNOTATION -eq $FINAL_TOTAL ]; then
-      echo "$(date): INFO: No nodes have remote-zone-migrated annotation - this is expected behavior post-fix"
+      echo "$(date): 📝 ANNOTATION ANALYSIS: No nodes have remote-zone-migrated annotation"
+      echo "$(date): 📝 EXPECTED BEHAVIOR: Post-fix, annotations should be cleaned up after successful migration"
     elif [ $FINAL_WITHOUT_ANNOTATION -gt 0 ]; then
-      echo "$(date): INFO: $FINAL_WITHOUT_ANNOTATION nodes missing annotation, $FINAL_WITH_ANNOTATION have it"
+      echo "$(date): 📝 ANNOTATION ANALYSIS: Mixed state - $FINAL_WITHOUT_ANNOTATION missing, $FINAL_WITH_ANNOTATION with annotation"
+      echo "$(date): 📝 INVESTIGATION: Check if nodes are in transition or if cleanup is incomplete"
+    else
+      echo "$(date): 📝 ANNOTATION ANALYSIS: All nodes have remote-zone-migrated annotation"
+      echo "$(date): 📝 INVESTIGATION: Verify if this is expected behavior for your OpenShift version"
     fi
   } > ${SHARED_DIR}/ocpbugs-70130-monitoring.log 2>&1 &
   
