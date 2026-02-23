@@ -1,9 +1,16 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-echo "📸 Testing CNV VM snapshot operations with IBM Storage Scale shared storage..."
+eval "$(curl -fsSL \
+    https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/\
+libs/bash/ci-operator/interop/common/TestReport--JunitXml.sh
+)"
 
-# Set default values
+LP_IO__TR__RESULTS_FILE="${ARTIFACT_DIR}/junit_vm_snapshots_tests.xml"
+LP_IO__TR__SUITE_NAME="VM Snapshots Tests"
+LP_IO__TR__START_TIME="${SECONDS}"
+trap 'TestReport--GenerateJunitXml' EXIT
+
 CNV_NAMESPACE="${CNV_NAMESPACE:-openshift-cnv}"
 SHARED_STORAGE_CLASS="${SHARED_STORAGE_CLASS:-ibm-spectrum-scale-cnv}"
 TEST_NAMESPACE="${TEST_NAMESPACE:-cnv-snapshots-test}"
@@ -13,97 +20,6 @@ RESTORE_VM_NAME="${RESTORE_VM_NAME:-restored-vm}"
 VM_CPU_REQUEST="${VM_CPU_REQUEST:-1}"
 VM_MEMORY_REQUEST="${VM_MEMORY_REQUEST:-1Gi}"
 VM_SNAPSHOT_TIMEOUT="${VM_SNAPSHOT_TIMEOUT:-10m}"
-
-# JUnit XML test results
-JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_vm_snapshots_tests.xml"
-TEST_START_TIME=$SECONDS
-TESTS_TOTAL=0
-TESTS_FAILED=0
-TESTS_PASSED=0
-TEST_CASES=""
-
-# Function to escape XML special characters
-escape_xml() {
-  local text="$1"
-  # Escape XML special characters: & must be first to avoid double-escaping
-  echo "$text" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g; s/'\''/\&apos;/g'
-}
-
-# Function to add test result to JUnit XML
-add_test_result() {
-  local test_name="$1"
-  local test_status="$2"  # "passed" or "failed"
-  local test_duration="$3"
-  local test_message="${4:-}"
-  local test_classname="${5:-VMSnapshotsTests}"
-  
-  # Escape XML special characters in user-provided strings
-  test_name=$(escape_xml "$test_name")
-  test_message=$(escape_xml "$test_message")
-  test_classname=$(escape_xml "$test_classname")
-  
-  TESTS_TOTAL=$((TESTS_TOTAL + 1))
-  
-  if [[ "$test_status" == "passed" ]]; then
-    TESTS_PASSED=$((TESTS_PASSED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\"/>"
-  else
-    TESTS_FAILED=$((TESTS_FAILED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\">
-      <failure message=\"Test failed\">${test_message}</failure>
-    </testcase>"
-  fi
-}
-
-# Function to generate JUnit XML report
-generate_junit_xml() {
-  local total_duration=$((SECONDS - TEST_START_TIME))
-  
-  cat > "${JUNIT_RESULTS_FILE}" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuites>
-  <testsuite name="VM Snapshots Tests" tests="${TESTS_TOTAL}" failures="${TESTS_FAILED}" errors="0" time="${total_duration}">
-${TEST_CASES}
-  </testsuite>
-</testsuites>
-EOF
-  
-  echo ""
-  echo "📊 Test Results Summary:"
-  echo "  Total Tests: ${TESTS_TOTAL}"
-  echo "  Passed: ${TESTS_PASSED}"
-  echo "  Failed: ${TESTS_FAILED}"
-  echo "  Duration: ${total_duration}s"
-  echo "  Results File: ${JUNIT_RESULTS_FILE}"
-  
-  # Copy to SHARED_DIR for data router reporter (if available)
-  if [[ -n "${SHARED_DIR:-}" ]] && [[ -d "${SHARED_DIR}" ]]; then
-    cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}/junit_vm_snapshots_tests.xml"
-    echo "  ✅ Results copied to SHARED_DIR"
-  fi
-}
-
-start_test() {
-  local test_description="$1"
-  : "🧪 ${test_description}..."
-  echo "$SECONDS"
-}
-
-# Helper function to record test result (eliminates repetitive duration calculation)
-record_test() {
-  local test_start="$1"
-  local test_name="$2"
-  local test_status="$3"
-  local test_message="${4:-}"
-  
-  local test_duration=$((SECONDS - test_start))
-  add_test_result "$test_name" "$test_status" "$test_duration" "$test_message"
-}
-
-# Trap to ensure JUnit XML is generated even on failure
-trap generate_junit_xml EXIT
 
 echo "📋 Configuration:"
 echo "  CNV Namespace: ${CNV_NAMESPACE}"
@@ -264,12 +180,10 @@ else
   exit 1
 fi
 
-# Test 1: FA-CNV-1025 - Create VM snapshot
-test_start=$(start_test "FA-CNV-1025: Creating VM snapshot with shared storage")
-test_status="failed"
-test_message=""
+testStart="${SECONDS}"
+testStatus="failed"
+testMessage=""
 
-echo "  📸 Creating VirtualMachineSnapshot: ${SNAPSHOT_NAME}..."
 if oc apply -f - <<EOF
 apiVersion: snapshot.kubevirt.io/v1beta1
 kind: VirtualMachineSnapshot
@@ -283,83 +197,48 @@ spec:
     name: ${VM_NAME}
 EOF
 then
-  echo "  ✅ VirtualMachineSnapshot created successfully"
-  
-  # Wait for snapshot to be ready
-  echo "  ⏳ Waiting for snapshot to be ready (${VM_SNAPSHOT_TIMEOUT} timeout)..."
   if oc wait vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}" --for=condition=Ready --timeout="${VM_SNAPSHOT_TIMEOUT}"; then
-    echo "  ✅ Snapshot is ready"
-    
-    # Get snapshot status
-    SNAPSHOT_STATUS=$(oc get vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-    echo "  📊 Snapshot status: ${SNAPSHOT_STATUS}"
-    
-    test_status="passed"
+    testStatus="passed"
   else
-    echo "  ⚠️  Snapshot not ready within timeout"
-    test_message="Snapshot not ready within ${VM_SNAPSHOT_TIMEOUT}"
-    
-    # Get snapshot details for debugging
-    echo "  📊 Snapshot details:"
+    testMessage="Snapshot not ready within ${VM_SNAPSHOT_TIMEOUT}"
     oc get vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}" -o yaml || true
     oc describe vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}" || true
   fi
 else
-  echo "  ❌ Failed to create VirtualMachineSnapshot"
-  test_message="Failed to create VirtualMachineSnapshot resource"
+  testMessage="Failed to create VirtualMachineSnapshot resource"
 fi
 
-record_test "$test_start" "fa_cnv_1025_create_vm_snapshot" "$test_status" "$test_message"
+TestReport--AddCase "fa_cnv_1025_create_vm_snapshot" "${testStatus}" "$((SECONDS - testStart))" "${testMessage}"
 
-# Test 2: FA-CNV-1026 - Verify snapshot exists
-test_start=$(start_test "FA-CNV-1026: Verifying VM snapshot exists")
-test_status="failed"
-test_message=""
+testStart="${SECONDS}"
+testStatus="failed"
+testMessage=""
 
-# Check if snapshot exists
 if oc get vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-  echo "  ✅ VirtualMachineSnapshot exists"
-  
-  # Get snapshot details
-  SNAPSHOT_READY=$(oc get vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.readyToUse}' 2>/dev/null || echo "false")
-  echo "  📊 Snapshot readyToUse: ${SNAPSHOT_READY}"
-  
-  # Check for VolumeSnapshot resources created by the VM snapshot
-  echo "  🔍 Checking for VolumeSnapshot resources..."
-  VOLUME_SNAPSHOTS=$(oc get volumesnapshot -n "${TEST_NAMESPACE}" --no-headers 2>/dev/null | wc -l || echo "0")
-  echo "  📊 VolumeSnapshot count: ${VOLUME_SNAPSHOTS}"
-  
-  if [[ ${VOLUME_SNAPSHOTS} -gt 0 ]]; then
-    echo "  ✅ VolumeSnapshot resources created"
-    echo "  📋 VolumeSnapshots:"
+  volumeSnapshots=$(oc get volumesnapshot -n "${TEST_NAMESPACE}" --no-headers 2>/dev/null | wc -l || echo "0")
+
+  if [[ "${volumeSnapshots}" -gt 0 ]]; then
     oc get volumesnapshot -n "${TEST_NAMESPACE}" -o custom-columns="NAME:.metadata.name,READYTOUSE:.status.readyToUse,SOURCEPVC:.spec.source.persistentVolumeClaimName"
-    
-    # Verify snapshot content manifest
-    SNAPSHOT_CONTENT=$(oc get vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.virtualMachineSnapshotContentName}' 2>/dev/null || echo "")
-    if [[ -n "${SNAPSHOT_CONTENT}" ]]; then
-      echo "  ✅ Snapshot content manifest exists: ${SNAPSHOT_CONTENT}"
-      test_status="passed"
+
+    snapshotContent=$(oc get vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.virtualMachineSnapshotContentName}' 2>/dev/null || echo "")
+    if [[ -n "${snapshotContent}" ]]; then
+      testStatus="passed"
     else
-      echo "  ⚠️  Snapshot content manifest not found"
-      test_message="Snapshot content manifest not found"
+      testMessage="Snapshot content manifest not found"
     fi
   else
-    echo "  ⚠️  No VolumeSnapshot resources found"
-    test_message="No VolumeSnapshot resources created"
+    testMessage="No VolumeSnapshot resources created"
   fi
 else
-  echo "  ❌ VirtualMachineSnapshot not found"
-  test_message="VirtualMachineSnapshot resource not found"
+  testMessage="VirtualMachineSnapshot resource not found"
 fi
 
-record_test "$test_start" "fa_cnv_1026_verify_vm_snapshot_exists" "$test_status" "$test_message"
+TestReport--AddCase "fa_cnv_1026_verify_vm_snapshot_exists" "${testStatus}" "$((SECONDS - testStart))" "${testMessage}"
 
-# Test 3: FA-CNV-1027 - Restore VM from snapshot
-test_start=$(start_test "FA-CNV-1027: Restoring VM from snapshot")
-test_status="failed"
-test_message=""
+testStart="${SECONDS}"
+testStatus="failed"
+testMessage=""
 
-echo "  🔄 Creating VirtualMachineRestore: ${RESTORE_VM_NAME}-restore..."
 if oc apply -f - <<EOF
 apiVersion: snapshot.kubevirt.io/v1beta1
 kind: VirtualMachineRestore
@@ -374,140 +253,76 @@ spec:
   virtualMachineSnapshotName: ${SNAPSHOT_NAME}
 EOF
 then
-  echo "  ✅ VirtualMachineRestore created successfully"
-  
-  # Wait for restore to complete
-  echo "  ⏳ Waiting for restore to complete (${VM_SNAPSHOT_TIMEOUT} timeout)..."
   if oc wait vmrestore "${RESTORE_VM_NAME}-restore" -n "${TEST_NAMESPACE}" --for=condition=Complete --timeout="${VM_SNAPSHOT_TIMEOUT}"; then
-    echo "  ✅ Restore completed successfully"
-    
-    # Get restore status
-    RESTORE_STATUS=$(oc get vmrestore "${RESTORE_VM_NAME}-restore" -n "${TEST_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-    echo "  📊 Restore status: ${RESTORE_STATUS}"
-    
-    # Check if restored VM exists
     if oc get vm "${RESTORE_VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      echo "  ✅ Restored VM exists"
-      
-      # Try to start the restored VM
-      echo "  🚀 Starting restored VM to verify it boots..."
       if oc patch vm "${RESTORE_VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":true}}'; then
-        echo "  ✅ Restored VM start command sent"
-        
-        # Wait for VMI to be created
-        TIMEOUT=120
-        ELAPSED=0
-        VMI_FOUND=false
-        
-        while [[ $ELAPSED -lt $TIMEOUT ]]; do
+        elapsed=0
+        vmiFound=false
+
+        while [[ "${elapsed}" -lt 120 ]]; do
           if oc get vmi "${RESTORE_VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-            VMI_FOUND=true
+            vmiFound=true
             break
           fi
           sleep 5
-          ELAPSED=$((ELAPSED + 5))
+          elapsed=$((elapsed + 5))
         done
-        
-        if [[ "$VMI_FOUND" == "true" ]]; then
-          echo "  ✅ Restored VM VMI created - VM boots successfully"
-          test_status="passed"
+
+        if [[ "${vmiFound}" == "true" ]]; then
+          testStatus="passed"
         else
-          echo "  ⚠️  Restored VM VMI not created"
-          test_message="Restored VM VMI not created within timeout"
+          testMessage="Restored VM VMI not created within timeout"
         fi
       else
-        echo "  ⚠️  Failed to start restored VM"
-        test_message="Failed to start restored VM"
+        testMessage="Failed to start restored VM"
       fi
     else
-      echo "  ⚠️  Restored VM not found"
-      test_message="Restored VM not found after restore operation"
+      testMessage="Restored VM not found after restore operation"
     fi
   else
-    echo "  ⚠️  Restore not complete within timeout"
-    test_message="Restore not complete within ${VM_SNAPSHOT_TIMEOUT}"
-    
-    # Get restore details for debugging
-    echo "  📊 Restore details:"
+    testMessage="Restore not complete within ${VM_SNAPSHOT_TIMEOUT}"
     oc get vmrestore "${RESTORE_VM_NAME}-restore" -n "${TEST_NAMESPACE}" -o yaml || true
     oc describe vmrestore "${RESTORE_VM_NAME}-restore" -n "${TEST_NAMESPACE}" || true
   fi
 else
-  echo "  ❌ Failed to create VirtualMachineRestore"
-  test_message="Failed to create VirtualMachineRestore resource"
+  testMessage="Failed to create VirtualMachineRestore resource"
 fi
 
-record_test "$test_start" "fa_cnv_1027_restore_vm_from_snapshot" "$test_status" "$test_message"
+TestReport--AddCase "fa_cnv_1027_restore_vm_from_snapshot" "${testStatus}" "$((SECONDS - testStart))" "${testMessage}"
 
-# Test 4: FA-CNV-1028 - Delete VM snapshot
-test_start=$(start_test "FA-CNV-1028: Deleting VM snapshot")
-test_status="failed"
-test_message=""
+testStart="${SECONDS}"
+testStatus="failed"
+testMessage=""
 
-echo "  🗑️  Deleting VirtualMachineSnapshot: ${SNAPSHOT_NAME}..."
 if oc delete vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}"; then
-  echo "  ✅ VirtualMachineSnapshot deletion initiated"
-  
-  # Wait for snapshot to be deleted
-  echo "  ⏳ Waiting for snapshot to be deleted (2m timeout)..."
-  TIMEOUT=120
-  ELAPSED=0
-  SNAPSHOT_DELETED=false
-  
-  while [[ $ELAPSED -lt $TIMEOUT ]]; do
+  elapsed=0
+  snapshotDeleted=false
+
+  while [[ "${elapsed}" -lt 120 ]]; do
     if ! oc get vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      SNAPSHOT_DELETED=true
+      snapshotDeleted=true
       break
     fi
     sleep 5
-    ELAPSED=$((ELAPSED + 5))
+    elapsed=$((elapsed + 5))
   done
-  
-  if [[ "$SNAPSHOT_DELETED" == "true" ]]; then
-    echo "  ✅ VirtualMachineSnapshot deleted successfully"
-    
-    # Verify VolumeSnapshot resources are cleaned up
-    echo "  🔍 Checking VolumeSnapshot cleanup..."
-    VOLUME_SNAPSHOTS=$(oc get volumesnapshot -n "${TEST_NAMESPACE}" --no-headers 2>/dev/null | wc -l || echo "0")
-    echo "  📊 Remaining VolumeSnapshot count: ${VOLUME_SNAPSHOTS}"
-    
-    # Verify original VM is unaffected
+
+  if [[ "${snapshotDeleted}" == "true" ]]; then
     if oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
-      echo "  ✅ Original VM unaffected by snapshot deletion"
-      test_status="passed"
+      testStatus="passed"
     else
-      echo "  ⚠️  Original VM not found (unexpected)"
-      test_message="Original VM not found after snapshot deletion"
+      testMessage="Original VM not found after snapshot deletion"
     fi
   else
-    echo "  ⚠️  Snapshot not deleted within timeout"
-    test_message="Snapshot not deleted within 2m timeout"
+    testMessage="Snapshot not deleted within 2m timeout"
     oc get vmsnapshot "${SNAPSHOT_NAME}" -n "${TEST_NAMESPACE}" -o yaml || true
   fi
 else
-  echo "  ❌ Failed to delete VirtualMachineSnapshot"
-  test_message="Failed to delete VirtualMachineSnapshot resource"
+  testMessage="Failed to delete VirtualMachineSnapshot resource"
 fi
 
-record_test "$test_start" "fa_cnv_1028_delete_vm_snapshot" "$test_status" "$test_message"
+TestReport--AddCase "fa_cnv_1028_delete_vm_snapshot" "${testStatus}" "$((SECONDS - testStart))" "${testMessage}"
 
-# Display snapshot summary
-echo ""
-echo "📊 Snapshot Operations Summary:"
-if oc get vmsnapshot -n "${TEST_NAMESPACE}" >/dev/null; then
-  echo "  📋 VirtualMachineSnapshots:"
-  oc get vmsnapshot -n "${TEST_NAMESPACE}" -o custom-columns="NAME:.metadata.name,PHASE:.status.phase,READYTOUSE:.status.readyToUse,AGE:.metadata.creationTimestamp" 2>/dev/null || echo "  None"
-fi
-
-if oc get volumesnapshot -n "${TEST_NAMESPACE}" >/dev/null; then
-  echo "  📋 VolumeSnapshots:"
-  oc get volumesnapshot -n "${TEST_NAMESPACE}" -o custom-columns="NAME:.metadata.name,READYTOUSE:.status.readyToUse,SOURCEPVC:.spec.source.persistentVolumeClaimName" 2>/dev/null || echo "  None"
-fi
-
-# Cleanup
-echo ""
-echo "🧹 Cleaning up test resources..."
-echo "  🗑️  Stopping VMs..."
 if oc get vm "${VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
   oc patch vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --type=merge -p '{"spec":{"running":false}}' || true
 fi
@@ -516,33 +331,12 @@ if oc get vm "${RESTORE_VM_NAME}" -n "${TEST_NAMESPACE}" >/dev/null; then
 fi
 sleep 10
 
-echo "  🗑️  Deleting restore resource..."
 oc delete vmrestore "${RESTORE_VM_NAME}-restore" -n "${TEST_NAMESPACE}" --ignore-not-found
-
-echo "  🗑️  Deleting snapshots..."
 oc delete vmsnapshot -n "${TEST_NAMESPACE}" --all --ignore-not-found
-
-echo "  🗑️  Deleting VMs..."
 oc delete vm "${VM_NAME}" -n "${TEST_NAMESPACE}" --ignore-not-found
 oc delete vm "${RESTORE_VM_NAME}" -n "${TEST_NAMESPACE}" --ignore-not-found
-
-echo "  🗑️  Deleting DataVolumes..."
 oc delete datavolume "${VM_NAME}-dv" -n "${TEST_NAMESPACE}" --ignore-not-found
-
-echo "  🗑️  Deleting test namespace..."
 oc delete namespace "${TEST_NAMESPACE}" --ignore-not-found
 
-echo "  ✅ Cleanup completed"
-
-echo ""
-echo "📊 VM Snapshot Test Summary"
-echo "==========================="
-echo "✅ FA-CNV-1025: VM snapshot creation tested"
-echo "✅ FA-CNV-1026: VM snapshot verification tested"
-echo "✅ FA-CNV-1027: VM restore from snapshot tested"
-echo "✅ FA-CNV-1028: VM snapshot deletion tested"
-echo "✅ VolumeSnapshot integration with IBM Storage Scale CSI verified"
-echo ""
-echo "🎉 VM snapshot operations with IBM Storage Scale shared storage completed!"
-
+true
 
