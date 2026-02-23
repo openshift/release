@@ -48,7 +48,9 @@ else
   echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
 fi
 
-EXTRA_FLAGS="${METRIC_PROFILES} --additional-worker-nodes ${ADDITIONAL_WORKER_NODES} --enable-autoscaler=${DEPLOY_AUTOSCALER}" 
+# Preserve any EXTRA_FLAGS from configuration and append standard parameters
+CONFIGURED_EXTRA_FLAGS="${EXTRA_FLAGS:-}"
+EXTRA_FLAGS="${METRIC_PROFILES} --additional-worker-nodes ${ADDITIONAL_WORKER_NODES} --enable-autoscaler=${DEPLOY_AUTOSCALER} ${CONFIGURED_EXTRA_FLAGS}" 
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
@@ -57,7 +59,7 @@ if [ "$DEPLOY_AUTOSCALER" = "false" ] && [ -f "${SHARED_DIR}/workers_scale_event
   export START_TIME
   END_TIME=$(cat "${SHARED_DIR}/workers_scale_end_epoch.txt")
   export END_TIME
-  EXTRA_FLAGS="${METRIC_PROFILES} --scale-event-epoch ${START_TIME}" 
+  EXTRA_FLAGS="${METRIC_PROFILES} --scale-event-epoch ${START_TIME} ${CONFIGURED_EXTRA_FLAGS}" 
   rm -f "${SHARED_DIR}/workers_scale_event_epoch.txt"
   rm -f "${SHARED_DIR}/workers_scale_end_epoch.txt"
 fi
@@ -65,7 +67,7 @@ fi
 export EXTRA_FLAGS
 
 # OCPBUGS-70130: Start OVN annotation monitoring if requested
-if [[ "$EXTRA_FLAGS" == *"--annotation-check=k8s.ovn.org/remote-zone-migrated"* ]]; then
+if [[ "$CONFIGURED_EXTRA_FLAGS" == *"--annotation-check=k8s.ovn.org/remote-zone-migrated"* ]]; then
   echo "$(date): Starting OCPBUGS-70130 OVN annotation monitoring"
   echo "Monitoring node readiness and k8s.ovn.org/remote-zone-migrated annotation"
   echo "This test validates the fix for rapid node scaling in OVN-Kubernetes"
@@ -186,7 +188,7 @@ fi
 ES_INDEX="workers-scale-results" ./run.sh
 
 # OCPBUGS-70130: Stop monitoring and show results
-if [[ "$EXTRA_FLAGS" == *"--annotation-check=k8s.ovn.org/remote-zone-migrated"* ]]; then
+if [[ "$CONFIGURED_EXTRA_FLAGS" == *"--annotation-check=k8s.ovn.org/remote-zone-migrated"* ]]; then
   echo "$(date): Stopping OCPBUGS-70130 monitoring and collecting results"
   
   # Stop monitoring process if still running
