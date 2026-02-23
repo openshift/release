@@ -1,0 +1,75 @@
+ref:
+  as: interop-tests-ibm-fusion-access-prepare-host-paths
+  from: cli
+  commands: interop-tests-ibm-fusion-access-prepare-host-paths-commands.sh
+  timeout: 10m0s
+  env:
+  - name: FA__SCALE__NAMESPACE
+    default: "ibm-spectrum-scale"
+    documentation: Target namespace for IBM Storage Scale daemon resources
+  - name: FA__GPFS_IMAGE
+    default: "cp.icr.io/cp/gpfs/data-management/ibm-spectrum-scale-daemon@sha256:243d01d63492f43266fbeef623db711df5f40e878f900e39ef6bde36a6148315"
+    documentation: IBM Storage Scale daemon container image used for host path preparation
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Prepares host filesystem paths for IBM Storage Scale kernel/daemon communication.
+
+    ## Problem Solved
+
+    The GPFS kernel module (mmfslinux.ko) uses call_usermodehelper() to execute
+    binaries in the HOST namespace for version verification during daemon startup.
+    In containerized deployments, the daemon runs inside a container but the kernel
+    module looks for helper binaries on the HOST at the path configured in mmfsd_path
+    (typically /var/gpfs/bin/).
+
+    Without this step, the kernel upcall fails with ENOENT (rc -1 code 2), causing
+    the daemon to fail with ENOTTY errors when trying to attach to /dev/ss0.
+
+    ## How It Works
+
+    This step deploys a privileged DaemonSet that:
+
+    1. Creates required directories in /var/gpfs/ (writable on RHCOS)
+    2. Copies GPFS binaries from container image to host /var/gpfs/bin/
+    3. Copies GPFS libraries from container image to host /var/gpfs/lib/
+    4. Configures host ldconfig with /var/gpfs/lib for library resolution
+    5. Verifies host-side binary execution
+
+    ## Why Not MachineConfig?
+
+    Previous versions used MachineConfig which:
+    - Triggers node reboots (15-20 min per bare-metal node)
+    - Cannot write to /usr on RHCOS (immutable ostree filesystem)
+    - Had inverted bind mount logic that didn't work
+
+    The DaemonSet approach:
+    - Completes in seconds (no reboots)
+    - Writes only to /var (mutable on RHCOS)
+    - Uses the same container image as the daemon for binary compatibility
+
+    ## Kernel Header Handling
+
+    Note: This step does NOT install kernel-devel packages on hosts.
+    KMM (Kernel Module Management) handles kernel headers via the Driver Toolkit (DTK)
+    container image during module compilation. Host-side kernel-devel is not required.
+
+    ## Sequencing
+
+    This step MUST run before the Fusion Access operator deploys GPFS because:
+    - Host paths must exist before KMM loads kernel modules
+    - mmfsd_path=/var/gpfs/bin/ should point to existing files when module loads
+
+    Note: The Fusion Access operator (v0.0.19+) handles KMM automatically.
+    No separate KMM step is required.
+
+    ## References
+
+    - IBM Storage Scale Container Native docs:
+      https://www.ibm.com/docs/en/storage-scale-container-native
+    - GPFS Portability Layer architecture:
+      https://www.ibm.com/docs/en/storage-scale/5.2.3?topic=structure-gpfs-open-source-portability-layer
+    - Kernel Module Management (KMM):
+      https://docs.openshift.com/container-platform/latest/hardware_enablement/kmm-kernel-module-management.html

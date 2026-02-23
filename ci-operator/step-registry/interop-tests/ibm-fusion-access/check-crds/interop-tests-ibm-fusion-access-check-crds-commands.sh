@@ -1,86 +1,88 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+set -eux -o pipefail; shopt -s inherit_errexit
 
 # JUnit XML test results configuration
-ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
-JUNIT_RESULTS_FILE="${ARTIFACT_DIR}/junit_check_crds_tests.xml"
-TEST_START_TIME=$SECONDS
-TESTS_TOTAL=0
-TESTS_FAILED=0
-TESTS_PASSED=0
-TEST_CASES=""
+junitResultsFile="${ARTIFACT_DIR}/junit_check_crds_tests.xml"
+testStartTime=$SECONDS
+testsTotal=0
+testsFailed=0
+testsPassed=0
+testCases=""
 
 # Function to add test result to JUnit XML
-add_test_result() {
-  local test_name="$1"
-  local test_status="$2"  # "passed" or "failed"
-  local test_duration="$3"
-  local test_message="${4:-}"
-  local test_classname="${5:-CheckCRDsTests}"
+AddTestResult() {
+  typeset testName="${1}"; (($#)) && shift
+  typeset testStatus="${1}"; (($#)) && shift  # "passed" or "failed"
+  typeset testDuration="${1}"; (($#)) && shift
+  typeset testMessage="${1:-}"; (($#)) && shift
+  typeset testClassName="${1:-CheckCRDsTests}"; (($#)) && shift
   
-  TESTS_TOTAL=$((TESTS_TOTAL + 1))
+  testsTotal=$((testsTotal + 1))
   
-  if [[ "$test_status" == "passed" ]]; then
-    TESTS_PASSED=$((TESTS_PASSED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\"/>"
+  if [[ "$testStatus" == "passed" ]]; then
+    testsPassed=$((testsPassed + 1))
+    testCases="${testCases}
+    <testcase name=\"${testName}\" classname=\"${testClassName}\" time=\"${testDuration}\"/>"
   else
-    TESTS_FAILED=$((TESTS_FAILED + 1))
-    TEST_CASES="${TEST_CASES}
-    <testcase name=\"${test_name}\" classname=\"${test_classname}\" time=\"${test_duration}\">
-      <failure message=\"Test failed\">${test_message}</failure>
+    testsFailed=$((testsFailed + 1))
+    testCases="${testCases}
+    <testcase name=\"${testName}\" classname=\"${testClassName}\" time=\"${testDuration}\">
+      <failure message=\"Test failed\">${testMessage}</failure>
     </testcase>"
   fi
+
+  true
 }
 
 # Function to generate JUnit XML report
-generate_junit_xml() {
-  local total_duration=$((SECONDS - TEST_START_TIME))
+GenerateJunitXml() {
+  typeset totalDuration=$((SECONDS - testStartTime))
   
-  cat > "${JUNIT_RESULTS_FILE}" <<EOF
+  cat > "${junitResultsFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="Check CRDs Tests" tests="${TESTS_TOTAL}" failures="${TESTS_FAILED}" errors="0" time="${total_duration}">
-${TEST_CASES}
+  <testsuite name="Check CRDs Tests" tests="${testsTotal}" failures="${testsFailed}" errors="0" time="${totalDuration}">
+${testCases}
   </testsuite>
 </testsuites>
 EOF
   
-  echo ""
-  echo "📊 Test Results Summary:"
-  echo "  Total Tests: ${TESTS_TOTAL}"
-  echo "  Passed: ${TESTS_PASSED}"
-  echo "  Failed: ${TESTS_FAILED}"
-  echo "  Duration: ${total_duration}s"
-  echo "  Results File: ${JUNIT_RESULTS_FILE}"
+  : '📊 Test Results Summary:'
+  : "  Total Tests: ${testsTotal}"
+  : "  Passed: ${testsPassed}"
+  : "  Failed: ${testsFailed}"
+  : "  Duration: ${totalDuration}s"
+  : "  Results File: ${junitResultsFile}"
   
   # Copy to SHARED_DIR for data router reporter (if available)
   if [[ -n "${SHARED_DIR:-}" ]] && [[ -d "${SHARED_DIR}" ]]; then
-    cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}/$(basename ${JUNIT_RESULTS_FILE})"
-    echo "  ✅ Results copied to SHARED_DIR"
+    cp "${junitResultsFile}" "${SHARED_DIR}/$(basename ${junitResultsFile})"
+    : '  ✅ Results copied to SHARED_DIR'
   fi
+
+  true
 }
 
 # Trap to ensure JUnit XML is generated even on failure
-trap generate_junit_xml EXIT
+trap GenerateJunitXml EXIT
 
-echo "🔍 Waiting for IBM Storage Scale CRDs..."
+: '🔍 Waiting for IBM Storage Scale CRDs...'
 
 # Test 1: Wait for CRDs to be established
-test_start=$SECONDS
-test_status="failed"
-test_message=""
+testStart=$SECONDS
+testStatus="failed"
+testMessage=""
 
 # The FusionAccess operator installs the IBM Storage Scale operator which creates these CRDs
 if oc wait --for=condition=Established crd/clusters.scale.spectrum.ibm.com --timeout=600s; then
-  echo "✅ IBM Storage Scale CRDs are ready"
-  test_status="passed"
+  : '✅ IBM Storage Scale CRDs are ready'
+  testStatus="passed"
 else
-  echo "❌ CRDs not established within timeout"
-  test_message="CRDs not established within 600s timeout"
+  : '❌ CRDs not established within timeout'
+  testMessage="CRDs not established within 600s timeout"
 fi
 
-test_duration=$((SECONDS - test_start))
-add_test_result "test_storage_scale_crds_established" "$test_status" "$test_duration" "$test_message"
+testDuration=$((SECONDS - testStart))
+AddTestResult "test_storage_scale_crds_established" "$testStatus" "$testDuration" "$testMessage"
+
+true
