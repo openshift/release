@@ -1,8 +1,6 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-: 'Creating IBM Fusion Access pull secrets'
-
 CreateRegistryAuth() {
   typeset ns="${1}"; (($#)) && shift
   typeset name="${1}"; (($#)) && shift
@@ -63,14 +61,12 @@ oc wait --for=jsonpath='{.metadata.name}'=fusion-pullsecret secret/fusion-pullse
 CreateRegistryAuth "${FA__NAMESPACE}" "ibm-entitlement-key" "${FA__IBM_REGISTRY}" "cp" "${ibmEntitlementKeyPath}"
 oc wait --for=jsonpath='{.metadata.name}'=ibm-entitlement-key secret/ibm-entitlement-key -n "${FA__NAMESPACE}" --timeout=60s
 
-: 'Updating global cluster pull secret'
 oc get secret pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d | \
   jq --rawfile pwd "${ibmEntitlementKeyPath}" \
     --arg host "${FA__IBM_REGISTRY}" \
     '.auths[$host] = {auth: ("cp:\($pwd | rtrimstr("\n"))" | @base64), email: ""}' | \
   oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/dev/stdin
 
-: 'Creating ibm-entitlement-key in scale namespaces (if present)'
 for ns in "${FA__SCALE__NAMESPACE}" "${FA__SCALE__DNS_NAMESPACE}" "${FA__SCALE__CSI_NAMESPACE}" "${FA__SCALE__OPERATOR_NAMESPACE}"; do
   if oc get namespace "${ns}" >/dev/null; then
     CreateRegistryAuth "${ns}" "ibm-entitlement-key" "${FA__IBM_REGISTRY}" "cp" "${ibmEntitlementKeyPath}"
@@ -79,13 +75,10 @@ for ns in "${FA__SCALE__NAMESPACE}" "${FA__SCALE__DNS_NAMESPACE}" "${FA__SCALE__
 done
 
 if [[ -f /var/run/secrets/fusion-pullsecret-extra ]]; then
-  : 'Creating fusion-pullsecret-extra from optional credentials'
   CreateRegistryAuthFromFile "${FA__NAMESPACE}" "fusion-pullsecret-extra" "quay.io/openshift-storage-scale" "/var/run/secrets/fusion-pullsecret-extra"
   oc wait --for=jsonpath='{.metadata.name}'=fusion-pullsecret-extra secret/fusion-pullsecret-extra -n "${FA__NAMESPACE}" --timeout=60s
 fi
 
 PatchDefaultSAImagePullSecrets
-
-: 'IBM Fusion Access pull secrets created'
 
 true

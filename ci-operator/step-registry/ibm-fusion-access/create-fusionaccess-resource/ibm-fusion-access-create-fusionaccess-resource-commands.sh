@@ -1,8 +1,6 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-: 'Creating FusionAccess resource...'
-
 oc apply -f=- <<EOF
 apiVersion: fusion.storage.openshift.io/v1alpha1
 kind: FusionAccess
