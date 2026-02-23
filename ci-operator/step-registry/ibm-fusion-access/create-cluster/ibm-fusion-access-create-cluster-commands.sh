@@ -1,8 +1,6 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-: 'Creating IBM Storage Scale Cluster'
-
 workerCount=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | wc -l)
 
 cat > /tmp/cluster-skeleton.yaml <<'SKELETON'
@@ -51,16 +49,13 @@ yq -o json /tmp/cluster-skeleton.yaml | \
         { name: "storage", resources: { cpu: $storageCpu, memory: $storageMem } }
       ] |
       if $quorum == 1 then .spec.quorum = { autoAssign: true } else . end
-    ' | oc apply -f -
+    ' | \
+  oc create --dry-run=client -o json --save-config -f - | \
+  oc apply -f -
 
-oc get cluster "${FA__SCALE__CLUSTER_NAME}" -n "${FA__SCALE__NAMESPACE}"
-
-: 'Waiting for cluster to be ready (may take 10-15 minutes)'
 oc wait --for=jsonpath='{.status.conditions[?(@.type=="Ready")].status}'=True \
   cluster/"${FA__SCALE__CLUSTER_NAME}" \
   -n "${FA__SCALE__NAMESPACE}" \
   --timeout="${FA__SCALE__CLUSTER_READY_TIMEOUT}"
-
-: '✅ IBM Storage Scale Cluster is ready'
 
 true
