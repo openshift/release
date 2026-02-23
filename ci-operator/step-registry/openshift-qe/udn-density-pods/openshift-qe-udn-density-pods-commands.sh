@@ -54,7 +54,7 @@ fi
 
 
 export WORKLOAD=udn-density-pods
-EXTRA_FLAGS+=" --local-indexing --layer3=${ENABLE_LAYER_3} --local-indexing --iterations=${ITERATIONS} --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+EXTRA_FLAGS="${KB_FLAGS} --local-indexing --layer3=${ENABLE_LAYER_3} --local-indexing --iterations=${ITERATIONS} --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
