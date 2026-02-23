@@ -8,26 +8,28 @@ ref:
       cpu: 100m
       memory: 200Mi
   env:
-  - name: STORAGE_SCALE_NAMESPACE
+  - name: FA__SCALE__NAMESPACE
     documentation: The namespace for IBM Storage Scale
     default: "ibm-spectrum-scale"
+  - name: FA__LOCALDISK_NAME
+    documentation: Name of the shared LocalDisk resource
+    default: "shared-san-disk"
   documentation: |-
-    Create IBM Storage Scale LocalDisk resources for shared EBS volumes.
-    
-    This step creates LocalDisk custom resources that represent the shared
-    EBS volumes attached to worker nodes. LocalDisk resources are required
-    for IBM Storage Scale to properly manage shared storage across multiple nodes.
-    
-    For each EBS volume (nvme2n1, nvme3n1, nvme4n1), a LocalDisk resource is
-    created with:
-    - device: The NVMe device path on the node
-    - node: The reference node where the device exists
-    - nodeConnectionSelector: Specifies which nodes can access the shared device
-    
+    Create IBM Storage Scale LocalDisk resource for shared SAN storage.
+
+    This step creates a SINGLE LocalDisk custom resource representing the
+    multi-attach io2 EBS volume shared by all worker nodes. This follows
+    IBM's documented SAN architecture where a shared LUN is accessible
+    from all storage nodes.
+
+    The LocalDisk is created with:
+    - device: NVMe device path pattern for EBS volumes
+    - node: First worker node (used for device discovery only)
+    - nodeConnectionSelector: Matches ALL worker nodes (shared access)
+
     This step must run after:
     - IBM Storage Scale cluster creation
-    - EBS volume attachment (storage-create-aws-extra-disks)
-    
-    This step must run before:
-    - Filesystem creation (which references LocalDisk names)
+    - Multi-attach EBS volume attachment (interop-tests-ibm-fusion-access-create-aws-multiattach-ebs)
 
+    This step must run before:
+    - Filesystem creation (which references the LocalDisk name)
