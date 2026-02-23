@@ -6,7 +6,7 @@ if [[ -f ${SHARED_DIR}/dpf-env ]]; then
     source ${SHARED_DIR}/dpf-env
 else
     echo " No dpf-env file found, using defaults"
-    REMOTE_HOST="${REMOTE_HOST:-nvd-srv-45.nvidia.eng.rdu2.dc.redhat.com}"
+    REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
     REMOTE_WORK_DIR="${REMOTE_WORK_DIR:-unknown}"
     CLUSTER_NAME="${CLUSTER_NAME:-unknown}"
 fi
