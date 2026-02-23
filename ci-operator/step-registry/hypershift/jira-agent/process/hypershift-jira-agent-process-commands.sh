@@ -169,9 +169,15 @@ set_assignee() {
 
 # Query Jira for issues (excluding already processed ones via label)
 echo "Querying Jira for issues..."
+if [ -n "${JIRA_AGENT_ISSUE_KEY:-}" ]; then
+  echo "Using override: JIRA_AGENT_ISSUE_KEY=$JIRA_AGENT_ISSUE_KEY"
+  JQL="key = ${JIRA_AGENT_ISSUE_KEY}"
+else
+  JQL="project in (OCPBUGS, CNTRLPLANE) AND resolution = Unresolved AND status in (New, \"To Do\") AND labels = issue-for-agent AND labels != agent-processed"
+fi
 ISSUES=$(curl -s "https://issues.redhat.com/rest/api/2/search" \
   -G \
-  --data-urlencode 'jql=project in (OCPBUGS, CNTRLPLANE) AND resolution = Unresolved AND status in (New, "To Do") AND labels = issue-for-agent AND labels != agent-processed' \
+  --data-urlencode "jql=$JQL" \
   --data-urlencode 'fields=key,summary' \
   --data-urlencode "maxResults=$MAX_ISSUES" \
   | jq -r '.issues[]? | "\(.key) \(.fields.summary)"')
