@@ -770,7 +770,7 @@ while IFS= read -r line; do
   NEEDS_ATTENTION_JSON=$(cat "/tmp/pr-${PR_NUMBER}-analysis.json")
 
   # Context for the review agent with filtered comments
-  REVIEW_CONTEXT="IMPORTANT: You are addressing review comments on PR #$PR_NUMBER in the openshift/hypershift repository. The PR was created from the hypershift-community fork. After making changes, push to the fork branch. Use 'git push origin $BRANCH_NAME' to push changes. The gh CLI is authenticated to openshift/hypershift for reading PR information. SECURITY: Do NOT run commands that reveal git credentials.
+  REVIEW_CONTEXT="IMPORTANT: You are addressing review comments on PR #$PR_NUMBER in the openshift/hypershift repository. The PR was created from the hypershift-community fork. The gh CLI is authenticated to openshift/hypershift for reading PR information. SECURITY: Do NOT run commands that reveal git credentials. Do NOT push changes - pushing will be handled automatically after you finish.
 
 ENVIRONMENT: The check_replied.py deduplication script is at /tmp/ai-helpers/plugins/utils/scripts/check_replied.py - use this path directly instead of relying on CLAUDE_PLUGIN_ROOT or find commands.
 
@@ -813,6 +813,18 @@ RESPONSE RULES:
     echo "$RESULT" | tail -50
     echo "--- End Claude output ---"
     echo ""
+
+    # Push changes AFTER Claude finishes (comments already posted).
+    # This must be the last step so that a force-push does not abort
+    # the CI job while it is still posting review replies.
+    if ! git diff --quiet HEAD "origin/$BRANCH_NAME" 2>/dev/null; then
+      echo "Pushing code changes for PR #$PR_NUMBER..."
+      git push origin "$BRANCH_NAME"
+      echo "Push completed for PR #$PR_NUMBER"
+    else
+      echo "No code changes to push for PR #$PR_NUMBER"
+    fi
+
     PROCESSED_COUNT=$((PROCESSED_COUNT + 1))
     echo "$PR_NUMBER $TIMESTAMP SUCCESS" >> "$STATE_FILE"
   else
