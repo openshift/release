@@ -10,7 +10,7 @@ hcp_ns="$HC_NS-$HC_NAME"
 export hcp_ns
 hcp_domain=$(echo -n $PROW_JOB_ID|cut -c-8)-$HYPERSHIFT_BASEDOMAIN
 export hcp_domain
-CLUSTER_ARCH=s390x
+CLUSTER_ARCH=$(oc get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}')
 export CLUSTER_ARCH
 
 ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
@@ -88,7 +88,7 @@ ${HYPERSHIFT_CLI_NAME} create cluster kubevirt \
     --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
     --infra-availability-policy ${HYPERSHIFT_INFRA_AVAILABILITY_POLICY} \
     --namespace $HC_NS \
-    --memory 8Gi \
+    --memory 16Gi \
     --cores 4 \
     --root-volume-size 60 \
     --release-image ${OCP_IMAGE_MULTI} ${extra_flags} > /tmp/hc-manifests/cluster-agent.yaml
@@ -277,7 +277,7 @@ create_sg_rule() {
 # Create security group rules to open the port range 30000-33000 for TCP traffic
 sg_name="$CLUSTER_NAME-sg"
 create_sg_rule $sg_name inbound tcp 30000 33000
-
+create_sg_rule $sg_name inbound tcp 3128 3128
 
 echo "$(date) Create hosted cluster kubeconfig"
 ${HYPERSHIFT_CLI_NAME} create kubeconfig kubevirt \
@@ -419,16 +419,13 @@ while [[ -z "$LB_EXTERNAL_IP" || "$LB_EXTERNAL_IP" == "<pending>" ]]; do
         -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
 done
 echo "LoadBalancer External IP: $LB_EXTERNAL_IP"
-echo
 
 echo "=== Creating DNS Zone: ${DNS_ZONE_NAME} ==="
 ZONE_OUTPUT=$(ibmcloud dns zone-create --instance "$DNS_INSTANCE_NAME" "$DNS_ZONE_NAME")
 echo "$ZONE_OUTPUT"
-echo
 
 ZONE_ID=$(echo "$ZONE_OUTPUT" | awk '/ID/ {print $2}')
 echo "DNS Zone ID: $ZONE_ID"
-echo
 
 echo "=== Getting VPC CRN ==="
 VPC_NAME="${CLUSTER_NAME}-vpc"
@@ -446,10 +443,8 @@ ibmcloud dns permitted-network-add "$ZONE_ID" \
     --vpc-crn "$VPC_CRN" \
     --instance "$DNS_INSTANCE_NAME"
 
-echo
 echo "=== Verifying DNS Zone ==="
 ibmcloud dns zones --instance "$DNS_INSTANCE_NAME"
-echo
 
 echo "=== Creating Wildcard A Record: *.apps.${DNS_ZONE_NAME} ==="
 ibmcloud dns resource-record-create "$ZONE_ID" \
@@ -459,7 +454,6 @@ ibmcloud dns resource-record-create "$ZONE_ID" \
   --ttl "$TTL" \
   --instance "$DNS_INSTANCE_NAME"
 
-echo
 echo "=== DNS Setup Complete ==="
 echo "*.apps.${DNS_ZONE_NAME}  -->  ${LB_EXTERNAL_IP}"
 
@@ -482,9 +476,63 @@ fi
 
 echo "$(date) Successfully completed the Hosted cluster creation with type Kubevirt"
 
+#Patching hcp kubeconfig
+HCP_KUBE=$(
+  oc --kubeconfig="$HOSTED_KUBECONFIG" config view \
+    -o jsonpath='{.clusters[0].name}'
+)
 
+oc --kubeconfig="$HOSTED_KUBECONFIG" config set-cluster "$HCP_KUBE" \
+  --certificate-authority=
 
+oc --kubeconfig="$HOSTED_KUBECONFIG" config set-cluster "$HCP_KUBE" \
+  --insecure-skip-tls-verify=true
 
+# Downloading the script to set proxy server
+echo "Downloading the setup script for proxy"
 
+GIT_SSH_COMMAND="ssh -i $tmp_ssh_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=no" \
+git clone git@github.ibm.com:OpenShift-on-Z/hosted-control-plane.git &&
 
+echo "Getting the proxy setup script"
+cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
 
+# Configuring proxy server on bastion
+echo "Getting management cluster basedomain to allow traffic to proxy server"
+mgmt_domain=$(oc whoami --show-server | awk -F'.' '{print $(NF-1)"."$NF}' | cut -d':' -f1)
+
+echo "Getting the proxy setup script"
+cp hosted-control-plane/.archive/setup_proxy.sh $HOME/setup_proxy.sh
+
+sed -i "s|MGMT_DOMAIN|${mgmt_domain}|" $HOME/setup_proxy.sh 
+sed -i "s|HCP_DOMAIN|${hcp_domain}|" $HOME/setup_proxy.sh 
+sed -i "s|BASTION_FIP|${BASTION_FIP}|" $HOME/setup_proxy.sh
+chmod 700 $HOME/setup_proxy.sh
+
+echo "Transferring the setup script to Bastion"
+scp -i "$SSH_KEY" \
+  -o StrictHostKeyChecking=no \
+  -o UserKnownHostsFile=/dev/null \
+  "$HOME/setup_proxy.sh" \
+  root@"$BASTION_FIP":/root/setup_proxy.sh
+
+echo "Triggering the proxy server setup on Bastion"
+ssh -i "$SSH_KEY" \
+  -o StrictHostKeyChecking=no \
+  -o UserKnownHostsFile=/dev/null \
+  root@"$BASTION_FIP" \
+  bash /root/setup_proxy.sh
+
+cat <<EOF > "${SHARED_DIR}/proxy-conf.sh"
+export HTTP_PROXY=http://${BASTION_FIP}:3128/
+export HTTPS_PROXY=http://${BASTION_FIP}:3128/
+export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+export http_proxy=http://${BASTION_FIP}:3128/
+export https_proxy=http://${BASTION_FIP}:3128/
+export no_proxy="static.redhat.com,redhat.io,amazonaws.com,r2.cloudflarestorage.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+EOF
+
+# Sourcing the proxy settings for the next steps
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi

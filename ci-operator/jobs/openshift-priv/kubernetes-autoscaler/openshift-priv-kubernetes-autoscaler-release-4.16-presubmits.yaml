@@ -34,9 +34,17 @@ presubmits:
         - --target=e2e-aws
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -117,9 +125,17 @@ presubmits:
         - --target=e2e-aws-operator
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -200,9 +216,17 @@ presubmits:
         - --target=e2e-azure-operator
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -283,9 +307,17 @@ presubmits:
         - --target=e2e-gcp-operator
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -366,9 +398,17 @@ presubmits:
         - --target=e2e-hypershift
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -445,9 +485,17 @@ presubmits:
         - --target=git-history
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -509,9 +557,17 @@ presubmits:
         - --target=goimports
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -572,9 +628,17 @@ presubmits:
         - --target=golint
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -635,9 +699,17 @@ presubmits:
         - --target=govet
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -738,72 +810,6 @@ presubmits:
     - ^release-4\.16$
     - ^release-4\.16-
     cluster: build06
-    context: ci/prow/okd-scos-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    hidden: true
-    labels:
-      ci-operator.openshift.io/variant: okd-scos
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-kubernetes-autoscaler-release-4.16-okd-scos-images
-    path_alias: github.com/openshift/kubernetes-autoscaler
-    rerun_command: /test okd-scos-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=okd-scos
-        command:
-        - ci-operator
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )okd-scos-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.16$
-    - ^release-4\.16-
-    cluster: build06
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -827,9 +833,17 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

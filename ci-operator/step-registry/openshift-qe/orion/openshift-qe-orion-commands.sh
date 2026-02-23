@@ -5,6 +5,32 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
+# UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
+if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
+    # Get current worker count (excluding infra and workload nodes)
+    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
+    echo "Current worker count: $current_worker_count"
+
+    # Determine scale prefix based on worker count
+    if [[ $current_worker_count -ge 200 ]]; then
+        scale_prefix="large-scale"
+    elif [[ $current_worker_count -ge 100 ]]; then
+        scale_prefix="med-scale"
+    elif [[ $current_worker_count -ge 20 ]]; then
+        scale_prefix="small-scale"
+    else
+        scale_prefix="trt-external-payload"
+    fi
+
+    # Select orion config based on UDN layer mode
+    if [[ "${ENABLE_LAYER_3}" == "false" ]]; then
+        export ORION_CONFIG="examples/${scale_prefix}-udn-l2.yaml"
+    else
+        export ORION_CONFIG="examples/${scale_prefix}-udn-l3.yaml"
+    fi
+    echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
+fi
+
 python --version
 pushd /tmp
 python -m virtualenv ./venv_qe
@@ -93,6 +119,8 @@ if [[ -n "$ORION_CONFIG" ]]; then
     fi
 fi
 
+VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+export VERSION
 if [[ -n "$ACK_FILE" ]]; then
     if [[ "$ACK_FILE" =~ ^https?:// ]]; then
         ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
@@ -121,10 +149,6 @@ if [[ -n "${ORION_ENVS}" ]]; then
       env_value=$(echo "$env_pair" | cut -d'=' -f2-)
       export "$env_key"="$env_value"
     done
-fi
-
-if [[ -n "${LOOKBACK_SIZE}" ]]; then
-    EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
 fi
 
 if [[ -n "${LOOKBACK_SIZE}" ]]; then
