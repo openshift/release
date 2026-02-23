@@ -65,6 +65,20 @@ if ! wait; then
   echo "At least one deprovision job failed or timed out."
 fi
 
+for workdir in $(find "${logdir}" -mindepth 1 -type d); do
+  if [[ -f "${workdir}/failure" ]]; then
+    infraID="$(basename "${workdir}")"
+    echo "Attempting to delete VPC network ${infraID}-network ..."
+    if gcloud --project="${GCP_PROJECT}" compute networks delete "${infraID}-network" --quiet; then
+      echo "Successfully deleted VPC network for ${infraID}"
+      rm "${workdir}/failure"
+      touch "${workdir}/warning"
+    else
+      echo "Failed to delete VPC network for ${infraID}"
+    fi
+  fi
+done
+
 gcs_bucket_age_cutoff="$(TZ="GMT" date --date="${CLUSTER_TTL}-8 hours" '+%a, %d %b %Y %H:%M:%S GMT')"
 gcs_bucket_age_cutoff_seconds="$(date --date="${gcs_bucket_age_cutoff}" '+%s')"
 echo "deleting GCS buckets with a creationTimestamp before ${gcs_bucket_age_cutoff} in GCE ..."
@@ -91,6 +105,12 @@ for INSTANCE in $INSTANCES; do
     echo "Deleting Filestore instance $INSTANCE"
     gcloud filestore instances delete "$INSTANCE" --async --force --quiet
 done
+
+WARNINGS="$(find ${clusters} -name warning -printf '%H\n' | sort)"
+if [[ -n "${WARNINGS}" ]]; then
+  echo "The following clusters required VPC network cleanup:"
+  xargs --max-args 1 basename <<< $WARNINGS
+fi
 
 FAILED="$(find ${clusters} -name failure -printf '%H\n' | sort)"
 if [[ -n "${FAILED}" ]]; then
