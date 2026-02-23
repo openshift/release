@@ -50,7 +50,9 @@ fi
 
 # Preserve any EXTRA_FLAGS from configuration and append standard parameters
 CONFIGURED_EXTRA_FLAGS="${EXTRA_FLAGS:-}"
-EXTRA_FLAGS="${METRIC_PROFILES} --additional-worker-nodes ${ADDITIONAL_WORKER_NODES} --enable-autoscaler=${DEPLOY_AUTOSCALER} ${CONFIGURED_EXTRA_FLAGS}" 
+# Remove --annotation-check flag since run.sh doesn't support it
+FILTERED_EXTRA_FLAGS=$(echo "${CONFIGURED_EXTRA_FLAGS}" | sed 's/--annotation-check=[^ ]* *//g')
+EXTRA_FLAGS="${METRIC_PROFILES} --additional-worker-nodes ${ADDITIONAL_WORKER_NODES} --enable-autoscaler=${DEPLOY_AUTOSCALER} ${FILTERED_EXTRA_FLAGS}" 
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
@@ -59,7 +61,7 @@ if [ "$DEPLOY_AUTOSCALER" = "false" ] && [ -f "${SHARED_DIR}/workers_scale_event
   export START_TIME
   END_TIME=$(cat "${SHARED_DIR}/workers_scale_end_epoch.txt")
   export END_TIME
-  EXTRA_FLAGS="${METRIC_PROFILES} --scale-event-epoch ${START_TIME} ${CONFIGURED_EXTRA_FLAGS}" 
+  EXTRA_FLAGS="${METRIC_PROFILES} --scale-event-epoch ${START_TIME} ${FILTERED_EXTRA_FLAGS}" 
   rm -f "${SHARED_DIR}/workers_scale_event_epoch.txt"
   rm -f "${SHARED_DIR}/workers_scale_end_epoch.txt"
 fi
