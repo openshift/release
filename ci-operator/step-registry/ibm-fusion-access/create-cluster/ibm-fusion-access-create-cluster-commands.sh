@@ -53,7 +53,7 @@ yq -o json /tmp/cluster-skeleton.yaml | \
   oc create --dry-run=client -o json --save-config -f - | \
   oc apply -f -
 
-oc wait --for=jsonpath='{.status.conditions[?(@.type=="Ready")].status}'=True \
+oc wait --for=jsonpath='{.status.conditions[?(@.type=="Success")].status}'=True \
   cluster/"${FA__SCALE__CLUSTER_NAME}" \
   -n "${FA__SCALE__NAMESPACE}" \
   --timeout="${FA__SCALE__CLUSTER_READY_TIMEOUT}"
