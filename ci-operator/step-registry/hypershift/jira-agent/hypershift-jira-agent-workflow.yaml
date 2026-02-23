@@ -5,12 +5,19 @@ workflow:
       - ref: hypershift-jira-agent-setup
     test:
       - ref: hypershift-jira-agent-process
+    post:
+      - ref: hypershift-jira-agent-report
   documentation: |-
     HyperShift Jira Agent workflow for automated issue processing.
 
     This workflow:
     1. Setup: Verifies Claude Code CLI is available
-    2. Process: Queries Jira for labeled issues, runs /jira-solve for each, creates PRs
+    2. Process: For each Jira issue, runs a four-phase pipeline:
+       a. Phase 1 - Solve: Runs /jira-solve to implement, commit, and push changes
+       b. Phase 2 - Review: Runs /code-review:pre-commit-review to review code quality (read-only)
+       c. Phase 3 - Fix: Addresses review findings by editing code and pushing fixes
+       d. Phase 4 - PR: Creates a draft PR after review is complete
+    3. Report: Generates HTML report with per-phase token usage, cost estimates, and posts link on PRs
 
-    The workflow uses the /jira-solve command in non-interactive mode.
+    The workflow uses /jira-solve and /code-review:pre-commit-review in non-interactive mode.
     Issues are queried from Jira with: project in (OCPBUGS, CNTRLPLANE) AND status in (New, "To Do") AND labels = issue-for-agent
