@@ -124,12 +124,18 @@ compute_ip_addresses="[${compute_ip_addresses%,}]"
 echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
 echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
 
-export HOME=/tmp
+# Use writable runtime dir so oc registry login does not need /run/containers
+# (avoids "mkdir /run/containers: permission denied" on strict clusters, e.g. build02.vmc)
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+mkdir -p "${XDG_RUNTIME_DIR}/containers"
+
 # Check if custom release image override is provided
 if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
   # Authenticate to build farm registries before pulling custom payload
   # Unset KUBECONFIG to ensure we interact with the build farm, not the cluster under test
   unset KUBECONFIG
+  echo "Registry auth will be written to ${XDG_RUNTIME_DIR}/containers (XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR})"
   oc registry login
   PULL_SECRET="${CLUSTER_PROFILE_DIR}"/pull-secret
   CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${PULL_SECRET}" --output=jsonpath="{.digest}")
