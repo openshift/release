@@ -3,50 +3,34 @@ set -eux -o pipefail; shopt -s inherit_errexit
 
 FA__SCALE__NAMESPACE="${FA__SCALE__NAMESPACE:-ibm-spectrum-scale}"
 
-echo "🔧 Patching buildgpl ConfigMap for RHCOS compatibility..."
-echo "NOTE: IBM Storage Scale v5.2.3.1 manifests create a broken buildgpl script"
-echo "This step fixes the script to work on RHCOS"
-echo ""
+: 'Patching buildgpl ConfigMap for RHCOS compatibility'
 
 # Wait for buildgpl ConfigMap to be created by operator (may take up to 15 minutes)
-echo "Waiting for buildgpl ConfigMap to be created (timeout: 15 minutes)..."
-COUNTER=0
-MAX_WAIT=900  # 15 minutes
+counter=0
+maxWait=900
 
-while [ $COUNTER -lt $MAX_WAIT ]; do
+while [[ $counter -lt $maxWait ]]; do
   if oc get configmap buildgpl -n "${FA__SCALE__NAMESPACE}" >/dev/null; then
-    echo "✅ buildgpl ConfigMap found after ${COUNTER}s"
     break
   fi
-  sleep 30
-  COUNTER=$((COUNTER + 30))
-  if [ $((COUNTER % 120)) -eq 0 ]; then
-    echo "  Still waiting... ${COUNTER}s elapsed"
+  if oc wait --for=jsonpath='{.metadata.name}'=buildgpl configmap/buildgpl \
+      -n "${FA__SCALE__NAMESPACE}" --timeout=30s; then
+    break
   fi
+  counter=$((counter + 30))
 done
 
 if ! oc get configmap buildgpl -n "${FA__SCALE__NAMESPACE}" >/dev/null; then
-  echo "⚠️  buildgpl ConfigMap not created after ${MAX_WAIT}s"
-  echo "   This may indicate:"
-  echo "   - Operator is using a different kernel module build method"
-  echo "   - KMM is being used instead of buildgpl (ideal)"
-  echo "   - Pods may already be running successfully"
-  echo ""
-  echo "Checking pod status..."
-  RUNNING_PODS=$(oc get pods -n "${FA__SCALE__NAMESPACE}" -l app.kubernetes.io/name=core --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
-  if [ "$RUNNING_PODS" -gt 0 ]; then
-    echo "✅ ${RUNNING_PODS} daemon pods are already running"
-    echo "   buildgpl ConfigMap not needed - skipping patch"
+  : '⚠️  buildgpl ConfigMap not created after timeout'
+  runningPods=$(oc get pods -n "${FA__SCALE__NAMESPACE}" -l app.kubernetes.io/name=core --field-selector=status.phase=Running --no-headers | wc -l)
+  if [[ "$runningPods" -gt 0 ]]; then
+    : 'Daemon pods already running - buildgpl not needed'
     exit 0
   else
-    echo "❌ No daemon pods running and no buildgpl ConfigMap found"
-    echo "   This indicates an issue with cluster creation"
-    exit 1  # Fail fast - cluster setup is broken
+    : '❌ No daemon pods running and no buildgpl ConfigMap found'
+    exit 1
   fi
 fi
-
-echo ""
-echo "Patching buildgpl script to fix compatibility issues..."
 
 # Apply the patch using a here-document with YAML format (avoids JSON newline escaping issues)
 if oc patch configmap buildgpl -n "${FA__SCALE__NAMESPACE}" --type=merge -p "$(cat <<EOF
@@ -74,35 +58,27 @@ data:
     exit 0
 EOF
 )"; then
-  echo "✅ buildgpl ConfigMap patched successfully"
-  
+  : '✅ buildgpl ConfigMap patched successfully'
+
   # Check if daemon pods already exist
-  DAEMON_PODS=$(oc get pods -n "${FA__SCALE__NAMESPACE}" -l app.kubernetes.io/instance=ibm-spectrum-scale,app.kubernetes.io/name=core --no-headers 2>/dev/null | wc -l)
-  
-  if [ "$DAEMON_PODS" -gt 0 ]; then
-    echo ""
-    echo "Daemon pods exist - deleting to apply fixed buildgpl script..."
+  daemonPods=$(oc get pods -n "${FA__SCALE__NAMESPACE}" -l app.kubernetes.io/instance=ibm-spectrum-scale,app.kubernetes.io/name=core --no-headers | wc -l)
+
+  if [[ "$daemonPods" -gt 0 ]]; then
     oc delete pods -l app.kubernetes.io/instance=ibm-spectrum-scale,app.kubernetes.io/name=core \
       -n "${FA__SCALE__NAMESPACE}" --ignore-not-found
-    
-    echo "Waiting for pods to recreate..."
+
     oc wait --for=condition=Ready pods -l app.kubernetes.io/instance=ibm-spectrum-scale,app.kubernetes.io/name=core \
-      -n "${FA__SCALE__NAMESPACE}" --timeout=300s || echo "⚠️  Pods not ready yet (will be verified in later steps)"
-    
-    RUNNING_PODS=$(oc get pods -n "${FA__SCALE__NAMESPACE}" -l app.kubernetes.io/name=core --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
-    echo "✅ ${RUNNING_PODS} daemon pods recreated"
+      -n "${FA__SCALE__NAMESPACE}" --timeout=300s
+
+    runningPods=$(oc get pods -n "${FA__SCALE__NAMESPACE}" -l app.kubernetes.io/name=core --field-selector=status.phase=Running --no-headers | wc -l)
   else
-    echo "ℹ️  No daemon pods exist yet - they will use fixed buildgpl when created"
+    : 'No daemon pods exist yet - they will use fixed buildgpl when created'
   fi
 else
-  echo "❌ Failed to patch buildgpl ConfigMap"
+  : '❌ Failed to patch buildgpl ConfigMap'
   exit 1
 fi
 
-echo ""
-echo "✅ buildgpl ConfigMap patched for RHCOS compatibility"
-echo "   Fixed issues:"
-echo "   - Removed broken lsmod check"
-echo "   - Creates kernel-specific lxtrace file"
-echo "   - Gracefully handles missing lxtrace source files"
+: '✅ buildgpl ConfigMap patched for RHCOS compatibility'
 
+true
