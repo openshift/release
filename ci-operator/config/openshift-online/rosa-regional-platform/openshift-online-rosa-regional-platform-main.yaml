@@ -21,35 +21,18 @@ tests:
   commands: ./test/execute-prow-job.sh
   container:
     from: src
-- as: provision-regional
+- as: nightly
   cron: 0 7 * * *
   steps:
-    cluster_profile: rosa-regional-platform-int
+    leases:
+    - count: 2
+      env: AWS_ACCOUNTS
+      resource_type: rosa-regional-platform-int
+    pre:
+    - ref: rosa-regional-platform-setup-bootstrap-account
     test:
-    - as: provision-both-accounts
-      commands: |
-        #!/bin/bash
-        set -euo pipefail
-
-        # Install Terraform
-        TERRAFORM_VERSION="1.10.4"
-        curl -fsSL "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -o /tmp/terraform.zip
-        unzip -q /tmp/terraform.zip -d /tmp
-        mv /tmp/terraform /usr/local/bin/terraform
-        chmod +x /usr/local/bin/terraform
-
-        # Verify installation
-        terraform version
-
-        echo "=== Using Account 1 for regional cluster ==="
-        # Account 1: Regional cluster
-        export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-        aws sts get-caller-identity
-
-        echo "=== Using Account 2 for management cluster ==="
-        # Account 2: Management cluster
-        export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
-        aws sts get-caller-identity
+    - as: nightly
+      commands: ./tests/nightly.sh
       from: src
       resources:
         requests:
