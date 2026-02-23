@@ -33,6 +33,14 @@ cd /tmp/hypershift
 git config user.name "OpenShift CI Bot"
 git config user.email "ci-bot@redhat.com"
 
+# Sync fork with upstream before doing any work
+echo "Syncing fork with upstream openshift/hypershift..."
+git remote add upstream https://github.com/openshift/hypershift.git
+git fetch upstream main
+git checkout main
+git rebase upstream/main
+echo "Fork synced with upstream successfully"
+
 # Generate GitHub App installation token
 echo "Generating GitHub App token..."
 
@@ -198,7 +206,7 @@ while IFS= read -r line; do
   fi
   # Reset to main branch for clean state between issues
   git checkout main 2>/dev/null || true
-  git reset --hard origin/main 2>/dev/null || true
+  git reset --hard upstream/main 2>/dev/null || true
 
   ISSUE_KEY=$(echo "$line" | awk '{print $1}')
   ISSUE_SUMMARY=$(echo "$line" | cut -d' ' -f2-)
