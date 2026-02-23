@@ -8220,6 +8220,17 @@ presubmits:
       job-release: "4.21"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa-4.21-nightly-x86-build-farm-114nodes
+    reporter_config:
+      slack:
+        channel: '#ocp-qe-scale-ci-results'
+        job_states_to_report:
+        - success
+        - failure
+        - error
+        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
+          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs> :warning: {{end}}'
     rerun_command: /test rosa-4.21-nightly-x86-build-farm-114nodes
     spec:
       containers:
@@ -8233,9 +8244,17 @@ presubmits:
         - --variant=rosa-4.21-nightly-x86
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
