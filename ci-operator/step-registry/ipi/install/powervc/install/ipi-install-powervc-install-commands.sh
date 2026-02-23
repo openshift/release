@@ -243,6 +243,21 @@ function dump_resources() {
 
 	if [ -f "${DIR}/metadata.json" ]
 	then
+		# Fix:
+		# Load Balancer: Error: addServerKnownHosts returns error open /tmp/.ssh/known_hosts: no such file or directory
+		mkdir -p ${HOME}/.ssh
+		touch ${HOME}/.ssh/known_hosts
+
+		# Fix:
+		# No user exists for uid 1003320000
+		if ! grep -q ":$(id -u):" /etc/passwd
+		then
+			if [ -w /etc/passwd ]
+			then
+				echo "test:x:$(id -u):$(id -u):test:/tmp:/sbin/nologin" >> /etc/passwd
+			fi
+		fi
+
 		PowerVC-Tool \
 			watch-create \
 			--cloud "${CLOUD}" \

@@ -138,7 +138,7 @@ then
 	PowerVC-Tool \
 		send-metadata \
 		--deleteMetadata ${DIR}/metadata.json \
-		--serverIP 10.130.41.245 \
+		--serverIP "${SERVER_IP}" \
 		--shouldDebug true
 fi
 
