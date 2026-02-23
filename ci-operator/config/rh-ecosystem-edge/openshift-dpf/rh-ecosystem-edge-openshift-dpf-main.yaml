@@ -14,20 +14,26 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: validate
-  commands: make ci-validate
-  container:
-    from: dpf-ci
-  timeout: 15m0s
-- as: sanity
+- always_run: true
+  as: sanity
+  capabilities:
+  - intranet
+  cluster: build05
+  restrict_network_access: false
   steps:
     test:
     - ref: dpf-hypervisor-sanity-existing
   timeout: 1h0m0s
-- as: e2e
+- always_run: true
+  as: deploy-cluster
+  capabilities:
+  - intranet
+  cluster: build05
+  restrict_network_access: false
   steps:
-    workflow: dpf-hypervisor-e2e
-  timeout: 8h0m0s
+    test:
+    - ref: dpf-hypervisor-deploy-cluster
+  timeout: 4h0m0s
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
