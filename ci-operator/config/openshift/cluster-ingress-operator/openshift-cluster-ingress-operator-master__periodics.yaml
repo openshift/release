@@ -1,0 +1,54 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+build_root:
+  from_repository: true
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-pre-release-ossm
+  capabilities:
+  - intranet
+  cron: 0 4 * * *
+  restrict_network_access: false
+  steps:
+    cluster_profile: aws-4
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export TOKEN=$(cat /var/run/nid-ossm-token/secrets/konflux-cluster-token)
+        export AUTHBREW=$(cat /var/run/nid-ossm-token/secrets/brew-secret)
+        export AUTHSTAGE=$(cat /var/run/nid-ossm-token/secrets/stage-secret)
+        make test-pre-release-ossm
+      credentials:
+      - collection: ""
+        mount_path: /var/run/nid-ossm-token/secrets
+        name: secrets
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: cluster-ingress-operator
+  variant: periodics
