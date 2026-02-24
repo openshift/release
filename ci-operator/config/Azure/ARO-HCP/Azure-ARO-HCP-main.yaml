@@ -89,7 +89,7 @@ images:
     RUN mkdir -p "$(go env GOPATH)" && chmod -R 777 "$(go env GOPATH)"
     RUN mkdir -p "$(go env GOCACHE)" && chmod -R 777 "$(go env GOCACHE)"
     RUN mkdir -p "$(go env GOBIN)" && chmod -R 777 "$(go env GOBIN)"
-    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
+    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP && rm -f go.work.sum
   from: src
   inputs:
     src:
@@ -188,6 +188,8 @@ tests:
   steps:
     cluster_profile: aro-hcp-int
     env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: int
       ARO_HCP_SUITE_NAME: integration/parallel
       LOCATION: uksouth
     leases:
@@ -201,6 +203,8 @@ tests:
   steps:
     cluster_profile: aro-hcp-stg
     env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: stg
       ARO_HCP_SUITE_NAME: stage/parallel
       LOCATION: uksouth
     leases:
@@ -214,6 +218,8 @@ tests:
   steps:
     cluster_profile: aro-hcp-prod
     env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_SUITE_NAME: prod/parallel
       LOCATION: uksouth
     leases:
@@ -223,10 +229,12 @@ tests:
     workflow: aro-hcp-e2e
 - always_run: true
   as: e2e-parallel
-  skip_if_only_changed: ^(?:action\.yml|AGENTS\.md|CLAUDE\.md|CODEOWNERS|CONTRIBUTING\.md|\.bingo/|\.cursor/|\.devcontainer/|docs/|\.editorconfig|GEMINI\.md|generate-repo\.sh|generate-tag\.sh|get-digest\.sh|get-tag-sha\.sh|\.gitattributes|\.gitguardian\.yaml|\.github/|\.gitleaks\.toml|\.golangci\.yml|LICENSE|\.mega-linter\.yml|README\.md|SECURITY\.md|svc-deploy\.sh|\.vscode/|\.yamlfmt\.yaml|\.yamllint\.yml)$|\.md$
+  skip_if_only_changed: ^(?:action\.yml|CODEOWNERS|docs/|LICENSE|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:bingo|cursor|devcontainer|github|vscode)/|\.(?:editorconfig|gitattributes|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|\.md$)$
   steps:
     cluster_profile: aro-hcp-dev
     env:
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: prow
       LOCATION: westus3
     workflow: aro-hcp-local-e2e
 zz_generated_metadata:

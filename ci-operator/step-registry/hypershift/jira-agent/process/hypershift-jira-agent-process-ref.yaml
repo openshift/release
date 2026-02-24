@@ -20,6 +20,12 @@ ref:
     default: "/var/run/claude-code-service-account/claude-prow"
     documentation: |-
       Path to the Google Cloud service account JSON key file for Vertex AI authentication.
+  - name: JIRA_AGENT_ISSUE_KEY
+    default: ""
+    documentation: |-
+      Optional override to process a specific Jira issue instead of querying.
+      When set (e.g., "CNTRLPLANE-2784"), skips the JQL query and processes
+      only this issue. Leave empty for normal JQL-based discovery.
   - name: JIRA_AGENT_MAX_ISSUES
     default: "1"
     documentation: |-
@@ -38,9 +44,14 @@ ref:
     mount_path: /var/run/claude-code-service-account
   documentation: |-
     Process step for the HyperShift Jira agent periodic job.
-    This step:
+    This step runs a four-phase pipeline for each issue:
+    Phase 1 - Solve: Runs /jira-solve to implement changes, commit, and push the branch (no PR created)
+    Phase 2 - Review: Runs /code-review:pre-commit-review to review code quality (read-only)
+    Phase 3 - Fix: Addresses review findings by editing code, committing, and pushing fixes
+    Phase 4 - PR Creation: Creates a draft PR via gh CLI after review is complete
+    Token usage (input/output) is extracted per phase and saved for reporting.
+    Post-processing: Adds 'agent-processed' label, transitions issue status, sets assignee
     - Queries Jira for issues with label 'issue-for-agent' (excluding 'agent-processed')
-    - For each issue, runs the /jira-solve command non-interactively
-    - On success, adds 'agent-processed' label to prevent reprocessing
     - Failed issues are retried on subsequent runs
+    - If the review skill is unavailable or fails, the PR is still created
     - Uses Vertex AI for Claude authentication via GCP service account
