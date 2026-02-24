@@ -1,0 +1,42 @@
+ref:
+  as: amd-gpu-operator-install-operators
+  from: amd-ci
+  commands: amd-gpu-operator-install-operators-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: amd-ci-credentials
+    mount_path: /var/run/amd-ci
+  env:
+  - name: HOME
+    default: /alabama
+  - name: OCP_CLUSTER_VERSION
+    documentation: OpenShift version (e.g., "4.16", "4.22") — passed to operator install for version-specific logic
+  - name: REMOTE_HOST
+    documentation: Remote host IP or hostname where the cluster is deployed
+  - name: CLUSTER_NAME
+    default: "ocp"
+    documentation: Name of the cluster
+  - name: CLUSTER_DOMAIN
+    default: "example.com"
+    documentation: Domain for the cluster
+  - name: CTLPLANES
+    default: "1"
+    documentation: Number of control plane nodes (used to auto-detect machine_config_role)
+  - name: WORKERS
+    default: "0"
+    documentation: Number of worker nodes (used to auto-detect machine_config_role)
+  - name: API_IP
+    default: "192.168.122.253"
+    documentation: API IP address for the cluster
+  - name: AMD_DRIVER_VERSION
+    default: "30.20.1"
+    documentation: AMD GPU driver version to install (ROCm/amdgpu driver version)
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+  documentation: |-
+    Installs AMD GPU Operator and dependencies (NFD, KMM) on an already-deployed
+    OpenShift cluster.  Runs make cluster-operators which orchestrates the full
+    operator installation flow: prerequisites check, MachineConfig, OLM installs,
+    NodeFeatureDiscovery, DeviceConfig, and waits for GPU resources.
