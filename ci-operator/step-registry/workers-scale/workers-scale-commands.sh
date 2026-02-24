@@ -93,15 +93,36 @@ current_worker_count=$(oc get nodes --no-headers -l "node-role.kubernetes.io/wor
 echo "current worker count $current_worker_count"
 echo "worker scale count $WORKER_REPLICA_COUNT"
 
-worker_count_num=$(($WORKER_REPLICA_COUNT))
-if [[ $worker_count_num -gt 0 ]]; then 
-    if [[ $current_worker_count -ne $worker_count_num ]]; then
-        if [[ $current_worker_count -gt $worker_count_num ]]; then
-            scaleDownMachines $current_worker_count $worker_count_num
-            waitForReady $worker_count_num
-        else
-            scaleMachineSets $worker_count_num
-            waitForReady $worker_count_num
+function scaleInBatches() {
+    local worker_count_num=$1
+    if [[ $worker_count_num -gt 0 ]]; then
+        if [[ $current_worker_count -ne $worker_count_num ]]; then
+            if [[ $current_worker_count -gt $worker_count_num ]]; then
+                scaleDownMachines $current_worker_count $worker_count_num
+                waitForReady $worker_count_num
+            else
+                scaleMachineSets $worker_count_num
+                waitForReady $worker_count_num
+            fi
         fi
     fi
+}
+
+first_batch_size=500
+batch_size=100
+
+if [[ $WORKER_REPLICA_COUNT -le $first_batch_size ]]; then
+    scaleInBatches $WORKER_REPLICA_COUNT
+else
+    current=$first_batch_size
+    scaleInBatches $current
+
+    while [ $current -lt $WORKER_REPLICA_COUNT ]; do
+
+        current=$(($current + $batch_size))
+        if [ $current -ge $WORKER_REPLICA_COUNT ]; then
+            current=$WORKER_REPLICA_COUNT
+        fi
+        scaleInBatches $current
+    done
 fi
