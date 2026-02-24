@@ -3,6 +3,12 @@ set -euo pipefail
 
 echo "=== HyperShift Jira Agent Process ==="
 
+# Apply Gangway API overrides (MULTISTAGE_PARAM_OVERRIDE_* prefix)
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_JIRA_AGENT_ISSUE_KEY:-}" ]]; then
+  echo "Applying Gangway override: JIRA_AGENT_ISSUE_KEY=${MULTISTAGE_PARAM_OVERRIDE_JIRA_AGENT_ISSUE_KEY}"
+  export JIRA_AGENT_ISSUE_KEY="${MULTISTAGE_PARAM_OVERRIDE_JIRA_AGENT_ISSUE_KEY}"
+fi
+
 # State file for sharing results with report step
 STATE_FILE="${SHARED_DIR}/processed-issues.txt"
 
