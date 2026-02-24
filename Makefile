@@ -3,7 +3,7 @@ SHELL=/usr/bin/env bash -o errexit
 .PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
 
 export CONTAINER_ENGINE ?= podman
-export CONTAINER_ENGINE_OPTS ?= --platform linux/amd64
+export CONTAINER_ENGINE_OPTS ?= --platform linux/$(shell uname -m | sed 's/x86_64/amd64/' | sed 's/aarch64/arm64/')
 export SKIP_PULL ?= false
 
 VOLUME_MOUNT_FLAGS = :z
