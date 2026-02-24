@@ -191,6 +191,7 @@ else
 fi
 ISSUES=$(curl -s "https://issues.redhat.com/rest/api/2/search" \
   -G \
+  -H "Authorization: Bearer $JIRA_TOKEN" \
   --data-urlencode "jql=$JQL" \
   --data-urlencode 'fields=key,summary' \
   --data-urlencode "maxResults=$MAX_ISSUES" \
