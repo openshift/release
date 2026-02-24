@@ -58,7 +58,7 @@ for OLS_TEST_DURATION in "${test_durations[@]}"; do
   job_status="success"
   job_start=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   job_end=""
-  additional_attributes='{"olsTestWorkers": '"${OLS_TEST_WORKERS}"', "olsTestDuration": "'"$OLS_TEST_DURATION"'"}'
+  additional_attributes='{"olsTestWorkers": '"${OLS_TEST_WORKERS}"', "olsTestDuration": "'"$OLS_TEST_DURATION"'", "mcpEnabled": "'"$ENABLE_MCP"'"}'
 
   # Create namespace and set monitoring labels
   run_or_fail oc create namespace openshift-lightspeed
@@ -77,6 +77,14 @@ for OLS_TEST_DURATION in "${test_durations[@]}"; do
   popd
 
   # Deploy olsconfig with fake values
+  PROVIDER_EXTRA=""
+  OLS_EXTRA=""
+
+  if [[ "${ENABLE_MCP:-false}" == "true" ]]; then
+    PROVIDER_EXTRA="      fakeProviderMCPToolCall: true"
+    OLS_EXTRA="    introspectionEnabled: true"
+  fi
+
   run_or_fail cat <<EOF | oc apply -f - -n openshift-lightspeed
 apiVersion: ols.openshift.io/v1alpha1
 kind: OLSConfig
@@ -92,11 +100,13 @@ spec:
       - name: fake_model
       name: fake_provider
       type: fake_provider
+${PROVIDER_EXTRA}
   ols:
     defaultModel: fake_model
     defaultProvider: fake_provider
     enableDeveloperUI: false
     logLevel: INFO
+${OLS_EXTRA}
     deployment:
       replicas: 1
     userDataCollection:
