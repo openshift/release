@@ -15,6 +15,9 @@ images:
 - context_dir: maas-api/
   dockerfile_path: Dockerfile
   to: maas-api
+- context_dir: maas-controller/
+  dockerfile_path: Dockerfile
+  to: maas-controller
 promotion:
   to:
   - namespace: opendatahub-io
@@ -75,6 +78,26 @@ tests:
       SOURCE_IMAGE_REF: maas-api
     env:
       IMAGE_REPO: maas-api
+      RELEASE_VERSION: latest
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: pr-image-mirror-maas-controller
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: maas-controller
+    env:
+      IMAGE_REPO: maas-controller
+    workflow: opendatahub-io-ci-image-mirror
+- always_run: false
+  as: merge-image-mirror-maas-controller
+  postsubmit: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: maas-controller
+    env:
+      IMAGE_REPO: maas-controller
       RELEASE_VERSION: latest
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
