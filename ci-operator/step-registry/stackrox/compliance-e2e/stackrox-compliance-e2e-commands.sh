@@ -8,11 +8,11 @@ export MAP_TESTS="${MAP_TESTS:-false}"
 export MAP_TESTS_SUITE_NAME="${MAP_TESTS_SUITE_NAME:-ACS-lp-interop}"
 
 function InstallYq() {
-    : "Installing yq if not available..."
+    : "Installing yq..."
 
-    # Install yq manually if not found in image
+    # Install yq manually
     mkdir -p /tmp/bin
-    export PATH="${PATH}:/tmp/bin"
+    export PATH="/tmp/bin:${PATH}"
     typeset arch=""
     arch="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
     curl -L "https://github.com/mikefarah/yq/releases/download/v4.52.4/yq_linux_${arch}" \
@@ -27,7 +27,7 @@ function CleanupCollect() {
     typeset resultFile=''
     typeset -a xmlFiles=()
 
-    InstallYq || true
+    InstallYq
 
     while IFS= read -r -d '' resultFile; do
         grep -qE '<testsuites?\b' "${resultFile}" && xmlFiles+=("${resultFile}") || true
