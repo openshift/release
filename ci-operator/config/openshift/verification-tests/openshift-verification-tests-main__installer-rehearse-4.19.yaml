@@ -15,6 +15,14 @@ base_images:
     name: "4.19"
     namespace: ocp
     tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.19"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.19"
   upi-installer:
     name: "4.19"
     namespace: ocp
@@ -56,19 +64,10 @@ tests:
 - as: installer-rehearse-azure
   cron: '@yearly'
   steps:
-    allow_skip_on_success: true
     cluster_profile: azure-qe
-    env:
-      IPSTACK: dualstack
-      SLEEP_DURATION: 1h
-    post:
-    - ref: azure-deprovision-resourcegroup
-    pre:
-    - ref: azure-provision-resourcegroup
-    - ref: azure-provision-vnet
-    - chain: azure-provision-bastionhost
     test:
-    - ref: cucushift-installer-wait
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-cluster
 - as: installer-rehearse-ibmcloud
   cron: '@yearly'
   steps:
