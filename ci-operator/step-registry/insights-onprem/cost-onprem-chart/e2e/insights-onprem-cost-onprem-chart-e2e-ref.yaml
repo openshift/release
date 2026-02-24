@@ -7,15 +7,12 @@ ref:
       cpu: 100m
       memory: 200Mi
   env:
-  - name: MINIO_HOST
-    default: "minio-storage"
-    documentation: "MinIO S3 hostname (just host, no port) - uses proxy service in app namespace"
-  - name: MINIO_PORT
-    default: "9000"
-    documentation: "MinIO S3 port"
-  - name: MINIO_BUCKET
-    default: "ros-data"
-    documentation: "MinIO bucket name for ROS data"
+  - name: DEPLOY_S4
+    default: "true"
+    documentation: "Set to 'true' to deploy S4 storage. When false, storage is handled externally or not required."
+  - name: S4_NAMESPACE
+    default: "s4-test"
+    documentation: "Namespace for S4 deployment when DEPLOY_S4=true"
   - name: COST_MGMT_CHANNEL
     default: "stable"
     documentation: "OLM channel for Cost Management Operator (stable, alpha, etc.)"
@@ -37,8 +34,10 @@ ref:
     
     It handles:
     - Dependency installation (yq, kubectl, helm, oc)
-    - MinIO configuration (from insights-onprem-minio-deploy step)
+    - S4 object storage deployment (when DEPLOY_S4=true)
     - Cost Management Operator installation (without hardcoded version)
-    - Helm wrapper for MinIO storage configuration
     - RHBK deployment, Strimzi/Kafka setup, Helm chart installation
     - TLS configuration and JWT authentication testing
+    
+    Set DEPLOY_S4=true to deploy S4 storage. By default (DEPLOY_S4=false),
+    storage is handled externally or not required.

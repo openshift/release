@@ -55,41 +55,14 @@ else
     echo "oc is already installed"
 fi
 
-echo "========== MinIO Configuration =========="
+echo "========== Object Storage Configuration =========="
 
-# Read MinIO configuration from SHARED_DIR (set by insights-onprem-minio-deploy step)
-if [ -f "${SHARED_DIR}/minio-env" ]; then
-    # shellcheck source=/dev/null
-    source "${SHARED_DIR}/minio-env"
-    
-    # Export the variables we need
-    export MINIO_HOST
-    export MINIO_PORT
-    export MINIO_ENDPOINT
-    export MINIO_NAMESPACE
-    export APP_NAMESPACE
-    
-    echo "MinIO host: ${MINIO_HOST}"
-    echo "MinIO port: ${MINIO_PORT}"
-    echo "MinIO endpoint (host:port): ${MINIO_ENDPOINT}"
-    echo "MinIO namespace: ${MINIO_NAMESPACE}"
-    echo "Application namespace: ${APP_NAMESPACE}"
-    
-    # Set NAMESPACE for the helm chart deployment
-    if [ -n "${APP_NAMESPACE:-}" ]; then
-        export NAMESPACE="${APP_NAMESPACE}"
-    fi
+if [ "${DEPLOY_S4:-false}" == "true" ]; then
+    echo "Deploying S4 storage to namespace: ${S4_NAMESPACE:-s4-test}"
+    echo "S4 configuration will be handled by deploy-test-cost-onprem.sh"
 else
-    echo "WARNING: MinIO configuration not found in SHARED_DIR"
-    echo "Make sure insights-onprem-minio-deploy step ran before this step"
-fi
-
-# Read credentials from separate files
-if [ -f "${SHARED_DIR}/minio-access-key" ]; then
-    MINIO_ACCESS_KEY=$(cat "${SHARED_DIR}/minio-access-key")
-    export MINIO_ACCESS_KEY
-    MINIO_SECRET_KEY=$(cat "${SHARED_DIR}/minio-secret-key")
-    export MINIO_SECRET_KEY
+    echo "Skipping S4 deployment (DEPLOY_S4=false)"
+    echo "Storage will be handled externally or is not required"
 fi
 
 echo "========== Installing Cost Management Operator =========="
@@ -174,68 +147,9 @@ fi
 
 fi  # end SKIP_COST_MGMT_INSTALL check
 
-echo "========== Configuring Helm for MinIO Storage =========="
-# Tell the Helm chart to use MinIO instead of ODF (NooBaa)
-# This prevents the chart from trying to lookup NooBaa CRDs which don't exist
-# when using MinIO for object storage
-
-# IMPORTANT: Find the REAL helm binary location BEFORE we create any wrappers
-# If helm was installed to /tmp/helm, we need to find the actual binary
-ORIGINAL_HELM=$(command -v helm)
-if [[ "${ORIGINAL_HELM}" == "/tmp/helm" ]]; then
-    # Helm was installed to /tmp, use the actual binary path
-    # Move it to a different location to avoid conflicts with the wrapper
-    mv /tmp/helm /tmp/helm-original
-    ORIGINAL_HELM="/tmp/helm-original"
-    echo "Moved original helm to ${ORIGINAL_HELM}"
-fi
-
-HELM_WRAPPER="/tmp/helm-wrapper"
-
-cat > "${HELM_WRAPPER}" << 'WRAPPER_EOF'
-#!/bin/bash
-# Helm wrapper that injects MinIO storage configuration
-# This intercepts helm calls and adds MinIO config
-# ONLY for the cost-onprem chart - other charts pass through unchanged
-
-ORIGINAL_HELM="__ORIGINAL_HELM__"
-
-# Only inject MinIO config for the cost-onprem chart installation
-# Check if this is an install/upgrade command for cost-onprem specifically
-if [[ "$*" == *"cost-onprem"* ]] && { [[ "$*" == *"upgrade"* ]] || [[ "$*" == *"install"* ]]; }; then
-    echo "[helm-wrapper] Detected cost-onprem chart - injecting MinIO storage configuration..."
-    # IMPORTANT: Do NOT set global.storageType=minio as that breaks OpenShift security contexts
-    # Instead, set odf.endpoint explicitly - the chart should skip NooBaa lookup when endpoint is provided
-    # We use a proxy service (minio-storage) in the app namespace that routes to MinIO.
-    echo "[helm-wrapper] Using MinIO host: ${MINIO_HOST:-minio-storage}, port: ${MINIO_PORT:-9000}"
-    exec "$ORIGINAL_HELM" "$@" \
-        --set "odf.endpoint=${MINIO_HOST:-minio-storage}" \
-        --set "odf.port=${MINIO_PORT:-9000}" \
-        --set "odf.useSSL=false" \
-        --set "odf.bucket=${MINIO_BUCKET:-ros-data}" \
-        --set "odf.skipLookup=true"
-else
-    # For all other helm commands (repo add, strimzi install, etc.), pass through unchanged
-    exec "$ORIGINAL_HELM" "$@"
-fi
-WRAPPER_EOF
-
-# Replace placeholders with actual values
-sed -i "s|__ORIGINAL_HELM__|${ORIGINAL_HELM}|g" "${HELM_WRAPPER}"
-
-chmod +x "${HELM_WRAPPER}"
-
-# Create symlink so 'helm' resolves to our wrapper
-ln -sf "${HELM_WRAPPER}" /tmp/helm
-
-echo "Helm wrapper installed at /tmp/helm"
-echo "Original helm binary: ${ORIGINAL_HELM}"
-echo "MinIO storage type will be injected for cost-onprem chart only"
-
-# Ensure /tmp is at the front of PATH so our wrapper is found first
-export PATH="/tmp:${PATH}"
-echo "PATH updated: /tmp is now first in PATH"
-echo "helm resolves to: $(command -v helm)"
+echo "========== Configuring Helm =========="
+echo "No Helm wrapper needed for S4 storage"
+echo "Storage configuration will be handled by deploy-test-cost-onprem.sh"
 
 echo "========== Configuring OpenShift SecurityContextConstraints =========="
 # Grant anyuid SCC to allow pods to run with runAsUser: 1000 when using storageType=minio
@@ -258,10 +172,16 @@ echo "========== Running E2E Tests =========="
 export NAMESPACE="${NAMESPACE:-cost-onprem}"
 export VERBOSE="${VERBOSE:-true}"
 export USE_LOCAL_CHART="true"
+export DEPLOY_S4="${DEPLOY_S4:-false}"
+export S4_NAMESPACE="${S4_NAMESPACE:-s4-test}"
+
+# Build deployment script arguments
+DEPLOY_ARGS=(
+    --namespace "${NAMESPACE}"
+    --verbose
+)
 
 # Run the deployment script from the chart repo source
 # The step runs with from: src, so we're already in the chart repo
 # Use bash to execute since source may be read-only (can't chmod)
-bash ./scripts/deploy-test-cost-onprem.sh \
-    --namespace "${NAMESPACE}" \
-    --verbose
+bash ./scripts/deploy-test-cost-onprem.sh "${DEPLOY_ARGS[@]}"
