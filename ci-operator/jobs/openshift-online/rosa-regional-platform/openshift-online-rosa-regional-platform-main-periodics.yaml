@@ -14,7 +14,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: rosa-regional-platform-int
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-online-rosa-regional-platform-main-provision-regional
+  name: periodic-ci-openshift-online-rosa-regional-platform-main-nightly
   spec:
     containers:
     - args:
@@ -22,12 +22,20 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --target=provision-regional
+      - --target=nightly
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

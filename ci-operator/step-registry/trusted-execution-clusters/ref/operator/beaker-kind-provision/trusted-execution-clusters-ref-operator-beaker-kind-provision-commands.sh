@@ -36,7 +36,7 @@ fi
 DEPLOYMENT_STATUS=0
 CRITICAL_FAILURE=false
 
-SETUP_SCRIPT_TIMEOUT="${SETUP_SCRIPT_TIMEOUT:-900}"
+SETUP_SCRIPT_TIMEOUT="${SETUP_SCRIPT_TIMEOUT:-1800}"
 
 OPERATOR_REPO="${OPERATOR_REPO:-https://github.com/trusted-execution-clusters/operator.git}"
 OPERATOR_BRANCH="${OPERATOR_BRANCH:-main}"
@@ -791,7 +791,10 @@ CURRENT_COMMIT_SHORT=$(git rev-parse --short HEAD)
 
 echo "[SUCCESS] Repository cloned to ${WORK_DIR}"
 echo "[INFO] Current commit: ${CURRENT_COMMIT_SHORT} (${CURRENT_COMMIT})"
+# Temporarily disable pipefail to avoid SIGPIPE from head closing the pipe early
+set +o pipefail
 echo "[INFO] Commit message: $(git log -1 --pretty=%B | head -1)"
+set -o pipefail
 
 # Adapt Kind Config for External Access
 echo "[INFO] Adapting kind configuration for external access..."

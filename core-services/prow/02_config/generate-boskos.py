@@ -187,6 +187,11 @@ CONFIG = {
         'eastus': 8,
         'westus2': 8
     },
+    'azure-cnv-devops-quota-slice': {
+        'northcentralus': 10,
+        'southcentralus': 10,
+        'centralus': 10
+    },
     'azure-perfscale-quota-slice': {
         'northcentralus': 10,
         'southcentralus': 10,
@@ -396,13 +401,13 @@ CONFIG = {
         'eu-west-1': 8,
         'eu-west-2': 8
     },
-    'hypershift-quota-slice': {
-        'default': 50,
-    },
     'hypershift-aws-quota-slice': {
         'default': 30,
     },
     'hypershift-aks-quota-slice': {
+        'default': 20,
+    },
+    'hypershift-azure-quota-slice': {
         'default': 20,
     },
     'hypershift-gcp-quota-slice': {
@@ -622,6 +627,9 @@ CONFIG = {
     'rosa-regional-platform-int-quota-slice': {
         'us-east-1': 15,
         'us-east-2': 15,
+    },
+    'amd-gpu-quota-slice': {
+        '10.1.178.14': 1,
     },
 }
 

@@ -1,0 +1,60 @@
+base_images:
+  base:
+    name: 5.0-priv
+    namespace: ocp-private
+    tag: base
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.25-openshift-4.23
+canonical_go_repository: github.com/openshift/project-request-limit
+images:
+- dockerfile_path: images/ci/Dockerfile
+  from: base
+  to: project-request-limit
+promotion:
+  to:
+  - name: 5.0-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 5.0-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 5.0-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 1Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-aws
+  steps:
+    cluster_profile: aws-3
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift-priv
+  repo: project-request-limit

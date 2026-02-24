@@ -1,13 +1,15 @@
 ref:
   as: mta-tests-ui
   from: mta-runner
+  grace_period: 10m
   commands: mta-tests-ui-commands.sh
   resources:
     requests:
       cpu: "1"
-      memory: 2Gi
+      memory: 8Gi
       ci-operator.openshift.io/shm: 2G
     limits:
+      memory: 8Gi
       ci-operator.openshift.io/shm: 2G
   env:
   - name: MTA_TESTS_UI_SCOPE
@@ -15,12 +17,18 @@ ref:
     documentation: |-
       Tag used to execute UI tests.
   - name: CYPRESS_SPEC
-    default: "**/*.test.ts"
+    default: "e2e/tests/**/*.test.ts"
     documentation: |-
       Value used for the '--spec' argument in the 'cypress run' command.
+      When scripts/findTierFiles.mjs exists, the script overrides this with
+      the tier file list for MTA_TESTS_UI_SCOPE (e.g. node scripts/findTierFiles.mjs @interop).
   - name: MAP_TESTS
     default: "false"
     documentation: |-
       Specify whether to update the test suite name for reporting tools
+  - name: MAP_TESTS_SUITE_NAME
+    default: "MTA-lp-interop"
+    documentation: |-
+      Suite name written into JUnit XML for Component Readiness when MAP_TESTS is true.
   documentation: |-
-    Execute the Cypress tackle-ui-tests using the provided arguments. All XML results will be combined into "$ARTIFACT_DIR/junit_tackle_ui_results.xml".
+    Execute the Cypress tackle2-ui tests using the provided arguments. All XML results will be combined into "$ARTIFACT_DIR/junit_tackle_ui_results.xml".

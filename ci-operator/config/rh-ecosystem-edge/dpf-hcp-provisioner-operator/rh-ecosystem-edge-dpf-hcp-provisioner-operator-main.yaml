@@ -1,0 +1,35 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.23
+images:
+- dockerfile_path: Dockerfile
+  to: dpf-hcp-provisioner-operator-ci
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- as: lint
+  commands: |
+    export XDG_CACHE_HOME=/tmp/.cache
+    unset GOFLAGS
+    make lint
+  container:
+    from: src
+  timeout: 30m0s
+- as: unit-tests
+  commands: |
+    unset GOFLAGS
+    make test
+  container:
+    from: src
+  timeout: 30m0s
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: dpf-hcp-provisioner-operator

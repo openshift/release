@@ -771,7 +771,7 @@ tests:
   cron: 19 10,20 * * *
   steps:
     cluster_profile: equinix-edge-enablement
-    workflow: baremetalds-two-node-fencing-techpreview
+    workflow: baremetalds-two-node-fencing-recovery
 - as: e2e-metal-ovn-two-node-fencing-ipv6-recovery-techpreview
   capabilities:
   - intranet
@@ -899,7 +899,7 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+      POOL_SELECTOR: vsphere-type=vcf9
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     observers:
@@ -980,7 +980,7 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     env:
-      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+      POOL_SELECTOR: vsphere-type=vcf9
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     observers:
@@ -1035,7 +1035,7 @@ tests:
     env:
       ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
       ENABLE_VSPHERE_FILESHARE_TESTS: "true"
-      POOLS: vcenter-110.ci.ibmc.devcluster.openshift.com-vcenter-110-dc01-vcenter-110-cl01
+      POOL_SELECTOR: vsphere-type=vcf9
       TEST_SKIPS: 'Testpattern: Dynamic PV (xfs).*multiVolume.*should concurrently
         access the single volume from pods on different node\|Testpattern: Dynamic
         PV (block volmode).*multiVolume.*should concurrently access the single volume
@@ -1115,6 +1115,7 @@ tests:
       CSI_MANAGEMENT_REMOVED: "true"
       FEATURE_GATES: '["VSphereMixedNodeEnv=true"]'
       FEATURE_SET: CustomNoUpgrade
+      STORAGE_CO_DEGRADE_CHECK: "true"
       TEST_SKIPS: \[sig-storage\]\|\[sig-arch\]\[Early\] Operators low level operators
     workflow: openshift-e2e-vsphere-upi-hybrid-env
 - as: e2e-vsphere-ovn-disk-setup-techpreview
@@ -2053,11 +2054,6 @@ tests:
     env:
       SKEW: 360d
     workflow: openshift-e2e-cert-rotation-shutdown
-- as: e2e-aws-crun-wasm
-  interval: 168h
-  steps:
-    cluster_profile: aws-3
-    workflow: openshift-e2e-aws-crun-wasm
 - as: e2e-aws-ovn-ha-cert-rotation-suspend-30d
   cron: 0 8 * * Fri
   steps:
@@ -2070,7 +2066,7 @@ tests:
       SKEW: 30d
     workflow: openshift-e2e-aws-cert-rotation
 - as: e2e-aws-ovn-edge-zones
-  cron: '@weekly'
+  cron: 0 0 * * 0,3
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws-edge-zones
@@ -2114,7 +2110,7 @@ tests:
     cluster_profile: aws-3
     env:
       FIPS_ENABLED: "true"
-      MAJOR_MINOR: "4.21"
+      MAJOR_MINOR: "4.22"
     test:
     - ref: fips-check-node-scan
     - ref: fips-check-art-fips
@@ -2403,6 +2399,18 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-gcp-ovn-rt
+- as: e2e-aws-disruptive-longrunning
+  cron: 0 12 * * *
+  steps:
+    cluster_profile: aws-5
+    env:
+      TEST_REQUIRES_SSH: "yes"
+      TEST_SUITE: openshift/disruptive-longrunning
+      TEST_TYPE: suite
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-disruption
 zz_generated_metadata:
   branch: main
   org: openshift
