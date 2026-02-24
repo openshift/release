@@ -40,6 +40,35 @@ add_test_result() {
   fi
 }
 
+function installYQIfNotExists() {
+    # Install yq manually if not found in image
+    echo "Checking if yq exists"
+    cmd_yq="$(yq --version 2>/dev/null || true)"
+    if [ -n "$cmd_yq" ]; then
+        echo "yq version: $cmd_yq"
+    else
+        echo "Installing yq"
+        mkdir -p /tmp/bin
+        export PATH=$PATH:/tmp/bin/
+        curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+         -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+    fi
+}
+
+function mapTestsForComponentReadiness() {
+    [[ ${MAP_TESTS:-false} != "true" ]] && return
+
+    results_file="${1}"
+    echo "Patching Tests Result File: ${results_file}"
+    if [ -f "${results_file}" ]; then
+        installYQIfNotExists
+        export REPORTPORTAL_CMP
+        echo "Mapping Test Suite Name To: ${REPORTPORTAL_CMP}"
+        yq eval -px -ox -iI0 '.testsuites.testsuite.+@name=env(REPORTPORTAL_CMP)' $results_file
+    fi
+    true
+}
+
 # Function to generate JUnit XML report
 generate_junit_xml() {
   local total_duration=$(($(date +%s) - TEST_START_TIME))
@@ -61,6 +90,8 @@ EOF
   echo "  Duration: ${total_duration}s"
   echo "  Results File: ${JUNIT_RESULTS_FILE}"
   
+  mapTestsForComponentReadiness "${JUNIT_RESULTS_FILE}"
+
   # Copy to SHARED_DIR for data router reporter (if available)
   if [[ -n "${SHARED_DIR:-}" ]] && [[ -d "${SHARED_DIR}" ]]; then
     cp "${JUNIT_RESULTS_FILE}" "${SHARED_DIR}/$(basename ${JUNIT_RESULTS_FILE})"
