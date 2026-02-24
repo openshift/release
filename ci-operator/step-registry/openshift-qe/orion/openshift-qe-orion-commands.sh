@@ -159,6 +159,10 @@ if [[ -n "${DISPLAY}" ]]; then
     EXTRA_FLAGS+=" --display ${DISPLAY}"
 fi
 
+if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
+    EXTRA_FLAGS+=" --github-repos ${CHANGE_POINT_REPOS}"
+fi
+
 set +e
 set -o pipefail
 FILENAME=$(basename ${ORION_CONFIG} | awk -F. '{print $1}')
@@ -166,6 +170,101 @@ export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_
 orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/${FILENAME}.txt
 orion_exit_status=$?
 set -e
+
+process_change_point() {
+
+    [[ -z "${CHANGE_POINT_REPOS}" ]] && return
+
+    GCS_BUCKET="gs://test-platform-results"
+    GCS_PATH=""
+
+    # Determine the path to prowjob.json based on prow ENV variables
+    case "${JOB_TYPE:-}" in
+        presubmit)
+            if [[ -n "${REPO_OWNER:-}" && -n "${REPO_NAME:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+                GCS_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/prowjob.json"
+            fi
+            ;;
+        periodic)
+            if [[ -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+                GCS_PATH="logs/${JOB_NAME}/${BUILD_ID}/prowjob.json"
+            fi
+            ;;
+        *)
+            return
+            ;;
+    esac
+
+    [[ -z "$GCS_PATH" ]] && return
+
+    echo "Fetching prowjob.json from $GCS_BUCKET/$GCS_PATH"
+    gsutil -m cp -r "${GCS_BUCKET}/${GCS_PATH}" . || return
+
+    # Extract trigger repos from prowjob.json
+    repos=$(jq -r '
+        if (.spec.extra_refs // []) | length > 0 then
+            .spec.extra_refs[] | "\(.org)/\(.repo)"
+        elif (.spec.refs // null) != null then
+            "\(.spec.refs.org)/\(.spec.refs.repo)"
+        else
+            empty
+        end
+    ' prowjob.json) || return
+
+    OWNERS_FILE=owners.txt
+    : > "$OWNERS_FILE"
+
+    # Iterate over each repo to fetch OWNERS
+    for repo in $repos; do
+        org="${repo%%/*}"
+        name="${repo##*/}"
+
+        url="https://raw.githubusercontent.com/openshift/release/main/ci-operator/jobs/${org}/${name}/OWNERS"
+
+        echo "Fetching OWNERS for $repo"
+
+        curl -fsSL "$url" \
+            | yq -r '.approvers[], .reviewers[]' \
+            >> "$OWNERS_FILE" \
+            || echo "OWNERS not found for $repo"
+    done
+
+    sort -u "$OWNERS_FILE" -o "$OWNERS_FILE"
+
+    OWNERS_JSON=$(jq -R -s -c 'split("\n") | map(select(length > 0))' "$OWNERS_FILE") || return
+
+    echo "Owners loaded as JSON array: $OWNERS_JSON"
+
+    for f in junit*.json; do
+        [ -e "$f" ] || { echo "No junit*.json files found"; return; }
+
+        echo "Processing file: $f"
+
+        jq --argjson owners "$OWNERS_JSON" '
+        map(
+            if .is_changepoint != true then
+                .
+            else
+                .github_context.repositories |=
+                    with_entries(
+                        .value.commits.items |=
+                            map(
+                                select(
+                                    (.commit_author.email // "" | ascii_downcase | contains($owners[]))
+                                    or
+                                    (.commit_author.name // "" | ascii_downcase | contains($owners[]))
+                                )
+                            )
+                        | .value.commits.count = (.value.commits.items | length)
+                    )
+            end
+        )
+        ' "$f" > "${f}.tmp" && mv "${f}.tmp" "$f" || return
+
+        echo "Updated $f"
+    done
+}
+process_change_point
 
 cp *.csv *.xml *.json *.txt "${ARTIFACT_DIR}/" 2>/dev/null || true
 
