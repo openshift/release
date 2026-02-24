@@ -44,13 +44,30 @@ spec:
     managed: true
 EOF
 
-for _ in {1..60}; do
-    if [[ "$(oc -n quay get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
-        echo "Quay is ready" >&2
+echo "Waiting for Quay to become ready (timeout: 15m)..." >&2
+for i in $(seq 1 90); do
+    status="$(oc -n quay get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
+    if [[ "$status" == "True" ]]; then
+        echo "Quay is ready (after $((i * 10))s)" >&2
         exit 0
+    fi
+    if (( i % 6 == 0 )); then
+        echo "[$((i * 10))s] Quay not ready yet. Component status:" >&2
+        oc -n quay get quayregistry quay -o jsonpath='{range .status.conditions[*]}{.type}: {.status} ({.reason}) {.message}{"\n"}{end}' 2>/dev/null >&2 || true
     fi
     sleep 10
 done
+
 echo "Timed out waiting for Quay to become ready" >&2
+echo "Final QuayRegistry conditions:" >&2
+oc -n quay get quayregistry quay -o jsonpath='{range .status.conditions[*]}{.type}: {.status} ({.reason}) {.message}{"\n"}{end}' 2>/dev/null >&2 || true
+echo "Pods in quay namespace:" >&2
+oc -n quay get pods -o wide >&2 || true
+echo "Events in quay namespace:" >&2
+oc -n quay get events --sort-by='.lastTimestamp' >&2 || true
+
 oc -n quay get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
+oc -n quay get pods -o yaml >"$ARTIFACT_DIR/quay-pods.yaml" || true
+oc -n quay get events --sort-by='.lastTimestamp' -o yaml >"$ARTIFACT_DIR/quay-events.yaml" || true
+oc -n quay get deployments -o yaml >"$ARTIFACT_DIR/quay-deployments.yaml" || true
 exit 1
