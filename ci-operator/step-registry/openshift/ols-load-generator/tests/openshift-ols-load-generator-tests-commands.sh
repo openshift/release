@@ -73,6 +73,24 @@ for OLS_TEST_DURATION in "${test_durations[@]}"; do
   pushd lightspeed-operator
   run_or_fail make deploy
   run_or_fail oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:openshift-lightspeed:lightspeed-operator-controller-manager
+  run_or_fail oc patch deployment lightspeed-operator-controller-manager \
+  -n openshift-lightspeed \
+  --type='json' \
+  -p='[
+    {
+      "op": "add",
+      "path": "/spec/template/spec/containers/0/securityContext",
+      "value": {
+        "allowPrivilegeEscalation": false,
+        "seccompProfile": {
+          "type": "RuntimeDefault"
+        },
+        "capabilities": {
+          "drop": ["ALL"]
+        }
+      }
+    }
+  ]'
   run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-operator-controller-manager --timeout=600s
   popd
 
