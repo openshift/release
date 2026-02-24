@@ -74,6 +74,7 @@ function gather_console_and_bootstrap() {
     unset GOVC_TLS_CA_CERTS
 
     infra_id=$(jq -r '.infraID' "${installer_dir}/metadata.json")
+    echo "DEBUG: infra_id=${infra_id}"
 
     # list all the virtual machines in the folder/rp
     clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${cluster_name}")
@@ -84,6 +85,8 @@ function gather_console_and_bootstrap() {
         echo "Did not find out the cluster virtual machines, skipping gather logs steps"
         return 1
     fi
+    echo "DEBUG: clustervms found:"
+    echo "$clustervms"
 
     GATHER_BOOTSTRAP_ARGS=()
     for ipath in $clustervms; do
@@ -91,6 +94,7 @@ function gather_console_and_bootstrap() {
       # shellcheck disable=SC2162
       IFS=/ read -a ipath_array <<< "$ipath";
       hostname=${ipath_array[-1]}
+      echo "DEBUG: ipath=${ipath} hostname=${hostname}"
 
       # create png of the current console to determine if a virtual machine has a problem
       echo "$(date -u --rfc-3339=seconds) - capture console image"
@@ -103,17 +107,26 @@ function gather_console_and_bootstrap() {
       # If hostname has cluster name in it (newer powercli installs), strip the host name off for the IP logic below to work for gather
       if [[ "${hostname}" == "${infra_id}"* ]]; then
         hostname=${hostname#${infra_id}-}
+        echo "DEBUG: hostname after stripping infra_id prefix: ${hostname}"
       fi
 
       # Older UPI installs have "-0" after bootstrap.  We'll remove those to be consistent with newer builds.
       if [[ "${hostname}" == "bootstrap-0" ]]; then
         hostname="bootstrap"
+        echo "DEBUG: hostname after bootstrap-0 rename: ${hostname}"
       fi
 
       echo "declaring ${hostname//-/_}_ip"
       # shellcheck disable=SC2140
       declare "${hostname//-/_}_ip"="$(govc vm.ip -wait=1m -vm.ipath="$ipath" | awk -F',' '{print $1}')"
+      varname="${hostname//-/_}_ip"
+      echo "DEBUG: ${varname}=${!varname:-UNSET}"
     done
+
+    echo "DEBUG: bootstrap_ip=${bootstrap_ip:-UNSET}"
+    echo "DEBUG: control_plane_0_ip=${control_plane_0_ip:-UNSET}"
+    echo "DEBUG: control_plane_1_ip=${control_plane_1_ip:-UNSET}"
+    echo "DEBUG: control_plane_2_ip=${control_plane_2_ip:-UNSET}"
 
     GATHER_BOOTSTRAP_ARGS+=('--bootstrap' "${bootstrap_ip}")
     GATHER_BOOTSTRAP_ARGS+=('--master' "${control_plane_0_ip}" '--master' "${control_plane_1_ip}" '--master' "${control_plane_2_ip}")
