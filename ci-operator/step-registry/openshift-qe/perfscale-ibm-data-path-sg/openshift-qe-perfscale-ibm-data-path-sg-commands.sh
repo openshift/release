@@ -9,7 +9,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # Configure ibmcloud
 export IBMCLOUD_CLI=ibmcloud
 REGION=$(jq -r .ibmcloud.region ${SHARED_DIR}/metadata.json)
-expore REGION
+export REGION
 "${IBMCLOUD_CLI}" config --check-version=false
 
 echo "Logging in..."
