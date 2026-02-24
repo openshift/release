@@ -76,7 +76,7 @@ export ADDITIONAL_PARAMS
 ./run.sh
 
 
-if [[ ${JOB_NAME} == *rehearse* ]]  && [[ -f collected-metrics-${UUID}/jobSummary.json ]]; then
+if [[ ${JOB_TYPE} == "periodic" ]] && [[ -f collected-metrics-${UUID}/jobSummary.json ]]; then
   OCP_PERF_DASH_HOST=$(cat ${ES_SECRETS_PATH}/ocp-perf-dash-address)
   OCP_PERF_DASH_DIR="/usr/share/ocp-perf-dash/${JOB_NAME}/${WORKLOAD}/${UUID}"
   METRICS="collected-metrics-${UUID}/*QuantilesMeasurement*.json collected-metrics-${UUID}/jobSummary.json"
