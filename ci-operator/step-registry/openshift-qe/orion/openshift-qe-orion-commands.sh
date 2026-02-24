@@ -121,17 +121,12 @@ fi
 
 VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
 export VERSION
-if [[ -n "$ACK_FILE" ]]; then
-    if [[ "$ACK_FILE" =~ ^https?:// ]]; then
-        ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
-        if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then
-            echo "Error: Failed to download $ACK_FILE" >&2
-            exit 1
-        fi
-    else
-        # Download the latest ACK file
-        ackFilePath="$ARTIFACT_DIR/$ACK_FILE"
-        curl -sL https://raw.githubusercontent.com/cloud-bulldozer/orion/refs/heads/main/ack/${VERSION}_${ACK_FILE} -o "$ackFilePath"
+# Only pass --ack for custom ACK URLs. Orion auto-loads ack/all_ack.yaml when present (unless --no-ack).
+if [[ -n "$ACK_FILE" ]] && [[ "$ACK_FILE" =~ ^https?:// ]]; then
+    ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
+    if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then
+        echo "Error: Failed to download $ACK_FILE" >&2
+        exit 1
     fi
     EXTRA_FLAGS+=" --ack $ackFilePath"
 fi
