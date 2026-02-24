@@ -1,0 +1,18 @@
+workflow:
+  as: openshift-e2e-aws-ovn-hybrid-wait
+  steps:
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ovn-conf
+    - ref: ovn-conf-custom-cidr
+    - ref: ovn-conf-hybrid-manifest
+    - chain: ipi-install
+    test:
+    - ref: baremetal-lab-wait
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-deprovision
+  documentation: |-
+    Builds an AWS OVN hybrid cluster then holds it for CLUSTER_DURATION seconds (e.g. for manual upgrade testing).
+    Set CLUSTER_NETWORK_CIDR, CLUSTER_NETWORK_HOST_PREFIX for cluster network; CLUSTER_DURATION for hold time in seconds.

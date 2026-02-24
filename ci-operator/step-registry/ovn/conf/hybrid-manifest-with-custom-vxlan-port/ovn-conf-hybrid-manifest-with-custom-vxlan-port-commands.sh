@@ -24,6 +24,6 @@ spec:
       hybridOverlayConfig:
         hybridOverlayVXLANPort: 9789
         hybridClusterNetwork:
-        - cidr: 10.132.0.0/14
+        - cidr: 10.95.0.0/16
           hostPrefix: 23
 EOF
