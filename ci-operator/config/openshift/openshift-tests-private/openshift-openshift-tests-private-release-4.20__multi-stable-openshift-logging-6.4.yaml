@@ -120,6 +120,31 @@ tests:
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: baremetalds-ipi-ovn-ipv6-fips-f999-logging-debug
+  capabilities:
+  - intranet
+  cron: 8 8 29 2 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        FIPS_MODE=true
+        IP_STACK=v6
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+    test:
+    - as: sleep-xhours
+      commands: sleep 6h
+      from: cli
+      resources:
+        limits:
+          memory: 200Mi
+        requests:
+          cpu: 50m
+          memory: 200Mi
+      timeout: 6h5m0s
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 zz_generated_metadata:
   branch: release-4.20
   org: openshift
