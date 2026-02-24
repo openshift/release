@@ -467,12 +467,37 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-421
     workflow: hypershift-aws-reqserving-e2e
+- as: periodic-jira-agent
+  cron: 30 8 * * 1
+  steps:
+    env:
+      JIRA_AGENT_MAX_ISSUES: "1"
+    workflow: hypershift-jira-agent
+- as: periodic-review-agent
+  cron: 0 8-23/3 * * 1-5
+  steps:
+    env:
+      REVIEW_AGENT_BATCH_ONLY: "true"
+      REVIEW_AGENT_MAX_PRS: "10"
+    workflow: hypershift-review-agent
 - always_run: false
   as: address-review-comments
   optional: true
   skip_if_only_changed: .*
   steps:
     workflow: hypershift-review-agent
+- always_run: false
+  as: e2e-gke
+  capabilities:
+  - build-tmpfs
+  optional: true
+  run_if_changed: ^(api/hypershift/v1beta1/gcp.*|hypershift-operator/controllers/.*/gcp.*|control-plane-operator/controllers/.*/gcp.*|cmd/cluster/gcp/.*|cmd/nodepool/gcp/.*)
+  steps:
+    cluster_profile: hypershift-gcp
+    env:
+      GKE_REGION: us-central1
+      GKE_RELEASE_CHANNEL: stable
+    workflow: hypershift-gcp-gke-e2e
 zz_generated_metadata:
   branch: release-5.0
   org: openshift

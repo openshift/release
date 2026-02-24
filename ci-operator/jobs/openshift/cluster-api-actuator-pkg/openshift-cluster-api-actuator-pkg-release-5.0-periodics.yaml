@@ -1,96 +1,18 @@
 periodics:
 - agent: kubernetes
-  cluster: build06
-  cron: 0 0 */2 * *
+  cluster: build10
   decorate: true
   extra_refs:
   - base_ref: release-5.0
     org: openshift
-    repo: ovn-kubernetes
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-3
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ovn-kubernetes-release-5.0-e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build06
-  cron: 0 0 */2 * *
-  decorate: true
-  extra_refs:
-  - base_ref: release-5.0
-    org: openshift
-    repo: ovn-kubernetes
+    repo: cluster-api-actuator-pkg
+  interval: 72h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ovn-kubernetes-release-5.0-e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+  name: periodic-ci-openshift-cluster-api-actuator-pkg-release-5.0-e2e-aws-operator-periodic
   spec:
     containers:
     - args:
@@ -99,7 +21,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+      - --target=e2e-aws-operator-periodic
       command:
       - ci-operator
       env:
@@ -157,18 +79,18 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 0 * * *
   decorate: true
   extra_refs:
   - base_ref: release-5.0
     org: openshift
-    repo: ovn-kubernetes
+    repo: cluster-api-actuator-pkg
+  interval: 72h
   labels:
-    ci-operator.openshift.io/cloud: ibmcloud
-    ci-operator.openshift.io/cloud-cluster-profile: ibmcloud
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure4
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ovn-kubernetes-release-5.0-e2e-ibmcloud-ipi-ovn-periodic
+  name: periodic-ci-openshift-cluster-api-actuator-pkg-release-5.0-e2e-azure-operator-periodic
   spec:
     containers:
     - args:
@@ -177,7 +99,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-ibmcloud-ipi-ovn-periodic
+      - --target=e2e-azure-operator-periodic
       command:
       - ci-operator
       env:
@@ -234,95 +156,19 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: 0 * * * *
+  cluster: build04
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: release-5.0
     org: openshift
-    repo: ovn-kubernetes
+    repo: cluster-api-actuator-pkg
+  interval: 72h
   labels:
-    ci-operator.openshift.io/variant: periodics
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ovn-kubernetes-release-5.0-periodics-downstream-merge
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=downstream-merge
-      - --variant=periodics
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build09
-  cron: 0 3 * * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-5.0
-    org: openshift
-    repo: ovn-kubernetes
-  labels:
-    capability/intranet: intranet
-    ci-operator.openshift.io/cloud: equinix-ocp-metal
-    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-    ci-operator.openshift.io/variant: periodics
-    ci.openshift.io/generator: prowgen
-    job-release: "5.0"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ovn-kubernetes-release-5.0-periodics-e2e-metal-ipi-ovn-bgp-virt-dualstack
+  name: periodic-ci-openshift-cluster-api-actuator-pkg-release-5.0-e2e-gcp-multi-operator-periodic
   spec:
     containers:
     - args:
@@ -331,8 +177,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-ipi-ovn-bgp-virt-dualstack
-      - --variant=periodics
+      - --target=e2e-gcp-multi-operator-periodic
       command:
       - ci-operator
       env:
@@ -389,24 +234,19 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
-  cron: 0 3 * * *
+  cluster: build04
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: release-5.0
     org: openshift
-    repo: ovn-kubernetes
+    repo: cluster-api-actuator-pkg
+  interval: 72h
   labels:
-    capability/intranet: intranet
-    ci-operator.openshift.io/cloud: equinix-ocp-metal
-    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-    ci-operator.openshift.io/variant: periodics
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ovn-kubernetes-release-5.0-periodics-e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
+  name: periodic-ci-openshift-cluster-api-actuator-pkg-release-5.0-e2e-gcp-operator-periodic
   spec:
     containers:
     - args:
@@ -415,8 +255,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-ipi-ovn-bgp-virt-dualstack-techpreview
-      - --variant=periodics
+      - --target=e2e-gcp-operator-periodic
       command:
       - ci-operator
       env:
@@ -473,24 +312,19 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
-  cron: 0 7 * * *
+  cluster: build10
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: release-5.0
     org: openshift
-    repo: ovn-kubernetes
+    repo: cluster-api-actuator-pkg
   labels:
-    capability/intranet: intranet
-    ci-operator.openshift.io/cloud: equinix-ocp-metal
-    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-    ci-operator.openshift.io/variant: periodics
+    ci-operator.openshift.io/cloud: openstack-vexxhost
+    ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ovn-kubernetes-release-5.0-periodics-e2e-metal-ipi-ovn-bgp-virt-ipv4
+  minimum_interval: 72h
+  name: periodic-ci-openshift-cluster-api-actuator-pkg-release-5.0-e2e-openstack-operator-periodic
   spec:
     containers:
     - args:
@@ -499,8 +333,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-ipi-ovn-bgp-virt-ipv4
-      - --variant=periodics
+      - --target=e2e-openstack-operator-periodic
       command:
       - ci-operator
       env:
@@ -557,24 +390,19 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
-  cron: 0 7 * * *
+  cluster: vsphere02
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: release-5.0
     org: openshift
-    repo: ovn-kubernetes
+    repo: cluster-api-actuator-pkg
+  interval: 72h
   labels:
-    capability/intranet: intranet
-    ci-operator.openshift.io/cloud: equinix-ocp-metal
-    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-    ci-operator.openshift.io/variant: periodics
+    ci-operator.openshift.io/cloud: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-elastic
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ovn-kubernetes-release-5.0-periodics-e2e-metal-ipi-ovn-bgp-virt-ipv4-techpreview
+  name: periodic-ci-openshift-cluster-api-actuator-pkg-release-5.0-e2e-vsphere-operator-periodic
   spec:
     containers:
     - args:
@@ -583,176 +411,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-ipi-ovn-bgp-virt-ipv4-techpreview
-      - --variant=periodics
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build09
-  cron: 0 4 * * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-5.0
-    org: openshift
-    repo: ovn-kubernetes
-  labels:
-    capability/intranet: intranet
-    ci-operator.openshift.io/cloud: equinix-ocp-metal
-    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-    ci-operator.openshift.io/variant: periodics
-    ci.openshift.io/generator: prowgen
-    job-release: "5.0"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ovn-kubernetes-release-5.0-periodics-e2e-metal-ipi-ovn-dualstack-bgp
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-ipi-ovn-dualstack-bgp
-      - --variant=periodics
-      command:
-      - ci-operator
-      env:
-      - name: HTTP_SERVER_IP
-        valueFrom:
-          fieldRef:
-            fieldPath: status.podIP
-      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-      imagePullPolicy: Always
-      name: ""
-      ports:
-      - containerPort: 8080
-        name: http
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/manifest-tool
-        name: manifest-tool-local-pusher
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: manifest-tool-local-pusher
-      secret:
-        secretName: manifest-tool-local-pusher
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build09
-  cron: 0 4 * * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-5.0
-    org: openshift
-    repo: ovn-kubernetes
-  labels:
-    capability/intranet: intranet
-    ci-operator.openshift.io/cloud: equinix-ocp-metal
-    ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
-    ci-operator.openshift.io/variant: periodics
-    ci.openshift.io/generator: prowgen
-    job-release: "5.0"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-ovn-kubernetes-release-5.0-periodics-e2e-metal-ipi-ovn-dualstack-bgp-local-gw
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=e2e-metal-ipi-ovn-dualstack-bgp-local-gw
-      - --variant=periodics
+      - --target=e2e-vsphere-operator-periodic
       command:
       - ci-operator
       env:
