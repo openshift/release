@@ -3,6 +3,10 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: cli
+  istio-builder:
+    name: maistra-builder
+    namespace: ci
+    tag: upstream-master
 build_root:
   image_stream_tag:
     name: maistra-builder
@@ -62,19 +66,19 @@ tests:
 - as: gencheck
   commands: |
     make gen-check \
-    BUILD_WITH_CONTAINER=0 \
-    GOBIN='/gobin' \
-    GOCACHE='/tmp/cache' \
-    GOMODCACHE='/tmp/cache' \
-    XDG_CACHE_HOME='/tmp/cache' \
-    ARTIFACTS='${ARTIFACT_DIR}'
+    ARTIFACTS="${ARTIFACT_DIR:-}" \
+    BUILD_WITH_CONTAINER="0" \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src
+    from: istio-builder
 - as: unit
   commands: |
     make -e T=-v build racetest binaries-test
   container:
-    from: src
+    from: istio-builder
 - as: istio-integration-pilot
   steps:
     cluster_profile: ossm-aws
