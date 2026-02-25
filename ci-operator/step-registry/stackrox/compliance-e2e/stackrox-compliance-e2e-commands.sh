@@ -80,7 +80,10 @@ if [ ! -f ".openshift-ci/dispatch.sh" ]; then
     cd stackrox
 fi
 
+# dispatch.sh's exit trap (handle_dangling_processes in lib.sh) sends SIGTERM
+# to all processes that are not itself, its children, or entrypoint/defunct.
+# Ignore SIGTERM so this script survives and our EXIT trap runs cleanly.
+trap '' TERM
+
 # Execute dispatch script
 .openshift-ci/dispatch.sh "${job}"
-
-true
