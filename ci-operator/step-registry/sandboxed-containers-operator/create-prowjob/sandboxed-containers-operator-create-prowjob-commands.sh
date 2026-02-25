@@ -298,7 +298,10 @@ generate_workflow() {
   local cron="0 0 31 2 1"
 
   echo "- as: ${platform}-ipi-${workload}"
+  echo "  capabilities:"
+  echo "  - intranet"
   echo "  cron: ${cron}"
+  echo "  restrict_network_access: false"
   echo "  steps:"
   echo "    cluster_profile: ${profile}"
   echo "    env:"
