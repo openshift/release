@@ -1,8 +1,12 @@
 base_images:
   cli:
-    name: "4.13"
+    name: "4.20"
     namespace: ocp
     tag: cli
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
   ubi:
     name: ubi
     namespace: ocp
@@ -11,7 +15,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-9-golang-1.24-openshift-4.20
 images:
 - dockerfile_path: Dockerfile
   from: ubi
@@ -43,7 +47,7 @@ promotion:
 releases:
   latest:
     integration:
-      name: "4.13"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -85,6 +89,122 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
+- always_run: false
+  as: e2e-upgrade
+  optional: true
+  steps:
+    cluster_profile: aws-3
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+    post:
+    - ref: quay-gather
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: quay-install-odf-operator
+    - as: install-stable
+      cli: latest
+      commands: |
+        set -exuo pipefail
+        NS="openshift-operators"
+
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1alpha1
+        kind: Subscription
+        metadata:
+          name: quay-operator
+          namespace: ${NS}
+        spec:
+          name: quay-operator
+          channel: "stable-3.16"
+          source: redhat-operators
+          sourceNamespace: openshift-marketplace
+          installPlanApproval: Automatic
+        EOF
+
+        echo "Waiting for stable quay-operator CSV to become ready..."
+        for i in $(seq 1 60); do
+          CSV=$(oc -n "${NS}" get subscription quay-operator -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
+          if [[ -n "$CSV" ]]; then
+            PHASE=$(oc -n "${NS}" get csv "$CSV" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+            if [[ "$PHASE" == "Succeeded" ]]; then
+              echo "Stable quay-operator installed: $CSV"
+              exit 0
+            fi
+          fi
+          echo "Waiting for stable CSV... (attempt $i/60)"
+          sleep 10
+        done
+        echo "Timed out waiting for stable operator installation"
+        oc -n "${NS}" get subscription quay-operator -o yaml > "${ARTIFACT_DIR}/sub-quay-operator.yaml" || true
+        oc -n "${NS}" get csv -o yaml > "${ARTIFACT_DIR}/all-csvs.yaml" || true
+        exit 1
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - ref: quay-install-quay
+    - ref: quay-create-admin
+    - as: smoke-test
+      commands: |
+        set -eux
+        export HOME="${HOME:-/tmp/home}"
+        export XDG_RUNTIME_DIR="${HOME}/run"
+        export REGISTRY_AUTH_PREFERENCE=podman
+        mkdir -p "${XDG_RUNTIME_DIR}"
+        registryEndpoint="$(oc -n quay get quayregistry quay -o jsonpath='{.status.registryEndpoint}')"
+        registry="${registryEndpoint#https://}"
+        oc registry login --registry "$registry" --auth-basic "admin:p@ssw0rd"
+        oc image mirror --insecure=true quay.io/projectquay/quay:latest "$registry/admin/quay"
+      from: src-oc
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: upgrade-operator
+      cli: latest
+      commands: |
+        set -exuo pipefail
+        export REGISTRY_AUTH_FILE=/var/run/brew-pullsecret/.dockerconfigjson
+        NS="openshift-operators"
+        echo "Upgrading quay-operator to CI-built bundle..."
+        operator-sdk run bundle-upgrade --timeout=10m --security-context-config restricted \
+          -n "$NS" "$OO_BUNDLE"
+        echo "Waiting for upgraded quay-operator deployment..."
+        oc wait --timeout=10m --for condition=Available -n "$NS" deployment -l operators.coreos.com/quay-operator."$NS"= || \
+          oc wait --timeout=10m --for condition=Available -n "$NS" deployment -l app=quay-operator
+        echo "Upgrade complete"
+      credentials:
+      - mount_path: /var/run/brew-pullsecret
+        name: brew-registry-pullsecret
+        namespace: test-credentials
+      dependencies:
+      - env: OO_BUNDLE
+        name: quay
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: post-upgrade-test
+      commands: |
+        set -eux
+        export HOME="${HOME:-/tmp/home}"
+        export XDG_RUNTIME_DIR="${HOME}/run"
+        export REGISTRY_AUTH_PREFERENCE=podman
+        mkdir -p "${XDG_RUNTIME_DIR}"
+        registryEndpoint="$(oc -n quay get quayregistry quay -o jsonpath='{.status.registryEndpoint}')"
+        registry="${registryEndpoint#https://}"
+        oc registry login --registry "$registry" --auth-basic "admin:p@ssw0rd"
+        oc image mirror --insecure=true quay.io/projectquay/quay:latest "$registry/admin/quay-post-upgrade"
+      from: src-oc
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: quay
