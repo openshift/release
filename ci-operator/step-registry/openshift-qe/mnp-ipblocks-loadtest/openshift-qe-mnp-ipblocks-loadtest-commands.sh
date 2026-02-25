@@ -41,17 +41,38 @@ log_error() { echo "$(date +'%Y-%m-%d %H:%M:%S') [ERROR] $1"; }
 
 # Check for required tools (most should be available in CI containers)
 log_info "📦 Checking for required tools..."
-for tool in git wget curl jq bc; do
+for tool in git wget curl jq bc oc; do
     if command -v $tool >/dev/null 2>&1; then
         log_info "✅ $tool available"
     else
-        log_warning "⚠️  $tool not found, attempting alternative"
+        log_warning "⚠️  $tool not found"
         if [[ "$tool" == "bc" ]]; then
             # bc alternative for basic math
             log_info "Using shell arithmetic instead of bc"
+        elif [[ "$tool" == "oc" ]]; then
+            log_error "❌ OpenShift CLI (oc) is required but not found"
+            log_error "   This indicates a container image configuration issue"
+            log_error "   Expected: oc command should be available in CI environment"
+            exit 1
         fi
     fi
 done
+
+# Verify cluster connectivity
+log_info "🔗 Verifying cluster connectivity..."
+if ! oc version --client >/dev/null 2>&1; then
+    log_error "❌ OpenShift CLI not functional"
+    log_error "   Check container image configuration"
+    exit 1
+fi
+
+if ! timeout 30 oc cluster-info >/dev/null 2>&1; then
+    log_error "❌ Cannot connect to OpenShift cluster"
+    log_error "   Check KUBECONFIG and cluster accessibility"
+    exit 1
+fi
+
+log_success "✅ OpenShift CLI configured and cluster accessible"
 
 # Create embedded verification script for PR #2978 validation
 log_info "🔧 Creating PR #2978 verification script..."
