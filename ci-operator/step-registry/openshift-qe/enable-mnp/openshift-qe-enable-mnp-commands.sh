@@ -68,18 +68,36 @@ fi
 # Wait for MultiNetworkPolicy CRD to be available
 log_info "Waiting for MultiNetworkPolicy CRD to be available..."
 for attempt in {1..60}; do
-    if oc api-resources | grep -q "multi-networkpolicies"; then
-        log_success "MultiNetworkPolicy CRD is available"
+    # Check multiple ways for CRD availability
+    if oc api-resources --api-group=k8s.cni.cncf.io 2>/dev/null | grep -q "multinetworkpolicies\|multi-networkpolicies"; then
+        log_success "MultiNetworkPolicy CRD is available via API group check"
+        break
+    elif oc api-resources 2>/dev/null | grep -E "multinetworkpolicies|multi-networkpolicies"; then
+        log_success "MultiNetworkPolicy CRD is available via general API resources"
+        break
+    elif oc get crd multinetworkpolicies.k8s.cni.cncf.io >/dev/null 2>&1; then
+        log_success "MultiNetworkPolicy CRD is available via direct CRD check"
         break
     fi
     
     log_info "Attempt $attempt/60: Waiting for CRD to be installed..."
+    
+    # Show debug info every 10 attempts
+    if (( attempt % 10 == 0 )); then
+        log_info "Debug: Available API groups:"
+        oc api-resources --api-group=k8s.cni.cncf.io 2>/dev/null || true
+        log_info "Debug: Network-related CRDs:"
+        oc get crd | grep -i network || true
+    fi
+    
     sleep 10
     
     if [[ $attempt -eq 60 ]]; then
         log_error "Timeout waiting for MultiNetworkPolicy CRD"
         log_error "Available network-related resources:"
         oc api-resources | grep -i network || true
+        log_error "Available CRDs:"
+        oc get crd | grep -i multinetwork || true
         exit 1
     fi
 done
