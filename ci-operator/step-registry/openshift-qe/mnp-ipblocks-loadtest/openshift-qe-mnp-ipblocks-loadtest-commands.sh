@@ -11,7 +11,7 @@ set -o pipefail
 # - 1400 pods across 14 workers (100 pods per worker)
 # - Results in 1.57M ACLs causing system instability
 
-echo "🧪 Starting MNP-76500 ACL Explosion Reproduction Test"
+echo "Starting MNP-76500 ACL Explosion Reproduction Test"
 echo "========================================================"
 
 # Configuration from environment variables
@@ -19,7 +19,7 @@ MNP_TOTAL_PODS="${MNP_TOTAL_PODS:-1400}"
 MNP_POLICY_COUNT="${MNP_POLICY_COUNT:-385}"
 MNP_CIDRS_PER_POLICY="${MNP_CIDRS_PER_POLICY:-450}"
 
-echo "📊 Test Configuration:"
+echo "Test Configuration:"
 echo "  - Total Pods: $MNP_TOTAL_PODS"
 echo "  - Policy Count: $MNP_POLICY_COUNT"
 echo "  - CIDRs per Policy: $MNP_CIDRS_PER_POLICY"
@@ -40,17 +40,17 @@ log_warning() { echo "$(date +'%Y-%m-%d %H:%M:%S') [WARNING] $1"; }
 log_error() { echo "$(date +'%Y-%m-%d %H:%M:%S') [ERROR] $1"; }
 
 # Check for required tools (most should be available in CI containers)
-log_info "📦 Checking for required tools..."
+log_info "Checking for required tools..."
 for tool in git wget curl jq bc oc; do
     if command -v $tool >/dev/null 2>&1; then
-        log_info "✅ $tool available"
+        log_info "SUCCESS $tool available"
     else
-        log_warning "⚠️  $tool not found"
+        log_warning "WARNING  $tool not found"
         if [[ "$tool" == "bc" ]]; then
             # bc alternative for basic math
             log_info "Using shell arithmetic instead of bc"
         elif [[ "$tool" == "oc" ]]; then
-            log_error "❌ OpenShift CLI (oc) is required but not found"
+            log_error "OpenShift CLI (oc) is required but not found"
             log_error "   This indicates a container image configuration issue"
             log_error "   Expected: oc command should be available in CI environment"
             exit 1
@@ -59,20 +59,20 @@ for tool in git wget curl jq bc oc; do
 done
 
 # Verify cluster connectivity
-log_info "🔗 Verifying cluster connectivity..."
+log_info "Verifying cluster connectivity..."
 if ! oc version --client >/dev/null 2>&1; then
-    log_error "❌ OpenShift CLI not functional"
+    log_error "OpenShift CLI not functional"
     log_error "   Check container image configuration"
     exit 1
 fi
 
 if ! timeout 30 oc cluster-info >/dev/null 2>&1; then
-    log_error "❌ Cannot connect to OpenShift cluster"
+    log_error "Cannot connect to OpenShift cluster"
     log_error "   Check KUBECONFIG and cluster accessibility"
     exit 1
 fi
 
-log_success "✅ OpenShift CLI configured and cluster accessible"
+log_success "SUCCESS OpenShift CLI configured and cluster accessible"
 
 # Create embedded verification script for PR #2978 validation
 log_info "🔧 Creating PR #2978 verification script..."
@@ -107,19 +107,19 @@ echo "Build Date: $BUILD_DATE"
 # Check if build is after PR merge date
 PR_MERGE_DATE="2026-02-20"
 if [[ "$BUILD_DATE" > "$PR_MERGE_DATE" || "$BUILD_DATE" == "$PR_MERGE_DATE" ]]; then
-    log_success "✅ Build date ($BUILD_DATE) is after PR #2978 target date"
+    log_success "SUCCESS Build date ($BUILD_DATE) is after PR #2978 target date"
 else
-    log_warning "⚠️  Build date ($BUILD_DATE) may not contain PR #2978"
+    log_warning "WARNING  Build date ($BUILD_DATE) may not contain PR #2978"
 fi
 
 # 2. Check MNP CRD availability
 log_info "=== 2. Multi-Network Policy Support Check ==="
 if oc api-resources | grep -q "multi-networkpolicies"; then
-    log_success "✅ MultiNetworkPolicy CRD is available"
+    log_success "SUCCESS MultiNetworkPolicy CRD is available"
     MNP_VERSION=$(oc api-resources | grep multi-networkpolicies | awk '{print $3}')
     echo "   API Version: $MNP_VERSION"
 else
-    log_error "❌ MultiNetworkPolicy CRD not found"
+    log_error "ERROR MultiNetworkPolicy CRD not found"
     exit 1
 fi
 
@@ -129,7 +129,7 @@ MNP_COUNT=$(oc get multi-networkpolicies.k8s.cni.cncf.io -A --no-headers 2>/dev/
 echo "Total MNPs deployed: $MNP_COUNT"
 
 if [[ $MNP_COUNT -gt 0 ]]; then
-    log_success "✅ MNPs are deployed and active"
+    log_success "SUCCESS MNPs are deployed and active"
     
     # Show first few MNPs with timing info
     echo "Sample MNPs:"
@@ -150,11 +150,11 @@ if [[ $MNP_COUNT -gt 0 ]]; then
     echo "Number of ipBlocks in policy: $IPBLOCK_COUNT"
     
     if [[ $IPBLOCK_COUNT -gt 1 ]]; then
-        log_success "✅ Multiple ipBlocks found ($IPBLOCK_COUNT) - Perfect test case for PR #2978"
+        log_success "SUCCESS Multiple ipBlocks found ($IPBLOCK_COUNT) - Perfect test case for PR #2978"
         echo "Sample ipBlocks (first 6):"
         oc get multi-networkpolicies.k8s.cni.cncf.io -n $NAMESPACE $NAME -o yaml | grep -A 1 "ipBlock:" | head -6
     else
-        log_warning "⚠️  Only $IPBLOCK_COUNT ipBlock found"
+        log_warning "WARNING  Only $IPBLOCK_COUNT ipBlock found"
     fi
     
     # Calculate expected impact
@@ -166,7 +166,7 @@ if [[ $MNP_COUNT -gt 0 ]]; then
     echo "Expected reduction: $(( (TOTAL_IPBLOCKS - MNP_COUNT) * 100 / TOTAL_IPBLOCKS ))% fewer ACLs"
     
 else
-    log_warning "⚠️  No MNPs available for analysis"
+    log_warning "WARNING  No MNPs available for analysis"
 fi
 
 # 6. Check ACL count and consolidation patterns
@@ -185,7 +185,7 @@ elif [[ -n "$CONTROL_POD" ]]; then
     POD_TO_USE="$CONTROL_POD"
     CONTAINER="ovnkube-cluster-manager"
 else
-    log_error "❌ Could not find appropriate OVN pod"
+    log_error "ERROR Could not find appropriate OVN pod"
     return 1
 fi
 
@@ -213,11 +213,11 @@ for attempt in 1 2 3; do
 done
 
 if [[ "$ACL_COUNT" == "timeout" ]]; then
-    log_warning "⚠️  ACL query timed out (system under heavy load)"
+    log_warning "WARNING  ACL query timed out (system under heavy load)"
     log_info "   This could indicate ACL explosion without PR #2978 fix"
     ACL_STATUS="timeout_detected"
 elif [[ "$ACL_COUNT" =~ ^[0-9]+$ ]]; then
-    log_success "✅ ACL count retrieved: $ACL_COUNT"
+    log_success "SUCCESS ACL count retrieved: $ACL_COUNT"
     
     # Analyze ACL count relative to ipBlocks
     if [[ $MNP_COUNT -gt 0 && $IPBLOCK_COUNT -gt 0 ]]; then
@@ -230,10 +230,10 @@ elif [[ "$ACL_COUNT" =~ ^[0-9]+$ ]]; then
         echo "  Actual ACLs: $ACL_COUNT"
         
         if [[ $ACL_COUNT -lt $EXPECTED_WITH_FIX ]]; then
-            log_success "✅ ACL count suggests PR #2978 ipBlock consolidation is WORKING!"
+            log_success "SUCCESS ACL count suggests PR #2978 ipBlock consolidation is WORKING!"
             ACL_STATUS="consolidation_working"
         elif [[ $ACL_COUNT -gt $EXPECTED_WITHOUT_FIX ]]; then
-            log_warning "⚠️  ACL count suggests NO consolidation - PR #2978 may not be active"
+            log_warning "WARNING  ACL count suggests NO consolidation - PR #2978 may not be active"
             ACL_STATUS="no_consolidation"
         else
             log_info "ℹ️  ACL count in middle range - needs further analysis"
@@ -246,12 +246,12 @@ elif [[ "$ACL_COUNT" =~ ^[0-9]+$ ]]; then
     OR_PATTERNS=$(timeout 15 oc -n openshift-ovn-kubernetes exec $POD_TO_USE -c $CONTAINER -- ovn-nbctl --timeout=5 find ACL match~='||' 2>/dev/null | wc -l || echo "0")
     
     if [[ "$OR_PATTERNS" =~ ^[0-9]+$ ]] && [[ $OR_PATTERNS -gt 0 ]]; then
-        log_success "✅ Found $OR_PATTERNS ACLs with OR patterns - Consolidation active!"
+        log_success "SUCCESS Found $OR_PATTERNS ACLs with OR patterns - Consolidation active!"
     else
-        log_warning "⚠️  No OR patterns found - ipBlocks may not be consolidated"
+        log_warning "WARNING  No OR patterns found - ipBlocks may not be consolidated"
     fi
 else
-    log_error "❌ Could not determine ACL count"
+    log_error "ERROR Could not determine ACL count"
     ACL_STATUS="query_failed"
 fi
 
@@ -270,9 +270,9 @@ OVN_RESTARTS=$(oc get pods -n openshift-ovn-kubernetes -o jsonpath='{range .item
 echo "Total OVN pod restarts: $OVN_RESTARTS"
 
 if [[ $OVN_RESTARTS -gt 5 ]]; then
-    log_warning "⚠️  High restart count ($OVN_RESTARTS) - possible system instability"
+    log_warning "WARNING  High restart count ($OVN_RESTARTS) - possible system instability"
 else
-    log_success "✅ Low restart count - system appears stable"
+    log_success "SUCCESS Low restart count - system appears stable"
 fi
 
 # 8. Generate verification summary
@@ -282,46 +282,46 @@ echo "PR #2978 Status Assessment:"
 
 # Build validation
 if [[ "$BUILD_DATE" > "$PR_MERGE_DATE" || "$BUILD_DATE" == "$PR_MERGE_DATE" ]]; then
-    echo "✅ Build version: Contains expected timeframe"
+    echo "SUCCESS Build version: Contains expected timeframe"
 else
-    echo "❌ Build version: May not contain PR #2978"
+    echo "ERROR Build version: May not contain PR #2978"
 fi
 
 # Feature validation
 if oc api-resources | grep -q "multi-networkpolicies"; then
-    echo "✅ MNP support: Available"
+    echo "SUCCESS MNP support: Available"
 else
-    echo "❌ MNP support: Missing"
+    echo "ERROR MNP support: Missing"
 fi
 
 # Test validation
 if [[ $MNP_COUNT -gt 0 && $IPBLOCK_COUNT -gt 1 ]]; then
-    echo "✅ Test case: Active with $MNP_COUNT MNPs, $IPBLOCK_COUNT ipBlocks each"
+    echo "SUCCESS Test case: Active with $MNP_COUNT MNPs, $IPBLOCK_COUNT ipBlocks each"
 else
-    echo "⚠️  Test case: Limited or inactive"
+    echo "WARNING  Test case: Limited or inactive"
 fi
 
 # Consolidation validation
 case $ACL_STATUS in
     "consolidation_working")
-        echo "✅ ACL consolidation: WORKING - PR #2978 appears active!"
+        echo "SUCCESS ACL consolidation: WORKING - PR #2978 appears active!"
         ;;
     "no_consolidation")
-        echo "❌ ACL consolidation: NOT working - PR #2978 may not be active"
+        echo "ERROR ACL consolidation: NOT working - PR #2978 may not be active"
         ;;
     "timeout_detected")
-        echo "⚠️  ACL consolidation: System overloaded (possible ACL explosion)"
+        echo "WARNING  ACL consolidation: System overloaded (possible ACL explosion)"
         ;;
     *)
-        echo "⚠️  ACL consolidation: Status unclear"
+        echo "WARNING  ACL consolidation: Status unclear"
         ;;
 esac
 
 # Stability validation
 if [[ $OVN_RESTARTS -le 5 && $OVN_PODS_READY -eq $OVN_PODS_TOTAL ]]; then
-    echo "✅ System stability: Good"
+    echo "SUCCESS System stability: Good"
 else
-    echo "⚠️  System stability: Issues detected"
+    echo "WARNING  System stability: Issues detected"
 fi
 
 echo
@@ -339,13 +339,9 @@ VERIFY_EOF
 
 # Make verification script executable
 if chmod +x /tmp/verify-pr2978-fix.sh 2>/dev/null; then
-    log_info "✅ Verification script made executable"
+    log_info "SUCCESS Verification script made executable"
 else
-    log_warning "⚠️  Could not make verification script executable, will run with bash"
-    # Create an alias function to handle the script execution
-    verify_pr2978_fix() {
-        bash /tmp/verify-pr2978-fix.sh "$@"
-    }
+    log_warning "Could not make verification script executable, will run with bash"
 fi
 
 # Clone Liquan's MNP load test tool
@@ -355,14 +351,14 @@ cd /tmp
 # Try to clone with timeout and fallback options
 if timeout 60 git clone --depth 1 https://github.com/liqcui/mnp_loadtest.git 2>/dev/null; then
     cd mnp_loadtest
-    log_success "✅ MNP load test tool cloned successfully"
+    log_success "SUCCESS MNP load test tool cloned successfully"
 elif timeout 60 git clone --depth 1 --single-branch https://github.com/liqcui/mnp_loadtest.git 2>/dev/null; then
     cd mnp_loadtest
-    log_success "✅ MNP load test tool cloned successfully (fallback mode)"
+    log_success "SUCCESS MNP load test tool cloned successfully (fallback mode)"
 else
-    log_error "❌ Failed to clone MNP load test tool"
+    log_error "Failed to clone MNP load test tool"
     log_error "   This may be due to network restrictions in CI environment"
-    log_warning "⚠️  Attempting to continue with limited functionality..."
+    log_warning "WARNING  Attempting to continue with limited functionality..."
     
     # Create minimal fallback structure
     mkdir -p mnp_loadtest
@@ -372,7 +368,7 @@ else
     cat > generate-customer-scale-pods.sh << 'FALLBACK_EOF'
 #!/bin/bash
 # Fallback MNP generation script for CI environment
-echo "⚠️  Using fallback MNP generation due to clone failure"
+echo "WARNING  Using fallback MNP generation due to clone failure"
 echo "Creating basic MNP test structure..."
 
 # Basic argument parsing
@@ -401,11 +397,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "Test parameters: $TOTAL_PODS pods, $POLICY_COUNT policies, $CIDRS_PER_POLICY CIDRs each"
-echo "⚠️  Note: This is a fallback implementation with limited functionality"
+echo "WARNING  Note: This is a fallback implementation with limited functionality"
 FALLBACK_EOF
 
     chmod +x generate-customer-scale-pods.sh
-    log_warning "⚠️  Created fallback script - test will have limited functionality"
+    log_warning "WARNING  Created fallback script - test will have limited functionality"
 fi
 
 # Verify cluster readiness
@@ -414,11 +410,11 @@ worker_count=$(oc get nodes -l node-role.kubernetes.io/worker= --no-headers | wc
 log_info "Worker nodes available: $worker_count"
 
 if [[ $worker_count -lt 14 ]]; then
-    log_error "❌ Insufficient workers: $worker_count < 14 required"
+    log_error "ERROR Insufficient workers: $worker_count < 14 required"
     exit 1
 fi
 
-log_success "✅ Cluster ready with $worker_count workers"
+log_success "SUCCESS Cluster ready with $worker_count workers"
 
 # Run initial PR #2978 verification
 log_info "🔍 Running initial PR #2978 fix verification..."
@@ -522,13 +518,13 @@ start_time=$(date +%s)
 if [[ -f "generate-customer-scale-pods.sh" ]]; then
     if chmod +x generate-customer-scale-pods.sh 2>/dev/null; then
         SCRIPT_EXEC="./generate-customer-scale-pods.sh"
-        log_info "✅ MNP script made executable"
+        log_info "SUCCESS MNP script made executable"
     else
-        log_warning "⚠️  Could not make MNP script executable, will try with bash"
+        log_warning "WARNING  Could not make MNP script executable, will try with bash"
         SCRIPT_EXEC="bash generate-customer-scale-pods.sh"
     fi
 else
-    log_error "❌ MNP script not found: generate-customer-scale-pods.sh"
+    log_error "ERROR MNP script not found: generate-customer-scale-pods.sh"
     log_error "   This indicates a critical failure in tool setup"
     exit 1
 fi
@@ -539,14 +535,14 @@ log_info "Command: $SCRIPT_EXEC --total-pods $MNP_TOTAL_PODS --policy-count $MNP
 
 # Execute with timeout to prevent hanging
 if timeout 1800 $SCRIPT_EXEC --total-pods "$MNP_TOTAL_PODS" --policy-count "$MNP_POLICY_COUNT" --cidrs-per-policy "$MNP_CIDRS_PER_POLICY" --apply; then
-    log_success "✅ MNP load test execution completed successfully"
+    log_success "SUCCESS MNP load test execution completed successfully"
     TEST_EXECUTION_STATUS="success"
 elif [[ $? -eq 124 ]]; then
-    log_error "❌ MNP load test timed out after 30 minutes"
+    log_error "MNP load test timed out after 30 minutes"
     log_error "   This may indicate system overload or ACL explosion"
     TEST_EXECUTION_STATUS="timeout"
 else
-    log_error "❌ MNP load test execution failed with exit code $?"
+    log_error "MNP load test execution failed with exit code $?"
     log_error "   Continuing to collect metrics for analysis..."
     TEST_EXECUTION_STATUS="failed"
 fi
@@ -589,15 +585,15 @@ if [[ "$baseline_acl_count" =~ ^[0-9]+$ ]] && [[ "$post_acl_count" =~ ^[0-9]+$ ]
     # Check for ACL explosion threshold (customer had 1.57M ACLs)
     acl_explosion_threshold=1000000  # 1M ACLs
     if [[ $post_acl_count -gt $acl_explosion_threshold ]]; then
-        log_warning "⚠️  ACL EXPLOSION DETECTED: $post_acl_count > $acl_explosion_threshold (threshold)"
+        log_warning "WARNING  ACL EXPLOSION DETECTED: $post_acl_count > $acl_explosion_threshold (threshold)"
         log_warning "   This reproduces the customer's MNP-76500 issue!"
     elif [[ $acl_increase -gt 100000 ]]; then
-        log_warning "⚠️  Significant ACL increase detected: $acl_increase new ACLs"
+        log_warning "WARNING  Significant ACL increase detected: $acl_increase new ACLs"
     else
-        log_success "✅ ACL count within reasonable limits"
+        log_success "SUCCESS ACL count within reasonable limits"
     fi
 else
-    log_warning "⚠️  Unable to calculate ACL increase (non-numeric values)"
+    log_warning "WARNING  Unable to calculate ACL increase (non-numeric values)"
     acl_increase="unknown"
 fi
 
@@ -615,17 +611,17 @@ log_info "MultiNetworkPolicies created: $mnp_count"
 # Pod distribution across workers
 log_info "📊 Pod distribution across workers:"
 if timeout 30 oc get pods -A --no-headers -o custom-columns=NODE:.spec.nodeName 2>/dev/null | grep -E "worker|compute" | sort | uniq -c | head -20; then
-    log_info "✅ Pod distribution analysis completed"
+    log_info "SUCCESS Pod distribution analysis completed"
 else
-    log_warning "⚠️  Could not analyze pod distribution - may indicate system overload"
+    log_warning "WARNING  Could not analyze pod distribution - may indicate system overload"
 fi
 
 # OVN pod status
 log_info "🔍 OVN pod status:"
 if timeout 30 oc get pods -n openshift-ovn-kubernetes -o wide 2>/dev/null; then
-    log_info "✅ OVN pod status retrieved"
+    log_info "SUCCESS OVN pod status retrieved"
 else
-    log_warning "⚠️  Could not retrieve OVN pod status - may indicate cluster issues"
+    log_warning "WARNING  Could not retrieve OVN pod status - may indicate cluster issues"
 fi
 
 # Check for any OVN pod restarts/crashes
@@ -633,12 +629,12 @@ if ovn_restart_data=$(timeout 30 oc get pods -n openshift-ovn-kubernetes -o json
     ovn_restarts=$(echo "$ovn_restart_data" | awk '{sum+=$2} END {print sum+0}')
     log_info "Total OVN pod restarts: $ovn_restarts"
 else
-    log_warning "⚠️  Could not determine OVN restart count"
+    log_warning "WARNING  Could not determine OVN restart count"
     ovn_restarts="unknown"
 fi
 
 if [[ $ovn_restarts -gt 0 ]]; then
-    log_warning "⚠️  OVN pod restarts detected: $ovn_restarts"
+    log_warning "WARNING  OVN pod restarts detected: $ovn_restarts"
     log_warning "   This may indicate system instability from ACL explosion"
 fi
 
@@ -647,10 +643,10 @@ log_info "💾 Saving test results to artifacts..."
 
 # Ensure artifact directory is writable
 if [[ ! -w "$ARTIFACT_DIR" ]]; then
-    log_warning "⚠️  Artifact directory not writable, trying to create backup location"
+    log_warning "WARNING  Artifact directory not writable, trying to create backup location"
     BACKUP_ARTIFACT_DIR="/tmp/test_artifacts_backup"
     mkdir -p "$BACKUP_ARTIFACT_DIR" || {
-        log_error "❌ Cannot create backup artifact directory"
+        log_error "ERROR Cannot create backup artifact directory"
         BACKUP_ARTIFACT_DIR="/tmp"
     }
     log_info "📁 Using backup artifact location: $BACKUP_ARTIFACT_DIR"
@@ -698,7 +694,7 @@ if ! cat > "$ARTIFACT_DIR/test_results.json" << EOF
 }
 EOF
 then
-    log_error "❌ Failed to write test results JSON"
+    log_error "ERROR Failed to write test results JSON"
     log_info "📋 Printing results to console as fallback:"
     echo "=== Test Results Summary ==="
     echo "Timestamp: $(date -Iseconds)"
@@ -709,7 +705,7 @@ then
     echo "Verification: $final_verification_status"
     echo "==========================="
 else
-    log_success "✅ Test results JSON saved successfully"
+    log_success "SUCCESS Test results JSON saved successfully"
 fi
 
 # Generate summary report
@@ -744,13 +740,13 @@ if ! cat > "$ARTIFACT_DIR/MNP-76500_test_summary.md" << EOF
 - **Explosion Detected**: $(if [[ "$post_acl_count" =~ ^[0-9]+$ ]] && [[ $post_acl_count -gt $acl_explosion_threshold ]]; then echo "🔴 YES - Customer issue reproduced!"; else echo "🟢 No"; fi)
 
 ## System Stability
-- **OVN Pod Restarts**: $ovn_restarts $(if [[ $ovn_restarts -gt 0 ]]; then echo "(⚠️  Instability detected)"; else echo "(✅ Stable)"; fi)
+- **OVN Pod Restarts**: $ovn_restarts $(if [[ $ovn_restarts -gt 0 ]]; then echo "(WARNING  Instability detected)"; else echo "(SUCCESS Stable)"; fi)
 
 ## PR #2978 Fix Verification Results
 - **Initial Verification Status**: $initial_verification_status
 - **Final Verification Status**: $final_verification_status
-- **ACL Consolidation Working**: $(if [[ "$final_verification_status" == "consolidation_working" ]]; then echo "✅ YES - Fix is active!"; else echo "❌ NO - Fix not detected"; fi)
-- **OR Patterns in ACLs**: $final_verify_or_patterns $(if [[ "$final_verify_or_patterns" =~ ^[0-9]+$ ]] && [[ $final_verify_or_patterns -gt 0 ]]; then echo "(✅ Consolidation patterns found)"; else echo "(⚠️  No consolidation detected)"; fi)
+- **ACL Consolidation Working**: $(if [[ "$final_verification_status" == "consolidation_working" ]]; then echo "SUCCESS YES - Fix is active!"; else echo "ERROR NO - Fix not detected"; fi)
+- **OR Patterns in ACLs**: $final_verify_or_patterns $(if [[ "$final_verify_or_patterns" =~ ^[0-9]+$ ]] && [[ $final_verify_or_patterns -gt 0 ]]; then echo "(SUCCESS Consolidation patterns found)"; else echo "(WARNING  No consolidation detected)"; fi)
 
 ## Customer Issue Reproduction Status
 $(if [[ "$post_acl_count" =~ ^[0-9]+$ ]] && [[ $post_acl_count -gt $acl_explosion_threshold ]]; then 
@@ -759,13 +755,13 @@ $(if [[ "$post_acl_count" =~ ^[0-9]+$ ]] && [[ $post_acl_count -gt $acl_explosio
     echo "- This matches the customer's MNP-76500 scenario"
     echo "- System likely experiencing performance degradation"
     if [[ "$final_verification_status" != "consolidation_working" ]]; then
-        echo "- ⚠️  **PR #2978 fix NOT active** - ACL explosion without consolidation"
+        echo "- WARNING  **PR #2978 fix NOT active** - ACL explosion without consolidation"
     fi
 else
     echo "ℹ️  **Customer issue not fully reproduced**"
     echo "- ACL count below explosion threshold"
     if [[ "$final_verification_status" == "consolidation_working" ]]; then
-        echo "- ✅ **PR #2978 fix appears to be working** - ACLs consolidated successfully"
+        echo "- SUCCESS **PR #2978 fix appears to be working** - ACLs consolidated successfully"
     else
         echo "- May need larger scale or different parameters"
     fi
@@ -773,17 +769,17 @@ fi)
 
 ## Fix Effectiveness Analysis
 $(if [[ "$final_verification_status" == "consolidation_working" ]]; then
-    echo "✅ **PR #2978 CONSOLIDATION DETECTED**"
+    echo "SUCCESS **PR #2978 CONSOLIDATION DETECTED**"
     echo "- Multiple ipBlocks are being consolidated into single ACLs"
     echo "- OR patterns found in ACL match conditions: $final_verify_or_patterns"
     echo "- System should handle large-scale MNP deployments efficiently"
 elif [[ "$final_verification_status" == "no_consolidation" ]]; then
-    echo "❌ **NO CONSOLIDATION DETECTED**"
+    echo "ERROR **NO CONSOLIDATION DETECTED**"
     echo "- Each ipBlock appears to create separate ACLs"
     echo "- PR #2978 fix may not be active in this build"
     echo "- System vulnerable to ACL explosion with large MNP deployments"
 else
-    echo "⚠️  **CONSOLIDATION STATUS UNCLEAR**"
+    echo "WARNING  **CONSOLIDATION STATUS UNCLEAR**"
     echo "- Unable to definitively determine if PR #2978 is active"
     echo "- May require manual analysis of ACL patterns"
 fi)
@@ -798,10 +794,10 @@ fi)
 *Generated on $(date) by MNP-76500 reproduction test*
 EOF
 then
-    log_error "❌ Failed to write test summary report"
+    log_error "ERROR Failed to write test summary report"
     log_info "📋 Summary will be available in console output only"
 else
-    log_success "✅ Test summary report saved successfully"
+    log_success "SUCCESS Test summary report saved successfully"
 fi
 
 # Final status with PR #2978 verification
@@ -822,24 +818,24 @@ fi
 log_info "🔍 PR #2978 VERIFICATION SUMMARY:"
 case $final_verification_status in
     "consolidation_working")
-        log_success "✅ PR #2978 FIX IS WORKING!"
+        log_success "SUCCESS PR #2978 FIX IS WORKING!"
         log_success "   - ipBlock consolidation detected"
         log_success "   - OR patterns in ACLs: $final_verify_or_patterns"
         log_success "   - System should handle MNP scale efficiently"
         ;;
     "no_consolidation")
-        log_warning "❌ PR #2978 FIX NOT DETECTED"
+        log_warning "ERROR PR #2978 FIX NOT DETECTED"
         log_warning "   - No ipBlock consolidation found"
         log_warning "   - Each ipBlock creates separate ACLs"
         log_warning "   - System vulnerable to ACL explosion"
         ;;
     "timeout_detected")
-        log_warning "⚠️  SYSTEM OVERLOADED - POSSIBLE ACL EXPLOSION"
+        log_warning "WARNING  SYSTEM OVERLOADED - POSSIBLE ACL EXPLOSION"
         log_warning "   - ACL queries timing out"
         log_warning "   - May indicate fix is not active"
         ;;
     *)
-        log_info "⚠️  PR #2978 STATUS UNCLEAR"
+        log_info "WARNING  PR #2978 STATUS UNCLEAR"
         log_info "   - Unable to determine consolidation status"
         log_info "   - Manual analysis may be required"
         ;;
@@ -850,7 +846,7 @@ if [[ "$final_verification_status" == "consolidation_working" ]]; then
     log_success "🎉 TEST OUTCOME: PR #2978 ipBlock consolidation is WORKING!"
     log_success "   The fix successfully prevents ACL explosion in large MNP deployments."
 elif [[ "$post_acl_count" =~ ^[0-9]+$ ]] && [[ $post_acl_count -gt $acl_explosion_threshold ]] && [[ "$final_verification_status" == "no_consolidation" ]]; then
-    log_warning "⚠️  TEST OUTCOME: Customer issue reproduced, but PR #2978 fix NOT active"
+    log_warning "WARNING  TEST OUTCOME: Customer issue reproduced, but PR #2978 fix NOT active"
     log_warning "   This demonstrates the problem exists and the fix is needed."
 else
     log_info "ℹ️  TEST OUTCOME: Partial results - further investigation needed"
@@ -872,16 +868,16 @@ log_info "  - Tool availability: git=$(command -v git >/dev/null && echo 'yes' |
 
 # Exit code determination for CI
 if [[ "${TEST_EXECUTION_STATUS:-unknown}" == "success" ]]; then
-    log_success "✅ Test completed successfully"
+    log_success "SUCCESS Test completed successfully"
     exit 0
 elif [[ "${TEST_EXECUTION_STATUS:-unknown}" == "timeout" ]]; then
-    log_error "❌ Test timed out - may indicate ACL explosion"
+    log_error "ERROR Test timed out - may indicate ACL explosion"
     exit 1
 elif [[ "${TEST_EXECUTION_STATUS:-unknown}" == "failed" ]]; then
-    log_error "❌ Test execution failed"
+    log_error "ERROR Test execution failed"
     exit 1
 else
-    log_warning "⚠️  Test status unclear - check logs for details"
+    log_warning "WARNING  Test status unclear - check logs for details"
     exit 0  # Don't fail CI for unclear status, let log analysis determine
 fi
 
