@@ -20,6 +20,9 @@ if [[ -f "${awsCredFile}" ]]; then
     typeset awsAccKeyID=
     typeset awsAccKeyToken=
 
+    echo ".awscred exists..."
+
+    set +x
     awsAccKeyID="$(sed -nE 's/^\s*aws_access_key_id\s*=\s*//p;T;q' "${awsCredFile}")"
     awsAccKeyToken="$(sed -nE 's/^\s*aws_secret_access_key\s*=\s*//p;T;q' "${awsCredFile}")"
 
@@ -38,6 +41,7 @@ if [[ -f "${awsCredFile}" ]]; then
         ' |
     yq -p json -o yaml eval . > "${optionFile}.tmp"
     mv -f "${optionFile}.tmp" "${optionFile}"
+    set -x
 
     unset awsAccKeyID awsAccKeyToken
 fi
