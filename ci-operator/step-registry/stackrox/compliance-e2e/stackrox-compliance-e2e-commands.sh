@@ -39,23 +39,22 @@ function CleanupCollect() {
         return
     }
 
-    # Prepare one jUnit XML: collect -> map suite name and merge
+    # Prepare one jUnit XML: collect -> map suite name and merge into a single document
     yq eval-all --input-format xml --output-format xml -I2 '
+        (. | [.[] | (.testsuite // .) | ([] + .)[] | select(kind == "map")]) as $suites |
+        $suites | .[] |= (
+            (
+                select(env(MAP_TESTS) == "true") |
+                ."+@name" = env(MAP_TESTS_SUITE_NAME)
+            )//. |
+            ([] + (.testcase // [])) as $tc |
+            ."+@tests" = ($tc | length | tostring) |
+            ."+@failures" = ([$tc[] | select(.failure)] | length | tostring) |
+            ."+@errors" = ([$tc[] | select(.error)] | length | tostring)
+        ) |
         {
             "+p_xml": "version=\"1.0\" encoding=\"UTF-8\"",
-            "testsuites": {"testsuite": [
-                .[] |
-                (.testsuite // .) |
-                ([] + .)[] |
-                select(kind == "map") | (
-                    select(env(MAP_TESTS) == "true") |
-                    ."+@name" = env(MAP_TESTS_SUITE_NAME)
-                )//. |
-                ([] + (.testcase // [])) as $tc |
-                ."+@tests" = ($tc | length | tostring) |
-                ."+@failures" = ([$tc[] | select(.failure)] | length | tostring) |
-                ."+@errors" = ([$tc[] | select(.error)] | length | tostring)
-            ]}
+            "testsuites": {"testsuite": $suites}
         }
     ' "${xmlFiles[@]}" 1> "${ARTIFACT_DIR}/${mergedFN}"
 
