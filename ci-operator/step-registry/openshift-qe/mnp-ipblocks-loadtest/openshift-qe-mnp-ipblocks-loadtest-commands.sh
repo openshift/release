@@ -427,7 +427,7 @@ else
 fi
 
 # Store verification results for comparison
-initial_verification_status="$VERIFY_ACL_STATUS"
+initial_verification_status="${VERIFY_ACL_STATUS:-unknown}"
 
 # Baseline measurements
 log_info "📏 Taking baseline measurements..."
@@ -566,9 +566,9 @@ else
 fi
 
 # Store final verification results
-final_verification_status="$VERIFY_ACL_STATUS"
-final_verify_acl_count="$VERIFY_ACL_COUNT"
-final_verify_or_patterns="$VERIFY_OR_PATTERNS"
+final_verification_status="${VERIFY_ACL_STATUS:-unknown}"
+final_verify_acl_count="${VERIFY_ACL_COUNT:-0}"
+final_verify_or_patterns="${VERIFY_OR_PATTERNS:-0}"
 
 # Post-test measurements
 log_info "📊 Collecting post-test measurements..."
