@@ -624,7 +624,7 @@ CONFIG = {
     'metal-redhat-gs-quota-slice': {
         'default': 1,
     },
-    'rosa-regional-platform-int-account-0-quota-slice': {
+    'rosa-regional-platform-int-quota-slice': {
         'us-east-1': 15,
     },
     'rosa-regional-platform-int-account-1-quota-slice': {
