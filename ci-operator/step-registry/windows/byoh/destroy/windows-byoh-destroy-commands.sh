@@ -40,8 +40,15 @@ export BYOH_INSTANCE_NAME
 export BYOH_NUM_WORKERS="${BYOH_NUM_WORKERS:-2}"
 export BYOH_WINDOWS_VERSION="${BYOH_WINDOWS_VERSION:-2022}"
 
+# Try to detect platform - if cluster doesn't exist, exit gracefully
+# This checks if we can reach the cluster API server
+if ! PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}" 2>/dev/null | tr '[:upper:]' '[:lower:]'); then
+    echo "Cluster API not available - cluster may have failed to bootstrap"
+    echo "No BYOH instances to clean up (provisioning never ran)"
+    exit 0
+fi
+
 # Extract terraform state + config from SHARED_DIR tarball
-PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}" | tr '[:upper:]' '[:lower:]')
 if [[ -f "${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar" ]]; then
     echo "Extracting terraform files from ${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar..."
     mkdir -p "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}"
@@ -49,9 +56,9 @@ if [[ -f "${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar" ]]; then
     echo "Terraform files extracted to ${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}/"
     ls -lh "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}/"
 else
-    echo "ERROR: Terraform tarball not found at ${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar"
-    echo "Destroy step requires terraform files created by provision step"
-    exit 1
+    echo "Terraform tarball not found at ${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar"
+    echo "BYOH provisioning never ran - no instances to clean up"
+    exit 0
 fi
 
 export BYOH_TMP_DIR="${ARTIFACT_DIR}/terraform_byoh/"
@@ -86,9 +93,8 @@ fi
 WORK_DIR="/usr/local/share/byoh-provisioner"
 echo "Using provisioner directory: ${WORK_DIR}"
 
-# Detect platform
-PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}" | tr '[:upper:]' '[:lower:]' 2>/dev/null || echo "unknown")
-echo "Platform detected: ${PLATFORM}"
+# Platform already detected earlier, use that value
+echo "Platform: ${PLATFORM}"
 
 # Verify byoh.sh is available
 if ! command -v byoh.sh &> /dev/null; then
@@ -103,10 +109,9 @@ TERRAFORM_STATE_FILE="${BYOH_TMP_DIR}${PLATFORM}/terraform.tfstate"
 if [[ -f "${TERRAFORM_STATE_FILE}" ]]; then
     echo "Terraform state found at ${TERRAFORM_STATE_FILE}"
 else
-    echo "ERROR: Terraform state not found at ${TERRAFORM_STATE_FILE}"
-    echo "Expected location: ${TERRAFORM_STATE_FILE}"
-    echo "Provision step should have created this file in ARTIFACT_DIR"
-    exit 1
+    echo "Terraform state not found at ${TERRAFORM_STATE_FILE}"
+    echo "BYOH provisioning may have failed or not completed - no instances to clean up"
+    exit 0
 fi
 
 # Initialize Terraform providers before destroy
