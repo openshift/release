@@ -172,14 +172,18 @@ echo "========== Running E2E Tests =========="
 export NAMESPACE="${NAMESPACE:-cost-onprem}"
 export VERBOSE="${VERBOSE:-true}"
 export USE_LOCAL_CHART="true"
-export DEPLOY_S4="${DEPLOY_S4:-false}"
-export S4_NAMESPACE="${S4_NAMESPACE:-s4-test}"
 
 # Build deployment script arguments
 DEPLOY_ARGS=(
     --namespace "${NAMESPACE}"
     --verbose
 )
+
+# Add S4 storage flags if enabled
+if [ "${DEPLOY_S4:-false}" == "true" ]; then
+    DEPLOY_ARGS+=(--deploy-s4)
+    DEPLOY_ARGS+=(--s4-namespace "${S4_NAMESPACE:-s4-test}")
+fi
 
 # Run the deployment script from the chart repo source
 # The step runs with from: src, so we're already in the chart repo
