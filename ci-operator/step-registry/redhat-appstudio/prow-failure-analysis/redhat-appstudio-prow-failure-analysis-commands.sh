@@ -46,6 +46,10 @@ if [[ -n "${INCLUDED_ARTIFACTS:-}" ]]; then
     export INCLUDED_ARTIFACTS
 fi
 
+if [[ -n "${EXCLUDED_ARTIFACTS:-}" ]]; then
+    export EXCLUDED_ARTIFACTS
+fi
+
 # Export embedding configuration
 export CORDON_DEVICE="${CORDON_DEVICE:-cpu}"
 export CORDON_BACKEND="${CORDON_BACKEND:-remote}"

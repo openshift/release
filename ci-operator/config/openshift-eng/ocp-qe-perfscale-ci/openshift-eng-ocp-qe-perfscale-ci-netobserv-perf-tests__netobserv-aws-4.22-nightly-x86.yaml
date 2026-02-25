@@ -32,7 +32,50 @@ resources:
       memory: 200Mi
 tests:
 - as: node-density-heavy-25nodes
-  cron: 8 8 29 2 *
+  cron: '@daily'
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      EBPFAGENT_PR_IMAGE: ""
+      FLP_PR_IMAGE: ""
+    env:
+      ACK_FILE: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/orion/ack.yaml
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CHANGE_POINT_REPOS: kube-burner/kube-burner,kube-burner/kube-burner-ocp,cloud-bulldozer/ingress-perf,cloud-bulldozer/e2e-benchmarking,cloud-bulldozer/orion,openshift/release
+      COMPUTE_NODE_REPLICAS: "25"
+      COMPUTE_NODE_TYPE: m6i.4xlarge
+      DISPLAY: noo_bundle_info
+      ES_BENCHMARK_INDEX: prod-netobserv-datapoints*
+      ES_METADATA_INDEX: perf_scale_ci*
+      ES_TYPE: qe
+      EXTRA_FLAGS: --es-index=ripsaw-kube-burner --metrics-profile metrics-aggregated.yml
+      EXTRA_MG_ARGS: --image=quay.io/netobserv/must-gather
+      FLP_CONSUMER_REPLICAS: "6"
+      LOKISTACK_SIZE: 1x.small
+      LOOKBACK: "30"
+      LOOKBACK_SIZE: "15"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion-periodic.yaml
+      ORION_ENVS: PLATFORM=AWS,WORKERS=25,WORKLOAD=node-density-heavy
+      PATCH_EBPFAGENT_IMAGE: "false"
+      PATCH_FLOWLOGS_IMAGE: "false"
+      PODS_PER_NODE: "200"
+      RUN_ORION: "true"
+      SIZE_VARIANT: large
+      VERSION: "4.22"
+      WORKLOAD: node-density-heavy
+      ZONES_COUNT: "3"
+    post:
+    - chain: netobserv-perf-test-post
+    test:
+    - ref: netobserv-perf-test-deploy
+    - ref: openshift-qe-kube-burner-ingress-perf
+    - chain: netobserv-perf-test-post-workload
+    - ref: openshift-qe-orion
+    workflow: openshift-qe-installer-aws
+- as: node-density-heavy-25nodes-service-without-loki
+  cron: '@weekly'
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -44,6 +87,7 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "25"
       COMPUTE_NODE_TYPE: m6i.4xlarge
+      DEPLOYMENT_MODEL: Service
       DISPLAY: noo_bundle_info
       ES_BENCHMARK_INDEX: prod-netobserv-datapoints*
       ES_METADATA_INDEX: perf_scale_ci*
@@ -51,12 +95,12 @@ tests:
       EXTRA_FLAGS: --es-index=ripsaw-kube-burner --metrics-profile metrics-aggregated.yml
       EXTRA_MG_ARGS: --image=quay.io/netobserv/must-gather
       FLP_CONSUMER_REPLICAS: "6"
-      LOKISTACK_SIZE: 1x.small
-      LOOKBACK: "60"
+      LOKI_OPERATOR: None
+      LOOKBACK: "30"
       LOOKBACK_SIZE: "15"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion-node-density-heavy.yaml
-      ORION_ENVS: PLATFORM=AWS,WORKERS=25
+      ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion-node-density-heavy-service.yaml
+      ORION_ENVS: PLATFORM=AWS,WORKERS=25,WORKLOAD=node-density-heavy,deploymentModel=Service
       PATCH_EBPFAGENT_IMAGE: "false"
       PATCH_FLOWLOGS_IMAGE: "false"
       PODS_PER_NODE: "200"
@@ -74,7 +118,7 @@ tests:
     - ref: openshift-qe-orion
     workflow: openshift-qe-installer-aws
 - as: cluster-density-v2-250nodes
-  cron: 8 8 29 2 *
+  cron: '@weekly'
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-perfscale-qe
@@ -84,6 +128,7 @@ tests:
     env:
       ACK_FILE: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/orion/ack.yaml
       BASE_DOMAIN: qe.devcluster.openshift.com
+      CHANGE_POINT_REPOS: kube-burner/kube-burner,kube-burner/kube-burner-ocp,cloud-bulldozer/ingress-perf,cloud-bulldozer/e2e-benchmarking,cloud-bulldozer/orion,openshift/release
       COMPUTE_NODE_REPLICAS: "250"
       COMPUTE_NODE_TYPE: m6i.4xlarge
       DISPLAY: noo_bundle_info
@@ -99,8 +144,8 @@ tests:
       LOOKBACK: "60"
       LOOKBACK_SIZE: "15"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion-cluster-density-v2.yaml
-      ORION_ENVS: PLATFORM=AWS,WORKERS=250
+      ORION_CONFIG: https://raw.githubusercontent.com/openshift-eng/ocp-qe-perfscale-ci/refs/heads/netobserv-perf-tests/scripts/queries/netobserv-orion-periodic.yaml
+      ORION_ENVS: PLATFORM=AWS,WORKERS=250,WORKLOAD=cluster-density-v2
       PATCH_EBPFAGENT_IMAGE: "false"
       PATCH_FLOWLOGS_IMAGE: "false"
       RUN_ORION: "true"
@@ -116,6 +161,39 @@ tests:
     - chain: netobserv-perf-test-post-workload
     - ref: openshift-qe-orion
     workflow: openshift-qe-installer-aws
+- as: cluster-density-v2-500nodes
+  cron: 0 0 1 1 *
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      EBPFAGENT_PR_IMAGE: ""
+      FLP_PR_IMAGE: ""
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "500"
+      COMPUTE_NODE_TYPE: m6i.4xlarge
+      EXTRA_FLAGS: --churn-delay=60s --churn-duration=10m --churn-percent=10 --timeout=5h
+        --es-index=ripsaw-kube-burner --metrics-profile metrics-aggregated.yml
+      EXTRA_MG_ARGS: --image=quay.io/netobserv/must-gather
+      FLP_CONSUMER_REPLICAS: "18"
+      ITERATION_MULTIPLIER_ENV: "2"
+      LOKISTACK_SIZE: 1x.medium
+      MULTISTAGE_PARAM_OVERRIDE_SAMPLING: "50"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      PATCH_EBPFAGENT_IMAGE: "false"
+      PATCH_FLOWLOGS_IMAGE: "false"
+      SIZE_VARIANT: large
+      WORKLOAD: cluster-density-v2
+      ZONES_COUNT: "3"
+    post:
+    - chain: netobserv-perf-test-post
+    test:
+    - ref: netobserv-perf-test-deploy
+    - ref: openshift-qe-kube-burner-ingress-perf
+    - chain: netobserv-perf-test-post-workload
+    workflow: openshift-qe-installer-aws
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: netobserv-perf-tests
   org: openshift-eng

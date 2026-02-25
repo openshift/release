@@ -1,0 +1,43 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+- dockerfile_path: Containerfile
+  to: amd-ci
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.22.0-0
+        stream: 4-stable
+        upper: 4.23.0-0
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: e2e-amd-ci
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      AMD_DRIVER_VERSION: 30.20.1
+      OCP_CLUSTER_VERSION: "4.22"
+      PCI_DEVICES: 0000:b3:00.0
+      REMOTE_HOST: 10.8.231.19
+      SKIP_CLUSTER_DELETE: "false"
+    workflow: amd-gpu-operator-e2e
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: amd-ci
+  variant: 4.22-stable

@@ -1,0 +1,28 @@
+ref:
+  as: windows-byoh-destroy
+  from_image:
+    namespace: ci
+    name: terraform-windows-provisioner
+    tag: latest
+  commands: windows-byoh-destroy-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: BYOH_INSTANCE_NAME
+      default: ""
+      documentation: "Base name for Windows instances (read from ARTIFACT_DIR, fallback to byoh-winc if unavailable)"
+    - name: BYOH_NUM_WORKERS
+      default: "2"
+      documentation: "Number of Windows workers to destroy"
+  documentation: |-
+    Destroys Windows BYOH nodes provisioned by windows-byoh-provision step.
+
+    This step:
+    1. Uses pre-built terraform-windows-provisioner image (ci/terraform-windows-provisioner:latest)
+    2. Extracts terraform tarball from ${SHARED_DIR}/terraform_byoh_<platform>.tar to ${ARTIFACT_DIR}/terraform_byoh/
+    3. Runs terraform init + terraform destroy to clean up resources
+
+    Note: Provision step tars terraform state/config (excluding .terraform/) and saves to SHARED_DIR.
+    Destroy step extracts tarball to ARTIFACT_DIR, runs terraform init to download providers, then destroy.

@@ -1,6 +1,6 @@
 base_images:
   assisted-test-infra:
-    name: ocm-2.16
+    name: ocm-2.17
     namespace: edge-infrastructure
     tag: assisted-test-infra
   dev-scripts:
@@ -640,6 +640,20 @@ tests:
     clone: true
     from: golangci-lint
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+- as: verify-image-manifest-lists
+  commands: |
+    OPENSHIFT_SKIP_EXTERNAL_TESTS=1 openshift-tests images \
+      --to-repository=quay.io/openshift/e2e-verify-image-manifest-lists \
+      --verify-manifest-lists \
+      --allow-missing-architectures=e2e-22-registry-k8s-io-e2e-test-images-node-perf-tf-wide-deep \
+      --allow-missing-architectures=e2e-41-registry-k8s-io-cloud-provider-gcp-gcp-compute-persistent-disk-csi-driver \
+      --allow-missing-architectures=e2e-quay-io-keycloak-keycloak \
+      --allow-missing-architectures=e2e-quay-io-crio-zstd-chunked-1 \
+      --allow-missing-architectures=e2e-quay-io-kubevirt-fedora-with-test-tooling-container-disk \
+      --log-level=debug
+  container:
+    from: tests
+  run_if_changed: ^test/extended/util/image/zz_generated\.txt$
 - always_run: false
   as: e2e-aws-ovn-etcd-scaling
   optional: true
