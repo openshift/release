@@ -51,10 +51,35 @@ tests:
     test:
     - ref: tls-scanner-run
     workflow: generic-claim
+- as: default-pqc-readiness
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.22"
+  optional: true
+  steps:
+    env:
+      PQC_CHECK: "true"
+    test:
+    - ref: tls-scanner-run
+    workflow: generic-claim
 - as: tls13-conformance
   optional: true
   steps:
     cluster_profile: aws-5
+    test:
+    - ref: tls-scanner-run
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-ovn-tls-13
+- as: tls13-pqc-readiness
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    env:
+      PQC_CHECK: "true"
     test:
     - ref: tls-scanner-run
     - ref: openshift-e2e-test
