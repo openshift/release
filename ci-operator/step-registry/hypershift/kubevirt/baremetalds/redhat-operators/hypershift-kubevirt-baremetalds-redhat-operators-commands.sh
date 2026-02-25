@@ -60,7 +60,7 @@ function mirror_ccs() {
     fi
 
     echo "4: skopeo copy docker://${CCS_CATALOG_IMAGE} oci:///home/ccs-local-catalog --remove-signatures"
-    skopeo copy "docker://${CCS_CATALOG_IMAGE}" "oci:///home/ccs-local-catalog" --remove-signatures
+    skopeo copy "docker://${CCS_CATALOG_IMAGE}" "oci:///home/ccs-local-catalog" --remove-signatures --authfile  /home/pull-secret
 
     echo "5: oc-mirror"
     catalog_image="ccs-local-catalog/ccs-local-catalog"
