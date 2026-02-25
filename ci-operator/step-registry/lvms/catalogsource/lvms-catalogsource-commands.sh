@@ -363,6 +363,11 @@ function main {
 		echo "Running in DISCONNECTED mode"
 
 		# Set up mirror registry variables
+		# Create mirror_registry_url if it doesn't exist yet
+		if [ ! -f "${SHARED_DIR}/mirror_registry_url" ] ; then
+			echo "mirror_registry_url file not found, extracting from ImageContentSourcePolicy"
+			oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]' | head -n 1 | cut -d '/' -f 1 > "${SHARED_DIR}/mirror_registry_url"
+		fi
 		MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
 		MIRROR_PROXY_REGISTRY_QUAY="${MIRROR_REGISTRY_HOST//5000/6001}"
 
