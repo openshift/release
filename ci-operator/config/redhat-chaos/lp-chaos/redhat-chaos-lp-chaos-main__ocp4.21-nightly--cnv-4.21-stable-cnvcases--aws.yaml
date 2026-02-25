@@ -1,0 +1,66 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.21
+images:
+- dockerfile_literal: |
+    FROM cli
+    RUN set -exo pipefail && \
+        # Install openssh-clients, jq, and yq
+        declare pkgs='openssh-clients jq' && \
+        if command -v dnf 1> /dev/null; then \
+            dnf install --setopt tsflags=nodocs -y ${pkgs} && \
+            dnf clean all; \
+        else \
+            microdnf install -y ${pkgs} && \
+            microdnf clean all; \
+        fi && \
+        rm -rf /var/cache/dnf/* && \
+        wget -qO - 'https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64.tar.gz' | \
+            tar zvx -C /usr/local/bin/ --transform 's|^\./yq_linux_amd64$|yq|' ./yq_linux_amd64 && \
+        # Download virtctl
+        export VERSION=$(curl -s https://storage.googleapis.com/kubevirt-prow/release/kubevirt/kubevirt/stable.txt) && \
+        curl -L -o /usr/local/bin/virtctl https://github.com/kubevirt/kubevirt/releases/download/${VERSION}/virtctl-${VERSION}-linux-amd64 && \
+        chmod +x /usr/local/bin/virtctl
+  from: cli
+  to: cli-plus-tools
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lp-chaos--cnv--node-outage
+  cron: 0 8 * * 4
+  steps:
+    cluster_profile: aws-lp-chaos
+    env:
+      BASE_DOMAIN: chaos.lp.devcluster.openshift.com
+      CNV_VERSION: "4.21"
+      COMPUTE_NODE_TYPE: m5.metal
+      LPC_LP_CNV__VM__REPLICA_COUNT: "1"
+      LPC_LP_CNV__VM__WAIT_TIMEOUT: 30m
+      TELEMETRY_GROUP: ocp4.21-nightly--cnv-4.21-stable--aws
+    test:
+    - chain: redhat-lp-chaos-lp-cnv-node-outage
+    workflow: redhat-lp-chaos-ocp-installer-aws-cnv
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: lp-chaos
+  variant: ocp4.21-nightly--cnv-4.21-stable-cnvcases--aws
