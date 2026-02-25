@@ -213,6 +213,12 @@ function verify_arn_exists() {
     esac
 }
 
+echo "Verifying all cluster resources were removed after deprovisioning ..."
+if [[ ! -s "${METADATA_FILE}" ]]; then
+  echo "Skipping: ${METADATA_FILE} not found."
+  exit
+fi
+
 echo "Using AWS region: $REGION"
 
 # for special regions, need to explict set the default region to work with some global API, e.g: iam
