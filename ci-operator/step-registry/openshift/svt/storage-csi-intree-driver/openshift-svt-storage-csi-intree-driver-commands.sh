@@ -41,12 +41,14 @@ EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}"
 export EXTRA_FLAGS
 
 rm -f ${SHARED_DIR}/index.json
-pip install jq
 python3.9 --version
-python3.9 -m pip install virtualenv
+curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+python3.9 get-pip.py --user
+export PATH=$PATH:/alabama/.local/bin:.
+python3.9 -m pip3 install virtualenv jq
 python3.9 -m virtualenv venv3
 source venv3/bin/activate
-python3.9 -m pip install pytimeparse futures
+python3.9 -m pip3 install pytimeparse futures
 pip3 install elasticsearch==7.10.0
 pip3 install "numpy<2"
 pip3 install requests
