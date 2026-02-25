@@ -114,6 +114,7 @@ eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --namespace local-cluster \
   --base-domain=${BASEDOMAIN} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
+  --control-plane-operator-image=quay.io/mgencur/cpo:OCPBUGS-60185 \
   --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
   --ssh-key=${SHARED_DIR}/id_rsa.pub \
   --release-image ${RELEASE_IMAGE} $(support_np_skew)"
