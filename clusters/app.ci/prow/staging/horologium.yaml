@@ -21,10 +21,17 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
       - name: horologium
-        image: us-docker.pkg.dev/k8s-infra-prow/images/horologium:v20260217-999e46ca7
+        image: quay.io/prucek/prow:horologium_db
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
+        - --job-config-postgres-uri=$(JOB_CONFIG_POSTGRES_URI)
+        env:
+        - name: JOB_CONFIG_POSTGRES_URI
+          valueFrom:
+            secretKeyRef:
+              name: job-config-db
+              key: uri
         volumeMounts:
         - name: config
           mountPath: /etc/config
