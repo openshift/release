@@ -26,6 +26,8 @@ hyperfleet-credential-provider generate-kubeconfig \
 NAMESPACE_NAME=${NAMESPACE_PREFIX}-$(date "+%Y%m%d")
 echo "${NAMESPACE_NAME}" > "${SHARED_DIR}/namespace_name"
 
+sleep 1800
+
 # copy the deploy scripts to /tmp to avoid any potential permission issue when running deploy-clm.sh
 cp -r /e2e/ /tmp/
 cd "/tmp/e2e/deploy-scripts/"
