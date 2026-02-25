@@ -157,16 +157,6 @@ case "${CLOUD_PROVIDER}" in
   oc wait --for=condition=Available --namespace hypershift deployments/operator --timeout=300s
     ;;
 
-  Kubevirt)
-    "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-    --additional-operator-env-vars="IMAGE_KUBEVIRT_CAPI_PROVIDER=registry.ci.openshift.org/ocp/4.18:cluster-api-provider-kubevirt" \
-    --platform-monitoring=All \
-    --enable-ci-debug-output \
-    --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-    --wait-until-available \
-    ${EXTRA_ARGS}
-    ;;
-
   *)
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
     --platform-monitoring=All \
