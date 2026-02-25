@@ -60,7 +60,7 @@ CONFIG = {
         'us-east-2': 2,
     },
     'aws-sd-qe-quota-slice': {
-        'us-west-2': 10,
+        'us-west-2': 20,
     },
     'aws-outpost-quota-slice': {
         'us-east-1': 10,
