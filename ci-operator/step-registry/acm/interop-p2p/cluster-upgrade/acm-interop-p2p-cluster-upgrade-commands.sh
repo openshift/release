@@ -34,9 +34,19 @@ fi
 #=====================
 # Helper functions
 #=====================
+need() {
+    command -v "$1" >/dev/null 2>&1 || {
+        echo "[FATAL] '$1' not found" >&2
+        exit 1
+    }
+}
+
 now() {
     date +%s
 }
+
+need oc
+need jq
 
 #=====================
 # Resolve target version and digest
