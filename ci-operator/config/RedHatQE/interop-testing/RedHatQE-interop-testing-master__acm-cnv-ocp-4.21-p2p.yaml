@@ -19,10 +19,10 @@ base_images:
     name: "2.15"
     namespace: acm-qe
     tag: multicluster-observability-operator-opp
-  virtctl:
-    name: "4.21"
-    namespace: ocp
-    tag: virtctl
+  openshift-virtualization-tests:
+    name: openshift-virtualization-tests
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -34,15 +34,14 @@ images:
       FROM this-is-ignored
       RUN dnf install -y git python39
     from: cli
-    optional: true
     to: cli-with-git
   - dockerfile_literal: |
       FROM this-is-ignored
       USER root
       RUN dnf install -y sshpass openssh-clients
       RUN dnf clean all
-    from: virtctl
-    to: virtctl-sshpass
+    from: openshift-virtualization-tests
+    to: openshift-virtualization-tests-sshpass
 releases:
   initial:
     release:
@@ -66,11 +65,13 @@ tests:
     cluster_profile: aws-cspi-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       ACM_SPOKE_CLUSTER_INITIAL_VERSION: "4.20"
       ACM_SPOKE_CLUSTER_NAME_PREFIX: acm-spoke
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       CLOUD_PROVIDER: ipi-aws
+      CNV_TESTS_UPGRADE_ONLY: "true"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
       FIREWATCH_CONFIG: |
@@ -98,6 +99,9 @@ tests:
       FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8652
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      OCP_VERSION: "4.20"
+      ODF_OPERATOR_CHANNEL: stable-4.20
+      ODF_VERSION_MAJOR_MINOR: "4.20"
       OPERATORS: |
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.15", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
@@ -133,14 +137,13 @@ tests:
     - ref: acm-mch
     - ref: acm-interop-p2p-cluster-install
     - ref: acm-fetch-managed-clusters
+    - ref: interop-tests-deploy-odf
     - ref: p2p-acm-cnv-install-policy
-    - ref: p2p-cnv-pre-upgrade
     - ref: acm-interop-p2p-cluster-upgrade
+    - ref: interop-tests-openshift-virtualization-tests
     - ref: acm-tests-observability
     - ref: acm-tests-grc
     - ref: acm-tests-alc
-    - ref: p2p-cnv-post-upgrade
-  timeout: 8h0m0s
 zz_generated_metadata:
   branch: master
   org: RedHatQE
