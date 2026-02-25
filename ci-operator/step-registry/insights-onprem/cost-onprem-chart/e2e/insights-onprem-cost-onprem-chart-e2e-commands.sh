@@ -182,7 +182,9 @@ DEPLOY_ARGS=(
 # Add S4 storage flags if enabled
 if [ "${DEPLOY_S4:-false}" == "true" ]; then
     DEPLOY_ARGS+=(--deploy-s4)
-    DEPLOY_ARGS+=(--s4-namespace "${S4_NAMESPACE:-s4-test}")
+    # Use the same namespace as the application for S4 if S4_NAMESPACE is not explicitly set
+    # This ensures the storage credentials secret is created in the correct namespace
+    DEPLOY_ARGS+=(--s4-namespace "${S4_NAMESPACE:-${NAMESPACE}}")
 fi
 
 # Run the deployment script from the chart repo source
