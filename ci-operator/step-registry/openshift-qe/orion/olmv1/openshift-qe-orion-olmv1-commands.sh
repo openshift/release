@@ -161,7 +161,7 @@ if [[ -n "$ORION_CONFIG" ]]; then
     fi
 fi
 
-# Only pass --ack for custom ACK URLs. Orion auto-loads ack/all_ack.yaml when present (unless --no-ack).
+# Only pass --ack for custom ACK URLs. Orion auto-loads ack/all_ack.yaml when present (unless --no-default-ack).
 if [[ -n "$ACK_FILE" ]] && [[ "$ACK_FILE" =~ ^https?:// ]]; then
     ackFilePath="/tmp/$(basename ${ACK_FILE})"
     if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then

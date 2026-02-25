@@ -121,7 +121,7 @@ fi
 
 VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
 export VERSION
-# Only pass --ack for custom ACK URLs. Orion auto-loads ack/all_ack.yaml when present (unless --no-ack).
+# Only pass --ack for custom ACK URLs. Orion auto-loads ack/all_ack.yaml when present (unless --no-default-ack).
 if [[ -n "$ACK_FILE" ]] && [[ "$ACK_FILE" =~ ^https?:// ]]; then
     ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
     if ! curl -fsSL "$ACK_FILE" -o "$ackFilePath" ; then
