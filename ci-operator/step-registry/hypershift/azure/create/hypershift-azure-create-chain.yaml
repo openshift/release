@@ -141,7 +141,10 @@ chain:
       documentation: "Enable marketplace flags"
     - name: HYPERSHIFT_AZURE_IMAGE_GENERATION
       default: ""
-      documentation: "image generation value"  
+      documentation: "image generation value"
+    - name: HCP_CLI
+      default: ""
+      documentation: "hcp cli path"      
     commands: |-
       set -exuo pipefail
 
@@ -222,8 +225,12 @@ chain:
         NSG_ID="$(cat "${SHARED_DIR}/azure_nsg_id")"
       fi
       
+      if [[  -z $HCP_CLI ]]; then
+      HCP_CLI="/usr/bin/hypershift"
+      fi
+      
       COMMAND=(
-        /usr/bin/hypershift create cluster azure \
+        "${HCP_CLI}" create cluster azure \
         --name ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
@@ -372,6 +379,7 @@ chain:
       if [[ $HYPERSHIFT_AZURE_SELF_MANAGED == "true" ]]; then
           COMMAND+=(--workload-identities-file "/etc/hypershift-selfmanaged-azurecreds/workload-identities.json")
       fi
+
 
       if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
         COMMAND+=(--render)
