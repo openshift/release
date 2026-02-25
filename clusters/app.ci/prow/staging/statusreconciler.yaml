@@ -19,12 +19,13 @@ spec:
       terminationGracePeriodSeconds: 180
       containers:
       - name: statusreconciler
-        image: us-docker.pkg.dev/k8s-infra-prow/images/status-reconciler:v20260217-999e46ca7
+        image: quay.io/prucek/prow:status-reconciler_db
         args:
         - --dry-run=false
         - --continue-on-error=true
         - --plugin-config=/etc/plugins/plugins.yaml
         - --config-path=/etc/config/config.yaml
+        - --job-config-postgres-uri=$(JOB_CONFIG_POSTGRES_URI)
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --gcs-credentials-file=/etc/gcs-credentials/service-account.json
@@ -32,6 +33,11 @@ spec:
         - --github-app-id=$(GITHUB_APP_ID)
         - --github-app-private-key-path=/etc/github/cert
         env:
+        - name: JOB_CONFIG_POSTGRES_URI
+          valueFrom:
+            secretKeyRef:
+              name: job-config-db
+              key: uri
         - name: GITHUB_APP_ID
           valueFrom:
             secretKeyRef:

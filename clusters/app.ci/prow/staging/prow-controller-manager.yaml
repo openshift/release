@@ -21,6 +21,7 @@ spec:
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
+        - --job-config-postgres-uri=$(JOB_CONFIG_POSTGRES_URI)
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --enable-controller=plank
@@ -30,12 +31,17 @@ spec:
         - --kubeconfig-dir=/etc/build-farm-credentials
         - --kubeconfig-suffix=config
         env:
+        - name: JOB_CONFIG_POSTGRES_URI
+          valueFrom:
+            secretKeyRef:
+              name: job-config-db
+              key: uri
         - name: GITHUB_APP_ID
           valueFrom:
             secretKeyRef:
               name: openshift-prow-github-app
               key: appid
-        image: us-docker.pkg.dev/k8s-infra-prow/images/prow-controller-manager:v20260217-999e46ca7
+        image: quay.io/prucek/prow:prow-controller-manager_db
         volumeMounts:
         - name: service-account-token
           mountPath: /var/sa-token
