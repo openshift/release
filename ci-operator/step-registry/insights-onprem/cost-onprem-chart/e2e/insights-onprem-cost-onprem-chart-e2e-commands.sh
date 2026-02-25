@@ -147,10 +147,6 @@ fi
 
 fi  # end SKIP_COST_MGMT_INSTALL check
 
-echo "========== Configuring Helm =========="
-echo "No Helm wrapper needed for S4 storage"
-echo "Storage configuration will be handled by deploy-test-cost-onprem.sh"
-
 echo "========== Configuring OpenShift SecurityContextConstraints =========="
 # Grant anyuid SCC to allow pods to run with runAsUser: 1000 when using storageType=minio
 # This is needed because the chart uses Kubernetes-style security contexts with minio
@@ -172,6 +168,8 @@ echo "========== Running E2E Tests =========="
 export NAMESPACE="${NAMESPACE:-cost-onprem}"
 export VERBOSE="${VERBOSE:-true}"
 export USE_LOCAL_CHART="true"
+export COST_MGMT_NAMESPACE="${NAMESPACE}"
+export COST_MGMT_RELEASE_NAME="${HELM_RELEASE_NAME:-cost-onprem}"
 
 # Build deployment script arguments
 DEPLOY_ARGS=(
