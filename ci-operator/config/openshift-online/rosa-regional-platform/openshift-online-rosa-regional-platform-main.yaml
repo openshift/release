@@ -29,14 +29,20 @@ tests:
 - as: nightly
   cron: 0 7 * * *
   steps:
-    cluster_profile: rosa-regional-platform-int
     leases:
     - count: 1
-      env: SECOND_AWS_ACCOUNT
-      resource_type: rosa-regional-platform-int-quota-slice
+      env: ACCOUNT_0_LEASE
+      resource_type: rosa-regional-platform-int-account-0-quota-slice
+    - count: 1
+      env: ACCOUNT_1_LEASE
+      resource_type: rosa-regional-platform-int-account-1-quota-slice
     test:
     - as: nightly
       commands: ./ci/nightly.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
       from: src
       resources:
         requests:
