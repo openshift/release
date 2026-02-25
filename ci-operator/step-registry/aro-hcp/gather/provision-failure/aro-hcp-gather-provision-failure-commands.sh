@@ -4,13 +4,14 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-# Load resource group names from provision.env
-if [[ -f "${SHARED_DIR}/provision.env" ]]; then
-  source "${SHARED_DIR}/provision.env"
-else
-  echo "ERROR: provision.env not found at ${SHARED_DIR}/provision.env"
+# Load resource group names from config.yaml
+if [[ ! -f "${SHARED_DIR}/config.yaml" ]]; then
+  echo "ERROR: config.yaml not found at ${SHARED_DIR}/config.yaml"
   exit 1
 fi
+SVC_RESOURCEGROUP=$(yq '.svc.rg' "${SHARED_DIR}/config.yaml")
+MGMT_RESOURCEGROUP=$(yq '.mgmt.rg' "${SHARED_DIR}/config.yaml")
+REGIONAL_RESOURCEGROUP=$(yq '.regionRG' "${SHARED_DIR}/config.yaml")
 
 # Verify required variables are set and not empty (because nounset)
 echo "SVC_RESOURCEGROUP: ${SVC_RESOURCEGROUP}"
