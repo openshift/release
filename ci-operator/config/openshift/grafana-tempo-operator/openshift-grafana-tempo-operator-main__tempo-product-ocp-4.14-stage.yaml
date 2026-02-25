@@ -1,10 +1,10 @@
 base_images:
   cli:
-    name: "4.17"
+    name: "4.14"
     namespace: ocp
     tag: cli
   upi-installer:
-    name: "4.17"
+    name: "4.14"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -22,7 +22,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.17"
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -35,16 +35,13 @@ tests:
     cluster_profile: azure-observability
     env:
       BASE_DOMAIN: observability.azure.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-      MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1106848
+      MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib:1106850
       OPERATORS: |
         [
             {"name": "tempo-product", "source": "tempo-catalogsource", "channel": "stable", "install_namespace": "openshift-tempo-operator","target_namespaces": "", "operator_group": "openshift-tempo-operator"},
             {"name": "opentelemetry-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-opentelemetry-operator", "target_namespaces": "", "operator_group": "openshift-opentelemetry-operator"},
             {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
             {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": ""},
-            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator", "target_namespaces": "", "operator_group":"coo-og"},
-            {"name": "lightspeed-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-lightspeed", "target_namespaces": "openshift-lightspeed", "operator_group": "openshift-lightspeed"},
             {"name": "serverless-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-serverless", "target_namespaces": "", "operator_group": "openshift-serverless"}
         ]
       SKIP_TESTS: tests/e2e-openshift-object-stores/*
@@ -52,10 +49,9 @@ tests:
     - ref: distributed-tracing-install-tempo-konflux-catalogsource
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-stage
-    - ref: distributed-tracing-tests-tracing-ui-integration
     workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: grafana-tempo-operator
-  variant: tempo-product-ocp-4.17-fips-stage
+  variant: tempo-product-ocp-4.14-stage
