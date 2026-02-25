@@ -27,11 +27,12 @@ spec:
       terminationGracePeriodSeconds: 180
       containers:
       - name: hook
-        image: us-docker.pkg.dev/k8s-infra-prow/images/hook:v20260217-999e46ca7
+        image: quay.io/prucek/prow:hook_db
         imagePullPolicy: Always
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
+        - --job-config-postgres-uri=$(JOB_CONFIG_POSTGRES_URI)
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
@@ -39,6 +40,11 @@ spec:
         - --github-app-private-key-path=/etc/github/cert
         - --hmac-secret-file=/etc/github/hmac
         env:
+        - name: JOB_CONFIG_POSTGRES_URI
+          valueFrom:
+            secretKeyRef:
+              name: job-config-db
+              key: uri
         - name: GITHUB_APP_ID
           valueFrom:
             secretKeyRef:
