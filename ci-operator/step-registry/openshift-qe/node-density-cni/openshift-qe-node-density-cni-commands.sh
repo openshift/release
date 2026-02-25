@@ -64,7 +64,7 @@ export EXTRA_FLAGS UUID
 
 ./run.sh
 
-if [[ ${REPO_NAME} == "ocp-qe-perfscale-ci" ]] && [[ ${JOB_TYPE} == "periodic" ]] && [[ -f collected-metrics-${UUID}/jobSummary.json ]]; then
+if [[ ${JOB_NAME} == *openshift-eng-ocp-qe-perfscale-ci* ]] && [[ ${JOB_TYPE} == "periodic" ]] && [[ -f collected-metrics-${UUID}/jobSummary.json ]]; then
   set +e
   OCP_PERF_DASH_HOST=$(cat ${ES_SECRETS_PATH}/ocp-perf-dash-address)
   OCP_PERF_DASH_DIR="/usr/share/ocp-perf-dash/${JOB_NAME}/${WORKLOAD}/${UUID}"
