@@ -86,7 +86,7 @@ mapTestsForComponentReadiness "${ARTIFACT_DIR}/junit.functest.xml"
  # Send junit files to shared dir for Data Router Reporter step
 cp "${ARTIFACT_DIR}"/*.xml "${SHARED_DIR}"
 
-
+CNV_WAIT_FOR_LIVE_DEBUG=1
 if [ "${exit_code:-0}" -ne 0 ]; then
     echo "deploy_test failed with exit code $exit_code"
     if [[ -n "${CNV_WAIT_FOR_LIVE_DEBUG:-}" ]]; then
