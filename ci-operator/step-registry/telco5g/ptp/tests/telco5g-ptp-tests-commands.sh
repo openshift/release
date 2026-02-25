@@ -244,8 +244,6 @@ export KUBECONFIG=$SHARED_DIR/kubeconfig
 # Set go version
 if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
   source "$HOME"/golang-1.20
-elif [[ "$T5CI_VERSION" == "4.16" ]]; then
-  source "$HOME"/golang-1.21.11
 else
   source "$HOME"/golang-1.22.4
 fi

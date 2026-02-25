@@ -401,13 +401,13 @@ CONFIG = {
         'eu-west-1': 8,
         'eu-west-2': 8
     },
-    'hypershift-quota-slice': {
-        'default': 50,
-    },
     'hypershift-aws-quota-slice': {
         'default': 30,
     },
     'hypershift-aks-quota-slice': {
+        'default': 20,
+    },
+    'hypershift-azure-quota-slice': {
         'default': 20,
     },
     'hypershift-gcp-quota-slice': {
