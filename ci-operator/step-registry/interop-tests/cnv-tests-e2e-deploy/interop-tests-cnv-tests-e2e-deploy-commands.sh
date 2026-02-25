@@ -75,7 +75,8 @@ fi
 
 
 # Run the tests
-make deploy_test || exit_code=$?
+# make deploy_test || exit_code=$?
+make deploy_cnv || exit_code=$?
 
 set +x
 
