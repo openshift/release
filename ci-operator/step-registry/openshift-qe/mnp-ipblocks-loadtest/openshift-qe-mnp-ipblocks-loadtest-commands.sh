@@ -537,14 +537,17 @@ log_info "Command: $SCRIPT_EXEC --total-pods $MNP_TOTAL_PODS --policy-count $MNP
 if timeout 1800 $SCRIPT_EXEC --total-pods "$MNP_TOTAL_PODS" --policy-count "$MNP_POLICY_COUNT" --cidrs-per-policy "$MNP_CIDRS_PER_POLICY" --apply; then
     log_success "SUCCESS MNP load test execution completed successfully"
     TEST_EXECUTION_STATUS="success"
-elif [[ $? -eq 124 ]]; then
-    log_error "MNP load test timed out after 30 minutes"
-    log_error "   This may indicate system overload or ACL explosion"
-    TEST_EXECUTION_STATUS="timeout"
 else
-    log_error "MNP load test execution failed with exit code $?"
-    log_error "   Continuing to collect metrics for analysis..."
-    TEST_EXECUTION_STATUS="failed"
+    exit_code=$?
+    if [[ $exit_code -eq 124 ]]; then
+        log_error "MNP load test timed out after 30 minutes"
+        log_error "   This may indicate system overload or ACL explosion"
+        TEST_EXECUTION_STATUS="timeout"
+    else
+        log_error "MNP load test execution failed with exit code $exit_code"
+        log_error "   Continuing to collect metrics for analysis..."
+        TEST_EXECUTION_STATUS="failed"
+    fi
 fi
 
 end_time=$(date +%s)
