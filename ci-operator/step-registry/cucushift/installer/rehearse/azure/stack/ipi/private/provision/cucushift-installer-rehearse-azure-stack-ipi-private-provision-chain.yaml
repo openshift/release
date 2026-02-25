@@ -1,0 +1,44 @@
+chain:
+  as: cucushift-installer-rehearse-azure-stack-ipi-private-provision
+  steps:
+  - chain: ipi-conf-azurestack
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vnet
+  - chain: azure-provision-bastionhost
+  - ref: proxy-config-generate
+  - ref: ipi-conf-azurestack-creds
+  - ref: ipi-conf-azurestack-rhcos
+  - ref: ipi-conf-additional-ca-azurestack
+  - ref: ipi-conf-azure-provisionednetwork
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  env:
+  - name: AZURESTACK_ENDPOINT
+    default: 'https://management.mtcazs.wwtatc.com'
+    documentation: |-
+      The Azure Stack Hub Endpoint to connect to.
+  - name: SUFFIX_ENDPOINT
+    default: "mtcazs.wwtatc.com"
+    documentation: |-
+      The endpoint suffix for storage accounts.
+  - name: RHCOS_VHD_RESOURCE_GROUP
+    default: "rhcosvhd"
+    documentation: |-
+      The resource group of boot image vhd.
+  - name: RHCOS_VHD_STORAGE_ACCOUNT
+    default: "vhdsaqe"
+    documentation: |-
+      The storage aaccount of boot image vhd.
+  - name: BASE_DOMAIN_RESOURCE_GROUP_NAME
+    default: "os4-common"
+    documentation: |-
+      The base domain resource group name
+  - name: PUBLISH
+    default:  "Internal"
+  - name: BASTION_VHD_URI
+    default: "https://vhdsa.blob.mtcazs.wwtatc.com/vhd/rhcos-410.84.202112040202-0-azurestack.x86_64.vhd"
+    documentation: |-
+      BYO azure VHD for bastion host. The default rhcos image value is gotten from 4.12.0-rc.8 installer.
+  documentation: |-
+    Create an IPI private cluster on AZURE for QE e2e tests.
