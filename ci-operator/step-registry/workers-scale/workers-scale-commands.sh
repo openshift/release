@@ -109,7 +109,7 @@ function scaleInBatches() {
 }
 
 first_batch_size=500
-batch_size=100
+batch_size=300
 
 if [[ $WORKER_REPLICA_COUNT -le $first_batch_size ]]; then
     scaleInBatches $WORKER_REPLICA_COUNT
