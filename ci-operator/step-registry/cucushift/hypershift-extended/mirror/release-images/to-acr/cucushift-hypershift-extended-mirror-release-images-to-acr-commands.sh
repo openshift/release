@@ -14,6 +14,28 @@ fi
 
 echo "az acr repository delete --name $ACR_NAME --repository $ACR_REPO_NAME -y" >> "${SHARED_DIR}/remove_resources_by_cli.sh"
 oc adm release mirror --from "$RELEASE_IMAGE_LATEST" --to "$ACR_REPO" -a "$PULL_SECRET_PATH" --max-per-registry=2
+
+# Mirror CAPI images from 4.20.10-multi release
+# TODO(https://issues.redhat.com/browse/CNTRLPLANE-1200): Remove this override once Hypershift installs the CAPI v1beta2 API version
+# The images are pinned to version 4.20.10.
+# https://issues.redhat.com/browse/OCPBUGS-74247
+CAPI_SOURCE_RELEASE="quay.io/openshift-release-dev/ocp-release@sha256:7f183e9b5610a2c9f9aabfd5906b418adfbe659f441b019933426a19bf6a5962"
+
+echo "Extracting CAPI images from 4.20.10-multi release..."
+CLUSTER_CAPI_CONTROLLERS=$(oc adm release info -a "$PULL_SECRET_PATH" "$CAPI_SOURCE_RELEASE" --image-for=cluster-capi-controllers)
+CLUSTER_CAPI_OPERATOR=$(oc adm release info -a "$PULL_SECRET_PATH" "$CAPI_SOURCE_RELEASE" --image-for=cluster-capi-operator)
+AZURE_CLUSTER_API_CONTROLLERS=$(oc adm release info -a "$PULL_SECRET_PATH" "$CAPI_SOURCE_RELEASE" --image-for=azure-cluster-api-controllers)
+
+echo "Mirroring CAPI images to ACR..."
+oc image mirror \
+  "$CLUSTER_CAPI_CONTROLLERS=$ACR_REPO:4.20.10-x86_64-cluster-capi-controllers" \
+  "$CLUSTER_CAPI_OPERATOR=$ACR_REPO:4.20.10-x86_64-cluster-capi-operator" \
+  "$AZURE_CLUSTER_API_CONTROLLERS=$ACR_REPO:4.20.10-x86_64-azure-cluster-api-controllers" \
+  -a "$PULL_SECRET_PATH" \
+  --max-per-registry=2 \
+  --keep-manifest-list \
+  --filter-by-os='.*'
+
 cat <<EOF >> "$SHARED_DIR"/hypershift_operator_registry_overrides
 quay.io/openshift-release-dev/ocp-v4.0-art-dev=$ACR_REPO
 quay.io/openshift-release-dev/ocp-release=$ACR_REPO
