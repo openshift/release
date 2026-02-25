@@ -114,13 +114,15 @@ eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \
   --namespace local-cluster \
   --base-domain=${BASEDOMAIN} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
-  --control-plane-operator-image=quay.io/mgencur/cpo:OCPBUGS-60185 \
   --image-content-sources ${SHARED_DIR}/mgmt_icsp.yaml \
   --ssh-key=${SHARED_DIR}/id_rsa.pub \
   --release-image ${RELEASE_IMAGE} $(support_np_skew)"
 
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
+
+oc annotate hostedcluster "${CLUSTER_NAME}" -n local-cluster \
+  "hypershift.openshift.io/control-plane-operator-image"="quay.io/mgencur/cpo:OCPBUGS-60185"
 
 # This is only needed for the RDU2 clusters, but harmless to execute for all cases.
 # They are backed by an HAProxy load balancer in a public (to VPN users) network.
