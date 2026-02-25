@@ -177,6 +177,367 @@ Shows:
 - Whether component is actively maintained
 - Git history context
 
+### `/installer-add-test` - Installer PR Test Job Creator
+
+**Purpose**: Analyze an OpenShift installer PR from GitHub or local changes and automatically create a corresponding CI presubmit test job with dedicated step-registry components.
+
+**Why it exists**: Creating test jobs for installer PRs requires understanding the changes, choosing appropriate test workflows, creating dedicated test steps, and configuring the CI system correctly. This command automates the entire process by fetching PR details or analyzing local git changes, creating step-registry components, and generating CI configuration.
+
+#### Basic Usage
+
+```bash
+# Using a GitHub PR URL
+/installer-add-test https://github.com/openshift/installer/pull/12345
+
+# Using a local directory path
+/installer-add-test /path/to/installer
+```
+
+#### Parameters
+
+| Parameter | Required | Description | Examples |
+|-----------|----------|-------------|----------|
+| `input` | Yes | Either a PR URL or local directory path | `https://github.com/openshift/installer/pull/12345` or `/home/user/go/src/github.com/openshift/installer` |
+
+#### What It Does
+
+The command performs a complete end-to-end workflow:
+
+**1. Detects input type** (PR URL vs local directory)
+   - Checks if input contains "github.com/pull/"
+   - Validates directory exists if local path
+
+**2. Gathers changes** from the appropriate source:
+   - **PR URL**: Fetches PR information from GitHub using WebFetch
+   - **Local directory**: Uses git commands to analyze changes
+     ```bash
+     git diff HEAD                           # Uncommitted changes
+     git diff --name-only HEAD               # Changed files
+     git log -1 --stat                       # Recent commit
+     ```
+
+**3. Analyzes the changes** to determine:
+   - Target platform (AWS, GCP, Azure, vSphere, etc.)
+   - Test requirements (e2e, upgrade, UPI, special configs)
+   - Existing test patterns to follow
+
+**4. Creates dedicated step-registry components**:
+   - `<step-name>-ref.yaml` - Step metadata and configuration
+   - `<step-name>-commands.sh` - Test execution script
+   - `OWNERS` file - Team ownership (if new directory)
+
+**5. Adds test configuration** to installer CI config:
+   - Configures appropriate cluster profile
+   - Sets up environment variables
+   - References the new step in test phase
+   - Reuses existing pre/post chains for setup/cleanup
+
+**6. Validates and generates** downstream artifacts:
+   - Runs `make validate-step-registry`
+   - Runs `make update` to generate Prow jobs
+   - Shows git diff of all changes
+
+**7. Provides summary** with:
+   - Test name and platform
+   - Trigger conditions
+   - Created step files
+   - Modified config files
+   - Next steps for testing
+
+#### Usage Examples
+
+##### Example 1: Creating Test from PR URL
+
+```bash
+/installer-add-test https://github.com/openshift/installer/pull/8123
+
+# Command will:
+# 1. Fetch PR from GitHub
+# 2. Extract: "Add support for AWS Local Zones"
+# 3. Identify changed files: pkg/asset/installconfig/aws/*.go
+# 4. Create step: installer-e2e-aws-local-zones
+# 5. Add test config to installer CI
+# 6. Generate Prow jobs
+```
+
+**What gets created:**
+```
+ci-operator/step-registry/installer/e2e/aws-local-zones/
+├── installer-e2e-aws-local-zones-ref.yaml
+├── installer-e2e-aws-local-zones-commands.sh
+└── OWNERS
+
+Modified:
+- ci-operator/config/openshift/installer/openshift-installer-main.yaml
+- ci-operator/jobs/openshift/installer/openshift-installer-main-presubmits.yaml
+```
+
+##### Example 2: Creating Test from Local Changes
+
+```bash
+# You're working on installer locally with uncommitted changes
+cd /path/to/installer
+# Made changes to pkg/asset/installconfig/gcp/edgezones.go
+
+# In release repo, run:
+/installer-add-test /path/to/installer
+
+# Command will:
+# 1. Check directory exists and is git repo
+# 2. Run git diff HEAD to see your changes
+# 3. Analyze: GCP edge zones feature
+# 4. Create step: installer-e2e-gcp-edge-zones
+# 5. Add test config
+# 6. Generate Prow jobs
+```
+
+##### Example 3: Creating Test from Recent Commit
+
+```bash
+# You have a committed change in installer repo
+cd /path/to/installer
+git log -1  # Shows: "azure: add availability zones support"
+
+# In release repo, run:
+/installer-add-test /path/to/installer
+
+# Command will:
+# 1. Find no uncommitted changes
+# 2. Analyze recent commit
+# 3. Create test for Azure availability zones
+```
+
+#### Key Features
+
+##### 1. Dual Input Support
+
+Works with both remote and local sources:
+- **GitHub PR**: Fetches from internet, analyzes PR description/files
+- **Local directory**: Analyzes git diff and commits
+
+##### 2. Intelligent Change Detection
+
+For local directories:
+- Checks uncommitted changes first (`git diff HEAD`)
+- Falls back to recent commits if nothing uncommitted
+- Extracts context from commit messages
+- Identifies platform from file paths
+
+##### 3. Dedicated Step Creation
+
+Always creates reusable step-registry components:
+- Follows naming convention: `installer-e2e-<platform>-<feature>`
+- Includes proper documentation
+- Sets appropriate resource limits
+- Creates executable test scripts
+
+##### 4. Pattern Matching
+
+Searches for similar existing tests:
+- Identifies appropriate workflows to reference
+- Uses consistent naming patterns
+- Follows platform-specific conventions
+
+##### 5. Complete Validation
+
+Ensures correctness:
+- Validates step-registry structure
+- Checks YAML syntax
+- Generates Prow jobs
+- Shows all changes with git diff
+
+##### 6. Team Ownership
+
+Creates OWNERS files for new directories:
+- Includes installer team members
+- Sets up proper approvers and reviewers
+
+#### What Gets Created
+
+**Step Registry Components** (in `ci-operator/step-registry/`):
+```
+installer/e2e/<feature>/
+├── installer-e2e-<platform>-<feature>-ref.yaml    # Step metadata
+├── installer-e2e-<platform>-<feature>-commands.sh # Test script
+└── OWNERS                                          # Team ownership
+```
+
+**Test Configuration** (in `ci-operator/config/openshift/installer/`):
+```yaml
+tests:
+  - as: e2e-<platform>-<feature>
+    run_if_changed: <platform>
+    optional: true
+    steps:
+      cluster_profile: <platform>-N
+      env:
+        FEATURE_ENABLED: "yes"
+      pre:
+      - chain: ipi-<platform>-pre
+      test:
+      - ref: installer-e2e-<platform>-<feature>
+      post:
+      - chain: ipi-<platform>-post
+```
+
+**Generated Prow Jobs** (in `ci-operator/jobs/openshift/installer/`):
+- Automatically created by `make update`
+- Should not be manually edited
+
+#### Common Use Cases
+
+##### 1. Review PR and Add Test
+
+**Scenario**: Reviewing installer PR, want to add CI test
+
+```bash
+# In PR review, copy URL
+/installer-add-test https://github.com/openshift/installer/pull/XXXXX
+
+# Test automatically created based on PR changes
+```
+
+##### 2. Local Development Workflow
+
+**Scenario**: Working on installer feature locally
+
+```bash
+# Make changes to installer
+cd ~/code/installer
+vim pkg/asset/installconfig/aws/localzones.go
+
+# Create test without committing/pushing
+cd ~/code/release
+/installer-add-test ~/code/installer
+
+# Test job created from local changes
+```
+
+##### 3. Post-Commit Test Addition
+
+**Scenario**: Feature merged but forgot to add test
+
+```bash
+# Installer change already merged
+# Create test by pointing to local clone
+/installer-add-test /path/to/installer
+
+# Analyzes recent commit, creates test
+```
+
+##### 4. Prototype Testing
+
+**Scenario**: Experimenting with installer changes
+
+```bash
+# Try different approaches locally
+# Create tests without creating PRs
+/installer-add-test /path/to/installer
+
+# Quick iteration on test configuration
+```
+
+#### Integration with Other Commands
+
+Often used together with `/step-finder`:
+
+```bash
+# First, search for similar existing tests
+/step-finder aws edge zones workflow
+
+# Review existing patterns
+# Then create the new test
+/installer-add-test https://github.com/openshift/installer/pull/XXXXX
+```
+
+#### Best Practices
+
+##### 1. Use Appropriate Input Type
+
+- **PR URL**: When reviewing/planning based on PR
+- **Local path**: When actively developing/prototyping
+
+##### 2. Review Generated Files
+
+Always review before committing:
+- Check test logic in `-commands.sh`
+- Verify environment variables
+- Ensure appropriate trigger conditions
+
+##### 3. Test Locally If Possible
+
+After creation:
+- Review the test script
+- Check for syntax errors
+- Validate the configuration
+
+##### 4. Keep Changes Focused
+
+For local directory usage:
+- Stage related changes only
+- Clear diff helps with accurate analysis
+
+#### Files Modified
+
+The command typically modifies:
+1. `ci-operator/step-registry/installer/e2e/<feature>/` - New directory with step files
+2. `ci-operator/config/openshift/installer/openshift-installer-main.yaml` - Test config
+3. `ci-operator/jobs/openshift/installer/openshift-installer-main-presubmits.yaml` - Generated (auto-updated)
+
+#### Input Detection Logic
+
+The command automatically detects input type:
+
+**PR URL indicators:**
+- Contains "github.com"
+- Contains "/pull/"
+- Matches pattern: `https://github.com/<org>/<repo>/pull/<number>`
+
+**Local directory indicators:**
+- Starts with `/` or `./` or `~/`
+- Does not contain "github.com"
+- Path exists on filesystem
+
+#### Error Handling
+
+Common errors and solutions:
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| Directory not found | Invalid path | Check path is correct and absolute |
+| Not a git repository | Directory isn't git repo | Ensure you're pointing to installer clone |
+| No changes found | No diff or commits | Make changes or commit something first |
+| WebFetch failed | Invalid PR URL | Verify PR exists and is accessible |
+| Step validation failed | Invalid YAML syntax | Review generated step files |
+| Make update failed | Config syntax error | Check error message, fix YAML |
+
+#### Limitations
+
+- Only works for installer repository (not other repos)
+- Requires PR to be accessible or local repo to be valid git repo
+- May need manual adjustments for complex test scenarios
+- Best effort analysis - review always required
+
+#### Next Steps After Running
+
+1. **Review generated files** - Check all created/modified files
+2. **Adjust test logic** - Fine-tune the test script if needed
+3. **Run validation** - Already done by command, but verify output
+4. **Test locally** - If possible, test the configuration
+5. **Commit changes** - Create PR with all generated files
+6. **Monitor CI** - Watch for successful job execution
+
+#### Comparison: PR URL vs Local Directory
+
+| Aspect | PR URL | Local Directory |
+|--------|--------|-----------------|
+| **Source** | GitHub PR page | Local git repository |
+| **Network** | Requires internet | Works offline |
+| **Changes** | Merged + uncommitted PR changes | Committed + uncommitted local changes |
+| **Context** | PR description, comments | Commit messages, diff |
+| **Use case** | Review, planning | Development, prototyping |
+| **Speed** | Slower (WebFetch) | Faster (local git) |
+
 ## Use Cases
 
 ### 1. Setting Up New CI Tests
