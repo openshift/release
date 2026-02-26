@@ -1,0 +1,28 @@
+ref:
+  as: servicemesh-istio-eks-mapt-create
+  commands: servicemesh-istio-eks-mapt-create-commands.sh
+  credentials:
+  - mount_path: /tmp/secrets
+    name: cluster-secrets-ossm-aws
+    namespace: ci
+  from_image:
+    name: mapt
+    namespace: ci
+    tag: v0.9.6
+  grace_period: 30m
+  resources:
+    limits:
+      cpu: "2"
+      memory: 6Gi
+    requests:
+      cpu: "2"
+      memory: 6Gi
+  documentation: |-
+    Creates a cost-effective spot EKS cluster using MAPT (Multi Architecture Provisioning Tool) for OSSM Istio testing.
+    The cluster supports privileged pods required for unit and gencheck tests that need kernel module access.
+
+    This step dynamically creates a unique S3 bucket for Pulumi state storage, eliminating the need for pre-existing shared buckets.
+    The bucket name is saved to ${SHARED_DIR}/mapt-s3-bucket-name for cleanup by the destroy step.
+
+    The step provides kubeconfig at ${SHARED_DIR}/kubeconfig for subsequent test execution steps.
+    Uses AWS credentials from the existing vault system (cluster-secrets-ossm-aws) with shared credentials file format.

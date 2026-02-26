@@ -1,0 +1,18 @@
+workflow:
+  as: servicemesh-istio-eks-mapt
+  steps:
+    pre:
+    - ref: servicemesh-istio-eks-mapt-create
+    post:
+    - ref: servicemesh-istio-eks-mapt-destroy
+  documentation: |-
+    The workflow is responsible for creating and destroying a spot EKS cluster using MAPT (Multi Architecture Provisioning Tool) for OpenShift Service Mesh (OSSM) Istio testing.
+    This workflow enables running privileged unit and gencheck tests that require kernel modules, Docker socket access, and system administration capabilities.
+
+    The workflow is completely self-contained with dynamic S3 bucket management:
+    - Pre phase: Creates unique S3 bucket, provisions spot EKS cluster, provides kubeconfig at ${SHARED_DIR}/kubeconfig
+    - Post phase: Destroys EKS cluster and deletes the entire S3 bucket, leaving zero leftover resources
+
+    The EKS cluster is optimized for cost efficiency using spot instances with 70-90% savings compared to on-demand instances.
+    No pre-existing S3 buckets are required - each job gets its own isolated state storage that is automatically cleaned up.
+    Uses the existing OSSM AWS credentials from the vault system (cluster-secrets-ossm-aws).

@@ -1,0 +1,28 @@
+ref:
+  as: servicemesh-istio-eks-mapt-destroy
+  commands: servicemesh-istio-eks-mapt-destroy-commands.sh
+  credentials:
+  - mount_path: /tmp/secrets
+    name: cluster-secrets-ossm-aws
+    namespace: ci
+  from_image:
+    name: mapt
+    namespace: ci
+    tag: v0.9.6
+  grace_period: 30m
+  resources:
+    limits:
+      cpu: "2"
+      memory: 6Gi
+    requests:
+      cpu: "2"
+      memory: 6Gi
+  documentation: |-
+    Destroys the spot EKS cluster created for OSSM Istio testing and cleans up all associated resources.
+    Includes proper error handling for locked stacks and ensures complete S3 bucket cleanup.
+
+    This step reads the dynamically created bucket name from ${SHARED_DIR}/mapt-s3-bucket-name and deletes the entire bucket
+    after destroying the MAPT infrastructure, ensuring zero leftover resources.
+
+    Uses AWS credentials from the existing vault system (cluster-secrets-ossm-aws) with shared credentials file format.
+    Handles cleanup failures gracefully with comprehensive error reporting.

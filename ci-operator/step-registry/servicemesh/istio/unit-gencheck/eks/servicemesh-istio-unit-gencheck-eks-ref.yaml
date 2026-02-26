@@ -1,0 +1,24 @@
+ref:
+  as: servicemesh-istio-unit-gencheck-eks
+  commands: servicemesh-istio-unit-gencheck-eks-commands.sh
+  from: src
+  grace_period: 20m
+  resources:
+    requests:
+      cpu: "4"
+      memory: 4Gi
+    limits:
+      memory: 16Gi
+  documentation: |-
+    Executes both OSSM Istio unit and gencheck tests in a single privileged pod running in the EKS cluster created by the MAPT workflow.
+    This combines both test suites to optimize cluster utilization and reduce infrastructure costs.
+
+    The step:
+    1. Creates a privileged pod with kernel module and Docker socket access
+    2. Copies source code to the pod using oc cp
+    3. Runs unit tests with BUILD_WITH_CONTAINER=0
+    4. Runs gencheck tests with BUILD_WITH_CONTAINER=0
+    5. Collects test artifacts and logs from both test suites
+    6. Cleans up the privileged pod
+
+    Requires kubeconfig at ${SHARED_DIR}/kubeconfig from the preceding MAPT create step.
