@@ -11,7 +11,7 @@ The `sandboxed-containers-operator-create-prowjob-commands.sh` script creates pr
 The script supports the following commands:
 
 - `create` - Create prowjob configuration files
-- `run` - Run prowjobs from YAML configuration
+- `run` - Run one prowjob from YAML (requires job YAML file and exactly one job name)
 
 ### Command Usage
 
@@ -66,7 +66,6 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 | `AWS_REGION_OVERRIDE`      | `us-east-2`              | AWS region for testing                                                      | Any valid AWS region     |
 | `CUSTOM_AZURE_REGION`      | `eastus`                 | Azure region for testing                                                    | Any valid Azure region   |
 | `OSC_CATALOG_TAG`          | `latest`                 | Defaults to `:latest`. Actual tag resolved at runtime by `env-cm` step. Can override with specific version tag (e.g., `1.11.1-1766149846`) or SHA | repo tag or SHA          |
-| `EXPECTED_OSC_VERSION`     | `1.10.1`                 | Derived from X.Y.X-epoch_time catalog tag or OSC_CATALOG_TAG                | Semantic version format  |
 | `INSTALL_KATA_RPM`         | `true`                   | Whether to install Kata RPM                                                 | `true` or `false`        |
 | `KATA_RPM_VERSION`         | `3.17.0-3.rhaos4.19.el9` | Kata RPM version (when `INSTALL_KATA_RPM=true`)                             | RPM version format       |
 | `PROW_RUN_TYPE`            | `candidate`              | Prow job run type                                                           | `candidate` or `release` |
@@ -81,7 +80,6 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
   - The `env-cm` step resolves the actual latest tag (X.Y.Z-epoch_time format) at runtime
   - This ensures jobs always test against the most recent build
 - Creates `brew-catalog` source with the resolved catalog tag
-  - If catalog tag is X.Y.Z-epoch_time, the expected version of the operator is extracted
 
 #### GA (Production) Mode
 - Uses `redhat-operators` catalog source with GA images
@@ -161,25 +159,33 @@ The `create-prowjob` script uses `:latest` as the default tag. The actual latest
 
 ## Run Command
 
-The `run` command allows you to trigger ProwJobs from a generated YAML configuration file. This command requires a valid Prow API token.
+The `run` command triggers a single ProwJob from a generated YAML configuration file. You must specify exactly one job name (the `as` value from the tests in the YAML, e.g. `azure-ipi-kata`, `aws-ipi-peerpods`). This command requires a valid Prow API token.
 
 ### Run Command Usage
 
 ```bash
-# Run all jobs from a YAML file
-./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml
-
-# Run specific jobs from a YAML file
-./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml azure-ipi-kata aws-ipi-peerpods
+# Run one job from a YAML file (exactly one job name required)
+./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml azure-ipi-kata
 ```
+
+### Create Yaml for Run
+Use the **create** command to create a yaml file in the current directory.  Modify it for your case.  Follow Option A in the output directions
+
+### Viewing the Run in Spyglass
+Go to [Prow configured jobs](https://prow.ci.openshift.org/configured-jobs/)
+Scroll down to *sandboxed-containers-operator* and click on it
+Search for the prow job you specified (ex aws-ipi-peerpods) and click on _Details_
+Click on _History_
+You will be taken to a list of the **Build** numbers, etc.  Your job should be at the top.  Clicking on that will show you the Spyglass of your job with the build log, artifacts, etc.
+This URL is used by **dig&shift** for reporting and analysis.  It will look something like [this](https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/openshift_release/75051/rehearse-75051-periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate421-azure-ipi-kata/2024178159888371712)
 
 ### Run Command Features
 
-- **Job Name Generation**: Automatically constructs job names using the pattern `periodic-ci-{org}-{repo}-{branch}-{variant}-{job_suffix}`
-- **Metadata Extraction**: Extracts organization, repository, branch, and variant from the YAML file's `zz_generated_metadata` section
-- **API Integration**: Uses the Prow/Gangway API to trigger jobs
-- **Job Status Monitoring**: Provides job IDs and status information
-- **Flexible Job Selection**: Can run all jobs or specific jobs by name
+- **Exactly one job**: You must provide the job YAML file and exactly one job name; neither more nor fewer are allowed.
+- **Job Name Generation**: Constructs the full job name as `periodic-ci-{org}-{repo}-{branch}-{variant}-{job_name}`.
+- **Metadata Extraction**: Extracts organization, repository, branch, and variant from the YAML file's `zz_generated_metadata` section.
+- **API Integration**: Uses the Prow/Gangway API to trigger the job.
+- **Job Status Monitoring**: Provides job ID and status information.
 
 ### Run Command Environment Variables
 

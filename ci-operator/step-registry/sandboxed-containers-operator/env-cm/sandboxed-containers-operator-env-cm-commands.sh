@@ -116,7 +116,7 @@ metadata:
   namespace: default
 data:
   catalogsourcename: "${CATALOG_SOURCE_NAME}"
-  operatorVer: "${EXPECTED_OPERATOR_VERSION}"
+  operatorVer: ""
   channel: "${OPERATOR_UPDATE_CHANNEL}"
   redirectNeeded: "false"
   exists: "true"
