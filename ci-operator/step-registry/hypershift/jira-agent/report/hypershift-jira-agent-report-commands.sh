@@ -68,6 +68,35 @@ html_escape() {
   sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'
 }
 
+# Read a duration file and return the value in seconds, or 0 if missing
+read_duration() {
+  local file=$1
+  if [ -f "$file" ] && [ -s "$file" ]; then
+    cat "$file" | tr -d '[:space:]'
+  else
+    echo "0"
+  fi
+}
+
+# Format seconds into a human-readable string (e.g. "40m 36s")
+format_duration() {
+  local secs=$1
+  if [ "$secs" -eq 0 ]; then
+    echo "-"
+    return
+  fi
+  local hours=$((secs / 3600))
+  local mins=$(( (secs % 3600) / 60 ))
+  local s=$((secs % 60))
+  if [ "$hours" -gt 0 ]; then
+    printf "%dh %dm %ds" "$hours" "$mins" "$s"
+  elif [ "$mins" -gt 0 ]; then
+    printf "%dm %ds" "$mins" "$s"
+  else
+    printf "%ds" "$s"
+  fi
+}
+
 # Build issue rows for summary table and detail sections
 SUMMARY_ROWS=""
 DETAIL_SECTIONS=""
@@ -120,6 +149,11 @@ while IFS= read -r line; do
   FIX_TOOLS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tools.txt" | html_escape)
   PR_TOOLS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tools.txt" | html_escape)
 
+  SOLVE_ERRORS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-output-errors.txt" | html_escape)
+  REVIEW_ERRORS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-review-errors.txt" | html_escape)
+  FIX_ERRORS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-errors.txt" | html_escape)
+  PR_ERRORS=$(read_extracted "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-errors.txt" | html_escape)
+
   # Read token usage per phase
   ISSUE_TOTAL_INPUT=0
   ISSUE_TOTAL_OUTPUT=0
@@ -128,16 +162,20 @@ while IFS= read -r line; do
   TOKEN_ROWS=""
   MODEL="unknown"
 
+  ISSUE_TOTAL_DURATION=0
+
   for phase_info in "solve:Phase 1: Solve" "review:Phase 2: Review" "fix:Phase 3: Fix" "pr:Phase 4: PR"; do
     PHASE_KEY="${phase_info%%:*}"
     PHASE_LABEL="${phase_info#*:}"
     TOKEN_FILE="${SHARED_DIR}/claude-${ISSUE_KEY}-${PHASE_KEY}-tokens.json"
+    DURATION_FILE="${SHARED_DIR}/claude-${ISSUE_KEY}-${PHASE_KEY}-duration.txt"
 
     P_INPUT=$(read_token_field "$TOKEN_FILE" "input_tokens")
     P_OUTPUT=$(read_token_field "$TOKEN_FILE" "output_tokens")
     P_CACHE_READ=$(read_token_field "$TOKEN_FILE" "cache_read_input_tokens")
     P_CACHE_CREATE=$(read_token_field "$TOKEN_FILE" "cache_creation_input_tokens")
     P_MODEL=$(read_token_field "$TOKEN_FILE" "model")
+    P_DURATION=$(read_duration "$DURATION_FILE")
     if [ "$P_MODEL" != "0" ] && [ "$P_MODEL" != "unknown" ]; then
       MODEL="$P_MODEL"
     fi
@@ -148,9 +186,10 @@ while IFS= read -r line; do
     ISSUE_TOTAL_OUTPUT=$((ISSUE_TOTAL_OUTPUT + P_OUTPUT))
     ISSUE_TOTAL_CACHE_READ=$((ISSUE_TOTAL_CACHE_READ + P_CACHE_READ))
     ISSUE_TOTAL_CACHE_CREATE=$((ISSUE_TOTAL_CACHE_CREATE + P_CACHE_CREATE))
+    ISSUE_TOTAL_DURATION=$((ISSUE_TOTAL_DURATION + P_DURATION))
 
     if [ "$P_INPUT" -gt 0 ] || [ "$P_OUTPUT" -gt 0 ]; then
-      TOKEN_ROWS="${TOKEN_ROWS}<tr><td>${PHASE_LABEL}</td><td>$(format_number "$P_INPUT")</td><td>$(format_number "$P_OUTPUT")</td><td>$(format_number "$P_CACHE_READ")</td><td>$(format_number "$P_CACHE_CREATE")</td><td>${P_COST}</td></tr>"
+      TOKEN_ROWS="${TOKEN_ROWS}<tr><td>${PHASE_LABEL}</td><td>$(format_duration "$P_DURATION")</td><td>$(format_number "$P_INPUT")</td><td>$(format_number "$P_OUTPUT")</td><td>$(format_number "$P_CACHE_READ")</td><td>$(format_number "$P_CACHE_CREATE")</td><td>${P_COST}</td></tr>"
     fi
   done
 
@@ -168,10 +207,10 @@ while IFS= read -r line; do
     TOKEN_TABLE="
   <h3>Token Usage &amp; Cost</h3>
   <table class=\"token-table\">
-  <thead><tr><th>Phase</th><th>Input Tokens</th><th>Output Tokens</th><th>Cache Read</th><th>Cache Create</th><th>Est. Cost</th></tr></thead>
+  <thead><tr><th>Phase</th><th>Duration</th><th>Input Tokens</th><th>Output Tokens</th><th>Cache Read</th><th>Cache Create</th><th>Est. Cost</th></tr></thead>
   <tbody>
   ${TOKEN_ROWS}
-  <tr class=\"total-row\"><td><strong>Total</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_INPUT")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_OUTPUT")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_CACHE_READ")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_CACHE_CREATE")</strong></td><td><strong>${ISSUE_COST}</strong></td></tr>
+  <tr class=\"total-row\"><td><strong>Total</strong></td><td><strong>$(format_duration "$ISSUE_TOTAL_DURATION")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_INPUT")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_OUTPUT")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_CACHE_READ")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_CACHE_CREATE")</strong></td><td><strong>${ISSUE_COST}</strong></td></tr>
   </tbody>
   </table>
   <p class=\"model-info\">Model: ${MODEL}</p>"
@@ -188,18 +227,22 @@ while IFS= read -r line; do
   <h3>Phase 1: Solve</h3>
   <div class=\"phase-output\"><pre>${SOLVE_TEXT}</pre></div>
   <details><summary>Tool calls</summary><pre>${SOLVE_TOOLS}</pre></details>
+  <details><summary>Tool errors</summary><pre class=\"error-pre\">${SOLVE_ERRORS}</pre></details>
 
   <h3>Phase 2: Pre-commit Review</h3>
   <div class=\"phase-output\"><pre>${REVIEW_TEXT}</pre></div>
   <details><summary>Tool calls</summary><pre>${REVIEW_TOOLS}</pre></details>
+  <details><summary>Tool errors</summary><pre class=\"error-pre\">${REVIEW_ERRORS}</pre></details>
 
   <h3>Phase 3: Review Fixes</h3>
   <div class=\"phase-output\"><pre>${FIX_TEXT}</pre></div>
   <details><summary>Tool calls</summary><pre>${FIX_TOOLS}</pre></details>
+  <details><summary>Tool errors</summary><pre class=\"error-pre\">${FIX_ERRORS}</pre></details>
 
   <h3>Phase 4: PR Creation</h3>
   <div class=\"phase-output\"><pre>${PR_TEXT}</pre></div>
   <details><summary>Tool calls</summary><pre>${PR_TOOLS}</pre></details>
+  <details><summary>Tool errors</summary><pre class=\"error-pre\">${PR_ERRORS}</pre></details>
 </div>"
 
 done < "$STATE_FILE"
@@ -242,6 +285,7 @@ cat > "$REPORT_FILE" <<EOF
   .token-table td:first-child, .token-table th:first-child { text-align: left; }
   .total-row td { border-top: 2px solid #333; }
   .model-info { color: #666; font-size: 0.85em; margin-top: 0.3em; }
+  .error-pre { background: #fff5f5; border-left: 3px solid #cb2431; }
 </style>
 </head>
 <body>
