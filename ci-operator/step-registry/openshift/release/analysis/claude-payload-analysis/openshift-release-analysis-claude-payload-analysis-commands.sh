@@ -60,7 +60,7 @@ cat > "${SETTINGS_FILE}" << 'SETTINGS_EOF'
 {
   "permissions": {
     "allow": [
-      "Bash(python3:*)", "Bash(gh:*)", "Bash(gcloud:*)", "Bash(curl:*)",
+      "Bash(python3:plugins/ci/skills/*)", "Bash(gh:*)", "Bash(gcloud:*)", "Bash(curl:*)",
       "Bash(jq:*)", "Bash(grep:*)", "Bash(cat:*)", "Bash(ls:*)",
       "Bash(mkdir:*)", "Bash(cp:*)", "Bash(chmod:*)", "Bash(head:*)",
       "Bash(tail:*)", "Bash(wc:*)", "Bash(sort:*)", "Bash(cut:*)",
@@ -79,7 +79,7 @@ echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 WORKDIR=$(mktemp -d /tmp/claude-analysis-XXXXXX)
 cd "${WORKDIR}"
 
-claude --settings-file "${SETTINGS_FILE}" \
+timeout 7200 claude --settings-file "${SETTINGS_FILE}" \
     --output-format text \
     -p "/ci:analyze-payload ${VERSION}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || true
