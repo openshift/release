@@ -1,0 +1,70 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+- dockerfile_path: Containerfile
+  to: nvidia-ci
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.21.0-0
+        stream: 4-stable
+        upper: 4.22.0-0
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- as: nvidia-dra-gpu-e2e
+  cron: 0 6 * * 3
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: g4dn.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m5d.2xlarge
+      CONTROL_PLANE_REPLICAS: "1"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    test:
+    - as: nvidia-dra-gpu-e2e-tests
+      commands: |
+        set -eo pipefail
+
+        export TEST_TRACE="true"
+        export TEST_VERBOSE="true"
+        export NVIDIAGPU_CLEANUP=false
+        export TEST_FEATURES=nvidiagpu
+        make run-tests
+
+        export READ_PACKAGES_GITHUB_TOKEN_FILE=/var/run/nvidia-ci/github_read_packages_token
+        export DRA_CHART_VERSION=$(./scripts/get-latest-dra-chart.sh)
+        export DRA_CHART_SOURCE=oci://ghcr.io/nvidia/k8s-dra-driver-gpu
+        export TEST_FEATURES=dra
+        export TEST_LABELS=dra-imex,dra-gpu
+        make run-tests
+      credentials:
+      - mount_path: /var/run/nvidia-ci
+        name: nvidia-ci
+        namespace: test-credentials
+      from: nvidia-ci
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: 4.21-dra
