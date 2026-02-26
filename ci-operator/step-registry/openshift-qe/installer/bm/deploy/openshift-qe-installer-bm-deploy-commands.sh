@@ -58,6 +58,7 @@ install_rh_crucible: $CRUCIBLE
 rh_crucible_url: "$CRUCIBLE_URL"
 payload_url: "${RELEASE_IMAGE_LATEST}"
 image_type: "minimal-iso"
+reset_idrac: $RESET_IDRAC
 EOF
 
 if [[ $PUBLIC_VLAN == "false" ]]; then
