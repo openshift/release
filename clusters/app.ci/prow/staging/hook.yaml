@@ -32,7 +32,7 @@ spec:
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
-        - --job-config-postgres-uri=$(JOB_CONFIG_POSTGRES_URI)
+        - --job-config-path=/etc/jobs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --github-graphql-endpoint=http://ghproxy/graphql
@@ -40,11 +40,6 @@ spec:
         - --github-app-private-key-path=/etc/github/cert
         - --hmac-secret-file=/etc/github/hmac
         env:
-        - name: JOB_CONFIG_POSTGRES_URI
-          valueFrom:
-            secretKeyRef:
-              name: job-config-db
-              key: uri
         - name: GITHUB_APP_ID
           valueFrom:
             secretKeyRef:
@@ -62,6 +57,9 @@ spec:
           readOnly: true
         - name: plugins
           mountPath: /etc/plugins
+          readOnly: true
+        - name: job-configs
+          mountPath: /etc/jobs
           readOnly: true
         livenessProbe:
           httpGet:
@@ -86,6 +84,9 @@ spec:
       - name: plugins
         configMap:
           name: plugins
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
 ---
 apiVersion: v1
 kind: Service
