@@ -145,8 +145,8 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 echo "[INFO] 🔧 Setting up EKS cluster for privileged OSSM testing..."
 
 # Create namespace with privileged pod security for OSSM tests
-oc create namespace ossm-tests || true
-oc label namespace ossm-tests \
+kubectl create namespace ossm-tests || true
+kubectl label namespace ossm-tests \
   pod-security.kubernetes.io/audit=privileged \
   pod-security.kubernetes.io/enforce=privileged \
   pod-security.kubernetes.io/warn=privileged || true
