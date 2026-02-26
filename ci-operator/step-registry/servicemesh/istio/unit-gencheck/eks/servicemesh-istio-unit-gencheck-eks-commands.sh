@@ -31,18 +31,15 @@ fi
 export AWS_REGION=${AWS_REGION:-"us-east-1"}
 echo "[SUCCESS] ✅ AWS credentials configured for EKS"
 
-# Debug kubeconfig and AWS setup
+# Debug kubeconfig and AWS setup (without exposing sensitive data)
 echo "[INFO] 🔍 Debugging EKS connectivity setup..."
 echo "[DEBUG] Kubeconfig file exists: $([ -f "${KUBECONFIG}" ] && echo "YES" || echo "NO")"
 echo "[DEBUG] Kubeconfig file size: $([ -f "${KUBECONFIG}" ] && wc -c < "${KUBECONFIG}" || echo "N/A") bytes"
-echo "[DEBUG] AWS credentials file: ${AWS_SHARED_CREDENTIALS_FILE}"
+echo "[DEBUG] AWS credentials file exists: $([ -f "${AWS_SHARED_CREDENTIALS_FILE}" ] && echo "YES" || echo "NO")"
 echo "[DEBUG] AWS region: ${AWS_REGION}"
 
-echo "[DEBUG] Kubeconfig contents (first few lines):"
-head -10 "${KUBECONFIG}" || echo "Could not read kubeconfig"
-
-echo "[DEBUG] Testing AWS CLI access:"
-if aws sts get-caller-identity; then
+echo "[DEBUG] Testing AWS CLI access..."
+if aws sts get-caller-identity --output text --query 'Account' > /dev/null 2>&1; then
   echo "[DEBUG] ✅ AWS CLI authentication working"
 else
   echo "[DEBUG] ❌ AWS CLI authentication failed"
@@ -54,17 +51,23 @@ if ! kubectl cluster-info --request-timeout=30s; then
   echo "[ERROR] ❌ Unable to connect to EKS cluster"
   echo "[ERROR] Checking possible issues:"
 
-  echo "[DEBUG] Attempting to get cluster version with verbose errors:"
-  kubectl version --client=true || echo "kubectl client check failed"
-  kubectl version --short=true 2>&1 || echo "kubectl server check failed"
+  echo "[DEBUG] Testing kubectl client:"
+  kubectl version --client=true > /dev/null 2>&1 || echo "kubectl client check failed"
+
+  echo "[DEBUG] Testing kubectl server connectivity:"
+  kubectl version --short=true > /dev/null 2>&1 || echo "kubectl server check failed"
 
   echo "[DEBUG] Checking if EKS cluster endpoint is reachable:"
-  CLUSTER_ENDPOINT=$(grep -o 'https://[^"]*\.eks\.[^"]*\.amazonaws\.com' "${KUBECONFIG}" || echo "Could not extract endpoint")
-  echo "[DEBUG] Cluster endpoint: ${CLUSTER_ENDPOINT}"
-
-  if [[ "${CLUSTER_ENDPOINT}" != "Could not extract endpoint" ]]; then
-    echo "[DEBUG] Testing endpoint connectivity:"
-    curl -k -m 10 "${CLUSTER_ENDPOINT}/version" 2>&1 || echo "Endpoint not reachable"
+  if CLUSTER_ENDPOINT=$(grep -o 'https://[^"]*\.eks\.[^"]*\.amazonaws\.com' "${KUBECONFIG}" 2>/dev/null); then
+    echo "[DEBUG] Found EKS endpoint in kubeconfig"
+    echo "[DEBUG] Testing basic endpoint connectivity..."
+    if curl -k -m 10 "${CLUSTER_ENDPOINT}/version" > /dev/null 2>&1; then
+      echo "[DEBUG] ✅ Endpoint is reachable"
+    else
+      echo "[DEBUG] ❌ Endpoint not reachable"
+    fi
+  else
+    echo "[DEBUG] Could not extract EKS endpoint from kubeconfig"
   fi
 
   exit 1
