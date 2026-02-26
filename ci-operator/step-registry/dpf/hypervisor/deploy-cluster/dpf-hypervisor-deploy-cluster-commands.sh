@@ -5,6 +5,11 @@ set -euo pipefail
 # commented
 ## source ${SHARED_DIR}/dpf-env
 
+echo "Checking access to SHARED_DIR ..."
+echo "Testing SHARED_DIR" > ${SHARED_DIR}/testing.txt
+ls -ltra ${SHARED_DIR}
+cat ${SHARED_DIR}/testing.txt
+
 # Configuration
 REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
 echo "Remote host: ${REMOTE_HOST}"
@@ -39,17 +44,18 @@ else
 fi
 
 # Bypassing env vars set in prepare-environment for now
-OPENSHIFT_DPF_BRANCH="dpf-25.10"
+## OPENSHIFT_DPF_BRANCH="dpf-25.10"
+# This needs ot be main branch
+OPENSHIFT_DPF_BRANCH="main"
 OPENSHIFT_DPF_GITHUB_REPO_URL="https://github.com/rh-ecosystem-edge/openshift-dpf.git"
 CLUSTER_NAME="doca8"
-REMOTE_WORK_DIR="/root/${CLUSTER_NAME}/ci"
+REMOTE_MAIN_WORK_DIR="/root/${CLUSTER_NAME}/ci"
 ENV_FILE="/root/${CLUSTER_NAME}/ci/.env_${CLUSTER_NAME}"
 
-CLUSTER_NAME="doca8"
 
 
 echo "Deploying OpenShift cluster with DPF on host ${REMOTE_HOST}"
-echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
+echo "Remote Main Working directory on hypervisor: ${REMOTE_MAIN_WORK_DIR}"
 echo "Cluster name: ${CLUSTER_NAME}"
 echo "Env file: ${ENV_FILE}"
 
@@ -59,64 +65,96 @@ echo "Env file: ${ENV_FILE}"
 ## mkdir -p ${LOGS_DIR}
 
 # logs directory for artifacts on the remote host
-REMOTE_LOGS_DIR="${REMOTE_WORK_DIR}/ci/deployment-logs"
+REMOTE_LOGS_DIR="${REMOTE_MAIN_WORK_DIR}/deployment-logs"
 echo "Remote logs directory on hypervisor: ${REMOTE_LOGS_DIR}"
 
 datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
 
 # Start deployment with logging
 ## DEPLOYMENT_LOG="${REMOTE_WORK_DIR}/logs/make_all_$(date +%Y%m%d_%H%M%S).log"
-## uncomment later:
-## DEPLOYMENT_LOG="${REMOTE_WORK_DIR}/logs/make_all_${datetime_string}.log"
+
+CLEAN_ALL_LOG="${REMOTE_LOGS_DIR}/make_clean-all_${datetime_string}.log"
+echo "Remote make clean-all logs directory on hypervisor: ${CLEAN_ALL_LOG}"
+
+DEPLOYMENT_LOG="${REMOTE_LOGS_DIR}/make_all_${datetime_string}.log"
+echo "Remote deployment logs directory on hypervisor: ${DEPLOYMENT_LOG}"
+
 
 # Git clone the dpf-openshift repo on hypervisor
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; env; cd ${REMOTE_WORK_DIR}; mkdir -p openshift-dpf-${datetime_string}; cd openshift-dpf-${datetime_string}; git clone -b ${OPENSHIFT_DPF_BRANCH} ${OPENSHIFT_DPF_GITHUB_REPO_URL}"; then
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; env; cd ${REMOTE_MAIN_WORK_DIR}; mkdir -p openshift-dpf-${datetime_string}; cd openshift-dpf-${datetime_string}; git clone -b ${OPENSHIFT_DPF_BRANCH} ${OPENSHIFT_DPF_GITHUB_REPO_URL}"; then
+  # need more checks to ensure repo was git cloned successfully
   echo "Git clone openshift-dpf repo was successful"
 else
   echo "Git clone openshift-dpf repo failed"
+  exit 1
 fi
 
-echo "Checking if github repo branch was cloned successfully"
-ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; env; cd ${REMOTE_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf; git status"
+REMOTE_WORK_DIR="${REMOTE_MAIN_WORK_DIR}/openshift-dpf-${datetime_string}"
+echo "Remote Working directory on hypervisor: ${REMOTE_WORK_DIR}"
 
-echo "Copy the .env file in ${REMOTE_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf"
-ssh ${SSH_OPTS} root@${REMOTE_HOST} "cp ${REMOTE_WORK_DIR}/env/.env_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf/.env; cat ${REMOTE_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf/.env"
+echo "Checking if github repo branch was cloned successfully"
+ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; env; cd ${REMOTE_WORK_DIR}/openshift-dpf; git status"
+
+# need error checks
+
+echo "Copy the .env file in ${REMOTE_WORK_DIR}/env to ${REMOTE_WORK_DIR}/openshift-dpf"
+ssh ${SSH_OPTS} root@${REMOTE_HOST} "cp ${REMOTE_MAIN_WORK_DIR}/env/.env_${CLUSTER_NAME} ${REMOTE_WORK_DIR}/openshift-dpf/.env; cat ${REMOTE_WORK_DIR}/openshift-dpf/.env"
+
+# need error checks
 
 echo "Create logs dir on the remote host"
 ssh ${SSH_OPTS} root@${REMOTE_HOST} "mkdir -p ${REMOTE_LOGS_DIR}; cd ${REMOTE_LOGS_DIR}; pwd"
 
+# need error checks
+
 echo "Updating variables to use correct file paths with timestamps in .env file"
 # Using delimiter '|' since we have '/' in the patterns
-ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf; sed -i 's|KUBECONFIG=.*|KUBECONFIG=${REMOTE_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf/kubeconfig-mno|' ${REMOTE_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf/.env"
+ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf; sed -i 's|KUBECONFIG=.*|KUBECONFIG=${REMOTE_WORK_DIR}/openshift-dpf/kubeconfig-mno|' ${REMOTE_WORK_DIR}/openshift-dpf/.env"
+
+# need error checks
 
 ### DEBUG: add a long timeout to troubleshoot from pod
 ## echo "Sleeping for 999999999 seconds ...."
 ## sleep 999999999
 
-exit 1
+echo "Sleeping for 600 seconds ...."
+sleep 600
 
-######### Below remove or comment to make sure you are able to cloning the repo
-
-### NOTE:  need to run make clean-all to delete the VMs before make all !!!!
-
-########### comment make all for now
-
-########### need to update the path for KUBECONFIG in the ,env file
-
-#### Global comment:
-: <<'GLOBALCOMMENT'
 # SSH session to 
 echo "Starting DPF deployment with 'make all'..."
 echo "Logs will be saved to: ${DEPLOYMENT_LOG}"
 
-# Execute make all on hypervisor with comprehensive logging
-if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf-${datetime_string}/openshift-dpf && mkdir -p logs && make all 2>&1 | tee ${DEPLOYMENT_LOG}"; then
-    echo "DPF deployment completed successfully"
+
+# Execute `make clean-all` on hypervisor with comprehensive logging
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf && mkdir -p ${REMOTE_LOGS_DIR} && make clean-all 2>&1 | tee ${CLEAN_ALL_LOG}"; then
+  
+  CLEAN_ALL_SUCCESS=true
+  echo "DPF pre-deployment clean-all completed successfully.  CLEAN_ALL_SUCCESS is set to: ${CLEAN_ALL_SUCCESS}"
+
+  echo "Sleeping for 300 seconds ...."
+  sleep 300
+
+  # Execute make all on hypervisor with comprehensive logging
+  echo "Execute make all on hypervisor with comprehensive logging"
+
+  if ssh ${SSH_OPTS} root@${REMOTE_HOST} "cd ${REMOTE_WORK_DIR}/openshift-dpf && mkdir -p ${REMOTE_LOGS_DIR} && make all 2>&1 | tee ${DEPLOYMENT_LOG}"; then
+   
     DEPLOYMENT_SUCCESS=true
-else
-    echo "DPF deployment failed"
+    echo "DPF deployment completed successfully, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
+  
+  else
     DEPLOYMENT_SUCCESS=false
+    echo "DPF deployment failed, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
+  fi
+
+else
+  CLEAN_ALL_SUCCESS=false
+  echo "DPF pre-deployment clean-all failed, CLEAN_ALL_SUCCESS is set to: ${CLEAN_ALL_SUCCESS}"
+  exit 1
 fi
+
+#### Global comment:
+: <<'GLOBALCOMMENT'
 
 # Copy deployment logs back for analysis
 echo "Copying deployment logs for artifact collection..."
@@ -131,8 +169,8 @@ if [[ "${DEPLOYMENT_SUCCESS}" == "true" ]]; then
         scp ${REMOTE_HOST}:${REMOTE_WORK_DIR}/kubeconfig ${SHARED_DIR}/kubeconfig
         echo "Kubeconfig copied successfully"
     elif ssh ${REMOTE_HOST} "cd ${REMOTE_WORK_DIR} && test -f ${CLUSTER_NAME}.kubeconfig"; then
-        scp ${REMOTE_HOST}:${REMOTE_WORK_DIR}/${CLUSTER_NAME}.kubeconfig ${SHARED_DIR}/kubeconfig
-        echo "Kubeconfig copied successfully"
+        scp ${REMOTE_HOST}:${REMOTE_WORK_DIR}/${CLUSTER_NAME}.kubeconfig ${SHARED_DIR}/${CLUSTER_NAME}.kubeconfig
+        echo "Hosted cluster kubeconfig copied successfully"
     else
         echo "WARNING: Could not find kubeconfig file"
         ssh ${REMOTE_HOST} "cd ${REMOTE_WORK_DIR} && ls -la *.kubeconfig kubeconfig" || echo "No kubeconfig files found"
