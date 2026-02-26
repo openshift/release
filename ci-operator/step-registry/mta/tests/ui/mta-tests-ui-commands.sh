@@ -116,6 +116,30 @@ fi
 export TARGET_URL="${target_url}"
 export CYPRESS_BASE_URL="${target_url}"
 
+# Wait for cluster/UI to be ready so session setup can reach /applications (avoids "expected login URL to equal applications" timeouts).
+# 300s max / 15s poll; when ready (e.g. after mta-deploy-tackle) UI often responds on first poll. 
+typeset -i cluster_wait="${MTA_UI_CLUSTER_READY_WAIT:-300}"
+(( cluster_wait > 0 )) || cluster_wait=300
+echo "Waiting up to ${cluster_wait}s for cluster/UI at ${TARGET_URL}..."
+for ((i = 0; i < cluster_wait; i += 15)); do
+    if curl -k -sSf -o /dev/null -w '%{http_code}' --max-time 10 "${TARGET_URL}" | grep -qE '^(200|301|302)$'; then
+        echo "Cluster/UI responded."
+        settle="${MTA_UI_SETTLE_SLEEP:-15}"
+        if [[ "${settle}" =~ ^[0-9]+$ ]] && (( settle > 0 )); then
+            echo "Waiting ${settle}s for app/login page to finish loading..."
+            sleep "${settle}"
+        fi
+        break
+    fi
+    if ((i + 15 >= cluster_wait)); then
+        echo "Timeout waiting for cluster/UI." >&2
+        last_code="$(curl -k -sS -o /dev/null -w '%{http_code}' --max-time 10 "${TARGET_URL}" 2>/dev/null || echo "curl_failed")"
+        echo "Last curl to ${TARGET_URL} got: ${last_code} (expected 200/301/302). Check mta-deploy-tackle step and route/ingress." >&2
+        exit 1
+    fi
+    sleep 15
+done
+
 # Execute Cypress via dotenvx. baseUrl comes from CYPRESS_BASE_URL (exported above). || true so we still archive on test failure.
 npx dotenvx run -- npx cypress run \
     --config "video=false,numTestsKeptInMemory=0" \
