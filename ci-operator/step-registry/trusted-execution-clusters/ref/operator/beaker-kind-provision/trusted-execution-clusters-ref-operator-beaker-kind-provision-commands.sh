@@ -267,17 +267,20 @@ if flock -w "${LOCK_TIMEOUT}" $LOCK_FD; then
 
   # Create marker file with job information
   # Use atomic write: write to temp file, then rename
-  cat > "${LOCK_FILE}.holder.tmp" << HOLDERINFO
-LOCK_HOLDER_ID=${LOCK_HOLDER_ID}
-LOCK_ACQUIRED_AT=$(date -u +'%Y-%m-%d_%H:%M:%S_UTC')
-LOCK_PID=$$
-HOLDERINFO
+  SCRIPT_PID=$BASHPID
+  {
+    echo "LOCK_HOLDER_ID=${LOCK_HOLDER_ID}"
+    echo "LOCK_ACQUIRED_AT=$(date -u +'%Y-%m-%d_%H:%M:%S_UTC')"
+    echo "LOCK_PID=${SCRIPT_PID}"
+  } > "${LOCK_FILE}.holder.tmp"
 
   # Atomic rename to ensure file is complete when it appears
   mv "${LOCK_FILE}.holder.tmp" "${LOCK_FILE}.holder"
 
   # Save our PID for cleanup script (atomic write)
-  echo "$$" > "${LOCK_FILE}.pid.tmp"
+  SCRIPT_PID=$BASHPID
+  printf "%s\n" "${SCRIPT_PID}" > "${LOCK_FILE}.pid.tmp"
+  sync  # Ensure data is written to disk
   mv "${LOCK_FILE}.pid.tmp" "${LOCK_FILE}.pid"
 
   echo "[INFO] Lock holder info saved"
