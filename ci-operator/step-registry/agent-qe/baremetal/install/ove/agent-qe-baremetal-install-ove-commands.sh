@@ -64,3 +64,5 @@ if [ -f /tmp/virtual_media_mount_failed ]; then
   echo "Failed to mount the ISO image in one or more hosts"
   exit 1
 fi
+
+sleep 5000
