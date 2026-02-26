@@ -1,0 +1,53 @@
+ref:
+  as: hypershift-azure-run-e2e-self-managed
+  cli: latest
+  commands: hypershift-azure-run-e2e-self-managed-commands.sh
+  credentials:
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-kubeconfig-azure
+      name: azure-hypershift-ci
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+      name: hypershift-ci-jobs-self-managed-azure
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure-e2e
+      name: hypershift-ci-jobs-self-managed-azure-e2e
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-ci-jobs-azurecreds
+      name: hypershift-ci-jobs-azurecreds
+      namespace: test-credentials
+  dependencies:
+    - env: OCP_IMAGE_LATEST
+      name: release:latest
+    - env: OCP_IMAGE_PREVIOUS
+      name: release:initial
+    - env: CI_HYPERSHIFT_OPERATOR
+      name: pipeline:hypershift-operator
+    - env: OCP_IMAGE_N1
+      name: release:latest
+    - env: OCP_IMAGE_N2
+      name: release:latest
+  env:
+    - default: ${SHARED_DIR}/management_cluster_kubeconfig
+      name: KUBECONFIG
+    - default: ${SHARED_DIR}/management_cluster_name
+      name: MGMT_HC_NAME
+    - default: ${SHARED_DIR}/management_cluster_namespace
+      name: MGMT_HC_NAMESPACE
+    - default: /etc/hypershift-kubeconfig-azure/hypershift-ops-admin.kubeconfig
+      name: MGMT_PARENT_KUBECONFIG
+    - default: "centralus"
+      name: HYPERSHIFT_AZURE_LOCATION
+    - default: ""
+      name: HYPERSHIFT_EXTERNAL_DNS_DOMAIN
+    - default: ""
+      name: CI_TESTS_RUN
+  from: hypershift-tests
+  grace_period: 30m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 2h0m0s
