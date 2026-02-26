@@ -25,18 +25,18 @@ spec:
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
-        - --job-config-postgres-uri=$(JOB_CONFIG_POSTGRES_URI)
-        env:
-        - name: JOB_CONFIG_POSTGRES_URI
-          valueFrom:
-            secretKeyRef:
-              name: job-config-db
-              key: uri
+        - --job-config-path=/etc/jobs
         volumeMounts:
         - name: config
           mountPath: /etc/config
+          readOnly: true
+        - name: job-configs
+          mountPath: /etc/jobs
           readOnly: true
       volumes:
       - name: config
         configMap:
           name: config
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs

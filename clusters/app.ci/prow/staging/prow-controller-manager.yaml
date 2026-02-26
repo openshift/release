@@ -21,7 +21,7 @@ spec:
         args:
         - --dry-run=false
         - --config-path=/etc/config/config.yaml
-        - --job-config-postgres-uri=$(JOB_CONFIG_POSTGRES_URI)
+        - --job-config-path=/etc/jobs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --enable-controller=plank
@@ -31,11 +31,6 @@ spec:
         - --kubeconfig-dir=/etc/build-farm-credentials
         - --kubeconfig-suffix=config
         env:
-        - name: JOB_CONFIG_POSTGRES_URI
-          valueFrom:
-            secretKeyRef:
-              name: job-config-db
-              key: uri
         - name: GITHUB_APP_ID
           valueFrom:
             secretKeyRef:
@@ -54,6 +49,9 @@ spec:
         - mountPath: /etc/build-farm-credentials
           name: build-farm-credentials
           readOnly: true
+        - name: job-configs
+          mountPath: /etc/jobs
+          readOnly: true
       volumes:
       - name: service-account-token
         projected:
@@ -69,3 +67,6 @@ spec:
       - name: build-farm-credentials
         secret:
           secretName: prow-controller-manager
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
