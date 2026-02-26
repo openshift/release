@@ -158,6 +158,12 @@ if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
     EXTRA_FLAGS+=" --github-repos ${CHANGE_POINT_REPOS}"
 fi
 
+if [[ ${JOB_TYPE} == "presubmit" ]] || [[ ${JOB_TYPE} == "periodic" ]]; then
+    EXTRA_FLAGS+=" --pr-analysis"
+else
+    EXTRA_FLAGS+=" --input-vars='{\"pull_number\": \"0\"}'"
+fi
+
 set +e
 set -o pipefail
 FILENAME=$(basename ${ORION_CONFIG} | awk -F. '{print $1}')
