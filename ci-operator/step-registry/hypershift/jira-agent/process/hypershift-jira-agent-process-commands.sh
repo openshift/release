@@ -235,6 +235,8 @@ while IFS= read -r line; do
 
   echo "Running: jira-solve $ISSUE_KEY origin --ci"
 
+  PHASE1_START=$(date +%s)
+
   # Load the skill content as system prompt
   SKILL_CONTENT=$(cat /tmp/hypershift/.claude/commands/jira-solve.md)
 
@@ -257,12 +259,18 @@ while IFS= read -r line; do
   set -e
   jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "/tmp/claude-${ISSUE_KEY}-output.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-output-text.txt" 2>/dev/null || true
   jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-output.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-output-tools.txt" 2>/dev/null || true
+  jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-output.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-output-errors.txt" 2>/dev/null || true
   # Extract token usage for Phase 1
   echo "Phase 1: $(wc -l < "/tmp/claude-${ISSUE_KEY}-output.json") total lines in stream-json"
   grep '^{' "/tmp/claude-${ISSUE_KEY}-output.json" > "/tmp/claude-${ISSUE_KEY}-output-filtered.json" 2>/dev/null || true
   echo "Phase 1: $(wc -l < "/tmp/claude-${ISSUE_KEY}-output-filtered.json") JSON lines after filtering"
   jq -s '[.[] | select(.type == "assistant")] | {input_tokens: (map(.message.usage.input_tokens // 0) | add // 0), output_tokens: (map(.message.usage.output_tokens // 0) | add // 0), cache_read_input_tokens: (map(.message.usage.cache_read_input_tokens // 0) | add // 0), cache_creation_input_tokens: (map(.message.usage.cache_creation_input_tokens // 0) | add // 0), model: (.[0].message.model // "unknown")}' "/tmp/claude-${ISSUE_KEY}-output-filtered.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json" 2>/dev/null || echo '{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json"
   echo "Phase 1 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json")"
+
+  PHASE1_END=$(date +%s)
+  PHASE1_DURATION=$((PHASE1_END - PHASE1_START))
+  echo "Phase 1 duration: ${PHASE1_DURATION}s"
+  echo "$PHASE1_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-duration.txt"
 
   if [ $EXIT_CODE -eq 0 ]; then
     echo "✅ Phase 1 (jira-solve) completed for $ISSUE_KEY"
@@ -288,6 +296,8 @@ while IFS= read -r line; do
       echo "Phase 2: Pre-commit quality review for $ISSUE_KEY"
       echo "=========================================="
 
+      PHASE2_START=$(date +%s)
+
       REVIEW_PROMPT="/code-review:pre-commit-review --language go --profile hypershift"
 
       set +e
@@ -306,12 +316,18 @@ while IFS= read -r line; do
 
       jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "/tmp/claude-${ISSUE_KEY}-review.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-text.txt" 2>/dev/null || true
       jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-review.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tools.txt" 2>/dev/null || true
+      jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-review.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-errors.txt" 2>/dev/null || true
       # Extract token usage for Phase 2
       echo "Phase 2: $(wc -l < "/tmp/claude-${ISSUE_KEY}-review.json") total lines in stream-json"
       grep '^{' "/tmp/claude-${ISSUE_KEY}-review.json" > "/tmp/claude-${ISSUE_KEY}-review-filtered.json" 2>/dev/null || true
       echo "Phase 2: $(wc -l < "/tmp/claude-${ISSUE_KEY}-review-filtered.json") JSON lines after filtering"
       jq -s '[.[] | select(.type == "assistant")] | {input_tokens: (map(.message.usage.input_tokens // 0) | add // 0), output_tokens: (map(.message.usage.output_tokens // 0) | add // 0), cache_read_input_tokens: (map(.message.usage.cache_read_input_tokens // 0) | add // 0), cache_creation_input_tokens: (map(.message.usage.cache_creation_input_tokens // 0) | add // 0), model: (.[0].message.model // "unknown")}' "/tmp/claude-${ISSUE_KEY}-review-filtered.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json" 2>/dev/null || echo '{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json"
       echo "Phase 2 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json")"
+
+      PHASE2_END=$(date +%s)
+      PHASE2_DURATION=$((PHASE2_END - PHASE2_START))
+      echo "Phase 2 duration: ${PHASE2_DURATION}s"
+      echo "$PHASE2_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-duration.txt"
 
       if [ $REVIEW_EXIT_CODE -eq 0 ]; then
         echo "✅ Phase 2 (pre-commit review) completed for $ISSUE_KEY"
@@ -332,6 +348,8 @@ while IFS= read -r line; do
          [ -s "${SHARED_DIR}/claude-${ISSUE_KEY}-review-text.txt" ]; then
         REVIEW_FINDINGS=$(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-review-text.txt")
       fi
+
+      PHASE3_START=$(date +%s)
 
       if [ -n "$REVIEW_FINDINGS" ]; then
         FIX_PROMPT="A code review was performed on the changes in the current branch. Below are the review findings. Address all actions and improvements by editing the code. After making all fixes, commit the changes (amend existing commits or create new commits as appropriate) and push the branch to origin.
@@ -361,6 +379,7 @@ IMPORTANT:
         # Extract fix phase output for report
         jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "/tmp/claude-${ISSUE_KEY}-fix.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-text.txt" 2>/dev/null || true
         jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-fix.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tools.txt" 2>/dev/null || true
+        jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-fix.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-errors.txt" 2>/dev/null || true
         # Extract token usage for Phase 3
         echo "Phase 3: $(wc -l < "/tmp/claude-${ISSUE_KEY}-fix.json") total lines in stream-json"
         grep '^{' "/tmp/claude-${ISSUE_KEY}-fix.json" > "/tmp/claude-${ISSUE_KEY}-fix-filtered.json" 2>/dev/null || true
@@ -378,11 +397,39 @@ IMPORTANT:
         echo "No review findings to address, skipping Phase 3"
       fi
 
+      PHASE3_END=$(date +%s)
+      PHASE3_DURATION=$((PHASE3_END - PHASE3_START))
+      echo "Phase 3 duration: ${PHASE3_DURATION}s"
+      echo "$PHASE3_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-duration.txt"
+
+      # Regenerate GitHub App tokens before push/PR operations.
+      # Installation tokens expire after 1 hour, and phases 1-3 can
+      # easily exceed that. Refreshing here ensures push and PR
+      # creation use a valid token.
+      echo "Refreshing GitHub App tokens before push/PR..."
+      GITHUB_TOKEN_FORK=$(generate_github_token "$INSTALLATION_ID_FORK")
+      if [ -z "$GITHUB_TOKEN_FORK" ] || [ "$GITHUB_TOKEN_FORK" = "null" ]; then
+        echo "ERROR: Failed to refresh GitHub App token for fork"
+      else
+        git config --global credential.helper "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN_FORK}; }; f"
+        echo "Fork token refreshed"
+      fi
+
+      GITHUB_TOKEN_UPSTREAM=$(generate_github_token "$INSTALLATION_ID_UPSTREAM")
+      if [ -z "$GITHUB_TOKEN_UPSTREAM" ] || [ "$GITHUB_TOKEN_UPSTREAM" = "null" ]; then
+        echo "ERROR: Failed to refresh GitHub App token for upstream"
+      else
+        export GITHUB_TOKEN="$GITHUB_TOKEN_UPSTREAM"
+        echo "Upstream token refreshed"
+      fi
+
       # === Phase 4: Create Pull Request ===
       echo ""
       echo "=========================================="
       echo "Phase 4: Creating Pull Request for $ISSUE_KEY"
       echo "=========================================="
+
+      PHASE4_START=$(date +%s)
 
       PR_PROMPT="Create a draft pull request for the changes on branch '${BRANCH_NAME}'. Details:
 - Jira issue: ${ISSUE_KEY}
@@ -412,12 +459,18 @@ IMPORTANT:
 
       jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' "/tmp/claude-${ISSUE_KEY}-pr.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-text.txt" 2>/dev/null || true
       jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-pr.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tools.txt" 2>/dev/null || true
+      jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-pr.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-errors.txt" 2>/dev/null || true
       # Extract token usage for Phase 4
       echo "Phase 4: $(wc -l < "/tmp/claude-${ISSUE_KEY}-pr.json") total lines in stream-json"
       grep '^{' "/tmp/claude-${ISSUE_KEY}-pr.json" > "/tmp/claude-${ISSUE_KEY}-pr-filtered.json" 2>/dev/null || true
       echo "Phase 4: $(wc -l < "/tmp/claude-${ISSUE_KEY}-pr-filtered.json") JSON lines after filtering"
       jq -s '[.[] | select(.type == "assistant")] | {input_tokens: (map(.message.usage.input_tokens // 0) | add // 0), output_tokens: (map(.message.usage.output_tokens // 0) | add // 0), cache_read_input_tokens: (map(.message.usage.cache_read_input_tokens // 0) | add // 0), cache_creation_input_tokens: (map(.message.usage.cache_creation_input_tokens // 0) | add // 0), model: (.[0].message.model // "unknown")}' "/tmp/claude-${ISSUE_KEY}-pr-filtered.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json" 2>/dev/null || echo '{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json"
       echo "Phase 4 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json")"
+
+      PHASE4_END=$(date +%s)
+      PHASE4_DURATION=$((PHASE4_END - PHASE4_START))
+      echo "Phase 4 duration: ${PHASE4_DURATION}s"
+      echo "$PHASE4_DURATION" > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-duration.txt"
 
       if [ $PR_EXIT_CODE -eq 0 ]; then
         PR_URL=$(grep -o 'https://github.com/openshift/hypershift/pull/[0-9]*' "/tmp/claude-${ISSUE_KEY}-pr.json" | head -1 || echo "")
