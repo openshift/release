@@ -68,55 +68,257 @@ cat ${SHARED_DIR}/variables.ps1 | grep -v "password\|username\|pullSecret\|auth"
 export KUBECONFIG="${installer_dir}/auth/kubeconfig"
 
 function gather_console_and_bootstrap() {
-    # shellcheck source=/dev/null
-    source "${SHARED_DIR}/govc.sh"
-    unset SSL_CERT_FILE
-    unset GOVC_TLS_CA_CERTS
-
     infra_id=$(jq -r '.infraID' "${installer_dir}/metadata.json")
 
-    # list all the virtual machines in the folder/rp
-    clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${cluster_name}")
-    if [[ -z "$clustervms" ]]; then
-        clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${infra_id}")
-    fi
-    if [[ -z "$clustervms" ]]; then
-        echo "Did not find out the cluster virtual machines, skipping gather logs steps"
-        return 1
-    fi
+    # Arrays to collect IPs across all vCenters
+    declare -a all_bootstrap_ips
+    declare -a all_control_plane_ips
 
-    GATHER_BOOTSTRAP_ARGS=()
-    for ipath in $clustervms; do
-      # split on /
-      # shellcheck disable=SC2162
-      IFS=/ read -a ipath_array <<< "$ipath";
-      hostname=${ipath_array[-1]}
+    # Track if we found any VMs
+    found_vms=false
 
-      # create png of the current console to determine if a virtual machine has a problem
-      echo "$(date -u --rfc-3339=seconds) - capture console image"
-      govc vm.console -vm.ipath="$ipath" -capture "${ARTIFACT_DIR}/${hostname}.png"
+    echo "$(date -u --rfc-3339=seconds) - Gathering console and bootstrap logs from all vCenters..."
 
-      # based on the virtual machine name create variable for each
-      # with ip addresses as the value
-      # wait 1 minute for an ip address to become available
-
-      # If hostname has cluster name in it (newer powercli installs), strip the host name off for the IP logic below to work for gather
-      if [[ "${hostname}" == "${infra_id}"* ]]; then
-        hostname=${hostname#${infra_id}-}
+    # Check if we have any non-single lease files (part of phasing out LEASE_single)
+    non_single_lease_count=0
+    for lease_file in "${SHARED_DIR}"/LEASE_*.json; do
+      if [[ -f "${lease_file}" ]]; then
+        lease_name=$(basename "${lease_file}" .json)
+        if [[ "${lease_name}" != "LEASE_single" ]]; then
+          non_single_lease_count=$((non_single_lease_count + 1))
+        fi
       fi
-
-      # Older UPI installs have "-0" after bootstrap.  We'll remove those to be consistent with newer builds.
-      if [[ "${hostname}" == "bootstrap-0" ]]; then
-        hostname="bootstrap"
-      fi
-
-      echo "declaring ${hostname//-/_}_ip"
-      # shellcheck disable=SC2140
-      declare "${hostname//-/_}_ip"="$(govc vm.ip -wait=1m -vm.ipath="$ipath" | awk -F',' '{print $1}')"
     done
 
-    GATHER_BOOTSTRAP_ARGS+=('--bootstrap' "${bootstrap_ip}")
-    GATHER_BOOTSTRAP_ARGS+=('--master' "${control_plane_0_ip}" '--master' "${control_plane_1_ip}" '--master' "${control_plane_2_ip}")
+    if [[ ${non_single_lease_count} -gt 0 ]]; then
+      echo "$(date -u --rfc-3339=seconds) - Found ${non_single_lease_count} non-single lease(s), skipping LEASE_single.json as part of migration to per-vCenter govc files"
+      use_single_lease=false
+    else
+      echo "$(date -u --rfc-3339=seconds) - No non-single leases found, will use LEASE_single.json for backward compatibility"
+      use_single_lease=true
+    fi
+
+    # Iterate through all LEASE files to process each vCenter
+    for lease_file in "${SHARED_DIR}"/LEASE_*.json; do
+      # Skip if no lease files found
+      if [[ ! -f "${lease_file}" ]]; then
+        continue
+      fi
+
+      # Extract lease name for logging
+      lease_name=$(basename "${lease_file}" .json)
+
+      # Skip LEASE_single if we have other leases (phasing out LEASE_single)
+      if [[ "${lease_name}" == "LEASE_single" && "${use_single_lease}" == "false" ]]; then
+        echo "$(date -u --rfc-3339=seconds) - Skipping ${lease_name} in favor of per-vCenter lease files"
+        continue
+      fi
+
+      echo "$(date -u --rfc-3339=seconds) - Processing ${lease_name}..."
+
+      # Determine which govc file(s) to source
+      # For LEASE_single.json, use govc.sh; for others, iterate through poolInfo
+      if [[ "${lease_name}" == "LEASE_single" ]]; then
+        # Legacy single lease - use the original govc.sh file
+        govc_file="${SHARED_DIR}/govc.sh"
+
+        # Check if govc file exists
+        if [[ ! -f "${govc_file}" ]]; then
+          echo "$(date -u --rfc-3339=seconds) - Warning: ${govc_file} not found, skipping ${lease_name}"
+          continue
+        fi
+
+        # Source the govc configuration
+        echo "$(date -u --rfc-3339=seconds) - Sourcing ${govc_file}..."
+        # shellcheck source=/dev/null
+        source "${govc_file}"
+        unset SSL_CERT_FILE
+        unset GOVC_TLS_CA_CERTS
+
+        # List all virtual machines in this vCenter's datacenter
+        clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${cluster_name}" 2>/dev/null || echo "")
+        if [[ -z "$clustervms" ]]; then
+          clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${infra_id}" 2>/dev/null || echo "")
+        fi
+
+        if [[ -z "$clustervms" ]]; then
+          echo "$(date -u --rfc-3339=seconds) - No VMs found in ${GOVC_DATACENTER} for lease ${lease_name}"
+          continue
+        fi
+
+        found_vms=true
+        echo "$(date -u --rfc-3339=seconds) - Found VMs in ${GOVC_DATACENTER}"
+
+        # Process VMs for single lease (code reuse below)
+      else
+        # New multi-pool lease - iterate through each pool
+        pool_count=$(jq -r '.status.poolInfo | length' < "${lease_file}")
+
+        if [[ "${pool_count}" == "null" || "${pool_count}" -eq 0 ]]; then
+          echo "$(date -u --rfc-3339=seconds) - No poolInfo found in ${lease_name}, skipping"
+          continue
+        fi
+
+        echo "$(date -u --rfc-3339=seconds) - Found ${pool_count} pool(s) in ${lease_name}"
+
+        # Iterate through each pool in the poolInfo array
+        for ((pool_idx = 0; pool_idx < pool_count; pool_idx++)); do
+          # Get the pool name from poolInfo
+          pool_name=$(jq -r ".status.poolInfo[${pool_idx}].name" < "${lease_file}")
+
+          echo "$(date -u --rfc-3339=seconds) - Processing pool: ${pool_name}"
+
+          # Create a sanitized filename from the pool name
+          pool_filename=$(echo "${pool_name}" | tr '.' '_' | tr ':' '_')
+          govc_file="${SHARED_DIR}/govc_${pool_filename}.sh"
+
+          # Check if govc file exists
+          if [[ ! -f "${govc_file}" ]]; then
+            echo "$(date -u --rfc-3339=seconds) - Warning: ${govc_file} not found, skipping pool ${pool_name}"
+            continue
+          fi
+
+          # Source the pool-specific govc configuration
+          echo "$(date -u --rfc-3339=seconds) - Sourcing ${govc_file}..."
+          # shellcheck source=/dev/null
+          source "${govc_file}"
+          unset SSL_CERT_FILE
+          unset GOVC_TLS_CA_CERTS
+
+          # List all virtual machines in this pool's datacenter
+          clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${cluster_name}" 2>/dev/null || echo "")
+          if [[ -z "$clustervms" ]]; then
+            clustervms=$(govc ls "/${GOVC_DATACENTER}/vm/${infra_id}" 2>/dev/null || echo "")
+          fi
+
+          if [[ -z "$clustervms" ]]; then
+            echo "$(date -u --rfc-3339=seconds) - No VMs found in ${GOVC_DATACENTER} for pool ${pool_name}"
+            continue
+          fi
+
+          found_vms=true
+          echo "$(date -u --rfc-3339=seconds) - Found VMs in ${GOVC_DATACENTER} for pool ${pool_name}"
+
+          # Process each VM in this pool
+          for ipath in $clustervms; do
+            # split on /
+            # shellcheck disable=SC2162
+            IFS=/ read -a ipath_array <<< "$ipath";
+            hostname=${ipath_array[-1]}
+
+            # Create png of the current console to determine if a virtual machine has a problem
+            echo "$(date -u --rfc-3339=seconds) - Capturing console image for ${hostname}"
+            govc vm.console -vm.ipath="$ipath" -capture "${ARTIFACT_DIR}/${hostname}.png" || \
+              echo "$(date -u --rfc-3339=seconds) - Warning: Failed to capture console for ${hostname}"
+
+            # If hostname has cluster name in it (newer powercli installs), strip the host name off
+            if [[ "${hostname}" == "${infra_id}"* ]]; then
+              hostname=${hostname#${infra_id}-}
+            fi
+
+            # Older UPI installs have "-0" after bootstrap. Remove those to be consistent with newer builds.
+            if [[ "${hostname}" == "bootstrap-0" ]]; then
+              hostname="bootstrap"
+            fi
+
+            # Get IP address for this VM
+            echo "$(date -u --rfc-3339=seconds) - Getting IP for ${hostname}"
+            vm_ip="$(govc vm.ip -wait=1m -vm.ipath="$ipath" 2>/dev/null | awk -F',' '{print $1}' || echo "")"
+
+            if [[ -z "${vm_ip}" ]]; then
+              echo "$(date -u --rfc-3339=seconds) - Warning: Could not get IP for ${hostname}"
+              continue
+            fi
+
+            echo "$(date -u --rfc-3339=seconds) - ${hostname} IP: ${vm_ip}"
+
+            # Categorize the VM and store its IP
+            if [[ "${hostname}" == "bootstrap" ]]; then
+              all_bootstrap_ips+=("${vm_ip}")
+              # Also set the variable for backwards compatibility
+              # shellcheck disable=SC2140
+              declare "bootstrap_ip"="${vm_ip}"
+            elif [[ "${hostname}" =~ ^control[-_]plane[-_][0-9]+$ ]]; then
+              all_control_plane_ips+=("${vm_ip}")
+              # Set individual control plane variables for backwards compatibility
+              # shellcheck disable=SC2140
+              declare "${hostname//-/_}_ip"="${vm_ip}"
+            fi
+          done # end VM processing for this pool
+        done # end pool iteration
+
+        # For multi-pool leases, skip the shared VM processing below since we handled it in the pool loop
+        continue
+      fi
+
+      # Shared VM processing code (only runs for LEASE_single)
+      for ipath in $clustervms; do
+        # split on /
+        # shellcheck disable=SC2162
+        IFS=/ read -a ipath_array <<< "$ipath";
+        hostname=${ipath_array[-1]}
+
+        # Create png of the current console to determine if a virtual machine has a problem
+        echo "$(date -u --rfc-3339=seconds) - Capturing console image for ${hostname}"
+        govc vm.console -vm.ipath="$ipath" -capture "${ARTIFACT_DIR}/${hostname}.png" || \
+          echo "$(date -u --rfc-3339=seconds) - Warning: Failed to capture console for ${hostname}"
+
+        # If hostname has cluster name in it (newer powercli installs), strip the host name off
+        if [[ "${hostname}" == "${infra_id}"* ]]; then
+          hostname=${hostname#${infra_id}-}
+        fi
+
+        # Older UPI installs have "-0" after bootstrap. Remove those to be consistent with newer builds.
+        if [[ "${hostname}" == "bootstrap-0" ]]; then
+          hostname="bootstrap"
+        fi
+
+        # Get IP address for this VM
+        echo "$(date -u --rfc-3339=seconds) - Getting IP for ${hostname}"
+        vm_ip="$(govc vm.ip -wait=1m -vm.ipath="$ipath" 2>/dev/null | awk -F',' '{print $1}' || echo "")"
+
+        if [[ -z "${vm_ip}" ]]; then
+          echo "$(date -u --rfc-3339=seconds) - Warning: Could not get IP for ${hostname}"
+          continue
+        fi
+
+        echo "$(date -u --rfc-3339=seconds) - ${hostname} IP: ${vm_ip}"
+
+        # Categorize the VM and store its IP
+        if [[ "${hostname}" == "bootstrap" ]]; then
+          all_bootstrap_ips+=("${vm_ip}")
+          # Also set the variable for backwards compatibility
+          # shellcheck disable=SC2140
+          declare "bootstrap_ip"="${vm_ip}"
+        elif [[ "${hostname}" =~ ^control[-_]plane[-_][0-9]+$ ]]; then
+          all_control_plane_ips+=("${vm_ip}")
+          # Set individual control plane variables for backwards compatibility
+          # shellcheck disable=SC2140
+          declare "${hostname//-/_}_ip"="${vm_ip}"
+        fi
+      done
+    done
+
+    # Check if we found any VMs at all
+    if [[ "${found_vms}" == "false" ]]; then
+      echo "$(date -u --rfc-3339=seconds) - Did not find any cluster virtual machines across all vCenters, skipping gather logs steps"
+      return 1
+    fi
+
+    # Build gather bootstrap arguments from collected IPs
+    GATHER_BOOTSTRAP_ARGS=()
+
+    # Add bootstrap IPs (usually just one)
+    for bootstrap_ip in "${all_bootstrap_ips[@]}"; do
+      GATHER_BOOTSTRAP_ARGS+=('--bootstrap' "${bootstrap_ip}")
+    done
+
+    # Add control plane IPs (expecting 3 for HA)
+    for cp_ip in "${all_control_plane_ips[@]}"; do
+      GATHER_BOOTSTRAP_ARGS+=('--master' "${cp_ip}")
+    done
+
+    echo "$(date -u --rfc-3339=seconds) - Running gather bootstrap with ${#all_bootstrap_ips[@]} bootstrap node(s) and ${#all_control_plane_ips[@]} control plane node(s)"
 
     # 4.5 and prior used the terraform.tfstate for gather bootstrap. This causes an error with:
     # state snapshot was created by Terraform v0.12.24, which is newer than current v0.12.20; upgrade to Terraform v0.12.24 or greater to work with this state"
