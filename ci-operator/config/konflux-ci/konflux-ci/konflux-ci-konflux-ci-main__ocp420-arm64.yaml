@@ -1,0 +1,40 @@
+base_images:
+  e2e-test-runner:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.20
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.23-openshift-4.20
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: konflux-e2e-v420-arm64
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws-konflux-qe
+    env:
+      COMPUTE_NODE_TYPE: m6g.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.4xlarge
+      OCP_ARCH: arm64
+    test:
+    - ref: konflux-ci-install-operator
+    workflow: konflux-ci-ipi
+zz_generated_metadata:
+  branch: main
+  org: konflux-ci
+  repo: konflux-ci
+  variant: ocp420-arm64
