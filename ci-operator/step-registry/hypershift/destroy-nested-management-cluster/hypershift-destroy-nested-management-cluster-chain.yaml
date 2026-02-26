@@ -12,8 +12,14 @@ chain:
       default: "AWS"
       documentation: "The cloud provider of the cluster."
     commands: |-
+      # Set cloud-specific kubeconfig
+      if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
+        export KUBECONFIG=/etc/hypershift-kubeconfig-azure/hypershift-ops-admin.kubeconfig
+      else
+        export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
+      fi
+
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
-      export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       mkdir -p "${ARTIFACT_DIR}/output"
       bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir="${ARTIFACT_DIR}/output" --name="${CLUSTER_NAME}" --namespace="${HYPERSHIFT_NAMESPACE}"
       tar -cvzf "${ARTIFACT_DIR}/artifacts.tar.gz" "${ARTIFACT_DIR}/output"
@@ -46,36 +52,63 @@ chain:
       - name: HYPERSHIFT_BASE_DOMAIN
         default: ""
         documentation: "The cluster's FQDN will be a subdomain of the base domain."
+      - name: HYPERSHIFT_AZURE_LOCATION
+        default: "centralus"
+        documentation: "The Azure location for the cluster (only used when CLOUD_PROVIDER=Azure)"
       - name: CLOUD_PROVIDER
         default: "AWS"
         documentation: "The cloud provider to use for the management cluster"
     commands: |-
-      AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
-      DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
-      
-      if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
-        AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-        DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+      # Set cloud-specific defaults
+      if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
+        export KUBECONFIG=/etc/hypershift-kubeconfig-azure/hypershift-ops-admin.kubeconfig
+        AZURE_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json"
+        DEFAULT_BASE_DOMAIN=hypershift.azure.devcluster.openshift.com
+      else
+        AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+        DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
+        export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
+
+        if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
+          AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+          DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+        fi
       fi
-      
+
       DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
-      
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
-      
-      export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
-      bin/hypershift destroy cluster aws \
-      --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
-      --name="${CLUSTER_NAME}" \
-      --namespace="${HYPERSHIFT_NAMESPACE}" \
-      --infra-id=${CLUSTER_NAME} \
-      --base-domain=${DOMAIN} \
-      --cluster-grace-period 40m
+
+      # Destroy the management cluster based on cloud provider
+      if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
+        echo "Destroying Azure management cluster ${CLUSTER_NAME}"
+        bin/hypershift destroy cluster azure \
+          --azure-creds=${AZURE_GUEST_INFRA_CREDENTIALS_FILE} \
+          --name="${CLUSTER_NAME}" \
+          --namespace="${HYPERSHIFT_NAMESPACE}" \
+          --location=${HYPERSHIFT_AZURE_LOCATION} \
+          --cluster-grace-period 40m
+      else
+        echo "Destroying AWS management cluster ${CLUSTER_NAME}"
+        bin/hypershift destroy cluster aws \
+          --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
+          --name="${CLUSTER_NAME}" \
+          --namespace="${HYPERSHIFT_NAMESPACE}" \
+          --infra-id=${CLUSTER_NAME} \
+          --base-domain=${DOMAIN} \
+          --cluster-grace-period 40m
+      fi
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-awscreds
       name: hypershift-ci-jobs-awscreds
       namespace: test-credentials
     - mount_path: /etc/hypershift-kubeconfig
       name: hypershift-ci-2
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-kubeconfig-azure
+      name: azure-hypershift-ci
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+      name: hypershift-ci-jobs-self-managed-azure
       namespace: test-credentials
     from_image:
       namespace: hypershift
