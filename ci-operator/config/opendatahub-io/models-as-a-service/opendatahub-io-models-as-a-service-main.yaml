@@ -37,7 +37,7 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: e2e-test-maas-api
+  as: e2e-test-maas
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|^\.github/
   steps:
     cluster_profile: aws-opendatahub
@@ -47,12 +47,14 @@ tests:
       HYPERSHIFT_NODE_COUNT: "3"
     test:
     - ref: idp-htpasswd
-    - as: e2e-maas-api-openshift
+    - as: e2e-maas-openshift
       cli: latest
       commands: ./test/e2e/scripts/prow_run_smoke_test.sh
       dependencies:
       - env: MAAS_API_IMAGE
         name: maas-api
+      - env: MAAS_CONTROLLER_IMAGE
+        name: maas-controller
       from: src
       resources:
         requests:
