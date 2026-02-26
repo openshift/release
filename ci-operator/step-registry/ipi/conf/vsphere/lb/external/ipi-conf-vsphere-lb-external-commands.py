@@ -37,11 +37,23 @@ logger = logging.getLogger()
 # then splits on the = then creates the corresponding
 # environmental variable
 def convert_shell_file_to_envvar(filename):
+    logger.info(f"Loading env vars from: {filename}")
     with open(filename) as ef:
         for line in ef:
-            # There are tabs in the govc.sh file
-            keyvalue = line.replace('\t', '').replace('export ', '').split("=")
-            os.environ[keyvalue[0]] = keyvalue[1].replace('\n', '').replace(' ', '').replace('"', '')
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            line = line.removeprefix('export ')
+            key, _, value = line.partition('=')
+            # Strip surrounding quotes (single or double)
+            if (value.startswith('"') and value.endswith('"')) or \
+               (value.startswith("'") and value.endswith("'")):
+                value = value[1:-1]
+            if "PASSWORD" in key.upper() or "SECRET" in key.upper():
+                logger.info(f"  Setting {key}=<REDACTED> (length={len(value)})")
+            else:
+                logger.info(f"  Setting {key}={value}")
+            os.environ[key] = value
 
 
 def subprocess_run(args):
@@ -209,7 +221,7 @@ frontend router-http
 frontend router-https
   bind *:443
   default_backend router-https
-  
+
 {%- for epname, port in endpoints.items() %}
     {% set health_check = "check check-ssl" %}
     {% if epname == "router-http" %}
@@ -220,7 +232,7 @@ backend {{ epname }}
   balance roundrobin
   option tcp-check
   default-server verify none inter 10s downinter 5s rise 2 fall 3 slowstart 60s maxconn 250 maxqueue 256 weight 100
-  
+
   {%- for ip in ipaddresses %}
   server {{ epname }}-{{ ip |replace(".", "-") }} {{ ip }}:{{ port }} {{ health_check }}
   {%- endfor %}
@@ -251,7 +263,7 @@ storage:
   files:
     - path: "/etc/haproxy/haproxy.conf"
       contents:
-        local: {haproxy_config_path.split('/')[-1]} 
+        local: {haproxy_config_path.split('/')[-1]}
       mode: 0644
 systemd:
   units:

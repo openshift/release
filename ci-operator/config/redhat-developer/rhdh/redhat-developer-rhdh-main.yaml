@@ -32,6 +32,7 @@ tests:
     version: "4.18"
   skip_if_only_changed: ^docs/|rpms\.lock\.yaml|showcase-docs/|^\.changeset/|CONTRIBUTING\.md|OWNERS|README\.md|USAGE_DATA\.md|^scripts/|^\.github/|\.threatmodel/|^ui/|\.md|\\.mdc|\\.toml$
   steps:
+    allow_skip_on_success: true
     post:
     - ref: redhat-developer-rhdh-send-data-router
     - chain: gather
@@ -125,6 +126,30 @@ tests:
   steps:
     env:
       OC_CLIENT_VERSION: stable-4.20
+    post:
+    - ref: redhat-developer-rhdh-send-data-router
+    - ref: redhat-developer-rhdh-send-alert
+    - chain: gather
+    test:
+    - ref: redhat-developer-rhdh-ocp-helm-nightly
+    workflow: generic-claim
+- always_run: false
+  as: e2e-ocp-v4-21-helm-nightly
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  cron: 0 2 * * TUE,THU,SAT,SUN
+  optional: true
+  presubmit: true
+  steps:
+    env:
+      OC_CLIENT_VERSION: stable-4.21
     post:
     - ref: redhat-developer-rhdh-send-data-router
     - ref: redhat-developer-rhdh-send-alert
