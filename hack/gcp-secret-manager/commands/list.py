@@ -30,19 +30,21 @@ from util import (
     callback=validate_collection,
 )
 @click.option(
-    "-g",
-    "--group",
+    "--rover-group",
     default="",
-    help="Use this option to list all secret collections for a group.",
+    help="Use this option to list all secret collections for a rover group.",
 )
-def list_secrets(output: str, collection: str, group: str):
+def list_secrets(output: str, collection: str, rover_group: str):
     """
-    List secrets from the specified collection.
-    If no collection is provided, lists all secret collections.
+    List secrets.
+
+    Without options: Lists all secret collections that exist.
+    With -c {COLLECTION}: Lists all secrets in group/field format.
+    With --rover-group {GROUP}: Lists collections accessible to that rover group.
     """
-    if collection != "" and group != "":
+    if collection != "" and rover_group != "":
         raise click.ClickException(
-            "--collection and --group cannot both be set at the same time"
+            "--collection and --rover-group cannot both be set at the same time"
         )
 
     if collection != "":
@@ -51,8 +53,8 @@ def list_secrets(output: str, collection: str, group: str):
         return
 
     collections_dict = get_group_collections()
-    if group != "":
-        list_collections_for_group(collections_dict, group, output)
+    if rover_group != "":
+        list_collections_for_rover_group(collections_dict, rover_group, output)
     else:
         list_all_collections(collections_dict, output)
 
@@ -67,17 +69,19 @@ def list_all_collections(collections_dict: Dict, output: str):
                 click.echo(f"- {collection}")
 
 
-def list_collections_for_group(
-    collections_dict: Dict[str, List[str]], group: str, output: str
+def list_collections_for_rover_group(
+    collections_dict: Dict[str, List[str]], rover_group: str, output: str
 ):
-    if group and group not in collections_dict:
-        click.echo(f"Group '{group}' has no secret collections")
+    """Lists collections for a specified rover group."""
+
+    if rover_group and rover_group not in collections_dict:
+        click.echo(f"Rover group '{rover_group}' has no secret collections")
         return
 
     if output == "json":
-        click.echo(json.dumps(collections_dict[group], indent=2))
+        click.echo(json.dumps(collections_dict[rover_group], indent=2))
     else:
-        for collection in collections_dict[group]:
+        for collection in collections_dict[rover_group]:
             click.echo(f"{collection}")
 
 
@@ -85,8 +89,23 @@ def list_secrets_for_collection(collection: str, output: str):
     secret_list = get_secrets_from_index(
         secretmanager.SecretManagerServiceClient(), collection
     )
+
+    paths = [secret.replace("__", "/") for secret in secret_list]
+    paths.sort()
+
     if output == "json":
-        click.echo(json.dumps(secret_list, indent=2))
+        click.echo(json.dumps(paths, indent=2))
     else:
-        for secret in secret_list:
-            click.echo(secret)
+        if not paths:
+            click.echo("(no secrets)")
+            return
+
+        last_top_group = None
+        for path in paths:
+            top_group = path.split("/")[0] if "/" in path else ""
+
+            if last_top_group is not None and top_group != last_top_group:
+                click.echo()
+
+            click.echo(path)
+            last_top_group = top_group

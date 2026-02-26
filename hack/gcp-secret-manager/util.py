@@ -74,18 +74,80 @@ def validate_secret_name(_ctx, _param, value):
     return value
 
 
-def get_secret_name(collection: str, name: str) -> str:
+def validate_group_name(_ctx, _param, value):
     """
-    Returns a normalized secret name by combining the collection and secret name.
+    Validates group name:
+    - Required (cannot be empty)
+    - Can contain single underscores (_)
+    - Cannot contain double underscores (__)
+    - Can contain forward slashes (/) for hierarchy
+    - Only lowercase letters, numbers, dashes, underscores, slashes
+    """
+    if not value:
+        raise click.BadParameter("Group name is required")
+
+    if "__" in value:
+        raise click.BadParameter(
+            "Group name cannot contain double underscores (__). "
+            "Use forward slashes (/) for nested groups."
+        )
+
+    # Allow: a-z, 0-9, -, _, /
+    if not re.fullmatch(r"[a-z0-9_/-]+", value):
+        invalid_chars = set(re.findall(r"[^a-z0-9_/-]", value))
+        raise click.BadParameter(
+            f"May only contain lowercase letters, numbers, dashes, one underscore, or slashes. "
+            f"Invalid characters: {', '.join(repr(c) for c in sorted(invalid_chars))}"
+        )
+
+    return value
+
+
+def validate_path(_ctx, _param, value):
+    """
+    Validates the secret path in the format 'group/field' or 'group/subgroup/field'.
+    """
+    if not value:
+        raise click.BadParameter("Path is required")
+
+    if "/" not in value:
+        raise click.BadParameter(
+            "Secret path must include both group and field name, separated by '/'\n"
+            "Examples: 'default/token', 'aws/prod/password'"
+        )
+
+    parts = value.split("/")
+    field = parts[-1]
+    group = "/".join(parts[:-1])
+
+    validate_group_name(None, None, group)
+    validate_secret_name(None, None, field)
+
+    return value
+
+
+def get_secret_name(collection: str, path: str) -> str:
+    """
+    Returns a normalized secret name as it is saved in Google Secret Manager.
 
     Args:
         collection (str): The name of the secret collection.
-        name (str): The base name of the secret.
+        path (str): The group/field path of the secret.
 
     Returns:
-        str: A string in the format "{collection}__{name}".
+        str: A string in the format "{collection}__{group}__{field}".
+        Forward slashes in {group} are converted to double underscores.
     """
-    return f"{collection}__{name}"
+    path_normalized = path.replace("/", "__")
+    return f"{collection}__{path_normalized}"
+
+
+def get_index_secret_for_collection(collection: str) -> str:
+    return f"{collection}__{INDEX_SECRET_NAME}"
+
+
+def get_updater_sa_secret_for_collection(collection: str) -> str:
+    return f"{collection}__{UPDATER_SA_SECRET_NAME}"
 
 
 def validate_secret_source(from_file: str, from_literal: str):
@@ -229,7 +291,7 @@ def get_secrets_from_index(
         List[str]: A list of secrets.
     """
     index_secret = client.secret_version_path(
-        PROJECT_ID, get_secret_name(collection, INDEX_SECRET_NAME), "latest"
+        PROJECT_ID, get_index_secret_for_collection(collection), "latest"
     )
     try:
         response = client.access_secret_version(request={"name": index_secret})
@@ -265,9 +327,7 @@ def update_index_secret(
         secret_names (List[str]): A list of the new list of secrets to write into the index.
     """
 
-    name = client.secret_path(
-        PROJECT_ID, get_secret_name(collection, INDEX_SECRET_NAME)
-    )
+    name = client.secret_path(PROJECT_ID, get_index_secret_for_collection(collection))
     payload = yaml.safe_dump(sorted(secret_names))
     try:
         client.add_secret_version(

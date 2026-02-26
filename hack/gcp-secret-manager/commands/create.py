@@ -16,8 +16,9 @@ from util import (
     get_secrets_from_index,
     update_index_secret,
     validate_collection,
-    validate_secret_name,
+    validate_path,
     validate_secret_source,
+    ensure_authentication,
 )
 
 # Metadata keys used when creating secrets:
@@ -41,14 +42,7 @@ REQUEST_INFO = "request-information"
     type=str,
     callback=validate_collection,
 )
-@click.option(
-    "-s",
-    "--secret",
-    required=True,
-    help="Name of the secret.",
-    type=str,
-    callback=validate_secret_name,
-)
+@click.argument("path", required=True, callback=validate_path)
 @click.option(
     "-f",
     "--from-file",
@@ -59,9 +53,16 @@ REQUEST_INFO = "request-information"
 @click.option(
     "-l", "--from-literal", default="", help="Secret data as string input.", type=str
 )
-def create(collection: str, secret: str, from_file: str, from_literal: str):
-    """Create a new secret in the specified collection."""
+def create(collection: str, path: str, from_file: str, from_literal: str):
+    """Create a new secret in the specified collection.
 
+    The secret PATH should be in the format 'group/field' where:
+    - group: Organizes related secrets (can be hierarchical: 'aws/prod')
+    - field: The specific secret name (e.g., 'username', 'password')
+
+    Example: secret-manager create -c my-collection aws/password -l "secret value"
+    """
+    ensure_authentication()
     validate_secret_source(from_file, from_literal)
 
     if not check_if_collection_exists(collection):
@@ -71,15 +72,20 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
             "See: https://docs.ci.openshift.org/docs/how-tos/adding-a-new-secret-to-ci/"
         )
     client = secretmanager.SecretManagerServiceClient()
-    secret_name = get_secret_name(collection, secret)
 
-    # Check if secret exists in either index or GCP
     index_secrets = get_secrets_from_index(client, collection)
-    if secret in index_secrets:
-        raise click.ClickException(f"Secret named '{secret}' already exists.")
+    path_normalized = path.replace("/", "__")
+    if path_normalized in index_secrets:
+        raise click.ClickException(
+            f"Secret '{path}' already exists."
+        )
+
+    secret_id_normalized = get_secret_name(collection, path)
     try:
-        client.get_secret(name=client.secret_path(PROJECT_ID, secret_name))
-        raise click.ClickException(f"Secret named '{secret}' already exists.")
+        client.get_secret(name=client.secret_path(PROJECT_ID, secret_id_normalized))
+        raise click.ClickException(
+            f"Secret '{path}' already exists."
+        )
     except NotFound:
         pass  # Secret doesn't exist in GCP - this is good
 
@@ -95,7 +101,7 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
         gcp_secret = client.create_secret(
             request={
                 "parent": f"projects/{PROJECT_ID}",
-                "secret_id": secret_name,
+                "secret_id": secret_id_normalized,
                 "secret": {
                     "replication": {"automatic": {}},
                     "labels": labels,
@@ -107,12 +113,12 @@ def create(collection: str, secret: str, from_file: str, from_literal: str):
             parent=gcp_secret.name,
             payload=SecretPayload(data=create_payload(from_file, from_literal)),
         )
-        update_index_secret(client, collection, index_secrets + [secret])
-        click.echo(f"Secret '{secret}' created")
+        update_index_secret(client, collection, index_secrets + [path_normalized])
+        click.echo(f"Secret '{path}' created successfully.")
     except Exception as e:
         raise click.ClickException(
-            f"Failed to create secret '{secret}': {e}. "
-            f"If the secret is in an inconsistent state, run 'delete -c {collection} -s {secret}', then try again."
+            f"Failed to create secret '{path}': {e}. "
+            f"If the secret is in an inconsistent state, run 'delete -c {collection} {path}', then try again."
         ) from e
 
 
