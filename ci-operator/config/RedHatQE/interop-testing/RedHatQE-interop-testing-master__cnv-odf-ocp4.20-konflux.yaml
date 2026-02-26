@@ -33,34 +33,18 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: cnv-odf-smoke-tests-aws-ipi-ocp420
+- as: cnv-odf-smoke-tests-azure-ipi-ocp420
   cron: 0 23 31 2 *
   steps:
-    cluster_profile: aws-interop-qe
+    cluster_profile: azure-cnv-devops
     env:
-      AWS_REGION_OVERWRITE: us-east-1
-      BASE_DOMAIN: release-ci.cnv-qe.rhood.us
+      BASE_DOMAIN_RESOURCE_GROUP: cnv-qe-devops-common
+      BASE_DOMAIN: azure.cnv-qe.rhood.us
+      COMPUTE_NODE_TYPE: Standard_D4s_v5
       CNV_VERSION: "4.20"
-      COMPUTE_NODE_TYPE: c5n.metal
-      FIREWATCH_CONFIG: |
-        {
-          "failure_rules":
-            [
-              {"step": "cucushift-*"                      , "failure_type": "all"          , "classification": "Cluster Health Check" , "group": { "name" : "cluster" , "priority" : 2}, "jira_additional_labels": ["!default"]                                           },
-              {"step": "*deploy-odf"                      , "failure_type": "all"          , "classification": "Operator Setup"       , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests","test-initialization"]                          },
-              {"step": "*deploy-cnv"                      , "failure_type": "all"          , "classification": "Operator Setup"       , "group": { "name" : "lp-tests", "priority" : 1}, "jira_additional_labels": ["!default", "interop-tests","test-initialization"]                          },
-              {"step": "*-openshift-virtualization-tests" , "failure_type": "test_failure" , "classification": "CNV Tests Failure"    , "group": { "name" : "lp-tests", "priority" : 2}, "jira_additional_labels": ["!default", "interop-tests"], "jira_project": "CNV", "jira_assignee": "!default"}
-            ]
-        }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.20-lp", "self-managed-lp", "cnv-lp"]'
-      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dkeler@redhat.com
-      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
-      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       OCP_VERSION: "4.20"
       ODF_OPERATOR_CHANNEL: stable-4.20
       ODF_VERSION_MAJOR_MINOR: "4.20"
-      RE_TRIGGER_ON_FAILURE: "false"
       USER_TAGS: |
         scenario cnv
         tests-tier smoke
@@ -69,7 +53,7 @@ tests:
     - ref: interop-tests-deploy-cnv
     - ref: interop-tests-deploy-odf
     - ref: interop-tests-openshift-virtualization-tests
-    workflow: firewatch-ipi-aws
+    workflow: ipi-azure
 zz_generated_metadata:
   branch: master
   org: RedHatQE
