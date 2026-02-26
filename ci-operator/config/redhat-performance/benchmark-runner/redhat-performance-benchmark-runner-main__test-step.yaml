@@ -1,0 +1,32 @@
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: benchmark-runner-step
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      USER_TAGS: |
+        Owner prow-sa
+      WORKLOAD: stressng_pod
+    test:
+    - ref: redhat-performance-benchmark-runner
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: redhat-performance
+  repo: benchmark-runner
+  variant: test-step
