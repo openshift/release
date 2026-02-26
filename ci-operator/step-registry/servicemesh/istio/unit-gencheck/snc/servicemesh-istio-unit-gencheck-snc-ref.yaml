@@ -1,0 +1,31 @@
+ref:
+  as: servicemesh-istio-unit-gencheck-snc
+  commands: servicemesh-istio-unit-gencheck-snc-commands.sh
+  from_image:
+    name: cli
+    namespace: ocp
+    tag: latest
+  grace_period: 60m
+  resources:
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 2Gi
+  documentation: |-
+    Executes OSSM Istio unit and gencheck tests in the privileged pod environment within OpenShift SNC cluster.
+
+    This step performs comprehensive testing in two phases:
+    1. Unit Tests: Runs 'make -e BUILD_WITH_CONTAINER=0 T=-v build racetest binaries-test'
+    2. GenCheck Tests: Runs 'make gen-check' with proper environment configuration
+
+    Uses oc exec to execute tests within the privileged pod created by the servicemesh-istio-snc-mapt workflow.
+    Collects test artifacts and logs via oc cp for CI reporting.
+
+    This test step is designed to work with the servicemesh-istio-snc-mapt workflow which handles:
+    - OpenShift SNC cluster provisioning
+    - Privileged pod setup with kernel module access
+    - Source code transfer to the test environment
+    - Cluster cleanup after testing
+
+    Timeout is set to 60 minutes to accommodate both unit test compilation and execution phases.

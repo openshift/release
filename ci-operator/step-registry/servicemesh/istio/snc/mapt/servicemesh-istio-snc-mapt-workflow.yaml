@@ -1,0 +1,20 @@
+workflow:
+  as: servicemesh-istio-snc-mapt
+  steps:
+    pre:
+    - ref: servicemesh-istio-snc-mapt-create
+    - ref: servicemesh-istio-e2e
+    - ref: servicemesh-sail-operator-copy-src
+    post:
+    - ref: servicemesh-istio-snc-mapt-destroy
+  documentation: |-
+    Infrastructure workflow for creating and destroying an OpenShift Single Node Cluster (SNC) using MAPT (Multi Architecture Provisioning Tool) for OpenShift Service Mesh (OSSM) Istio testing.
+    This workflow provides the environment setup for privileged tests that require kernel modules, Docker socket access, and system administration capabilities.
+
+    The workflow handles infrastructure lifecycle only - test execution is performed by separate test steps:
+    - Pre phase: Creates unique S3 bucket, provisions spot OpenShift SNC cluster, sets up privileged pod environment, copies source code
+    - Post phase: Destroys SNC cluster and deletes the entire S3 bucket with simplified cleanup approach
+
+    The OpenShift SNC cluster provides native OpenShift tooling and authentication while using spot instances for 70-90% cost savings.
+    No pre-existing S3 buckets are required - each job gets its own isolated state storage that is automatically cleaned up.
+    Uses the existing OSSM AWS credentials from the vault system (cluster-secrets-ossm-aws) plus OpenShift pull secret.

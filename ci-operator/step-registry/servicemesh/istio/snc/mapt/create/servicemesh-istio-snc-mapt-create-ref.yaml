@@ -1,0 +1,33 @@
+ref:
+  as: servicemesh-istio-snc-mapt-create
+  commands: servicemesh-istio-snc-mapt-create-commands.sh
+  credentials:
+  - mount_path: /tmp/secrets
+    name: cluster-secrets-ossm-aws
+    namespace: ci
+  - mount_path: /tmp/secrets
+    name: pull-secret
+    namespace: ci
+  from_image:
+    name: mapt
+    namespace: ci
+    tag: v0.9.6
+  grace_period: 30m
+  resources:
+    limits:
+      cpu: "2"
+      memory: 6Gi
+    requests:
+      cpu: "2"
+      memory: 6Gi
+  documentation: |-
+    Creates a cost-effective OpenShift Single Node Cluster (SNC) using MAPT (Multi Architecture Provisioning Tool) for OSSM Istio testing.
+    The cluster provides better OpenShift compatibility compared to vanilla Kubernetes while maintaining cost efficiency with spot instances.
+
+    This step dynamically creates a unique S3 bucket for Pulumi state storage, eliminating the need for pre-existing shared buckets.
+    The bucket name is saved to ${SHARED_DIR}/mapt-s3-bucket-name for cleanup by the destroy step.
+
+    The step provides kubeconfig at ${SHARED_DIR}/kubeconfig for subsequent test execution steps.
+    Uses AWS credentials from the existing vault system (cluster-secrets-ossm-aws) and pull secret for OpenShift cluster access.
+
+    Resource defaults: 8 CPU / 32GB RAM with spot instances for 70-90% cost savings compared to on-demand instances.
