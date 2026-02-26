@@ -46,6 +46,8 @@ if [[ -f "${awsCredFile}" ]]; then
     unset awsAccKeyID awsAccKeyToken
 fi
 
+e=400; while ((e--)); do { [ -e /tmp/debug.done ] && break; sleep 60; }; done
+
 : "Executing CLC interop commands..."
 set +x
 export CYPRESS_OPTIONS_HUB_PASSWORD=
