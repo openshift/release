@@ -1,6 +1,11 @@
 build_root:
   project_image:
     dockerfile_path: ci/Containerfile
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -24,14 +29,13 @@ tests:
 - as: nightly
   cron: 0 7 * * *
   steps:
-    cluster_profile: rosa-regional-platform-int
-    leases:
-    - count: 1
-      env: SECOND_AWS_ACCOUNT
-      resource_type: rosa-regional-platform-int-quota-slice
     test:
     - as: nightly
       commands: ./ci/nightly.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
       from: src
       resources:
         requests:
