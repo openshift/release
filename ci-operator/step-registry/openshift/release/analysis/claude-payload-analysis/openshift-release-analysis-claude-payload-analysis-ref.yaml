@@ -1,0 +1,33 @@
+ref:
+  as: openshift-release-analysis-claude-payload-analysis
+  from_image:
+    namespace: ci
+    name: claude-ai-helpers
+    tag: latest
+  commands: openshift-release-analysis-claude-payload-analysis-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: ci-claude-code-service-account
+    mount_path: /var/run/claude-code-service-account
+  env:
+  - name: PAYLOAD_TAG
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "us-east5"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "openshift-ci-data-analysis"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/json"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 9h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Analyzes rejected release payloads using Claude AI. Receives a
+    PAYLOAD_TAG from the release controller, polls until the payload
+    reaches terminal state, then runs the analyze-payload skill to
+    identify root causes of blocking job failures and generates an
+    HTML report saved to ARTIFACT_DIR.
