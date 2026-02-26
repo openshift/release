@@ -11,18 +11,6 @@ ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp3-csi'}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-100}Gi"
 ODF_SUBSCRIPTION_SOURCE="${ODF_SUBSCRIPTION_SOURCE:-'redhat-operators'}"
 
-# TODO: update to 4.21 once ODF 4.21 is released in the official redhat-operators 4.21 catalog
-ODF_MAX_VERSION="4.20"
-ODF_MAX_VERSION_NUMERIC=$(echo "${ODF_MAX_VERSION}" | awk -F. '{ printf "%d%02d", $1, $2 }')
-
-function ocp_version() {
-  oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}'
-}
-
-function ocp_version_numeric() {
-  ocp_version | awk -F. '{ printf "%d%02d", $1, $2 }'
-}
-
 # Make the masters schedulable so we have more capacity to run VMs
 CONTROL_PLANE_TOPOLOGY=$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')
 if [[ ${CONTROL_PLANE_TOPOLOGY} != "External" ]]
@@ -30,12 +18,70 @@ then
   oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
 fi
 
-if [ "$(ocp_version_numeric)" -ge "${ODF_MAX_VERSION_NUMERIC}" ]
-then
-  ODF_OPERATOR_CHANNEL=stable-${ODF_MAX_VERSION}
+ODF_CATALOG_SOURCE="${ODF_SUBSCRIPTION_SOURCE}"
+if oc get packagemanifest -l "catalog=${ODF_SUBSCRIPTION_SOURCE}" -n openshift-marketplace -o name 2>/dev/null | grep -q 'odf-operator'; then
+  echo "odf-operator package found in ${ODF_SUBSCRIPTION_SOURCE} catalog"
+  ODF_OPERATOR_CHANNEL=$(oc get packagemanifest -l "catalog=${ODF_SUBSCRIPTION_SOURCE}" -n openshift-marketplace \
+    -o jsonpath='{.items[?(@.metadata.name=="odf-operator")].status.channels[*].name}' | tr ' ' '\n' | sort -V | tail -1)
 else
-  ODF_OPERATOR_CHANNEL=stable-$(ocp_version)
+  echo "odf-operator package not found in ${ODF_SUBSCRIPTION_SOURCE} catalog, creating fallback catalog source"
+
+  CURRENT_IMAGE=$(oc get catalogsource redhat-operators -n openshift-marketplace -o jsonpath='{.spec.image}')
+  echo "Current redhat-operators catalog image: ${CURRENT_IMAGE}"
+
+  CURRENT_TAG=$(echo "${CURRENT_IMAGE}" | sed 's/.*:v//')
+  CURRENT_MAJOR=$(echo "${CURRENT_TAG}" | cut -d. -f1)
+  CURRENT_MINOR=$(echo "${CURRENT_TAG}" | cut -d. -f2)
+  FALLBACK_MINOR=$((CURRENT_MINOR - 1))
+  FALLBACK_TAG="v${CURRENT_MAJOR}.${FALLBACK_MINOR}"
+  FALLBACK_IMAGE="registry.redhat.io/redhat/redhat-operator-index:${FALLBACK_TAG}"
+
+  echo "Creating fallback catalog source with image: ${FALLBACK_IMAGE}"
+  ODF_CATALOG_SOURCE="redhat-operators-fallback"
+  oc apply -f - <<EOCATALOG
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: ${ODF_CATALOG_SOURCE}
+  namespace: openshift-marketplace
+spec:
+  displayName: Red Hat Operators Fallback (${FALLBACK_TAG})
+  image: ${FALLBACK_IMAGE}
+  publisher: Red Hat
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 10m
+EOCATALOG
+
+  echo "Waiting for fallback catalog source to become ready"
+  for ((i=1; i <= 60; i++)); do
+    STATE=$(oc get catalogsource "${ODF_CATALOG_SOURCE}" -n openshift-marketplace \
+      -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null || true)
+    if [[ "${STATE}" == "READY" ]]; then
+      echo "Fallback catalog source is ready"
+      break
+    fi
+    echo "Try ${i}/60: catalog source not ready yet (state: ${STATE}). Retrying in 10s"
+    sleep 10
+  done
+
+  echo "Waiting for odf-operator packagemanifest to appear in fallback catalog"
+  for ((i=1; i <= 60; i++)); do
+    if oc get packagemanifest -l "catalog=${ODF_CATALOG_SOURCE}" -n openshift-marketplace -o name 2>/dev/null | grep -q 'odf-operator'; then
+      echo "odf-operator package found in fallback catalog"
+      break
+    fi
+    echo "Try ${i}/60: odf-operator not available yet. Retrying in 10s"
+    sleep 10
+  done
+
+  ODF_OPERATOR_CHANNEL=$(oc get packagemanifest -l "catalog=${ODF_CATALOG_SOURCE}" -n openshift-marketplace \
+    -o jsonpath='{.items[?(@.metadata.name=="odf-operator")].status.channels[*].name}' | tr ' ' '\n' | sort -V | tail -1)
 fi
+
+ODF_SUBSCRIPTION_SOURCE="${ODF_CATALOG_SOURCE}"
+echo "Using catalog source: ${ODF_SUBSCRIPTION_SOURCE}, channel: ${ODF_OPERATOR_CHANNEL}"
 
 echo "Installing ODF from ${ODF_OPERATOR_CHANNEL} into ${ODF_INSTALL_NAMESPACE}"
 # create the install namespace
