@@ -1,3 +1,12 @@
+base_images:
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-machine-approver
@@ -88,6 +97,20 @@ tests:
   steps:
     cluster_profile: aws-3
     workflow: openshift-e2e-aws-capi
+- as: e2e-hypershift-aws
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-e2e-external
+- as: e2e-hypershift-aks
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift-aks
+    env:
+      AUTH_THROUGH_CERTS: "true"
+      ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
+      HYPERSHIFT_AZURE_LOCATION: uksouth
+    workflow: hypershift-azure-aks-e2e
 - as: verify-deps
   steps:
     env:
