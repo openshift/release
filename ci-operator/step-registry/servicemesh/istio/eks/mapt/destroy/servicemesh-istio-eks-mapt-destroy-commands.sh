@@ -16,46 +16,89 @@ delete_versioned_bucket() {
   echo "[INFO] 🧹 Deleting all current objects..."
   aws s3 rm "s3://${bucket_name}" --recursive
 
-  # Step 2: Delete all object versions and delete markers
+  # Step 2: Delete all object versions and delete markers using simple approach
   echo "[INFO] 🗂️ Deleting all object versions and delete markers..."
 
-  # List all object versions and delete markers
-  aws s3api list-object-versions --bucket "${bucket_name}" --output json > /tmp/s3-versions.json 2>/dev/null || echo "{}" > /tmp/s3-versions.json
+  # Use a simpler approach that doesn't rely on jq
+  local max_attempts=5
+  local attempt=1
 
-  # Delete all versions
-  if jq -e '.Versions[]?' /tmp/s3-versions.json >/dev/null 2>&1; then
-    echo "[INFO] 📦 Found object versions to delete..."
-    jq -r '.Versions[]? | "{\\"Key\\": \\"" + .Key + "\\", \\"VersionId\\": \\"" + .VersionId + "\\"}"' /tmp/s3-versions.json | \
-    jq -s '{"Objects": [.[] | fromjson], "Quiet": true}' > /tmp/delete-versions.json
+  while [ $attempt -le $max_attempts ]; do
+    echo "[INFO] 🔄 Cleanup attempt ${attempt}/${max_attempts}..."
 
-    if [ -s /tmp/delete-versions.json ] && jq -e '.Objects | length > 0' /tmp/delete-versions.json >/dev/null; then
-      aws s3api delete-objects --bucket "${bucket_name}" --delete file:///tmp/delete-versions.json
+    # List and delete object versions (using table output and awk - no jq needed)
+    echo "[INFO] 📦 Checking for object versions..."
+    aws s3api list-object-versions --bucket "${bucket_name}" --output table 2>/dev/null | \
+    grep -E '^\|.*\|.*\|.*\|.*\|' | \
+    awk -F'|' 'NR>2 && $3 ~ /[^[:space:]]/ && $4 ~ /[^[:space:]]/ {
+      gsub(/^[ \t]+|[ \t]+$/, "", $3);
+      gsub(/^[ \t]+|[ \t]+$/, "", $4);
+      if(length($3) > 0 && length($4) > 0) print "aws s3api delete-object --bucket '${bucket_name}' --key \"" $3 "\" --version-id " $4
+    }' > /tmp/delete-versions.sh 2>/dev/null
+
+    # Execute version deletions
+    if [ -s /tmp/delete-versions.sh ]; then
+      echo "[INFO] 📦 Found object versions, deleting..."
+      bash /tmp/delete-versions.sh 2>/dev/null || echo "[WARN] Some version deletions may have failed"
+    else
+      echo "[INFO] 📦 No object versions found"
     fi
-  fi
 
-  # Delete all delete markers
-  if jq -e '.DeleteMarkers[]?' /tmp/s3-versions.json >/dev/null 2>&1; then
-    echo "[INFO] 🏷️ Found delete markers to clean up..."
-    jq -r '.DeleteMarkers[]? | "{\\"Key\\": \\"" + .Key + "\\", \\"VersionId\\": \\"" + .VersionId + "\\"}"' /tmp/s3-versions.json | \
-    jq -s '{"Objects": [.[] | fromjson], "Quiet": true}' > /tmp/delete-markers.json
+    # List and delete delete markers
+    echo "[INFO] 🏷️ Checking for delete markers..."
+    aws s3api list-object-versions --bucket "${bucket_name}" --query 'DeleteMarkers[].{Key:Key,VersionId:VersionId}' --output table 2>/dev/null | \
+    grep -E '^\|.*\|.*\|' | \
+    awk -F'|' 'NR>2 && $2 ~ /[^[:space:]]/ && $3 ~ /[^[:space:]]/ {
+      gsub(/^[ \t]+|[ \t]+$/, "", $2);
+      gsub(/^[ \t]+|[ \t]+$/, "", $3);
+      if(length($2) > 0 && length($3) > 0) print "aws s3api delete-object --bucket '${bucket_name}' --key \"" $2 "\" --version-id " $3
+    }' > /tmp/delete-markers.sh 2>/dev/null
 
-    if [ -s /tmp/delete-markers.json ] && jq -e '.Objects | length > 0' /tmp/delete-markers.json >/dev/null; then
-      aws s3api delete-objects --bucket "${bucket_name}" --delete file:///tmp/delete-markers.json
+    # Execute delete marker deletions
+    if [ -s /tmp/delete-markers.sh ]; then
+      echo "[INFO] 🏷️ Found delete markers, removing..."
+      bash /tmp/delete-markers.sh 2>/dev/null || echo "[WARN] Some delete marker deletions may have failed"
+    else
+      echo "[INFO] 🏷️ No delete markers found"
     fi
-  fi
 
-  # Step 3: Delete the empty bucket
-  echo "[INFO] 🪣 Deleting empty bucket..."
-  aws s3 rb "s3://${bucket_name}"
-  local delete_result=$?
+    # Try to delete the bucket
+    echo "[INFO] 🪣 Attempting to delete bucket..."
+    if aws s3 rb "s3://${bucket_name}" 2>/dev/null; then
+      echo "[SUCCESS] ✅ Successfully deleted bucket on attempt ${attempt}"
+      rm -f /tmp/delete-versions.sh /tmp/delete-markers.sh
+      set -o errexit
+      return 0
+    else
+      echo "[WARN] ⚠️ Bucket deletion failed on attempt ${attempt}, checking for remaining objects..."
+
+      # Check what's left in the bucket
+      remaining_objects=$(aws s3api list-object-versions --bucket "${bucket_name}" --query 'length(Versions[]) + length(DeleteMarkers[])' --output text 2>/dev/null || echo "unknown")
+      echo "[INFO] 📊 Remaining objects/versions in bucket: ${remaining_objects}"
+
+      if [ "${remaining_objects}" = "0" ] || [ "${remaining_objects}" = "null" ]; then
+        echo "[INFO] ✅ Bucket appears empty now, retrying deletion..."
+      else
+        echo "[WARN] ⚠️ Still has ${remaining_objects} objects/versions, continuing cleanup..."
+        sleep 2
+      fi
+    fi
+
+    attempt=$((attempt + 1))
+  done
+
+  # Final attempt - force delete anything remaining
+  echo "[WARN] ⚠️ Standard cleanup failed, attempting force delete..."
+  aws s3 rb "s3://${bucket_name}" --force 2>/dev/null || echo "[ERROR] ❌ Force delete also failed"
 
   # Cleanup temp files
-  rm -f /tmp/s3-versions.json /tmp/delete-versions.json /tmp/delete-markers.json
+  rm -f /tmp/delete-versions.sh /tmp/delete-markers.sh
 
   # Re-enable exit on error
   set -o errexit
 
-  return $delete_result
+  # Return failure since we couldn't delete cleanly
+  return 1
 }
 
 aws_validation() {

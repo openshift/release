@@ -9,6 +9,14 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 echo "[INFO] 🔧 Setting up privileged unit and gencheck test execution in EKS cluster..."
 
+# Install kubectl for EKS cluster management (MAPT image has AWS CLI but not kubectl)
+echo "[INFO] 🔧 Installing kubectl for EKS cluster management..."
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x kubectl
+mv kubectl /usr/local/bin/ || sudo mv kubectl /usr/local/bin/ || cp kubectl /tmp/kubectl
+export PATH="/usr/local/bin:/tmp:${PATH}"
+echo "[SUCCESS] ✅ kubectl installed successfully"
+
 # Set up AWS credentials for EKS authentication (AWS CLI already available in MAPT image)
 echo "[INFO] 🔐 Setting up AWS credentials for EKS authentication..."
 if [ -f "/tmp/secrets/.awscred" ]; then
@@ -23,14 +31,54 @@ fi
 export AWS_REGION=${AWS_REGION:-"us-east-1"}
 echo "[SUCCESS] ✅ AWS credentials configured for EKS"
 
-# Test kubectl connectivity
+# Debug kubeconfig and AWS setup
+echo "[INFO] 🔍 Debugging EKS connectivity setup..."
+echo "[DEBUG] Kubeconfig file exists: $([ -f "${KUBECONFIG}" ] && echo "YES" || echo "NO")"
+echo "[DEBUG] Kubeconfig file size: $([ -f "${KUBECONFIG}" ] && wc -c < "${KUBECONFIG}" || echo "N/A") bytes"
+echo "[DEBUG] AWS credentials file: ${AWS_SHARED_CREDENTIALS_FILE}"
+echo "[DEBUG] AWS region: ${AWS_REGION}"
+
+echo "[DEBUG] Kubeconfig contents (first few lines):"
+head -10 "${KUBECONFIG}" || echo "Could not read kubeconfig"
+
+echo "[DEBUG] Testing AWS CLI access:"
+if aws sts get-caller-identity; then
+  echo "[DEBUG] ✅ AWS CLI authentication working"
+else
+  echo "[DEBUG] ❌ AWS CLI authentication failed"
+fi
+
+# Test kubectl connectivity with verbose output
 echo "[INFO] 🔌 Testing EKS cluster connectivity..."
-if ! kubectl cluster-info --request-timeout=30s > /dev/null 2>&1; then
+if ! kubectl cluster-info --request-timeout=30s; then
   echo "[ERROR] ❌ Unable to connect to EKS cluster"
-  echo "[ERROR] ❌ Kubeconfig or AWS credentials may be invalid"
+  echo "[ERROR] Checking possible issues:"
+
+  echo "[DEBUG] Attempting to get cluster version with verbose errors:"
+  kubectl version --client=true || echo "kubectl client check failed"
+  kubectl version --short=true 2>&1 || echo "kubectl server check failed"
+
+  echo "[DEBUG] Checking if EKS cluster endpoint is reachable:"
+  CLUSTER_ENDPOINT=$(grep -o 'https://[^"]*\.eks\.[^"]*\.amazonaws\.com' "${KUBECONFIG}" || echo "Could not extract endpoint")
+  echo "[DEBUG] Cluster endpoint: ${CLUSTER_ENDPOINT}"
+
+  if [[ "${CLUSTER_ENDPOINT}" != "Could not extract endpoint" ]]; then
+    echo "[DEBUG] Testing endpoint connectivity:"
+    curl -k -m 10 "${CLUSTER_ENDPOINT}/version" 2>&1 || echo "Endpoint not reachable"
+  fi
+
   exit 1
 fi
 echo "[SUCCESS] ✅ EKS cluster connectivity verified"
+
+# Create namespace with privileged pod security for OSSM tests (moved from create step)
+echo "[INFO] 🔧 Setting up EKS cluster for privileged OSSM testing..."
+kubectl create namespace ossm-tests || true
+kubectl label namespace ossm-tests \
+  pod-security.kubernetes.io/audit=privileged \
+  pod-security.kubernetes.io/enforce=privileged \
+  pod-security.kubernetes.io/warn=privileged || true
+echo "[SUCCESS] ✅ EKS cluster configured for privileged OSSM testing"
 
 # Generate unique names for this test run
 POD_NAME="ossm-unit-gencheck-test-${BUILD_ID}"

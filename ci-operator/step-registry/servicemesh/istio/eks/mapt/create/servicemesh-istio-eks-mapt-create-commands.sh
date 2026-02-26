@@ -139,16 +139,8 @@ if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
 fi
 echo "[SUCCESS] ✅ OSSM Istio MAPT EKS cluster created successfully"
 
-# Export kubeconfig for subsequent steps
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+echo "[INFO] 💾 Saving kubeconfig location for test step..."
+echo "[INFO] 📁 Kubeconfig available at: ${SHARED_DIR}/kubeconfig"
 
-echo "[INFO] 🔧 Setting up EKS cluster for privileged OSSM testing..."
-
-# Create namespace with privileged pod security for OSSM tests
-kubectl create namespace ossm-tests || true
-kubectl label namespace ossm-tests \
-  pod-security.kubernetes.io/audit=privileged \
-  pod-security.kubernetes.io/enforce=privileged \
-  pod-security.kubernetes.io/warn=privileged || true
-
-echo "[SUCCESS] ✅ EKS cluster configured for privileged OSSM testing"
+echo "[SUCCESS] ✅ MAPT EKS cluster ready for testing"
+echo "[INFO] ℹ️ Namespace and pod security setup will be handled by test step"
