@@ -60,7 +60,7 @@ cat > "${SETTINGS_FILE}" << 'SETTINGS_EOF'
 {
   "permissions": {
     "allow": [
-      "Bash(python3:plugins/ci/skills/*)", "Bash(gh:*)", "Bash(gcloud:*)", "Bash(curl:*)",
+      "Bash(python3:*/skills/*)", "Bash(gh:*)", "Bash(gcloud:*)", "Bash(curl:*)",
       "Bash(jq:*)", "Bash(grep:*)", "Bash(cat:*)", "Bash(ls:*)",
       "Bash(mkdir:*)", "Bash(cp:*)", "Bash(chmod:*)", "Bash(head:*)",
       "Bash(tail:*)", "Bash(wc:*)", "Bash(sort:*)", "Bash(cut:*)",
@@ -80,8 +80,8 @@ WORKDIR=$(mktemp -d /tmp/claude-analysis-XXXXXX)
 cd "${WORKDIR}"
 
 timeout 7200 claude --settings-file "${SETTINGS_FILE}" \
-    --output-format text \
-    -p "/ci:analyze-payload ${VERSION}" \
+    --output-format stream-json \
+    -p "/ci:analyze-payload ${PAYLOAD_TAG}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || true
 
 # Copy HTML report(s) to artifact directory
