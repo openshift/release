@@ -1,14 +1,16 @@
 build_root:
   project_image:
     dockerfile_literal: |-
-      FROM registry.access.redhat.com/ubi8/python-39
+      FROM registry.access.redhat.com/ubi10/python-312-minimal
 
       # Prow expects to be able to check out a repo under /go
       USER 0:0
       WORKDIR /go
-      RUN chown 1001:1001 .
+      RUN chmod 777 .
+      RUN microdnf install -y git
 
       USER 1001:1001
+      RUN python -m pip install 'tox>=4'
 images:
 - dockerfile_path: Containerfile
   to: merge-bot
@@ -19,14 +21,14 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: make install-all-deps
+test_binary_build_commands: "true"
 tests:
 - as: lint
-  commands: make lint
+  commands: tox -e lint
   container:
     from: test-bin
 - as: unittests
-  commands: make unittests
+  commands: tox -e py3
   container:
     from: test-bin
 - as: cluster-api-provider-openstack-main
