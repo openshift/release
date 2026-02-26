@@ -88,7 +88,7 @@ POD_NAME="ossm-unit-gencheck-test-${BUILD_ID}"
 CONTAINER_NAME="istio-builder"
 
 # Get the MAISTRA_BUILDER_IMAGE if available, otherwise use default
-BUILDER_IMAGE="${MAISTRA_BUILDER_IMAGE:-quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master}"
+BUILDER_IMAGE="gcr.io/istio-testing/build-tools:master-eebcdda8856e2d4f528991d27d4808880cce4c52"
 echo "[INFO] 📦 Using builder image: ${BUILDER_IMAGE}"
 
 # Function to cleanup resources
