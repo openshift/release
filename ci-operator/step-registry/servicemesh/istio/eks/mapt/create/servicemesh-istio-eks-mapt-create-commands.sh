@@ -119,7 +119,7 @@ mapt aws eks create \
   --spot \
   --addons aws-ebs-csi-driver,coredns,eks-pod-identity-agent,kube-proxy,vpc-cni \
   --load-balancer-controller \
-  --tags app-code=ossm-mapt,test-job-id="${JOB_ID}",mapt="${CORRELATE_MAPT}",s3-bucket="${DYNAMIC_BUCKET_NAME}"
+  --tags app-code=ossm-mapt,test-job-id="${JOB_ID:-${BUILD_ID}}",mapt="${CORRELATE_MAPT}",s3-bucket="${DYNAMIC_BUCKET_NAME}"
 
 if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
   echo "[ERROR] ❌ kubeconfig file not found at ${SHARED_DIR}/kubeconfig"
