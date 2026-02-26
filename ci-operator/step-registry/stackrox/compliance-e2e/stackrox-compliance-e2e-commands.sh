@@ -8,11 +8,11 @@ export MAP_TESTS="${MAP_TESTS:-false}"
 export MAP_TESTS_SUITE_NAME="${MAP_TESTS_SUITE_NAME:-ACS-lp-interop}"
 
 function InstallYq() {
-    : "Installing yq if not available..."
+    : "Installing yq..."
 
-    # Install yq manually if not found in image
+    # Install yq manually
     mkdir -p /tmp/bin
-    export PATH="${PATH}:/tmp/bin"
+    export PATH="/tmp/bin:${PATH}"
     typeset arch=""
     arch="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
     curl -L "https://github.com/mikefarah/yq/releases/download/v4.52.4/yq_linux_${arch}" \
@@ -27,7 +27,7 @@ function CleanupCollect() {
     typeset resultFile=''
     typeset -a xmlFiles=()
 
-    InstallYq || true
+    InstallYq
 
     while IFS= read -r -d '' resultFile; do
         grep -qE '<testsuites?\b' "${resultFile}" && xmlFiles+=("${resultFile}") || true
@@ -39,23 +39,22 @@ function CleanupCollect() {
         return
     }
 
-    # Prepare one jUnit XML: collect -> map suite name and merge
+    # Prepare one jUnit XML: collect -> map suite name and merge into a single document
     yq eval-all --input-format xml --output-format xml -I2 '
+        (. | [.[] | (.testsuite // .) | ([] + .)[] | select(kind == "map")]) as $suites |
+        $suites | .[] |= (
+            (
+                select(env(MAP_TESTS) == "true") |
+                ."+@name" = env(MAP_TESTS_SUITE_NAME)
+            )//. |
+            ([] + (.testcase // [])) as $tc |
+            ."+@tests" = ($tc | length | tostring) |
+            ."+@failures" = ([$tc[] | select(.failure)] | length | tostring) |
+            ."+@errors" = ([$tc[] | select(.error)] | length | tostring)
+        ) |
         {
             "+p_xml": "version=\"1.0\" encoding=\"UTF-8\"",
-            "testsuites": {"testsuite": [
-                .[] |
-                (.testsuite // .) |
-                ([] + .)[] |
-                select(kind == "map") | (
-                    select(env(MAP_TESTS) == "true") |
-                    ."+@name" = env(MAP_TESTS_SUITE_NAME)
-                )//. |
-                ([] + (.testcase // [])) as $tc |
-                ."+@tests" = ($tc | length | tostring) |
-                ."+@failures" = ([$tc[] | select(.failure)] | length | tostring) |
-                ."+@errors" = ([$tc[] | select(.error)] | length | tostring)
-            ]}
+            "testsuites": {"testsuite": $suites}
         }
     ' "${xmlFiles[@]}" 1> "${ARTIFACT_DIR}/${mergedFN}"
 
@@ -81,7 +80,10 @@ if [ ! -f ".openshift-ci/dispatch.sh" ]; then
     cd stackrox
 fi
 
+# dispatch.sh's exit trap (handle_dangling_processes in lib.sh) sends SIGTERM
+# to all processes that are not itself, its children, or entrypoint/defunct.
+# Ignore SIGTERM so this script survives and our EXIT trap runs cleanly.
+trap '' TERM
+
 # Execute dispatch script
 .openshift-ci/dispatch.sh "${job}"
-
-true
