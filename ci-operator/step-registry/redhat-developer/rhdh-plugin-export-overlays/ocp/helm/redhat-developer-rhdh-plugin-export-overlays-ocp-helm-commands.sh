@@ -125,7 +125,8 @@ fi
 
 echo "Running tests for workspace: ${CHANGED_WORKSPACES}"
 cd "workspaces/${CHANGED_WORKSPACES}/e2e-tests"
-yarn install
+yarn install --immutable
+yarn playwright install chromium
 
 TEST_EXIT_CODE=0
 yarn test || TEST_EXIT_CODE=$?

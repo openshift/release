@@ -19,12 +19,13 @@ spec:
       terminationGracePeriodSeconds: 180
       containers:
       - name: statusreconciler
-        image: us-docker.pkg.dev/k8s-infra-prow/images/status-reconciler:v20260206-85e3dda3b
+        image: quay.io/prucek/prow:status-reconciler_db
         args:
         - --dry-run=false
         - --continue-on-error=true
         - --plugin-config=/etc/plugins/plugins.yaml
         - --config-path=/etc/config/config.yaml
+        - --job-config-path=/etc/jobs
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --gcs-credentials-file=/etc/gcs-credentials/service-account.json
@@ -50,6 +51,9 @@ spec:
         - name: gcs-credentials
           mountPath: /etc/gcs-credentials
           readOnly: true
+        - name: job-configs
+          mountPath: /etc/jobs
+          readOnly: true
       volumes:
       - name: github-app-credentials
         secret:
@@ -63,3 +67,6 @@ spec:
       - name: gcs-credentials
         secret:
           secretName: gce-sa-credentials-gcs-private
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs

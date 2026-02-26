@@ -1,0 +1,27 @@
+ref:
+  as: openstack-conf-rhcosimage
+  from: openstack-installer
+  commands: openstack-conf-rhcosimage-commands.sh
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: OS_CLOUD
+    default: "openstack"
+    documentation: Name of cloud to use from the clouds.yaml file
+  - name: OPENSTACK_RHCOS_IMAGE_NAME
+    default: "rhcos"
+    documentation: |-
+      Prefix for the RHCOS image name in OpenStack Glance. The OCP minor
+      version is appended automatically (e.g. "rhcos" becomes "rhcos-4.18").
+      The step will create or update this image to match the version embedded
+      in openshift-install.
+  documentation: |-
+    Pre-uploads the RHCOS image to OpenStack Glance when it is not already
+    at the version expected by the installer, then patches install-config.yaml
+    to reference that image via platform.openstack.clusterOSImage. This
+    avoids redundant image downloads during every cluster installation.

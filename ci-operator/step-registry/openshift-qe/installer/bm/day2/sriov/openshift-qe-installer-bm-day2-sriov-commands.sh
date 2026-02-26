@@ -7,6 +7,9 @@ cat /etc/os-release
 
 SRIOV_NUM_VFS=$(cat ${CLUSTER_PROFILE_DIR}/config | jq ".sriov_num_vfs")
 SRIOV_PF_NAME=$(cat ${CLUSTER_PROFILE_DIR}/sriov_pf_name)
+KERNEL_VFS_RANGE=$(cat ${CLUSTER_PROFILE_DIR}/sriov_kernel_vfs_range)
+DPDK_VFS_RANGE=$(cat ${CLUSTER_PROFILE_DIR}/sriov_dpdk_vfs_range)
+
 
 oc config view
 oc projects
@@ -70,21 +73,63 @@ EOF
 
 sleep 180
 
-# Create the SRIOV network policy
-cat << EOF| oc apply -f -
-apiVersion: sriovnetwork.openshift.io/v1
-kind: SriovNetworkNodePolicy
-metadata:
-  name: ${SRIOV_POLICY_NAME}
-  namespace: openshift-sriov-network-operator
-spec:
-  deviceType: ${SRIOV_DEVICE_TYPE}
-  nicSelector:
-    pfNames:
-     - ${SRIOV_PF_NAME}
-  mtu: ${SRIOV_MTU}
-  nodeSelector:
-    ${SRIOV_NODE_SELECTOR}: ""
-  numVfs: ${SRIOV_NUM_VFS}
-  resourceName: ${SRIOV_RESOURCE_NAME}
+if [ "${TELCO}" == "true" ]; then
+  # Create the SRIOV network policy for Kernel and DPDK VFs
+
+  cat << EOF| oc apply -f -
+  apiVersion: sriovnetwork.openshift.io/v1
+  kind: SriovNetworkNodePolicy
+  metadata:
+    name: ${SRIOV_POLICY_NAME_KERNEL_VFS}
+    namespace: openshift-sriov-network-operator
+  spec:
+    deviceType: netdevice
+    nicSelector:
+      pfNames:
+       - ${SRIOV_PF_NAME}#${KERNEL_VFS_RANGE}
+    mtu: ${SRIOV_MTU}
+    nodeSelector:
+      ${SRIOV_NODE_SELECTOR}: ""
+    numVfs: ${SRIOV_NUM_VFS}
+    resourceName: ${SRIOV_RESOURCE_NAME_KERNEL_VFS}
 EOF
+
+  cat << EOF| oc apply -f -
+  apiVersion: sriovnetwork.openshift.io/v1
+  kind: SriovNetworkNodePolicy
+  metadata:
+    name: ${SRIOV_POLICY_NAME_DPDK_VFS}
+    namespace: openshift-sriov-network-operator
+  spec:
+    deviceType: vfio-pci
+    nicSelector:
+      pfNames:
+       - ${SRIOV_PF_NAME}#${DPDK_VFS_RANGE}
+    mtu: ${SRIOV_MTU}
+    nodeSelector:
+      ${SRIOV_NODE_SELECTOR}: ""
+    numVfs: ${SRIOV_NUM_VFS}
+    resourceName: ${SRIOV_RESOURCE_NAME_DPDK_VFS}
+EOF
+
+else
+
+  # Create the SRIOV network policy
+  cat << EOF| oc apply -f -
+  apiVersion: sriovnetwork.openshift.io/v1
+  kind: SriovNetworkNodePolicy
+  metadata:
+    name: ${SRIOV_POLICY_NAME}
+    namespace: openshift-sriov-network-operator
+  spec:
+    deviceType: ${SRIOV_DEVICE_TYPE}
+    nicSelector:
+      pfNames:
+       - ${SRIOV_PF_NAME}
+    mtu: ${SRIOV_MTU}
+    nodeSelector:
+      ${SRIOV_NODE_SELECTOR}: ""
+    numVfs: ${SRIOV_NUM_VFS}
+    resourceName: ${SRIOV_RESOURCE_NAME}
+EOF
+fi
