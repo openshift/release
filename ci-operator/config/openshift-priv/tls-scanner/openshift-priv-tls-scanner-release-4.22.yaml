@@ -1,0 +1,67 @@
+base_images:
+  base:
+    name: 4.22-priv
+    namespace: ocp-private
+    tag: base-rhel9
+  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.24-openshift-4.22
+build_root:
+  image_stream_tag:
+    name: builder-priv
+    namespace: ocp-private
+    tag: rhel-9-golang-1.24-openshift-4.22
+canonical_go_repository: github.com/openshift/tls-scanner
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.24-openshift-4.22: {}
+  to: tls-scanner-tool
+promotion:
+  to:
+  - disabled: true
+    name: 4.22-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.22-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.22-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: default-tls
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.22"
+  optional: true
+  steps:
+    test:
+    - ref: tls-scanner-run
+    workflow: generic-claim
+- as: tls13-conformance
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    test:
+    - ref: tls-scanner-run
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws-ovn-tls-13
+zz_generated_metadata:
+  branch: release-4.22
+  org: openshift-priv
+  repo: tls-scanner
