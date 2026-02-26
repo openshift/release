@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# For rehearsal only
+export PAYLOAD_TAG=4.22.0-0.nightly-2026-02-25-152806
+
 echo "Starting claude-payload-analysis for payload: ${PAYLOAD_TAG}"
 
 # Parse version and stream from payload tag
