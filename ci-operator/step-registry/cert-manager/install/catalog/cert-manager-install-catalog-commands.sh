@@ -145,7 +145,7 @@ EOF
 # Note: This is a temporary workaround to avoid the disruptive impact of the 'enable-qe-catalogsource-disconnected' step.
 # As per current implementation, that step is called by every 'disconnected' cluster provisioning workflow that maintained by QE.
 # Hence this function can be removed in future once above mentioned design is well refined.
-function tmp_prune_distruptive_resource() {
+function tmp_prune_disruptive_resource() {
     echo "Pruning the disruptive resources in pervious step 'enable-qe-catalogsource-disconnected'..."
     run_command "oc delete catalogsource qe-app-registry -n openshift-marketplace --ignore-not-found"
     run_command "oc delete imagecontentsourcepolicy image-policy-aosqe --ignore-not-found"
@@ -188,7 +188,7 @@ if [ "${MIRROR_OPERATORS}" == "true" ]; then
     cd "$TMP_DIR"
 
     check_mirror_registry
-    tmp_prune_distruptive_resource
+    tmp_prune_disruptive_resource
     configure_host_pull_secret
     install_oc_mirror
     mirror_catalog_and_operator
