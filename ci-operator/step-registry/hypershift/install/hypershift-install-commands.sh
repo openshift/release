@@ -5,7 +5,15 @@ set -eux
 EXTRA_ARGS=""
 HCP_CLI="bin/hypershift"
 OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
-if [[ $HO_MULTI == "true" ]]; then
+
+# TODO: Remove after GCP e2e testing - use custom image with GCP platform support
+if [[ "${CLOUD_PROVIDER:-}" == "GCP" ]]; then
+  OPERATOR_IMAGE="quay.io/cveiga/hypershift:GCP-295-e2e-gcp-platform-support-1f525aa1"
+  mkdir -p /tmp/hs-cli
+  oc image extract "${OPERATOR_IMAGE}" --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/etc/ci-pull-credentials/.dockerconfigjson --filter-by-os="linux/amd64"
+  chmod +x /tmp/hs-cli/hypershift
+  HCP_CLI="/tmp/hs-cli/hypershift"
+elif [[ $HO_MULTI == "true" ]]; then
   OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
   oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
   mkdir /tmp/hs-cli
@@ -100,61 +108,35 @@ case "${CLOUD_PROVIDER}" in
     ;;
 
   GCP)
-  # The kubeconfig from gke-provision uses a static access token,
+  # The kubeconfig from hypershift-gcp-gke-provision uses a static access token,
   # so no gcloud/auth-plugin installation is needed here.
 
-  # Install CRDs that GKE doesn't have by default (unlike OpenShift)
-  # Same approach as AKS - required for HyperShift functionality
-  echo "Installing required CRDs..."
-  # Prometheus operator CRDs (for monitoring resources)
-  oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
-  oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
-  oc apply -f https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
-  # OpenShift Route CRD (for hosted cluster ingress)
-  oc apply -f https://raw.githubusercontent.com/openshift/api/6bababe9164ea6c78274fd79c94a3f951f8d5ab2/route/v1/zz_generated.crd-manifests/routes.crd.yaml
-  # DNSEndpoint CRD (for external-dns zone delegation)
-  oc apply -f https://raw.githubusercontent.com/kubernetes-sigs/external-dns/v0.15.0/docs/contributing/crd-source/crd-manifest.yaml
-
-  # Read GCP environment variables from SHARED_DIR (saved by gke-provision)
+  # Read GCP environment variables from SHARED_DIR (saved by hypershift-gcp-gke-provision)
   # These are required by the operator's GCPPrivateServiceConnect controller
   GCP_PROJECT_ID="$(<"${SHARED_DIR}/control-plane-project-id")"
   GCP_REGION_VALUE="$(<"${SHARED_DIR}/gcp-region")"
+  CLUSTER_NAME="$(<"${SHARED_DIR}/cluster-name")"
+
+  # CI DNS config (read from SHARED_DIR since hypershift-install is a shared step)
+  HYPERSHIFT_CI_PROJECT="$(<"${SHARED_DIR}/hypershift-ci-project")"
+  HYPERSHIFT_CI_DNS_DOMAIN="$(<"${SHARED_DIR}/hypershift-ci-dns-domain")"
 
   # Install HyperShift operator
   # The --pull-secret flag creates the pull-secret in the hypershift namespace
-  # (same approach as AKS - see hypershift-install logs)
-  # Disable conversion webhook - same approach as AKS
-  # GKE Autopilot has compatibility issues with cert-manager webhook initialization
-  # Webhooks can be enabled later once cert-manager integration is stabilized
-  #
-  # NOTE: We do NOT use --wait-until-available here because the operator needs
-  # GCP_PROJECT and GCP_REGION env vars to start, but we can only set those
-  # after the deployment is created. We'll wait manually after setting env vars.
   "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-  --enable-conversion-webhook=false \
   --external-dns-provider=google \
-  --external-dns-domain-filter=dummy \
+  --external-dns-domain-filter="${HYPERSHIFT_CI_DNS_DOMAIN}" \
+  --external-dns-google-project="${HYPERSHIFT_CI_PROJECT}" \
   --private-platform=GCP \
+  --gcp-project="${GCP_PROJECT_ID}" \
+  --gcp-region="${GCP_REGION_VALUE}" \
   --platform-monitoring=All \
   --enable-ci-debug-output \
   --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
   ${EXTRA_ARGS}
-
-  # TODO(GCP-402): Remove this workaround once hypershift install supports
-  # --gcp-project and --gcp-region flags. See https://issues.redhat.com/browse/GCP-402
-  #
-  # Set GCP environment variables on the operator deployment
-  # This must be done after install creates the deployment, but before
-  # the operator can become ready (it requires these to start)
-  echo "Setting GCP_PROJECT=${GCP_PROJECT_ID} and GCP_REGION=${GCP_REGION_VALUE} on operator deployment"
-  oc set env deployment/operator -n hypershift \
-    GCP_PROJECT="${GCP_PROJECT_ID}" \
-    GCP_REGION="${GCP_REGION_VALUE}"
-
-  # Wait for the operator to become ready with the env vars set
-  echo "Waiting for operator to become available..."
-  oc rollout status deployment/operator -n hypershift --timeout=300s
-  oc wait --for=condition=Available --namespace hypershift deployments/operator --timeout=300s
+  # Note: --wait-until-available is omitted for GCP because the operator
+  # requires a webhook TLS certificate from cert-manager, which is created
+  # in the hypershift-gcp-control-plane-setup step after install.
     ;;
 
   Kubevirt)
