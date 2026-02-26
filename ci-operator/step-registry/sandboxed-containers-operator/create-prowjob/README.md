@@ -66,7 +66,6 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 | `AWS_REGION_OVERRIDE`      | `us-east-2`              | AWS region for testing                                                      | Any valid AWS region     |
 | `CUSTOM_AZURE_REGION`      | `eastus`                 | Azure region for testing                                                    | Any valid Azure region   |
 | `OSC_CATALOG_TAG`          | `latest`                 | Defaults to `:latest`. Actual tag resolved at runtime by `env-cm` step. Can override with specific version tag (e.g., `1.11.1-1766149846`) or SHA | repo tag or SHA          |
-| `EXPECTED_OSC_VERSION`     | `1.10.1`                 | Derived from X.Y.X-epoch_time catalog tag or OSC_CATALOG_TAG                | Semantic version format  |
 | `INSTALL_KATA_RPM`         | `true`                   | Whether to install Kata RPM                                                 | `true` or `false`        |
 | `KATA_RPM_VERSION`         | `3.17.0-3.rhaos4.19.el9` | Kata RPM version (when `INSTALL_KATA_RPM=true`)                             | RPM version format       |
 | `PROW_RUN_TYPE`            | `candidate`              | Prow job run type                                                           | `candidate` or `release` |
@@ -81,7 +80,6 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
   - The `env-cm` step resolves the actual latest tag (X.Y.Z-epoch_time format) at runtime
   - This ensures jobs always test against the most recent build
 - Creates `brew-catalog` source with the resolved catalog tag
-  - If catalog tag is X.Y.Z-epoch_time, the expected version of the operator is extracted
 
 #### GA (Production) Mode
 - Uses `redhat-operators` catalog source with GA images
