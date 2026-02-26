@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.5.2"
+	TAG="v1.0.2"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
 	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
@@ -134,7 +134,7 @@ set -e
 #
 if [ ${RET} -eq 0 ]
 then
-	echo "Sending metadata.json"
+	echo "Deleting metadata.json"
 	PowerVC-Tool \
 		send-metadata \
 		--deleteMetadata ${DIR}/metadata.json \
