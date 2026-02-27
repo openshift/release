@@ -77,7 +77,7 @@ echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 WORKDIR=$(mktemp -d /tmp/claude-analysis-XXXXXX)
 cd "${WORKDIR}"
 
-timeout 7200 claude --settings-file "${SETTINGS_FILE}" \
+timeout 7200 claude --settings "${SETTINGS_FILE}" \
     --output-format stream-json \
     --max-turns 100 \
     -p "/ci:analyze-payload ${PAYLOAD_TAG}" \
