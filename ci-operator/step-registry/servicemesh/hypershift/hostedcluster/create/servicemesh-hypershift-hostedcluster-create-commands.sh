@@ -1,0 +1,1 @@
+../../../../hypershift/hostedcluster/create/hostedcluster/hypershift-hostedcluster-create-hostedcluster-commands.sh
