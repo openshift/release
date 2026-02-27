@@ -241,6 +241,7 @@ else
       --format qcow2 \
       --capacity ${VOLUME_CAPACITY} || echo "Volume ${VOLUME_NAME} already exists, proceed without creation"
 
+    date
     # Upload the rhcos image to the source volume
     echo "Uploading rhcos image to source volume..."
     ${VIRSH} -k 60 -K 5 vol-upload \
@@ -248,6 +249,7 @@ else
       --pool ${POOL_NAME} \
       ${INSTALL_DIR}/${VOLUME_NAME}
   fi
+  date
 
   # Generate manifests for cluster modifications
   echo "Generating manifests..."
@@ -374,7 +376,7 @@ create_node () {
 
     if [[ "$ARCH" == "ppc64le" ]]; then
       HTTPD_PORT="$(leaseLookup 'httpd-port')"
-      EXTRA_ARGS="${EXTRA_ARGS} coreos.live.rootfs_url=http://${HOSTNAME}:${HTTPD_PORT}/${ROOTFS_NAME}"
+      EXTRA_ARGS="${EXTRA_ARGS} coreos.live.rootfs_url=http://${HOSTNAME}:${HTTPD_PORT}/${ROOTFS_NAME} rd.writable.fs_size=16G"
     fi
 
     # Boot artifacts names/paths were exported above upon creation
@@ -464,6 +466,7 @@ done
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
+  sleep 30m
   restart_nodes &
   ${OCPINSTALL} --dir "${INSTALL_DIR}" agent wait-for bootstrap-complete --log-level=debug &
 else
