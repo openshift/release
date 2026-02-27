@@ -6,8 +6,10 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
-  to: driver-toolkit
+- dockerfile_path: Dockerfile.rhel9
+  to: driver-toolkit-rhel-9
+- dockerfile_path: Dockerfile.rhel10
+  to: driver-toolkit-rhel-10
 promotion:
   to:
   - additional_images:
@@ -41,13 +43,20 @@ tests:
   container:
     clone: true
     from: ocp_builder_rhel-9-golang-1.20-openshift-4.15
-- as: verify-image-content
+- as: verify-image-content-dtk-for-rhel-9
   commands: |
     ls /manifests/01-openshift-imagestream.yaml
     ls /manifests/image-references
     cat /etc/driver-toolkit-release.json
   container:
-    from: driver-toolkit
+    from: driver-toolkit-rhel-9
+- as: verify-image-content-dtk-for-rhel-10
+  commands: |
+    ls /manifests/01-openshift-imagestream.yaml
+    ls /manifests/image-references
+    cat /etc/driver-toolkit-release.json
+  container:
+    from: driver-toolkit-rhel-10
 - as: e2e-aws
   steps:
     cluster_profile: aws
