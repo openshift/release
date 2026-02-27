@@ -45,6 +45,7 @@ while true; do
             echo "All blocking jobs succeeded. No analysis needed."
             exit 0
         fi
+        FAILED_JOBS=$(echo "${RELEASE_JSON}" | jq -r '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Failed") | .key] | .[]')
         echo "All blocking jobs have completed. ${FAILED} failed. Starting analysis..."
         break
     fi
@@ -129,6 +130,33 @@ fi
 # Check if we produced a report
 if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
     echo "Analysis complete. Report(s) saved to artifact directory."
+
+    # Send Slack notification
+    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
+    if [ -f "${SLACK_WEBHOOK_URL}" ]; then
+        WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
+
+        # Build a bullet list of failed jobs
+        FAILED_LIST=""
+        while IFS= read -r job; do
+            [ -n "$job" ] && FAILED_LIST="${FAILED_LIST}
+    • ${job}"
+        done <<< "${FAILED_JOBS}"
+
+        SLACK_TEXT=":this_is_fine: New rejected payload! *${PAYLOAD_TAG}* :alert-siren:
+
+*Failed blocking jobs (${FAILED}):*${FAILED_LIST}
+
+:robot_face: No need to panic — Claude's already on the case! He's _continuously integrated_ himself into the investigation and has a full report ready for you.
+
+<${PROW_JOB_URL}|:point_right: View Analysis Report>"
+
+        jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
+            curl -sf -X POST -H 'Content-type: application/json' -d @- \
+            "${WEBHOOK}" || echo "Warning: Failed to send Slack notification."
+    else
+        echo "Slack webhook file not found at ${SLACK_WEBHOOK_URL}, skipping notification."
+    fi
 else
     echo "Warning: No HTML report was generated."
     exit 1
