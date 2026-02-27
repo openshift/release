@@ -1,0 +1,51 @@
+base_images:
+  flowlogs-pipeline:
+    name: flowlogs-pipeline
+    namespace: netobserv
+    tag: ci
+  netobserv-ebpf-agent:
+    name: netobserv-ebpf-agent
+    namespace: netobserv
+    tag: ci
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: Dockerfile.prow
+  to: netobserv-perfscale
+promotion:
+  to:
+  - namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-deploy
+  optional: true
+  run_if_changed: scripts/
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      LOKISTACK_SIZE: 1x.demo
+    post:
+    - ref: netobserv-perf-test-cleanup
+    test:
+    - ref: netobserv-perf-test-deploy
+    workflow: openshift-qe-installer-aws
+zz_generated_metadata:
+  branch: openshift-eng-ocp-qe-perfscale-ci-netobserv-perf-tests
+  org: openshift-perfscale
+  repo: netobserv
