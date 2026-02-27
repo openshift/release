@@ -79,6 +79,7 @@ cd "${WORKDIR}"
 
 timeout 7200 claude --settings-file "${SETTINGS_FILE}" \
     --output-format stream-json \
+    --max-turns 100 \
     -p "/ci:analyze-payload ${PAYLOAD_TAG}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || true
 
