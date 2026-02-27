@@ -41,4 +41,4 @@ echo "Forcing a 2.5-hour delay to allow other machines to join the bootstrap nod
 sleep 2.5h
 
 echo "Checking cluster installation progress by verifying all cluster operators are available and stable."
-oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
+oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=2h
