@@ -126,7 +126,7 @@ OCP_VERSION=${OCP_VERSION:-"4.20.0"}
 CPU=${CPU:-"8"}
 MEMORY=${MEMORY:-"32"}
 SPOT=${SPOT:-"true"}
-SPOT_INCREASE_RATE=${SPOT_INCREASE_RATE:-"40"}
+SPOT_INCREASE_RATE=${SPOT_INCREASE_RATE:-"60"}
 MAPT_TAGS=${MAPT_TAGS:-"ci=true,repo=openshift-servicemesh"}
 
 echo "[INFO] START Creating OSSM Istio MAPT OpenShift SNC infrastructure for ${CORRELATE_MAPT}..."
