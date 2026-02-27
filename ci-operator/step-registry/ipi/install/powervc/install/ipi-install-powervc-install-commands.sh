@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.6.2"
+	TAG="v1.0.2"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
 	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
@@ -243,15 +243,29 @@ function dump_resources() {
 
 	if [ -f "${DIR}/metadata.json" ]
 	then
+		# Fix:
+		# Load Balancer: Error: addServerKnownHosts returns error open /tmp/.ssh/known_hosts: no such file or directory
+		mkdir -p ${HOME}/.ssh
+		touch ${HOME}/.ssh/known_hosts
+
+		# Fix:
+		# No user exists for uid 1003320000
+		if ! grep -q ":$(id -u):" /etc/passwd
+		then
+			if [ -w /etc/passwd ]
+			then
+				echo "test:x:$(id -u):$(id -u):test:/tmp:/sbin/nologin" >> /etc/passwd
+			fi
+		fi
+
 		PowerVC-Tool \
 			watch-create \
 			--cloud "${CLOUD}" \
 			--baseDomain "ipi-ppc64le.cis.ibm.net" \
-			--cisInstanceCRN "${CRN}" \
 			--metadata "${DIR}/metadata.json" \
+			--kubeconfig "${DIR}/auth/kubeconfig" \
 			--bastionUsername "cloud-user" \
 			--bastionRsa "${SSH_PRIV_KEY_FILE}" \
-			--kubeconfig "${DIR}/auth/kubeconfig" \
 			--shouldDebug false
 	else
 		echo "Could not find ${DIR}/metadata.json for watch-create"

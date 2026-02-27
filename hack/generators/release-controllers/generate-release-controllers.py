@@ -6,8 +6,6 @@
 # Ignore large context objects
 # pylint: disable=R0902, R0903
 
-# All non-static methods in contexts
-# pylint: disable=R0201
 
 import argparse
 # Allow TOOD

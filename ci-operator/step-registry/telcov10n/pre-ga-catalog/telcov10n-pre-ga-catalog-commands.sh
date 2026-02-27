@@ -316,21 +316,42 @@ mkdir -pv ${info_dir}
 pushd .
 cd ${info_dir}
 
+
+download_url="${catalog_soruces_url}/${version_tag}"
+
 echo "Downloading YAML files from ${catalog_soruces_url}/${version_tag}..."
-yaml_files=$(curl -sSL ${catalog_soruces_url}/${version_tag} | grep -oP '(?<=href=")[^"]+' | grep 'yaml$')
+yaml_files=$(curl -sSL ${download_url} | grep -oP '(?<=href=")[^"]+' | grep 'yaml$' || echo "" )
 
 if [ -z "$yaml_files" ]; then
   echo "ERROR: No YAML files found in ${version_tag}"
   echo "This should not happen as version was pre-verified"
-  echo "Contents of ${catalog_soruces_url}/${version_tag}:"
-  curl -sSL "${catalog_soruces_url}/${version_tag}"
+
+  echo "Trying other version build"
+  _version=$( echo $version_tag | cut -d"-" -f1 )
+  all_version_folder=$(curl -s $catalog_soruces_url | grep $_version | grep -oP 'v\d+\.\d+-\d+T\d+' | sort --reverse )
+
+  for folder in $all_version_folder
+  do
+    yaml_files=$(curl -sSL ${catalog_soruces_url}/${folder} |  grep -oP '(?<=href=")[^"]+' | grep yaml )
+    if [[ ! -z $yaml_files ]]
+    then
+      echo "Found files in build: $folder"
+      download_url=${catalog_soruces_url}/${folder}
+      break
+    fi
+  done
+fi
+
+if [[ -z $yaml_files ]]
+then
+  echo "Cloud not locate manifest in version ${_version}"
   exit 1
 fi
 
 echo "Downloading files..."
 for f in $yaml_files; do
   set -x
-  curl -sSLO ${catalog_soruces_url}/${version_tag}/${f}
+  curl -sSLO ${download_url}/${f}
   set +x
 done
 

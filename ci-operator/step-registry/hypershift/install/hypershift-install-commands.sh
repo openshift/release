@@ -55,6 +55,8 @@ if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-cpo-overrides"
 fi
 
+EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=registry.ci.openshift.org/ocp/4.18:cluster-api-provider-kubevirt"
+
 case "${CLOUD_PROVIDER}" in
   AWS)
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
@@ -86,12 +88,20 @@ case "${CLOUD_PROVIDER}" in
       oc apply -f https://raw.githubusercontent.com/openshift/api/6bababe9164ea6c78274fd79c94a3f951f8d5ab2/route/v1/zz_generated.crd-manifests/routes.crd.yaml
     fi
 
+    AZURE_MANAGED_SERVICE_ARGS="--managed-service=ARO-HCP"
+    AZURE_EXTERNAL_DNS_ARGS="--external-dns-provider=azure \
+      --external-dns-credentials=/etc/hypershift-aks-e2e-dns-credentials/credentials.json \
+      --external-dns-domain-filter=${AZURE_EXTERNAL_DNS_DOMAIN}"
+
+    if [ "${AZURE_SELF_MANAGED}" == "true" ]; then
+      AZURE_MANAGED_SERVICE_ARGS=""
+      # Keep external DNS enabled - domain filter is set via HYPERSHIFT_EXTERNAL_DNS_DOMAIN env var
+    fi
+
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
     --enable-conversion-webhook=false \
-    --managed-service=ARO-HCP \
-    --external-dns-provider=azure \
-    --external-dns-credentials=/etc/hypershift-aks-e2e-dns-credentials/credentials.json \
-    --external-dns-domain-filter="${AZURE_EXTERNAL_DNS_DOMAIN}" \
+    ${AZURE_MANAGED_SERVICE_ARGS} \
+    ${AZURE_EXTERNAL_DNS_ARGS} \
     --platform-monitoring=All \
     --enable-ci-debug-output \
     --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
