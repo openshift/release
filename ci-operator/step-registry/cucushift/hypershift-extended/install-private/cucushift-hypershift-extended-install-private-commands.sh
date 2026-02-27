@@ -20,8 +20,6 @@ COMMAND=(
     --hypershift-image="${OPERATOR_IMAGE}"
     --platform-monitoring=All
     --wait-until-available
-    --scale-from-zero-provider=azure
-    --scale-from-zero-creds=/etc/hypershift-ext-dns-app-azure/credentials
 )
 
 case "${HYPERSHIFT_FEATURE_SET:-}" in
