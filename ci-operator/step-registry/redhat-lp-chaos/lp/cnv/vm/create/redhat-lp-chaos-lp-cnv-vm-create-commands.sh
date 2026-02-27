@@ -5,7 +5,7 @@ set -euxo pipefail; shopt -s inherit_errexit
 declare vmList=""
 declare vmNamesForWait=""
 
-if [[ "${STEP_NAME:-}" == *"-after-chaos" ]]; then
+if [[ "$0" == *"-after-chaos" ]]; then
     runPhase="post"
 else
     runPhase="pre"
