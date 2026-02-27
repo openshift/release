@@ -45,7 +45,6 @@ while true; do
             echo "All blocking jobs succeeded. No analysis needed."
             exit 0
         fi
-        FAILED_JOBS=$(echo "${RELEASE_JSON}" | jq -r '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Failed") | .key] | .[]')
         echo "All blocking jobs have completed. ${FAILED} failed. Starting analysis..."
         break
     fi
