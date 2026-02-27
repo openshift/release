@@ -71,6 +71,20 @@ objects:
             app: prow
             component: qe-private-deck
         spec:
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      component: qe-private-deck
+                  topologyKey: topology.kubernetes.io/zone
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchLabels:
+                    component: qe-private-deck
+                topologyKey: kubernetes.io/hostname
           serviceAccountName: qe-private-deck
           initContainers:
           - name: git-sync-init
