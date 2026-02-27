@@ -806,6 +806,11 @@ RESPONSE RULES:
   set -e
   echo "Claude processing complete. Full output saved to /tmp/claude-pr-${PR_NUMBER}-output.json"
 
+  # Copy Claude output to SHARED_DIR for the report step
+  if [ -f "/tmp/claude-pr-${PR_NUMBER}-output.json" ]; then
+    cp "/tmp/claude-pr-${PR_NUMBER}-output.json" "${SHARED_DIR}/claude-pr-${PR_NUMBER}-output.json"
+  fi
+
   if [ $EXIT_CODE -eq 0 ]; then
     echo "Successfully processed PR #$PR_NUMBER"
     echo ""
