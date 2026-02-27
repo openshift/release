@@ -53,6 +53,27 @@ tests:
     - ref: openshift-qe-virt-density
     - ref: openshift-qe-orion-virt-density
     workflow: openshift-qe-installer-bm-deploy
+- as: weekly-telco-core-cpt
+  capabilities:
+  - intranet
+  cron: 0 17 * * 5
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-cpt
+    env:
+      CHURN_CYCLES: "2"
+      CHURN_PERCENT: "50"
+      EXTRA_FLAGS: --perf-profile=cpt-pao --gc-metrics=true --gc=true
+      ITERATIONS: "15"
+      LABEL: node-role.kubernetes.io/worker-dpdk,node-role.kubernetes.io/worker-metallb
+      TELCO: "true"
+    test:
+    - ref: openshift-qe-installer-bm-day2-label
+    - ref: openshift-qe-installer-bm-day2-sriov
+    - ref: openshift-qe-installer-bm-day2-metallb
+    - ref: openshift-qe-installer-bm-day2-perf-profile-rds-core
+    - ref: openshift-qe-rds-core
+    workflow: openshift-qe-installer-bm-deploy
 zz_generated_metadata:
   branch: main
   org: openshift-eng
