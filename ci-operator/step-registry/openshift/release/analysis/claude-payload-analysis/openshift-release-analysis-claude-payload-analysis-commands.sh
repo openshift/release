@@ -57,12 +57,7 @@ cat > "${SETTINGS_FILE}" << 'SETTINGS_EOF'
 {
   "permissions": {
     "allow": [
-      "Bash(python3:*/skills/*)", "Bash(gh:*)", "Bash(gcloud:*)", "Bash(curl:*)",
-      "Bash(jq:*)", "Bash(grep:*)", "Bash(cat:*)", "Bash(ls:*)", "Bash(find:*)",
-      "Bash(tar:*)", "Bash(gunzip:*)",
-      "Bash(mkdir:*)", "Bash(cp:*)", "Bash(chmod:*)", "Bash(head:*)",
-      "Bash(tail:*)", "Bash(wc:*)", "Bash(sort:*)", "Bash(cut:*)",
-      "Bash(tr:*)", "Bash(sed:*)", "Bash(awk:*)",
+      "Bash(*)",
       "Read(*)", "Write(*)", "Edit(*)", "Glob(*)", "Grep(*)",
       "WebFetch(*)", "WebSearch(*)",
       "Task(*)", "Skill(*)"
