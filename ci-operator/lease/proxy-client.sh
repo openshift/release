@@ -258,7 +258,7 @@ function lease__release() {
     local result=1
     if [ $ec -eq 0 ]; then
         case "$response" in
-            200)
+            2*)
                 result=0
                 ;;
         esac
