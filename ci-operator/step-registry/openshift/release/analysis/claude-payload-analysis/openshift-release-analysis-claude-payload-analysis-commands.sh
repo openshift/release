@@ -131,25 +131,26 @@ fi
 if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
     echo "Analysis complete. Report(s) saved to artifact directory."
 
+    # Ask Claude to summarize its findings for Slack
+    echo "Asking Claude to summarize findings for Slack..."
+    SUMMARY=$(claude \
+        --model "${CLAUDE_MODEL}" \
+        --continue \
+        --output-format text \
+        --max-turns 1 \
+        -p "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
+        2>/dev/null) || SUMMARY=""
+
     # Send Slack notification
     PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
     if [ -f "${SLACK_WEBHOOK_URL}" ]; then
         WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
 
-        # Build a bullet list of failed jobs
-        FAILED_LIST=""
-        while IFS= read -r job; do
-            [ -n "$job" ] && FAILED_LIST="${FAILED_LIST}
-    • ${job}"
-        done <<< "${FAILED_JOBS}"
+        SLACK_TEXT=":this_is_fine::alert-siren: *Rejected Payload Analysis* :alert-siren::this_is_fine:
 
-        SLACK_TEXT=":this_is_fine: New rejected payload! *${PAYLOAD_TAG}* :alert-siren:
+:robot_face: ${SUMMARY:-No summary available.}
 
-*Failed blocking jobs (${FAILED}):*${FAILED_LIST}
-
-:robot_face: No need to panic — Claude's already on the case! He's _continuously integrated_ himself into the investigation and has a full report ready for you.
-
-<${PROW_JOB_URL}|:point_right: View Analysis Report>"
+<${PROW_JOB_URL}|:point_right: View Full Analysis Report>"
 
         jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
             curl -sf -X POST -H 'Content-type: application/json' -d @- \
