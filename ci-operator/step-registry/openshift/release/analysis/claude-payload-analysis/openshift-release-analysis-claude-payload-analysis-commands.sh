@@ -6,6 +6,11 @@ set -o pipefail
 
 echo "Starting claude-payload-analysis for payload: ${PAYLOAD_TAG}"
 
+# Install gcloud CLI for GCS artifact access
+echo "Installing gcloud CLI..."
+dnf install -y google-cloud-cli
+echo "gcloud CLI installed."
+
 # Parse version and stream from payload tag
 # Format: 4.22.0-0.nightly-2026-02-25-152806
 VERSION=$(echo "${PAYLOAD_TAG}" | grep -oP '^\d+\.\d+')
@@ -58,6 +63,7 @@ WORKDIR=$(mktemp -d /tmp/claude-analysis-XXXXXX)
 cd "${WORKDIR}"
 
 timeout 7200 claude \
+    --model "${CLAUDE_MODEL}" \
     --allowedTools "Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill" \
     --output-format stream-json \
     --max-turns 100 \
