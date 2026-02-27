@@ -253,6 +253,10 @@ if [ $CLAUDE_EXIT_CODE -ne 0 ]; then
   echo "CLAUDE PROCESSING FAILED"
   echo "=========================================="
   echo "Exit code: $CLAUDE_EXIT_CODE"
+  echo ""
+  echo "Claude stderr log:"
+  cat "/tmp/claude-dependabot-output.log" 2>/dev/null || echo "(no stderr log found)"
+  cp "/tmp/claude-dependabot-output.log" "${ARTIFACT_DIR}/claude-stderr.log" 2>/dev/null || true
   rm -f "$CLAUDE_OUTPUT_FILE"
   rm -f "$CLAUDE_RESULTS_FILE"
   exit 1
