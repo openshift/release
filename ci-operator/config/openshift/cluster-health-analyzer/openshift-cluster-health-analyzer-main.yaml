@@ -1,3 +1,20 @@
+base_images:
+  monitoring-console-plugin:
+    name: "4.22"
+    namespace: ocp
+    tag: monitoring-console-plugin
+  monitoring-plugin:
+    name: "4.22"
+    namespace: ocp
+    tag: monitoring-plugin
+  monitoring-ui-tests-runner:
+    name: "4.22"
+    namespace: ocp
+    tag: monitoring-ui-tests-runner
+  observability-bundle:
+    name: observability-bundle
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -35,9 +52,26 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.21"
+  optional: true
   steps:
     test:
     - ref: cluster-health-analyzer
+    workflow: generic-claim
+- always_run: false
+  as: e2e-incidents-ui
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.21"
+  optional: true
+  steps:
+    test:
+    - ref: monitoring-plugin-tests-incidents-ui-custom-cha
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
