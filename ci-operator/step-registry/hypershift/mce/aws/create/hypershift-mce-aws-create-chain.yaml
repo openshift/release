@@ -11,7 +11,7 @@ chain:
           default: "ci.hypershift.devcluster.openshift.com"
           documentation: "The cluster's FQDN will be a subdomain of the base domain."
         - name: HYPERSHIFT_AWS_REGION
-          default: "us-east-1"
+          default: ""
           documentation: "The AWS region of the cluster."
       commands: |-
         set -exuo pipefail
@@ -32,7 +32,7 @@ chain:
           export AWS_SHARED_CREDENTIALS_FILE="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
           export AWS_REGION=${HYPERSHIFT_AWS_REGION}
           # hypershift CLI is needed to create iam cli-role, and it is already available in hypershift-operator image
-          output=$(bin/hypershift create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE} --region ${AWS_REGION})
+          output=$(bin/hypershift create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE})
           echo "$output"
           hcp_role_arn="$(echo $output | grep 'arn:aws:iam:' | awk '{print $NF}')"
           echo "$hcp_role_arn" > "${SHARED_DIR}/hcp-role-arn"
