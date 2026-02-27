@@ -8,7 +8,7 @@ OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
 
 # TODO: Remove after GCP e2e testing - use custom image with GCP platform support
 if [[ "${CLOUD_PROVIDER:-}" == "GCP" ]]; then
-  OPERATOR_IMAGE="quay.io/cveiga/hypershift:GCP-295-e2e-gcp-platform-support-1f525aa1"
+  OPERATOR_IMAGE="quay.io/cveiga/hypershift:GCP-295-e2e-gcp-platform-support-4f9d5c16"
   mkdir -p /tmp/hs-cli
   oc image extract "${OPERATOR_IMAGE}" --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/etc/ci-pull-credentials/.dockerconfigjson --filter-by-os="linux/amd64"
   chmod +x /tmp/hs-cli/hypershift

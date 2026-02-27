@@ -21,7 +21,7 @@ echo "Starting HyperShift GCP e2e tests..."
 # 2. Remove lines 138-159 (the E2E_TEST_BIN execution block)
 # 3. Keep only the hack/ci-test-e2e.sh path (lines 160-180)
 # =============================================================================
-GCP_TEST_IMAGE="quay.io/cveiga/hypershift:GCP-295-e2e-gcp-platform-support-1f525aa1-test"
+GCP_TEST_IMAGE="quay.io/cveiga/hypershift:GCP-295-e2e-gcp-platform-support-4f9d5c16-test"
 echo "Extracting e2e test binary from ${GCP_TEST_IMAGE}..."
 mkdir -p /tmp/hypershift-tests
 oc image extract "${GCP_TEST_IMAGE}" \
@@ -158,7 +158,7 @@ OIDC_ISSUER_URL="https://hypershift-${CLUSTER_NAME}-oidc"
 if [[ -n "${E2E_TEST_BIN:-}" && -x "${E2E_TEST_BIN}" ]]; then
     echo "Running e2e tests using extracted binary: ${E2E_TEST_BIN}"
     # TODO(GCP-295): Remove CPO image override after multizone fix is merged
-    CPO_IMAGE="quay.io/cveiga/hypershift:GCP-295-e2e-gcp-platform-support-1f525aa1"
+    CPO_IMAGE="quay.io/cveiga/hypershift:GCP-295-e2e-gcp-platform-support-4f9d5c16"
     # TODO(GCP-426): Remove CAPG image override once HyperShift's CAPI CRDs serve v1beta2
     CAPG_IMAGE="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:bdec420448b81cc57f5b53bbcf491c0ed53b6e3ca97da722f69f386a373afe50"
 
@@ -194,7 +194,7 @@ if [[ -n "${E2E_TEST_BIN:-}" && -x "${E2E_TEST_BIN}" ]]; then
       --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}"
 else
     # TODO(GCP-295): Remove CPO image override after multizone fix is merged
-    CPO_IMAGE="quay.io/cveiga/hypershift:GCP-295-e2e-gcp-platform-support-1f525aa1"
+    CPO_IMAGE="quay.io/cveiga/hypershift:GCP-295-e2e-gcp-platform-support-4f9d5c16"
     # TODO(GCP-426): Remove CAPG image override once HyperShift's CAPI CRDs serve v1beta2
     CAPG_IMAGE="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:bdec420448b81cc57f5b53bbcf491c0ed53b6e3ca97da722f69f386a373afe50"
 
