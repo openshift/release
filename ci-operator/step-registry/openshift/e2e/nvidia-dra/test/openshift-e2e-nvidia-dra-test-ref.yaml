@@ -1,0 +1,54 @@
+ref:
+  as: openshift-e2e-nvidia-dra-test
+  from: tests
+  grace_period: 15m
+  commands: openshift-e2e-nvidia-dra-test-commands.sh
+  timeout: 2h
+  env:
+  - name: DRA_TEST_SUITE
+    default: "basic"
+    documentation: |-
+      Test suite to run: basic, multi-gpu, partitionable, all
+      - basic: Single GPU allocation and resource cleanup tests
+      - multi-gpu: Multiple GPU allocation tests (requires 2+ GPUs)
+      - partitionable: MIG and time-slicing tests (requires MIG-capable GPU)
+      - all: Run all available tests
+  - name: GPU_TYPE
+    default: "tesla-t4"
+    documentation: |-
+      GPU type for validation (affects test expectations)
+      Options: tesla-t4, a10g, a100, l4
+  - name: GPU_ARCHITECTURE
+    default: "turing"
+    documentation: |-
+      NVIDIA architecture: turing, ampere, hopper
+      - turing: T4, RTX series
+      - ampere: A10G, A30, A40, A100
+      - hopper: H100
+  - name: GPU_MIG_CAPABLE
+    default: "false"
+    documentation: |-
+      Whether GPU supports MIG partitioning (true/false)
+      MIG-capable GPUs: A30, A100, H100
+      If false, MIG tests will be skipped
+  - name: DRA_SKIP_PREREQUISITES
+    default: "false"
+    documentation: |-
+      Skip GPU Operator/DRA Driver installation (true/false)
+      Set to true if prerequisites are already installed
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  documentation: |-
+    Runs NVIDIA DRA (Dynamic Resource Allocation) extended tests on GPU-enabled OpenShift clusters.
+
+    This step executes openshift-tests for NVIDIA DRA functionality validation including:
+    - Single GPU allocation via DRA
+    - Multi-GPU workload allocation
+    - Pod lifecycle and resource cleanup
+    - Device accessibility and CDI integration
+    - Optional: MIG partitioning and time-slicing (if GPU supports)
+
+    The step automatically detects GPU nodes and skips tests if no GPUs are available.
+    Prerequisites (GPU Operator and DRA Driver) are installed automatically if not present.

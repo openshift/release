@@ -1,0 +1,28 @@
+ref:
+  as: openshift-e2e-nvidia-dra-gpu-operator-install
+  from: cli
+  grace_period: 15m
+  commands: openshift-e2e-nvidia-dra-gpu-operator-install-commands.sh
+  timeout: 30m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Installs the NVIDIA GPU Operator via OLM (OperatorHub) with CDI enabled.
+
+    This step:
+    1. Creates the nvidia-gpu-operator namespace
+    2. Creates an OperatorGroup for the namespace
+    3. Subscribes to the gpu-operator-certified package from the certified operators catalog
+    4. Waits for the operator CSV to reach Succeeded phase
+    5. Creates a ClusterPolicy with CDI enabled (REQUIRED for DRA)
+    6. Waits for the ClusterPolicy to become ready
+    7. Verifies GPU nodes are properly labeled
+
+    Prerequisites:
+    - OpenShift cluster with GPU-enabled worker nodes
+    - Certified operators catalog available in openshift-marketplace
+
+    This step is REQUIRED before running NVIDIA DRA tests as the GPU Operator
+    must be pre-installed with CDI support enabled.
