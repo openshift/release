@@ -1,0 +1,40 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      channel: candidate
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: deploy
+  capabilities:
+  - intranet
+  restrict_network_access: false
+  steps:
+    cluster_profile: metal-perfscale-selfsched
+    env:
+      MICROSHIFT_VERSION: latest-4.21
+      MODEL: R640
+      NUM_SERVERS: "1"
+      PROMETHEUS_LOGGING: "false"
+    post:
+    - ref: openshift-qe-installer-bm-self-sched-terminate
+    pre:
+    - ref: openshift-qe-installer-bm-self-sched
+    - ref: openshift-qe-installer-bm-ping
+    test:
+    - ref: openshift-qe-microshift-deploy
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: microshift-metal-selfsched-4.21-candidate-x86
