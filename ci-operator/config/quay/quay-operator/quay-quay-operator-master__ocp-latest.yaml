@@ -166,7 +166,10 @@ tests:
       cli: latest
       commands: |
         set -exuo pipefail
-        export REGISTRY_AUTH_FILE=/var/run/brew-pullsecret/.dockerconfigjson
+        export HOME="${HOME:-/tmp/home}"
+        export XDG_RUNTIME_DIR="${HOME}/run"
+        mkdir -p "${XDG_RUNTIME_DIR}/containers"
+        cp /var/run/brew-pullsecret/.dockerconfigjson "${XDG_RUNTIME_DIR}/containers/auth.json"
         NS="openshift-operators"
         echo "Upgrading quay-operator to CI-built bundle..."
         operator-sdk run bundle-upgrade --timeout=10m --security-context-config restricted \

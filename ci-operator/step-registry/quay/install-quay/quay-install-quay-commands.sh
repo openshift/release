@@ -4,6 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "Waiting for NooBaa CRD to be available..." >&2
+for i in $(seq 1 60); do
+    if oc get crd noobaas.noobaa.io &>/dev/null; then
+        echo "NooBaa CRD available" >&2
+        break
+    fi
+    if (( i == 60 )); then
+        echo "Timed out waiting for NooBaa CRD" >&2
+        exit 1
+    fi
+    sleep 5
+done
+
 cat <<EOF | oc apply -f -
 apiVersion: noobaa.io/v1alpha1
 kind: NooBaa
