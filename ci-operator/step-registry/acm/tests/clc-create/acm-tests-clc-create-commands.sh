@@ -20,7 +20,7 @@ if [[ -f "${awsCredFile}" ]]; then
     typeset awsAccKeyID=
     typeset awsAccKeyToken=
 
-    echo ".awscred exists..."
+    : "File .awscred exists..."
 
     set +x
     awsAccKeyID="$(sed -nE 's/^\s*aws_access_key_id\s*=\s*//p;T;q' "${awsCredFile}")"
@@ -28,15 +28,15 @@ if [[ -f "${awsCredFile}" ]]; then
 
     [ -n "${awsAccKeyID}" ] && [ -n "${awsAccKeyToken}" ]
 
-    : "Updating credentials in ${optionFile}..."
+    echo "Updating credentials in ${optionFile}..."
     yq -o json eval . "${optionFile}" |
     jq -c \
           --arg awsAccKeyID "${awsAccKeyID}" \
           --arg awsAccKeyToken "${awsAccKeyToken}" \
         '
-          .connections.apiKeys.aws|=(
+          .options.connections.apiKeys.aws|=(
                 .awsAccessKeyID=$awsAccKeyID |
-                .awsSecretAccessKey=$awsAccKeyToken
+                .awsSecretAccessKeyID=$awsAccKeyToken
             )
         ' |
     yq -p json -o yaml eval . > "${optionFile}.tmp"
@@ -45,8 +45,6 @@ if [[ -f "${awsCredFile}" ]]; then
 
     unset awsAccKeyID awsAccKeyToken
 fi
-
-e=400; while ((e--)); do { [ -e /tmp/debug.done ] && break; sleep 60; }; done
 
 : "Executing CLC interop commands..."
 set +x
