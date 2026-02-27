@@ -61,7 +61,11 @@ echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
 cat ${OVERRIDE_CONFIG_FILE}
 
 unset GOFLAGS
-make -o tooling/templatize/templatize entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml.gz DEPLOY_ENV=prow EXTRA_ARGS="--region ${LOCATION}" ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml EXTRA_ARGS="--abort-if-regional-exist"
+make -o tooling/templatize/templatize entrypoint/Region \
+  DEPLOY_ENV=prow \
+  EXTRA_ARGS="--region ${LOCATION} --abort-if-regional-exist" \
+  TIMING_OUTPUT=${SHARED_DIR}/steps.yaml.gz \
+  ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml
 
 # Mark successful completion
 touch "${SHARED_DIR}/provision-complete"
