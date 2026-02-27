@@ -492,6 +492,8 @@ fi
 # Build hypervisor SSH configuration if enabled
 build_hypervisor_config
 
+sleep 5h
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade
