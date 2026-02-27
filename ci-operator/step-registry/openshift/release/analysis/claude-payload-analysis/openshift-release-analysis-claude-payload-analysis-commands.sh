@@ -6,9 +6,11 @@ set -o pipefail
 
 echo "Starting claude-payload-analysis for payload: ${PAYLOAD_TAG}"
 
-# Install gcloud CLI for GCS artifact access
+# Install gcloud CLI for GCS artifact access (no root required)
 echo "Installing gcloud CLI..."
-dnf install -y google-cloud-cli
+curl -sSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz | tar -xz -C /tmp
+/tmp/google-cloud-sdk/install.sh --quiet --path-update true
+export PATH="/tmp/google-cloud-sdk/bin:${PATH}"
 echo "gcloud CLI installed."
 
 # Parse version and stream from payload tag
@@ -61,6 +63,11 @@ echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 
 WORKDIR=$(mktemp -d /tmp/claude-analysis-XXXXXX)
 cd "${WORKDIR}"
+
+# Install the must-gather plugin for analyzing must-gather archives
+echo "Installing must-gather plugin..."
+claude plugin install must-gather@ai-helpers
+echo "must-gather plugin installed."
 
 timeout 7200 claude \
     --model "${CLAUDE_MODEL}" \
