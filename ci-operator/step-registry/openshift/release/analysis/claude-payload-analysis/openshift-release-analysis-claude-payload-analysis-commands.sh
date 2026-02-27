@@ -4,9 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# For rehearsal only
-export PAYLOAD_TAG=4.22.0-0.nightly-2026-02-25-152806
-
 echo "Starting claude-payload-analysis for payload: ${PAYLOAD_TAG}"
 
 # Parse version and stream from payload tag
@@ -24,7 +21,7 @@ echo "Release API: ${API_URL}"
 # Poll until all blocking jobs have finished (no Pending jobs remain).
 # We can't wait for the payload to reach terminal state because this
 # analysis job is itself part of the payload's verification jobs.
-MAX_WAIT=28800  # 8 hours in seconds
+MAX_WAIT=36000 # 10 hours in seconds
 POLL_INTERVAL=300  # 5 minutes
 ELAPSED=0
 
@@ -61,7 +58,8 @@ cat > "${SETTINGS_FILE}" << 'SETTINGS_EOF'
   "permissions": {
     "allow": [
       "Bash(python3:*/skills/*)", "Bash(gh:*)", "Bash(gcloud:*)", "Bash(curl:*)",
-      "Bash(jq:*)", "Bash(grep:*)", "Bash(cat:*)", "Bash(ls:*)",
+      "Bash(jq:*)", "Bash(grep:*)", "Bash(cat:*)", "Bash(ls:*)", "Bash(find:*)",
+      "Bash(tar:*)", "Bash(gunzip:*)",
       "Bash(mkdir:*)", "Bash(cp:*)", "Bash(chmod:*)", "Bash(head:*)",
       "Bash(tail:*)", "Bash(wc:*)", "Bash(sort:*)", "Bash(cut:*)",
       "Bash(tr:*)", "Bash(sed:*)", "Bash(awk:*)",
