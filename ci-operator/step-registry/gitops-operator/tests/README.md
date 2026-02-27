@@ -10,19 +10,19 @@
 
 ## Purpose
 
-Use to execute the gitops-operator [sequential tests](https://github.com/redhat-developer/gitops-operator/tree/master/test/openshift/e2e/sequential) using the provided arguments. All XML results will be combined into "$ARTIFACT_DIR/junit_gitops-sequential.xml".
+Use to execute the gitops-operator [parallel tests](https://github.com/redhat-developer/gitops-operator/tree/master/test/openshift/e2e/ginkgo/parallel) using the provided arguments. All XML results will be combined into "openshift-gitops-parallel-e2e.xml".
 
 ## Process
 
-1. Runs the Operator tests from [sequential tests](https://github.com/redhat-developer/gitops-operator/tree/master/test/openshift/e2e/sequential) directory
-2. Copies the XML file to `$ARTIFACT_DIR/junit_gitops-sequential.xml`
+1. Runs the Operator tests from [parallel tests](https://github.com/redhat-developer/gitops-operator/tree/master/test/openshift/e2e/ginkgo/parallel) directory
+2. Copies the XML file to `${ARTIFACT_DIR}/original_results/`
 
 ## Prerequisite(s)
 
 ### Infrastructure
 
 - A provisioned test cluster to target.
-  - Should have a `openshift-operators` namespace/project with:
+  - Should have a `openshift-gitops-operator` namespace/project with:
     - The [`gitops-operator-operator`](../../install-operators/README.md) is installed.
 
 ### Environment Variables
