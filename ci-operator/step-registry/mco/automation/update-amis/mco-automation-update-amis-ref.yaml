@@ -1,0 +1,64 @@
+ref:
+  as: mco-automation-update-amis
+  from: src
+  commands: mco-automation-update-amis-commands.sh
+  grace_period: 5m0s
+  timeout: 30m0s
+  env:
+  - name: GITHUB_REPO_ORG
+    default: openshift
+    documentation: |-
+      The organization of the GitHub repository.
+  - name: GITHUB_REPO_NAME
+    default: machine-config-operator
+    documentation: |-
+      The name of the GitHub repository.
+  - name: GITHUB_REPO_BRANCH
+    default: main
+    documentation: |-
+      The branch of the GitHub repository to create PR against.
+  - name: GITHUB_TOKEN_PATH
+    default: /etc/github/oauth
+    documentation: |-
+      The path to the GitHub token file.
+  - name: GITHUB_PR_TITLE
+    default: "Update AMI Whitelist"
+    documentation: |-
+      The description part of the PR title. Final title format: [Automated]OCPBUGS-XXX: <title>
+  - name: GITHUB_PR_USER
+    default: openshift-ci-robot
+    documentation: |-
+      The user name for git commits.
+  - name: GITHUB_PR_EMAIL
+    default: openshift-ci-robot@users.noreply.github.com
+    documentation: |-
+      The email for git commits.
+  - name: JIRA_TOKEN_PATH
+    default: /var/run/jira-token/token
+    documentation: |-
+      The path to the Jira API token file. If not set, bug creation will be skipped.
+      The target version is derived from JOB_NAME or branch name automatically.
+  - name: EXPECTED_RELEASE_VERSION
+    documentation: |-
+      Required. The release version this job should run from (e.g., "4.22").
+      Ensures only one periodic config runs this job. If the JOB_NAME doesn't match,
+      the job fails with instructions to update the config.
+  - name: CHERRY_PICK_BRANCHES
+    default: ""
+    documentation: |-
+      Space-separated list of branches to cherry-pick to (e.g., "release-4.21 release-4.20 release-4.19").
+      A /cherry-pick comment will be added to the PR. Leave empty to disable.
+  credentials:
+  - collection: ""
+    mount_path: /etc/github
+    name: github-credentials-openshift-ci-robot-private-git-cloner
+    namespace: ci
+  - namespace: test-credentials
+    name: mco-jira-token
+    mount_path: /var/run/jira-token
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  documentation: |-
+    Runs 'make update-amis' on the MCO repository and creates a PR if there are changes.
