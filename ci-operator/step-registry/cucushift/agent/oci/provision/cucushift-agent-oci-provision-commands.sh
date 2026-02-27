@@ -54,7 +54,7 @@ pushd ${INSTALL_DIR}
 cp -t "${INSTALL_DIR}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
 
 echo "Installing from initial release $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
-oc adm release extract -a "$pull_secret_path" "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" \
+oc adm release extract -a "$pull_secret_path" registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2026-02-25-232937 \
   --command=openshift-install --to=/tmp
 rm ${pull_secret_path}
 echo "Copying Custom Manifest"
