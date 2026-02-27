@@ -51,28 +51,14 @@ while true; do
     sleep ${POLL_INTERVAL}
 done
 
-# Write Claude settings file with permissions allowlist
-SETTINGS_FILE=$(mktemp /tmp/claude-settings-XXXXXX.json)
-cat > "${SETTINGS_FILE}" << 'SETTINGS_EOF'
-{
-  "permissions": {
-    "allow": [
-      "Bash(*)",
-      "Read(*)", "Write(*)", "Edit(*)", "Glob(*)", "Grep(*)",
-      "WebFetch(*)", "WebSearch(*)",
-      "Task(*)", "Skill(*)"
-    ]
-  }
-}
-SETTINGS_EOF
-
 # Run Claude to analyze the payload
 echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 
 WORKDIR=$(mktemp -d /tmp/claude-analysis-XXXXXX)
 cd "${WORKDIR}"
 
-timeout 7200 claude --settings "${SETTINGS_FILE}" \
+timeout 7200 claude \
+    --allowedTools "Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill" \
     --output-format stream-json \
     --max-turns 100 \
     -p "/ci:analyze-payload ${PAYLOAD_TAG}" \
