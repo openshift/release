@@ -74,6 +74,12 @@ echo "[INFO] AUTH Loading AWS credentials from vault..."
 aws_validation
 echo "[SUCCESS] !!!! AWS credentials loaded successfully"
 
+# Check for pull-secret file
+if [ ! -f /tmp/secrets/pull-secret ]; then
+  echo "Error: Pull secret file not found"
+  exit 1
+fi
+
 echo "[INFO] TAG Setting CORRELATE_MAPT..."
 CORRELATE_MAPT="ossm-istio-snc-${BUILD_ID}"
 export CORRELATE_MAPT
