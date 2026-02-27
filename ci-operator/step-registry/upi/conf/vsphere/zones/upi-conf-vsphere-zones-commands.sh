@@ -88,7 +88,8 @@ echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
 echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
 
 export HOME=/tmp
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
+# Use job-level override if set (e.g. custom OCP image for debug cluster); otherwise use release controller image.
+export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-$RELEASE_IMAGE_LATEST}
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
 
