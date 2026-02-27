@@ -197,6 +197,10 @@ echo "${INFRA_ID}" > "${SHARED_DIR}/infra-id"
 echo "${VPC_NAME}" > "${SHARED_DIR}/vpc-name"
 echo "${PSC_SUBNET_NAME}" > "${SHARED_DIR}/psc-subnet"
 
+# CI DNS config for hypershift-install (shared step, can't use workflow env vars)
+echo "${HYPERSHIFT_GCP_CI_PROJECT}" > "${SHARED_DIR}/hypershift-ci-project"
+echo "${HYPERSHIFT_GCP_CI_DNS_DOMAIN}" > "${SHARED_DIR}/hypershift-ci-dns-domain"
+
 # Verify cluster access
 oc get nodes
 oc version
