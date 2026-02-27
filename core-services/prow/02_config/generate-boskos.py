@@ -115,6 +115,9 @@ CONFIG = {
         'us-east-1': 5,
         'ap-northeast-1': 5,
     },
+    'aws-eusc-qe-quota-slice': {
+        'eusc-de-east-1': 5,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
