@@ -141,7 +141,11 @@ if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
         2>/dev/null) || SUMMARY=""
 
     # Send Slack notification
-    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
+    if [ "${JOB_TYPE:-}" = "presubmit" ]; then
+        PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+    else
+        PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
+    fi
     if [ -f "${SLACK_WEBHOOK_URL}" ]; then
         WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
 
