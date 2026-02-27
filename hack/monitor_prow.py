@@ -9,7 +9,8 @@ import json
 import os
 
 
-exec_cmd = lambda *cmd: subprocess.check_output(cmd).decode('utf-8')
+def exec_cmd(*cmd):
+    return subprocess.check_output(cmd).decode('utf-8')
 RED = exec_cmd('tput', 'setaf', '1')
 GREEN = exec_cmd('tput', 'setaf', '2')
 YELLOW = exec_cmd('tput', 'setaf', '3')
