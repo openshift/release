@@ -5,6 +5,12 @@ set -euxo pipefail; shopt -s inherit_errexit
 declare vmList=""
 declare vmNamesForWait=""
 
+if [[ "${STEP_NAME:-}" == *"-after-chaos" ]]; then
+    runPhase="post"
+else
+    runPhase="pre"
+fi
+
 : '--- Target Configuration Summary ---'
 : "VM_NUM: ${LPC_LP_CNV__VM__REPLICA_COUNT} | InstanceType: ${LPC_LP_CNV__VM__INSTANCE_TYPE}"
 : "Source: ${LPC_LP_CNV__VM__DV_SOURCE_NAME} (NS: ${LPC_LP_CNV__VM__DV_SOURCE_NS})"
@@ -19,7 +25,7 @@ declare vmNamesForWait=""
 # Create vms
 function VmCreate() {
   declare vmIndex="${1}"; (($#)) && shift
-  declare currentVmName="${LPC_LP_CNV__VM__PREFIX}-${vmIndex}"
+  declare currentVmName="${LPC_LP_CNV__VM__PREFIX}-${runPhase}-${vmIndex}"
   : "Submitting target VirtualMachine ${currentVmName}"
   # The DataVolume is automatically created via dataVolumeTemplates
   {
@@ -100,8 +106,8 @@ EOF
 for ((i=1; i<=${LPC_LP_CNV__VM__REPLICA_COUNT}; i++)); do
     : "=== Start to create the ${i} vm (Total: ${LPC_LP_CNV__VM__REPLICA_COUNT})"
     VmCreate "${i}"
-    vmList+="${LPC_LP_CNV__VM__PREFIX}-${i} "
-    vmNamesForWait+="vm/${LPC_LP_CNV__VM__PREFIX}-${i} "
+    vmList+="${LPC_LP_CNV__VM__PREFIX}-${runPhase}-${i} "
+    vmNamesForWait+="vm/${LPC_LP_CNV__VM__PREFIX}-${runPhase}-${i} "
 done
   : 'Waiting for VMs to enter Ready state...'
   oc wait ${vmNamesForWait} -n "${LPC_LP_CNV__VM__NS}" --for=condition=Ready --timeout="${LPC_LP_CNV__VM__WAIT_TIMEOUT}"
