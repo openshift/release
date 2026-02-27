@@ -1,0 +1,128 @@
+ref:
+  as: redhat-chaos-orion-pod-scenarios-prometheus
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: ORION_REPO
+    default: "https://github.com/cloud-bulldozer/orion.git"
+    documentation: |-
+      Orion github repository
+  - name: TAG
+    default: "main"
+    documentation: |-
+      Override branch of orion
+  - name: POD_NAMESPACE
+    default: "openshift-monitoring"
+    documentation:
+      Namespace of targeted pods
+  - name: LABEL_SELECTOR
+    default: "statefulset.kubernetes.io/pod-name=prometheus-k8s-0"
+  - name: ES_BENCHMARK_INDEX
+    default: "krkn-metrics*"
+    documentation:
+      Index which contains benchmark results
+  - name: ES_METADATA_INDEX
+    default: "krkn-telemetry*"
+    documentation:
+      Index which contains metadata about runs.
+  - name: ACK_FILE
+    default: ""
+    documentation:
+      File will be prefixed with the version
+  - name: ES_TYPE
+    default: "qe"
+    documentation: |-
+      Set es type to internal or qe for getting data
+  - name: ORION_CONFIG
+    default: "examples/pod_disruption_scenarios.yaml"
+    documentation: |-
+      Configuration file to run orion on
+  - name: UUID
+    default: ""
+    documentation: |-
+      Default is blank, which means the uuid will not be applied to the command line args
+  - name: VERSION
+    default: ""
+    documentation:
+      Version of OCP to run Orion against, ex 4.18
+  - name: IGNORE_JOB_ITERATIONS
+    default: "false"
+    documentation:
+      Set orion's --node-count argument
+  - name: OUTPUT_FORMAT
+    default: "TEXT"
+    documentation:
+      Export in desired output format
+  - name: LOOKBACK
+    default: "15"
+    documentation:
+      Number of days orion should lookback at results.
+  - name: RUN_ORION
+    default: "true"
+    documentation:
+      Determine if we should run Orion or not.
+  - name: LOOKBACK_SIZE
+    default: ""
+    documentation:
+      Number of samples orion should consider for results.
+  - name: COLLAPSE
+    default: "false"
+    documentation:
+      Flag to regulate displaying only changepoints vs the entire output.
+  - name: ORION_ENVS
+    default: ""
+    documentation:
+      Comma separated list of envs that needs to exported in runtime for templated configurations.
+  - name: CLOUD_INFRASTRUCTURE
+    default: ""
+    documentation:
+      Cloud infra (aws,gcp,etc)
+  - name: TOTAL_NODE_COUNT
+    default: ""
+    documentation:
+      Total node count
+  - name: NODE_INSTANCE_TYPE
+    default: ""
+    documentation:
+      Worker node instance type
+  - name: NETWORK_PLUGINS
+    default: "OVNKubernetes"
+    documentation:
+      Network type
+  - name: CLOUD_TYPE
+    default: ""
+    documentation:
+      Cloud type (self-managed, rosa, etc)
+  - name: SCENARIO_TYPE
+    default: 	pod_disruption_scenarios
+    documentation:
+      Type of scenario to run
+  - name: SCENARIO_FILE
+    default: /tmp/pod_scenario.yaml
+    documentation: 
+      How we further define certain scenarios apart from scenario type (not applicable here)
+  - name: DISPLAY
+    default: "build_url"
+    documentation:
+      Display custom metadata fields, like ocpVirtVersion, osImage, etc.
+  - name: DEBUG
+    default: "true"
+    documentation: Run orion with debug on
+  commands: redhat-chaos-orion-pod-scenarios-prometheus-commands.sh
+  timeout: 6h
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret/qe
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-perfscale-es-creds
+    mount_path: /secret/internal
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale configmap-scale workload in the deployed cluster

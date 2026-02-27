@@ -56,6 +56,34 @@ tests:
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: redhat-chaos-installer-aws
+  timeout: 5h0m0s
+- as: krkn-hub-node-orion
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      CLOUD_INFRASTRUCTURE: AWS
+      CLOUD_TYPE: self-managed
+      NETWORK_PLUGINS: OVNKubernetes
+      NODE_INSTANCE_TYPE: '*.xlarge*'
+      TOTAL_NODE_COUNT: "9"
+      VERSION: "4.19"
+    test:
+    - chain: redhat-chaos-orion-pod-scenarios
+- always_run: false
+  as: krkn-hub-az-orion
+  steps:
+    cluster_profile: aws-chaos
+    env:
+      CLOUD_INFRASTRUCTURE: Azure
+      CLOUD_TYPE: self-managed
+      NETWORK_PLUGINS: OVNKubernetes
+      NODE_INSTANCE_TYPE: '*Standard_D16s*'
+      TOTAL_NODE_COUNT: "9"
+      VERSION: "4.19"
+    test:
+    - chain: redhat-chaos-orion-pod-scenarios
+    - chain: redhat-chaos-orion-node-tests
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
