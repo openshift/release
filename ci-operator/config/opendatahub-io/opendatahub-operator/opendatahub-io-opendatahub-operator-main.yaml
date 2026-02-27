@@ -3,6 +3,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.39.2
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
   ubi:
     name: ubi-minimal
     namespace: ocp
@@ -91,40 +95,75 @@ tests:
       RELEASE_VERSION: rhoai
     workflow: opendatahub-io-ci-image-mirror
 - as: opendatahub-operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.19"
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: gcp-opendatahub
-    dependencies:
-      OO_BUNDLE: opendatahub-operator-bundle
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-8
-      OO_INSTALL_NAMESPACE: openshift-operators
+    pre:
+    - ref: ipi-install-rbac
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace opendatahub-operator
+        oc label ns opendatahub-operator security.openshift.io/scc.podSecurityLabelSync=true --overwrite
+        operator-sdk run bundle --timeout=5m -n opendatahub-operator "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n opendatahub-operator deployment opendatahub-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: opendatahub-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - as: e2e
       cli: latest
       commands: |
         unset GOFLAGS
-        make e2e-test -e E2E_TEST_FLAGS="-timeout 60m" -e OPERATOR_NAMESPACE=openshift-operators
+        make e2e-test -e E2E_TEST_FLAGS="-timeout 60m" -e OPERATOR_NAMESPACE=opendatahub-operator
       from: src
       resources:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: optional-operators-ci-operator-sdk-gcp
+    workflow: generic-claim
 - as: opendatahub-operator-rhoai-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.19"
   skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
-    cluster_profile: gcp-opendatahub
-    dependencies:
-      OO_BUNDLE: opendatahub-operator-rhoai-bundle
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-8
-      OO_INSTALL_NAMESPACE: redhat-ods-operator
+    pre:
+    - ref: ipi-install-rbac
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace redhat-ods-operator
+        oc label ns redhat-ods-operator security.openshift.io/scc.podSecurityLabelSync=true --overwrite
+        operator-sdk run bundle --timeout=5m -n redhat-ods-operator "$OO_BUNDLE" --verbose
+      dependencies:
+      - env: OO_BUNDLE
+        name: opendatahub-operator-rhoai-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - as: e2e
       cli: latest
       commands: |
@@ -135,36 +174,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 3Gi
-    workflow: optional-operators-ci-operator-sdk-gcp
-- as: opendatahub-operator-e2e-hypershift
-  optional: true
-  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^golangci|^crd-ref-docs\.config|^OWNERS$|^PROJECT$|^LICENSE$|^OWNERS_ALIASES$|^Makefile$|^cmd/[^/]+/|^[^/]+\.(yaml|yml)$|^.gitleaksignore$|^.yamllint$
-  steps:
-    allow_best_effort_post_steps: true
-    allow_skip_on_success: true
-    cluster_profile: aws-opendatahub
-    dependencies:
-      OO_BUNDLE: opendatahub-operator-bundle
-    env:
-      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
-      COMPUTE_NODE_TYPE: m5.2xlarge
-      HYPERSHIFT_AWS_REGION: us-west-2
-      HYPERSHIFT_NODE_COUNT: "3"
-      OO_INSTALL_MODE: AllNamespaces
-      OO_INSTALL_NAMESPACE: openshift-operators
-      USE_HOSTED_KUBECONFIG: "true"
-    test:
-    - as: e2e
-      cli: latest
-      commands: |
-        unset GOFLAGS
-        make e2e-test -e E2E_TEST_FLAGS="-timeout 60m" -e OPERATOR_NAMESPACE=openshift-operators
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 3Gi
-    workflow: opendatahub-io-hypershift
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
