@@ -30,7 +30,7 @@ tests:
   cron: 0 7 * * *
   steps:
     post:
-    - as: teardown
+    - as: e2e-teardown
       commands: ./ci/nightly.sh --teardown
       credentials:
       - mount_path: /var/run/rosa-credentials
@@ -42,8 +42,38 @@ tests:
           cpu: 100m
           memory: 200Mi
     test:
-    - as: nightly
+    - as: e2e
       commands: ./ci/nightly.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- always_run: false
+  as: on-demand-e2e
+  steps:
+    post:
+    - as: e2e-teardown
+      commands: ./ci/nightly.sh --teardown
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: e2e
+      commands: |-
+        export REPOSITORY_URL="https://github.com/${REPO_OWNER}/${REPO_NAME}".git
+        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
+        ./ci/nightly.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-nightly-static-creds
