@@ -12,10 +12,16 @@ ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF' |& sed -e 's/.*auths.*/*** PULL
 set -x
 
 API_SERVER=$(cat nested_kubeconfig | yq -r ".clusters[0].cluster.server" | sed 's|^http[s]*://||' | sed 's|:[0-9]*$||')
+API_SERVER_NODE_PORT=$(cat nested_kubeconfig | yq -r ".clusters[0].cluster.server" | sed -n 's|.*:\([0-9]*\)$|\1|p')
 if [[ ! $API_SERVER =~ \[ && ! $API_SERVER =~ \] && ! $API_SERVER =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     API_SERVER=".${API_SERVER}"
 fi
 sed -i "1 s|$| $API_SERVER|" $HOME/squid.conf
+
+if [[ -n "$API_SERVER_NODE_PORT" ]]; then
+  sed -i "/^acl allowed_ssl_ports / s/$/ $API_SERVER_NODE_PORT/" $HOME/squid.conf
+fi
+
 cat $HOME/squid.conf
 
 sudo setenforce 0
