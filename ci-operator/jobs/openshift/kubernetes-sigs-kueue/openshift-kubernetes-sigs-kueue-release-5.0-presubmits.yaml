@@ -1,18 +1,83 @@
 presubmits:
-  openshift/kubernetes-sigs-kueue:
+  ViaQ/vector:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.0$
-    - ^release-5\.0-
-    cluster: build01
-    context: ci/prow/e2e-aws-ocp-4-18
+    - ^release-6\.0$
+    - ^release-6\.0-
+    cluster: build06
+    context: ci/prow/cargo-deny-check-bans
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-release-5.0-e2e-aws-ocp-4-18
-    rerun_command: /test e2e-aws-ocp-4-18
+    name: pull-ci-ViaQ-vector-release-6.0-cargo-deny-check-bans
+    rerun_command: /test cargo-deny-check-bans
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=cargo-deny-check-bans
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cargo-deny-check-bans,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-6\.0$
+    - ^release-6\.0-
+    cluster: build06
+    context: ci/prow/clo-functional
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-ViaQ-vector-release-6.0-clo-functional
+    rerun_command: /test clo-functional
     spec:
       containers:
       - args:
@@ -21,7 +86,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ocp-4-18
+        - --target=clo-functional
         command:
         - ci-operator
         env:
@@ -74,20 +139,22 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ocp-4-18,?($|\s.*)
+    trigger: (?m)^/test( | .* )clo-functional,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.0$
-    - ^release-5\.0-
-    cluster: build01
-    context: ci/prow/e2e-aws-ocp-4-19
+    - ^release-6\.0$
+    - ^release-6\.0-
+    cluster: build06
+    context: ci/prow/cluster-logging-operator-e2e
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-release-5.0-e2e-aws-ocp-4-19
-    rerun_command: /test e2e-aws-ocp-4-19
+    name: pull-ci-ViaQ-vector-release-6.0-cluster-logging-operator-e2e
+    rerun_command: /test cluster-logging-operator-e2e
     spec:
       containers:
       - args:
@@ -96,7 +163,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ocp-4-19
+        - --target=cluster-logging-operator-e2e
         command:
         - ci-operator
         env:
@@ -149,19 +216,21 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-ocp-4-19,?($|\s.*)
+    trigger: (?m)^/test( | .* )cluster-logging-operator-e2e,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.0$
-    - ^release-5\.0-
-    cluster: build01
+    - ^release-6\.0$
+    - ^release-6\.0-
+    cluster: build06
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-release-5.0-images
+    name: pull-ci-ViaQ-vector-release-6.0-images
     rerun_command: /test images
     spec:
       containers:
@@ -170,7 +239,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
@@ -207,23 +275,25 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.0$
-    - ^release-5\.0-
-    cluster: build01
-    context: ci/prow/integration
+    - ^release-6\.0$
+    - ^release-6\.0-
+    cluster: build06
+    context: ci/prow/ldd-openssl
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-release-5.0-integration
-    rerun_command: /test integration
+    name: pull-ci-ViaQ-vector-release-6.0-ldd-openssl
+    rerun_command: /test ldd-openssl
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=integration
+        - --target=ldd-openssl
         command:
         - ci-operator
         env:
@@ -264,27 +334,29 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )integration,?($|\s.*)
+    trigger: (?m)^/test( | .* )ldd-openssl,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-5\.0$
-    - ^release-5\.0-
-    cluster: build01
-    context: ci/prow/test
+    - ^release-6\.0$
+    - ^release-6\.0-
+    cluster: build06
+    context: ci/prow/unit
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-release-5.0-test
-    rerun_command: /test test
+    name: pull-ci-ViaQ-vector-release-6.0-unit
+    rerun_command: /test unit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=test
+        - --target=unit
         command:
         - ci-operator
         env:
@@ -325,65 +397,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-5\.0$
-    - ^release-5\.0-
-    cluster: build01
-    context: ci/prow/vet
-    decorate: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-kubernetes-sigs-kueue-release-5.0-vet
-    rerun_command: /test vet
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=vet
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )vet,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)

@@ -1,28 +1,19 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
-  cron: 40 4 * * *
+  cluster: build02
+  cron: 10 15 18 2 *
   decorate: true
   extra_refs:
-  - base_ref: release-5.0
+  - base_ref: release-4.17
     org: openshift
-    repo: csi-operator
+    repo: cluster-etcd-operator
   labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-3
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-csi-operator-release-5.0-periodics-periodic-e2e-aws-efs-csi
-  reporter_config:
-    slack:
-      channel: '#forum-ocp-storage'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: |
-        ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  name: periodic-ci-openshift-cluster-etcd-operator-release-4.17-periodics-e2e-metal-assisted-four-node-parallel
   spec:
     containers:
     - args:
@@ -31,7 +22,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=periodic-e2e-aws-efs-csi
+      - --target=e2e-metal-assisted-four-node-parallel
       - --variant=periodics
       command:
       - ci-operator
@@ -89,29 +80,20 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: 26 17 * * *
+  cluster: build02
+  cron: 22 14 23 7 *
   decorate: true
   extra_refs:
-  - base_ref: release-5.0
+  - base_ref: release-4.17
     org: openshift
-    repo: csi-operator
+    repo: cluster-etcd-operator
   labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure4
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-csi-operator-release-5.0-periodics-periodic-e2e-azure-file-csi
-  reporter_config:
-    slack:
-      channel: '#forum-ocp-storage'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: |
-        ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  name: periodic-ci-openshift-cluster-etcd-operator-release-4.17-periodics-e2e-metal-assisted-four-node-recovery
   spec:
     containers:
     - args:
@@ -120,7 +102,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=periodic-e2e-azure-file-csi
+      - --target=e2e-metal-assisted-four-node-recovery
       - --variant=periodics
       command:
       - ci-operator
@@ -178,29 +160,20 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
-  cron: 2 10 * * *
+  cluster: build02
+  cron: 27 5 26 7 *
   decorate: true
   extra_refs:
-  - base_ref: release-5.0
+  - base_ref: release-4.17
     org: openshift
-    repo: csi-operator
+    repo: cluster-etcd-operator
   labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure4
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
-    job-release: "5.0"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-csi-operator-release-5.0-periodics-periodic-e2e-smb-csi
-  reporter_config:
-    slack:
-      channel: '#forum-ocp-storage'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: |
-        ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  name: periodic-ci-openshift-cluster-etcd-operator-release-4.17-periodics-e2e-metal-assisted-four-node-scaling
   spec:
     containers:
     - args:
@@ -209,7 +182,87 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=periodic-e2e-smb-csi
+      - --target=e2e-metal-assisted-four-node-scaling
+      - --variant=periodics
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  cron: 34 16 19 2 *
+  decorate: true
+  extra_refs:
+  - base_ref: release-4.17
+    org: openshift
+    repo: cluster-etcd-operator
+  labels:
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+    ci-operator.openshift.io/variant: periodics
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-cluster-etcd-operator-release-4.17-periodics-e2e-metal-assisted-four-node-serial
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-metal-assisted-four-node-serial
       - --variant=periodics
       command:
       - ci-operator
