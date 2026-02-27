@@ -790,9 +790,11 @@ RESPONSE RULES:
 2. Only make code changes when explicitly requested (look for imperative language like 'change', 'fix', 'update', 'remove')
 3. For questions or clarifications, reply with an explanation only - do not change code unless asked"
 
+  PHASE_START=$(date +%s)
   set +e  # Don't exit on error for individual PRs
   echo "Starting Claude processing with streaming output..."
   # Redirect stdin from /dev/null to prevent Claude from consuming the while loop's here-string input
+  # Separate stderr from stdout so stream-json stays clean
   RESULT=$(claude -p "$PR_NUMBER. $REVIEW_CONTEXT" \
     --system-prompt "$SKILL_CONTENT" \
     --allowedTools "Bash Read Write Edit Grep Glob WebFetch" \
@@ -801,15 +803,56 @@ RESPONSE RULES:
     --verbose \
     --output-format stream-json \
     < /dev/null \
-    2>&1 | tee "/tmp/claude-pr-${PR_NUMBER}-output.json")
+    2> "/tmp/claude-pr-${PR_NUMBER}-output.log" \
+    | tee "/tmp/claude-pr-${PR_NUMBER}-output.json")
   EXIT_CODE=$?
   set -e
   echo "Claude processing complete. Full output saved to /tmp/claude-pr-${PR_NUMBER}-output.json"
 
-  # Copy Claude output to SHARED_DIR for the report step
-  if [ -f "/tmp/claude-pr-${PR_NUMBER}-output.json" ]; then
-    cp "/tmp/claude-pr-${PR_NUMBER}-output.json" "${SHARED_DIR}/claude-pr-${PR_NUMBER}-output.json"
-  fi
+  # Extract phase output text
+  jq -j 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text // empty' \
+    "/tmp/claude-pr-${PR_NUMBER}-output.json" \
+    > "${SHARED_DIR}/claude-pr-${PR_NUMBER}-output-text.txt" 2>/dev/null || true
+
+  # Extract tool calls (aggregated with counts)
+  jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' \
+    "/tmp/claude-pr-${PR_NUMBER}-output.json" 2>/dev/null \
+    | sort | uniq -c | sort -rn \
+    > "${SHARED_DIR}/claude-pr-${PR_NUMBER}-output-tools.txt" 2>/dev/null || true
+
+  # Extract tool errors
+  jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' \
+    "/tmp/claude-pr-${PR_NUMBER}-output.json" 2>/dev/null \
+    | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' \
+    > "${SHARED_DIR}/claude-pr-${PR_NUMBER}-output-errors.txt" 2>/dev/null || true
+
+  # Extract token usage (aggregate across all assistant messages)
+  grep '^{' "/tmp/claude-pr-${PR_NUMBER}-output.json" > "/tmp/claude-pr-${PR_NUMBER}-output-filtered.json" 2>/dev/null || true
+  jq -s '[.[] | select(.type == "assistant")] | {
+    input_tokens: (map(.message.usage.input_tokens // 0) | add // 0),
+    output_tokens: (map(.message.usage.output_tokens // 0) | add // 0),
+    cache_read_input_tokens: (map(.message.usage.cache_read_input_tokens // 0) | add // 0),
+    cache_creation_input_tokens: (map(.message.usage.cache_creation_input_tokens // 0) | add // 0),
+    model: (.[0].message.model // "unknown")
+  }' "/tmp/claude-pr-${PR_NUMBER}-output-filtered.json" \
+    > "${SHARED_DIR}/claude-pr-${PR_NUMBER}-tokens.json" 2>/dev/null \
+    || echo '{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model":"unknown"}' \
+    > "${SHARED_DIR}/claude-pr-${PR_NUMBER}-tokens.json"
+  echo "Tokens: $(cat "${SHARED_DIR}/claude-pr-${PR_NUMBER}-tokens.json")"
+
+  # Extract duration
+  PHASE_END=$(date +%s)
+  PHASE_DURATION=$((PHASE_END - PHASE_START))
+  echo "$PHASE_DURATION" > "${SHARED_DIR}/claude-pr-${PR_NUMBER}-duration.txt"
+  echo "Phase duration: ${PHASE_DURATION}s"
+
+  # Extract num_turns and session_id from result line
+  grep '"type":"result"' "/tmp/claude-pr-${PR_NUMBER}-output.json" 2>/dev/null \
+    | jq -r '.num_turns // 0' 2>/dev/null | head -1 \
+    > "${SHARED_DIR}/claude-pr-${PR_NUMBER}-num-turns.txt" 2>/dev/null || echo "0" > "${SHARED_DIR}/claude-pr-${PR_NUMBER}-num-turns.txt"
+  grep '"type":"result"' "/tmp/claude-pr-${PR_NUMBER}-output.json" 2>/dev/null \
+    | jq -r '.session_id // "unknown"' 2>/dev/null | head -1 \
+    > "${SHARED_DIR}/claude-pr-${PR_NUMBER}-session-id.txt" 2>/dev/null || echo "unknown" > "${SHARED_DIR}/claude-pr-${PR_NUMBER}-session-id.txt"
 
   if [ $EXIT_CODE -eq 0 ]; then
     echo "Successfully processed PR #$PR_NUMBER"
