@@ -81,6 +81,19 @@ tests:
     - ref: openshift-extended-test-longduration
     - ref: openshift-e2e-test-qe-report
     workflow: cucushift-installer-rehearse-gcp-cases-clusters
+- as: installer-rehearse-vsphere
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OSSTREAM: rhel-10
+      SLEEP_DURATION: 24h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-vsphere-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-vsphere-ipi-provision
 zz_generated_metadata:
   branch: main
   org: openshift
