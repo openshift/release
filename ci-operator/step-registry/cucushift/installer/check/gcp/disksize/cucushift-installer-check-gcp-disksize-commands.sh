@@ -12,11 +12,6 @@ set -o pipefail
 EXIT_CODE=101
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
 
-if [ -z "${COMPUTE_DISK_SIZEGB}" ] && [ -z "${CONTROL_PLANE_DISK_SIZEGB}" ]; then
-  echo "Empty 'COMPUTE_DISK_SIZEGB' and 'CONTROL_PLANE_DISK_SIZEGB', nothing to do, exiting."
-  exit 0
-fi
-
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
@@ -28,21 +23,34 @@ then
   gcloud config set project "${GOOGLE_PROJECT_ID}"
 fi
 
-echo "COMPUTE_DISK_SIZEGB: ${COMPUTE_DISK_SIZEGB}"
-echo "CONTROL_PLANE_DISK_SIZEGB: ${CONTROL_PLANE_DISK_SIZEGB}"
+compute_disk_sizegb=$(yq-go r "${SHARED_DIR}/install-config.yaml" compute[0].platform.gcp.osDisk.diskSizeGB)
+if [ -z "${compute_disk_sizegb}" ]; then
+  compute_disk_sizegb=$(yq-go r "${SHARED_DIR}/install-config.yaml" platform.gcp.defaultMachinePlatform.osDisk.diskSizeGB)
+fi
+if [ -z "${compute_disk_sizegb}" ]; then
+  compute_disk_sizegb="128"
+fi
+
+control_plane_disk_sizegb=$(yq-go r "${SHARED_DIR}/install-config.yaml" controlPlane.platform.gcp.osDisk.diskSizeGB)
+if [ -z "${control_plane_disk_sizegb}" ]; then
+  control_plane_disk_sizegb=$(yq-go r "${SHARED_DIR}/install-config.yaml" platform.gcp.defaultMachinePlatform.osDisk.diskSizeGB)
+fi
+if [ -z "${control_plane_disk_sizegb}" ]; then
+  control_plane_disk_sizegb="128"
+fi
 
 ## Try the validation
 ret=0
 
-echo "$(date -u --rfc-3339=seconds) - Checking OS disk type of cluster nodes..."
+echo "$(date -u --rfc-3339=seconds) - Checking OS disk sizeGb of cluster nodes..."
 readarray -t disks < <(gcloud compute disks list --filter="${CLUSTER_NAME}" --format="table(name,sizeGb)" | grep -v NAME)
 for line in "${disks[@]}"; do
   name="${line%% *}"
   size="${line##* }"
-  if [[ "${name}" =~ worker ]] && [[ -n "${COMPUTE_DISK_SIZEGB}" ]]; then
-    expected_size="${COMPUTE_DISK_SIZEGB}"
-  elif [[ "${name}" =~ master ]] && [[ -n "${CONTROL_PLANE_DISK_SIZEGB}" ]]; then
-    expected_size="${CONTROL_PLANE_DISK_SIZEGB}"
+  if [[ "${name}" =~ worker ]]; then
+    expected_size="${compute_disk_sizegb}"
+  elif [[ "${name}" =~ master ]]; then
+    expected_size="${control_plane_disk_sizegb}"
   else
     echo "$(date -u --rfc-3339=seconds) - Skip disk '${name}'."
     continue 
