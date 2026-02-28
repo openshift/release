@@ -65,7 +65,10 @@ make -o tooling/templatize/templatize entrypoint/Region \
   DEPLOY_ENV=prow \
   EXTRA_ARGS="--region ${LOCATION} --abort-if-regional-exist" \
   TIMING_OUTPUT=${SHARED_DIR}/steps.yaml.gz \
-  ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml
+  ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml \
+  CONFIG_OUTPUT=${SHARED_DIR}/config.yaml
+
+cp "${SHARED_DIR}/config.yaml" "${ARTIFACT_DIR}/config.yaml"
 
 # Mark successful completion
 touch "${SHARED_DIR}/provision-complete"
