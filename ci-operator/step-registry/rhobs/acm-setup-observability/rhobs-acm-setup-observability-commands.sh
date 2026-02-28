@@ -100,7 +100,6 @@ spec:
 EOF
 
 echo "[INFO] Waiting for MinIO become ready..."
-oc wait --for=jsonpath='{.status.phase}'=Bound --timeout=5m pvc/minio -n open-cluster-management-observability
 oc wait --for=condition=Available --timeout=20m Deployment/minio -n open-cluster-management-observability
 
 oc apply -f - <<EOF
@@ -118,6 +117,6 @@ EOF
 
 echo "[INFO] Waiting for MCO components to become ready..."
 sleep 1m
-oc wait --for=condition=Ready pod -l alertmanager=observability,app=multicluster-observability-alertmanager -n open-cluster-management-observability --timeout=5m
-oc wait --for=condition=Ready pod -l app=rbac-query-proxy -n open-cluster-management-observability --timeout=5m
+oc wait --for=condition=Ready pod -l alertmanager=observability,app=multicluster-observability-alertmanager -n open-cluster-management-observability --timeout=10m
+oc wait --for=condition=Ready pod -l app=rbac-query-proxy -n open-cluster-management-observability --timeout=10m
 echo "[SUCCESS] ACM Observability is fully ready."
