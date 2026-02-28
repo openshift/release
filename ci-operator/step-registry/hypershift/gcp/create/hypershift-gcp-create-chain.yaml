@@ -16,6 +16,17 @@ chain:
     commands: |-
       set -exuo pipefail
 
+      # TODO(GCP-295): Remove after GCP platform support merges
+      # Extract hypershift CLI from custom image with GCP flags support
+      GCP_OPERATOR_IMAGE="quay.io/cveiga/hypershift:GCP-295-e2e-gcp-platform-support-4f9d5c16"
+      mkdir -p /tmp/hs-cli
+      oc image extract "${GCP_OPERATOR_IMAGE}" \
+        --path /usr/"${HCP_CLI}":/tmp/hs-cli \
+        --registry-config=/etc/ci-pull-credentials/.dockerconfigjson \
+        --filter-by-os="linux/amd64"
+      chmod +x /tmp/hs-cli/hypershift
+      HCP_CLI="/tmp/hs-cli/hypershift"
+
       # Load configuration from SHARED_DIR (populated by prior steps)
       GCP_REGION="$(<"${SHARED_DIR}/gcp-region")"
       HC_PROJECT_ID="$(<"${SHARED_DIR}/hosted-cluster-project-id")"
@@ -49,7 +60,7 @@ chain:
       HC_NAME="gcp-hc-${CLUSTER_NAME:0-8}"
       echo "$(date) Creating GCP HyperShift cluster ${HC_NAME}"
 
-      bin/hypershift create cluster gcp \
+      "${HCP_CLI}" create cluster gcp \
         --name "${HC_NAME}" \
         --namespace clusters \
         --base-domain "${BASE_DOMAIN}" \
@@ -84,7 +95,7 @@ chain:
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=clusters "hostedcluster/${HC_NAME}"
       echo "Cluster became available, creating kubeconfig"
-      bin/hypershift create kubeconfig --namespace=clusters --name="${HC_NAME}" > "${SHARED_DIR}/nested_kubeconfig"
+      "${HCP_CLI}" create kubeconfig --namespace=clusters --name="${HC_NAME}" > "${SHARED_DIR}/nested_kubeconfig"
 
       # Save cluster name for the test chain
       echo "${HC_NAME}" > "${SHARED_DIR}/cluster-name"
