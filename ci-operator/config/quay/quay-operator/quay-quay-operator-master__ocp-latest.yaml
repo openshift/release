@@ -36,7 +36,7 @@ operator:
     context_dir: bundle/
     dockerfile_path: Dockerfile
   substitutions:
-  - pullspec: quay.io/projectquay/quay-operator:v3.6.1
+  - pullspec: quay.io/projectquay/quay-operator:v3.17.0-dev
     with: quay-operator
 promotion:
   to:
@@ -151,12 +151,21 @@ tests:
         set -eux
         export HOME="${HOME:-/tmp/home}"
         export XDG_RUNTIME_DIR="${HOME}/run"
-        export REGISTRY_AUTH_PREFERENCE=podman
-        mkdir -p "${XDG_RUNTIME_DIR}"
+        mkdir -p "${XDG_RUNTIME_DIR}/containers"
         registryEndpoint="$(oc -n quay get quayregistry quay -o jsonpath='{.status.registryEndpoint}')"
         registry="${registryEndpoint#https://}"
-        oc registry login --registry "$registry" --auth-basic "admin:p@ssw0rd"
-        oc image mirror --insecure=true quay.io/projectquay/quay:latest "$registry/admin/quay"
+        oc registry login --registry "$registry" --auth-basic "admin:p@ssw0rd" --to="${XDG_RUNTIME_DIR}/containers/auth.json"
+        for attempt in 1 2 3; do
+          echo "Image mirror attempt $attempt/3..."
+          if oc image mirror --insecure=true -a "${XDG_RUNTIME_DIR}/containers/auth.json" quay.io/projectquay/quay:latest "$registry/admin/quay"; then
+            echo "Image mirror succeeded"
+            exit 0
+          fi
+          echo "Attempt $attempt failed, retrying in 10s..."
+          sleep 10
+        done
+        echo "Image mirror failed after 3 attempts"
+        exit 1
       from: src-oc
       resources:
         requests:
@@ -196,12 +205,21 @@ tests:
         set -eux
         export HOME="${HOME:-/tmp/home}"
         export XDG_RUNTIME_DIR="${HOME}/run"
-        export REGISTRY_AUTH_PREFERENCE=podman
-        mkdir -p "${XDG_RUNTIME_DIR}"
+        mkdir -p "${XDG_RUNTIME_DIR}/containers"
         registryEndpoint="$(oc -n quay get quayregistry quay -o jsonpath='{.status.registryEndpoint}')"
         registry="${registryEndpoint#https://}"
-        oc registry login --registry "$registry" --auth-basic "admin:p@ssw0rd"
-        oc image mirror --insecure=true quay.io/projectquay/quay:latest "$registry/admin/quay-post-upgrade"
+        oc registry login --registry "$registry" --auth-basic "admin:p@ssw0rd" --to="${XDG_RUNTIME_DIR}/containers/auth.json"
+        for attempt in 1 2 3; do
+          echo "Image mirror attempt $attempt/3..."
+          if oc image mirror --insecure=true -a "${XDG_RUNTIME_DIR}/containers/auth.json" quay.io/projectquay/quay:latest "$registry/admin/quay-post-upgrade"; then
+            echo "Image mirror succeeded"
+            exit 0
+          fi
+          echo "Attempt $attempt failed, retrying in 10s..."
+          sleep 10
+        done
+        echo "Image mirror failed after 3 attempts"
+        exit 1
       from: src-oc
       resources:
         requests:
