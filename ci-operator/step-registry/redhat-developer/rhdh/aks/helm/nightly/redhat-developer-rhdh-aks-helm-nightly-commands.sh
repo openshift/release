@@ -145,7 +145,7 @@ PR_CHANGESET=$(git diff --name-only $RELEASE_BRANCH_NAME)
 echo "Changeset: $PR_CHANGESET"
 
 # Check if changes are exclusively within the specified directories
-DIRECTORIES_TO_CHECK=".ibm|e2e-tests|docs|.claude|.cursor|.rulesync|.vscode"
+DIRECTORIES_TO_CHECK=".ci|e2e-tests|docs|.claude|.cursor|.rulesync|.vscode"
 ONLY_IN_DIRS=true
 
 for change in $PR_CHANGESET; do
@@ -219,4 +219,4 @@ echo "Using image: ${QUAY_REPO}:${TAG_NAME}, with digest: ${IMAGE_SHA}"
 
 echo "========== Test Execution =========="
 echo "Executing openshift-ci-tests.sh"
-bash ./.ibm/pipelines/openshift-ci-tests.sh
+bash ./.ci/pipelines/openshift-ci-tests.sh
