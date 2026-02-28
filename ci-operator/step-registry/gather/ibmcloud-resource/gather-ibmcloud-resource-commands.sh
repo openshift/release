@@ -1,16 +1,16 @@
 #!/bin/bash
-function debug_on_failure() {
-    local exit_code=$?
-    # Only sleep if the exit code is non-zero (failure)
-    if [ $exit_code -ne 0 ]; then
-        echo "Script failed with exit code $exit_code. Sleeping for debugging purposes."
-        sleep 5s
-    else
-        sleep 5s
-    fi
-}
+# function debug_on_failure() {
+#     local exit_code=$?
+#     # Only sleep if the exit code is non-zero (failure)
+#     if [ $exit_code -ne 0 ]; then
+#         echo "Script failed with exit code $exit_code. Sleeping for debugging purposes."
+#         sleep 5s
+#     else
+#         sleep 5s
+#     fi
+# }
 
-trap debug_on_failure EXIT ERR
+#trap debug_on_failure EXIT ERR
 
 set -o nounset
 set -o pipefail
@@ -265,7 +265,6 @@ ssh_instances() {
     fi
        
     set +e
-    set -x 
     # Add Jump Host if bastion exists
     if [[ -n "$proxy_ip" ]]; then
         proxy_args="ssh -o IdentityFile=${ssh_key} -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p ${bastion_user}@${proxy_ip}"
