@@ -39,6 +39,34 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- always_run: true
+  as: perfscale-cdv2
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "3"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --pod-ready-threshold=20s --service-latency
+      CDV2_ITERATION_MULTIPLIER: "15"
+      ENABLE_LOCAL_INDEX: "false"
+      GC: "false"
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-cluster-density-v2
+    - as: run-must-gather
+      cli: latest
+      commands: |
+        oc adm must-gather --image="${MUST_GATHER_IMAGE}" --dest-dir="${ARTIFACT_DIR}/must-gather"
+      dependencies:
+      - env: MUST_GATHER_IMAGE
+        name: must-gather
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+    workflow: openshift-qe-installer-aws
 zz_generated_metadata:
   branch: main
   org: openshift
