@@ -1,0 +1,37 @@
+chain:
+  as: cucushift-installer-rehearse-gcp-ipi-xpn-custom-dns-private-provision
+  steps: 
+  - ref: upi-conf-gcp-xpn
+  - ref: ignition-bastionhost
+  - ref: gcp-provision-bastionhost
+  - chain: ipi-conf-gcp
+  - ref: ipi-conf-credentials-mode
+  - ref: ipi-conf-gcp-xpn-network
+  - ref: ipi-conf-gcp-basedomain
+  - ref: gcp-provision-xpn-min-perm-passthrough-serviceaccount
+  - ref: ipi-conf-gcp-service-account
+  - ref: ipi-install-rbac
+  - ref: openshift-cluster-bot-rbac
+  - ref: ipi-install-hosted-loki
+  - ref: ipi-install-install-in-bastion
+  - ref: gcp-provision-private-custom-dns
+  - ref: bastion-dnsmasq
+  - ref: proxy-config-generate
+  - ref: enable-qe-catalogsource
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-gcp-private
+  - ref: cucushift-installer-check-gcp-credentials-mode
+  - ref: cucushift-installer-check-user-provisioned-dns
+  env:
+  - name: PUBLISH
+    default:  "Internal"
+  - name: CREDENTIALS_MODE
+    default: "Passthrough"
+    documentation: CCO mode.
+  - name: USER_PROVISIONED_DNS
+    default: "yes"
+    documentation: |-
+      Allow users to select the user provisioned dns option for AWS installations during configuration. Valid options are "yes" and "no". When "yes", the
+      configuration will enable the user provisioned dns option through the install configuration file.
+  documentation: |-
+    Create an IPI private cluster with custom DNS enabled on GCP for QE e2e tests.
