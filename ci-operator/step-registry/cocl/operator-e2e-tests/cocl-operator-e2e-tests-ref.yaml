@@ -1,0 +1,85 @@
+ref:
+  as: cocl-operator-e2e-tests
+  from_image:
+    namespace: ocp
+    name: "4.21"
+    tag: cli
+  commands: cocl-operator-e2e-tests-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - namespace: test-credentials
+    name: cocl-operator-secrets
+    mount_path: /var/run/vault/cocl-secrets
+  env:
+  - name: OPERATOR_NAMESPACE
+    default: "openshift-cocl-operator"
+    documentation: Namespace where the COCL operator is installed
+  - name: TEST_NAMESPACE
+    default: "trusted-execution-clusters"
+    documentation: Namespace where test CRs will be created
+  - name: PCRS_COMPUTE_IMAGE
+    default: "quay.io/redhat-user-workloads/cocl-operator-tenant/compute-pcrs:latest"
+    documentation: Image for PCRs compute component
+  - name: REGISTER_SERVER_IMAGE
+    default: "quay.io/redhat-user-workloads/cocl-operator-tenant/registration-server:latest"
+    documentation: Image for registration server component
+  - name: ATTESTATION_KEY_REGISTER_IMAGE
+    default: "quay.io/redhat-user-workloads/cocl-operator-tenant/attestation-key-register:latest"
+    documentation: Image for attestation key register component
+  - name: TRUSTEE_IMAGE
+    default: "quay.io/trusted-execution-clusters/key-broker-service:20260106"
+    documentation: Image for trustee/KBS service
+  - name: APPROVED_IMAGE
+    default: "quay.io/fedora/fedora-coreos@sha256:8f11c87187dfe83145001e9571948f9ab466e9f4a8b1e092a4798e5db1030dc3"
+    documentation: Test image to add to ApprovedImage CR
+  - name: E2E_TEST_TIMEOUT
+    default: "900"
+    documentation: Timeout in seconds for E2E test completion
+  documentation: |-
+    Run end-to-end tests for the Confidential Clusters (COCL) operator.
+
+    This step performs the following operations:
+    1. Verifies the COCL operator is installed and running
+    2. Extracts component image URLs from operator CSV relatedImages
+    3. Creates the test namespace (trusted-execution-clusters)
+    4. Gets cluster ingress domain to construct publicTrusteeAddr
+    5. Creates a TrustedExecutionCluster CR with component images and dynamic publicTrusteeAddr
+    6. Creates an ApprovedImage CR for testing
+    7. Waits for operator to reconcile and create expected resources
+    8. Verifies ConfigMaps are populated with expected values
+    9. Verifies CR status and auto-created CRs (Machine, AttestationKey) if applicable
+
+    Image Resolution:
+    - Primary source: CSV spec.relatedImages (extracted dynamically)
+    - Fallback: Environment variable defaults (if image not found in CSV)
+    - This ensures tests use the exact images bundled with the operator version
+
+    Prerequisites:
+    - COCL operator must be installed (via install-operators step)
+    - Operator must be running in OPERATOR_NAMESPACE
+    - CSV must be available in OPERATOR_NAMESPACE
+    - Cluster must have sufficient resources for operator workloads
+
+    Success Criteria:
+    - TrustedExecutionCluster CR status becomes Ready
+    - ApprovedImage CR is successfully reconciled
+    - All expected pods reach Running state
+    - ConfigMaps contain expected configuration data
+    - Auto-created Machine and AttestationKey CRs appear (if conditions met)
+
+    Environment Variables:
+    - OPERATOR_NAMESPACE: Namespace where operator is installed (default: openshift-cocl-operator)
+    - TEST_NAMESPACE: Namespace for test CRs (default: trusted-execution-clusters)
+    - PCRS_COMPUTE_IMAGE: Fallback compute-pcrs image (if not in CSV)
+    - REGISTER_SERVER_IMAGE: Fallback registration-server image (if not in CSV)
+    - ATTESTATION_KEY_REGISTER_IMAGE: Fallback attestation-key-register image (if not in CSV)
+    - TRUSTEE_IMAGE: Fallback trustee/KBS image (if not in CSV)
+    - APPROVED_IMAGE: Image to use in ApprovedImage test CR
+    - E2E_TEST_TIMEOUT: Test timeout in seconds (default: 900)
+
+    Exit Codes:
+    - 0: E2E tests passed successfully
+    - 1: Operator not ready, CSV not found, CR creation failed, or verification failed
