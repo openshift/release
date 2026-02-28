@@ -133,4 +133,4 @@ npm install || true
 
 # run test
 echo "--- Running COO ACM Alerting UI Cypress test ---"
-npm run test-cypress-e2e -- --spec "cypress/e2e/coo/02.acm_alerting_ui.cy.ts" || true
+npm run test-cypress-e2e -- --spec "cypress/e2e/coo/02.acm_alerting_ui.cy.ts"
