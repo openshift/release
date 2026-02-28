@@ -1,0 +1,45 @@
+workflow:
+  as: hypershift-gcp-gke-e2e-v2
+  documentation: |-
+    The HyperShift GCP GKE e2e-v2 workflow provisions a GKE cluster,
+    creates a GCP hosted cluster, runs Ginkgo v2 tests, and cleans up.
+
+    Pre phase:
+    1. ipi-install-rbac: Grant image-puller permissions on build farm
+    2. hypershift-gcp-gke-provision: Create GCP projects, VPC, and GKE cluster
+    3. hypershift-gcp-gke-prerequisites: Install CRDs and cert-manager on GKE
+    4. hypershift-install: Install the HyperShift operator
+    5. hypershift-gcp-control-plane-setup: Configure WIF and webhook TLS
+    6. hypershift-gcp-hosted-cluster-setup: Create WIF and network infrastructure
+    7. hypershift-gcp-create: Create GCP HostedCluster and wait for rollout
+
+    Test phase:
+    1. hypershift-e2e-v2: Run Ginkgo v2 tests against the hosted cluster
+
+    Post phase:
+    1. hypershift-dump: Collect HyperShift artifacts for debugging
+    2. hypershift-gcp-destroy: Destroy the GCP HostedCluster
+    3. hypershift-gcp-gke-deprovision: Delete GKE cluster and GCP projects
+  steps:
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-gcp-destroy
+    - ref: hypershift-gcp-gke-deprovision
+    test:
+    - chain: hypershift-e2e-v2
+    pre:
+    - ref: ipi-install-rbac
+    - ref: hypershift-gcp-gke-provision
+    - ref: hypershift-gcp-gke-prerequisites
+    - ref: hypershift-install
+    - ref: hypershift-gcp-control-plane-setup
+    - ref: hypershift-gcp-hosted-cluster-setup
+    - chain: hypershift-gcp-create
+    env:
+      CLOUD_PROVIDER: "GCP"
+      GKE_REGION: "us-central1"
+      GKE_RELEASE_CHANNEL: "stable"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      HYPERSHIFT_GCP_CI_PROJECT: "gcp-hcp-hypershift-ci"
+      HYPERSHIFT_GCP_CI_DNS_ZONE: "hypershift-ci-zone"
+      HYPERSHIFT_GCP_CI_DNS_DOMAIN: "hypershift-ci.gcp-hcp.openshiftapps.com"

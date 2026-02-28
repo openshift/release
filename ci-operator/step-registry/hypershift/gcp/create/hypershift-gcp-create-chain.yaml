@@ -1,0 +1,153 @@
+chain:
+  as: hypershift-gcp-create
+  steps:
+  - as: create-hostedcluster
+    cli: latest
+    env:
+    - name: HYPERSHIFT_NODE_COUNT
+      default: "2"
+      documentation: "Number of nodes for the hosted cluster NodePool."
+    - name: HYPERSHIFT_GCP_BOOT_IMAGE
+      default: "projects/rhcos-cloud/global/images/rhcos-9-6-20250925-0-gcp-x86-64"
+      documentation: "GCP boot image for hosted cluster nodes (RHCOS image path)"
+    - name: HYPERSHIFT_GCP_CI_DNS_DOMAIN
+      default: ""
+      documentation: "DNS domain for HyperShift CI hosted clusters"
+    commands: |-
+      set -exuo pipefail
+
+      # Load configuration from SHARED_DIR (populated by prior steps)
+      GCP_REGION="$(<"${SHARED_DIR}/gcp-region")"
+      HC_PROJECT_ID="$(<"${SHARED_DIR}/hosted-cluster-project-id")"
+      CLUSTER_NAME="$(<"${SHARED_DIR}/cluster-name")"
+
+      # Network config (from hypershift-gcp-hosted-cluster-setup)
+      VPC_NAME="$(<"${SHARED_DIR}/hc-vpc-name")"
+      PSC_SUBNET="$(<"${SHARED_DIR}/hc-subnet-name")"
+
+      # WIF config (from hypershift-gcp-hosted-cluster-setup)
+      WIF_PROJECT_NUMBER="$(<"${SHARED_DIR}/wif-project-number")"
+      WIF_POOL_ID="$(<"${SHARED_DIR}/wif-pool-id")"
+      WIF_PROVIDER_ID="$(<"${SHARED_DIR}/wif-provider-id")"
+      CONTROLPLANE_SA="$(<"${SHARED_DIR}/controlplane-sa")"
+      NODEPOOL_SA="$(<"${SHARED_DIR}/nodepool-sa")"
+      CLOUDCONTROLLER_SA="$(<"${SHARED_DIR}/cloudcontroller-sa")"
+      STORAGE_SA="$(<"${SHARED_DIR}/storage-sa")"
+      SA_SIGNING_KEY_PATH="$(<"${SHARED_DIR}/sa-signing-key-path")"
+
+      # Construct base domain and OIDC issuer URL
+      BASE_DOMAIN="in.${CLUSTER_NAME}.${HYPERSHIFT_GCP_CI_DNS_DOMAIN}"
+      OIDC_ISSUER_URL="https://hypershift-${CLUSTER_NAME}-oidc"
+
+      RELEASE_IMAGE="${OCP_IMAGE_LATEST}"
+
+      # TODO(GCP-295): Remove image overrides after GCP platform support merges
+      CPO_IMAGE="quay.io/cveiga/hypershift:GCP-295-e2e-gcp-platform-support-4f9d5c16"
+      # TODO(GCP-426): Remove CAPG image override once HyperShift's CAPI CRDs serve v1beta2
+      CAPG_IMAGE="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:bdec420448b81cc57f5b53bbcf491c0ed53b6e3ca97da722f69f386a373afe50"
+
+      HC_NAME="gcp-hc-${CLUSTER_NAME:0-8}"
+      echo "$(date) Creating GCP HyperShift cluster ${HC_NAME}"
+
+      bin/hypershift create cluster gcp \
+        --name "${HC_NAME}" \
+        --namespace clusters \
+        --base-domain "${BASE_DOMAIN}" \
+        --external-dns-domain="${BASE_DOMAIN}" \
+        --node-pool-replicas "${HYPERSHIFT_NODE_COUNT}" \
+        --release-image "${RELEASE_IMAGE}" \
+        --pull-secret /etc/ci-pull-credentials/.dockerconfigjson \
+        --project "${HC_PROJECT_ID}" \
+        --region "${GCP_REGION}" \
+        --network "${VPC_NAME}" \
+        --private-service-connect-subnet "${PSC_SUBNET}" \
+        --endpoint-access PublicAndPrivate \
+        --workload-identity-project-number "${WIF_PROJECT_NUMBER}" \
+        --workload-identity-pool-id "${WIF_POOL_ID}" \
+        --workload-identity-provider-id "${WIF_PROVIDER_ID}" \
+        --controlplane-service-account "${CONTROLPLANE_SA}" \
+        --nodepool-service-account "${NODEPOOL_SA}" \
+        --cloud-controller-service-account "${CLOUDCONTROLLER_SA}" \
+        --storage-service-account "${STORAGE_SA}" \
+        --service-account-signing-key-path "${SA_SIGNING_KEY_PATH}" \
+        --oidc-issuer-url "${OIDC_ISSUER_URL}" \
+        --boot-image "${HYPERSHIFT_GCP_BOOT_IMAGE}" \
+        --annotations "hypershift.openshift.io/control-plane-operator-image=${CPO_IMAGE}" \
+        --annotations "hypershift.openshift.io/capi-provider-gcp-image=${CAPG_IMAGE}" \
+        --annotations "hypershift.openshift.io/pod-security-admission-label-override=baseline" \
+        --annotations "hypershift.openshift.io/skip-release-image-validation=true" \
+        --disable-cluster-capabilities ImageRegistry \
+        --disable-cluster-capabilities Console \
+        --disable-cluster-capabilities Ingress \
+        --tech-preview-no-upgrade
+
+      echo "Waiting for cluster to become available"
+      oc wait --timeout=30m --for=condition=Available --namespace=clusters "hostedcluster/${HC_NAME}"
+      echo "Cluster became available, creating kubeconfig"
+      bin/hypershift create kubeconfig --namespace=clusters --name="${HC_NAME}" > "${SHARED_DIR}/nested_kubeconfig"
+
+      # Save cluster name for the test chain
+      echo "${HC_NAME}" > "${SHARED_DIR}/cluster-name"
+
+      # Wait for version rollout to complete
+      set +e
+      export HC_NAME
+      timeout 25m bash -c '
+        until [[ "$(oc get -n clusters hostedcluster/${HC_NAME} -o jsonpath='"'"'{.status.version.history[?(@.state!="")].state}'"'"')" = "Completed" ]]; do
+          sleep 15
+        done
+      '
+
+      if [[ $? -ne 0 ]]; then
+        cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
+      <?xml version="1.0" encoding="UTF-8"?>
+      <testsuite name="hypershift install" tests="1" failures="1">
+        <testcase name="hosted cluster version rollout succeeds">
+          <failure message="hosted cluster version rollout never completed">
+            <![CDATA[
+      error: hosted cluster version rollout never completed
+      Degraded: $(oc get -n clusters hostedcluster/${HC_NAME} -o jsonpath='{.status.conditions[?(@.type=="Degraded")].message}')
+      ClusterVersionSucceeding: $(oc get -n clusters hostedcluster/${HC_NAME} -o jsonpath='{.status.conditions[?(@.type=="ClusterVersionSucceeding")].message}')
+            ]]>
+          </failure>
+        </testcase>
+      </testsuite>
+      EOF
+        exit 1
+      else
+        cat << EOF > ${ARTIFACT_DIR}/junit_hosted_cluster.xml
+      <?xml version="1.0" encoding="UTF-8"?>
+      <testsuite name="hypershift install" tests="1" failures="0">
+        <testcase name="hosted cluster version rollout succeeds">
+          <system-out>
+            <![CDATA[
+      info: hosted cluster version rollout completed successfully
+            ]]>
+          </system-out>
+        </testcase>
+      </testsuite>
+      EOF
+      fi
+    from: hypershift-operator
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 60m0s
+    credentials:
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+    dependencies:
+    - name: "release:latest"
+      env: OCP_IMAGE_LATEST
+  documentation: |-
+    Creates a GCP HostedCluster using the hypershift CLI and waits for
+    the cluster version rollout to complete.
+
+    Reads infrastructure configuration from SHARED_DIR files created by
+    hypershift-gcp-gke-provision, hypershift-gcp-hosted-cluster-setup,
+    and hypershift-gcp-control-plane-setup.
+
+    Saves the cluster name to SHARED_DIR/cluster-name for the test chain.
