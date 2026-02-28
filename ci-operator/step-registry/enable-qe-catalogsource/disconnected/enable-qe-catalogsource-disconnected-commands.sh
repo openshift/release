@@ -118,7 +118,17 @@ function set_cluster_auth () {
         # vmc.mirror-registry.qe.devcluster.openshift.com:6001
         registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0`
 
-        jq --argjson a "{\"${MIRROR_PROXY_REGISTRY_QUAY}\": {\"auth\": \"$registry_cred\"}, \"${MIRROR_PROXY_REGISTRY}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+        # Merge konflux operator art image share credentials if available
+        konflux_dockerconfig="/var/run/vault/deploy-konflux-operator-art-image-share/.dockerconfigjson"
+        if [[ -f "${konflux_dockerconfig}" ]]; then
+            echo "Merging konflux operator art image share credentials..."
+            # Extract auths from konflux dockerconfig and merge with other auths
+            konflux_auths=$(cat "${konflux_dockerconfig}" | jq -r '.auths')
+            jq --argjson a "{\"${MIRROR_PROXY_REGISTRY_QUAY}\": {\"auth\": \"$registry_cred\"}, \"${MIRROR_PROXY_REGISTRY}\": {\"auth\": \"$registry_cred\"}}" --argjson konflux "$konflux_auths" '.auths |= . + $a + $konflux' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+        else
+            echo "Konflux credentials not found at ${konflux_dockerconfig}, skipping..."
+            jq --argjson a "{\"${MIRROR_PROXY_REGISTRY_QUAY}\": {\"auth\": \"$registry_cred\"}, \"${MIRROR_PROXY_REGISTRY}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+        fi
         # echo "$ cat /tmp/new-dockerconfigjson"
         # cat /tmp/new-dockerconfigjson
         # set the registry auth for the cluster
@@ -191,6 +201,16 @@ function mirror_optional_images () {
     skopeo login registry.redhat.io -u ${redhat_auth_user} -p ${redhat_auth_password}
     skopeo login quay.io/openshift-qe-optional-operators -u ${optional_auth_user} -p ${optional_auth_password}
 
+    # Login to Konflux registry if credentials are available
+    konflux_dockerconfig="/var/run/vault/deploy-konflux-operator-art-image-share/.dockerconfigjson"
+    if [[ -f "${konflux_dockerconfig}" ]]; then
+        echo "Logging into Konflux registry..."
+        konflux_auth=$(cat "${konflux_dockerconfig}" | jq -r '.auths["quay.io/redhat-user-workloads"].auth')
+        konflux_user=$(echo "$konflux_auth" | base64 -d | cut -d: -f1)
+        konflux_pass=$(echo "$konflux_auth" | base64 -d | cut -d: -f2)
+        skopeo login quay.io/redhat-user-workloads -u "${konflux_user}" -p "${konflux_pass}"
+    fi
+
     echo "skopeo copy docker://${origin_index_image} oci://${work_dir}/oci-local-catalog --remove-signatures"
 
     RETRY_COUNT=0
@@ -261,6 +281,48 @@ EOF
     run_command "cd $work_dir"
     run_command "oc-mirror --v1 --config ${work_dir}/imageset-config.yaml docker://${MIRROR_REGISTRY_HOST} --oci-registries-config=${work_dir}/registry.conf --continue-on-error --skip-missing --dest-skip-tls --source-skip-tls"
     echo "oc-mirror operators success"
+
+    # Mirror Konflux FBC images if credentials are available
+    if [[ -f "${konflux_dockerconfig}" ]]; then
+        echo "Mirroring Konflux FBC images..."
+        # Define Konflux FBC images to mirror
+        konflux_fbc_operators=(
+            "ose-sriov-network-rhel9-operator"
+            "metallb-rhel9-operator"
+            "ingress-node-firewall-rhel9-operator"
+            "kubernetes-nmstate-rhel9-operator"
+        )
+
+        for operator in "${konflux_fbc_operators[@]}"; do
+            source_image="quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__${ocp_major}.${ocp_minor}__${operator}"
+            target_image="${MIRROR_REGISTRY_HOST}/redhat-user-workloads/ocp-art-tenant/art-fbc:ocp__${ocp_major}.${ocp_minor}__${operator}"
+
+            echo "Mirroring ${source_image} to ${target_image}"
+            RETRY_COUNT=0
+            MAX_RETRIES=3
+
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                set +e
+                skopeo copy --all docker://${source_image} docker://${target_image} --dest-tls-verify=false
+                COPY_STATUS=$?
+                set -e
+                if [ $COPY_STATUS -eq 0 ]; then
+                    echo "Successfully mirrored ${operator} FBC image"
+                    break
+                else
+                    RETRY_COUNT=$((RETRY_COUNT + 1))
+                    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                        echo "Retry $RETRY_COUNT/$MAX_RETRIES for ${operator}..."
+                        sleep 10
+                    else
+                        echo "Warning: Failed to mirror ${operator} FBC image after $MAX_RETRIES retries"
+                    fi
+                fi
+            done
+        done
+    else
+        echo "Konflux credentials not available, skipping Konflux FBC image mirroring"
+    fi
 }
 
 # Slove: x509: certificate signed by unknown authority
@@ -336,6 +398,9 @@ spec:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY}
     source: registry-proxy.engineering.redhat.com
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads
+    source: quay.io/redhat-user-workloads
 EOF
     else
         # Create both IDMS and ITMS together for digest-based and tag-based image references
@@ -368,6 +433,9 @@ spec:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY}
     source: registry-proxy.engineering.redhat.com
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads
+    source: quay.io/redhat-user-workloads
 ---
 apiVersion: config.openshift.io/v1
 kind: ImageTagMirrorSet
@@ -396,6 +464,9 @@ spec:
   - mirrors:
     - ${MIRROR_PROXY_REGISTRY}
     source: registry-proxy.engineering.redhat.com
+  - mirrors:
+    - ${MIRROR_PROXY_REGISTRY_QUAY}/redhat-user-workloads
+    source: quay.io/redhat-user-workloads
 EOF
     fi
 
@@ -603,7 +674,9 @@ echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
 set_CA_for_nodes
 # get cluster Major.Minor version
 #
-#ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
+ocp_major=$(echo ${ocp_version} | cut -d '.' -f1)
+ocp_minor=$(echo ${ocp_version} | cut -d '.' -f2)
 kube_major=$(oc version -o json |jq -r '.serverVersion.major')
 kube_minor=$(oc version -o json |jq -r '.serverVersion.minor' | sed 's/+$//')
 
