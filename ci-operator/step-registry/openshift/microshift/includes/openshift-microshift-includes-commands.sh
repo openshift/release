@@ -194,8 +194,15 @@ function download_microshift_scripts() {
 }
 
 function ci_get_clonerefs() {
+    local arch
+    arch=$(uname -m)
+    case "$arch" in
+        x86_64) arch="amd64" ;;
+        aarch64) arch="arm64" ;;
+        *) echo "Unsupported architecture: $arch"; exit 1 ;;
+    esac
     curl -L \
-        "https://github.com/microshift-io/prow/releases/download/nightly/clonerefs-linux-$(go env GOARCH)" \
+        "https://github.com/microshift-io/prow/releases/download/nightly/clonerefs-linux-${arch}" \
         -o /tmp/clonerefs
     chmod +x /tmp/clonerefs
 }
