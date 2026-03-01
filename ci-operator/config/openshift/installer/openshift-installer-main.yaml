@@ -218,17 +218,35 @@ tests:
     from: yamllint
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: e2e-aws-ovn
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(baremetal|libvirt|openstack))|(^cluster-api/providers/([^a]|a[^w]|aw[^s]).*/)|(/agent/)
   steps:
     cluster_profile: aws-4
-    env:
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      USER_TAGS: |
-        keyA valueA
-        key2 value2
-        keySpecial v@lu3-Special_.:/=+
-        keyD valueD spaces
-    workflow: openshift-e2e-aws
+    test:
+    - as: e2e
+      commands: |
+        source "$LEASE_PROXY_CLIENT_SH"
+
+        echo "Acquiring a lease of type aws-2-quota-slice"
+        names=$(lease__acquire -t aws-2-quota-slice)
+        echo "$names acquired"
+
+        echo "Releasing $names"
+        lease__release -n "$names"
+        echo "$names released"
+
+        printf -- '\n---\n\n'
+
+        ec=0
+        echo "Trying to acquire a lease of an invalid type"
+        names=$(lease__acquire -t foobar) || ec=$?
+        if [ $ec -ne 0 ]; then
+          echo "error: $names"
+          echo "exit code: $ec"
+        fi
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
 - always_run: false
   as: e2e-aws-ovn-techpreview
   optional: true
