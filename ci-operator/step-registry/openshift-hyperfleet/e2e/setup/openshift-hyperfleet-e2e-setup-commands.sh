@@ -48,6 +48,8 @@ EXTERNAL_IP=$(kubectl get svc hyperfleet-api -n $NAMESPACE_NAME -o jsonpath='{.s
 export HYPERFLEET_API_URL=http://${EXTERNAL_IP}:8000
 echo "${HYPERFLEET_API_URL}" > "${SHARED_DIR}/hyperfleet_api_url"
 
+sleep 3600
+
 log "=== Checking Hyperfleet API accessibility ==="
 curl -X GET ${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/
 
