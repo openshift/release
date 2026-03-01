@@ -170,13 +170,19 @@ if [[ -f "${SHARED_DIR}/AWS_REGION" ]]; then
     # 2. Returns InternalDNS for hostname queries (correct AWS FQDN for all regions)
     cat > /tmp/oc << EOF
 #!/bin/bash
+# Log all commands for debugging
+echo "[OC-WRAPPER] Command: \$*" >> /tmp/oc-wrapper-debug.log
+
 # Wrapper to force platform detection to return "none" for UPI
 if [[ "\$*" == *"infrastructure cluster"* ]] && [[ "\$*" == *"platformStatus.type"* ]]; then
+    echo "[OC-WRAPPER] Matched: platform detection" >> /tmp/oc-wrapper-debug.log
     echo "None"
 elif [[ "\$*" == *"status.addresses"* ]] && [[ "\$*" == *"Hostname"* ]]; then
+    echo "[OC-WRAPPER] Matched: hostname query" >> /tmp/oc-wrapper-debug.log
     # Return InternalDNS instead of Hostname (correct AWS FQDN for all regions)
     echo "${WORKER_INTERNAL_DNS}"
 else
+    echo "[OC-WRAPPER] No match, passing through to real oc" >> /tmp/oc-wrapper-debug.log
     exec "${REAL_OC}" "\$@"
 fi
 EOF
@@ -188,6 +194,9 @@ EOF
     echo "Platform override applied - oc wrapper will return:"
     echo "  - platform='none' for platform detection"
     echo "  - hostname='${WORKER_INTERNAL_DNS}' for hostname queries (InternalDNS)"
+
+    # Set trap to dump debug log on exit (success or failure)
+    trap 'echo "=== OC WRAPPER DEBUG LOG ==="; cat /tmp/oc-wrapper-debug.log 2>/dev/null || echo "No debug log found"' EXIT
 fi
 
 echo "Provisioning ${BYOH_NUM_WORKERS} Windows ${BYOH_WINDOWS_VERSION} nodes..."
