@@ -134,6 +134,17 @@ export AZURE_TENANT_ID
 
 debug "azure: authentication configured successfully (credentials redacted)"
 
+# GitHub App: Load App credentials for PR creation
+# The GitHub App is used to create cross-fork PRs against Azure org repos
+debug "cfg: loading GitHub App credentials"
+if [[ ! -f "${GITHUB_APP_ID_PATH}" ]]; then
+  error "github-app: app ID file not found at ${GITHUB_APP_ID_PATH}"
+fi
+if [[ ! -f "${GITHUB_APP_KEY_PATH}" ]]; then
+  error "github-app: private key file not found at ${GITHUB_APP_KEY_PATH}"
+fi
+debug "cfg: GitHub App credentials loaded successfully (content redacted)"
+
 # Image Updater: Build and run the image-updater tool
 info "image: fetching the latest image digests for all components"
 make image-updater OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
@@ -187,6 +198,8 @@ info "git: creating the pull request"
 set +o errexit
 run /usr/bin/prcreator \
   -github-token-path="${GITHUB_TOKEN_PATH}" \
+  -pr-app-id="$(cat "${GITHUB_APP_ID_PATH}")" \
+  -pr-app-private-key-path="${GITHUB_APP_KEY_PATH}" \
   -organization="${GITHUB_REPO_ORG}" \
   -repo="${GITHUB_REPO_NAME}" \
   -branch="${GITHUB_REPO_BRANCH}" \
