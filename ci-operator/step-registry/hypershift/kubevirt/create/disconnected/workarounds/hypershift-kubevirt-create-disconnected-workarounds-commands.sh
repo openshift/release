@@ -70,6 +70,11 @@ oc apply -f "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
 
 ###
 
+scp "${SSHOPTS[@]}" "root@${IP}:/home/ho_operator_image" "${SHARED_DIR}/ho_operator_image"
+### workaround for https://issues.redhat.com/browse/CNV-38194
+echo "workaround for https://issues.redhat.com/browse/CNV-38194"
+scp "${SSHOPTS[@]}" "root@${IP}:/etc/pki/ca-trust/source/anchors/registry.2.crt" "${SHARED_DIR}/registry.2.crt"
+###
 
 ###
 # For some reason operator-ose-csi-external-snapshotter-rhel8 is not correctly appearing
