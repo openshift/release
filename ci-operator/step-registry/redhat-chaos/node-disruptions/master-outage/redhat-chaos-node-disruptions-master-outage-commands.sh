@@ -80,6 +80,28 @@ elif [ "$platform" = "VSphere" ]; then
     export VSPHERE_USERNAME
     VSPHERE_PASSWORD=$(oc get secret vsphere-creds -n kube-system -o jsonpath="$jsonpath_password" | base64 --decode)
     export VSPHERE_PASSWORD
+elif [ "$platform" = "Nutanix" ]; then
+    export CLOUD_TYPE="nutanix"
+    # Source Nutanix credentials from cluster profile or shared directory
+    if [[ -f ${CLUSTER_PROFILE_DIR}/secrets.sh ]]; then
+        NUTANIX_AUTH_PATH=${CLUSTER_PROFILE_DIR}/secrets.sh
+    elif [[ -f ${SHARED_DIR}/nutanix_context.sh ]]; then
+        NUTANIX_AUTH_PATH=${SHARED_DIR}/nutanix_context.sh
+    else
+        echo "Warning: Nutanix credentials not found in CLUSTER_PROFILE_DIR or SHARED_DIR"
+        echo "Node disruption scenarios may not work without Prism Central credentials"
+    fi
+    
+    if [[ -n "${NUTANIX_AUTH_PATH:-}" ]]; then
+        # shellcheck source=/dev/null
+        source "${NUTANIX_AUTH_PATH}"
+        # Export Prism Central credentials for potential use by Kraken
+        export NUTANIX_HOST="${prism_central_host:-${NUTANIX_HOST:-}}"
+        export NUTANIX_PORT="${prism_central_port:-${NUTANIX_PORT:-}}"
+        export NUTANIX_USERNAME="${prism_central_username:-${NUTANIX_USERNAME:-}}"
+        export NUTANIX_PASSWORD="${prism_central_password:-${NUTANIX_PASSWORD:-}}"
+        echo "Nutanix Prism Central credentials configured: ${NUTANIX_HOST}:${NUTANIX_PORT}"
+    fi
 fi
 
 ./node-disruptions/prow_run.sh
