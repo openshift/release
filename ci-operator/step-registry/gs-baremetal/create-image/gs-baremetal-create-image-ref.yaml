@@ -1,0 +1,28 @@
+ref:
+  as: gs-baremetal-create-image
+  from_image:
+    namespace: ci
+    name: "baremetal-qe-base"
+    tag: latest
+  commands: gs-baremetal-create-image-commands.sh
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+  grace_period: 600
+  env:
+    - name: INSTALL_DIR
+      default: ""
+      documentation: |-
+        Directory for install-config, agent-config, and generated ISO. Defaults to
+        SHARED_DIR/install-dir so gs-baremetal-orchestrate can use the same path.
+        When empty, the step uses SHARED_DIR/install-dir and writes it to
+        SHARED_DIR/install_dir_path for the next step.
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    Day 0 step: runs openshift-install agent create image. Requires install-config.yaml and
+    agent-config.yaml in SHARED_DIR (from gs-baremetal-conf). Produces the agent
+    ISO in INSTALL_DIR for gs-baremetal-orchestrate to serve and optionally
+    run wait-for install-complete.

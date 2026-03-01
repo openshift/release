@@ -1,0 +1,40 @@
+ref:
+  as: gs-baremetal-conf
+  from_image:
+    namespace: ci
+    name: "baremetal-qe-base"
+    tag: latest
+  commands: gs-baremetal-conf-commands.sh
+  resources:
+    requests:
+      cpu: "1"
+      memory: 256Mi
+  grace_period: 300
+  env:
+    - name: CLUSTER_NAME
+      default: ""
+      documentation: |-
+        OpenShift cluster name. If empty, derived from cluster_name in SHARED_DIR or CLUSTER_PROFILE_DIR.
+    - name: BASE_DOMAIN
+      default: ""
+      documentation: |-
+        Base domain for the cluster. If empty, read from CLUSTER_PROFILE_DIR/base_domain.
+    - name: NTP_SOURCES
+      default: ""
+      documentation: |-
+        Comma-separated NTP sources for additionalNTPSources (e.g. 192.168.1.1 or pool.ntp.org).
+        Optional; leave empty if not needed.
+    - name: INTERNAL_NET_GW
+      default: ""
+      documentation: |-
+        Default gateway for static networking (next-hop for 0.0.0.0/0). Optional.
+    - name: INTERNAL_NET_DNS
+      default: ""
+      documentation: |-
+        DNS server IP for nodes (dns-resolver config). Optional; can use first host or gateway.
+  documentation: |-
+    Day 0 step: generates install-config.yaml and agent-config.yaml with static networking
+    (NMState) for OCP 4.19 Agent-Based Installer. Reads host list from SHARED_DIR/hosts.yaml
+    (fields: name, mac, ip, baremetal_iface or interface, prefix_length or INTERNAL_NET_CIDR).
+    Cluster profile must provide base_domain and pull-secret; cluster_name can be in SHARED_DIR
+    or from ipi-conf. Use before agent create image and gs-baremetal-orchestrate.
