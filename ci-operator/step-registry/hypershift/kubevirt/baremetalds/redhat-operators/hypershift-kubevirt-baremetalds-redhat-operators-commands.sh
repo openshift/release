@@ -49,18 +49,19 @@ function mirror_ccs() {
     echo "3: Check skopeo and registry credentials"
     if [[ ! -f /usr/bin/skopeo ]]; then
         yum install -y skopeo
-        oc -n openshift-config extract secret/pull-secret --to="/tmp" --confirm
-        set +x
-        mirror_token=$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "${mirror_registry}" '.auths[$var1]["auth"]'|base64 -d)
-        skopeo login "${mirror_registry}" -u "${mirror_token%:*}" -p "${mirror_token#*:}"
-        REGISTRY_REDHAT_IO_USER=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 1)
-        REGISTRY_REDHAT_IO_PASSWORD=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 2)
-        skopeo login registry.redhat.io -u "${REGISTRY_REDHAT_IO_USER}" -p "${REGISTRY_REDHAT_IO_PASSWORD}"
-        set -x
     fi
+    
+    oc -n openshift-config extract secret/pull-secret --to="/tmp" --confirm
+    set +x
+    mirror_token=$(cat "/tmp/.dockerconfigjson" | jq -r --arg var1 "${mirror_registry}" '.auths[$var1]["auth"]'|base64 -d)
+    skopeo login "${mirror_registry}" -u "${mirror_token%:*}" -p "${mirror_token#*:}"
+    REGISTRY_REDHAT_IO_USER=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 1)
+    REGISTRY_REDHAT_IO_PASSWORD=$(cat /home/pull-secret | jq -r '.auths."registry.redhat.io".auth' | base64 -d | cut -d ':' -f 2)
+    skopeo login registry.redhat.io -u "${REGISTRY_REDHAT_IO_USER}" -p "${REGISTRY_REDHAT_IO_PASSWORD}"
+    set -x
 
     echo "4: skopeo copy docker://${CCS_CATALOG_IMAGE} oci:///home/ccs-local-catalog --remove-signatures"
-    skopeo copy "docker://${CCS_CATALOG_IMAGE}" "oci:///home/ccs-local-catalog" --remove-signatures
+    skopeo copy "docker://${CCS_CATALOG_IMAGE}" "oci:///home/ccs-local-catalog" --remove-signatures --authfile  /home/pull-secret
 
     echo "5: oc-mirror"
     catalog_image="ccs-local-catalog/ccs-local-catalog"
@@ -125,9 +126,9 @@ END
     # cleanup leftovers from previous executions
     rm -rf oc-mirror-workspace
     # try at least 3 times to be sure to get all the images...
-    /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-    /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
-    /home/oc-mirror --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing
+    /home/oc-mirror --v1 --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing --dest-skip-tls --source-use-http --source-skip-tls
+    /home/oc-mirror --v1 --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing --dest-skip-tls --source-use-http --source-skip-tls
+    /home/oc-mirror --v1 --config "/home/imageset-config.yaml" docker://${mirror_registry} --oci-registries-config="/home/registry.conf" --continue-on-error --skip-missing --dest-skip-tls --source-use-http --source-skip-tls
     popd
 
     echo "6: Create imageconentsourcepolicy and catalogsource"
