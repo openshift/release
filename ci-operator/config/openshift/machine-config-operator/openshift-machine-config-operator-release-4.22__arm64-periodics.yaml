@@ -1,0 +1,55 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.rhel7
+  to: machine-config-operator
+releases:
+  latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-mco-disruptive
+  interval: 72h
+  shard_count: 2
+  steps:
+    cluster_profile: aws-3
+    env:
+      OCP_ARCH: arm64
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: openshift-e2e-aws
+- as: e2e-aws-mco-disruptive-techpreview
+  interval: 24h
+  shard_count: 2
+  steps:
+    cluster_profile: aws-3
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      OCP_ARCH: arm64
+      TEST_SUITE: openshift/machine-config-operator/disruptive
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.22
+  org: openshift
+  repo: machine-config-operator
+  variant: arm64-periodics
