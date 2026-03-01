@@ -21,6 +21,37 @@ RUN_TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
 echo "Generating report for $TOTAL PRs ($SUCCESS_COUNT succeeded, $FAILED_COUNT failed)"
 
+# Read a pre-extracted text file, or return a placeholder
+read_extracted() {
+  local file=$1
+  if [ -f "$file" ] && [ -s "$file" ]; then
+    cat "$file"
+  else
+    echo "(no output captured)"
+  fi
+}
+
+# Read a JSON token file and extract a field, defaulting to 0
+read_token_field() {
+  local file=$1
+  local field=$2
+  if [ -f "$file" ] && [ -s "$file" ]; then
+    jq -r ".${field} // 0" "$file" 2>/dev/null || echo "0"
+  else
+    echo "0"
+  fi
+}
+
+# Read a duration file and return the value in seconds, or 0 if missing
+read_duration() {
+  local file=$1
+  if [ -f "$file" ] && [ -s "$file" ]; then
+    cat "$file" | tr -d '[:space:]'
+  else
+    echo "0"
+  fi
+}
+
 # HTML-escape a string
 html_escape() {
   sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'
@@ -71,66 +102,6 @@ linkify_jira() {
   echo "$text" | sed -E 's/([A-Z][A-Z0-9]+-[0-9]+)/<a href="https:\/\/issues.redhat.com\/browse\/\1">\1<\/a>/g'
 }
 
-# Extract data from stream-json output file
-# Each line is a JSON object; we parse relevant fields
-extract_from_stream_json() {
-  local json_file=$1
-  local field=$2
-
-  if [ ! -f "$json_file" ] || [ ! -s "$json_file" ]; then
-    echo ""
-    return
-  fi
-
-  case "$field" in
-    text)
-      # Get the final result text
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.result // empty' 2>/dev/null | head -1 || echo ""
-      ;;
-    input_tokens)
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.usage.input_tokens // 0' 2>/dev/null | head -1 || echo "0"
-      ;;
-    output_tokens)
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.usage.output_tokens // 0' 2>/dev/null | head -1 || echo "0"
-      ;;
-    cache_read)
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.usage.cache_read_input_tokens // 0' 2>/dev/null | head -1 || echo "0"
-      ;;
-    cache_create)
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.usage.cache_creation_input_tokens // (.usage.cache_creation.ephemeral_5m_input_tokens // 0)' 2>/dev/null | head -1 || echo "0"
-      ;;
-    duration_ms)
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.duration_ms // 0' 2>/dev/null | head -1 || echo "0"
-      ;;
-    duration_api_ms)
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.duration_api_ms // 0' 2>/dev/null | head -1 || echo "0"
-      ;;
-    num_turns)
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.num_turns // 0' 2>/dev/null | head -1 || echo "0"
-      ;;
-    model)
-      grep '"type":"system"' "$json_file" 2>/dev/null | jq -r '.model // "unknown"' 2>/dev/null | head -1 || echo "unknown"
-      ;;
-    session_id)
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.session_id // "unknown"' 2>/dev/null | head -1 || echo "unknown"
-      ;;
-    cost_usd)
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.total_cost_usd // 0' 2>/dev/null | head -1 || echo "0"
-      ;;
-    tools_available)
-      grep '"type":"system"' "$json_file" 2>/dev/null | jq -r '.tools // [] | join(",")' 2>/dev/null | head -1 || echo ""
-      ;;
-    tool_calls)
-      # Extract tool use entries
-      grep '"type":"tool_use"' "$json_file" 2>/dev/null | jq -r '[.name // empty] | join("\n")' 2>/dev/null || echo ""
-      ;;
-    tool_errors)
-      # Extract tool results with is_error=true
-      grep '"is_error":true' "$json_file" 2>/dev/null | jq -r '.content // empty' 2>/dev/null || echo ""
-      ;;
-  esac
-}
-
 # Build PR rows for summary table and detail sections
 SUMMARY_ROWS=""
 DETAIL_SECTIONS=""
@@ -154,34 +125,33 @@ while IFS= read -r line; do
     STATUS_LABEL="Failed"
   fi
 
-  # Try to find the Claude output JSON
-  OUTPUT_FILE="${SHARED_DIR}/claude-pr-${PR_NUMBER}-output.json"
-  if [ ! -f "$OUTPUT_FILE" ]; then
-    OUTPUT_FILE="/tmp/claude-pr-${PR_NUMBER}-output.json"
-  fi
+  # Read pre-extracted data from SHARED_DIR
+  TOKEN_FILE="${SHARED_DIR}/claude-pr-${PR_NUMBER}-tokens.json"
+  DURATION_FILE="${SHARED_DIR}/claude-pr-${PR_NUMBER}-duration.txt"
+  TEXT_FILE="${SHARED_DIR}/claude-pr-${PR_NUMBER}-output-text.txt"
+  TOOLS_FILE="${SHARED_DIR}/claude-pr-${PR_NUMBER}-output-tools.txt"
+  ERRORS_FILE="${SHARED_DIR}/claude-pr-${PR_NUMBER}-output-errors.txt"
+  NUM_TURNS_FILE="${SHARED_DIR}/claude-pr-${PR_NUMBER}-num-turns.txt"
+  SESSION_ID_FILE="${SHARED_DIR}/claude-pr-${PR_NUMBER}-session-id.txt"
 
-  # Extract data from stream-json output
-  RESULT_TEXT=$(extract_from_stream_json "$OUTPUT_FILE" "text" | html_escape)
-  PR_INPUT=$(extract_from_stream_json "$OUTPUT_FILE" "input_tokens")
-  PR_OUTPUT=$(extract_from_stream_json "$OUTPUT_FILE" "output_tokens")
-  PR_CACHE_READ=$(extract_from_stream_json "$OUTPUT_FILE" "cache_read")
-  PR_CACHE_CREATE=$(extract_from_stream_json "$OUTPUT_FILE" "cache_create")
-  DURATION_MS=$(extract_from_stream_json "$OUTPUT_FILE" "duration_ms")
-  DURATION_API_MS=$(extract_from_stream_json "$OUTPUT_FILE" "duration_api_ms")
-  NUM_TURNS=$(extract_from_stream_json "$OUTPUT_FILE" "num_turns")
-  MODEL=$(extract_from_stream_json "$OUTPUT_FILE" "model")
-  SESSION_ID=$(extract_from_stream_json "$OUTPUT_FILE" "session_id")
-  TOOLS_AVAILABLE=$(extract_from_stream_json "$OUTPUT_FILE" "tools_available")
+  # Extract data from pre-extracted files
+  RESULT_TEXT=$(read_extracted "$TEXT_FILE" | html_escape)
+  PR_INPUT=$(read_token_field "$TOKEN_FILE" "input_tokens")
+  PR_OUTPUT=$(read_token_field "$TOKEN_FILE" "output_tokens")
+  PR_CACHE_READ=$(read_token_field "$TOKEN_FILE" "cache_read_input_tokens")
+  PR_CACHE_CREATE=$(read_token_field "$TOKEN_FILE" "cache_creation_input_tokens")
+  MODEL=$(read_token_field "$TOKEN_FILE" "model")
+  DURATION_SECS=$(read_duration "$DURATION_FILE")
+  NUM_TURNS=$(read_duration "$NUM_TURNS_FILE")
+  SESSION_ID=$(read_extracted "$SESSION_ID_FILE")
 
   : "${PR_INPUT:=0}"
   : "${PR_OUTPUT:=0}"
   : "${PR_CACHE_READ:=0}"
   : "${PR_CACHE_CREATE:=0}"
-  : "${DURATION_MS:=0}"
+  : "${DURATION_SECS:=0}"
   : "${NUM_TURNS:=0}"
 
-  DURATION_SECS=$((DURATION_MS / 1000))
-  DURATION_API_SECS=$((DURATION_API_MS / 1000))
   PR_COST=$(calculate_cost "$PR_INPUT" "$PR_OUTPUT" "$PR_CACHE_READ" "$PR_CACHE_CREATE")
 
   # Accumulate grand totals
@@ -190,57 +160,27 @@ while IFS= read -r line; do
   GRAND_TOTAL_CACHE_READ=$((GRAND_TOTAL_CACHE_READ + PR_CACHE_READ))
   GRAND_TOTAL_CACHE_CREATE=$((GRAND_TOTAL_CACHE_CREATE + PR_CACHE_CREATE))
 
-  # Extract tool calls from stream-json
-  TOOL_CALLS_RAW=""
-  TOOL_ERRORS_RAW=""
-  if [ -f "$OUTPUT_FILE" ] && [ -s "$OUTPUT_FILE" ]; then
-    # Tool calls: extract tool_use messages with name and input
-    TOOL_CALLS_RAW=$(grep '"type":"tool_use"' "$OUTPUT_FILE" 2>/dev/null \
-      | jq -r '"  \(.name)(\(.input | tostring | .[0:120])...)"' 2>/dev/null \
-      || echo "")
-
-    # Tool errors: extract tool_result messages where is_error is true
-    TOOL_ERRORS_RAW=$(grep '"is_error":true' "$OUTPUT_FILE" 2>/dev/null \
-      | jq -r '.content // "unknown error"' 2>/dev/null \
-      || echo "")
-  fi
+  # Read pre-extracted tool calls and errors
+  TOOL_CALLS_RAW=$(read_extracted "$TOOLS_FILE")
+  TOOL_ERRORS_RAW=$(read_extracted "$ERRORS_FILE")
 
   TOOL_CALLS_ESCAPED=$(echo "$TOOL_CALLS_RAW" | html_escape)
   TOOL_ERRORS_ESCAPED=$(echo "$TOOL_ERRORS_RAW" | html_escape)
 
   TOOL_CALL_COUNT=0
-  if [ -n "$TOOL_CALLS_RAW" ]; then
+  if [ "$TOOL_CALLS_RAW" != "(no output captured)" ] && [ -n "$TOOL_CALLS_RAW" ]; then
     TOOL_CALL_COUNT=$(echo "$TOOL_CALLS_RAW" | grep -c '.' || true)
   fi
 
   TOOL_ERROR_COUNT=0
-  if [ -n "$TOOL_ERRORS_RAW" ]; then
+  if [ "$TOOL_ERRORS_RAW" != "(no output captured)" ] && [ -n "$TOOL_ERRORS_RAW" ]; then
     TOOL_ERROR_COUNT=$(echo "$TOOL_ERRORS_RAW" | grep -c '.' || true)
-  fi
-
-  # Build available tools chips
-  TOOLS_CHIPS=""
-  if [ -n "$TOOLS_AVAILABLE" ]; then
-    IFS=',' read -ra TOOLS_ARRAY <<< "$TOOLS_AVAILABLE"
-    TOOLS_LOADED=${#TOOLS_ARRAY[@]}
-    for tool in "${TOOLS_ARRAY[@]}"; do
-      TOOLS_CHIPS="${TOOLS_CHIPS}<span class=\"tool-chip\">${tool}</span>"
-    done
-  else
-    TOOLS_LOADED=0
   fi
 
   # PR link
   PR_LINK="<a href=\"https://github.com/openshift/hypershift/pull/${PR_NUMBER}\">#${PR_NUMBER}</a>"
 
-  # Get PR title from analysis file if available
-  PR_TITLE=""
-  ANALYSIS_FILE="${SHARED_DIR}/pr-${PR_NUMBER}-analysis.json"
-  if [ ! -f "$ANALYSIS_FILE" ]; then
-    ANALYSIS_FILE="/tmp/pr-${PR_NUMBER}-analysis.json"
-  fi
-
-  # Get PR title via git log or state file
+  # Get PR title
   PR_TITLE_RAW=$(gh pr view "$PR_NUMBER" --repo openshift/hypershift --json title --jq '.title' 2>/dev/null || echo "PR #${PR_NUMBER}")
   PR_TITLE=$(echo "$PR_TITLE_RAW" | html_escape)
   PR_TITLE_LINKED=$(linkify_jira "$PR_TITLE")
@@ -257,7 +197,7 @@ while IFS= read -r line; do
   <tr class=\"total-row\"><td><strong>Total</strong></td><td><strong>$(format_duration "$DURATION_SECS")</strong></td><td><strong>$(format_number "$PR_INPUT")</strong></td><td><strong>$(format_number "$PR_OUTPUT")</strong></td><td><strong>$(format_number "$PR_CACHE_READ")</strong></td><td><strong>$(format_number "$PR_CACHE_CREATE")</strong></td><td><strong>${PR_COST}</strong></td></tr>
   </tbody>
   </table>
-  <p class=\"model-info\">Model: ${MODEL} &middot; Duration: $(format_duration "$DURATION_SECS") (API: $(format_duration "$DURATION_API_SECS")) &middot; ${NUM_TURNS} turn(s) &middot; Session: ${SESSION_ID}</p>"
+  <p class=\"model-info\">Model: ${MODEL} &middot; Duration: $(format_duration "$DURATION_SECS") &middot; ${NUM_TURNS} turn(s) &middot; Session: ${SESSION_ID}</p>"
   fi
 
   # Summary table row
@@ -274,11 +214,6 @@ while IFS= read -r line; do
   <div class=\"phase-output\"><pre>${RESULT_TEXT:-"(no output captured)"}</pre></div>
   <details><summary>Tool calls (${TOOL_CALL_COUNT})</summary><pre>${TOOL_CALLS_ESCAPED:-"(no tool calls)"}</pre></details>
   <details><summary>Tool errors (${TOOL_ERROR_COUNT})</summary><pre class=\"error-pre\">${TOOL_ERRORS_ESCAPED:-"(no tool errors)"}</pre></details>
-
-  <details>
-    <summary>Available tools (${TOOLS_LOADED} loaded, ${TOOL_CALL_COUNT} used)</summary>
-    <div class=\"tools-available\">${TOOLS_CHIPS:-"(no tools data available)"}</div>
-  </details>
 </div>"
 
 done < "$STATE_FILE"
@@ -325,8 +260,6 @@ cat > "$REPORT_FILE" <<EOF
   .total-row td { border-top: 2px solid #333; font-weight: 600; }
   .model-info { color: #666; font-size: 0.85em; margin-top: 0.3em; }
   .error-pre { background: #fff5f5; border-left: 3px solid #cb2431; }
-  .tools-available { display: flex; flex-wrap: wrap; gap: 0.4em; margin: 0.5em 0; }
-  .tool-chip { background: #f6f8fa; border: 1px solid #eee; padding: 0.15em 0.5em; border-radius: 3px; font-family: SFMono-Regular, Consolas, monospace; font-size: 0.8em; color: #666; }
   .footer { text-align: center; color: #666; font-size: 0.8em; margin-top: 3em; padding-top: 1em; border-top: 1px solid #eee; }
 </style>
 </head>
