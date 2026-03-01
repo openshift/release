@@ -157,16 +157,25 @@ if [[ -f "${SHARED_DIR}/AWS_REGION" ]]; then
     echo "Detected UPI workflow (AWS_REGION file exists from ami-discover step)"
     echo "Overriding byoh.sh platform detection to use 'none' for UPI..."
 
+    # Get worker node InternalDNS (correct AWS FQDN for all regions)
+    WORKER_INTERNAL_DNS=$(oc get nodes -l "node-role.kubernetes.io/worker" -o=jsonpath="{.items[0].status.addresses[?(@.type=='InternalDNS')].address}")
+    echo "Worker InternalDNS: ${WORKER_INTERNAL_DNS}"
+
     # Store the real oc location before modifying PATH
     REAL_OC=$(which oc)
     echo "Real oc location: ${REAL_OC}"
 
-    # Create a wrapper oc command that returns "None" for platform detection
+    # Create a wrapper oc command that:
+    # 1. Returns "None" for platform detection
+    # 2. Returns InternalDNS for hostname queries (correct AWS FQDN for all regions)
     cat > /tmp/oc << EOF
 #!/bin/bash
 # Wrapper to force platform detection to return "none" for UPI
 if [[ "\$*" == *"infrastructure cluster"* ]] && [[ "\$*" == *"platformStatus.type"* ]]; then
     echo "None"
+elif [[ "\$*" == *"status.addresses"* ]] && [[ "\$*" == *"Hostname"* ]]; then
+    # Return InternalDNS instead of Hostname (correct AWS FQDN for all regions)
+    echo "${WORKER_INTERNAL_DNS}"
 else
     exec "${REAL_OC}" "\$@"
 fi
@@ -176,7 +185,9 @@ EOF
     # Prepend /tmp to PATH so our wrapper is found first
     export PATH="/tmp:${PATH}"
 
-    echo "Platform override applied - oc wrapper created to return platform='none'"
+    echo "Platform override applied - oc wrapper will return:"
+    echo "  - platform='none' for platform detection"
+    echo "  - hostname='${WORKER_INTERNAL_DNS}' for hostname queries (InternalDNS)"
 fi
 
 echo "Provisioning ${BYOH_NUM_WORKERS} Windows ${BYOH_WINDOWS_VERSION} nodes..."
