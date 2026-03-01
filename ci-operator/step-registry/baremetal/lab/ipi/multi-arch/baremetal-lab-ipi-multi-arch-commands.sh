@@ -22,9 +22,9 @@ additional_worker_arch=$(echo "${ADDITIONAL_WORKER_ARCHITECTURE}" | sed 's/aarch
 case "${architecture}" in
   "amd64")
     if [ "${additional_worker_arch}" != "arm64" ]; then
-        echo "Error: An 'arm64' additional worker is expected for a multi-arch ${architecture} \
-        cluster. Worker architecture given is ${additional_worker_arch}. Exiting."
-        exit 1
+        echo "[INFO]: An 'arm64' additional worker is expected for a multi-arch ${architecture} \
+        cluster. Additional worker architecture given is ${additional_worker_arch}. Exiting."
+        exit 0
     fi
     ;;
   "arm64")
