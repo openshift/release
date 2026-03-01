@@ -13,6 +13,61 @@ function create_winc_test_configmap()
   oc get cm winc-test-config -oyaml -n winc-test
 }
 
+function setup_image_mirroring()
+{
+  # Create ImageTagMirrorSet to redirect Windows container images to CI registry
+  # Images are pre-mirrored via core-services/image-mirroring/_config.yaml
+  # This works for both connected Prow (registry.ci.openshift.org) and disconnected (ephemeral mirror)
+
+  echo "Setting up ImageTagMirrorSet for Windows container images..."
+
+  # Determine mirror registry based on environment
+  if [ -f "${SHARED_DIR}/mirror_registry_url" ]; then
+    # Disconnected environment with ephemeral mirror registry
+    MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+    echo "Disconnected mode: Using ephemeral mirror registry at ${MIRROR_REGISTRY_HOST}"
+  else
+    # Connected Prow CI - use pre-mirrored images from CI registry
+    MIRROR_REGISTRY_HOST="registry.ci.openshift.org"
+    echo "Connected mode: Using pre-mirrored images from ${MIRROR_REGISTRY_HOST}"
+  fi
+
+  # Create ImageTagMirrorSet to redirect Windows images to mirror
+  # Includes PowerShell containers and CSI driver images for storage tests
+  # PowerShell: Server 2019 (1809), Server 2022 (ltsc2022)
+  # CSI: Azure File and vSphere drivers for OCP-66352
+  # TODO: Remove Server 2019 support after AMI/image upgrades to Server 2022
+  cat <<EOF | oc create -f -
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: winc-test-tagmirrorset
+spec:
+  imageTagMirrors:
+  - source: mcr.microsoft.com/powershell
+    mirrors:
+    - ${MIRROR_REGISTRY_HOST}/microsoft/powershell
+  - source: mcr.microsoft.com/oss/kubernetes-csi/csi-node-driver-registrar
+    mirrors:
+    - ${MIRROR_REGISTRY_HOST}/microsoft/csi-node-driver-registrar
+  - source: mcr.microsoft.com/k8s/csi/azurefile-csi
+    mirrors:
+    - ${MIRROR_REGISTRY_HOST}/microsoft/azurefile-csi
+  - source: registry.k8s.io/sig-storage/csi-node-driver-registrar
+    mirrors:
+    - ${MIRROR_REGISTRY_HOST}/k8s/csi-node-driver-registrar
+  - source: registry.k8s.io/csi-vsphere/driver
+    mirrors:
+    - ${MIRROR_REGISTRY_HOST}/k8s/vsphere-csi-driver
+  - source: registry.k8s.io/sig-storage/livenessprobe
+    mirrors:
+    - ${MIRROR_REGISTRY_HOST}/k8s/livenessprobe
+EOF
+
+  echo "ImageTagMirrorSet created successfully"
+  oc get imagetagmirrorset winc-test-tagmirrorset -o yaml
+}
+
 function create_workloads()
 {
   oc new-project winc-test
@@ -206,8 +261,11 @@ while [[ $(oc -n openshift-machine-api get machineset/${winworker_machineset_nam
 # Timeout increased to 30m to accommodate BYOH node configuration time
 oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=30m
 
-# Choose the Windows container vesion depending on the Windows version
+# Choose the Windows container version depending on the Windows version
 # installed on the Windows workers
+# Supported: Server 2019 (1809), Server 2022 (ltsc2022)
+# TODO: Remove Server 2019 support after AMI/image upgrades to Server 2022
+# TODO: Add Server 2025 (ltsc2025) when Microsoft publishes the image
 os_version=$(oc get nodes -l 'kubernetes.io/os=windows' -o=jsonpath="{.items[0].status.nodeInfo.osImage}")
 
 windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
@@ -216,6 +274,12 @@ then
     windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-1809"
 fi
 
+# Setup image mirroring for Prow CI (if mirror registry is available)
+# This creates ImageTagMirrorSet and mirrors Windows images
+setup_image_mirroring "$windows_container_image"
+
+# Create workloads using the original image (ITMS will redirect to mirror)
 create_workloads $windows_container_image
 
+# Create ConfigMap with the original image (ITMS will redirect to mirror)
 create_winc_test_configmap $windows_os_image_id $windows_container_image
