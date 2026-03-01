@@ -53,7 +53,7 @@ K8S_CLUSTER_URL=$(oc whoami --show-server)
 echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
 
 echo "Note: This cluster will be automatically deleted 4 hours after being claimed."
-echo "To debug issues or log in to the cluster manually, use the script: .ibm/pipelines/ocp-cluster-claim-login.sh"
+echo "To debug issues or log in to the cluster manually, use the script: .ci/pipelines/ocp-cluster-claim-login.sh"
 
 oc create serviceaccount tester-sa-2 -n default
 oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2
@@ -105,7 +105,7 @@ PR_CHANGESET=$(git diff --name-only $RELEASE_BRANCH_NAME)
 echo "Changeset: $PR_CHANGESET"
 
 # Check if changes are exclusively within the specified directories
-DIRECTORIES_TO_CHECK=".ibm|e2e-tests|docs|.claude|.cursor|.rulesync|.vscode"
+DIRECTORIES_TO_CHECK=".ci|e2e-tests|docs|.claude|.cursor|.rulesync|.vscode"
 ONLY_IN_DIRS=true
 
 for change in $PR_CHANGESET; do
@@ -179,4 +179,4 @@ echo "Using image: ${QUAY_REPO}:${TAG_NAME}, with digest: ${IMAGE_SHA}"
 
 echo "========== Test Execution =========="
 echo "Executing openshift-ci-tests.sh"
-bash ./.ibm/pipelines/openshift-ci-tests.sh
+bash ./.ci/pipelines/openshift-ci-tests.sh
