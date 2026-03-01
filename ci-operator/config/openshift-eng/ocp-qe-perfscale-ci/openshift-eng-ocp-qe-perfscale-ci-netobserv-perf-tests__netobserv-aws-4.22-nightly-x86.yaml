@@ -1,4 +1,8 @@
 base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
   cli:
     name: "4.22"
     namespace: ocp
@@ -19,6 +23,15 @@ base_images:
     name: ocp-qe-perfscale-ci
     namespace: ci
     tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_literal: FROM cerberus.prow
+  from: cerberus.prow
+  to: perfscale-observer
 releases:
   latest:
     candidate:
@@ -64,8 +77,13 @@ tests:
       RUN_ORION: "true"
       SIZE_VARIANT: large
       VERSION: "4.22"
+      WAIT_EXPRESSION: oc get flowcollector cluster --no-headers 2>/dev/null | grep
+        -c 'Ready'
       WORKLOAD: node-density-heavy
       ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     post:
     - chain: netobserv-perf-test-post
     test:
@@ -107,8 +125,13 @@ tests:
       RUN_ORION: "true"
       SIZE_VARIANT: large
       VERSION: "4.22"
+      WAIT_EXPRESSION: oc get flowcollector cluster --no-headers 2>/dev/null | grep
+        -c 'Ready'
       WORKLOAD: node-density-heavy
       ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     post:
     - chain: netobserv-perf-test-post
     test:
@@ -151,8 +174,13 @@ tests:
       RUN_ORION: "true"
       SIZE_VARIANT: large
       VERSION: "4.22"
+      WAIT_EXPRESSION: oc get flowcollector cluster --no-headers 2>/dev/null | grep
+        -c 'Ready'
       WORKLOAD: cluster-density-v2
       ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     post:
     - chain: netobserv-perf-test-post
     test:
@@ -184,8 +212,13 @@ tests:
       PATCH_EBPFAGENT_IMAGE: "false"
       PATCH_FLOWLOGS_IMAGE: "false"
       SIZE_VARIANT: large
+      WAIT_EXPRESSION: oc get flowcollector cluster --no-headers 2>/dev/null | grep
+        -c 'Ready'
       WORKLOAD: cluster-density-v2
       ZONES_COUNT: "3"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     post:
     - chain: netobserv-perf-test-post
     test:
