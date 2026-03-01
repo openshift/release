@@ -86,10 +86,10 @@ else
 fi
 
 # Load AWS region if discovered by previous step (for UPI workflows)
-# Write to byoh.sh config file instead of relying on environment variables
+# Do NOT export AWS_REGION - it causes byoh.sh to use broken hostname construction for us-east-1
+# Only export AWS_DEFAULT_REGION (for Terraform) and write to config file
 if [[ -f "${SHARED_DIR}/AWS_REGION" ]]; then
     AWS_REGION=$(cat "${SHARED_DIR}/AWS_REGION")
-    export AWS_REGION
     export AWS_DEFAULT_REGION="${AWS_REGION}"
 
     # Write to byoh.sh user config file (more reliable than env vars)
@@ -98,6 +98,7 @@ if [[ -f "${SHARED_DIR}/AWS_REGION" ]]; then
     echo "AWS_DEFAULT_REGION=${AWS_REGION}" >> "${HOME}/.config/byoh-provisioner/config"
     echo "Using AWS region from SHARED_DIR: ${AWS_REGION}"
     echo "Wrote AWS_DEFAULT_REGION=${AWS_REGION} to byoh.sh config file"
+    echo "Note: AWS_REGION not exported to force byoh.sh to use nslookup for hostname discovery"
 elif [[ -n "${AWS_REGION:-}" ]]; then
     export AWS_DEFAULT_REGION="${AWS_REGION}"
     echo "Using AWS region from environment: ${AWS_REGION}"
@@ -157,17 +158,12 @@ if [[ -f "${SHARED_DIR}/AWS_REGION" ]]; then
     echo "Detected UPI workflow (AWS_REGION file exists from ami-discover step)"
     echo "Overriding byoh.sh platform detection to use 'none' for UPI..."
 
-    # Get worker node InternalDNS (correct AWS FQDN for all regions)
-    WORKER_INTERNAL_DNS=$(oc get nodes -l "node-role.kubernetes.io/worker" -o=jsonpath="{.items[0].status.addresses[?(@.type=='InternalDNS')].address}")
-    echo "Worker InternalDNS: ${WORKER_INTERNAL_DNS}"
-
     # Store the real oc location before modifying PATH
     REAL_OC=$(which oc)
     echo "Real oc location: ${REAL_OC}"
 
-    # Create a wrapper oc command that:
-    # 1. Returns "None" for platform detection
-    # 2. Returns InternalDNS for hostname queries (correct AWS FQDN for all regions)
+    # Create a wrapper oc command that returns "None" for platform detection
+    # Do NOT intercept hostname queries - let byoh.sh use nslookup for correct FQDN discovery
     cat > /tmp/oc << EOF
 #!/bin/bash
 # Log all commands for debugging
@@ -177,10 +173,6 @@ echo "[OC-WRAPPER] Command: \$*" >> /tmp/oc-wrapper-debug.log
 if [[ "\$*" == *"infrastructure cluster"* ]] && [[ "\$*" == *"platformStatus.type"* ]]; then
     echo "[OC-WRAPPER] Matched: platform detection" >> /tmp/oc-wrapper-debug.log
     echo "None"
-elif [[ "\$*" == *"status.addresses"* ]] && [[ "\$*" == *"Hostname"* ]]; then
-    echo "[OC-WRAPPER] Matched: hostname query" >> /tmp/oc-wrapper-debug.log
-    # Return InternalDNS instead of Hostname (correct AWS FQDN for all regions)
-    echo "${WORKER_INTERNAL_DNS}"
 else
     echo "[OC-WRAPPER] No match, passing through to real oc" >> /tmp/oc-wrapper-debug.log
     exec "${REAL_OC}" "\$@"
@@ -191,9 +183,8 @@ EOF
     # Prepend /tmp to PATH so our wrapper is found first
     export PATH="/tmp:${PATH}"
 
-    echo "Platform override applied - oc wrapper will return:"
-    echo "  - platform='none' for platform detection"
-    echo "  - hostname='${WORKER_INTERNAL_DNS}' for hostname queries (InternalDNS)"
+    echo "Platform override applied - oc wrapper will return platform='none'"
+    echo "Hostname discovery will use nslookup (works correctly for all AWS regions)"
 
     # Set trap to dump debug log on exit (success or failure)
     trap 'echo "=== OC WRAPPER DEBUG LOG ==="; cat /tmp/oc-wrapper-debug.log 2>/dev/null || echo "No debug log found"' EXIT
