@@ -174,6 +174,45 @@ tests:
         requests:
           cpu: 100m
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected
+- as: lseval-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+      variant: fips
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.17"
+  cron: 10 12 * * *
+  steps:
+    allow_skip_on_success: true
+    post:
+    - ref: gather-must-gather
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        export WATSONX_PROVIDER_KEY_PATH=/var/run/watsonx/token
+        export OPENAI_PROVIDER_KEY_PATH=/var/run/openai/token
+
+        tests/scripts/test-lseval-periodic.sh
+      credentials:
+      - mount_path: /var/run/watsonx
+        name: watsonx-apitoken
+        namespace: test-credentials
+      - mount_path: /var/run/openai
+        name: openai-apitoken
+        namespace: test-credentials
+      dependencies:
+      - env: OLS_IMAGE
+        name: lightspeed-service-api
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
