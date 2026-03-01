@@ -246,6 +246,18 @@ tests:
       ARO_HCP_DEPLOY_ENV: prow
       LOCATION: westus3
     workflow: aro-hcp-local-e2e
+- as: global-pipeline-postsubmit
+  run_if_changed: ^(?:config/config\.yaml|observability/observability\.yaml|dev-infrastructure/.*)$
+  steps:
+    cluster_profile: aro-hcp-dev
+    env:
+      LOCATION: westus3
+    leases:
+    - count: 1
+      env: LEASED_GLOBAL_PIPELINE_RESOURCE
+      resource_type: aro-hcp-dev-global-pipeline-quota-slice
+    test:
+    - ref: aro-hcp-provision-global-pipeline
 zz_generated_metadata:
   branch: main
   org: Azure
