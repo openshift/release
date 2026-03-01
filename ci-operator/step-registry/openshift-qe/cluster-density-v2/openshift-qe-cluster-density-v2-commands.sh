@@ -61,7 +61,7 @@ iteration_multiplier=$((${CDV2_ITERATION_MULTIPLIER:-${ITERATION_MULTIPLIER_ENV:
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 
 export WORKLOAD=cluster-density-v2
-EXTRA_FLAGS="${CD_V2_EXTRA_FLAGS} --local-indexing --gc=${GC} --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+EXTRA_FLAGS="${CD_V2_EXTRA_FLAGS} --local-indexing --gc=${GC} --gc-metrics=${GC_METRICS} --profile-type=${PROFILE_TYPE} --qps=${QPS} --pprof=${PPROF}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 
