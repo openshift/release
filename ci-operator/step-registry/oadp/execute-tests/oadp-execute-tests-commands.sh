@@ -55,6 +55,7 @@ trap 'collect-results' SIGINT SIGTERM ERR EXIT
 
 # Set variables needed for test execution
 export PROVIDER=$OADP_CLOUD_PROVIDER
+export REGION=${REGION:-"us-east-2"}
 export BACKUP_LOCATION=$OADP_BACKUP_LOCATION
 export PROW_NAMESPACE=$NAMESPACE
 export NAMESPACE="openshift-adp"
@@ -136,7 +137,7 @@ export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&
 
 sleep 30
 
-oc adm must-gather --image=registry.redhat.io/oadp/oadp-mustgather-rhel9:v1.4 --dest-dir="${ARTIFACT_DIR}/oadp-must-gather"
+# oc adm must-gather --image=registry.redhat.io/oadp/oadp-mustgather-rhel9:v1.4 --dest-dir="${ARTIFACT_DIR}/oadp-must-gather"
 
 # Copy logs into artifact directory if they exist
 echo "Checking for additional logs in ${LOGS_FOLDER}"
