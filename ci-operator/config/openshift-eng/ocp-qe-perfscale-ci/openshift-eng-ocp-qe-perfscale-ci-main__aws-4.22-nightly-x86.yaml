@@ -290,6 +290,32 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     - ref: openshift-qe-workers-scale
     workflow: openshift-qe-udn-density-pods
+- as: mnp-ipblocks-76500
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      ADDITIONAL_WORKER_NODES: "11"
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.12xlarge
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: registry.build07.ci.openshift.org/ci-ln-09l6sn2/release:latest
+      LOKI_USE_SERVICEMONITOR: "false"
+      MNP_CIDRS_PER_POLICY: "450"
+      MNP_POLICY_COUNT: "385"
+      MNP_TOTAL_PODS: "1400"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      SET_ENV_BY_PLATFORM: custom
+      USER_TAGS: |
+        TicketId MNP-76500
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-workers-scale
+    - ref: openshift-qe-enable-mnp
+    - ref: openshift-qe-mnp-ipblocks-loadtest
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: openshift-qe-installer-aws
 zz_generated_metadata:
   branch: main
   org: openshift-eng
