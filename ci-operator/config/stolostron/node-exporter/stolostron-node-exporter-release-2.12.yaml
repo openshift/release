@@ -2,23 +2,15 @@ base_images:
   base:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
-  stolostron_builder_go1.24-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.24-linux
+    tag: "9"
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.21-linux
+    tag: go1.23-linux
 images:
 - dockerfile_path: Dockerfile.ocp
   from: base
-  inputs:
-    stolostron_builder_go1.24-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: node-exporter
 promotion:
   to:
@@ -27,12 +19,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.9"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.9"
+      name: "4.21"
       namespace: ocp
 resources:
   '*':
@@ -77,8 +69,7 @@ tests:
         export OSCI_COMPONENT_NAME="node-exporter"
         make osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

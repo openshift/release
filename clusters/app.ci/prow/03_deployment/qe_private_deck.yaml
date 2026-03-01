@@ -71,6 +71,20 @@ objects:
             app: prow
             component: qe-private-deck
         spec:
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchLabels:
+                      component: qe-private-deck
+                  topologyKey: topology.kubernetes.io/zone
+              requiredDuringSchedulingIgnoredDuringExecution:
+              - labelSelector:
+                  matchLabels:
+                    component: qe-private-deck
+                topologyKey: kubernetes.io/hostname
           serviceAccountName: qe-private-deck
           initContainers:
           - name: git-sync-init
@@ -134,7 +148,7 @@ objects:
                 - mountPath: /etc/proxy/secrets
                   name: session-secret
             - name: deck
-              image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260128-95b2a3412
+              image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20260217-999e46ca7
               args:
                 - --github-oauth-config-file=/etc/oauth/config.json
                 - --github-app-id=$(GITHUB_APP_ID)
@@ -250,6 +264,17 @@ objects:
             - name: build-farm-credentials
               secret:
                 secretName: deck
+  - apiVersion: policy/v1
+    kind: PodDisruptionBudget
+    metadata:
+      namespace: ${NAMESPACE}
+      name: qe-private-deck
+    spec:
+      minAvailable: 1
+      selector:
+        matchLabels:
+          app: prow
+          component: qe-private-deck
   - apiVersion: v1
     kind: Secret
     metadata:

@@ -15,7 +15,7 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.6.2"
+	TAG="v1.0.2"
 	echo "Installing PowerVC-Tool version ${TAG}"
 	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
 	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
@@ -136,6 +136,18 @@ EOF
 # Workaround for this error as clouds.yaml is also here
 #   NewServiceClient returns error unable to load clouds.yaml: no clouds.yml file found: file does not exist
 cd /tmp/
+
+echo "Running PowerVC-Tool check-alive..."
+PowerVC-Tool \
+	check-alive \
+	--serverIP "${SERVER_IP}" \
+	--shouldDebug true
+RC=$?
+if [ ${RC} -gt 0 ]
+then
+	echo "Error: PowerVC-Tool check-alive --serverIP ${SERVER_IP} --shouldDebug true"
+	exit ${RC}
+fi
 
 SUBNET_ID=$(openstack --os-cloud=${CLOUD} network show "${NETWORK_NAME}" --format shell | grep ^subnets | sed -e "s,^[^']*',," -e "s,'.*$,,")
 if [ -z "${SUBNET_ID}" ]

@@ -218,7 +218,7 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-op-1of2
+- as: e2e-gcp-op-part1
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp-3
@@ -235,7 +235,7 @@ tests:
           cpu: 100m
       timeout: 1h40m0s
     workflow: ipi-gcp
-- as: e2e-gcp-op-2of2
+- as: e2e-gcp-op-part2
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp-3
@@ -267,6 +267,36 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h10m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-op-ocl-part1
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-ocl-1of2
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h30m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-op-ocl-part2
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-ocl-2of2
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 2h30m0s
     workflow: ipi-gcp
 - always_run: false
   as: e2e-gcp-op-techpreview

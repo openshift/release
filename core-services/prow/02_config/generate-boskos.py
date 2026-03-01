@@ -256,9 +256,12 @@ CONFIG = {
     },
     'aro-hcp-prod-quota-slice': {
         'default': 10
-  },
+    },
     'aro-hcp-dev-quota-slice': {
         'default': 15,
+    },
+    'aro-hcp-dev-global-pipeline-quota-slice': {
+        'default': 1,
     },
     'aro-hcp-test-msi-containers-dev': {},
     'aro-hcp-test-msi-containers-int': {},
@@ -401,13 +404,13 @@ CONFIG = {
         'eu-west-1': 8,
         'eu-west-2': 8
     },
-    'hypershift-quota-slice': {
-        'default': 50,
-    },
     'hypershift-aws-quota-slice': {
         'default': 30,
     },
     'hypershift-aks-quota-slice': {
+        'default': 20,
+    },
+    'hypershift-azure-quota-slice': {
         'default': 20,
     },
     'hypershift-gcp-quota-slice': {
@@ -623,10 +626,6 @@ CONFIG = {
     },
     'metal-redhat-gs-quota-slice': {
         'default': 1,
-    },
-    'rosa-regional-platform-int-quota-slice': {
-        'us-east-1': 15,
-        'us-east-2': 15,
     },
     'amd-gpu-quota-slice': {
         '10.1.178.14': 1,

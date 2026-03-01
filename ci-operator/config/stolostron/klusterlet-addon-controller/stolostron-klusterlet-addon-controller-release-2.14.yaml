@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-  stolostron_builder_go1.25-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.25-linux
 binary_build_commands: go build ./cmd/manager
 build_root:
   image_stream_tag:
@@ -16,10 +12,6 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile
   from: base
-  inputs:
-    stolostron_builder_go1.25-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.25-linux
   to: klusterlet-addon-controller
 promotion:
   to:
@@ -28,12 +20,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.19"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.19"
       namespace: ocp
 resources:
   '*':
@@ -99,8 +91,7 @@ tests:
         export OSCI_PUBLISH_DELAY="0"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

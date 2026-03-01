@@ -96,8 +96,8 @@ function setup_hub_cluster_with_site_config_addon {
     echo
     set -x
     oc -n ${MCH_NAMESPACE} patch multiclusterhubs.operator.open-cluster-management.io multiclusterhub \
-      --type json \
-      --patch '[{"op": "add", "path":"/spec/overrides/components/-", "value": {"name":"siteconfig","enabled": true}}]'
+      --type merge \
+      --patch '{"spec": {"overrides": {"components": [{"name": "siteconfig", "enabled": true}]}}}'
     set +x
     wait_until_command_is_ok "oc -n ${MCH_NAMESPACE} get po | grep siteconfig" 10s 30
 

@@ -1,0 +1,47 @@
+base_images:
+  base:
+    name: 5.0-priv
+    namespace: ocp-private
+    tag: base
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-golang-1.12
+canonical_go_repository: github.com/openshift/crd-schema-gen
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: crd-schema-gen
+promotion:
+  to:
+  - name: 5.0-priv
+    namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 5.0-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 5.0-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 2Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    go get -u golang.org/x/tools/imports
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift-priv
+  repo: crd-schema-gen
