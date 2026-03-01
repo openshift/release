@@ -88,9 +88,11 @@ fi
 # Function to copy artifacts to the artifact directory after test run.
 function copyArtifacts {
   if [ -d "gui_test_screenshots" ]; then
-    cp -r gui_test_screenshots "${ARTIFACT_DIR}/gui_test_screenshots"
     # Copy JUnit files directly to ARTIFACT_DIR with a unique name for BigQuery ingestion
     cp gui_test_screenshots/junit_cypress-*.xml "${ARTIFACT_DIR}/junit_distributed-tracing-console-plugin.xml" 2>/dev/null || true
+    # Remove the duplicate junit file from gui_test_screenshots before copying to artifact dir
+    rm -f gui_test_screenshots/junit_cypress-*.xml 2>/dev/null || true
+    cp -r gui_test_screenshots "${ARTIFACT_DIR}/gui_test_screenshots"
     echo "Artifacts copied successfully."
   else
     echo "Directory gui_test_screenshots does not exist. Nothing to copy."
@@ -169,43 +171,19 @@ export CYPRESS_LOGIN_USERS=kubeadmin:${kubeadmin_password}
 export NO_COLOR=1
 export CYPRESS_CACHE_FOLDER=/tmp/Cypress
 
-# Fetch the OpenShift version and extract the minor version
-oc_version_minor=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d . -f 2)
-
-echo "Detected OpenShift minor version: $oc_version_minor"
-
 # Define the repository URL and target directory
 repo_url="https://github.com/openshift/distributed-tracing-console-plugin.git"
 target_dir="/tmp/distributed-tracing-console-plugin"
 
-# Clone the repository and checkout the appropriate branch based on the OpenShift version
-if [[ "$oc_version_minor" -ge 19 ]]; then
-  echo "OpenShift version is 4.$oc_version_minor or greater. Cloning the main branch."
-  git clone "$repo_url" "$target_dir"
-  if [ $? -eq 0 ]; then
-    cd "$target_dir/tests" || exit 0
-    git checkout release-1.0
-    echo "Successfully cloned the repository and changed directory to $target_dir/tests."
-  else
-    echo "Error cloning the repository."
-    exit 0
-  fi
+# Clone the repository (uses main branch by default)
+echo "Cloning the repository."
+git clone "$repo_url" "$target_dir"
+if [ $? -eq 0 ]; then
+  cd "$target_dir/tests" || exit 0
+  echo "Successfully cloned the repository and changed directory to $target_dir/tests."
 else
-  echo "OpenShift version is less than 4.19. Cloning and checking out the release-0.4 branch."
-  git clone "$repo_url" "$target_dir"
-  if [ $? -eq 0 ]; then
-    cd "$target_dir/tests" || exit 0
-    git checkout release-0.4
-    if [ $? -eq 0 ]; then
-      echo "Successfully cloned the repository, changed directory to $target_dir/tests, and checked out the release-0.4 branch."
-    else
-      echo "Error checking out the release-0.4 branch."
-      exit 0
-    fi
-  else
-    echo "Error cloning the repository."
-    exit 0
-  fi
+  echo "Error cloning the repository."
+  exit 0
 fi
 
 # Install npm modules
