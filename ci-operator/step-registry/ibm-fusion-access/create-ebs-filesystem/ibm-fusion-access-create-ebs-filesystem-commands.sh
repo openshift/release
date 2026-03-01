@@ -1,17 +1,11 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-FA__SCALE__NAMESPACE="${FA__SCALE__NAMESPACE:-ibm-spectrum-scale}"
-
-echo "🗂️  Creating IBM Storage Scale Filesystem..."
-
-# Create Filesystem resource referencing LocalDisk resources
-oc apply -f=- <<EOF
+cat > /tmp/filesystem-skeleton.yaml <<'SKELETON'
 apiVersion: scale.spectrum.ibm.com/v1beta1
 kind: Filesystem
 metadata:
   name: shared-filesystem
-  namespace: ${FA__SCALE__NAMESPACE}
 spec:
   local:
     blockSize: 4M
@@ -27,16 +21,16 @@ spec:
     role: object_r
     type: container_file_t
     user: system_u
-EOF
+SKELETON
 
-echo "✅ Filesystem resource created"
-oc get filesystem shared-filesystem -n ${FA__SCALE__NAMESPACE}
+yq -o json /tmp/filesystem-skeleton.yaml | \
+  jq --arg ns "${FA__SCALE__NAMESPACE}" '.metadata.namespace = $ns' | \
+  oc create --dry-run=client -o json --save-config -f - | \
+  oc apply -f -
 
-echo ""
-echo "Waiting for filesystem to be ready (may take up to 1 hour)..."
 oc wait --for=jsonpath='{.status.conditions[?(@.type=="Success")].status}'=True \
   filesystem/shared-filesystem \
-  -n ${FA__SCALE__NAMESPACE} \
-  --timeout=3600s
+  -n "${FA__SCALE__NAMESPACE}" \
+  --timeout="${FA__SCALE__FILESYSTEM_READY_TIMEOUT}"
 
-echo "✅ Filesystem is ready"
+true
