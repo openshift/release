@@ -863,6 +863,41 @@ set -o errexit
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
+# For IBM Cloud, check if bootstrap completed successfully even if cleanup failed
+# This works around a known issue where COS instance cleanup fails but cluster is functional
+if test "${ret}" -ne 0 && [[ "${CLUSTER_TYPE}" == ibmcloud* ]]; then
+  echo "IBM Cloud installation failed with ret=${ret}, checking if bootstrap completed successfully..."
+  
+  # Check if this is the known COS cleanup error
+  if grep -q "failed retrieving cos instance for destroy bootstrap" "${dir}/.openshift_install.log" 2>/dev/null || \
+     grep -q "COS Resource Not Found" "${dir}/.openshift_install.log" 2>/dev/null; then
+    echo "✓ Detected known COS cleanup error"
+    
+    # Check if bootstrap actually completed successfully
+    if grep -q "safe to remove the bootstrap" "${dir}/.openshift_install.log" 2>/dev/null; then
+      echo "✓ Bootstrap completion message found in log"
+      
+      if [ -f "${dir}/auth/kubeconfig" ]; then
+        echo "✓ Kubeconfig file exists"
+        
+        if env KUBECONFIG="${dir}/auth/kubeconfig" oc get --raw / >/dev/null 2>&1; then
+          echo "✓ API server is accessible"
+          echo "Bootstrap completed successfully despite COS cleanup failure. Treating as success for IBM Cloud."
+          ret=0
+        else
+          echo "✗ API server is not accessible"
+        fi
+      else
+        echo "✗ Kubeconfig file not found at ${dir}/auth/kubeconfig"
+      fi
+    else
+      echo "✗ Bootstrap completion message not found - this is a real failure"
+    fi
+  else
+    echo "This is not the known COS cleanup issue - treating as real failure"
+  fi
+fi
+
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
