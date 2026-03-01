@@ -94,14 +94,19 @@ else
   echo "Orion version: $orion_version"
 fi
 
-EXTRA_FLAGS="${ORION_EXTRA_FLAGS:-} --lookback ${LOOKBACK}d --hunter-analyze"
+EXTRA_FLAGS=()
+if [[ -n "${ORION_EXTRA_FLAGS:-}" ]]; then
+    read -ra ORION_EXTRAS <<< "$ORION_EXTRA_FLAGS"
+    EXTRA_FLAGS+=("${ORION_EXTRAS[@]}")
+fi
+EXTRA_FLAGS+=(--lookback "${LOOKBACK}d" --hunter-analyze)
 
 if [ ${OUTPUT_FORMAT} == "JUNIT" ]; then
-    EXTRA_FLAGS+=" --output-format junit --save-output-path=junit.xml"
+    EXTRA_FLAGS+=(--output-format junit --save-output-path=junit.xml)
 elif [ "${OUTPUT_FORMAT}" == "JSON" ]; then
-    EXTRA_FLAGS+=" --output-format json"
+    EXTRA_FLAGS+=(--output-format json)
 elif [ "${OUTPUT_FORMAT}" == "TEXT" ]; then
-    EXTRA_FLAGS+=" --output-format text"
+    EXTRA_FLAGS+=(--output-format text)
 else
     echo "Unsupported format: ${OUTPUT_FORMAT}"
     exit 1
@@ -128,11 +133,11 @@ if [[ -n "$ACK_FILE" ]] && [[ "$ACK_FILE" =~ ^https?:// ]]; then
         echo "Error: Failed to download $ACK_FILE" >&2
         exit 1
     fi
-    EXTRA_FLAGS+=" --ack $ackFilePath"
+    EXTRA_FLAGS+=(--ack "$ackFilePath")
 fi
 
 if [ ${COLLAPSE} == "true" ]; then
-    EXTRA_FLAGS+=" --collapse"
+    EXTRA_FLAGS+=(--collapse)
 fi
 
 if [[ -n "${ORION_ENVS}" ]]; then
@@ -147,22 +152,28 @@ if [[ -n "${ORION_ENVS}" ]]; then
 fi
 
 if [[ -n "${LOOKBACK_SIZE}" ]]; then
-    EXTRA_FLAGS+=" --lookback-size ${LOOKBACK_SIZE}"
+    EXTRA_FLAGS+=(--lookback-size "${LOOKBACK_SIZE}")
 fi
 
 if [[ -n "${DISPLAY}" ]]; then
-    EXTRA_FLAGS+=" --display ${DISPLAY}"
+    EXTRA_FLAGS+=(--display "${DISPLAY}")
 fi
 
 if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
-    EXTRA_FLAGS+=" --github-repos ${CHANGE_POINT_REPOS}"
+    EXTRA_FLAGS+=(--github-repos "${CHANGE_POINT_REPOS}")
+fi
+
+if [[ ${JOB_TYPE} == "presubmit" ]] || [[ ${JOB_TYPE} == "periodic" ]]; then
+    EXTRA_FLAGS+=(--pr-analysis)
+else
+    EXTRA_FLAGS+=(--input-vars='{"pull_number": "0"}')
 fi
 
 set +e
 set -o pipefail
 FILENAME=$(basename ${ORION_CONFIG} | awk -F. '{print $1}')
 export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" 
-orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/${FILENAME}.txt
+orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} "${EXTRA_FLAGS[@]}" | tee ${ARTIFACT_DIR}/${FILENAME}.txt
 orion_exit_status=$?
 set -e
 
