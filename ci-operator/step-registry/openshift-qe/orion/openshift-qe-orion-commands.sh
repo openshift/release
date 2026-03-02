@@ -299,9 +299,21 @@ process_change_point
 
 cp *.csv *.xml *.json *.txt *.html "${ARTIFACT_DIR}/" 2>/dev/null || true
 
+# Write deferred JSON results to SHARED_DIR for report step aggregation
+if [ "${RUN_ORION}" == "deferred" ]; then
+    for f in junit*.json; do
+        [ -e "$f" ] && cp "$f" "${SHARED_DIR}/orion-${FILENAME}-$(basename "$f")" 2>/dev/null || true
+    done
+fi
+
 if [ $orion_exit_status -eq 3 ]; then
   echo "Orion returned exit code 3, which means there are no results to analyze."
   echo "Exiting zero since there were no regressions found."
+  exit 0
+fi
+
+if [ "${RUN_ORION}" == "deferred" ]; then
+  echo "RUN_ORION=deferred. Exit status $orion_exit_status deferred to report step."
   exit 0
 fi
 
