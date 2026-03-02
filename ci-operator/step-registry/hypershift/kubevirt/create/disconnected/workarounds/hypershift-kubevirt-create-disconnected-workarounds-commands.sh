@@ -59,10 +59,10 @@ jq -s '.[0] * .[1]' "${XDG_RUNTIME_DIR}/containers/auth.json" /home/pull-secret 
 ./oc-mirror version
 
 # mirror to disk first
-./oc-mirror --config imageset_config.yaml file://"${LOCALPATH}" --authfile /home/oc_mirror_auth --retry-times 5 --v2 --remove-signatures --ignore-release-signature
+./oc-mirror --config imageset_config.yaml file://"${LOCALPATH}" --authfile /home/oc_mirror_auth --retry-times 5 --v2
 
 # push to the internal registry
-./oc-mirror --config imageset_config.yaml --from file://"${LOCALPATH}" docker://${mirror_registry} --authfile /home/oc_mirror_auth --retry-times 5 --v2 --remove-signatures --ignore-release-signature 
+./oc-mirror --config imageset_config.yaml --from file://"${LOCALPATH}" docker://${mirror_registry} --authfile /home/oc_mirror_auth --retry-times 5 --v2
 
 # apply IDMS
 cat "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
@@ -70,11 +70,13 @@ oc apply -f "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
 
 ###
 
-scp "${SSHOPTS[@]}" "root@${IP}:/home/ho_operator_image" "${SHARED_DIR}/ho_operator_image"
+EOF
+
 ### workaround for https://issues.redhat.com/browse/CNV-38194
 echo "workaround for https://issues.redhat.com/browse/CNV-38194"
 scp "${SSHOPTS[@]}" "root@${IP}:/etc/pki/ca-trust/source/anchors/registry.2.crt" "${SHARED_DIR}/registry.2.crt"
 ###
+
 
 ###
 # For some reason operator-ose-csi-external-snapshotter-rhel8 is not correctly appearing
