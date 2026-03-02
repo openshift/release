@@ -623,6 +623,40 @@ RELEASESCRIPT
 else
   log_warn "Lock info not found in ${SHARED_DIR}/beaker_lock_info"
   log_warn "This might mean the lock was never acquired or already released"
+  log_info "Attempting cleanup of any stale lock files..."
+
+  # Best-effort cleanup when beaker_lock_info is missing
+  # This handles timeout scenarios where the job never saved lock info
+  LOCK_FILE="${LOCK_FILE:-/tmp/tec-operator-ci.lock}"
+
+  ssh "${SSHOPTS[@]}" "${BEAKER_USER}@${BEAKER_IP}" bash -s -- "${LOCK_FILE}" << 'STALE_CLEANUP' || log_warn "Stale lock cleanup had issues"
+LOCK_FILE="$1"
+
+if ls "${LOCK_FILE}"* >/dev/null 2>&1; then
+  echo "[INFO] Found stale lock files, cleaning up..."
+
+  # Try to kill any lock holder processes
+  if [ -f "${LOCK_FILE}.pid" ]; then
+    LOCK_PID=$(cat "${LOCK_FILE}.pid" 2>/dev/null || echo "")
+    if [ -n "${LOCK_PID}" ] && ps -p "${LOCK_PID}" >/dev/null 2>&1; then
+      echo "[INFO] Stopping lock holder process ${LOCK_PID}..."
+      kill -USR1 "${LOCK_PID}" 2>/dev/null || kill -9 "${LOCK_PID}" 2>/dev/null || true
+    fi
+  fi
+
+  # Kill any orphaned hold_lock.sh processes
+  pkill -9 -f "hold_lock.sh" 2>/dev/null || true
+
+  # Remove lock files
+  rm -f "${LOCK_FILE}" "${LOCK_FILE}.holder" "${LOCK_FILE}.pid" 2>/dev/null || true
+
+  echo "[SUCCESS] Stale lock files cleaned up"
+else
+  echo "[INFO] No stale lock files found"
+fi
+STALE_CLEANUP
+
+  log_info "Stale lock cleanup completed"
 fi
 
 log_info "Lock release procedure completed"
