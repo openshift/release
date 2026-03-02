@@ -54,12 +54,14 @@ set -e
 
 echo "Preflight exit code: ${preflight_exit_code}"
 
-if [ "${PUBLISH_ARTIFACTS}" == "true" ]; then 
+# Always save logs to ensure we can capture logs where preflight exits on error
+cp -a preflight.log "${ARTIFACT_DIR}"/
+cp -a "${preflight_stdout_file}" "${ARTIFACT_DIR}"/
+cp -a "${preflight_stderr_file}" "${ARTIFACT_DIR}"/
+
+if [ "${PUBLISH_ARTIFACTS}" == "true" ]; then
     echo "PUBLIC_ARTIFACTS is set to true. Publishing all artifacts."
     cp -a "${PFLT_ARTIFACTS}" "${ARTIFACT_DIR}"/
-    cp -a preflight.log "${ARTIFACT_DIR}"/    
-    cp -a "${preflight_stdout_file}" "${ARTIFACT_DIR}"/
-    cp -a "${preflight_stderr_file}" "${ARTIFACT_DIR}"/
 fi
 
 echo "Placing assets into ${preflight_targz_file} for any future CI tasks."
