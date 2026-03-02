@@ -56,6 +56,12 @@ pci_devices: []
 wait_timeout: ${WAIT_TIMEOUT:-3600}
 no_wait: false
 version_channel: ${VERSION_CHANNEL:-stable}
+
+operators:
+  install: false
+  machine_config_role: worker
+  driver_version: "30.20.1"
+  enable_metrics: true
 EOF
 
 echo "Generated cluster config:"

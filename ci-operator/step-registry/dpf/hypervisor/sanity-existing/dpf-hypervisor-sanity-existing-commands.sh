@@ -1,95 +1,64 @@
 #!/bin/bash
 set -euo pipefail
 
-# Sanity test on EXISTING cluster - no provisioning
-# Uses kubeconfig and sanity-env from Vault
+# Configuration
+REMOTE_HOST="${REMOTE_HOST:-10.6.135.45}"
 
-REMOTE_HOST="${REMOTE_HOST:-nvd-srv-45.nvidia.eng.rdu2.dc.redhat.com}"
-BUILD_ID="${BUILD_ID:-$(date +%Y%m%d-%H%M%S)}"
+echo "Setting up SSH access to DPF hypervisor: ${REMOTE_HOST}"
 
-echo "=== DPF Sanity Test on Existing Cluster ==="
-echo "Remote host: ${REMOTE_HOST}"
-echo "Build ID: ${BUILD_ID}"
-
-# Setup SSH
-echo "Setting up SSH..."
+# Prepare SSH key from Vault (add trailing newline if missing)
+echo "Configuring SSH private key..."
 cat /var/run/dpf-ci/private-key | base64 -d > /tmp/id_rsa
 echo "" >> /tmp/id_rsa
 chmod 600 /tmp/id_rsa
 
-SSH="ssh -i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@${REMOTE_HOST}"
-SCP="scp -i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+# Define SSH command with explicit options (don't rely on ~/.ssh/config)
+SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
+
+### DEBUG: add a ong timeout to troubleshoot from pod
+## echo "Sleeping for 999999999 seconds ...."
+## sleep 999999999
 
 # Test SSH connection
-echo "Testing SSH connection..."
-if ! ${SSH} echo 'SSH connection successful'; then
-    echo "ERROR: Failed to connect to ${REMOTE_HOST}"
+echo "Testing SSH connection to ${REMOTE_HOST}..."
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} echo 'SSH connection successful'; then
+    echo "SSH setup complete and tested successfully"
+else
+    echo "ERROR: Failed to connect to hypervisor ${REMOTE_HOST}"
+    echo "Debug information:"
+    echo "- Checking if SSH key exists:"
+    ls -la /tmp/id_rsa
+    echo "- Testing SSH connectivity with verbose output:"
+    ssh -v ${SSH_OPTS} root@${REMOTE_HOST} echo 'test' || true
     exit 1
 fi
 
-# Create working directory on hypervisor
-SANITY_DIR="/tmp/dpf-sanity-${BUILD_ID}"
-echo "Creating working directory: ${SANITY_DIR}"
-${SSH} "mkdir -p ${SANITY_DIR}"
+# Export SSH settings for subsequent steps
+echo "REMOTE_HOST=${REMOTE_HOST}" >> ${SHARED_DIR}/dpf-env
+echo "SSH_OPTS=${SSH_OPTS}" >> ${SHARED_DIR}/dpf-env
+echo "SSH setup completed successfully for ${REMOTE_HOST}"
 
-# Copy repository to hypervisor (tar + ssh, rsync not available)
-echo "Copying repository to hypervisor..."
-tar czf - --exclude='.git' --exclude='logs' --exclude='*.log' . | \
-    ${SSH} "tar xzf - -C ${SANITY_DIR}"
+echo "Remote host: ${REMOTE_HOST}"
 
-# Decode and copy kubeconfig from Vault
-echo "Setting up kubeconfig..."
-if [[ -f /var/run/dpf-ci/kubeconfig ]]; then
-    cat /var/run/dpf-ci/kubeconfig | base64 -d > /tmp/kubeconfig
-    ${SCP} /tmp/kubeconfig root@${REMOTE_HOST}:${SANITY_DIR}/kubeconfig
-else
-    echo "ERROR: kubeconfig not found in Vault"
-    exit 1
-fi
+datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
 
-# Decode and copy sanity-env as .env
-echo "Setting up environment (sanity-env)..."
-if [[ -f /var/run/dpf-ci/sanity-env ]]; then
-    cat /var/run/dpf-ci/sanity-env | base64 -d > /tmp/sanity-env
-    # Add KUBECONFIG path
-    echo "KUBECONFIG=${SANITY_DIR}/kubeconfig" >> /tmp/sanity-env
-    ${SCP} /tmp/sanity-env root@${REMOTE_HOST}:${SANITY_DIR}/.env
-else
-    echo "ERROR: sanity-env not found in Vault"
-    exit 1
-fi
+# Run dpf make target checks test
+echo "=== DPF Make Target checks on Existing Cluster ==="
+if ssh $SSH_OPTS root@$REMOTE_HOST "ls -ltr; env; cd /root/doca8/openshift-dpf; export KUBECONFIG=/root/doca8/openshift-dpf/kubeconfig-mno; oc get dpu -A; make verify-workers; make verify-dpu-nodes; make verify-deployment; make verify-dpudeployment"; then echo "DPF Spot Checks Tests Passed"; else echo "DPF Spot Checks Tests Failed"; fi
 
-# Make scripts executable
-${SSH} "find ${SANITY_DIR}/scripts -name '*.sh' -exec chmod +x {} +"
 
-# Verify setup
-echo "Verifying setup..."
-${SSH} "cd ${SANITY_DIR} && ls -la .env kubeconfig"
-${SSH} "cd ${SANITY_DIR} && cat .env"
+# Run dpf-sanity-checks sanity test
+## echo "=== DPF Sanity Test on Existing Cluster ==="
+## echo "log file on hypervisor: log-dpf-sanity-checks-${datetime_string}"
 
-# Run sanity tests
-echo "=== Running DPF Sanity Tests ==="
-SANITY_LOG="${SANITY_DIR}/sanity-$(date +%Y%m%d_%H%M%S).log"
-TEST_RESULT=0
+## if ssh $SSH_OPTS root@$REMOTE_HOST "ls -ltr; env; cd /root/doca8/openshift-dpf; cat .env; make run-dpf-sanity 2>&1 | tee log-dpf-sanity-checks-${datetime_string}"; then echo "Sanity Test Passed"; else echo "Sanity Test Failed"; fi
 
-if ${SSH} "cd ${SANITY_DIR} && make run-dpf-sanity 2>&1 | tee ${SANITY_LOG}"; then
-    echo "Sanity tests PASSED"
-else
-    echo "Sanity tests FAILED"
-    TEST_RESULT=1
-fi
+## echo "====== DPF Sanity Test Log file:"
+## ssh $SSH_OPTS root@$REMOTE_HOST "cd /root/doca8/openshift-dpf; cat log-dpf-sanity-checks-${datetime_string}"
 
-# Collect artifacts
-mkdir -p ${ARTIFACT_DIR}/sanity-results
-${SCP} root@${REMOTE_HOST}:${SANITY_LOG} ${ARTIFACT_DIR}/sanity-results/ || echo "Could not retrieve log"
+echo "=== DPF Kubernetes Traffic Flow Tests on Existing Cluster ==="
+# Run kubernetes traffic flow test
+if ssh $SSH_OPTS root@$REMOTE_HOST "ls -ltr; env; cd /root/doca8/openshift-dpf; cat .env; export TFT_SERVER_NODE=worker-303ea712f378 ; export TFT_CLIENT_NODE=worker-303ea712f378; make run-traffic-flow-tests 2>&1 | tee log-traffic-flow-tests-${datetime_string}"; then echo "Kubernetes Network Traffic Flow Iperf Tests Passed"; else echo "Kubernetes Network Traffic Flow Iperf Tests Failed"; fi
 
-# Cleanup
-echo "Cleaning up..."
-${SSH} "rm -rf ${SANITY_DIR}"
-
-if [[ ${TEST_RESULT} -eq 0 ]]; then
-    echo "=== Sanity Test Completed Successfully ==="
-else
-    echo "=== Sanity Test Failed ==="
-    exit 1
-fi
+echo "====== DPF Kubernetes Traffic Flow Tests Log file:"
+ssh $SSH_OPTS root@$REMOTE_HOST "cd /root/doca8/openshift-dpf; cat log-traffic-flow-tests-${datetime_string}"

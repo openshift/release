@@ -38,7 +38,7 @@ spec:
   hibernationConfig:
     resumeTimeout: 20m0s
   imageSetRef:
-    name: ocp-release-4.15.12-x86-64-for-4.15.0-0-to-4.16.0-0  # will be automatically updated if `version_*` labels are set
+    name: ocp-release-4.15.61-multi-for-4.15.0-0-to-4.16.0-0  # will be automatically updated if `version_*` labels are set
   installAttemptsLimit: 1
   installConfigSecretTemplateRef:
     name: install-config-aws-us-east-1  # ref install-config file located in this directory

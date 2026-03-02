@@ -67,6 +67,90 @@ elif [[ -n "${MICROSHIFT_GIT}" ]]; then
     fi
     bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall ${configure_args} /tmp/pull-secret
 
+elif [[ -n "${MICROSHIFT_NIGHTLY:-}" ]]; then
+    : MICROSHIFT_NIGHTLY is set - install from cached nightly RPMs
+
+    git clone https://github.com/openshift/microshift -b "release-${OCP_VERSION}" ~/microshift
+
+    configure_args=""
+    if grep -qw -- "--skip-dnf-update" ~/microshift/scripts/devenv-builder/configure-vm.sh; then
+        configure_args="--skip-dnf-update"
+    fi
+
+    : Set up firewall, oc, etc. without building
+    bash -x ~/microshift/scripts/devenv-builder/configure-vm.sh --force-firewall --no-build --no-build-deps ${configure_args} /tmp/pull-secret
+
+    : Download nightly RPMs from S3 directly on EC2
+    if [[ ! -f /tmp/brew-rpms-s3-path ]]; then
+        echo "ERROR: brew-rpms-s3-path not found"
+        exit 1
+    fi
+
+    NIGHTLY_S3_PATH=$(cat /tmp/brew-rpms-s3-path)
+    echo "Downloading nightly RPMs from: ${NIGHTLY_S3_PATH}"
+
+    # Install AWS CLI on EC2 (CI pod has its own installation for S3 search)
+    "${DNF_RETRY}" "install" "unzip"
+    curl -s "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o /tmp/awscliv2.zip
+    unzip -q /tmp/awscliv2.zip -d /tmp
+    sudo /tmp/aws/install --install-dir /usr/local/aws-cli --bin-dir /usr/local/bin
+    rm -rf /tmp/awscliv2.zip /tmp/aws
+
+    # Configure AWS credentials
+    mkdir -p ~/.aws
+    chmod 0700 ~/.aws
+
+    # Disable tracing for credential handling
+    set +x
+    cat > ~/.aws/credentials <<CREDS
+[microshift-ci]
+aws_access_key_id = $(cat /tmp/aws_access_key_id)
+aws_secret_access_key = $(cat /tmp/aws_secret_access_key)
+CREDS
+    set -x
+
+    chmod -R go-rwx ~/.aws
+    export AWS_PROFILE=microshift-ci
+
+    # Download brew-rpms.tar from S3
+    aws s3 cp "${NIGHTLY_S3_PATH}" /tmp/brew-rpms.tar
+    echo "Downloaded: $(ls -lh /tmp/brew-rpms.tar)"
+
+    # Extract and install
+    tar xf /tmp/brew-rpms.tar -C /tmp/
+    echo "Extracted nightly RPMs:"
+    find /tmp/brew-rpms -name "*.rpm" -type f
+
+    # Find the RPM directory for the current architecture and OCP version
+    rpm_arch=$(uname -m)
+
+    # Look specifically for nightly builds
+    rpm_dir="/tmp/brew-rpms/${OCP_VERSION}-nightly/${rpm_arch}"
+
+    if [[ ! -d "${rpm_dir}" ]]; then
+        echo "ERROR: No nightly RPMs found for OCP version ${OCP_VERSION} and architecture ${rpm_arch}"
+        echo "Expected directory: ${rpm_dir}"
+        echo "Available directories in brew-rpms:"
+        find /tmp/brew-rpms -type d -name "${rpm_arch}" | sort
+        echo "NOTE: nightly=true is for installing nightly builds only."
+        echo "For EC/RC/zstream, use the standard installation (without nightly=true)."
+        exit 1
+    fi
+
+    echo "Installing nightly RPMs from: ${rpm_dir}"
+    ls -1 "${rpm_dir}"/*.rpm
+
+    sudo dnf install -y "${rpm_dir}"/*.rpm
+
+    echo "Installed MicroShift version:"
+    rpm -q microshift microshift-networking microshift-selinux
+
+    # Clean up AWS credentials
+    rm -rf ~/.aws /tmp/aws_access_key_id /tmp/aws_secret_access_key /tmp/brew-rpms-s3-path
+    rm -rf /tmp/brew-rpms.tar /tmp/brew-rpms
+
+    sudo systemctl enable --now microshift
+
 else
     : Neither MICROSHIFT_PR nor MICROSHIFT_GIT are set - use release-OCP_VERSION to checkout right scripts and install MicroShift from repositories
 
@@ -105,15 +189,24 @@ fi
 EOF
 chmod +x /tmp/install.sh
 
-scp \
-    "${MICROSHIFT_CLUSTERBOT_SETTINGS}" \
-    "${SHARED_DIR}/ci-functions.sh" \
-    /tmp/install.sh \
-    /tmp/config.yaml \
-    /var/run/rhsm/subscription-manager-org \
-    /var/run/rhsm/subscription-manager-act-key \
-    "${CLUSTER_PROFILE_DIR}/pull-secret" \
-    "${INSTANCE_PREFIX}:/tmp"
+files_to_copy=(
+    "${MICROSHIFT_CLUSTERBOT_SETTINGS}"
+    "${SHARED_DIR}/ci-functions.sh"
+    /tmp/install.sh
+    /tmp/config.yaml
+    /var/run/rhsm/subscription-manager-org
+    /var/run/rhsm/subscription-manager-act-key
+    "${CLUSTER_PROFILE_DIR}/pull-secret"
+)
+
+# Add AWS credentials for nightly RPM download (if using nightly=true)
+if [[ -f "${SHARED_DIR}/brew-rpms-s3-path" ]]; then
+    files_to_copy+=("${SHARED_DIR}/brew-rpms-s3-path")
+    files_to_copy+=("${SHARED_DIR}/aws_access_key_id")
+    files_to_copy+=("${SHARED_DIR}/aws_secret_access_key")
+fi
+
+scp "${files_to_copy[@]}" "${INSTANCE_PREFIX}:/tmp"
 
 ssh "${INSTANCE_PREFIX}" "/tmp/install.sh"
 ssh "${INSTANCE_PREFIX}" "sudo cp /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig /tmp/kubeconfig && sudo chown \$(whoami). /tmp/kubeconfig"
