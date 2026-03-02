@@ -11,7 +11,7 @@ The certificate managed by cert-manager is auto-renewed [when it is 2/3rd of the
 $ oc config use-context build01
 $ oc project cert-manager
 ### injected the env vars for aws auth
-$ oc --as system:admin apply --validate=false -f clusters/build-clusters/01_cluster/cert-manager/_cert-manager.yaml
+$ oc --as system:admin apply --validate=false -f clusters/build-clusters/build01/cert-manager/_cert-manager.yaml
 ```
 
 Manual steps: We apply those objects by `applyconfig`. Showing the commands here is only for debugging purpose.
