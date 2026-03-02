@@ -55,6 +55,9 @@ spec:
       [sysctl]
       kernel.sched_rt_runtime_us = -1
 
+      [service]
+      stalld_service="service.stalld=start,enable"
+
       [sysfs]
       /sys/bus/workqueue/devices/writeback/cpumask = \${not_isolated_cpumask}
       /sys/devices/virtual/workqueue/cpumask = \${not_isolated_cpumask}
