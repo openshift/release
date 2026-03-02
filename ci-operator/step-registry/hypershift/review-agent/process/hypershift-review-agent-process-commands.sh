@@ -631,6 +631,9 @@ echo "GitHub App tokens configured successfully"
 MAX_PRS=${REVIEW_AGENT_MAX_PRS:-10}
 echo "Configuration: MAX_PRS=$MAX_PRS"
 
+# Shared prompt instruction for subagent behavior
+SUBAGENT_PROMPT="SUBAGENTS: Launch ALL subagents in parallel (single message with multiple Task tool calls) for maximum speed. Each subagent should be given subagent_type: \"general-purpose\". Do NOT set the model parameter — let subagents inherit the parent model, as these analysis tasks require a capable model."
+
 # Check for target PR mode
 # - REVIEW_AGENT_TARGET_PR: Explicit PR number override
 # - PULL_NUMBER: Used for single-PR presubmit job (not in batch-only mode)
@@ -788,7 +791,9 @@ $NEEDS_ATTENTION_JSON
 RESPONSE RULES:
 1. For each piece of feedback, choose ONE response mechanism only - never respond to the same feedback via both inline reply AND general PR comment
 2. Only make code changes when explicitly requested (look for imperative language like 'change', 'fix', 'update', 'remove')
-3. For questions or clarifications, reply with an explanation only - do not change code unless asked"
+3. For questions or clarifications, reply with an explanation only - do not change code unless asked
+
+${SUBAGENT_PROMPT}"
 
   set +e  # Don't exit on error for individual PRs
   echo "Starting Claude processing with streaming output..."

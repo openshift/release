@@ -48,19 +48,17 @@ format_number() {
   printf "%s" "$num" | sed -e ':a' -e 's/\([0-9]\)\([0-9]\{3\}\)\(\b\)/\1,\2\3/' -e 'ta'
 }
 
-# Calculate estimated cost in USD based on token counts
-# Claude Opus 4.6 pricing per million tokens:
-#   input=$5, output=$25, cache_read=$0.50, cache_create=$6.25 (5-min cache write)
-# Returns formatted string like "$1.2345"
-calculate_cost() {
-  local input_tokens=${1:-0}
-  local output_tokens=${2:-0}
-  local cache_read=${3:-0}
-  local cache_create=${4:-0}
+# Format a cost value as "$X.XXXX"
+format_cost() {
+  local cost_usd=${1:-0}
+  printf '$%.4f' "$cost_usd"
+}
 
-  local cost
-  cost=$(awk "BEGIN {printf \"%.4f\", ($input_tokens * 5 + $output_tokens * 25 + $cache_read * 0.5 + $cache_create * 6.25) / 1000000}" 2>/dev/null) || cost="0.0000"
-  printf '$%s' "$cost"
+# Sum two floating-point cost values
+sum_costs() {
+  local a=${1:-0}
+  local b=${2:-0}
+  awk "BEGIN {printf \"%.6f\", $a + $b}" 2>/dev/null || echo "0"
 }
 
 # HTML-escape a string
@@ -104,6 +102,7 @@ GRAND_TOTAL_INPUT=0
 GRAND_TOTAL_OUTPUT=0
 GRAND_TOTAL_CACHE_READ=0
 GRAND_TOTAL_CACHE_CREATE=0
+GRAND_TOTAL_COST_USD="0"
 
 while IFS= read -r line; do
   ISSUE_KEY=$(echo "$line" | awk '{print $1}')
@@ -159,6 +158,7 @@ while IFS= read -r line; do
   ISSUE_TOTAL_OUTPUT=0
   ISSUE_TOTAL_CACHE_READ=0
   ISSUE_TOTAL_CACHE_CREATE=0
+  ISSUE_TOTAL_COST_USD="0"
   TOKEN_ROWS=""
   MODEL="unknown"
 
@@ -176,16 +176,18 @@ while IFS= read -r line; do
     P_CACHE_CREATE=$(read_token_field "$TOKEN_FILE" "cache_creation_input_tokens")
     P_MODEL=$(read_token_field "$TOKEN_FILE" "model")
     P_DURATION=$(read_duration "$DURATION_FILE")
+    P_COST_RAW=$(read_token_field "$TOKEN_FILE" "total_cost_usd")
     if [ "$P_MODEL" != "0" ] && [ "$P_MODEL" != "unknown" ]; then
       MODEL="$P_MODEL"
     fi
 
-    P_COST=$(calculate_cost "$P_INPUT" "$P_OUTPUT" "$P_CACHE_READ" "$P_CACHE_CREATE")
+    P_COST=$(format_cost "$P_COST_RAW")
 
     ISSUE_TOTAL_INPUT=$((ISSUE_TOTAL_INPUT + P_INPUT))
     ISSUE_TOTAL_OUTPUT=$((ISSUE_TOTAL_OUTPUT + P_OUTPUT))
     ISSUE_TOTAL_CACHE_READ=$((ISSUE_TOTAL_CACHE_READ + P_CACHE_READ))
     ISSUE_TOTAL_CACHE_CREATE=$((ISSUE_TOTAL_CACHE_CREATE + P_CACHE_CREATE))
+    ISSUE_TOTAL_COST_USD=$(sum_costs "$ISSUE_TOTAL_COST_USD" "$P_COST_RAW")
     ISSUE_TOTAL_DURATION=$((ISSUE_TOTAL_DURATION + P_DURATION))
 
     if [ "$P_INPUT" -gt 0 ] || [ "$P_OUTPUT" -gt 0 ]; then
@@ -193,13 +195,49 @@ while IFS= read -r line; do
     fi
   done
 
-  ISSUE_COST=$(calculate_cost "$ISSUE_TOTAL_INPUT" "$ISSUE_TOTAL_OUTPUT" "$ISSUE_TOTAL_CACHE_READ" "$ISSUE_TOTAL_CACHE_CREATE")
+  ISSUE_COST=$(format_cost "$ISSUE_TOTAL_COST_USD")
+
+  # Build per-model breakdown rows from aggregated model_usage across phases
+  MODEL_BREAKDOWN_ROWS=""
+  MODEL_FILES=""
+  for phase_key in solve review fix pr; do
+    tf="${SHARED_DIR}/claude-${ISSUE_KEY}-${phase_key}-tokens.json"
+    if [ -f "$tf" ]; then
+      MODEL_FILES="$MODEL_FILES $tf"
+    fi
+  done
+  if [ -n "$MODEL_FILES" ]; then
+    MODEL_BREAKDOWN=$(jq -s '
+      [.[].model_usage // {} | to_entries[]]
+      | group_by(.key)
+      | map({
+          model: .[0].key,
+          input: (map(.value.inputTokens // .value.input_tokens // 0) | add),
+          output: (map(.value.outputTokens // .value.output_tokens // 0) | add),
+          cache_read: (map(.value.cacheReadInputTokens // .value.cache_read_input_tokens // 0) | add),
+          cache_create: (map(.value.cacheCreationInputTokens // .value.cache_creation_input_tokens // 0) | add)
+        })
+      | sort_by(.model)
+      | .[]
+      | "\(.model)|\(.input)|\(.output)|\(.cache_read)|\(.cache_create)"
+    ' $MODEL_FILES 2>/dev/null || echo "")
+    if [ -n "$MODEL_BREAKDOWN" ]; then
+      MODEL_BREAKDOWN_ROWS="<tr><td colspan=\"7\" style=\"background:#f0f0f0; font-size:0.85em; color:#666; padding:0.3em 1em;\"><em>Per-model breakdown</em></td></tr>"
+      while IFS='|' read -r M_NAME M_INPUT M_OUTPUT M_CACHE_READ M_CACHE_CREATE; do
+        if [ -n "$M_NAME" ]; then
+          M_SHORT=$(echo "$M_NAME" | sed 's/-[0-9]*$//')
+          MODEL_BREAKDOWN_ROWS="${MODEL_BREAKDOWN_ROWS}<tr style=\"font-size:0.85em; color:#666;\"><td>&nbsp;&nbsp;${M_SHORT}</td><td>-</td><td>$(format_number "$M_INPUT")</td><td>$(format_number "$M_OUTPUT")</td><td>$(format_number "$M_CACHE_READ")</td><td>$(format_number "$M_CACHE_CREATE")</td><td>-</td></tr>"
+        fi
+      done <<< "$MODEL_BREAKDOWN"
+    fi
+  fi
 
   # Accumulate grand totals
   GRAND_TOTAL_INPUT=$((GRAND_TOTAL_INPUT + ISSUE_TOTAL_INPUT))
   GRAND_TOTAL_OUTPUT=$((GRAND_TOTAL_OUTPUT + ISSUE_TOTAL_OUTPUT))
   GRAND_TOTAL_CACHE_READ=$((GRAND_TOTAL_CACHE_READ + ISSUE_TOTAL_CACHE_READ))
   GRAND_TOTAL_CACHE_CREATE=$((GRAND_TOTAL_CACHE_CREATE + ISSUE_TOTAL_CACHE_CREATE))
+  GRAND_TOTAL_COST_USD=$(sum_costs "$GRAND_TOTAL_COST_USD" "$ISSUE_TOTAL_COST_USD")
 
   # Token usage table for this issue
   TOKEN_TABLE=""
@@ -207,10 +245,11 @@ while IFS= read -r line; do
     TOKEN_TABLE="
   <h3>Token Usage &amp; Cost</h3>
   <table class=\"token-table\">
-  <thead><tr><th>Phase</th><th>Duration</th><th>Input Tokens</th><th>Output Tokens</th><th>Cache Read</th><th>Cache Create</th><th>Est. Cost</th></tr></thead>
+  <thead><tr><th>Phase</th><th>Duration</th><th>Input Tokens</th><th>Output Tokens</th><th>Cache Read</th><th>Cache Create</th><th>Cost</th></tr></thead>
   <tbody>
   ${TOKEN_ROWS}
   <tr class=\"total-row\"><td><strong>Total</strong></td><td><strong>$(format_duration "$ISSUE_TOTAL_DURATION")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_INPUT")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_OUTPUT")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_CACHE_READ")</strong></td><td><strong>$(format_number "$ISSUE_TOTAL_CACHE_CREATE")</strong></td><td><strong>${ISSUE_COST}</strong></td></tr>
+  ${MODEL_BREAKDOWN_ROWS}
   </tbody>
   </table>
   <p class=\"model-info\">Model: ${MODEL}</p>"
@@ -247,8 +286,8 @@ while IFS= read -r line; do
 
 done < "$STATE_FILE"
 
-# Calculate grand total cost
-GRAND_TOTAL_COST=$(calculate_cost "$GRAND_TOTAL_INPUT" "$GRAND_TOTAL_OUTPUT" "$GRAND_TOTAL_CACHE_READ" "$GRAND_TOTAL_CACHE_CREATE")
+# Format grand total cost
+GRAND_TOTAL_COST=$(format_cost "$GRAND_TOTAL_COST_USD")
 
 # Write the HTML report
 cat > "$REPORT_FILE" <<EOF
@@ -298,12 +337,12 @@ cat > "$REPORT_FILE" <<EOF
   <div class="stat"><div class="value" style="color:#cb2431">${FAILED_COUNT}</div><div class="label">Failed</div></div>
   <div class="stat"><div class="value">$(format_number "$GRAND_TOTAL_INPUT")</div><div class="label">Input Tokens</div></div>
   <div class="stat"><div class="value">$(format_number "$GRAND_TOTAL_OUTPUT")</div><div class="label">Output Tokens</div></div>
-  <div class="stat"><div class="value">${GRAND_TOTAL_COST}</div><div class="label">Est. Cost</div></div>
+  <div class="stat"><div class="value">${GRAND_TOTAL_COST}</div><div class="label">Cost</div></div>
 </div>
 
 <h2>Summary</h2>
 <table>
-<thead><tr><th>Issue</th><th>Timestamp</th><th>Status</th><th>Pull Request</th><th>Est. Cost</th></tr></thead>
+<thead><tr><th>Issue</th><th>Timestamp</th><th>Status</th><th>Pull Request</th><th>Cost</th></tr></thead>
 <tbody>
 ${SUMMARY_ROWS}
 </tbody>
