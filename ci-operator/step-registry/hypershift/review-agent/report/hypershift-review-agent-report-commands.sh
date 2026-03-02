@@ -32,18 +32,17 @@ format_number() {
   printf "%s" "$num" | sed -e ':a' -e 's/\([0-9]\)\([0-9]\{3\}\)\(\b\)/\1,\2\3/' -e 'ta'
 }
 
-# Calculate estimated cost in USD based on token counts
-# Claude Opus 4.6 pricing per million tokens:
-#   input=$5, output=$25, cache_read=$0.50, cache_create=$6.25 (5-min cache write)
-calculate_cost() {
-  local input_tokens=${1:-0}
-  local output_tokens=${2:-0}
-  local cache_read=${3:-0}
-  local cache_create=${4:-0}
+# Format a cost value as "$X.XXXX"
+format_cost() {
+  local cost_usd=${1:-0}
+  printf '$%.4f' "$cost_usd"
+}
 
-  local cost
-  cost=$(awk "BEGIN {printf \"%.4f\", ($input_tokens * 5 + $output_tokens * 25 + $cache_read * 0.5 + $cache_create * 6.25) / 1000000}" 2>/dev/null) || cost="0.0000"
-  printf '$%s' "$cost"
+# Sum two floating-point cost values
+sum_costs() {
+  local a=${1:-0}
+  local b=${2:-0}
+  awk "BEGIN {printf \"%.6f\", $a + $b}" 2>/dev/null || echo "0"
 }
 
 # Format seconds into a human-readable string
@@ -128,6 +127,9 @@ extract_from_stream_json() {
       # Extract tool results with is_error=true
       grep '"is_error":true' "$json_file" 2>/dev/null | jq -r '.content // empty' 2>/dev/null || echo ""
       ;;
+    model_usage)
+      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.modelUsage // {} | to_entries[] | "\(.key)|\(.value.input_tokens // 0)|\(.value.output_tokens // 0)|\(.value.cache_read_input_tokens // 0)|\(.value.cache_creation_input_tokens // 0)"' 2>/dev/null | head -20 || echo ""
+      ;;
   esac
 }
 
@@ -138,6 +140,7 @@ GRAND_TOTAL_INPUT=0
 GRAND_TOTAL_OUTPUT=0
 GRAND_TOTAL_CACHE_READ=0
 GRAND_TOTAL_CACHE_CREATE=0
+GRAND_TOTAL_COST_USD="0"
 
 while IFS= read -r line; do
   PR_NUMBER=$(echo "$line" | awk '{print $1}')
@@ -182,13 +185,16 @@ while IFS= read -r line; do
 
   DURATION_SECS=$((DURATION_MS / 1000))
   DURATION_API_SECS=$((DURATION_API_MS / 1000))
-  PR_COST=$(calculate_cost "$PR_INPUT" "$PR_OUTPUT" "$PR_CACHE_READ" "$PR_CACHE_CREATE")
+  PR_COST_RAW=$(extract_from_stream_json "$OUTPUT_FILE" "cost_usd")
+  : "${PR_COST_RAW:=0}"
+  PR_COST=$(format_cost "$PR_COST_RAW")
 
   # Accumulate grand totals
   GRAND_TOTAL_INPUT=$((GRAND_TOTAL_INPUT + PR_INPUT))
   GRAND_TOTAL_OUTPUT=$((GRAND_TOTAL_OUTPUT + PR_OUTPUT))
   GRAND_TOTAL_CACHE_READ=$((GRAND_TOTAL_CACHE_READ + PR_CACHE_READ))
   GRAND_TOTAL_CACHE_CREATE=$((GRAND_TOTAL_CACHE_CREATE + PR_CACHE_CREATE))
+  GRAND_TOTAL_COST_USD=$(sum_costs "$GRAND_TOTAL_COST_USD" "$PR_COST_RAW")
 
   # Extract tool calls from stream-json
   TOOL_CALLS_RAW=""
@@ -246,15 +252,29 @@ while IFS= read -r line; do
   PR_TITLE_LINKED=$(linkify_jira "$PR_TITLE")
 
   # Token usage table
+  # Build per-model breakdown rows
+  MODEL_BREAKDOWN_ROWS=""
+  MODEL_BREAKDOWN_RAW=$(extract_from_stream_json "$OUTPUT_FILE" "model_usage")
+  if [ -n "$MODEL_BREAKDOWN_RAW" ]; then
+    MODEL_BREAKDOWN_ROWS="<tr><td colspan=\"7\" style=\"background:#f0f0f0; font-size:0.85em; color:#666; padding:0.3em 1em;\"><em>Per-model breakdown</em></td></tr>"
+    while IFS='|' read -r M_NAME M_INPUT M_OUTPUT M_CACHE_READ M_CACHE_CREATE; do
+      if [ -n "$M_NAME" ]; then
+        M_SHORT=$(echo "$M_NAME" | sed 's/-[0-9]*$//')
+        MODEL_BREAKDOWN_ROWS="${MODEL_BREAKDOWN_ROWS}<tr style=\"font-size:0.85em; color:#666;\"><td>&nbsp;&nbsp;${M_SHORT}</td><td>-</td><td>$(format_number "$M_INPUT")</td><td>$(format_number "$M_OUTPUT")</td><td>$(format_number "$M_CACHE_READ")</td><td>$(format_number "$M_CACHE_CREATE")</td><td>-</td></tr>"
+      fi
+    done <<< "$MODEL_BREAKDOWN_RAW"
+  fi
+
   TOKEN_TABLE=""
   if [ "$PR_INPUT" -gt 0 ] || [ "$PR_OUTPUT" -gt 0 ] || [ "$PR_CACHE_CREATE" -gt 0 ]; then
     TOKEN_TABLE="
   <h3>Token Usage &amp; Cost</h3>
   <table class=\"token-table\">
-  <thead><tr><th>Phase</th><th>Duration</th><th>Input Tokens</th><th>Output Tokens</th><th>Cache Read</th><th>Cache Create</th><th>Est. Cost</th></tr></thead>
+  <thead><tr><th>Phase</th><th>Duration</th><th>Input Tokens</th><th>Output Tokens</th><th>Cache Read</th><th>Cache Create</th><th>Cost</th></tr></thead>
   <tbody>
   <tr><td>Comment Analysis</td><td>$(format_duration "$DURATION_SECS")</td><td>$(format_number "$PR_INPUT")</td><td>$(format_number "$PR_OUTPUT")</td><td>$(format_number "$PR_CACHE_READ")</td><td>$(format_number "$PR_CACHE_CREATE")</td><td>${PR_COST}</td></tr>
   <tr class=\"total-row\"><td><strong>Total</strong></td><td><strong>$(format_duration "$DURATION_SECS")</strong></td><td><strong>$(format_number "$PR_INPUT")</strong></td><td><strong>$(format_number "$PR_OUTPUT")</strong></td><td><strong>$(format_number "$PR_CACHE_READ")</strong></td><td><strong>$(format_number "$PR_CACHE_CREATE")</strong></td><td><strong>${PR_COST}</strong></td></tr>
+  ${MODEL_BREAKDOWN_ROWS}
   </tbody>
   </table>
   <p class=\"model-info\">Model: ${MODEL} &middot; Duration: $(format_duration "$DURATION_SECS") (API: $(format_duration "$DURATION_API_SECS")) &middot; ${NUM_TURNS} turn(s) &middot; Session: ${SESSION_ID}</p>"
@@ -283,8 +303,8 @@ while IFS= read -r line; do
 
 done < "$STATE_FILE"
 
-# Calculate grand total cost
-GRAND_TOTAL_COST=$(calculate_cost "$GRAND_TOTAL_INPUT" "$GRAND_TOTAL_OUTPUT" "$GRAND_TOTAL_CACHE_READ" "$GRAND_TOTAL_CACHE_CREATE")
+# Format grand total cost
+GRAND_TOTAL_COST=$(format_cost "$GRAND_TOTAL_COST_USD")
 
 # Write the HTML report
 cat > "$REPORT_FILE" <<EOF
@@ -341,12 +361,12 @@ cat > "$REPORT_FILE" <<EOF
   <div class="stat"><div class="value" style="color:#cb2431">${FAILED_COUNT}</div><div class="label">Failed</div></div>
   <div class="stat"><div class="value">$(format_number "$GRAND_TOTAL_INPUT")</div><div class="label">Input Tokens</div></div>
   <div class="stat"><div class="value">$(format_number "$GRAND_TOTAL_OUTPUT")</div><div class="label">Output Tokens</div></div>
-  <div class="stat"><div class="value">${GRAND_TOTAL_COST}</div><div class="label">Est. Cost</div></div>
+  <div class="stat"><div class="value">${GRAND_TOTAL_COST}</div><div class="label">Cost</div></div>
 </div>
 
 <h2>Summary</h2>
 <table>
-<thead><tr><th>PR</th><th>Title</th><th>Timestamp</th><th>Status</th><th>Est. Cost</th></tr></thead>
+<thead><tr><th>PR</th><th>Title</th><th>Timestamp</th><th>Status</th><th>Cost</th></tr></thead>
 <tbody>
 ${SUMMARY_ROWS}
 </tbody>

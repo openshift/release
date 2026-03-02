@@ -261,10 +261,20 @@ while IFS= read -r line; do
   jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-output.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-output-tools.txt" 2>/dev/null || true
   jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-output.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-output-errors.txt" 2>/dev/null || true
   # Extract token usage for Phase 1
-  echo "Phase 1: $(wc -l < "/tmp/claude-${ISSUE_KEY}-output.json") total lines in stream-json"
-  grep '^{' "/tmp/claude-${ISSUE_KEY}-output.json" > "/tmp/claude-${ISSUE_KEY}-output-filtered.json" 2>/dev/null || true
-  echo "Phase 1: $(wc -l < "/tmp/claude-${ISSUE_KEY}-output-filtered.json") JSON lines after filtering"
-  jq -s '[.[] | select(.type == "assistant")] | {input_tokens: (map(.message.usage.input_tokens // 0) | add // 0), output_tokens: (map(.message.usage.output_tokens // 0) | add // 0), cache_read_input_tokens: (map(.message.usage.cache_read_input_tokens // 0) | add // 0), cache_creation_input_tokens: (map(.message.usage.cache_creation_input_tokens // 0) | add // 0), model: (.[0].message.model // "unknown")}' "/tmp/claude-${ISSUE_KEY}-output-filtered.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json" 2>/dev/null || echo '{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json"
+  grep '"type":"result"' "/tmp/claude-${ISSUE_KEY}-output.json" \
+    | head -1 \
+    | jq '{
+        total_cost_usd: (.total_cost_usd // 0),
+        duration_ms: (.duration_ms // 0),
+        num_turns: (.num_turns // 0),
+        input_tokens: (.usage.input_tokens // 0),
+        output_tokens: (.usage.output_tokens // 0),
+        cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
+        cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
+        model_usage: (.modelUsage // {}),
+        model: ((.modelUsage // {} | keys | first) // "unknown")
+      }' > "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json" 2>/dev/null \
+    || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json"
   echo "Phase 1 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-solve-tokens.json")"
 
   PHASE1_END=$(date +%s)
@@ -318,10 +328,20 @@ while IFS= read -r line; do
       jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-review.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tools.txt" 2>/dev/null || true
       jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-review.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-errors.txt" 2>/dev/null || true
       # Extract token usage for Phase 2
-      echo "Phase 2: $(wc -l < "/tmp/claude-${ISSUE_KEY}-review.json") total lines in stream-json"
-      grep '^{' "/tmp/claude-${ISSUE_KEY}-review.json" > "/tmp/claude-${ISSUE_KEY}-review-filtered.json" 2>/dev/null || true
-      echo "Phase 2: $(wc -l < "/tmp/claude-${ISSUE_KEY}-review-filtered.json") JSON lines after filtering"
-      jq -s '[.[] | select(.type == "assistant")] | {input_tokens: (map(.message.usage.input_tokens // 0) | add // 0), output_tokens: (map(.message.usage.output_tokens // 0) | add // 0), cache_read_input_tokens: (map(.message.usage.cache_read_input_tokens // 0) | add // 0), cache_creation_input_tokens: (map(.message.usage.cache_creation_input_tokens // 0) | add // 0), model: (.[0].message.model // "unknown")}' "/tmp/claude-${ISSUE_KEY}-review-filtered.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json" 2>/dev/null || echo '{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json"
+      grep '"type":"result"' "/tmp/claude-${ISSUE_KEY}-review.json" \
+        | head -1 \
+        | jq '{
+            total_cost_usd: (.total_cost_usd // 0),
+            duration_ms: (.duration_ms // 0),
+            num_turns: (.num_turns // 0),
+            input_tokens: (.usage.input_tokens // 0),
+            output_tokens: (.usage.output_tokens // 0),
+            cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
+            cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
+            model_usage: (.modelUsage // {}),
+            model: ((.modelUsage // {} | keys | first) // "unknown")
+          }' > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json" 2>/dev/null \
+        || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json"
       echo "Phase 2 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-review-tokens.json")"
 
       PHASE2_END=$(date +%s)
@@ -381,10 +401,20 @@ IMPORTANT:
         jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-fix.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tools.txt" 2>/dev/null || true
         jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-fix.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-errors.txt" 2>/dev/null || true
         # Extract token usage for Phase 3
-        echo "Phase 3: $(wc -l < "/tmp/claude-${ISSUE_KEY}-fix.json") total lines in stream-json"
-        grep '^{' "/tmp/claude-${ISSUE_KEY}-fix.json" > "/tmp/claude-${ISSUE_KEY}-fix-filtered.json" 2>/dev/null || true
-        echo "Phase 3: $(wc -l < "/tmp/claude-${ISSUE_KEY}-fix-filtered.json") JSON lines after filtering"
-        jq -s '[.[] | select(.type == "assistant")] | {input_tokens: (map(.message.usage.input_tokens // 0) | add // 0), output_tokens: (map(.message.usage.output_tokens // 0) | add // 0), cache_read_input_tokens: (map(.message.usage.cache_read_input_tokens // 0) | add // 0), cache_creation_input_tokens: (map(.message.usage.cache_creation_input_tokens // 0) | add // 0), model: (.[0].message.model // "unknown")}' "/tmp/claude-${ISSUE_KEY}-fix-filtered.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json" 2>/dev/null || echo '{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json"
+        grep '"type":"result"' "/tmp/claude-${ISSUE_KEY}-fix.json" \
+          | head -1 \
+          | jq '{
+              total_cost_usd: (.total_cost_usd // 0),
+              duration_ms: (.duration_ms // 0),
+              num_turns: (.num_turns // 0),
+              input_tokens: (.usage.input_tokens // 0),
+              output_tokens: (.usage.output_tokens // 0),
+              cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
+              cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
+              model_usage: (.modelUsage // {}),
+              model: ((.modelUsage // {} | keys | first) // "unknown")
+            }' > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json" 2>/dev/null \
+          || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json"
         echo "Phase 3 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-fix-tokens.json")"
 
         if [ $FIX_EXIT_CODE -eq 0 ]; then
@@ -461,10 +491,20 @@ IMPORTANT:
       jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | "\(.name): \(.input | keys | join(", "))"' "/tmp/claude-${ISSUE_KEY}-pr.json" 2>/dev/null | sort | uniq -c | sort -rn > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tools.txt" 2>/dev/null || true
       jq -r 'select(.type == "user") | .tool_use_result | select(type == "string") | select(startswith("Error:")) | gsub("\n"; "⏎")' "/tmp/claude-${ISSUE_KEY}-pr.json" 2>/dev/null | sort | uniq -c | sort -rn | sed 's/⏎/\n/g' > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-errors.txt" 2>/dev/null || true
       # Extract token usage for Phase 4
-      echo "Phase 4: $(wc -l < "/tmp/claude-${ISSUE_KEY}-pr.json") total lines in stream-json"
-      grep '^{' "/tmp/claude-${ISSUE_KEY}-pr.json" > "/tmp/claude-${ISSUE_KEY}-pr-filtered.json" 2>/dev/null || true
-      echo "Phase 4: $(wc -l < "/tmp/claude-${ISSUE_KEY}-pr-filtered.json") JSON lines after filtering"
-      jq -s '[.[] | select(.type == "assistant")] | {input_tokens: (map(.message.usage.input_tokens // 0) | add // 0), output_tokens: (map(.message.usage.output_tokens // 0) | add // 0), cache_read_input_tokens: (map(.message.usage.cache_read_input_tokens // 0) | add // 0), cache_creation_input_tokens: (map(.message.usage.cache_creation_input_tokens // 0) | add // 0), model: (.[0].message.model // "unknown")}' "/tmp/claude-${ISSUE_KEY}-pr-filtered.json" > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json" 2>/dev/null || echo '{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json"
+      grep '"type":"result"' "/tmp/claude-${ISSUE_KEY}-pr.json" \
+        | head -1 \
+        | jq '{
+            total_cost_usd: (.total_cost_usd // 0),
+            duration_ms: (.duration_ms // 0),
+            num_turns: (.num_turns // 0),
+            input_tokens: (.usage.input_tokens // 0),
+            output_tokens: (.usage.output_tokens // 0),
+            cache_read_input_tokens: (.usage.cache_read_input_tokens // 0),
+            cache_creation_input_tokens: (.usage.cache_creation_input_tokens // 0),
+            model_usage: (.modelUsage // {}),
+            model: ((.modelUsage // {} | keys | first) // "unknown")
+          }' > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json" 2>/dev/null \
+        || echo '{"total_cost_usd":0,"duration_ms":0,"num_turns":0,"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"model_usage":{},"model":"unknown"}' > "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json"
       echo "Phase 4 tokens: $(cat "${SHARED_DIR}/claude-${ISSUE_KEY}-pr-tokens.json")"
 
       PHASE4_END=$(date +%s)
