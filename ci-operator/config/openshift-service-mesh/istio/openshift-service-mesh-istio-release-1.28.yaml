@@ -34,7 +34,7 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-- as: gencheck
+- as: unit-and-gencheck
   steps:
     cluster_profile: ossm-aws
     env:
@@ -80,30 +80,6 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-hypershift
-- as: unit
-  steps:
-    cluster_profile: ossm-aws
-    env:
-      BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.28
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
     - as: unit
       cli: latest
       commands: |
