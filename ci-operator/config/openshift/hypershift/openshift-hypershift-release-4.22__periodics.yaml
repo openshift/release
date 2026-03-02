@@ -39,7 +39,22 @@ releases:
       product: ocp
       stream: ci
       version: "4.22"
+  latest-4-19:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.19"
   latest-4-20:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.21"
+  latest-4-20-skew:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.20"
+  latest-4-21:
     candidate:
       product: ocp
       stream: nightly
@@ -266,6 +281,60 @@ tests:
       MIRROR_OLM_REMOTE_INDEX: registry.redhat.io/redhat/redhat-operator-index:v4.15
       ODF_OPERATOR_SUB_CHANNEL: stable-4.15
     workflow: hypershift-kubevirt-baremetalds-disconnected-conformance
+- as: e2e-kubevirt-metal-conformance-calico-version-skew-y1
+  capabilities:
+  - intranet
+  minimum_interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    dependencies:
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:latest-4-21
+      RELEASE_IMAGE_LATEST: release:latest-4-21
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.22
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.19
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-19
+      REDHAT_OPERATORS_INDEX_TAG: v4.19
+    test:
+    - ref: hypershift-kubevirt-check-kernel-isolation
+    - chain: hypershift-conformance
+    workflow: hypershift-kubevirt-baremetalds-conformance-calico
+- as: e2e-kubevirt-metal-conformance-calico-version-skew-y2
+  capabilities:
+  - intranet
+  minimum_interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    dependencies:
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:latest-4-20-skew
+      RELEASE_IMAGE_LATEST: release:latest-4-20-skew
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.22
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.19
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-19
+      REDHAT_OPERATORS_INDEX_TAG: v4.19
+    test:
+    - ref: hypershift-kubevirt-check-kernel-isolation
+    - chain: hypershift-conformance
+    workflow: hypershift-kubevirt-baremetalds-conformance-calico
+- as: e2e-kubevirt-metal-conformance-calico-version-skew-y3
+  capabilities:
+  - intranet
+  minimum_interval: 168h
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    dependencies:
+      HOSTEDCLUSTER_RELEASE_IMAGE_LATEST: release:latest-4-19
+      RELEASE_IMAGE_LATEST: release:latest-4-19
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.22
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.19
+      ODF_OPERATOR_SUB_SOURCE: redhat-operators-v4-19
+      REDHAT_OPERATORS_INDEX_TAG: v4.19
+    test:
+    - ref: hypershift-kubevirt-check-kernel-isolation
+    - chain: hypershift-conformance
+    workflow: hypershift-kubevirt-baremetalds-conformance-calico
 - as: e2e-kubevirt-aws-ovn-csi
   cron: 0 4 * * *
   steps:
