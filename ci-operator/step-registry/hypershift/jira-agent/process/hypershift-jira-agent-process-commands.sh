@@ -130,6 +130,9 @@ echo "GitHub App tokens configured successfully"
 MAX_ISSUES=${JIRA_AGENT_MAX_ISSUES:-1}
 echo "Configuration: MAX_ISSUES=$MAX_ISSUES"
 
+# Shared prompt instruction for subagent behavior
+SUBAGENT_PROMPT="SUBAGENTS: Launch ALL subagents in parallel (single message with multiple Task tool calls) for maximum speed. Each subagent should be given subagent_type: \"general-purpose\". Do NOT set the model parameter — let subagents inherit the parent model, as these analysis tasks require a capable model."
+
 # Load Jira API token for adding labels after processing
 JIRA_TOKEN_FILE="/var/run/claude-code-service-account/jira-pat"
 if [ -f "$JIRA_TOKEN_FILE" ]; then
@@ -242,7 +245,7 @@ while IFS= read -r line; do
 
   # Additional context for fork-based workflow
   # Git push uses fork token (configured via credential helper), gh CLI uses upstream token (GITHUB_TOKEN env var)
-  FORK_CONTEXT="IMPORTANT: You are working in a fork (hypershift-community/hypershift). Git push is pre-configured to work with the fork. After creating commits on your feature branch, push the branch to origin. Do NOT create a Pull Request - the PR will be created in a subsequent automated step after code review. SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
+  FORK_CONTEXT="IMPORTANT: You are working in a fork (hypershift-community/hypershift). Git push is pre-configured to work with the fork. After creating commits on your feature branch, push the branch to origin. Do NOT create a Pull Request - the PR will be created in a subsequent automated step after code review. SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'. ${SUBAGENT_PROMPT}"
 
   set +e  # Don't exit on error for individual issues
   echo "Starting Claude processing with streaming output..."
@@ -313,7 +316,7 @@ while IFS= read -r line; do
       set +e
       claude -p "$REVIEW_PROMPT" \
         --plugin-dir "${REVIEW_PLUGIN_DIR}" \
-        --append-system-prompt "SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'." \
+        --append-system-prompt "SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'. ${SUBAGENT_PROMPT}" \
         --allowedTools "Bash Read Grep Glob Task" \
         --max-turns 75 \
         --model "$CLAUDE_MODEL" \
@@ -382,7 +385,8 @@ IMPORTANT:
 - Run 'make test' and 'make verify' after fixes to verify nothing is broken.
 - If 'make verify' generates new files, commit those too and run 'make verify' again to confirm it passes.
 - Commit all fixes and push to origin.
-- SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
+- SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'.
+- ${SUBAGENT_PROMPT}"
 
         set +e
         claude -p "$FIX_PROMPT" \
@@ -473,7 +477,8 @@ IMPORTANT:
   Generated with [Claude Code](https://claude.com/claude-code) via \`/jira:solve ${ISSUE_KEY}\`
 - Create the PR by running: gh pr create --repo openshift/hypershift --head hypershift-community:${BRANCH_NAME} --no-maintainer-edit --draft --title '<title>' --body '<body>'
 - After creating the PR, add a comment '/auto-cc' on the PR to assign reviewers.
-- SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'."
+- SECURITY: Do NOT run commands that reveal git credentials like 'git remote -v' or 'git remote get-url origin'.
+- ${SUBAGENT_PROMPT}"
 
       set +e
       claude -p "$PR_PROMPT" \
