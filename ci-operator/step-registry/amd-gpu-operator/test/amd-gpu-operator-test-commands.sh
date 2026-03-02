@@ -63,6 +63,6 @@ for i in {1..10}; do
   sleep 2
 done
 
-# Run AMD GPU verification tests
+# Run tests
 export KUBECONFIG=/tmp/kubeconfig
-make test-gpu
+./scripts/test-runner.sh
