@@ -16,21 +16,6 @@ set -o pipefail
 GANGWAY_API_ENDPOINT="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions"
 ARO_CLUSTER_VERSION="${ARO_CLUSTER_VERSION:-4.17}"
 
-get_expected_version() {
-    # Extract expected version from catalog tag
-    # If catalog tag is in X.Y.Z-[0-9]+ format, returns X.Y.Z portion
-    # If input is "latest", returns "0.0.0"
-    # Otherwise returns empty string
-    local catalog_tag="$1"
-
-    if [[ "${catalog_tag}" =~ ^([0-9]+\.[0-9]+\.[0-9]+)-[0-9]+$ ]]; then
-        echo "${BASH_REMATCH[1]}"
-    elif [[ "${catalog_tag}" == "latest" ]]; then
-        echo "0.0.0"
-    else
-        echo ""
-    fi
-}
 # Function to check if a specific version exists in an OCP release channel
 # Uses the Cincinnati API to query available versions
 check_version_in_channel() {
@@ -115,9 +100,6 @@ validate_and_set_defaults() {
 
     # Azure Region Configuration
     CUSTOM_AZURE_REGION="${CUSTOM_AZURE_REGION:-eastus}"
-
-    # OSC Version Configuration
-    EXPECTED_OSC_VERSION="${EXPECTED_OSC_VERSION:-1.10.1}"
 
     # Kata RPM Configuration
     INSTALL_KATA_RPM="${INSTALL_KATA_RPM:-false}"
@@ -204,14 +186,6 @@ validate_and_set_defaults() {
       # The env-cm step will resolve the actual latest tag at runtime
       OSC_CATALOG_TAG="${OSC_CATALOG_TAG:-latest}"
       echo "Using OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
-
-      # Extract expected OSC version from catalog tag if it matches X.Y.Z-[0-9]+ format
-      extracted_version=$(get_expected_version "${OSC_CATALOG_TAG}")
-      if [[ -n "${extracted_version}" ]]; then
-          EXPECTED_OSC_VERSION="${extracted_version}"
-          echo "Extracted EXPECTED_OSC_VERSION from OSC_CATALOG_TAG: ${EXPECTED_OSC_VERSION}"
-      fi
-
       CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:${OSC_CATALOG_TAG}}"
       CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-brew-catalog}"
     else # GA
@@ -226,12 +200,11 @@ show_usage() {
     echo ""
     echo "Commands:"
     echo "  create            Create prowjob configuration files"
-    echo "  run               Run prowjobs from YAML configuration"
+    echo "  run               Run one prowjob from YAML (requires job_yaml_file and exactly one job name)"
 	echo "  update_templates  Regenerate the ci-operator/config/openshift/sandboxed-containers-operator templates using default values (unless overridden)"
     echo ""
     echo "Examples:"
     echo "  $0 create"
-    echo "  $0 run /path/to/job_yaml.yaml"
     echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata"
     echo ""
     echo "Environment variables for 'create' command:"
@@ -240,7 +213,6 @@ show_usage() {
     echo "  OCP_CHANNEL                    - Release channel: stable, fast, candidate, eus (default: fast)"
     echo "                                   Note: RC/EC versions require OCP_CHANNEL=candidate"
     echo "  TEST_RELEASE_TYPE              - Test release type: Pre-GA or GA (default: Pre-GA)"
-    echo "  EXPECTED_OSC_VERSION           - Expected OSC version (default: 1.10.1)"
     echo "  INSTALL_KATA_RPM               - Install Kata RPM: true or false (default: true)"
     echo "  KATA_RPM_VERSION               - Kata RPM version (default: 3.17.0-3.rhaos4.19.el9)"
     echo "  SLEEP_DURATION                 - Sleep duration after tests (default: 0h)"
@@ -298,7 +270,10 @@ generate_workflow() {
   local cron="0 0 31 2 1"
 
   echo "- as: ${platform}-ipi-${workload}"
+  echo "  capabilities:"
+  echo "  - intranet"
   echo "  cron: ${cron}"
+  echo "  restrict_network_access: false"
   echo "  steps:"
   echo "    cluster_profile: ${profile}"
   echo "    env:"
@@ -326,7 +301,6 @@ generate_workflow() {
     "CATALOG_SOURCE_IMAGE: ${CATALOG_SOURCE_IMAGE:-\"\"}"
     "CATALOG_SOURCE_NAME: ${CATALOG_SOURCE_NAME}"
     "ENABLE_MUST_GATHER: \"${ENABLE_MUST_GATHER}\""
-    "EXPECTED_OPERATOR_VERSION: ${EXPECTED_OSC_VERSION}"
     "INITDATA: ${INITDATA:-\"\"}"
     "INSTALL_KATA_RPM: \"${INSTALL_KATA_RPM}\""
     "KATA_RPM_VERSION: ${kata_rpm_version:-\"\"}"
@@ -454,8 +428,6 @@ EOF
     echo "  • ARO Version: ${ARO_CLUSTER_VERSION}"
     echo "  • Prow Run Type: ${PROW_RUN_TYPE}"
     echo "  • Test Release Type: ${TEST_RELEASE_TYPE}"
-    echo "  • Expected OSC Version: ${EXPECTED_OSC_VERSION}"
-    echo "  • Expected Trustee Version: ${EXPECTED_TRUSTEE_VERSION:-N/A}"
     echo "  • AWS Region: ${AWS_REGION_OVERRIDE}"
     echo "  • Azure Region: ${CUSTOM_AZURE_REGION}"
     echo "  • Kata RPM: ${INSTALL_KATA_RPM} (${KATA_RPM_VERSION})"
@@ -478,10 +450,7 @@ EOF
     echo "1. Set your Prow API token:"
     echo "   export PROW_API_TOKEN=your_token_here"
     echo ""
-    echo "2. Run all jobs from the generated file:"
-    echo "   ./sandboxed-containers-operator-create-prowjob-commands.sh run ${OUTPUT_FILE}"
-    echo ""
-    echo "3. Or run specific jobs:"
+    echo "2. Run one job from the generated file (specify exactly one job name):"
     echo "   ./sandboxed-containers-operator-create-prowjob-commands.sh run ${OUTPUT_FILE} azure-ipi-kata"
     echo ""
     echo "Option B - Submit configuration to CI:"
@@ -504,25 +473,30 @@ EOF
 # Function to run prowjobs
 command_run() {
     echo "=========================================="
-    echo "Sandboxed Containers Operator - Run Prowjobs"
+    echo "Sandboxed Containers Operator - Run Prowjob"
     echo ""
 
-    # Check if job_yaml file is provided
-    if [[ $# -eq 0 ]]; then
-        echo "ERROR: No job YAML file specified"
+    # Require exactly two arguments: job_yaml_file and one job name
+    if [[ $# -lt 2 ]]; then
+        echo "ERROR: Exactly one job must be specified"
         echo ""
-        echo "Usage: $0 run <job_yaml_file> [job_names...]"
+        echo "Usage: $0 run <job_yaml_file> <job_name>"
         echo ""
-        echo "Examples:"
-        echo "  $0 run /path/to/job_yaml.yaml"
+        echo "Example:"
         echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata"
-        echo "  $0 run /path/to/job_yaml.yaml azure-ipi-kata azure-ipi-peerpods"
         echo ""
+        echo "Valid job names are the 'as' values from the tests in the YAML (e.g. azure-ipi-kata, aws-ipi-peerpods)."
+        exit 1
+    fi
+    if [[ $# -gt 2 ]]; then
+        echo "ERROR: Exactly one job must be specified (got $(( $# - 1 )) job names)"
+        echo ""
+        echo "Usage: $0 run <job_yaml_file> <job_name>"
         exit 1
     fi
 
     JOB_YAML_FILE="$1"
-    shift
+    JOB_SUFFIX="$2"
 
     # Check if job_yaml file exists
     if [[ ! -f "${JOB_YAML_FILE}" ]]; then
@@ -531,6 +505,7 @@ command_run() {
     fi
 
     echo "Job YAML file: ${JOB_YAML_FILE}"
+    echo "Job: ${JOB_SUFFIX}"
 
     # Extract metadata from job_yaml
     ORG=$(yq eval '.zz_generated_metadata.org' "${JOB_YAML_FILE}")
@@ -546,30 +521,8 @@ command_run() {
 
     # Generate job name prefix
     JOB_PREFIX="periodic-ci-${ORG}-${REPO}-${BRANCH}-${VARIANT}"
-    echo "Job name prefix: ${JOB_PREFIX}"
-
-    # Determine job names to run
-    if [[ $# -eq 0 ]]; then
-        # No specific jobs provided, extract all 'as' values from tests
-        echo "No specific jobs provided, extracting all jobs from YAML..."
-        mapfile -t JOB_NAMES < <(yq eval '.tests[].as' "${JOB_YAML_FILE}")
-    else
-        # Use provided job names
-        echo "Using provided job names: $*"
-        JOB_NAMES=("$@")
-    fi
-
-    if [[ ${#JOB_NAMES[@]} -eq 0 ]]; then
-        echo "ERROR: No jobs found to run"
-        exit 1
-    fi
-
-    echo ""
-    echo "Jobs to run:"
-    for job_suffix in "${JOB_NAMES[@]}"; do
-        full_job_name="${JOB_PREFIX}-${job_suffix}"
-        echo "  - ${full_job_name}"
-    done
+    full_job_name="${JOB_PREFIX}-${JOB_SUFFIX}"
+    echo "Full job name: ${full_job_name}"
 
     echo ""
     echo "Preparing job execution..."
@@ -591,61 +544,54 @@ command_run() {
     fi
     echo "✓ Job configuration converted to JSON"
 
-    # Trigger jobs
+    # Trigger job
     echo ""
-    echo "Triggering jobs..."
+    echo "Triggering job: ${full_job_name}"
 
-    for job_suffix in "${JOB_NAMES[@]}"; do
-        full_job_name="${JOB_PREFIX}-${job_suffix}"
-        echo ""
-        echo "Triggering job: ${full_job_name}"
+    # Create payload
+    UNRESOLVED_SPEC=$(cat config.json)
+    payload=$(jq -n --arg job "${full_job_name}" \
+       --argjson config "${UNRESOLVED_SPEC}" \
+       '{
+           "job_name": $job,
+           "job_execution_type": "1",
+           "pod_spec_options": {
+              "envs": {
+                 "UNRESOLVED_CONFIG": $config
+               },
+            }
+        }')
 
-        # Create payload
-        UNRESOLVED_SPEC=$(cat config.json)
-        payload=$(jq -n --arg job "${full_job_name}" \
-           --argjson config "${UNRESOLVED_SPEC}" \
-           '{
-               "job_name": $job,
-               "job_execution_type": "1",
-               "pod_spec_options": {
-                  "envs": {
-                     "UNRESOLVED_CONFIG": $config
-                   },
-                }
-            }')
+    # Make API call
+    echo "Making API call to trigger job..."
+    if curl -s -X POST -H "Authorization: Bearer ${PROW_API_TOKEN}" \
+        -H "Content-Type: application/json" -d "${payload}" \
+        "${GANGWAY_API_ENDPOINT}" > "output_${JOB_SUFFIX}.json"; then
 
-        # Make API call
-        echo "Making API call to trigger job..."
-        if curl -s -X POST -H "Authorization: Bearer ${PROW_API_TOKEN}" \
-            -H "Content-Type: application/json" -d "${payload}" \
-            "${GANGWAY_API_ENDPOINT}" > "output_${job_suffix}.json"; then
+        # Extract job ID
+        job_id=$(jq -r '.id' "output_${JOB_SUFFIX}.json")
+        if [[ "${job_id}" != "null" && -n "${job_id}" ]]; then
+            echo "✓ Job triggered successfully!"
+            echo "  Job ID: ${job_id}"
+            echo "  Output saved to: output_${JOB_SUFFIX}.json"
 
-            # Extract job ID
-            job_id=$(jq -r '.id' "output_${job_suffix}.json")
-            if [[ "${job_id}" != "null" && -n "${job_id}" ]]; then
-                echo "✓ Job triggered successfully!"
-                echo "  Job ID: ${job_id}"
-                echo "  Output saved to: output_${job_suffix}.json"
-
-                # Get job status
-                echo "Fetching job status..."
-                curl -s -X GET -H "Authorization: Bearer ${PROW_API_TOKEN}" \
-                    "${GANGWAY_API_ENDPOINT}/${job_id}" > "status_${job_suffix}.json"
-                echo "  Status saved to: status_${job_suffix}.json"
-            else
-                echo "✗ Failed to get job ID from response"
-                echo "Response content:"
-                cat "output_${job_suffix}.json"
-            fi
+            # Get job status
+            echo "Fetching job status..."
+            curl -s -X GET -H "Authorization: Bearer ${PROW_API_TOKEN}" \
+                "${GANGWAY_API_ENDPOINT}/${job_id}" > "status_${JOB_SUFFIX}.json"
+            echo "  Status saved to: status_${JOB_SUFFIX}.json"
         else
-            echo "✗ Failed to trigger job"
-            echo "Check output_${job_suffix}.json for details"
+            echo "✗ Failed to get job ID from response"
+            echo "Response content:"
+            cat "output_${JOB_SUFFIX}.json"
         fi
-    done
+    else
+        echo "✗ Failed to trigger job"
+        echo "Check output_${JOB_SUFFIX}.json for details"
+    fi
 
     echo ""
-    echo "Job triggering completed!"
-    echo "Check the output_*.json and status_*.json files for details"
+    echo "Job triggering completed."
 }
 
 command_update_templates() {
