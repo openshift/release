@@ -128,7 +128,7 @@ extract_from_stream_json() {
       grep '"is_error":true' "$json_file" 2>/dev/null | jq -r '.content // empty' 2>/dev/null || echo ""
       ;;
     model_usage)
-      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.modelUsage // {} | to_entries[] | "\(.key)|\(.value.input_tokens // 0)|\(.value.output_tokens // 0)|\(.value.cache_read_input_tokens // 0)|\(.value.cache_creation_input_tokens // 0)"' 2>/dev/null | head -20 || echo ""
+      grep '"type":"result"' "$json_file" 2>/dev/null | jq -r '.modelUsage // {} | to_entries[] | "\(.key)|\(.value.inputTokens // .value.input_tokens // 0)|\(.value.outputTokens // .value.output_tokens // 0)|\(.value.cacheReadInputTokens // .value.cache_read_input_tokens // 0)|\(.value.cacheCreationInputTokens // .value.cache_creation_input_tokens // 0)"' 2>/dev/null | head -20 || echo ""
       ;;
   esac
 }

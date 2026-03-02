@@ -212,10 +212,10 @@ while IFS= read -r line; do
       | group_by(.key)
       | map({
           model: .[0].key,
-          input: (map(.value.input_tokens // 0) | add),
-          output: (map(.value.output_tokens // 0) | add),
-          cache_read: (map(.value.cache_read_input_tokens // 0) | add),
-          cache_create: (map(.value.cache_creation_input_tokens // 0) | add)
+          input: (map(.value.inputTokens // .value.input_tokens // 0) | add),
+          output: (map(.value.outputTokens // .value.output_tokens // 0) | add),
+          cache_read: (map(.value.cacheReadInputTokens // .value.cache_read_input_tokens // 0) | add),
+          cache_create: (map(.value.cacheCreationInputTokens // .value.cache_creation_input_tokens // 0) | add)
         })
       | sort_by(.model)
       | .[]
