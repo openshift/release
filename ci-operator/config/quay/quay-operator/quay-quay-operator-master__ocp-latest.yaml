@@ -77,8 +77,8 @@ tests:
         set -eux
         registryEndpoint="$(oc -n quay get quayregistry quay -o jsonpath='{.status.registryEndpoint}')"
         registry="${registryEndpoint#https://}"
-        oc registry login --registry "$registry" --auth-basic "admin:p@ssw0rd"
-        oc image mirror --insecure=true quay.io/projectquay/quay:latest "$registry/admin/quay"
+        oc registry login --registry "$registry" --auth-basic "admin:p@ssw0rd" --insecure --to=/tmp/authfile
+        oc image mirror --insecure=true -a /tmp/authfile quay.io/projectquay/quay:latest "$registry/admin/quay"
       from: src-oc
       resources:
         requests:
