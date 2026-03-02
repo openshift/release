@@ -64,12 +64,17 @@ fi
 # Get standard zones from the region (excluding AI zones) and randomize selection
 # This prevents control plane nodes from being placed in AI zones when zones aren't explicitly set
 function get_zones_from_region() {
-  local zone_count=${1:-3}
+  local machine_type=${1}
+  local zone_count=${2:-3}
   # Get all zones from the region, filtering out AI zones and randomizing
-  mapfile -t AVAILABILITY_ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)' 2>/dev/null | grep -v '\-ai[0-9]' | shuf)
+  mapfile -t AVAILABILITY_ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)' 2>/dev/null | grep -v '\-ai[0-9]')
+  # Generate availability zones with OpenShift Installer required instance types
+  mapfile -t INSTANCE_ZONES < <(gcloud compute machine-types list --filter="zone~${GCP_REGION} AND name=${machine_type}" --format='value(zone)')
+  # Generate availability zones based on these 2 criteria
+  mapfile -t ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${INSTANCE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d | shuf)
   
   # Take the first zone_count zones
-  local zones=("${AVAILABILITY_ZONES[@]:0:${zone_count}}")
+  local zones=("${ZONES[@]:0:${zone_count}}")
   # Format as YAML array: [zone1, zone2, zone3]
   local zones_str="["
   for i in "${!zones[@]}"; do
@@ -121,7 +126,7 @@ if [[ "${GCP_REGION}" == "us-central1" ]] || [[ "${GCP_REGION}" == "us-south1" ]
     fi
     
     # Get zones for control plane (3 zones for HA)
-    CONTROL_PLANE_ZONES_STR=$(get_zones_from_region 3)
+    CONTROL_PLANE_ZONES_STR=$(get_zones_from_region "${master_type}" 3)
     # Get zones for compute (same zones for consistency)
     COMPUTE_ZONES_STR="${CONTROL_PLANE_ZONES_STR}"
     
