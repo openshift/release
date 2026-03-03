@@ -123,6 +123,18 @@ spec:
     oc create secret generic $CONSOLE_CLIENT_SECRET_NAME --from-literal=clientSecret=$CONSOLE_CLIENT_SECRET_VALUE --dry-run=client -o yaml > "$SHARED_DIR"/oidcProviders-secret-configmap.yaml
     echo "---" >> "$SHARED_DIR"/oidcProviders-secret-configmap.yaml
     oc create configmap keycloak-oidc-ca --from-file=ca-bundle.crt=/tmp/router-ca/ca-bundle.crt --dry-run=client -o yaml >> "$SHARED_DIR"/oidcProviders-secret-configmap.yaml
+
+    # Determine if we should include extra and uid claims (considering OCPBUGS-57736 is fixed only in >= 4.20)
+    CLUSTER_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>/dev/null || echo "")
+    INCLUDE_EXTRA_UID=false
+    if [ -n "$CLUSTER_VERSION" ]; then
+        OCP_MAJOR=$(echo "$CLUSTER_VERSION" | cut -d. -f1)
+        OCP_MINOR=$(echo "$CLUSTER_VERSION" | cut -d. -f2)
+        if [ "$OCP_MAJOR" -gt 4 ] || ([ "$OCP_MAJOR" -eq 4 ] && [ "$OCP_MINOR" -ge 20 ]); then
+            INCLUDE_EXTRA_UID=true
+        fi
+    fi
+
     # Spaces or symbol characters in below "name" should work, in case of similar bug OCPBUGS-44099 in old IDP area
     # Note, the value examples (e.g. extra's values) used here may be tested and referenced otherwhere.
     # So, when modifying them, search and modify otherwhere too
@@ -131,13 +143,23 @@ spec:
   "oidcProviders": [
     {
       "claimMappings": {
-        "groups": {"claim": "groups", "prefix": "oidc-groups-test:"},
-        "username": {"claim": "email", "prefixPolicy": "Prefix", "prefix": {"prefixString": "oidc-user-test:"}},
+EOF
+
+    # Conditionally add extra and uid fields for OpenShift >= 4.20
+    if [ "$INCLUDE_EXTRA_UID" = "true" ]; then
+        echo "Including extra and uid fields"
+        cat >> "$SHARED_DIR"/oidcProviders.json << EOF
         "extra": [
           {"key": "extratest.openshift.com/foo", "valueExpression": "claims.email"},
           {"key": "extratest.openshift.com/bar", "valueExpression": "\"extra-test-mark\""}
         ],
-        "uid": {"expression": "\"testuid-\" + claims.sub + \"-uidtest\""}
+        "uid": {"expression": "\"testuid-\" + claims.sub + \"-uidtest\""},
+EOF
+    fi
+
+    cat >> "$SHARED_DIR"/oidcProviders.json << EOF
+        "groups": {"claim": "groups", "prefix": "oidc-groups-test:"},
+        "username": {"claim": "email", "prefixPolicy": "Prefix", "prefix": {"prefixString": "oidc-user-test:"}}
       },
       "issuer": {
         "issuerURL": "$ISSUER_URL", "audiences": ["$AUDIENCE_1", "$AUDIENCE_2"],
