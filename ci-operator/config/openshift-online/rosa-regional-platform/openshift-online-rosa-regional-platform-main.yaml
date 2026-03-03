@@ -29,14 +29,70 @@ tests:
 - as: nightly
   cron: 0 7 * * *
   steps:
-    cluster_profile: rosa-regional-platform-int
-    leases:
-    - count: 1
-      env: SECOND_AWS_ACCOUNT
-      resource_type: rosa-regional-platform-int-quota-slice
+    post:
+    - as: e2e-teardown
+      commands: ./ci/nightly.sh --teardown
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     test:
-    - as: nightly
+    - as: e2e
       commands: ./ci/nightly.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- always_run: false
+  as: on-demand-e2e
+  steps:
+    post:
+    - as: e2e-teardown
+      commands: ./ci/nightly.sh --teardown
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: e2e
+      commands: |-
+        export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
+        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
+        ./ci/nightly.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: nightly-resources-janitor
+  cron: 0 12 * * 0
+  steps:
+    test:
+    - as: nightly-resources-janitor
+      commands: ./ci/nightly-resources-janitor.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
       from: src
       resources:
         requests:

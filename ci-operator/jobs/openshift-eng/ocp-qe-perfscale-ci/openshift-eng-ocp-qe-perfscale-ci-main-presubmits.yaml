@@ -6,6 +6,1200 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build10
+    context: ci/prow/4.20-nightly-control-plane-aws-ipsec-120nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
+      ci-operator.openshift.io/variant: 4.20-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.20-nightly-control-plane-aws-ipsec-120nodes
+    rerun_command: /test 4.20-nightly-control-plane-aws-ipsec-120nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=aws-ipsec-120nodes
+        - --variant=4.20-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.20-nightly-control-plane-aws-ipsec-120nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/4.20-nightly-control-plane-azure-ovn-multi-120nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure-perfscale
+      ci-operator.openshift.io/variant: 4.20-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.20-nightly-control-plane-azure-ovn-multi-120nodes
+    rerun_command: /test 4.20-nightly-control-plane-azure-ovn-multi-120nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=azure-ovn-multi-120nodes
+        - --variant=4.20-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.20-nightly-control-plane-azure-ovn-multi-120nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/4.20-nightly-control-plane-baremetal-multi-3nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+      ci-operator.openshift.io/variant: 4.20-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.20-nightly-control-plane-baremetal-multi-3nodes
+    rerun_command: /test 4.20-nightly-control-plane-baremetal-multi-3nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=baremetal-multi-3nodes
+        - --variant=4.20-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.20-nightly-control-plane-baremetal-multi-3nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/4.20-nightly-control-plane-gcp-etcd-fips-120nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
+      ci-operator.openshift.io/variant: 4.20-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.20-nightly-control-plane-gcp-etcd-fips-120nodes
+    rerun_command: /test 4.20-nightly-control-plane-gcp-etcd-fips-120nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=gcp-etcd-fips-120nodes
+        - --variant=4.20-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.20-nightly-control-plane-gcp-etcd-fips-120nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/4.20-nightly-control-plane-ibmcloud-24nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: ibmcloud
+      ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-qe
+      ci-operator.openshift.io/variant: 4.20-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.20-nightly-control-plane-ibmcloud-24nodes
+    rerun_command: /test 4.20-nightly-control-plane-ibmcloud-24nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=ibmcloud-24nodes
+        - --variant=4.20-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.20-nightly-control-plane-ibmcloud-24nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/4.20-nightly-control-plane-nutanix-24nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/sshd-bastion: sshd-bastion
+      ci-operator.openshift.io/cloud: nutanix
+      ci-operator.openshift.io/cloud-cluster-profile: nutanix-qe-zone
+      ci-operator.openshift.io/variant: 4.20-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.20-nightly-control-plane-nutanix-24nodes
+    rerun_command: /test 4.20-nightly-control-plane-nutanix-24nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=nutanix-24nodes
+        - --variant=4.20-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.20-nightly-control-plane-nutanix-24nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: vsphere02
+    context: ci/prow/4.20-nightly-control-plane-vsphere-24nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
+      ci-operator.openshift.io/variant: 4.20-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.20"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.20-nightly-control-plane-vsphere-24nodes
+    rerun_command: /test 4.20-nightly-control-plane-vsphere-24nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=vsphere-24nodes
+        - --variant=4.20-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.20-nightly-control-plane-vsphere-24nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
+    context: ci/prow/4.21-nightly-control-plane-aws-ipsec-120nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-perfscale
+      ci-operator.openshift.io/variant: 4.21-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.21-nightly-control-plane-aws-ipsec-120nodes
+    rerun_command: /test 4.21-nightly-control-plane-aws-ipsec-120nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=aws-ipsec-120nodes
+        - --variant=4.21-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.21-nightly-control-plane-aws-ipsec-120nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/4.21-nightly-control-plane-azure-ovn-multi-120nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: azure-perfscale
+      ci-operator.openshift.io/variant: 4.21-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.21-nightly-control-plane-azure-ovn-multi-120nodes
+    rerun_command: /test 4.21-nightly-control-plane-azure-ovn-multi-120nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=azure-ovn-multi-120nodes
+        - --variant=4.21-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.21-nightly-control-plane-azure-ovn-multi-120nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/4.21-nightly-control-plane-baremetal-multi-3nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal-qe
+      ci-operator.openshift.io/variant: 4.21-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.21-nightly-control-plane-baremetal-multi-3nodes
+    rerun_command: /test 4.21-nightly-control-plane-baremetal-multi-3nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=baremetal-multi-3nodes
+        - --variant=4.21-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.21-nightly-control-plane-baremetal-multi-3nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/4.21-nightly-control-plane-gcp-etcd-fips-120nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
+      ci-operator.openshift.io/variant: 4.21-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.21-nightly-control-plane-gcp-etcd-fips-120nodes
+    rerun_command: /test 4.21-nightly-control-plane-gcp-etcd-fips-120nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=gcp-etcd-fips-120nodes
+        - --variant=4.21-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.21-nightly-control-plane-gcp-etcd-fips-120nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/4.21-nightly-control-plane-ibmcloud-24nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: ibmcloud
+      ci-operator.openshift.io/cloud-cluster-profile: ibmcloud-qe
+      ci-operator.openshift.io/variant: 4.21-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.21-nightly-control-plane-ibmcloud-24nodes
+    rerun_command: /test 4.21-nightly-control-plane-ibmcloud-24nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=ibmcloud-24nodes
+        - --variant=4.21-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.21-nightly-control-plane-ibmcloud-24nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/4.21-nightly-control-plane-nutanix-24nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/sshd-bastion: sshd-bastion
+      ci-operator.openshift.io/cloud: nutanix
+      ci-operator.openshift.io/cloud-cluster-profile: nutanix-qe-zone
+      ci-operator.openshift.io/variant: 4.21-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.21-nightly-control-plane-nutanix-24nodes
+    rerun_command: /test 4.21-nightly-control-plane-nutanix-24nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=nutanix-24nodes
+        - --variant=4.21-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.21-nightly-control-plane-nutanix-24nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: vsphere02
+    context: ci/prow/4.21-nightly-control-plane-vsphere-24nodes
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-connected-2
+      ci-operator.openshift.io/variant: 4.21-nightly-control-plane
+      ci.openshift.io/generator: prowgen
+      job-release: "4.21"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-4.21-nightly-control-plane-vsphere-24nodes
+    rerun_command: /test 4.21-nightly-control-plane-vsphere-24nodes
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=vsphere-24nodes
+        - --variant=4.21-nightly-control-plane
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )(4.21-nightly-control-plane-vsphere-24nodes|remaining-required),?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build10
     context: ci/prow/aws-4.20-nightly-x86-compact-cp-3nodes
     decorate: true
     decoration_config:
@@ -1111,7 +2305,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-180nodes
+    context: ci/prow/aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-180nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1122,8 +2316,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-180nodes
-    rerun_command: /test aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-180nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-180nodes
+    rerun_command: /test aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-180nodes
     spec:
       containers:
       - args:
@@ -1132,7 +2326,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-420to421-180nodes
+        - --target=loaded-upgrade-180nodes
         - --variant=aws-4.22-nightly-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -1189,14 +2383,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-180nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-180nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-24nodes-72udn
+    context: ci/prow/aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-72udn
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1207,8 +2401,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-24nodes-72udn
-    rerun_command: /test aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-24nodes-72udn
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-72udn
+    rerun_command: /test aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-72udn
     spec:
       containers:
       - args:
@@ -1217,7 +2411,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-420to421-24nodes-72udn
+        - --target=loaded-upgrade-24nodes-72udn
         - --variant=aws-4.22-nightly-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -1274,14 +2468,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-24nodes-72udn|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-72udn|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-24nodes-layer2-72udn
+    context: ci/prow/aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-layer2-72udn
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1292,8 +2486,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-24nodes-layer2-72udn
-    rerun_command: /test aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-24nodes-layer2-72udn
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-layer2-72udn
+    rerun_command: /test aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-layer2-72udn
     spec:
       containers:
       - args:
@@ -1302,7 +2496,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-420to421-24nodes-layer2-72udn
+        - --target=loaded-upgrade-24nodes-layer2-72udn
         - --variant=aws-4.22-nightly-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -1359,14 +2553,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-24nodes-layer2-72udn|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-layer2-72udn|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-3nodes-udn
+    context: ci/prow/aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-3nodes-udn
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1377,8 +2571,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-3nodes-udn
-    rerun_command: /test aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-3nodes-udn
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-3nodes-udn
+    rerun_command: /test aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-3nodes-udn
     spec:
       containers:
       - args:
@@ -1387,7 +2581,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-420to421-3nodes-udn
+        - --target=loaded-upgrade-3nodes-udn
         - --variant=aws-4.22-nightly-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -1444,7 +2638,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-420to421-3nodes-udn|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(aws-4.22-nightly-x86-loaded-upgrade-from-4.21-loaded-upgrade-3nodes-udn|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1876,7 +3070,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-180nodes
+    context: ci/prow/aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-180nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1887,8 +3081,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-180nodes
-    rerun_command: /test aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-180nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-180nodes
+    rerun_command: /test aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-180nodes
     spec:
       containers:
       - args:
@@ -1897,7 +3091,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-420to421-180nodes
+        - --target=loaded-upgrade-180nodes
         - --variant=aws-5.0-nightly-x86-loaded-upgrade-from-4.22
         command:
         - ci-operator
@@ -1954,14 +3148,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-180nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-180nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-24nodes-72udn
+    context: ci/prow/aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-24nodes-72udn
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1972,8 +3166,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-24nodes-72udn
-    rerun_command: /test aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-24nodes-72udn
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-24nodes-72udn
+    rerun_command: /test aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-24nodes-72udn
     spec:
       containers:
       - args:
@@ -1982,7 +3176,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-420to421-24nodes-72udn
+        - --target=loaded-upgrade-24nodes-72udn
         - --variant=aws-5.0-nightly-x86-loaded-upgrade-from-4.22
         command:
         - ci-operator
@@ -2039,14 +3233,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-24nodes-72udn|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-24nodes-72udn|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-24nodes-layer2-72udn
+    context: ci/prow/aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-24nodes-layer2-72udn
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -2057,8 +3251,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-24nodes-layer2-72udn
-    rerun_command: /test aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-24nodes-layer2-72udn
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-24nodes-layer2-72udn
+    rerun_command: /test aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-24nodes-layer2-72udn
     spec:
       containers:
       - args:
@@ -2067,7 +3261,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-420to421-24nodes-layer2-72udn
+        - --target=loaded-upgrade-24nodes-layer2-72udn
         - --variant=aws-5.0-nightly-x86-loaded-upgrade-from-4.22
         command:
         - ci-operator
@@ -2124,14 +3318,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-24nodes-layer2-72udn|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-24nodes-layer2-72udn|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-3nodes-udn
+    context: ci/prow/aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-3nodes-udn
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -2142,8 +3336,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "5.0"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-3nodes-udn
-    rerun_command: /test aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-3nodes-udn
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-3nodes-udn
+    rerun_command: /test aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-3nodes-udn
     spec:
       containers:
       - args:
@@ -2152,7 +3346,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-420to421-3nodes-udn
+        - --target=loaded-upgrade-3nodes-udn
         - --variant=aws-5.0-nightly-x86-loaded-upgrade-from-4.22
         command:
         - ci-operator
@@ -2209,7 +3403,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-420to421-3nodes-udn|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(aws-5.0-nightly-x86-loaded-upgrade-from-4.22-loaded-upgrade-3nodes-udn|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -9028,7 +10222,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-120nodes
+    context: ci/prow/rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-120nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -9038,8 +10232,8 @@ presubmits:
       ci-operator.openshift.io/variant: rosa-4.22-candidate-x86-loaded-upgrade-from-4.21
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-120nodes
-    rerun_command: /test rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-120nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-120nodes
+    rerun_command: /test rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-120nodes
     spec:
       containers:
       - args:
@@ -9048,7 +10242,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-421to422-120nodes
+        - --target=loaded-upgrade-120nodes
         - --variant=rosa-4.22-candidate-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -9105,14 +10299,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-120nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-120nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-249nodes
+    context: ci/prow/rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-249nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -9122,8 +10316,8 @@ presubmits:
       ci-operator.openshift.io/variant: rosa-4.22-candidate-x86-loaded-upgrade-from-4.21
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-249nodes
-    rerun_command: /test rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-249nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-249nodes
+    rerun_command: /test rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-249nodes
     spec:
       containers:
       - args:
@@ -9132,7 +10326,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-421to422-249nodes
+        - --target=loaded-upgrade-249nodes
         - --variant=rosa-4.22-candidate-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -9189,14 +10383,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-249nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-249nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-24nodes
+    context: ci/prow/rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -9206,8 +10400,8 @@ presubmits:
       ci-operator.openshift.io/variant: rosa-4.22-candidate-x86-loaded-upgrade-from-4.21
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-24nodes
-    rerun_command: /test rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-24nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes
+    rerun_command: /test rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes
     spec:
       containers:
       - args:
@@ -9216,7 +10410,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-421to422-24nodes
+        - --target=loaded-upgrade-24nodes
         - --variant=rosa-4.22-candidate-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -9273,7 +10467,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-24nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(rosa-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -11397,7 +12591,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-120nodes
+    context: ci/prow/rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-120nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -11407,8 +12601,8 @@ presubmits:
       ci-operator.openshift.io/variant: rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-120nodes
-    rerun_command: /test rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-120nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-120nodes
+    rerun_command: /test rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-120nodes
     spec:
       containers:
       - args:
@@ -11417,7 +12611,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-421to422-120nodes
+        - --target=loaded-upgrade-120nodes
         - --variant=rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -11474,14 +12668,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-120nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-120nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-249nodes
+    context: ci/prow/rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-249nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -11491,8 +12685,8 @@ presubmits:
       ci-operator.openshift.io/variant: rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-249nodes
-    rerun_command: /test rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-249nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-249nodes
+    rerun_command: /test rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-249nodes
     spec:
       containers:
       - args:
@@ -11501,7 +12695,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-421to422-249nodes
+        - --target=loaded-upgrade-249nodes
         - --variant=rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -11558,14 +12752,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-249nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-249nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-24nodes
+    context: ci/prow/rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -11575,8 +12769,8 @@ presubmits:
       ci-operator.openshift.io/variant: rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-24nodes
-    rerun_command: /test rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-24nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes
+    rerun_command: /test rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes
     spec:
       containers:
       - args:
@@ -11585,7 +12779,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-421to422-24nodes
+        - --target=loaded-upgrade-24nodes
         - --variant=rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -11642,14 +12836,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-24nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-24nodes-onperfsector
+    context: ci/prow/rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-onperfsector
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -11659,8 +12853,8 @@ presubmits:
       ci-operator.openshift.io/variant: rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-24nodes-onperfsector
-    rerun_command: /test rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-24nodes-onperfsector
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-onperfsector
+    rerun_command: /test rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-onperfsector
     spec:
       containers:
       - args:
@@ -11669,7 +12863,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-421to422-24nodes-onperfsector
+        - --target=loaded-upgrade-24nodes-onperfsector
         - --variant=rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -11726,14 +12920,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-24nodes-onperfsector|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-24nodes-onperfsector|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-498nodes
+    context: ci/prow/rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-498nodes
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -11743,8 +12937,8 @@ presubmits:
       ci-operator.openshift.io/variant: rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-498nodes
-    rerun_command: /test rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-498nodes
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-498nodes
+    rerun_command: /test rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-498nodes
     spec:
       containers:
       - args:
@@ -11753,7 +12947,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-421to422-498nodes
+        - --target=loaded-upgrade-498nodes
         - --variant=rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -11810,14 +13004,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-498nodes|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-498nodes|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build10
-    context: ci/prow/rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-498nodes-onperfsector
+    context: ci/prow/rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-498nodes-onperfsector
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -11827,8 +13021,8 @@ presubmits:
       ci-operator.openshift.io/variant: rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-498nodes-onperfsector
-    rerun_command: /test rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-498nodes-onperfsector
+    name: pull-ci-openshift-eng-ocp-qe-perfscale-ci-main-rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-498nodes-onperfsector
+    rerun_command: /test rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-498nodes-onperfsector
     spec:
       containers:
       - args:
@@ -11837,7 +13031,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=loaded-upgrade-421to422-498nodes-onperfsector
+        - --target=loaded-upgrade-498nodes-onperfsector
         - --variant=rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21
         command:
         - ci-operator
@@ -11894,7 +13088,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )(rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-421to422-498nodes-onperfsector|remaining-required),?($|\s.*)
+    trigger: (?m)^/test( | .* )(rosa_hcp-4.22-candidate-x86-loaded-upgrade-from-4.21-loaded-upgrade-498nodes-onperfsector|remaining-required),?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

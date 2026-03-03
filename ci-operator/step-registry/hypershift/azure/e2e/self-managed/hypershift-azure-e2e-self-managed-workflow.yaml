@@ -1,0 +1,36 @@
+workflow:
+  as: hypershift-azure-e2e-self-managed
+  documentation: |-
+    The HyperShift Azure e2e self-managed workflow executes tests against a new ephemeral
+    HyperShift cluster running on self-managed Azure infrastructure. This workflow provisions
+    an Azure management cluster using HyperShift on a shared management plane, installs the
+    HyperShift operator, and runs e2e tests.
+
+    Administrative access to the control plane is provided via the `KUBECONFIG` environment variable.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+    - Bryan Cox (brcox@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/CNTRLPLANE/summary
+  steps:
+    post:
+    - chain: hypershift-destroy-nested-management-cluster
+    test:
+    - ref: hypershift-azure-run-e2e-self-managed
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    env:
+      CLOUD_PROVIDER: "Azure"
+      HYPERSHIFT_NODE_COUNT: "3"
+      HYPERSHIFT_AZURE_LOCATION: "centralus"
+      AZURE_SELF_MANAGED: "true"
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "aks-e2e.hypershift.azure.devcluster.openshift.com"
