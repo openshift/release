@@ -1,15 +1,19 @@
 #!/bin/bash
 
+# Save any pre-set overrides (e.g., from REST API via MULTISTAGE_PARAM_OVERRIDE_*)
+_OVERRIDE_QUAY_REPO="${QUAY_REPO:-}"
+_OVERRIDE_TAG_NAME="${TAG_NAME:-}"
+
 echo "========== Repository, Branch, and PR Variables =========="
-GITHUB_ORG_NAME="redhat-developer"
+GITHUB_ORG_NAME="${GITHUB_ORG_NAME:-redhat-developer}"
 echo "GITHUB_ORG_NAME: $GITHUB_ORG_NAME"
-GITHUB_REPOSITORY_NAME="rhdh"
+GITHUB_REPOSITORY_NAME="${GITHUB_REPOSITORY_NAME:-rhdh}"
 echo "GITHUB_REPOSITORY_NAME: $GITHUB_REPOSITORY_NAME"
-RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
+RELEASE_BRANCH_NAME="${RELEASE_BRANCH_NAME:-$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')}"
 echo "RELEASE_BRANCH_NAME: $RELEASE_BRANCH_NAME"
-GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
+GIT_PR_NUMBER="${GIT_PR_NUMBER:-$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')}"
 echo "GIT_PR_NUMBER: $GIT_PR_NUMBER"
-TAG_NAME=""
+TAG_NAME="${TAG_NAME:-}"
 export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER TAG_NAME
 
 echo "========== Check for [skip-e2e] commit comments in the PR title =========="
@@ -95,7 +99,7 @@ echo "========== Cluster kubeadmin logout =========="
 oc logout
 
 echo "========== Git Repository Setup & Checkout =========="
-QUAY_REPO="rhdh-community/rhdh"
+QUAY_REPO="${QUAY_REPO:-rhdh-community/rhdh}"
 export QUAY_REPO
 
 # Clone and checkout the specific PR
@@ -140,7 +144,11 @@ done
 echo "ONLY_IN_DIRS: $ONLY_IN_DIRS"
 
 echo "========== Image Tag Resolution =========="
-if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
+if [[ -n "${_OVERRIDE_QUAY_REPO}" && -n "${_OVERRIDE_TAG_NAME}" ]]; then
+    QUAY_REPO="${_OVERRIDE_QUAY_REPO}"
+    TAG_NAME="${_OVERRIDE_TAG_NAME}"
+    echo "Using overridden QUAY_REPO: $QUAY_REPO, TAG_NAME: $TAG_NAME"
+elif [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     QUAY_REPO="rhdh/rhdh-hub-rhel9"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
