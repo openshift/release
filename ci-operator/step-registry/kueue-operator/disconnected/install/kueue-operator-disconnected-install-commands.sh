@@ -51,7 +51,7 @@ function configure_host_pull_secret () {
 
 function install_oc_mirror () {
     echo "[$(timestamp)] Installing the latest oc-mirror client..."
-    run_command "curl -k -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/latest/oc-mirror.tar.gz"
+    run_command "curl -k -L -o oc-mirror.tar.gz https://mirror.openshift.com/pub/openshift-v4/$(uname -m)/clients/ocp/latest-4.20/oc-mirror.tar.gz"
     run_command "tar -xvzf oc-mirror.tar.gz && chmod +x ./oc-mirror && rm -f oc-mirror.tar.gz"
 }
 
