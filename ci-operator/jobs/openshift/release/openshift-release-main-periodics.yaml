@@ -66559,6 +66559,87 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
+  cluster: build09
+  cron: '@yearly'
+  decorate: true
+  decoration_config:
+    timeout: 12h0m0s
+  name: periodic-ci-openshift-release-main-claude-payload-analysis
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/usr/local/pull-secret
+      - --target=claude-payload-analysis
+      command:
+      - ci-operator
+      env:
+      - name: PAYLOAD_TAG
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: claude-payload-analysis
+            steps:
+              env:
+                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
+              test:
+              - ref: openshift-release-analysis-claude-payload-analysis
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: claude-payload-analysis
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
   cluster: app.ci
   decorate: true
   interval: 6h
