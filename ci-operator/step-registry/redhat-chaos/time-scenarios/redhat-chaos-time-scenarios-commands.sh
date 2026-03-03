@@ -7,7 +7,6 @@ set -o nounset
 set -o pipefail
 set -x
 
-ES_USERNAME=$(cat "/secret/es/username")
 typeset secretDir=/secret/es
 ES_PASSWORD=$(<"${secretDir}/es-password--${CHAOS_TEAM_NAME}")
 ES_USERNAME=$(<"${secretDir}/es-username--${CHAOS_TEAM_NAME}")
