@@ -1,0 +1,18 @@
+workflow:
+  as: gs-baremetal-agent-install
+  steps:
+    cluster_profile: metal-redhat-gs
+    allow_best_effort_post_steps: true
+    pre:
+      - ref: gs-baremetal-fetch-hosts
+      - ref: gs-baremetal-conf
+      - ref: gs-baremetal-create-image
+      - ref: gs-baremetal-orchestrate
+    test:
+      - chain: cucushift-installer-check-cluster-health
+    post: []
+  documentation: |-
+    Agent-Based Installation (ABI) on bare metal in RDU2 (metal-redhat-gs) without a bastion.
+    Pre: fetch-hosts (copy hosts.yaml from credential) -> conf (install-config + agent-config from hosts.yaml) -> create-image (agent ISO) ->
+    orchestrate (serve ISO, trigger BMCs, optional wait-for install-complete). Test: cluster health.
+    Requires hosts.yaml in credential mount at /bw/hosts.yaml (BitWarden note BMC field) or set HOSTS_SOURCE_PATH. Capabilities: intranet.

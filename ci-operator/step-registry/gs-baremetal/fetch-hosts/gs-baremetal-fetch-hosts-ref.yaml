@@ -1,0 +1,30 @@
+ref:
+  as: gs-baremetal-fetch-hosts
+  from_image:
+    namespace: ci
+    name: "baremetal-qe-base"
+    tag: latest
+  commands: gs-baremetal-fetch-hosts-commands.sh
+  credentials:
+    - name: openshift-virtualization-tests-credentials
+      namespace: test-credentials
+      mount_path: /bw
+  resources:
+    requests:
+      cpu: "10m"
+      memory: 64Mi
+  grace_period: 60
+  env:
+    - name: HOSTS_SOURCE_PATH
+      default: ""
+      documentation: |-
+        Full path to the hosts YAML file. If empty, uses BW_PATH/hosts.yaml.
+    - name: BW_PATH
+      default: "/bw"
+      documentation: |-
+        Directory mounted from credentials (e.g. BitWarden vault). If HOSTS_SOURCE_PATH is unset,
+        step reads from BW_PATH/hosts.yaml.
+  documentation: |-
+    Day 0 step: copies the host list into SHARED_DIR/hosts.yaml for gs-baremetal-conf and gs-baremetal-orchestrate.
+    Mount a credential that contains hosts.yaml (e.g. BitWarden note "BMC" field content in the
+    expected format). Run as the first pre-step before gs-baremetal-conf.

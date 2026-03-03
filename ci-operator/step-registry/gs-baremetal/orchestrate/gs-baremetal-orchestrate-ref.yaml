@@ -1,0 +1,36 @@
+ref:
+  as: gs-baremetal-orchestrate
+  from_image:
+    namespace: ci
+    name: "baremetal-qe-base"
+    tag: latest
+  commands: gs-baremetal-orchestrate-commands.sh
+  resources:
+    requests:
+      cpu: "1"
+      memory: 512Mi
+  timeout: 2h0m0s
+  grace_period: 600
+  env:
+    - name: AGENT_ISO
+      default: "agent.x86_64.iso"
+      documentation: |-
+        Filename of the agent ISO in SHARED_DIR (e.g. agent.x86_64.iso).
+    - name: BOOT_MODE
+      default: "iso"
+      documentation: |-
+        Boot mode for nodes. Valid values are "iso" (virtual media) or "pxe".
+    - name: INSTALL_DIR
+      default: ""
+      documentation: |-
+        Optional path to install dir. If set, ISO is expected at INSTALL_DIR/agent.<arch>.iso
+        and wait-for install-complete is run from INSTALL_DIR. Otherwise ISO path is SHARED_DIR/AGENT_ISO.
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    Day 1 step: hosts the agent ISO from the CI Pod and triggers bare metal nodes via direct BMC
+    (Redfish/IPMI) to mount virtual media and power on. No bastion (AUX_HOST) required.
+    Optionally runs openshift-install agent wait-for install-complete.
+    Requires hosts.yaml in SHARED_DIR with per-host BMC details (e.g. host, bmc_address,
+    bmc_user, bmc_password). Used by the gs-baremetal-agent-install workflow for RDU2 lab.
