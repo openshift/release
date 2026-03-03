@@ -4,6 +4,8 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+ls -l "${SHARED_DIR}/config.yaml" 
+
 # Temporary: support both pre- and post- binaries for PR
 #            https://github.com/Azure/ARO-HCP/pull/4181/
 # The new binary requires --rendered-config; passing it to the old binary breaks.

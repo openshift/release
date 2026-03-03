@@ -17,3 +17,5 @@ make -C config render-partial-config \
   CONFIG_OUTPUT="${SHARED_DIR}/config.yaml"
 
 cp "${SHARED_DIR}/config.yaml" "${ARTIFACT_DIR}/config.yaml"
+
+ls -l "${SHARED_DIR}/config.yaml"

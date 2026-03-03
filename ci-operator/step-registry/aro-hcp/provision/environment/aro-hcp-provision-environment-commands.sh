@@ -70,5 +70,7 @@ make -o tooling/templatize/templatize entrypoint/Region \
 
 cp "${SHARED_DIR}/config.yaml" "${ARTIFACT_DIR}/config.yaml"
 
+ls -l "${SHARED_DIR}/config.yaml" 
+
 # Mark successful completion
 touch "${SHARED_DIR}/provision-complete"
