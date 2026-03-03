@@ -1,0 +1,29 @@
+# Alert when a build farm has scheduling pressure (high pending pod count or nodes under
+# memory/disk/PID pressure). These conditions cause CI jobs to hold plank slots longer
+# (pods wait to be scheduled), contributing to plank saturation before "pods failed to
+# schedule" is visible. Alerts route to #ops-testplatform; see docs/dptp-triage-sop/build-farm-scheduling-pressure.md.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: build-farm-scheduling-pressure
+  namespace: openshift-monitoring
+spec:
+  groups:
+  - name: build-farm-scheduling-pressure
+    rules:
+    - alert: BuildFarmHighPendingPods
+      expr: |
+        count(kube_pod_status_phase{job="kube-state-metrics",namespace="ci",phase="Pending"} == 1) > 50
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        message: 'Build farm has {{ $value }} pods in Pending in namespace ci for 10m. Scheduling pressure causes jobs to hold plank slots longer and contributes to plank saturation. See SOP: docs/dptp-triage-sop/build-farm-scheduling-pressure.md'
+    - alert: BuildFarmNodePressure
+      expr: |
+        count(kube_node_status_condition{job="kube-state-metrics",condition=~"MemoryPressure|DiskPressure|PIDPressure",status="true"} == 1) > 0
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        message: 'Build farm has {{ $value }} node(s) with MemoryPressure, DiskPressure, or PIDPressure. Scheduling pressure contributes to plank saturation. See SOP: docs/dptp-triage-sop/build-farm-scheduling-pressure.md'
