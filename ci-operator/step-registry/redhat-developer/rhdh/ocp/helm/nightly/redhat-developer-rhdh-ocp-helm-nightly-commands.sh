@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# Save any pre-set overrides (e.g., from REST API via MULTISTAGE_PARAM_OVERRIDE_*)
-_OVERRIDE_QUAY_REPO="${QUAY_REPO:-}"
-_OVERRIDE_TAG_NAME="${TAG_NAME:-}"
-
 echo "========== Repository, Branch, and PR Variables =========="
 GITHUB_ORG_NAME="${GITHUB_ORG_NAME:-redhat-developer}"
 echo "GITHUB_ORG_NAME: $GITHUB_ORG_NAME"
@@ -78,9 +74,6 @@ echo "========== Cluster kubeadmin logout =========="
 oc logout
 
 echo "========== Git Repository Setup & Checkout =========="
-QUAY_REPO="${QUAY_REPO:-rhdh-community/rhdh}"
-export QUAY_REPO
-
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd "${GITHUB_REPOSITORY_NAME}" || exit
@@ -123,9 +116,7 @@ done
 echo "ONLY_IN_DIRS: $ONLY_IN_DIRS"
 
 echo "========== Image Tag Resolution =========="
-if [[ -n "${_OVERRIDE_QUAY_REPO}" && -n "${_OVERRIDE_TAG_NAME}" ]]; then
-    QUAY_REPO="${_OVERRIDE_QUAY_REPO}"
-    TAG_NAME="${_OVERRIDE_TAG_NAME}"
+if [[ -n "${QUAY_REPO}" && -n "${TAG_NAME}" ]]; then
     echo "Using overridden QUAY_REPO: $QUAY_REPO, TAG_NAME: $TAG_NAME"
 elif [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     QUAY_REPO="rhdh/rhdh-hub-rhel9"
@@ -148,6 +139,7 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
     echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"
 else
+    QUAY_REPO="rhdh-community/rhdh"
     # Timeout configuration for waiting for Docker image availability
     MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
     POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
@@ -179,6 +171,7 @@ else
         fi
     done
 fi
+export QUAY_REPO
 
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
