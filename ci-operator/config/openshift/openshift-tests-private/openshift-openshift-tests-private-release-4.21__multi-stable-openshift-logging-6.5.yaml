@@ -1,0 +1,103 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.21"
+  tools:
+    name: "4.21"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.21"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: candidate
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: gcp-ipi-arm-fips-f999-logging
+  cron: 0 9 * * 3
+  steps:
+    cluster_profile: gcp-observability
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-8
+      FILTERS_ADDITIONAL: ""
+      FIPS_ENABLED: "true"
+      FORCE_SUCCESS_EXIT: "true"
+      LOGGING_TEST_VERSION: "6.5"
+      OCP_ARCH: arm64
+      OPERATORS: |
+        [
+            {"name": "cluster-logging", "source": "cluster-logging-operator-registry", "channel": "stable-6.5", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "loki-operator", "source": "loki-operator-registry", "channel": "stable-6.5", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      TEST_ADDITIONAL: ""
+      TEST_FILTERS: ~Disruptive&;~Longduration&;~AWSSTS&;~AZWIF&;~AZMonitor&;~Cloudwatch&;~Splunk&
+      TEST_IMPORTANCE: Critical|High
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: openshift-logging-catalogsources
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: baremetalds-ipi-ovn-ipv6-f999-logging
+  cron: 0 21 * * 6
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      FILTERS_ADDITIONAL: ""
+      LOGGING_TEST_VERSION: "6.5"
+      OPERATORS: |
+        [
+            {"name": "cluster-logging", "source": "cluster-logging-operator-registry", "channel": "stable-6.5", "install_namespace": "openshift-logging","target_namespaces": "", "operator_group": "openshift-logging"},
+            {"name": "loki-operator", "source": "loki-operator-registry", "channel": "stable-6.5", "install_namespace": "openshift-operators-redhat","target_namespaces": "", "operator_group": "openshift-operators-redhat"},
+            {"name": "cluster-observability-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-cluster-observability-operator","target_namespaces": "", "operator_group": "openshift-cluster-observability-operator"},
+            {"name": "amq-streams", "source": "redhat-operators", "channel": "amq-streams-2.x", "install_namespace": "openshift-operators","target_namespaces": "", "operator_group": ""}
+        ]
+      TEST_ADDITIONAL: ""
+      TEST_FILTERS: CPaasrunOnly;CPaasrunBoth;~Disruptive&;~Longduration&;~AWSSTS&;~AZWIF&;~AZMonitor&;~GCL&;~Cloudwatch&
+      TEST_IMPORTANCE: Critical|High
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: sig-openshift-logging
+      TEST_TIMEOUT: "15"
+    test:
+    - ref: openshift-logging-catalogsources
+    - ref: install-operators
+    - chain: openshift-e2e-test-logging-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: openshift-tests-private
+  variant: multi-stable-openshift-logging-6.5
