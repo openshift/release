@@ -57,7 +57,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-quay
     env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
+      COMPUTE_NODE_TYPE: m5.4xlarge
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: '!create'
       OO_PACKAGE: quay-operator
@@ -70,7 +70,30 @@ tests:
     - ref: quay-install-odf-operator
     - ref: optional-operators-subscribe
     - ref: quay-install-quay
-    - ref: quay-create-admin
+    - as: quay-create-admin
+      commands: |
+        set -euo pipefail
+
+        echo "Getting Quay registry endpoint..." >&2
+        registryEndpoint="$(oc -n quay get quayregistry quay -o jsonpath='{.status.registryEndpoint}')"
+
+        echo "Creating admin user via initialization API..." >&2
+        response="$(curl -sk --retry 30 --retry-delay 10 --retry-all-errors \
+          -X POST "$registryEndpoint/api/v1/user/initialize" \
+          --header 'Content-Type: application/json' \
+          --data '{"username": "admin", "password": "p@ssw0rd", "email": "admin@localhost.local", "access_token": false}')"
+
+        if echo "$response" | grep -q '"username"'; then
+          echo "Admin user created successfully" >&2
+        else
+          echo "Failed to create admin user: $response" >&2
+          exit 1
+        fi
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     test:
     - as: tests
       commands: |
