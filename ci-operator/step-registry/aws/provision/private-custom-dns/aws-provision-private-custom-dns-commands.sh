@@ -12,6 +12,12 @@ EXIT_CODE=101
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
 
 REGION="${LEASED_RESOURCE}"
+
+if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+  source_region=$(jq -r ".\"${REGION}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
+  REGION=$source_region
+fi
+
 INFRA_ID=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
