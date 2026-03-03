@@ -31,30 +31,42 @@ echo "Release API: ${API_URL}"
 MAX_WAIT=36000 # 10 hours in seconds
 POLL_INTERVAL=300  # 5 minutes
 ELAPSED=0
+POLL_COUNT=0
+
+echo ""
+echo "=== Waiting for all blocking jobs to complete before analysis ==="
+echo "Polling every $((POLL_INTERVAL / 60)) minutes (timeout: $((MAX_WAIT / 3600)) hours)"
+echo ""
 
 while true; do
+    POLL_COUNT=$((POLL_COUNT + 1))
     RELEASE_JSON=$(curl -sf "${API_URL}")
     PENDING=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Pending")] | length')
     FAILED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Failed")] | length')
+    SUCCEEDED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Succeeded")] | length')
     TOTAL=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[]] | length')
 
-    echo "Blocking jobs: ${TOTAL} total, ${PENDING} pending, ${FAILED} failed"
+    ELAPSED_MIN=$((ELAPSED / 60))
+    echo "[Poll #${POLL_COUNT} | ${ELAPSED_MIN}m elapsed] Blocking jobs: ${SUCCEEDED}/${TOTAL} succeeded, ${PENDING} pending, ${FAILED} failed"
 
     if [[ "${PENDING}" -eq 0 ]]; then
+        echo ""
         if [[ "${FAILED}" -eq 0 ]]; then
-            echo "All blocking jobs succeeded. No analysis needed."
+            echo "All ${TOTAL} blocking jobs succeeded. No analysis needed."
             exit 0
         fi
-        echo "All blocking jobs have completed. ${FAILED} failed. Starting analysis..."
+        echo "All blocking jobs have completed. ${FAILED}/${TOTAL} failed. Starting analysis..."
         break
     fi
 
     ELAPSED=$((ELAPSED + POLL_INTERVAL))
     if [[ ${ELAPSED} -ge ${MAX_WAIT} ]]; then
-        echo "Timed out after ${MAX_WAIT}s waiting for blocking jobs to complete (${PENDING} still pending)."
+        echo ""
+        echo "Timed out after $((MAX_WAIT / 3600)) hours waiting for blocking jobs to complete (${PENDING} still pending)."
         exit 1
     fi
 
+    echo "  Next check in $((POLL_INTERVAL / 60)) minutes..."
     sleep ${POLL_INTERVAL}
 done
 
