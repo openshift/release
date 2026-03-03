@@ -106,7 +106,7 @@ tests:
           memory: 100Mi
       timeout: 1h0m0s
     workflow: servicemesh-istio-e2e-hypershift
-- as: unit
+- as: unit-and-gencheck
   steps:
     cluster_profile: ossm-aws
     env:
@@ -129,6 +129,29 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 20m0s
+    - as: gencheck
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export BUILD_WITH_CONTAINER=0 && \
+          export GOBIN='/gobin' && \
+          export GOCACHE='/tmp/cache' && \
+          export GOMODCACHE='/tmp/cache' && \
+          export XDG_CACHE_HOME='/tmp/cache' && \
+          export ARTIFACTS='${ARTIFACT_DIR}' && \
+          cd /work && \
+          entrypoint \
+          make gen-check"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 1h0m0s
     - as: unit
       cli: latest
       commands: |
