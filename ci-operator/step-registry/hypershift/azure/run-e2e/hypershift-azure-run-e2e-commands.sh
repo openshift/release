@@ -131,7 +131,7 @@ if [[ "${OAUTH_EXTERNAL_OIDC_PROVIDER}" != "" ]]; then
   esac
 fi
 
-CI_TESTS_RUN="TestCiliumConnectivity"
+#CI_TESTS_RUN="TestCiliumConnectivity"
 #AZURE_NETWORK_TYPE="OVNKubernetes"
 #if [[ "${CI_TESTS_RUN:-}" == "TestCiliumConnectivity" ]];then
 AZURE_NETWORK_TYPE="--network-type=Other"
