@@ -44,8 +44,8 @@ CONSOLE_HOST="$(oc --kubeconfig="$KUBECONFIG" get route console -n openshift-con
 CONSOLE_CLIENT_ID="$(</var/run/hypershift-ext-oidc-app-console/client-id)"
 CONSOLE_CALLBACK_URI="https://${CONSOLE_HOST}/auth/callback"
 CONSOLE_REDIRECT_URIS="$(az ad app show --id "$CONSOLE_CLIENT_ID" --query 'web.redirectUris' -o tsv)"
-if ! grep "$CONSOLE_CALLBACK_URI" <<< "$CONSOLE_REDIRECT_URIS"; then
-    echo "The URI to remove $CONSOLE_REDIRECT_URIS is not found within the list of redirect uris $CONSOLE_CALLBACK_URI"
+if ! grep "$CONSOLE_CALLBACK_URI" <<< "$CONSOLE_REDIRECT_URIS" > /dev/null; then
+    echo "The URI to remove is not found within the list of redirect uris"
     exit 0
 fi
 CONSOLE_REDIRECT_URIS_NEW="$(echo "$CONSOLE_REDIRECT_URIS" | grep -v "$CONSOLE_CALLBACK_URI" | paste -s -d ' ' -)"
