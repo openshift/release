@@ -55,8 +55,20 @@ fi
 # --- SSH CONFIGURATION ---
 # StrictHostKeyChecking=no and UserKnownHostsFile=/dev/null are used
 # to avoid interactive prompts in the CI environment.
-SSH_ARGS=" -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
-
+#SSH_ARGS=" -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
+# --- SSH CONFIGURATION ---
+# Force using only the provided identity and avoid interactive prompts
+SSH_ARGS=" -i ${SSH_KEY_PATH} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
+# ...existing code...
+# --- EXECUTE SSH COMMAND ---
+# Try normal run; if it fails, show a verbose retry to help debugging
+if ! ssh $SSH_ARGS root@$IP_JUMPHOST "$SSH_CMD"; then
+    echo "SSH failed, retrying with verbose output for debug:" >&2
+    ssh -vvv $SSH_ARGS root@$IP_JUMPHOST "$SSH_CMD" || {
+        echo "SSH failed after verbose attempt" >&2
+        exit 1
+    }
+fi
 # --- REMOTE COMMAND ---
 # Note: The variables CLUSTER_VERSION, CLUSTER_NAME, and PULL_SECRET_FILE
 # must be set in the environment for this to work.
