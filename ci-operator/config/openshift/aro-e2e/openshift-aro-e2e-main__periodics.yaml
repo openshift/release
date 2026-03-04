@@ -1,0 +1,37 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+- build_args:
+  - name: REGISTRY
+    value: registry.access.redhat.com
+  dockerfile_path: Dockerfile.ansible
+  to: aro-ansible
+releases:
+  latest:
+    release:
+      channel: stable
+      version: 4.14.33
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e
+  capabilities:
+  - intranet
+  cron: 0 6 * * *
+  restrict_network_access: false
+  steps:
+    cluster_profile: aro-redhat-tenant
+    workflow: aro-e2e-classic-ansible
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: aro-e2e
+  variant: periodics
