@@ -147,7 +147,6 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.gcp-storage-sa="${STORAGE_SA}" \
   --e2e.gcp-sa-signing-key-path="${SA_SIGNING_KEY_PATH}" \
   --e2e.gcp-oidc-issuer-url="${OIDC_ISSUER_URL}" \
-  --e2e.gcp-boot-image="${HYPERSHIFT_GCP_BOOT_IMAGE}" \
   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}"
