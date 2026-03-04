@@ -138,7 +138,7 @@ if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
     # Send initial Slack notification
     if [ -n "${SLACK_WEBHOOK}" ]; then
         if [ -n "${BISECT_YAML}" ]; then
-            SLACK_TEXT=":this_is_fine::alert-siren: *Rejected Payload Analysis* :alert-siren::this_is_fine:
+            SLACK_TEXT=":claude_thinking: *Rejected Payload Analysis*
 
 :robot_face: ${SUMMARY:-No summary available.}
 
@@ -146,7 +146,7 @@ if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
 
 <${PROW_JOB_URL}|:point_right: View Full Analysis Report>"
         else
-            SLACK_TEXT=":this_is_fine::alert-siren: *Rejected Payload Analysis* :alert-siren::this_is_fine:
+            SLACK_TEXT=":claude_thinking: *Rejected Payload Analysis*
 
 :robot_face: ${SUMMARY:-No summary available.}
 
