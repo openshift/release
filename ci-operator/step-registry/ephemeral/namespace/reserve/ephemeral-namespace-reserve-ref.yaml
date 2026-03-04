@@ -1,0 +1,65 @@
+ref:
+  as: ephemeral-namespace-reserve
+  cli: latest
+  commands: ephemeral-namespace-reserve-commands.sh
+  credentials:
+  - mount_path: /usr/local/ci-secrets/ephemeral-cluster
+    name: ephemeral-bot-svc-account
+    namespace: test-credentials
+  env:
+  - name: BONFIRE_NAMESPACE_POOL
+    default: "default"
+    documentation: |-
+      The namespace pool from which to reserve. Maps to the bonfire
+      --pool flag. Common pools are "default" and "minimal".
+  - name: BONFIRE_NAMESPACE_DURATION
+    default: "1h"
+    documentation: |-
+      How long to reserve the namespace. Must be between 30m and 14d.
+      Format is a duration string such as "1h", "2h30m", or "90m".
+  - name: BONFIRE_NAMESPACE_TIMEOUT
+    default: "600"
+    documentation: |-
+      Maximum number of seconds to wait for a namespace to become
+      available from the pool. If the timeout is reached, the
+      reservation is automatically released.
+  - name: BONFIRE_NAMESPACE_REQUESTER
+    default: ""
+    documentation: |-
+      Override the requester identity on the namespace reservation.
+      Defaults to the OpenShift CI job name if left empty.
+  - name: BONFIRE_VERSION
+    default: ">=4.18.0"
+    documentation: |-
+      Version specifier for the crc-bonfire PyPI package to install.
+      For example ">=4.18.0" or "==4.20.1".
+  from_image:
+    namespace: ocp
+    name: "4.16-art-latest"
+    tag: cli
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 15m0s
+  grace_period: 1m0s
+  documentation: |-
+    Reserves an ephemeral namespace on the consoledot ephemeral
+    cluster using the bonfire CLI. Logs into the ephemeral cluster
+    using credentials from the ephemeral-bot-svc-account secret,
+    installs bonfire, and reserves a namespace from the requested
+    pool.
+
+    On success the following files are written to SHARED_DIR for
+    use by subsequent steps:
+
+      - ephemeral-namespace        The reserved namespace name.
+      - ephemeral-kubeconfig       A kubeconfig targeting the
+                                   ephemeral cluster, already
+                                   set to the reserved namespace.
+      - ephemeral-cluster-server   The API server URL of the
+                                   ephemeral cluster.
+
+    Downstream test steps should export
+    KUBECONFIG="${SHARED_DIR}/ephemeral-kubeconfig" to interact
+    with the ephemeral cluster namespace.
