@@ -3,6 +3,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+export AZURE_TOKEN_CREDENTIALS=prod
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
@@ -14,6 +15,7 @@ az account set --subscription "${SUBSCRIPTION_ID}"
 
 unset GOFLAGS
 make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
+export AZURE_TOKEN_CREDENTIALS=prod
 export KUBECONFIG=kubeconfig
 
 FRONTEND_ADDRESS=$(kubectl get virtualservice -n aro-hcp aro-hcp-vs-frontend -o jsonpath='{.spec.hosts[0]}')

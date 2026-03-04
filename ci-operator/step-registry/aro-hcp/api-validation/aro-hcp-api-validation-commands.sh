@@ -3,6 +3,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -o xtrace
+export AZURE_TOKEN_CREDENTIALS=prod
 
 # Verify Node.js is available
 node --version

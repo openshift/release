@@ -6,8 +6,10 @@ set -o pipefail
 
 set -x # Turn on command tracing
 
+export AZURE_TOKEN_CREDENTIALS=prod
 export GOPATH=/opt/app-root
 go install gotest.tools/gotestsum@latest
+export AZURE_TOKEN_CREDENTIALS=prod
 export PATH=${PATH}:"${GOPATH}/bin"
 
 test-integration/hack/start-cosmos-emulator.sh

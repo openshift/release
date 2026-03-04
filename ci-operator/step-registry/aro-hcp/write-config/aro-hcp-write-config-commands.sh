@@ -4,6 +4,7 @@ set -o nounset
 set -o pipefail
 
 if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
+  export AZURE_TOKEN_CREDENTIALS=prod
   export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
 fi
 

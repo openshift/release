@@ -122,14 +122,17 @@ done
 # Security: Load credentials without printing them
 AZURE_CLIENT_ID="$(cat "${AZURE_CREDENTIALS_DIR}/client-id")"
 readonly AZURE_CLIENT_ID
+export AZURE_TOKEN_CREDENTIALS=prod
 export AZURE_CLIENT_ID
 
 AZURE_CLIENT_SECRET="$(cat "${AZURE_CREDENTIALS_DIR}/client-secret")"
 readonly AZURE_CLIENT_SECRET
+export AZURE_TOKEN_CREDENTIALS=prod
 export AZURE_CLIENT_SECRET
 
 AZURE_TENANT_ID="$(cat "${AZURE_CREDENTIALS_DIR}/tenant")"
 readonly AZURE_TENANT_ID
+export AZURE_TOKEN_CREDENTIALS=prod
 export AZURE_TENANT_ID
 
 debug "azure: authentication configured successfully (credentials redacted)"

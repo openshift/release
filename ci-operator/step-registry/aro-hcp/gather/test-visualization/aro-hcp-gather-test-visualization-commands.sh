@@ -3,6 +3,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -o xtrace
+export AZURE_TOKEN_CREDENTIALS=prod
 
 test/aro-hcp-tests visualize --timing-input ${SHARED_DIR} --output ${ARTIFACT_DIR}/test-timing/
 
