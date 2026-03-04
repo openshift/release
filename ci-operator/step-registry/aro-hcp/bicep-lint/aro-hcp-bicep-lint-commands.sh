@@ -4,6 +4,8 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+export AZURE_TOKEN_CREDENTIALS=prod
+
 az config set bicep.use_binary_from_path=true
 az bicep version
 

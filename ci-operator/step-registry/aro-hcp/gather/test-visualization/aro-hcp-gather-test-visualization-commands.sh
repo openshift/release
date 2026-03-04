@@ -4,6 +4,8 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+export AZURE_TOKEN_CREDENTIALS=prod
+
 test/aro-hcp-tests visualize --timing-input ${SHARED_DIR} --output ${ARTIFACT_DIR}/test-timing/
 
 # Copy yaml files from SHARED_DIR (decompress .gz files, copy .yaml files)

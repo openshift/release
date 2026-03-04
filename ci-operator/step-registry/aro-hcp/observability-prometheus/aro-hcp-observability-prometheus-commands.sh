@@ -4,6 +4,8 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+export AZURE_TOKEN_CREDENTIALS=prod
+
 # Verify promtool is available
 promtool --version
 
