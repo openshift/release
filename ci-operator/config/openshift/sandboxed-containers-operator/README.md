@@ -11,7 +11,7 @@ usual changes to those files are::
     base_images:
       tests-private:
         # Always use the latest provided by "skopeo list-tags docker://registry.ci.openshift.org/ci/tests-private"
-        tag: "4.20"
+        tag: "4.22"
     releases:
       latest:
         release:
