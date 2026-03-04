@@ -32,6 +32,10 @@ bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 # shellcheck disable=SC2087
 ssh ${SSH_ARGS} root@"${bastion}" bash -s <<EOF
     export KUBECONFIG=/root/vmno/kubeconfig
+    export PROW_JOB_ID="${PROW_JOB_ID:-}"
+    export BUILD_ID="${BUILD_ID:-}"
+    export JOB_NAME="${JOB_NAME:-}"
+    export JOB_TYPE="${JOB_TYPE:-}"
     rm -rf ~/e2e-benchmarking
     git clone "$REPO_URL" $TAG_OPTION --depth 1
     pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
