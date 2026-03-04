@@ -45,4 +45,4 @@ CLIENT_SECRET=$(cat /tmp/osdsecrets/OSD_CLIENT_SECRET)
 
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-info.name")
 
-bash ./.ibm/pipelines/cluster/osd-gcp/destroy-osd.sh
+bash ./.ci/pipelines/cluster/osd-gcp/destroy-osd.sh
