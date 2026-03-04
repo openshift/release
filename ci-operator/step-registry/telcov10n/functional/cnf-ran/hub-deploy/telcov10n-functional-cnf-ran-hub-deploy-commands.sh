@@ -36,7 +36,6 @@ process_inventory() {
 }
 
 
-export CLUSTER_NAME="kni-qe-99"
 echo CLUSTER_NAME="${CLUSTER_NAME}"
 
 echo "Create group_vars directory"
