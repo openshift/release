@@ -3,6 +3,11 @@
 set -o errexit
 set +o nounset
 
+if [[ "${SKIP_SEND_ALERT}" == "true" ]]; then
+  echo "SKIP_SEND_ALERT is set to true, skipping alert."
+  exit 0
+fi
+
 if [[ "$JOB_TYPE" != "periodic" ]]; then
   echo "This job is not a nightly job, skipping alert."
   exit 0
