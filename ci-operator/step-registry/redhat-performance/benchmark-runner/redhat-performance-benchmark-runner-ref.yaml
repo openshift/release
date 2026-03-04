@@ -1,0 +1,27 @@
+ref:
+  as: redhat-performance-benchmark-runner
+  from_image:
+    namespace: ci
+    name: benchmark-runner
+    tag: latest
+  commands: redhat-performance-benchmark-runner-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: benchmark-runner-perfci-config
+    mount_path: /secret
+  grace_period: 30s
+  env:
+  - name: BENCHMARK_OPERATOR_NAMESPACE
+    default: benchmark-runner
+    documentation: Namespace for workloads on the test cluster. Native workloads (stressng, uperf) use benchmark-runner namespace. Do not set NAMESPACE here so the framework uses the job namespace for the result secret.
+  - name: WORKLOAD
+    default: stressng_pod
+    documentation: Benchmark workload to run (e.g. stressng_pod, uperf_pod).
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: >-
+    Runs benchmark-runner native workloads (python3.14 /benchmark_runner/main/main.py)
+    in the test cluster. Workloads run as native K8s Jobs (no benchmark-operator).
+    Used for PerfCI workloads (e.g. stressng, uperf, bootstorm).
