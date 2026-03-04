@@ -35,10 +35,6 @@ base_images:
     name: scos-4.22
     namespace: origin
     tag: operator-registry
-  upi-installer:
-    name: "4.20"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -124,8 +120,9 @@ images:
   to: serverless-metadata-webhook
 releases:
   latest:
-    release:
-      channel: fast
+    candidate:
+      product: ocp
+      stream: nightly
       version: "4.20"
 resources:
   '*':
@@ -135,13 +132,18 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-vsphere-continuous
-  cron: 35 17 * * 0
+- as: olmv1-operator-e2e
+  cron: 25 3 * * 6
   steps:
-    cluster_profile: vsphere-elastic
+    cluster_profile: aws-serverless
+    env:
+      BASE_DOMAIN: serverless.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+      SPOT_INSTANCES: "true"
+      ZONES_COUNT: "1"
     test:
     - as: operator-e2e
-      commands: HA=false GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin make test-e2e-with-kafka
+      commands: GOPATH=/tmp/go PATH=$PATH:/tmp/go/bin OLM_VERSION=v1 make test-e2e-with-kafka
       dependencies:
       - env: SERVERLESS_KNATIVE_OPERATOR
         name: serverless-knative-operator
@@ -166,9 +168,9 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-vsphere-upi
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: 420-vsphere
+  variant: 4.20-techpreview
