@@ -140,7 +140,7 @@ if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
         if [ -n "${BISECT_YAML}" ]; then
             SLACK_TEXT=":claude_thinking: *Rejected Payload Analysis*
 
-:robot_face: ${SUMMARY:-No summary available.}
+${SUMMARY:-No summary available.}
 
 :hourglass_flowing_sand: Bisect experiments are running. Follow-up results will be posted when complete.
 
@@ -148,7 +148,7 @@ if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
         else
             SLACK_TEXT=":claude_thinking: *Rejected Payload Analysis*
 
-:robot_face: ${SUMMARY:-No summary available.}
+${SUMMARY:-No summary available.}
 
 <${PROW_JOB_URL}|:point_right: View Full Analysis Report>"
         fi
