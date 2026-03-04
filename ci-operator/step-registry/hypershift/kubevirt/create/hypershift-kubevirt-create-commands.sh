@@ -135,6 +135,7 @@ then
 
 fi
 
+RELEASE_IMAGE="registry.build07.ci.openshift.org/ci-ln-r4q5xf2/release:latest"
 oc create namespace "${CLUSTER_NAMESPACE_PREFIX}" --dry-run=client -o yaml | oc apply -f -
 oc create ns "${CLUSTER_NAMESPACE_PREFIX}-${CLUSTER_NAME}"
 if [[ -n "${ATTACH_DEFAULT_NETWORK}" ]]; then
