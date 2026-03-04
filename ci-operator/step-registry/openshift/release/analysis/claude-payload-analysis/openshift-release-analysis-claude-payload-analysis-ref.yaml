@@ -12,6 +12,9 @@ ref:
   - namespace: test-credentials
     name: trt-alert-slack-webhook-url
     mount_path: /var/run/slack-webhook
+  - namespace: test-credentials
+    name: payload-agent-github-token
+    mount_path: /var/run/github-token
   env:
   - name: PAYLOAD_TAG
   - name: CLAUDE_CODE_USE_VERTEX
@@ -26,15 +29,19 @@ ref:
     default: "claude-opus-4-6"
   - name: SLACK_WEBHOOK_URL
     default: "/var/run/slack-webhook/url"
+  - name: GITHUB_TOKEN_FILE
+    default: "/var/run/github-token/token"
   resources:
     requests:
       cpu: 1000m
       memory: 2Gi
-  timeout: 12h0m0s
+  timeout: 22h0m0s
   grace_period: 1m0s
   documentation: |-
-    Analyzes rejected release payloads using Claude AI. Receives a
-    PAYLOAD_TAG from the release controller, polls until the payload
-    reaches terminal state, then runs the analyze-payload skill to
-    identify root causes of blocking job failures and generates an
-    HTML report saved to ARTIFACT_DIR.
+    Analyzes rejected release payloads using Claude AI with the payload-agent
+    skill. Receives a PAYLOAD_TAG from the release controller, polls until
+    blocking jobs complete, then runs the payload-agent to identify root
+    causes, stage reverts for high-confidence suspects, and bisect
+    medium-confidence suspects with draft revert PRs. Generates HTML reports
+    and sends Slack notifications. If bisect experiments are initiated,
+    polls for job completion and re-runs the agent for Phase 2 results.
