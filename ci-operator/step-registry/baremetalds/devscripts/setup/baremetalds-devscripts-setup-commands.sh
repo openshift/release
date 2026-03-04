@@ -400,6 +400,7 @@ fi
 if [ "${AGENT_E2E_TEST_BOOT_MODE}" == "ISO_NO_REGISTRY" ];
 then
   echo "export AGENT_ISO_BUILDER_IMAGE=${AGENT_ISO_BUILDER_IMAGE}" >> /root/dev-scripts/config_root.sh
+  echo "export APPLIANCE_IMAGE=${APPLIANCE_IMAGE}" >> /root/dev-scripts/config_root.sh
 fi
 
 # If any extra manifests, then set ASSETS_EXTRA_FOLDER
