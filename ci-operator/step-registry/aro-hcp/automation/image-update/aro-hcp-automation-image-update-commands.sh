@@ -187,6 +187,7 @@ set +o errexit
 run /usr/bin/prcreator \
   -github-app-id="$(cat "${GITHUB_APP_ID_PATH}")" \
   -github-app-private-key-path="${GITHUB_APP_KEY_PATH}" \
+  -pr-source-mode=branch \
   -organization="${GITHUB_REPO_ORG}" \
   -repo="${GITHUB_REPO_NAME}" \
   -branch="${GITHUB_REPO_BRANCH}" \
