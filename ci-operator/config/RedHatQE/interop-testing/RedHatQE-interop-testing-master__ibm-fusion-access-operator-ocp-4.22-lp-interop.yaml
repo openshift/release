@@ -70,6 +70,53 @@ tests:
     - chain: interop-tests-ibm-fusion-access-ebs-integration-chain
     - ref: interop-tests-ibm-fusion-access-verify-cluster
   timeout: 4h0m0s
+- as: ibm-fips
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.2xlarge
+      CUSTOM_SECURITY_GROUP_PORTS: 12345,1191,60000-61000
+      CUSTOM_SECURITY_GROUP_PROTOCOLS: tcp,udp
+      CUSTOM_SECURITY_GROUP_SOURCES: ""
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp", "self-managed-lp", "ibm-fusion-access-lp",
+        "fips"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mbaldess@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FUSION_ACCESS_NAMESPACE: ibm-fusion-access
+      FUSION_ACCESS_STORAGE_SCALE_VERSION: v5.2.3.5
+      KMM_REGISTRY_ORG: ""
+      KMM_REGISTRY_REPO: gpfs-compat-kmod
+      KMM_REGISTRY_URL: ""
+      MAP_TESTS: "true"
+      OCP_VERSION: "4.22"
+      REPORT_TO_DR: "true"
+      REPORTPORTAL_CMP: Fusion-access-lp-interop
+      STORAGE_SCALE_CLIENT_CPU: "2"
+      STORAGE_SCALE_CLIENT_MEMORY: 4Gi
+      STORAGE_SCALE_CLUSTER_NAME: ibm-spectrum-scale
+      STORAGE_SCALE_STORAGE_CPU: "2"
+      STORAGE_SCALE_STORAGE_MEMORY: 8Gi
+      USER_TAGS: |
+        scenario ibm-fusion-access
+    post:
+    - ref: interop-tests-ibm-fusion-access-custom-ibm-must-gather
+    - chain: ipi-aws-post
+    - ref: mpiit-data-router-reporter
+    - ref: firewatch-report-issues
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - chain: interop-tests-ibm-fusion-access-environment-setup-chain
+    - chain: interop-tests-ibm-fusion-access-ebs-integration-chain
+    - ref: interop-tests-ibm-fusion-access-verify-cluster
+  timeout: 4h0m0s
 zz_generated_metadata:
   branch: master
   org: RedHatQE
