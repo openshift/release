@@ -15,7 +15,7 @@ chmod 600 /tmp/id_rsa
 # Define SSH command with explicit options (don't rely on ~/.ssh/config)
 SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
-### DEBUG: add a ong timeout to troubleshoot from pod
+### DEBUG: add a long timeout to troubleshoot from pod
 ## echo "Sleeping for 999999999 seconds ...."
 ## sleep 999999999
 
@@ -43,22 +43,92 @@ echo "Remote host: ${REMOTE_HOST}"
 datetime_string=$(date +"%Y-%m-%d_%H-%M-%S")
 
 # Run dpf make target checks test
+REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION="/root/doca8/ci/last-openshift-dpf-dir.sh"
+
 echo "=== DPF Make Target checks on Existing Cluster ==="
-if ssh $SSH_OPTS root@$REMOTE_HOST "ls -ltr; env; cd /root/doca8/openshift-dpf; export KUBECONFIG=/root/doca8/openshift-dpf/kubeconfig-mno; oc get dpu -A; make verify-workers; make verify-dpu-nodes; make verify-deployment; make verify-dpudeployment"; then echo "DPF Spot Checks Tests Passed"; else echo "DPF Spot Checks Tests Failed"; fi
+echo "Using openshift-dpf dir from last cluster-deploy: '${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}'"
+
+##if ssh ${SSH_OPTS} root@${REMOTE_HOST} "
+
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -e; \
+    pwd; \
+    ls -ltr; \
+    env; \
+    source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
+    echo \${LAST_OPENSHIFT_DPF}; \
+    env; \
+    cd \${LAST_OPENSHIFT_DPF}; \
+    pwd; \
+    export KUBECONFIG=\${LAST_OPENSHIFT_DPF}/kubeconfig.doca8; \
+    oc get dpu -A; \
+    echo \${KUBECONFIG}; \
+    ls -ltr ; \
+    export VERIFY_DEPLOYMENT=true; \
+    make verify-workers; \
+    make verify-dpu-nodes; \
+    make verify-deployment; \
+    make verify-dpudeployment"; then
+
+  echo "DPF spot check tests Passed"; 
+
+else 
+  echo "DPF spot checks tests Failed"; 
+  exit 1
+fi
 
 
 # Run dpf-sanity-checks sanity test
-## echo "=== DPF Sanity Test on Existing Cluster ==="
-## echo "log file on hypervisor: log-dpf-sanity-checks-${datetime_string}"
+echo "=== DPF Sanity Test on last Existing Cluster ==="
+echo "log file on hypervisor: log-dpf-sanity-checks-${datetime_string}"
 
-## if ssh $SSH_OPTS root@$REMOTE_HOST "ls -ltr; env; cd /root/doca8/openshift-dpf; cat .env; make run-dpf-sanity 2>&1 | tee log-dpf-sanity-checks-${datetime_string}"; then echo "Sanity Test Passed"; else echo "Sanity Test Failed"; fi
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
+  env; \
+  source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
+  echo \${LAST_OPENSHIFT_DPF}; \
+  env; \
+  cd \${LAST_OPENSHIFT_DPF}; \
+  cat .env; \
+  make run-dpf-sanity 2>&1 | tee log-dpf-sanity-checks-${datetime_string}"; then 
+  
+  echo "Sanity Test Passed"; 
+  
+else 
+  echo "Sanity Test Failed";
+
+fi
 
 ## echo "====== DPF Sanity Test Log file:"
-## ssh $SSH_OPTS root@$REMOTE_HOST "cd /root/doca8/openshift-dpf; cat log-dpf-sanity-checks-${datetime_string}"
+ssh ${SSH_OPTS} root@${REMOTE_HOST} "source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
+  echo \${LAST_OPENSHIFT_DPF}; \
+  env; \
+  cd \${LAST_OPENSHIFT_DPF}; \
+  cat log-dpf-sanity-checks-${datetime_string}"
 
 echo "=== DPF Kubernetes Traffic Flow Tests on Existing Cluster ==="
 # Run kubernetes traffic flow test
-if ssh $SSH_OPTS root@$REMOTE_HOST "ls -ltr; env; cd /root/doca8/openshift-dpf; cat .env; export TFT_SERVER_NODE=worker-303ea712f378 ; export TFT_CLIENT_NODE=worker-303ea712f378; make run-traffic-flow-tests 2>&1 | tee log-traffic-flow-tests-${datetime_string}"; then echo "Kubernetes Network Traffic Flow Iperf Tests Passed"; else echo "Kubernetes Network Traffic Flow Iperf Tests Failed"; fi
+# Need to discover worker node names after being renamed
+if ssh ${SSH_OPTS} root@${REMOTE_HOST} "ls -ltr; \
+  env; \
+  source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
+  echo \${LAST_OPENSHIFT_DPF}; \
+  env; \
+  cd \${LAST_OPENSHIFT_DPF}; \
+  cat .env; \
+  export TFT_SERVER_NODE=worker-303ea712f378 ; \
+  export TFT_CLIENT_NODE=worker-303ea712f378; \
+  make run-traffic-flow-tests 2>&1 | tee log-traffic-flow-tests-${datetime_string}"; then
+
+  echo "Kubernetes Network Traffic Flow Iperf Tests Passed"; 
+
+else 
+  echo "Kubernetes Network Traffic Flow Iperf Tests Failed";
+
+fi
 
 echo "====== DPF Kubernetes Traffic Flow Tests Log file:"
-ssh $SSH_OPTS root@$REMOTE_HOST "cd /root/doca8/openshift-dpf; cat log-traffic-flow-tests-${datetime_string}"
+ssh ${SSH_OPTS} root@${REMOTE_HOST} "source ${REMOTE_LAST_OPENSHIFT_DPF_DIR_LOCATION}; \
+  echo \${LAST_OPENSHIFT_DPF}; \
+  env; \
+  cd \${LAST_OPENSHIFT_DPF}; \
+  cat log-traffic-flow-tests-${datetime_string}"
+  

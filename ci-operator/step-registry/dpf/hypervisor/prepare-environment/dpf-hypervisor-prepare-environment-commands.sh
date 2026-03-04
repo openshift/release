@@ -8,6 +8,9 @@ echo "Preparing DPF testing environment on ${REMOTE_HOST}"
 
 # Create unique working directory
 WORK_DIR="dpf-ci-$(date +%Y%m%d-%H%M%S)-$$"
+
+## walid: we don't want to store files in /tmp, they can be deleted after hypervisor 
+## reboot plus limited disk space
 REMOTE_WORK_DIR="/tmp/${WORK_DIR}"
 
 echo "Creating working directory: ${REMOTE_WORK_DIR}"
@@ -22,6 +25,7 @@ tar -czf - --exclude='.git' --exclude='logs' --exclude='*.log' . | \
 echo "Setting up environment configuration..."
 cat /var/run/dpf-ci/env | base64 -d > /tmp/dpf-ci.env
 
+### walid - this won't work since we won't have the API and cluster name in DNS
 # Generate dynamic cluster name for CI
 CLUSTER_NAME="dpf-ci-$(date +%Y%m%d-%H%M%S)"
 sed -i "s/CLUSTER_NAME=.*/CLUSTER_NAME=${CLUSTER_NAME}/" /tmp/dpf-ci.env
