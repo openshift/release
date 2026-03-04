@@ -16,6 +16,9 @@ images:
 - context_dir: .
   dockerfile_path: ./packages/maas/Dockerfile.workspace
   to: odh-mod-arch-maas-image
+- context_dir: .
+  dockerfile_path: ./packages/automl/Dockerfile.workspace
+  to: odh-mod-arch-automl-image
 promotion:
   to:
   - namespace: opendatahub-io
@@ -96,6 +99,22 @@ tests:
       SOURCE_IMAGE_REF: odh-mod-arch-maas-image
     env:
       IMAGE_REPO: mod-arch-maas
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-automl-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-automl-image
+    env:
+      IMAGE_REPO: mod-arch-automl
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-automl-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-automl-image
+    env:
+      IMAGE_REPO: mod-arch-automl
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
