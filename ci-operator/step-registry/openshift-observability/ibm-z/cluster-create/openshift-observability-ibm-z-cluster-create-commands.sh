@@ -30,7 +30,7 @@ fi
 wrapped_tmp="${SSH_KEY_PATH}.wrapped"
 if grep -qE 'BEGIN .*PRIVATE KEY' "$PRIVATE_KEY_FILE" >/dev/null 2>&1; then
     # Secret already contains a header/footer — copy as-is to writable path
-    cp -f "$PRIVATE_KEY_FILE" "$SSH_KEYPath" 2>/dev/null || cp -f "$PRIVATE_KEY_FILE" "$SSH_KEY_PATH"
+    cp -f "$PRIVATE_KEY_FILE" "$SSH_KEY_PATH" 2>/dev/null || cp -f "$PRIVATE_KEY_FILE" "$SSH_KEY_PATH"
 else
     # Wrap the raw key content with BEGIN/END markers into a temporary file, then copy it
     {
