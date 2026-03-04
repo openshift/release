@@ -121,6 +121,9 @@ OIDC_ISSUER_URL="https://hypershift-${CLUSTER_NAME}-oidc"
 # TODO(GCP-426): Remove CAPG image override once HyperShift's CAPI CRDs serve v1beta2
 CAPG_IMAGE="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:bdec420448b81cc57f5b53bbcf491c0ed53b6e3ca97da722f69f386a373afe50"
 
+# TODO(GCP-440): Remove boot image pin once NodePool controller discovers it from stream metadata
+GCP_BOOT_IMAGE="projects/rhcos-cloud/global/images/rhcos-9-6-20250925-0-gcp-x86-64"
+
 echo "Running e2e tests using hack/ci-test-e2e.sh"
 hack/ci-test-e2e.sh -test.v \
   -test.run="${CI_TESTS_RUN:-TestCreateCluster}" \
@@ -147,7 +150,7 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.gcp-storage-sa="${STORAGE_SA}" \
   --e2e.gcp-sa-signing-key-path="${SA_SIGNING_KEY_PATH}" \
   --e2e.gcp-oidc-issuer-url="${OIDC_ISSUER_URL}" \
-  --e2e.gcp-boot-image="${HYPERSHIFT_GCP_BOOT_IMAGE}" \
+  --e2e.gcp-boot-image="${GCP_BOOT_IMAGE}" \
   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
   --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
   --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}"
