@@ -131,6 +131,7 @@ export AZURE_CLIENT_SECRET
 AZURE_TENANT_ID="$(cat "${AZURE_CREDENTIALS_DIR}/tenant")"
 readonly AZURE_TENANT_ID
 export AZURE_TENANT_ID
+export AZURE_TOKEN_CREDENTIALS=prod
 
 debug "azure: authentication configured successfully (credentials redacted)"
 
