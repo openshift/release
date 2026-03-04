@@ -1,15 +1,15 @@
 #!/bin/bash
 
 echo "========== Repository, Branch, and PR Variables =========="
-GITHUB_ORG_NAME="redhat-developer"
+GITHUB_ORG_NAME="${GITHUB_ORG_NAME:-redhat-developer}"
 echo "GITHUB_ORG_NAME: $GITHUB_ORG_NAME"
-GITHUB_REPOSITORY_NAME="rhdh"
+GITHUB_REPOSITORY_NAME="${GITHUB_REPOSITORY_NAME:-rhdh}"
 echo "GITHUB_REPOSITORY_NAME: $GITHUB_REPOSITORY_NAME"
-RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
+RELEASE_BRANCH_NAME="${RELEASE_BRANCH_NAME:-$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')}"
 echo "RELEASE_BRANCH_NAME: $RELEASE_BRANCH_NAME"
-GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
+GIT_PR_NUMBER="${GIT_PR_NUMBER:-$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')}"
 echo "GIT_PR_NUMBER: $GIT_PR_NUMBER"
-TAG_NAME=""
+TAG_NAME="${TAG_NAME:-}"
 export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER TAG_NAME
 
 echo "========== Workdir Setup =========="
@@ -102,9 +102,6 @@ export CONTAINER_PLATFORM_VERSION
 echo "CONTAINER_PLATFORM_VERSION=${CONTAINER_PLATFORM_VERSION}"
 
 echo "========== Git Repository Setup & Checkout =========="
-QUAY_REPO="rhdh-community/rhdh"
-export QUAY_REPO
-
 # Clone and checkout the specific PR
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
 cd "${GITHUB_REPOSITORY_NAME}" || exit
@@ -147,7 +144,9 @@ done
 echo "ONLY_IN_DIRS: $ONLY_IN_DIRS"
 
 echo "========== Image Tag Resolution =========="
-if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
+if [[ -n "${QUAY_REPO}" && -n "${TAG_NAME}" ]]; then
+    echo "Using overridden QUAY_REPO: $QUAY_REPO, TAG_NAME: $TAG_NAME"
+elif [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     QUAY_REPO="rhdh/rhdh-hub-rhel9"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
         # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
@@ -168,6 +167,7 @@ elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
     echo "INFO: Container image will be tagged as: ${QUAY_REPO}:${TAG_NAME}"
 else
+    QUAY_REPO="rhdh-community/rhdh"
     # Timeout configuration for waiting for Docker image availability
     MAX_WAIT_TIME_SECONDS=$((60*60))    # Maximum wait time in minutes * seconds
     POLL_INTERVAL_SECONDS=60      # Check every 60 seconds
@@ -199,6 +199,7 @@ else
         fi
     done
 fi
+export QUAY_REPO
 
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
