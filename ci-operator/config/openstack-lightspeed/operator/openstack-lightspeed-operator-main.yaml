@@ -50,6 +50,23 @@ tests:
         kind: Namespace
         metadata:
           name: openshift-lightspeed
+        ---
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: openstack
+        EOF
+
+        cat <<EOF | oc apply -f -
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+          name: openstack-lightspeed-og
+          namespace: openshift-lightspeed
+        spec:
+          targetNamespaces:
+          - openshift-lightspeed
+          - openstack
         EOF
 
         operator-sdk run bundle "$OO_BUNDLE" --namespace openshift-lightspeed
