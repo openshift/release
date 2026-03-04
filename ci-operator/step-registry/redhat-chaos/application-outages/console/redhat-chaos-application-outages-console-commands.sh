@@ -17,6 +17,9 @@ case "${CHAOS_TEAM_NAME}" in
   chaos)
     ES_SERVER="https://search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
     ;;
+  lp-chaos)
+    ES_SERVER="https://open-search.lp-chaos--svc--web-app.chaos.lp.devcluster.openshift.com"
+    ;;
   *)
     ES_SERVER=""
     ;;
