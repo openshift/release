@@ -1,0 +1,35 @@
+ref:
+  as: ephemeral-namespace-release
+  cli: latest
+  commands: ephemeral-namespace-release-commands.sh
+  credentials:
+  - mount_path: /usr/local/ci-secrets/ephemeral-cluster
+    name: ephemeral-bot-svc-account
+    namespace: test-credentials
+  env:
+  - name: BONFIRE_VERSION
+    default: ">=4.18.0"
+    documentation: |-
+      Version specifier for the crc-bonfire PyPI package to install.
+      Must match the version used in the reserve step.
+  best_effort: true
+  optional_on_success: false
+  from_image:
+    namespace: ocp
+    name: "4.16-art-latest"
+    tag: cli
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 10m0s
+  grace_period: 1m0s
+  documentation: |-
+    Releases an ephemeral namespace previously reserved by the
+    ephemeral-namespace-reserve step. Reads the namespace name
+    from SHARED_DIR/ephemeral-namespace and calls
+    "bonfire namespace release" to return it to the pool.
+
+    This step is marked best_effort so that it always runs during
+    the post phase, even if earlier steps failed. The namespace
+    is released unconditionally to prevent leaked reservations.
