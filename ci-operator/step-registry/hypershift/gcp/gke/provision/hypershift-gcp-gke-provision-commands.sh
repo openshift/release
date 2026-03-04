@@ -189,13 +189,17 @@ echo "Kubeconfig created successfully"
 set -x
 
 # Save cluster info for deprovision step and downstream steps
-echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/control-plane-cluster-name"
 echo "${CP_PROJECT_ID}" > "${SHARED_DIR}/control-plane-project-id"
 echo "${HC_PROJECT_ID}" > "${SHARED_DIR}/hosted-cluster-project-id"
 echo "${GCP_REGION}" > "${SHARED_DIR}/gcp-region"
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra-id"
 echo "${VPC_NAME}" > "${SHARED_DIR}/vpc-name"
 echo "${PSC_SUBNET_NAME}" > "${SHARED_DIR}/psc-subnet"
+
+# CI DNS config for hypershift-install (shared step, can't use workflow env vars)
+echo "${HYPERSHIFT_GCP_CI_PROJECT}" > "${SHARED_DIR}/hypershift-ci-project"
+echo "${HYPERSHIFT_GCP_CI_DNS_DOMAIN}" > "${SHARED_DIR}/hypershift-ci-dns-domain"
 
 # Verify cluster access
 oc get nodes

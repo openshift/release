@@ -3,12 +3,10 @@
 set -euo pipefail
 
 # This step runs e2e tests against a HyperShift Control Plane cluster on GKE
-# Currently this is a placeholder that runs basic validation
-# Full e2e test suite will be integrated once infrastructure is validated
 
 echo "Starting HyperShift GCP e2e tests..."
 
-# The kubeconfig from gke-provision uses a static access token,
+# The kubeconfig from hypershift-gcp-gke-provision uses a static access token,
 # so no gcloud/auth-plugin installation is needed here.
 
 # Load kubeconfig for the Control Plane cluster
@@ -17,8 +15,61 @@ if [[ ! -f "${SHARED_DIR}/kubeconfig" ]]; then
     exit 1
 fi
 
-
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+# Load GCP configuration from provision steps
+GCP_REGION="$(<"${SHARED_DIR}/gcp-region")"
+HC_PROJECT_ID="$(<"${SHARED_DIR}/hosted-cluster-project-id")"
+# The PSC subnet for the consumer endpoint must be in the HC project.
+# The operator auto-discovers the service attachment subnet on the CP side.
+PSC_SUBNET="$(<"${SHARED_DIR}/hc-subnet-name")"
+CLUSTER_NAME="$(<"${SHARED_DIR}/hosted-cluster-name")"
+
+# Construct base domain for hosted clusters (from workflow env var)
+BASE_DOMAIN="in.${CLUSTER_NAME}.${HYPERSHIFT_GCP_CI_DNS_DOMAIN}"
+
+# Load HC-specific infrastructure (from hypershift-gcp-hosted-cluster-setup step)
+# Use HC-specific VPC if available, otherwise fall back to Control Plane VPC
+if [[ -f "${SHARED_DIR}/hc-vpc-name" ]]; then
+    VPC_NAME="$(<"${SHARED_DIR}/hc-vpc-name")"
+else
+    VPC_NAME="$(<"${SHARED_DIR}/vpc-name")"
+fi
+
+# Load WIF configuration (from hypershift-gcp-hosted-cluster-setup step)
+WIF_PROJECT_NUMBER=""
+WIF_POOL_ID=""
+WIF_PROVIDER_ID=""
+NODEPOOL_SA=""
+CONTROLPLANE_SA=""
+CLOUDCONTROLLER_SA=""
+STORAGE_SA=""
+SA_SIGNING_KEY_PATH=""
+
+if [[ -f "${SHARED_DIR}/wif-project-number" ]]; then
+    WIF_PROJECT_NUMBER="$(<"${SHARED_DIR}/wif-project-number")"
+fi
+if [[ -f "${SHARED_DIR}/wif-pool-id" ]]; then
+    WIF_POOL_ID="$(<"${SHARED_DIR}/wif-pool-id")"
+fi
+if [[ -f "${SHARED_DIR}/wif-provider-id" ]]; then
+    WIF_PROVIDER_ID="$(<"${SHARED_DIR}/wif-provider-id")"
+fi
+if [[ -f "${SHARED_DIR}/nodepool-sa" ]]; then
+    NODEPOOL_SA="$(<"${SHARED_DIR}/nodepool-sa")"
+fi
+if [[ -f "${SHARED_DIR}/controlplane-sa" ]]; then
+    CONTROLPLANE_SA="$(<"${SHARED_DIR}/controlplane-sa")"
+fi
+if [[ -f "${SHARED_DIR}/cloudcontroller-sa" ]]; then
+    CLOUDCONTROLLER_SA="$(<"${SHARED_DIR}/cloudcontroller-sa")"
+fi
+if [[ -f "${SHARED_DIR}/storage-sa" ]]; then
+    STORAGE_SA="$(<"${SHARED_DIR}/storage-sa")"
+fi
+if [[ -f "${SHARED_DIR}/sa-signing-key-path" ]]; then
+    SA_SIGNING_KEY_PATH="$(<"${SHARED_DIR}/sa-signing-key-path")"
+fi
 
 set -x
 
@@ -44,13 +95,59 @@ echo "=== Testing Cluster Connectivity ==="
 oc cluster-info
 oc get nodes -o wide
 
-# TODO: Add full e2e test execution once infrastructure is validated
-# This will include:
-# - Creating a HostedCluster on GCP
-# - Validating NodePool scaling
-# - Running conformance tests
-# - Cleanup
+# Verify WIF configuration is available
+if [[ -z "${WIF_PROJECT_NUMBER}" || -z "${WIF_POOL_ID}" || -z "${WIF_PROVIDER_ID}" ]]; then
+    echo "ERROR: WIF configuration not available"
+    echo "Ensure hypershift-gcp-hosted-cluster-setup step has run before this step"
+    exit 1
+fi
 
-echo "=== Basic Validation Complete ==="
-echo "HyperShift operator is running and CRDs are installed"
-echo "Full e2e tests will be added in future iterations"
+# Validate SA signing key is available
+if [[ -z "${SA_SIGNING_KEY_PATH}" || ! -s "${SA_SIGNING_KEY_PATH}" ]]; then
+    echo "ERROR: SA signing key not found or empty at ${SA_SIGNING_KEY_PATH}"
+    echo "Ensure hypershift-gcp-hosted-cluster-setup step has run"
+    exit 1
+fi
+
+echo "=== Running e2e tests with GCP platform ==="
+
+# Run the e2e tests
+# Use CI_TESTS_RUN to filter which tests to run (default: TestCreateCluster)
+export EVENTUALLY_VERBOSE="false"
+
+# Construct OIDC issuer URL (matches pattern used by hypershift create iam gcp)
+OIDC_ISSUER_URL="https://hypershift-${CLUSTER_NAME}-oidc"
+
+# TODO(GCP-426): Remove CAPG image override once HyperShift's CAPI CRDs serve v1beta2
+CAPG_IMAGE="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:bdec420448b81cc57f5b53bbcf491c0ed53b6e3ca97da722f69f386a373afe50"
+
+echo "Running e2e tests using hack/ci-test-e2e.sh"
+hack/ci-test-e2e.sh -test.v \
+  -test.run="${CI_TESTS_RUN:-TestCreateCluster}" \
+  -test.parallel=20 \
+  --e2e.platform=GCP \
+  --e2e.base-domain="${BASE_DOMAIN}" \
+  --e2e.external-dns-domain="${BASE_DOMAIN}" \
+  --e2e.annotations="hypershift.openshift.io/capi-provider-gcp-image=${CAPG_IMAGE}" \
+  --e2e.annotations="hypershift.openshift.io/pod-security-admission-label-override=baseline" \
+  --e2e.disable-cluster-capabilities=ImageRegistry \
+  --e2e.disable-cluster-capabilities=Console \
+  --e2e.disable-cluster-capabilities=Ingress \
+  --e2e.gcp-project="${HC_PROJECT_ID}" \
+  --e2e.gcp-region="${GCP_REGION}" \
+  --e2e.gcp-network="${VPC_NAME}" \
+  --e2e.gcp-psc-subnet="${PSC_SUBNET}" \
+  --e2e.gcp-endpoint-access=PublicAndPrivate \
+  --e2e.gcp-wif-project-number="${WIF_PROJECT_NUMBER}" \
+  --e2e.gcp-wif-pool-id="${WIF_POOL_ID}" \
+  --e2e.gcp-wif-provider-id="${WIF_PROVIDER_ID}" \
+  --e2e.gcp-nodepool-sa="${NODEPOOL_SA}" \
+  --e2e.gcp-controlplane-sa="${CONTROLPLANE_SA}" \
+  --e2e.gcp-cloudcontroller-sa="${CLOUDCONTROLLER_SA}" \
+  --e2e.gcp-storage-sa="${STORAGE_SA}" \
+  --e2e.gcp-sa-signing-key-path="${SA_SIGNING_KEY_PATH}" \
+  --e2e.gcp-oidc-issuer-url="${OIDC_ISSUER_URL}" \
+  --e2e.gcp-boot-image="${HYPERSHIFT_GCP_BOOT_IMAGE}" \
+  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
+  --e2e.latest-release-image="${OCP_IMAGE_LATEST}" \
+  --e2e.previous-release-image="${OCP_IMAGE_PREVIOUS}"

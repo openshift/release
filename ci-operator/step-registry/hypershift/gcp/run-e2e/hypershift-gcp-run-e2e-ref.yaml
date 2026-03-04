@@ -1,14 +1,43 @@
 ref:
   as: hypershift-gcp-run-e2e
-  from: upi-installer
+  cli: latest
+  from: hypershift-tests
   commands: hypershift-gcp-run-e2e-commands.sh
+  credentials:
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+  dependencies:
+    - env: OCP_IMAGE_LATEST
+      name: release:latest
+    - env: OCP_IMAGE_PREVIOUS
+      name: release:initial
+  env:
+    - default: ""
+      name: CI_TESTS_RUN
+      documentation: "Regex to filter which tests to run (default: TestCreateCluster)"
+    - default: "true"
+      name: TECH_PREVIEW_NO_UPGRADE
+      documentation: "GCP platform requires TechPreview mode"
+    - default: "projects/rhcos-cloud/global/images/rhcos-9-6-20250925-0-gcp-x86-64"
+      name: HYPERSHIFT_GCP_BOOT_IMAGE
+      documentation: "GCP boot image for hosted cluster nodes (RHCOS image path)"
+    - default: ""
+      name: HYPERSHIFT_GCP_CI_DNS_DOMAIN
+      documentation: "DNS domain for HyperShift CI hosted clusters"
   resources:
     requests:
       cpu: 100m
       memory: 256Mi
-  timeout: 15m0s
-  grace_period: 5m0s
+  timeout: 2h0m0s
+  grace_period: 30m0s
   documentation: |-
     This step runs e2e tests against a HyperShift Control Plane cluster on GKE.
-    Currently runs basic validation of the HyperShift operator installation.
-    Full e2e test suite will be integrated once infrastructure is validated.
+
+    Prerequisites:
+    - hypershift-gcp-gke-provision must have created the GKE cluster
+    - hypershift-install must have installed the HyperShift operator
+    - hypershift-gcp-control-plane-setup must have configured WIF
+    - hypershift-gcp-hosted-cluster-setup must have created HC infrastructure
+
+    Reads GCP configuration from SHARED_DIR files created by prior steps.
