@@ -70,6 +70,14 @@ while true; do
         echo ""
         if [[ "${FAILED}" -eq 0 ]]; then
             echo "All ${TOTAL} blocking jobs succeeded. No analysis needed."
+            if [ -n "${SLACK_WEBHOOK}" ]; then
+                ACCEPT_TEXT=":large_green_circle: *Payload Accepted: ${PAYLOAD_TAG}*
+
+All ${TOTAL} blocking jobs succeeded."
+                jq -n --arg text "$ACCEPT_TEXT" '{text: $text}' | \
+                    curl -sf -X POST -H 'Content-type: application/json' -d @- \
+                    "${SLACK_WEBHOOK}" || echo "Warning: Failed to send Slack notification."
+            fi
             exit 0
         fi
         echo "All blocking jobs have completed. ${FAILED}/${TOTAL} failed. Starting analysis..."
