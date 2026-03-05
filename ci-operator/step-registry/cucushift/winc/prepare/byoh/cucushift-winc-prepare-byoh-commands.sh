@@ -120,6 +120,10 @@ spec:
           value: "windows"
           operator: Equal
           effect: "NoSchedule"
+        - key: "node.cloudprovider.kubernetes.io/uninitialized"
+          value: "true"
+          operator: Equal
+          effect: "NoSchedule"
       containers:
         - name: win-webserver
           image: ${1}
@@ -203,104 +207,41 @@ spec:
         ports:
         - containerPort: 8080
 EOF
-  # Wait up to 5 minutes for Linux workload to be ready
-  oc wait deployment linux-webserver -n winc-test --for condition=Available=True --timeout=5m
-}
-
-# Function to get Windows machineset name based on platform
-getMachinesetName() {
-  local platform="$1"
-  local name
-
-  case "$platform" in
-    aws|gcp)
-      name=$(oc get machinesets -n openshift-machine-api -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep winworker | head -n1)
-      if [[ -z "$name" ]]; then
-        name=$(oc get machinesets -n openshift-machine-api -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep worker | head -n1)
-        name="${name/worker/winworker}"
-      fi
-      echo "$name"
-      ;;
-    azure)
-      echo "windows"
-      ;;
-    vsphere|nutanix)
-      echo "winworker"
-      ;;
-    *)
-      echo ""
-      return 1
-      ;;
-  esac
-}
-
-
-# Get platform type
-IAAS_PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}"| tr '[:upper:]' '[:lower:]')
-
-# Get the Windows machineset name
-winworker_machineset_name=$(getMachinesetName "$IAAS_PLATFORM")
-
-if [ -z "$winworker_machineset_name" ]; then
-  echo "Failed to determine Windows machineset name for platform: $IAAS_PLATFORM"
-  exit 1
-fi
-
-# Get Windows OS image ID based on platform
-case "$IAAS_PLATFORM" in
-  aws)
-    windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.ami.id}" -n openshift-machine-api)
-    ;;
-  azure)
-    windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.image.sku}" -n openshift-machine-api)
-    ;;
-  vsphere)
-    windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.template}" -n openshift-machine-api)
-    ;;
-  gcp)
-    # we need the value after family/
-    # in this example projects/windows-cloud/global/images/family/windows-2022-core
-    # windows_os_image_id needs to be windows-2022-core
-    windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.disks[0].image}" -n openshift-machine-api | tr "/" "\n" | tail -n1)
-    ;;
-  nutanix)
-    # Extract the image name from Nutanix providerSpec
-    windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.image.name}" -n openshift-machine-api)
-    ;;
-  *)
-    echo "Cloud provider \"$IAAS_PLATFORM\" is not supported by WMCO"
+  # Wait up to 5 minutes for Linux workload to be ready (fast, small image)
+  if ! oc wait deployment linux-webserver -n winc-test --for condition=Available=True --timeout=5m; then
+    echo "ERROR: Linux workload deployment timed out after 5 minutes"
+    echo "=== Debug: Pod status ==="
+    oc get pods -n winc-test -l app=linux-webserver -o wide || true
+    echo "=== Debug: Pod description ==="
+    LINUX_POD=$(oc get pods -n winc-test -l app=linux-webserver --no-headers -o custom-columns=":metadata.name" | head -1)
+    if [[ -n "${LINUX_POD}" ]]; then
+      oc describe pod "${LINUX_POD}" -n winc-test || true
+    else
+      echo "No pods found"
+    fi
     exit 1
-    ;;
-esac
+  fi
+}
 
-# Verify we got the Windows OS image ID
-if [ -z "$windows_os_image_id" ]; then
-  echo "Failed to retrieve Windows OS image ID for platform: $IAAS_PLATFORM"
-  exit 1
+echo "=== BYOH Windows Test Environment Setup ==="
+
+# Windows nodes are already provisioned and Ready (verified by windows-byoh-provision step)
+# No need to wait for MachineSets - they don't exist for BYOH/UPI
+
+# Get Windows OS image ID from SHARED_DIR (saved by provision step)
+# For AWS UPI: aws-windows-ami-discover saves AMI ID
+# For other platforms: use descriptive placeholder
+if [[ -f "${SHARED_DIR}/AWS_WINDOWS_AMI" ]]; then
+    windows_os_image_id=$(cat "${SHARED_DIR}/AWS_WINDOWS_AMI")
+    echo "Using Windows AMI from SHARED_DIR: ${windows_os_image_id}"
+else
+    # Fallback: get from node labels or use placeholder
+    windows_os_image_id="byoh-windows-$(oc get nodes -l 'kubernetes.io/os=windows' -o=jsonpath="{.items[0].status.nodeInfo.osImage}" | grep -oP '\d{4}' || echo '2022')"
+    echo "Using Windows OS image placeholder: ${windows_os_image_id}"
 fi
-
-echo "Windows machineset name: $winworker_machineset_name"
-echo "Windows OS image ID: $windows_os_image_id"
-
-# Get replica count
-winworker_machineset_replicas=$(oc get machineset -n openshift-machine-api $winworker_machineset_name -o jsonpath="{.spec.replicas}")
-
-echo "Waiting for Windows nodes to come up in Running state"
-while [[ $(oc -n openshift-machine-api get machineset/${winworker_machineset_name} -o 'jsonpath={.status.readyReplicas}') != "${winworker_machineset_replicas}" ]]; do echo -n "." && sleep 10; done
-
-# Make sure the Windows nodes get in Ready state
-# Timeout increased to 30m to accommodate BYOH node configuration time
-oc wait nodes -l kubernetes.io/os=windows --for condition=Ready=True --timeout=30m
-
-# Display Windows node taints before creating workloads
-echo "=== Windows node taints ==="
-oc get nodes -l kubernetes.io/os=windows -o jsonpath='{range .items[*]}{.metadata.name}{": "}{.spec.taints}{"\n"}{end}'
 
 # Choose the Windows container version depending on the Windows version
 # installed on the Windows workers
-# Supported: Server 2019 (1809), Server 2022 (ltsc2022)
-# TODO: Remove Server 2019 support after AMI/image upgrades to Server 2022
-# TODO: Add Server 2025 (ltsc2025) when Microsoft publishes the image
 os_version=$(oc get nodes -l 'kubernetes.io/os=windows' -o=jsonpath="{.items[0].status.nodeInfo.osImage}")
 
 windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022"
@@ -309,12 +250,40 @@ then
     windows_container_image="mcr.microsoft.com/powershell:lts-nanoserver-1809"
 fi
 
-# Setup image mirroring for Prow CI (if mirror registry is available)
-# This creates ImageTagMirrorSet to redirect Windows image pulls to CI registry
+echo "Windows OS version: ${os_version}"
+echo "Windows OS image ID: ${windows_os_image_id}"
+echo "Windows container image: ${windows_container_image}"
+
+# Setup image mirroring for Prow CI (redirects to CI registry)
+# This creates ImageTagMirrorSet to redirect Windows image pulls to fast local mirror
 setup_image_mirroring
 
+
+# Wait for Windows nodes to become schedulable (WMCO post-configuration)
+# Nodes may be Ready but marked unschedulable during WMCO configuration
+echo "Waiting for Windows nodes to become schedulable..."
+timeout 5m bash -c '
+  while true; do
+    # Check if any Windows nodes are unschedulable
+    unschedulable=$(oc get nodes -l kubernetes.io/os=windows -o jsonpath="{.items[?(@.spec.unschedulable==true)].metadata.name}")
+    if [[ -z "${unschedulable}" ]]; then
+      echo "All Windows nodes are schedulable"
+      break
+    fi
+    echo "Waiting for nodes to become schedulable: ${unschedulable}"
+    sleep 10
+  done
+'
+
+# Display Windows node taints before creating workloads
+echo "=== Windows node taints ==="
+oc get nodes -l kubernetes.io/os=windows -o jsonpath='{range .items[*]}{.metadata.name}{": "}{.spec.taints}{"\n"}{end}'
+
 # Create workloads using the original image (ITMS will redirect to mirror)
-create_workloads $windows_container_image
+# If deployment fails, debug output will show pod/event details
+create_workloads "$windows_container_image"
 
 # Create ConfigMap with the original image (ITMS will redirect to mirror)
-create_winc_test_configmap $windows_os_image_id $windows_container_image
+create_winc_test_configmap "$windows_os_image_id" "$windows_container_image"
+
+echo "=== BYOH Windows Test Environment Ready ==="

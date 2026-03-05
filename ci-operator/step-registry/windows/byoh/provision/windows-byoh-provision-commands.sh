@@ -97,6 +97,24 @@ if [[ -f "${CLUSTER_PROFILE_DIR}/gce.json" ]]; then
     echo "GCP credentials configured"
 fi
 
+# Load AWS Windows AMI and region from SHARED_DIR if available (for UPI workflows)
+if [[ -f "${SHARED_DIR}/AWS_WINDOWS_AMI" ]]; then
+    AWS_WINDOWS_AMI=$(cat "${SHARED_DIR}/AWS_WINDOWS_AMI")
+    export AWS_WINDOWS_AMI
+    echo "Loaded AWS_WINDOWS_AMI from SHARED_DIR: ${AWS_WINDOWS_AMI}"
+else
+    echo "AWS_WINDOWS_AMI file not found in SHARED_DIR"
+fi
+
+if [[ -f "${SHARED_DIR}/AWS_REGION" ]]; then
+    AWS_REGION=$(cat "${SHARED_DIR}/AWS_REGION")
+    export AWS_REGION
+    export AWS_DEFAULT_REGION="${AWS_REGION}"
+    echo "Loaded AWS region from SHARED_DIR: ${AWS_REGION}"
+else
+    echo "ERROR: AWS_REGION file not found at ${SHARED_DIR}/AWS_REGION"
+fi
+
 # Verify terraform and byoh.sh are available (pre-installed in terraform-windows-provisioner image)
 if ! command -v terraform &> /dev/null; then
     echo "ERROR: terraform command not found in terraform-windows-provisioner image"
@@ -119,6 +137,8 @@ echo "Provisioning ${BYOH_NUM_WORKERS} Windows ${BYOH_WINDOWS_VERSION} nodes..."
 # Default timeout: 45 minutes (vSphere provisioning takes longer than cloud platforms)
 READY_TIMEOUT="${BYOH_READY_TIMEOUT:-45m}"
 echo "Waiting for ${BYOH_NUM_WORKERS} BYOH Windows nodes to become Ready (timeout: ${READY_TIMEOUT})..."
+# Export BYOH_NUM_WORKERS so it's available in the subshell
+export BYOH_NUM_WORKERS
 timeout "${READY_TIMEOUT}" bash -c '
     loops=0
     max_loops=30
@@ -127,16 +147,16 @@ timeout "${READY_TIMEOUT}" bash -c '
         # Count nodes where STATUS field (column 2) starts with "Ready" (not "NotReady")
         READY=$(oc get nodes -l kubernetes.io/os=windows,windowsmachineconfig.openshift.io/byoh=true --no-headers 2>/dev/null | awk '\''$2 == "Ready" || $2 ~ /^Ready,/ {print}'\'' | wc -l)
         TOTAL=$(oc get nodes -l kubernetes.io/os=windows,windowsmachineconfig.openshift.io/byoh=true --no-headers 2>/dev/null | wc -l)
-        echo "[$loops/$max_loops] BYOH nodes ready: ${READY}/${TOTAL} (waiting for '${BYOH_NUM_WORKERS}')"
-        if [[ "${READY}" -ge "'${BYOH_NUM_WORKERS}'" ]]; then
+        echo "[$loops/$max_loops] BYOH nodes ready: ${READY}/${TOTAL} (waiting for ${BYOH_NUM_WORKERS})"
+        if [[ "${READY}" -ge "${BYOH_NUM_WORKERS}" ]]; then
             echo "All ${READY} BYOH Windows nodes are Ready"
             break
         fi
         ((loops++))
-        sleep $sleep_seconds
+        sleep "$sleep_seconds"
     done
     if (( loops >= max_loops )); then
-        echo "Timeout: Only ${READY}/'${BYOH_NUM_WORKERS}' BYOH nodes became Ready after ${max_loops} attempts"
+        echo "Timeout: Only ${READY}/${BYOH_NUM_WORKERS} BYOH nodes became Ready after ${max_loops} attempts"
         oc get nodes -l kubernetes.io/os=windows,windowsmachineconfig.openshift.io/byoh=true -o wide || true
         exit 1
     fi
@@ -152,15 +172,24 @@ oc get nodes -l kubernetes.io/os=windows,windowsmachineconfig.openshift.io/byoh=
 # Export instance information for WMCO BYOH e2e tests
 echo "Exporting Windows instance information to SHARED_DIR for WMCO tests..."
 
-# Detect platform
-PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}" | tr '[:upper:]' '[:lower:]')
+# Detect which platform terraform-windows-provisioner actually used
+# Don't query cluster - check which directory was created
+PLATFORM=""
+for p in aws azure gcp vsphere nutanix none; do
+    if [[ -d "${BYOH_TMP_DIR}${p}" ]]; then
+        PLATFORM="${p}"
+        break
+    fi
+done
 
-# Get instance IPs from Terraform output
-TERRAFORM_DIR="${BYOH_TMP_DIR}${PLATFORM}"
-if [[ ! -d "${TERRAFORM_DIR}" ]]; then
-    echo "ERROR: Terraform directory not found: ${TERRAFORM_DIR}"
+if [[ -z "${PLATFORM}" ]]; then
+    echo "ERROR: No terraform platform directory found in ${BYOH_TMP_DIR}"
+    ls -la "${BYOH_TMP_DIR}" || true
     exit 1
 fi
+
+TERRAFORM_DIR="${BYOH_TMP_DIR}${PLATFORM}"
+echo "Detected terraform platform directory: ${PLATFORM}"
 
 cd /usr/local/share/byoh-provisioner
 INSTANCE_IPS=$(terraform -chdir="${TERRAFORM_DIR}" output -json instance_ip 2>/dev/null | jq -r '.[]' || echo "")
@@ -198,8 +227,8 @@ echo "Instance information exported for WMCO BYOH tests"
 
 # Save terraform state + config to SHARED_DIR for destroy step
 # Tar directory excluding .terraform/ (providers) to avoid 3MB Secret limit
+# Use the detected PLATFORM from earlier (not cluster query) since UPI uses "none"
 echo "Saving terraform state and config to SHARED_DIR for destroy step..."
-PLATFORM=$(oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.type}" | tr '[:upper:]' '[:lower:]')
 if [[ -d "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}" ]]; then
     tar -cf "${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar" -C "${ARTIFACT_DIR}/terraform_byoh/${PLATFORM}" --exclude='.terraform' .
     echo "Terraform files saved to ${SHARED_DIR}/terraform_byoh_${PLATFORM}.tar"
