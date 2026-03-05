@@ -44,6 +44,7 @@ NODEPOOL_SA=""
 CONTROLPLANE_SA=""
 CLOUDCONTROLLER_SA=""
 STORAGE_SA=""
+IMAGEREGISTRY_SA=""
 SA_SIGNING_KEY_PATH=""
 
 if [[ -f "${SHARED_DIR}/wif-project-number" ]]; then
@@ -66,6 +67,9 @@ if [[ -f "${SHARED_DIR}/cloudcontroller-sa" ]]; then
 fi
 if [[ -f "${SHARED_DIR}/storage-sa" ]]; then
     STORAGE_SA="$(<"${SHARED_DIR}/storage-sa")"
+fi
+if [[ -f "${SHARED_DIR}/imageregistry-sa" ]]; then
+    IMAGEREGISTRY_SA="$(<"${SHARED_DIR}/imageregistry-sa")"
 fi
 if [[ -f "${SHARED_DIR}/sa-signing-key-path" ]]; then
     SA_SIGNING_KEY_PATH="$(<"${SHARED_DIR}/sa-signing-key-path")"
@@ -148,6 +152,7 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.gcp-controlplane-sa="${CONTROLPLANE_SA}" \
   --e2e.gcp-cloudcontroller-sa="${CLOUDCONTROLLER_SA}" \
   --e2e.gcp-storage-sa="${STORAGE_SA}" \
+  --e2e.gcp-imageregistry-sa="${IMAGEREGISTRY_SA}" \
   --e2e.gcp-sa-signing-key-path="${SA_SIGNING_KEY_PATH}" \
   --e2e.gcp-oidc-issuer-url="${OIDC_ISSUER_URL}" \
   --e2e.gcp-boot-image="${GCP_BOOT_IMAGE}" \

@@ -114,6 +114,7 @@ CONTROLPLANE_SA=$(awk -F'"' '/"ctrlplane-op"/{print $4}' "${IAM_OUTPUT}")
 NODEPOOL_SA=$(awk -F'"' '/"nodepool-mgmt"/{print $4}' "${IAM_OUTPUT}")
 CLOUDCONTROLLER_SA=$(awk -F'"' '/"cloud-controller"/{print $4}' "${IAM_OUTPUT}")
 STORAGE_SA=$(awk -F'"' '/"gcp-pd-csi"/{print $4}' "${IAM_OUTPUT}")
+IMAGEREGISTRY_SA=$(awk -F'"' '/"image-registry"/{print $4}' "${IAM_OUTPUT}")
 
 # Save to SHARED_DIR for run-e2e step
 echo "${PROJECT_NUMBER}" > "${SHARED_DIR}/wif-project-number"
@@ -123,6 +124,7 @@ echo "${CONTROLPLANE_SA}" > "${SHARED_DIR}/controlplane-sa"
 echo "${NODEPOOL_SA}" > "${SHARED_DIR}/nodepool-sa"
 echo "${CLOUDCONTROLLER_SA}" > "${SHARED_DIR}/cloudcontroller-sa"
 echo "${STORAGE_SA}" > "${SHARED_DIR}/storage-sa"
+echo "${IMAGEREGISTRY_SA}" > "${SHARED_DIR}/imageregistry-sa"
 
 echo "WIF configuration saved to SHARED_DIR"
 
