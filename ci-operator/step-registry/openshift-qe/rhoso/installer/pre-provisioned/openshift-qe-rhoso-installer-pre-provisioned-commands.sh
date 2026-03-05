@@ -60,6 +60,8 @@ jumphost="${jumphost}"
 bastion="${bastion}"
 
 ssh root@${bastion} "
+  set -o errexit
+  set -o pipefail
   echo 'Hostname: \$(hostname)'
   rm -rf JetBrew
   git clone https://github.com/redhat-performance/JetBrew.git

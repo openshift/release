@@ -19,6 +19,8 @@ set -o pipefail
 set -x
 
 ssh root@${bastion} "
+  set -o errexit
+  set -o pipefail
   if mount | grep -qE \"^${nfs_host}:${nfs_path} on /mnt/ \"; then
     echo \"NFS already mounted\"
   else
