@@ -5,10 +5,6 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
-if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
-
 # UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
 if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
     # Get current worker count (excluding infra and workload nodes)
@@ -56,6 +52,10 @@ if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
 fi
 
 pip install -r requirements.txt
+
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 case "$ES_TYPE" in
   qe)
