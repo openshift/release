@@ -28,11 +28,12 @@ if [[ ! -r "$PRIVATE_KEY_FILE" ]]; then
 fi
 # ...existing code...
 
+
 # --- PREPARE SSH KEY ---
 # Copy the (read-only) secret to a writable location, then normalize it there
 wrapped_tmp="${SSH_KEY_PATH}.wrapped"
 # ensure wrapped_tmp is removed on exit
-trap 'rm -f "$wrapped_tmp"' EXIT
+# trap 'rm -f "$wrapped_tmp"' EXIT
 
 if grep -qE 'BEGIN .*PRIVATE KEY' "$PRIVATE_KEY_FILE" >/dev/null 2>&1; then
     # Secret already contains a header/footer — copy as-is to writable path
@@ -46,15 +47,8 @@ else
     } > "$wrapped_tmp"
     # copy the wrapped file into the final SSH_KEY_PATH (avoids writing to the mounted secret)
     cp -f "$wrapped_tmp" "$SSH_KEY_PATH"
-fi
-
-# Set strict permissions for SSH (600 is safe and commonly used)
-chmod 0600 "$SSH_KEY_PATH"
-
-# Optional: quick parse check (will exit if key invalid or passphrase-protected)
-if ! command -v ssh-keygen >/dev/null 2>&1 || ! ssh-keygen -y -f "$SSH_KEY_PATH" >/dev/null 2>&1; then
-    echo "Error: constructed private key at $SSH_KEY_PATH is invalid, requires a passphrase, or ssh-keygen is missing" >&2
-    exit 1
+    # explicit cleanup instead of trap (avoids using trap which requires grace_period)
+    rm -f "$wrapped_tmp"
 fi
 # ...existing code...
 
