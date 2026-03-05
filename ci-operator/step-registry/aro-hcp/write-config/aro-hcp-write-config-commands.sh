@@ -7,6 +7,7 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_LOCATION:-}" ]]; then
   export LOCATION="${MULTISTAGE_PARAM_OVERRIDE_LOCATION}"
 fi
 
+export AZURE_TOKEN_CREDENTIALS=prod
 
 # NOTE: this config will be only partially accurate on public envs
 make -C config render-partial-config \

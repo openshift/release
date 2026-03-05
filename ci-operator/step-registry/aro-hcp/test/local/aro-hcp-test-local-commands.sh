@@ -15,6 +15,7 @@ az account set --subscription "${SUBSCRIPTION_ID}"
 unset GOFLAGS
 make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV=prow
 export KUBECONFIG=kubeconfig
+export AZURE_TOKEN_CREDENTIALS=prod
 
 FRONTEND_ADDRESS=$(kubectl get virtualservice -n aro-hcp aro-hcp-vs-frontend -o jsonpath='{.spec.hosts[0]}')
 ADMIN_API_ADDRESS=$(kubectl get virtualservice -n aro-hcp-admin-api admin-api-vs -o jsonpath='{.spec.hosts[0]}')

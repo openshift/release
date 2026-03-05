@@ -55,6 +55,9 @@ spec:
       [sysctl]
       kernel.sched_rt_runtime_us = -1
 
+      [service]
+      service.stalld=start,enable
+
       [sysfs]
       /sys/bus/workqueue/devices/writeback/cpumask = \${not_isolated_cpumask}
       /sys/devices/virtual/workqueue/cpumask = \${not_isolated_cpumask}
@@ -62,7 +65,7 @@ spec:
       /sys/devices/system/machinecheck/machinecheck*/ignore_ce = 1
 
       [bootloader]
-      cmdline_realtime=+isolcpus=\${managed_irq}\${isolated_cores} \${disable_pstate} nosoftlockup nohz_full=\${isolated_cores} rcu_nocbs=\${isolated_cores} nohz=on audit=0
+      cmdline_realtime=+isolcpus=\${managed_irq}\${isolated_cores} \${disable_pstate} nosoftlockup
 
       [irqbalance]
       banned_cpus=\${isolated_cores}

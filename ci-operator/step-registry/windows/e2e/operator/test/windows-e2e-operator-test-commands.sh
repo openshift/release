@@ -7,6 +7,9 @@ set -o pipefail
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
+export FIPS_ENABLED="${FIPS_ENABLED:-false}"
+echo "FIPS_ENABLED: ${FIPS_ENABLED}"
+
 if [ "$COMMUNITY" == "true" ]; then
   #!/bin/bash
   # yq is needed to transform fields in the community bundle
