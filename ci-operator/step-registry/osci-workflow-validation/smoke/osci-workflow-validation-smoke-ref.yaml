@@ -1,0 +1,37 @@
+ref:
+  as: osci-workflow-validation-smoke
+  cli: latest
+  commands: osci-workflow-validation-smoke-commands.sh
+  env:
+  - name: DEPLOY_TIMEOUT
+    default: "120"
+    documentation: |-
+      Maximum number of seconds to wait for the deployment to become
+      ready in the ephemeral namespace.
+  from_image:
+    namespace: ocp
+    name: "4.16-art-latest"
+    tag: cli
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 10m0s
+  grace_period: 1m0s
+  documentation: |-
+    Deploys the osci-workflow-validation application into the ephemeral
+    namespace reserved by the ephemeral-namespace-reserve step, waits
+    for the deployment to become ready, and verifies that the /healthz
+    endpoint returns HTTP 200.
+
+    This step expects the following files in SHARED_DIR (written by the
+    ephemeral-namespace-reserve step):
+      - ephemeral-namespace     The reserved namespace name.
+      - ephemeral-kubeconfig    A kubeconfig targeting the ephemeral cluster.
+
+    The container image to deploy is read from the OSCI_WORKFLOW_VALIDATION_IMAGE
+    environment variable, which is populated by ci-operator via the
+    dependencies mechanism.
+  dependencies:
+  - env: OSCI_WORKFLOW_VALIDATION_IMAGE
+    name: osci-workflow-validation

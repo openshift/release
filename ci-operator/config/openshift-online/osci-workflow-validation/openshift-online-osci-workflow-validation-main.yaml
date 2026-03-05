@@ -1,0 +1,28 @@
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.21
+images:
+- dockerfile_path: Dockerfile
+  to: osci-workflow-validation
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: go test ./...
+  container:
+    from: src
+- as: ephemeral-smoke
+  steps:
+    workflow: ephemeral-namespace
+    test:
+    - ref: osci-workflow-validation-smoke
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: osci-workflow-validation
