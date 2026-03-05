@@ -35,9 +35,7 @@ process_inventory() {
     echo "Processing complete. Check \"${dest_file}\""
 }
 
-
-export CLUSTER_NAME="kni-qe-99"
-echo CLUSTER_NAME="${CLUSTER_NAME}"
+echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
 echo "Create group_vars directory"
 mkdir /eco-ci-cd/inventories/ocp-deployment/group_vars
