@@ -29,8 +29,6 @@ echo "--- Running with the following parameters ---"
 echo "TEST_TYPE: ${TEST_TYPE}"
 echo "TEST_SUITE: ${TEST_SUITE}"
 echo "CUSTOM_TEST_LIST: ${CUSTOM_TEST_LIST:-not set}"
-echo "EXTENSIVE_TEST_LIST: ${EXTENSIVE_TEST_LIST:-not set}"
-echo "MINIMAL_TEST_LIST: ${MINIMAL_TEST_LIST:-not set}"
 echo "TEST_PROVIDER: ${TEST_PROVIDER}"
 echo "TEST_SKIPS: ${TEST_SKIPS:-not set}"
 echo "-------------------------------------------"
@@ -50,13 +48,12 @@ cat > "${MAIN_PLAYBOOK}" <<-EOF
     test_type:               "{{ lookup('env','TEST_TYPE')           | default('minimal') }}"
     test_suite:              "{{ lookup('env','TEST_SUITE')          | default('openshift/conformance/parallel') }}"
     custom_test_list:        "{{ lookup('env','CUSTOM_TEST_LIST')    | default('') }}"
-    minimal_test_list:       "{{ lookup('env','MINIMAL_TEST_LIST')   | default('') }}"
-    extensive_test_list:     "{{ lookup('env','EXTENSIVE_TEST_LIST') | default('') }}"
     test_provider:           "{{ lookup('env','TEST_PROVIDER')       | default('baremetal') }}"
     test_skips:              "{{ lookup('env','TEST_SKIPS')          | default('') }}"
     local_artifact_dir:      "{{ lookup('env','ARTIFACT_DIR')        | default('') }}"
     remote_artifact_base_dir: "/tmp/artifacts"
     test_list_file:          "/tmp/test-list"
+    raw_test_list_file:      "/tmp/test-list-raw"
     test_skips_file:         "/tmp/test-skips"
     filtered_list_file:      "/tmp/test-list-filtered"
     pull_secret_file:        "/root/pull-secret"
@@ -111,16 +108,12 @@ cat > "${SINGLE_TEST_TASKS}" <<-EOF
           register: pulled_image
           changed_when: false
 
-        - name: "Prepare static test-list for extensive and custom"
-          when: test_type == 'extensive' or test_type == 'custom'
+        - name: "Prepare static test-list for custom test type"
+          when: test_type == 'custom'
           ansible.builtin.copy:
             dest: "{{ test_list_file }}"
             content: >-
-              {%- if test_type == 'extensive' -%}
-              {{ extensive_test_list }}
-              {%- else -%}
               {{ custom_test_list }}
-              {%- endif -%}
 
         - name: "Fail if custom tests requested but no list provided"
           when: test_type == 'custom' and custom_test_list == ''
@@ -132,9 +125,19 @@ cat > "${SINGLE_TEST_TASKS}" <<-EOF
           ansible.builtin.set_fact:
             effective_test_suite: >-
               {%- if test_type == 'minimal' -%}
-              kubernetes/conformance/parallel/minimal
+              openshift/conformance/parallel
               {%- else -%}
               {{ test_suite }}
+              {%- endif -%}
+
+        - name: "Set filter for minimal test suite"
+          when: test_type == 'minimal'
+          ansible.builtin.set_fact:
+            minimal_test_filter: >-
+              {%- if test_type == 'minimal' -%}
+              --run minimal
+              {%- else -%}
+              ""
               {%- endif -%}
 
         - name: "Generate suite list via dry-run"
@@ -148,14 +151,29 @@ cat > "${SINGLE_TEST_TASKS}" <<-EOF
                 {{ openshift_tests_image }}
                 openshift-tests run {{ effective_test_suite }}
                 --dry-run
+                {{ minimal_test_filter }}
                 --provider "{\"type\":\"{{ test_provider }}\"}"
           register: suite_list
 
-        - name: "Write suite list to test-list"
+        - name: "Write suite list to raw test-list output"
+          when: test_type == 'suite' or test_type == 'minimal'
+          ansible.builtin.copy:
+            dest: "{{ raw_test_list_file }}"
+            content: "{{ suite_list.stdout }}"
+        
+        - name: "Get the test list from the raw output"
+          when: test_type == 'suite' or test_type == 'minimal'
+          ansible.builtin.command:
+            cmd: >
+              grep '^"\\[' "{{ raw_test_list_file }}"
+          register: test_list
+          changed_when: false
+        
+        - name: "Write test list to test-list file"
           when: test_type == 'suite' or test_type == 'minimal'
           ansible.builtin.copy:
             dest: "{{ test_list_file }}"
-            content: "{{ suite_list.stdout }}"
+            content: "{{ test_list.stdout }}"
 
         - name: "Write test-skips file"
           ansible.builtin.copy:
@@ -179,6 +197,19 @@ cat > "${SINGLE_TEST_TASKS}" <<-EOF
             path: "{{ remote_artifact_dir_run }}"
             state: directory
             mode: '0755'
+
+        - name: check environment health before running tests
+          ansible.builtin.shell:
+            export KUBECONFIG={{ kubeconfig_file }};
+            oc get co;
+            oc get pods --all-namespaces;
+            oc logs -n openshift-etcd -l k8s-app=etcd --tail=100000 | grep "slow";
+          register: test1
+          ignore_errors: yes
+
+        - name: test1
+          ansible.builtin.debug:
+            var: test1
 
         - name: "Launch conformance tests for {{ kubeconfig_basename }}"
           ansible.builtin.shell: |
