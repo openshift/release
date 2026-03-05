@@ -4,9 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Clone test files at runtime since .containerignore in eco-ci-cd
-# excludes tests/ from the Docker build context
+# TODO(debug): remove this block for final pr {{{
+rm -rf /tmp/telco-dast-qe
 git clone --depth 1 -b "${DAST_TEST_BRANCH}" "${DAST_TEST_REPO}" /tmp/telco-dast-qe
+# }}} end debug block
 
 dastdir="/tmp/telco-dast-qe/tests/dast"
 # set default values
