@@ -103,6 +103,7 @@ if [[ -z "$SELECTED_VERSION" ]]; then
 fi
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+echo "${SELECTED_VERSION}" > "${SHARED_DIR}/ocp-version"
 
 # Build tags
 TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' | tr -d '[]' || true)
