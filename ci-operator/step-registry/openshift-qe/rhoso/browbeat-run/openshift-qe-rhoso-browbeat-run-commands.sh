@@ -20,6 +20,8 @@ set -o pipefail
 set -x
 
 ssh root@${bastion} "
+  set -o errexit
+  set -o pipefail
   # Export CI metadata and ES host to the remote environment
   export PROW_JOB_ID=\"${PROW_JOB_ID:-}\"
   export JOB_TYPE=\"${JOB_TYPE:-}\"
