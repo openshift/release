@@ -120,12 +120,13 @@ export POWERVC_SHARED_CREDENTIALS_FILE
 cat > "${SHARED_DIR}/powervc-conf.yaml" << EOF
 ARCH: ${ARCH}
 BASE_DOMAIN: ${BASE_DOMAIN}
+BASTION_FLAVOR: ${BASTION_FLAVOR}
 BASTION_IMAGE_NAME: ${BASTION_IMAGE_NAME}
 BRANCH: ${BRANCH}
 CLOUD: ${CLOUD}
+CLUSTER_FLAVOR: ${CLUSTER_FLAVOR}
 CLUSTER_NAME: ${CLUSTER_NAME}
 COMPUTE_NODE_TYPE: ${COMPUTE_NODE_TYPE}
-FLAVOR: ${FLAVOR}
 LEASED_RESOURCE: ${LEASED_RESOURCE}
 NETWORK_NAME: ${NETWORK_NAME}
 RHCOS_IMAGE_NAME: ${RHCOS_IMAGE_NAME}
@@ -170,17 +171,18 @@ openstack \
 	"${CLUSTER_NAME}-key"
 
 echo "Running PowerVC-Tool create-bastion..."
-echo "CLOUD=${CLOUD}"
-echo "CLUSTER_NAME=${CLUSTER_NAME}"
-echo "FLAVOR=${FLAVOR}"
+echo "BASTION_FLAVOR=${BASTION_FLAVOR}"
 echo "BASTION_IMAGE_NAME=${BASTION_IMAGE_NAME}"
+echo "CLOUD=${CLOUD}"
+echo "CLUSTER_FLAVOR=${CLUSTER_FLAVOR}"
+echo "CLUSTER_NAME=${CLUSTER_NAME}"
 echo "NETWORK_NAME=${NETWORK_NAME}"
 
 PowerVC-Tool \
 	create-bastion \
 	--cloud "${CLOUD}" \
 	--bastionName "${CLUSTER_NAME}" \
-	--flavorName "${FLAVOR}" \
+	--flavorName "${BASTION_FLAVOR}" \
 	--imageName "${BASTION_IMAGE_NAME}" \
 	--networkName "${NETWORK_NAME}" \
 	--sshKeyName "${CLUSTER_NAME}-key" \
@@ -191,7 +193,7 @@ PowerVC-Tool \
 RC=$?
 if [ ${RC} -gt 0 ]
 then
-	echo "Error: PowerVC-Tool create-bastion --cloud ${CLOUD} --bastionName ${CLUSTER_NAME} --flavorName ${FLAVOR} --imageName ${BASTION_IMAGE_NAME} --networkName ${NETWORK_NAME} --sshKeyName ${CLUSTER_NAME}-key --domainName ${BASE_DOMAIN} --enableHAProxy true --shouldDebug true"
+	echo "Error: PowerVC-Tool create-bastion --cloud ${CLOUD} --bastionName ${CLUSTER_NAME} --flavorName ${BASTION_FLAVOR} --imageName ${BASTION_IMAGE_NAME} --networkName ${NETWORK_NAME} --sshKeyName ${CLUSTER_NAME}-key --domainName ${BASE_DOMAIN} --enableHAProxy true --shouldDebug true"
 	exit ${RC}
 fi
 
@@ -253,7 +255,7 @@ platform:
     cloud: ${CLOUD}
     clusterOSImage: ${RHCOS_IMAGE_NAME}
     defaultMachinePlatform:
-      type: ${FLAVOR}
+      type: ${CLUSTER_FLAVOR}
     ingressVIPs:
     - ${VIP_INGRESS}
     controlPlanePort:
