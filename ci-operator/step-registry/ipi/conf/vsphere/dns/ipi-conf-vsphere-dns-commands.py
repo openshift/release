@@ -114,11 +114,13 @@ def main():
         logger.critical("JOB_NAME_SAFE is undefined")
         sys.exit(1)
 
+    vsphere_additional_cluster = os.environ.get("VSPHERE_ADDITIONAL_CLUSTER", "false")
+
     base_domain = "vmc-ci.devcluster.openshift.com"
     with open(f"{shared_dir}/basedomain.txt", "w") as base_domain_file:
         logger.info(f"base_domain: {base_domain}")
         base_domain_file.write(f"{base_domain}")
-    
+
     namespace = os.environ.get("NAMESPACE")
     unique_name = os.environ.get("UNIQUE_HASH")
     cluster_name = f"{namespace}-{unique_name}"
@@ -127,8 +129,9 @@ def main():
     with open(f"{shared_dir}/vips.txt", "r") as vip_file:
         vips = vip_file.readlines()
 
-    if len(vips) < 2:
-        logger.critical("reading vips.txt resulted in a list less than 2, exiting")
+    min_vips = 4 if vsphere_additional_cluster == "true" else 2
+    if len(vips) < min_vips:
+        logger.critical(f"reading vips.txt resulted in {len(vips)} vips, need at least {min_vips}, exiting")
         sys.exit(1)
 
     # empty change dictionary for batch and change_resource_record_sets
@@ -151,6 +154,20 @@ def main():
     # api.<cluster_domain>
     # *.apps.<cluster_domain> wildcard
     resource_names = [f"api.{cluster_domain}", f"*.apps.{cluster_domain}"]
+
+    # When VSPHERE_ADDITIONAL_CLUSTER is true, add spoke cluster DNS records
+    # and write additional_cluster.sh for downstream consumers (e.g. hive e2e)
+    if vsphere_additional_cluster == "true":
+        additional_cluster_name = f"hive-{cluster_name}-spoke"
+        additional_cluster_domain = f"{additional_cluster_name}.{base_domain}"
+        resource_names.append(f"api.{additional_cluster_domain}")
+        resource_names.append(f"*.apps.{additional_cluster_domain}")
+
+        with open(f"{shared_dir}/additional_cluster.sh", "w") as ac_file:
+            ac_file.write(f"export ADDITIONAL_CLUSTER_NAME={additional_cluster_name}\n")
+            ac_file.write(f"export ADDITIONAL_CLUSTER_API_VIP={vips[2].strip()}\n")
+            ac_file.write(f"export ADDITIONAL_CLUSTER_INGRESS_VIP={vips[3].strip()}\n")
+        logger.info(f"wrote additional_cluster.sh for spoke {additional_cluster_name}")
 
     # Windows nodes _still_ require api-int.<cluster_domain>
     # This _should_ _not_ be here as we are not properly testing

@@ -3,6 +3,11 @@ ref:
   from: vsphere-ci-python
   commands: ipi-deprovision-vsphere-dns-commands.py
   run_as_script: true
+  env:
+  - name: VSPHERE_ADDITIONAL_CLUSTER
+    default: "false"
+    documentation: >-
+      When true, also deletes DNS records for the spoke cluster provisioned by hive e2e.
   resources:
     requests:
       cpu: 1000m
@@ -12,4 +17,6 @@ ref:
     name: ci-route-53
     mount_path: /var/run/vault/vsphere
   documentation: >-
-    Releases DNS records via `${SHARED_DIR}/hosted-zone.txt` and `${SHARED_DIR}/dns-delete.json`.  The IP addresses were allocated with the ipi-conf-vsphere-dns step.
+    Deletes Route53 DNS records created by the ipi-conf-vsphere-dns step.
+    Reconstructs the record set from ${SHARED_DIR}/vips.txt and environment
+    variables, then issues a DELETE change batch via the Route53 API.
