@@ -43,6 +43,8 @@ fi
 echo "USE_OC_LOGIN_REGISTRIES set to: ${USE_OC_LOGIN_REGISTRIES}"
 
 export OVERRIDE_CONFIG_FILE=${OVERRIDE_CONFIG_FILE:-/tmp/rp-override-config-$(date +%s).yaml}
+export AZURE_TOKEN_CREDENTIALS=prod
+
 yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.registry = \"${BACKEND_SOURCE_REGISTRY}\" |
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.backend.image.repository = \"${BACKEND_REPOSITORY}\" |
@@ -61,7 +63,14 @@ echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
 cat ${OVERRIDE_CONFIG_FILE}
 
 unset GOFLAGS
-make -o tooling/templatize/templatize entrypoint/Region TIMING_OUTPUT=${SHARED_DIR}/steps.yaml.gz DEPLOY_ENV=prow EXTRA_ARGS="--region ${LOCATION}" ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml EXTRA_ARGS="--abort-if-regional-exist"
+make -o tooling/templatize/templatize entrypoint/Region \
+  DEPLOY_ENV=prow \
+  EXTRA_ARGS="--region ${LOCATION} --abort-if-regional-exist" \
+  TIMING_OUTPUT=${SHARED_DIR}/steps.yaml.gz \
+  ENTRYPOINT_JUNIT_OUTPUT=${ARTIFACT_DIR}/junit_entrypoint.xml \
+  CONFIG_OUTPUT=${SHARED_DIR}/config.yaml
+
+cp "${SHARED_DIR}/config.yaml" "${ARTIFACT_DIR}/config.yaml"
 
 # Mark successful completion
 touch "${SHARED_DIR}/provision-complete"

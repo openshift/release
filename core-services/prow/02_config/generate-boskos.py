@@ -256,9 +256,12 @@ CONFIG = {
     },
     'aro-hcp-prod-quota-slice': {
         'default': 10
-  },
+    },
     'aro-hcp-dev-quota-slice': {
         'default': 15,
+    },
+    'aro-hcp-dev-global-pipeline-quota-slice': {
+        'default': 1,
     },
     'aro-hcp-test-msi-containers-dev': {},
     'aro-hcp-test-msi-containers-int': {},
@@ -468,7 +471,7 @@ CONFIG = {
         'us-east-1': 10,
     },
     'hypershift-hive-quota-slice': {
-        'default': 10,
+        'default': 20,
     },
     'aws-virtualization-quota-slice': {
         'us-east-1': 5,

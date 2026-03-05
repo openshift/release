@@ -15,7 +15,8 @@ function lease__ensure_jq() {
         return 1
     fi
 
-    local response="$(curl --no-progress-meter -sL \
+    local response="$(curl --connect-timeout 300 --max-time 600 \
+      --no-progress-meter -sL \
       -o "$response_body" \
       --write-out '%{response_code}' \
       -H "Accept: application/vnd.github+json" \
@@ -72,7 +73,8 @@ function lease__ensure_jq() {
     fi
 
     local jq_bin="${download_dir}/jq"
-    response=$(curl --no-progress-meter -L --write-out '%{response_code}' "${jq_download_link}" -o "$jq_bin") || ec=$?
+    response=$(curl --connect-timeout 300 --max-time 600 --no-progress-meter \
+      -L --write-out '%{response_code}' "${jq_download_link}" -o "$jq_bin") || ec=$?
     if [ $ec -ne 0 ]; then
         printf 'Failed to download jq at %s: %s\n' "$jq_download_link" "$response"
         rm -f "$response_body" &>/dev/null
@@ -104,24 +106,30 @@ function lease__ensure_jq() {
     return 0
 }
 
-# Acquire a lease from the lease proxy server.
+# Acquire `--count` leases from the lease proxy server. Upon acquiring them, each lease name
+# is printed on its own line and, unless `--store=false` has been passed, appended to the
+# `leases` file in  the $SHARED_DIR diretory. The store leases can then be released all at once
+# by invoking `lease__release_stored`.
 #
 # Options:
 #   -t|--type:  Lease resource type. Required.
 #   -c|--count: Number of leases to acquire. Optional, default to 1.
+#   --store: Save the acquired lease names in a file within $SHARED_DIR. Optional, default to true.
 #
 # Environment:
 #   LEASE_PROXY_SERVER_URL: Lease proxy server URL in this form: `http://lease.proxy`.
 #     Optional, execute in dry run mode and always succeed if it is not set.
+#   SHARED_DIR: A directory that persists across multiple multi-stage steps.
 #
 # Result:
 #   Return 0 if the operation succeeds and print the lease names that have been acquired,
-#     separated each other by a single space.
+#     separated each other by a comma.
 #   Return 1 and print an error message otherwise.
 #   Return 2 and print an error message if the lease type does not exist.
 function lease__acquire() {
     local type=''
     local count='1'
+    local store='true'
     local ec=0
 
     while [[ $# -gt 0 ]]; do
@@ -142,6 +150,10 @@ function lease__acquire() {
                 count="${1#*=}"
                 shift
                 ;;
+            --store=*)
+                store="${1#*=}"
+                shift
+                ;;
             *)
                 shift
                 ;;
@@ -155,6 +167,11 @@ function lease__acquire() {
 
     if [[ ! "$count" =~ ^[[:digit:]]+$ ]]; then
         printf "count parameter is invalid\n"
+        return 1
+    fi
+
+    if [ "$store" != "true" -a "$store" != "false" ]; then
+        printf "store parameter is invalid\n"
         return 1
     fi
 
@@ -187,7 +204,30 @@ function lease__acquire() {
                 return 2
                 ;;
             2*)
-                jq -r '.names[]' "$response_body"
+                local names=$(jq -r '.names[]' "$response_body") || ec=$?
+                if [ $ec -ne 0 ]; then
+                    printf 'Failed to parse the response: %s\n' "$names"
+                    return 1
+                fi
+
+                if [ "$store" == "true" -a ! -z "$names" ]; then
+                    if [ -z "$SHARED_DIR" ]; then
+                        printf '$SHARED_DIR is empty\n'
+                        return 1
+                    fi
+
+                    local lease_names_path="${SHARED_DIR}/leases"
+                    # Append a newline at the end because we might want to append multiple
+                    # times to the same file and we want prevent two names being on the
+                    # same line.
+                    if ! printf '%s\n' "$names" >>"$lease_names_path"; then
+                        printf "Failed to store lease names in \"%s\"\n" "$lease_names_path"
+                        return 1
+                    fi
+                fi
+
+                local names_newline=$(printf '%s' "$names" | tr '\n' ',')
+                printf '%s' "$names_newline"
                 rm -f "$response_body" &>/dev/null
                 return 0
                 ;;
@@ -206,7 +246,7 @@ function lease__acquire() {
 # Release a lease.
 #
 # Options:
-#   -n|--name: Lease name to release.
+#   -n|--names: A comma separated list of lease names to release.
 #
 # Environment:
 #   LEASE_PROXY_SERVER_URL: Lease proxy server URL in this form: `http://lease.proxy`.
@@ -216,17 +256,17 @@ function lease__acquire() {
 #   Return 0 only if the operation succeeds.
 #   Return 1 and print an error message otherwise.
 function lease__release() {
-    local name=''
+    local names=''
     local ec=0
 
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            -n|--name)
-                name="$2"
+            -n|--names)
+                names="$2"
                 shift 2
                 ;;
-            --name=*)
-                name="${1#*=}"
+            --names=*)
+                names="${1#*=}"
                 shift
                 ;;
             *)
@@ -235,13 +275,13 @@ function lease__release() {
         esac
     done
 
-    if [ -z "$name" ]; then
-        printf "resource name is required\n"
+    if [ -z "$names" ]; then
+        printf "lease names are required\n"
         return 1
     fi
 
     if [ -z "$LEASE_PROXY_SERVER_URL" ]; then
-        printf 'LEASE_PROXY_SERVER_URL not set, dry run mode: it would release \"%s\"\n' "$name"
+        printf 'LEASE_PROXY_SERVER_URL not set, dry run mode: it would release \"%s\"\n' "$names"
         return 0
     fi
 
@@ -251,14 +291,20 @@ function lease__release() {
         return 1
     fi
 
+    local request_body=$(jq -cR 'split(",")|{names: (.)}' <<<"$names") || ec=$?
+    if [ $ec -ne 0 ]; then
+        printf 'Failed to compose the request body: %s' "$request_body"
+        return 1
+    fi
+
     local response=$(curl --no-progress-meter -X POST -o "$response_body" \
-      --write-out '%{response_code}' \
-      "${LEASE_PROXY_SERVER_URL}/lease/release?name=${name}") || ec=$?
+      -H "Content-Type: application/json" -d "$request_body" --write-out '%{response_code}' \
+      "${LEASE_PROXY_SERVER_URL}/lease/release") || ec=$?
 
     local result=1
     if [ $ec -eq 0 ]; then
         case "$response" in
-            200)
+            2*)
                 result=0
                 ;;
         esac
@@ -272,3 +318,55 @@ function lease__release() {
     rm -f "$response_body" &>/dev/null
     return $result
 }
+
+# Release all leases stored into $SHARED_DIR.
+#
+# Environment:
+#   LEASE_PROXY_SERVER_URL: Lease proxy server URL in this form: `http://lease.proxy`.
+#     Optional, execute in dry run mode and always succeed if it is not set.
+#   SHARED_DIR: A directory that persists across multiple multi-stage steps.
+#
+# Result:
+#   Return 0 only if the operation succeeds.
+#   Return 1 and print an error message otherwise.
+function lease__release_stored() {
+    local ec=0
+    local lease_names_path="${SHARED_DIR}/leases"
+
+    if [ -z "$SHARED_DIR" ]; then
+        printf '$SHARED_DIR is empty\n'
+        return 1
+    fi
+
+    if [ ! -f "$lease_names_path" ]; then
+        return 0
+    fi
+
+    local names=$(cat "$lease_names_path" | tr '\n' ',') || ec=$?
+    if [ $ec -ne 0 ]; then
+        printf "Failed to read lease names from \"%s\": %s\n" "$lease_names_path" "$names"
+        return 1
+    fi
+
+    # Remove trailing commas, if any.
+    while [[ "$names" == *, ]]; do
+        names="${names%,}"
+    done
+
+    if [ -z "$names" ]; then
+        return 0
+    fi
+
+    lease__release --names="$names" || ec=$?
+    if [ $ec -ne 0 ]; then
+        return $ec
+    fi
+
+    if ! printf '' >"$lease_names_path"; then
+        printf "Failed to clean \"%s\"\n" "$lease_names_path"
+        return 1
+    fi
+
+    return 0
+}
+

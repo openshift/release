@@ -11,11 +11,19 @@ source "${SHARED_DIR}/packet-conf.sh" && scp "${SSHOPTS[@]}" "${SHARED_DIR}/nest
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 set -x
 
-API_SERVER=$(cat nested_kubeconfig | yq -r ".clusters[0].cluster.server" | sed 's|^http[s]*://||' | sed 's|:[0-9]*$||')
+API_URL=$(yq -r ".clusters[0].cluster.server" nested_kubeconfig)
+API_SERVER=$(echo "$API_URL" | sed 's|^http[s]*://||' | sed 's|:[0-9]*$||')
+API_PORT=$(echo "$API_URL" | sed 's|^http[s]*://||' | grep -o ':[0-9]*$' | tr -d ':')
+
 if [[ ! $API_SERVER =~ \[ && ! $API_SERVER =~ \] && ! $API_SERVER =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     API_SERVER=".${API_SERVER}"
 fi
 sed -i "1 s|$| $API_SERVER|" $HOME/squid.conf
+
+# Add the API server port to allowed_ssl_ports if it is not already listed
+if [[ -n "$API_PORT" ]] && ! grep -q "acl allowed_ssl_ports port.*\b${API_PORT}\b" $HOME/squid.conf; then
+    sed -i "s|^acl allowed_ssl_ports port.*|& $API_PORT|" $HOME/squid.conf
+fi
 cat $HOME/squid.conf
 
 sudo setenforce 0
