@@ -285,7 +285,9 @@ fi
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
 
 # Download the binary from mirror
-curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+# Transform aarch64 -> arm64 to match mirror directory structure
+ARCH=$(arch | sed 's/aarch64/arm64/')
+curl -sL "https://mirror.openshift.com/pub/ci/${ARCH}/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
 chmod +x /tmp/mco-sanitize
 
 set -x # log the MG commands
@@ -307,9 +309,14 @@ if ! /tmp/mco-sanitize --input="${ARTIFACT_DIR}/must-gather"; then
 fi                                                                                                                     
 
 [ -f "${ARTIFACT_DIR}/must-gather/event-filter.html" ] && cp "${ARTIFACT_DIR}/must-gather/event-filter.html" "${ARTIFACT_DIR}/event-filter.html"
-installCamgi
-/tmp/camgi "${ARTIFACT_DIR}/must-gather" > "${ARTIFACT_DIR}/must-gather/camgi.html"
-[ -f "${ARTIFACT_DIR}/must-gather/camgi.html" ] && cp "${ARTIFACT_DIR}/must-gather/camgi.html" "${ARTIFACT_DIR}/camgi.html"
+# camgi only has x86_64 builds available, skip on other architectures
+if [ "$ARCH" = "x86_64" ]; then
+    installCamgi
+    /tmp/camgi "${ARTIFACT_DIR}/must-gather" > "${ARTIFACT_DIR}/must-gather/camgi.html"
+    [ -f "${ARTIFACT_DIR}/must-gather/camgi.html" ] && cp "${ARTIFACT_DIR}/must-gather/camgi.html" "${ARTIFACT_DIR}/camgi.html"
+else
+    echo "Skipping camgi (only available for x86_64 architecture)"
+fi
 tar -czC "${ARTIFACT_DIR}/must-gather" -f "${ARTIFACT_DIR}/must-gather.tar.gz" .
 rm -rf "${ARTIFACT_DIR}"/must-gather
 set +x # stop logging commands
