@@ -5,11 +5,12 @@ set -o errexit
 set -o pipefail
 
 # TODO(debug): remove this block for final pr {{{
-rm -rf /tmp/telco-dast-qe
-git clone --depth 1 -b "${DAST_TEST_BRANCH}" "${DAST_TEST_REPO}" /tmp/telco-dast-qe
+git clone --depth 1 -b "${DAST_TEST_BRANCH}" "${DAST_TEST_REPO}" /tmp/telco-dast-qe-override
 # }}} end debug block
 
-dastdir="/tmp/telco-dast-qe/tests/dast"
+# TODO(debug): change back to /tmp/telco-dast-qe for final pr
+dastdir="/tmp/telco-dast-qe-override/tests/dast"
+
 # set default values
 WORKSPACE=${SHARED_DIR}
 export KUBECONFIG=${WORKSPACE}/kubeconfig
