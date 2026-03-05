@@ -26,15 +26,15 @@ if [[ -f "${awsCredFile}" ]]; then
 
     [ -n "${awsAccKeyID}" ] && [ -n "${awsAccKeyToken}" ]
 
-    : "Updating credentials in ${optionFile}..."
+    echo "Updating credentials in ${optionFile}..."
     yq -o json eval . "${optionFile}" |
     jq -c \
           --arg awsAccKeyID "${awsAccKeyID}" \
           --arg awsAccKeyToken "${awsAccKeyToken}" \
         '
-          .connections.apiKeys.aws|=(
+          .options.connections.apiKeys.aws|=(
                 .awsAccessKeyID=$awsAccKeyID |
-                .awsSecretAccessKey=$awsAccKeyToken
+                .awsSecretAccessKeyID=$awsAccKeyToken
             )
         ' |
     yq -p json -o yaml eval . > "${optionFile}.tmp"

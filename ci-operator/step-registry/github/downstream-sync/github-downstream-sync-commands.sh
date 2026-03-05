@@ -111,6 +111,38 @@ else
   GO_MOD_FAILED=true
 fi
 
+if [[ "${GO_MOD_FAILED:-false}" != "true" ]]; then
+  echo "🧪 Syncing test annotations with upstream changes…"
+  pushd openshift > /dev/null
+  if go mod vendor; then
+    popd > /dev/null
+    if ./openshift/hack/update-tests-annotation.sh; then
+      if ! git diff --quiet openshift/test/generated/zz_generated.annotations.go; then
+        echo "   📝 Changes detected in test annotations, committing…"
+        git add openshift/test/generated/zz_generated.annotations.go
+        git commit -m "sync test annotations with upstream changes
+
+- go mod vendor
+- ./openshift/hack/update-tests-annotation.sh
+
+Automated sync after downstream merge to keep test annotations
+in sync with upstream test modifications and rules.go changes."
+        echo "   ✅ Test annotations synced successfully"
+        TEST_ANNOTATIONS_SYNCED=true
+      else
+        echo "   ℹ️  No changes needed in test annotations"
+      fi
+    else
+      echo "   ⚠️  Test annotation sync failed"
+      TEST_ANNOTATIONS_FAILED=true
+    fi
+  else
+    popd > /dev/null
+    echo "   ⚠️  Test annotation sync failed"
+    TEST_ANNOTATIONS_FAILED=true
+  fi
+fi
+
 echo "📤 Pushing branch to origin…"
 git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${DOWNSTREAM_REPO}"
 git push origin "$BRANCH"
@@ -121,8 +153,11 @@ PR_BODY="Automated merge of upstream/${DEFAULT_BRANCH} → ${DEFAULT_BRANCH}."
 if [[ "${GO_MOD_SYNCED:-false}" == "true" ]]; then
   PR_BODY="${PR_BODY}"$'\n\n'"**Note:** This PR includes an automated sync of \`openshift/go.mod\` with upstream dependencies (\`go mod tidy\`)."
 fi
+if [[ "${TEST_ANNOTATIONS_SYNCED:-false}" == "true" ]]; then
+  PR_BODY="${PR_BODY}"$'\n\n'"**Note:** This PR includes an automated sync of test annotations with upstream test changes (\`go mod vendor\` + \`update-tests-annotation.sh\`)."
+fi
 # Make it a draft if we detected conflicts or go mod failures (keeps Prow from auto-running presubmits).
-DRAFT=$( [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" ]] && echo true || echo false )
+DRAFT=$( [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" || "${TEST_ANNOTATIONS_FAILED:-false}" == "true" ]] && echo true || echo false )
 # Build the PR JSON $PAYLOAD
 PAYLOAD=$(
   jq -nc \
@@ -149,23 +184,22 @@ if [[ -z "$PR_NUM" || "$PR_NUM" == "null" ]]; then
 fi
 echo "🔖 Opened PR #${PR_NUM}"
 
-if [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" ]]; then
-  # Build the title prefix and hold reason based on what failed
-  if [[ "${CONFLICT:-false}" == "true" && "${GO_MOD_FAILED:-false}" == "true" ]]; then
-    echo "🚨 Merge conflict AND go.mod sync failed, holding PR #${PR_NUM}"
-    TITLE_PREFIX="MERGE CONFLICT + GO MOD FAILED!"
-    HOLD_REASON="/hold\nMerge conflict detected AND go.mod sync failed in openshift/.\n\nPlease resolve merge conflicts first, then run:\n  cd openshift && go mod tidy"
-  elif [[ "${CONFLICT:-false}" == "true" ]]; then
-    echo "🚨 Prepending MERGE CONFLICT! and holding PR #${PR_NUM}"
-    TITLE_PREFIX="MERGE CONFLICT!"
-    HOLD_REASON="/hold\nneeds conflict resolution"
-  else
-    echo "🚨 go.mod sync failed, holding PR #${PR_NUM}"
-    TITLE_PREFIX="GO MOD SYNC FAILED!"
-    HOLD_REASON="/hold\nFailed to sync openshift/go.mod with upstream dependencies.\n\nThe \`go mod tidy\` command failed in openshift/.\n\nThis likely means upstream introduced dependency changes that conflict with downstream-specific dependencies. Please manually run:\n  cd openshift && go mod tidy\n\nand resolve any issues."
-  fi
+if [[ "${CONFLICT:-false}" == "true" || "${GO_MOD_FAILED:-false}" == "true" || "${TEST_ANNOTATIONS_FAILED:-false}" == "true" ]]; then
+  FAILURES=()
+  STEPS=()
 
-  NEW_TITLE="${TITLE_PREFIX} ${PR_TITLE}"
+  [[ "${CONFLICT:-false}" == "true" ]] && FAILURES+=("CONFLICT") && STEPS+=("Resolve merge conflicts")
+  [[ "${GO_MOD_FAILED:-false}" == "true" ]] && FAILURES+=("GO MOD FAILED") && STEPS+=("Run: cd openshift && go mod tidy")
+  [[ "${TEST_ANNOTATIONS_FAILED:-false}" == "true" ]] && FAILURES+=("TEST ANNOTATIONS FAILED") && STEPS+=("Run: go mod vendor && ./openshift/hack/update-tests-annotation.sh")
+
+  TITLE_PREFIX=$(IFS=" + "; echo "${FAILURES[*]}")
+  HOLD_REASON="/hold"
+  for step in "${STEPS[@]}"; do
+    HOLD_REASON="${HOLD_REASON}\n${step}"
+  done
+
+  echo "🚨 ${TITLE_PREFIX}, holding PR #${PR_NUM}"
+  NEW_TITLE="${TITLE_PREFIX}! ${PR_TITLE}"
   curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X PATCH -d "{\"title\":\"${NEW_TITLE}\"}" \
     "https://api.github.com/repos/${DOWNSTREAM_REPO}/pulls/${PR_NUM}"
   curl -sS -H "Authorization: token ${GITHUB_TOKEN}" -X POST -d "{\"body\":\"${HOLD_REASON}\"}" \

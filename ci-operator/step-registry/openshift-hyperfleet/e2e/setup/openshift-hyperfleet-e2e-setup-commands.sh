@@ -22,8 +22,8 @@ hyperfleet-credential-provider generate-kubeconfig \
   --cluster-name="$CLUSTER_NAME" \
   --output="${SHARED_DIR}/kubeconfig" 
 
-# Generate namespace name with date suffix
-NAMESPACE_NAME=${NAMESPACE_PREFIX}-$(date "+%Y%m%d")
+# Generate namespace name with build_id suffix
+NAMESPACE_NAME=${NAMESPACE_PREFIX}-${BUILD_ID}
 echo "${NAMESPACE_NAME}" > "${SHARED_DIR}/namespace_name"
 
 # copy the deploy scripts to /tmp to avoid any potential permission issue when running deploy-clm.sh

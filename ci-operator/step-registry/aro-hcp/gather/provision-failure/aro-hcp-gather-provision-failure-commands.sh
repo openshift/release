@@ -4,13 +4,14 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-# Load resource group names from provision.env
-if [[ -f "${SHARED_DIR}/provision.env" ]]; then
-  source "${SHARED_DIR}/provision.env"
-else
-  echo "ERROR: provision.env not found at ${SHARED_DIR}/provision.env"
+# Load resource group names from config.yaml
+if [[ ! -f "${SHARED_DIR}/config.yaml" ]]; then
+  echo "ERROR: config.yaml not found at ${SHARED_DIR}/config.yaml"
   exit 1
 fi
+SVC_RESOURCEGROUP=$(yq '.svc.rg' "${SHARED_DIR}/config.yaml")
+MGMT_RESOURCEGROUP=$(yq '.mgmt.rg' "${SHARED_DIR}/config.yaml")
+REGIONAL_RESOURCEGROUP=$(yq '.regionRG' "${SHARED_DIR}/config.yaml")
 
 # Verify required variables are set and not empty (because nounset)
 echo "SVC_RESOURCEGROUP: ${SVC_RESOURCEGROUP}"
@@ -27,6 +28,7 @@ export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
 export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/infra-subscription-id")
+export AZURE_TOKEN_CREDENTIALS=prod
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 az account set --subscription "${SUBSCRIPTION_ID}"
