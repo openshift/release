@@ -1,0 +1,41 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.24-openshift-4.21
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: openshift-pipelines-runner
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: openshift-pipelines-e2e-osp
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws-osp-qe
+    test:
+    - ref: openshift-pipelines-install
+    - ref: openshift-pipelines-tests
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-v1.21
+  org: openshift-pipelines
+  repo: release-tests
+  variant: openshift-pipelines-ocp4.21-e2e-osp
