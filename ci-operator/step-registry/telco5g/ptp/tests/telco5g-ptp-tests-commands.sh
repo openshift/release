@@ -258,6 +258,12 @@ echo "deploying ptp-operator on branch ${PTP_UNDER_TEST_BRANCH}"
 export IMG=image-registry.openshift-image-registry.svc:5000/openshift-ptp/ptp-operator:${T5CI_VERSION}
 build_images
 
+# Download oc
+wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+tar -zxvf openshift-client-linux.tar.gz
+sudo mv oc kubectl /usr/local/bin/
+oc version --client
+
 # deploy ptp-operator
 if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
   echo "Running on upstream main branch"
