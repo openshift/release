@@ -19,6 +19,8 @@ set -o pipefail
 set -x
 
 ssh root@${bastion} "
+  set -o errexit
+  set -o pipefail
   echo 'Hostname: \$(hostname)'
   rm -rf browbeat
   git clone https://github.com/openstack/browbeat.git
