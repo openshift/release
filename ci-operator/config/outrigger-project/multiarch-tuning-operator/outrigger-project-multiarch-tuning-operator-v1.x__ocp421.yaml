@@ -36,19 +36,19 @@ operator:
 releases:
   initial:
     integration:
-      name: "4.19"
+      name: "4.21"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.19"
+      name: "4.21"
       namespace: ocp
   multi-initial:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.19"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -75,31 +75,31 @@ resources:
       cpu: "8"
       memory: 10Gi
 tests:
-- as: e2e-azure
+- as: e2e-gcp
   capabilities:
   - arm64
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Za-z]+\.md$)|((^|/)\.github/)|((^|/)\.tekton/)|((^|/).*konflux\.Dockerfile$)
   steps:
-    cluster_profile: azure-arm64
+    cluster_profile: gcp-arm64
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-initial
       OPERATOR_IMAGE: pipeline:multiarch-tuning-operator
     env:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      ADDITIONAL_WORKER_VM_TYPE: n2-standard-4
       ADDITIONAL_WORKERS: "1"
       COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
     test:
     - ref: ipi-install-heterogeneous
     - ref: multiarch-tuning-operator-e2e-olm-kustomize
-    workflow: ipi-azure
+    workflow: ipi-gcp
 - always_run: false
   as: e2e-aws-ovn-proxy-mto-origin
   capabilities:
   - arm64
-  cron: 30 16 16 * *
+  cron: 30 16 27 * *
   steps:
     cluster_profile: aws
     dependencies:
@@ -108,12 +108,11 @@ tests:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
       ADDITIONAL_WORKERS: "1"
-      CATALOG_IMAGE_OVERRIDE: quay.io/multi-arch/multiarch-tuning-operator:catalog-downstream-v1.x
+      CATALOG_IMAGE_OVERRIDE: quay.io/multi-arch/multiarch-tuning-operator:catalog-upstream-v1.x
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       MTO_BRANCH: v1.x
       MTO_OPERATOR_INSTALL_METHOD: catalog
-      MTO_PROJECT_NAME: openshift
       OCP_ARCH: arm64
       SUBSCRIPTION_CHANNEL_OVERRIDE: v1.x
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
@@ -147,12 +146,11 @@ tests:
       ADDITIONAL_WORKER_ARCHITECTURE: x86_64
       ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
       ADDITIONAL_WORKERS: "1"
-      CATALOG_IMAGE_OVERRIDE: quay.io/multi-arch/multiarch-tuning-operator:catalog-downstream-v1.x
+      CATALOG_IMAGE_OVERRIDE: quay.io/multi-arch/multiarch-tuning-operator:catalog-upstream-v1.x
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: m6g.xlarge
       MTO_BRANCH: v1.x
       MTO_OPERATOR_INSTALL_METHOD: catalog
-      MTO_PROJECT_NAME: openshift
       OCP_ARCH: arm64
       SUBSCRIPTION_CHANNEL_OVERRIDE: v1.x
       TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
@@ -174,6 +172,6 @@ tests:
     workflow: openshift-e2e-aws-ovn
 zz_generated_metadata:
   branch: v1.x
-  org: openshift
+  org: outrigger-project
   repo: multiarch-tuning-operator
-  variant: ocp419
+  variant: ocp421
