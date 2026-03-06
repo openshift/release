@@ -1,0 +1,37 @@
+base_images:
+  cli:
+    name: "4.21"
+    namespace: ocp
+    tag: cli
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.21"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.22-openshift-4.17
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.21"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-upi
+  cron: 1 * 31 2 *
+  steps:
+    cluster_profile: aws
+    env:
+      CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: quay.io/openshift-release-dev/ocp-release:4.21.4-x86_64
+    workflow: release-qe-tests-stage-testing
+zz_generated_metadata:
+  branch: release-4.21
+  org: openshift
+  repo: openshift-tests-private
+  variant: stage-testing
