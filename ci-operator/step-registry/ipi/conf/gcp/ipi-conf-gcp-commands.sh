@@ -61,13 +61,25 @@ if [[ -z "${COMPUTE_NODE_TYPE}" ]]; then
   fi
 fi
 
-# Get standard zones from the region (excluding AI zones) and randomize selection
-# This prevents control plane nodes from being placed in AI zones when zones aren't explicitly set
-function get_zones_from_region() {
-  local zone_count=${1:-3}
-  # Get all zones from the region, filtering out AI zones and randomizing
-  mapfile -t AVAILABILITY_ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)' 2>/dev/null | grep -v '\-ai[0-9]' | shuf)
-  
+# Get zones from the region that support a given machine type (excluding AI zones)
+# and randomize selection. This prevents control plane nodes from being placed in
+# zones where their machine type is unavailable.
+function get_zones_for_machine_type() {
+  local machine_type=$1
+  local zone_count=${2:-3}
+
+  # Get zones where this machine type is available, filtering out AI zones
+  mapfile -t AVAILABILITY_ZONES < <(gcloud compute machine-types list \
+    --filter="zone~${GCP_REGION} AND name=${machine_type}" \
+    --format='value(zone)' 2>/dev/null | grep -v '\-ai[0-9]' | shuf)
+
+  if [[ ${#AVAILABILITY_ZONES[@]} -eq 0 ]]; then
+    # Fallback: get all non-AI zones if machine type query fails
+    mapfile -t AVAILABILITY_ZONES < <(gcloud compute zones list \
+      --filter="region:${GCP_REGION} AND status:UP" \
+      --format='value(name)' 2>/dev/null | grep -v '\-ai[0-9]' | shuf)
+  fi
+
   # Take the first zone_count zones
   local zones=("${AVAILABILITY_ZONES[@]:0:${zone_count}}")
   # Format as YAML array: [zone1, zone2, zone3]
@@ -120,10 +132,10 @@ if [[ "${GCP_REGION}" == "us-central1" ]] || [[ "${GCP_REGION}" == "us-south1" ]
       gcloud config set project "${GOOGLE_PROJECT_ID}" 2>/dev/null || true
     fi
     
-    # Get zones for control plane (3 zones for HA)
-    CONTROL_PLANE_ZONES_STR=$(get_zones_from_region 3)
-    # Get zones for compute (same zones for consistency)
-    COMPUTE_ZONES_STR="${CONTROL_PLANE_ZONES_STR}"
+    # Get zones for control plane filtered by master machine type availability
+    CONTROL_PLANE_ZONES_STR=$(get_zones_for_machine_type "${master_type}" 3)
+    # Get zones for compute filtered by compute machine type availability
+    COMPUTE_ZONES_STR=$(get_zones_for_machine_type "${COMPUTE_NODE_TYPE}" 3)
     
     # Apply zones via patch if we got valid zones
     if [[ -n "${CONTROL_PLANE_ZONES_STR}" ]] && [[ "${CONTROL_PLANE_ZONES_STR}" != "[]" ]]; then
