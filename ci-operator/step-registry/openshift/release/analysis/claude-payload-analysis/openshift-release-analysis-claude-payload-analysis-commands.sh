@@ -198,9 +198,9 @@ if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
     if [ -f "${SLACK_WEBHOOK_URL}" ]; then
         WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
 
-        SLACK_TEXT=":this_is_fine::alert-siren: *Rejected Payload Analysis* :alert-siren::this_is_fine:
+        SLACK_TEXT=":claude-thinking: *Payload Analysis*
 
-:robot_face: ${SUMMARY:-No summary available.}
+${SUMMARY:-No summary available.}
 
 <${PROW_JOB_URL}|:point_right: View Full Analysis Report>"
 
