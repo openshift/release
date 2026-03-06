@@ -114,6 +114,11 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
 fi
 PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 
+# Copy HTML report(s) to artifact directory before anything else that might fail
+echo "Copying reports to artifact directory..."
+find "${WORKDIR}" -name "payload-analysis-*.html" -exec cp {} "${ARTIFACT_DIR}/" \;
+find "${WORKDIR}" -name "*-autodl.json" -exec cp {} "${ARTIFACT_DIR}/" \;
+
 # Generate JUnit XML for timeout and phase duration tracking
 JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-ci.xml"
 PHASE_PREFIX="[sig-claude]"
@@ -169,10 +174,6 @@ ${TIMEOUT_CASES}
 EOF
 
 echo "JUnit XML written to ${JUNIT_FILE}"
-
-# Copy HTML report(s) to artifact directory
-echo "Copying reports to artifact directory..."
-find "${WORKDIR}" -name "payload-analysis-*.html" -exec cp {} "${ARTIFACT_DIR}/" \;
 
 # Check if we produced a report
 if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
