@@ -1,26 +1,31 @@
 presubmits:
-  openshift-pipelines/console-plugin:
+  openshift/cri-o:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.22$
-    - ^release-4\.22-
-    cluster: build04
-    context: ci/prow/build
+    - ^release-4\.23$
+    - ^release-4\.23-
+    cluster: build05
+    context: ci/prow/e2e-aws-ovn
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-3
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-pipelines-console-plugin-release-4.22-build
-    rerun_command: /test build
+    name: pull-ci-openshift-cri-o-release-4.23-e2e-aws-ovn
+    rerun_command: /test e2e-aws-ovn
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=build
+        - --target=e2e-aws-ovn
         command:
         - ci-operator
         env:
@@ -38,6 +43,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -55,6 +63,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -67,28 +81,33 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )build,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.22$
-    - ^release-4\.22-
-    cluster: build04
-    context: ci/prow/frontend
+    - ^release-4\.23$
+    - ^release-4\.23-
+    cluster: build08
+    context: ci/prow/e2e-gcp-ovn
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-pipelines-console-plugin-release-4.22-frontend
-    rerun_command: /test frontend
+    name: pull-ci-openshift-cri-o-release-4.23-e2e-gcp-ovn
+    rerun_command: /test e2e-gcp-ovn
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=frontend
+        - --target=e2e-gcp-ovn
         command:
         - ci-operator
         env:
@@ -106,6 +125,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
@@ -123,6 +145,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
@@ -135,19 +163,21 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )frontend,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.22$
-    - ^release-4\.22-
-    cluster: build04
+    - ^release-4\.23$
+    - ^release-4\.23-
+    cluster: build01
     context: ci/prow/images
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-pipelines-console-plugin-release-4.22-images
+    name: pull-ci-openshift-cri-o-release-4.23-images
     rerun_command: /test images
     spec:
       containers:
@@ -156,6 +186,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=[release:latest]
+        - --target=rpms
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
