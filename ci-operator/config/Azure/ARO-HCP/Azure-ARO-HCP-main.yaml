@@ -82,7 +82,6 @@ images:
       ENV GOFLAGS='-mod=readonly'
       RUN make install-tools && \
           make -C tooling/templatize templatize && \
-          make -C test/ aro-hcp-tests prow-job-executor && \
           go clean -cache -modcache && \
           rm -f go.work.sum
       RUN mkdir -p "$(go env GOROOT)" && chmod -R 777 "$(go env GOROOT)"
@@ -97,6 +96,9 @@ images:
         - destination_dir: src
           source_path: /go/src/github.com/Azure/ARO-HCP
     to: aro-hcp-e2e-tools
+  - dockerfile_path: test/Containerfile.e2e
+    from: src
+    to: aro-hcp-e2e-tests
   - dockerfile_literal: |
       FROM src
       USER root
@@ -118,6 +120,7 @@ images:
 promotion:
   to:
   - additional_images:
+      aro-hcp-e2e-tests: aro-hcp-e2e-tests
       aro-hcp-e2e-tools: aro-hcp-e2e-tools
     excluded_images:
     - '*'
@@ -131,6 +134,13 @@ resources:
     requests:
       cpu: "3"
       memory: 4Gi
+  aro-hcp-e2e-tests:
+    limits:
+      cpu: "8"
+      memory: 10Gi
+    requests:
+      cpu: "8"
+      memory: 10Gi
   aro-hcp-e2e-tools:
     limits:
       cpu: "8"

@@ -19,15 +19,14 @@ make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../k
 export KUBECONFIG=kubeconfig
 export AZURE_TOKEN_CREDENTIALS=prod
 
-FRONTEND_ADDRESS=$(kubectl get virtualservice -n aro-hcp aro-hcp-vs-frontend -o jsonpath='{.spec.hosts[0]}')
-ADMIN_API_ADDRESS=$(kubectl get virtualservice -n aro-hcp-admin-api admin-api-vs -o jsonpath='{.spec.hosts[0]}')
+FRONTEND_ADDRESS="https://$(kubectl get virtualservice -n aro-hcp aro-hcp-vs-frontend -o jsonpath='{.spec.hosts[0]}')"
+ADMIN_API_ADDRESS="https://$(kubectl get virtualservice -n aro-hcp-admin-api admin-api-vs -o jsonpath='{.spec.hosts[0]}')"
 
 az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 make frontend-grant-ingress DEPLOY_ENV=prow
 az account set --subscription "${SUBSCRIPTION_ID}"
 
-make e2e/local -o test/aro-hcp-tests SKIP_CERT_VERIFICATION=true FRONTEND_ADDRESS="https://${FRONTEND_ADDRESS}" ADMIN_API_ADDRESS="https://${ADMIN_API_ADDRESS}"
+make e2e-local/setup FRONTEND_ADDRESS="${FRONTEND_ADDRESS}"
 
-# the make target produces a junit.xml in ARTIFACT_DIR.  We want to copy to SHARED_DIR so we can create
-# direct debugging links for the individual tests that failed. Gzip it due to 3mb SHARED_DIR limit.
-gzip -c "${ARTIFACT_DIR}/junit.xml" > "${SHARED_DIR}/junit-e2e.xml.gz"
+echo "${FRONTEND_ADDRESS}" > "${SHARED_DIR}/frontend-address"
+echo "${ADMIN_API_ADDRESS}" > "${SHARED_DIR}/admin-api-address"
