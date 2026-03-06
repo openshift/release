@@ -33,6 +33,8 @@ POLL_INTERVAL=300  # 5 minutes
 ELAPSED=0
 POLL_COUNT=0
 
+PHASE_WAIT_START=$(date +%s)
+
 echo ""
 echo "=== Waiting for all blocking jobs to complete before analysis ==="
 echo "Polling every $((POLL_INTERVAL / 60)) minutes (timeout: $((MAX_WAIT / 3600)) hours)"
@@ -70,6 +72,8 @@ while true; do
     sleep ${POLL_INTERVAL}
 done
 
+PHASE_WAIT_DURATION=$(( $(date +%s) - PHASE_WAIT_START ))
+
 # Run Claude to analyze the payload
 echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 
@@ -81,6 +85,7 @@ echo "Installing must-gather plugin..."
 claude plugin install must-gather@ai-helpers
 echo "must-gather plugin installed."
 
+PHASE_ANALYSIS_START=$(date +%s)
 CLAUDE_EXIT=0
 timeout 7200 claude \
     --model "${CLAUDE_MODEL}" \
@@ -90,7 +95,10 @@ timeout 7200 claude \
     -p "/ci:analyze-payload ${PAYLOAD_TAG}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || CLAUDE_EXIT=$?
 
+PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
+
 # If Claude timed out (exit 124), nudge it to wrap up with a shorter timeout
+PHASE_NUDGE_START=$(date +%s)
 NUDGE_EXIT=0
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo ""
@@ -104,48 +112,61 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         -p "I think you got stuck and hit the timeout. Please wrap up your analysis now with whatever data you have collected so far. Generate the required report artifacts immediately. Note you timed out in the report." \
         --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-output.log" || NUDGE_EXIT=$?
 fi
+PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 
-# Generate JUnit XML for timeout tracking
+# Generate JUnit XML for timeout and phase duration tracking
 JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-ci.xml"
-TESTCASE_NAME="[sig-claude] Claude should complete in a reasonable time"
+PHASE_PREFIX="[sig-claude]"
+TIMEOUT_TESTCASE="${PHASE_PREFIX} Claude should complete in a reasonable time"
+TOTAL_DURATION=$(( PHASE_WAIT_DURATION + PHASE_ANALYSIS_DURATION + PHASE_NUDGE_DURATION ))
 
-generate_junit() {
-    local testcases="$1"
-    local failures="$2"
-    local tests="$3"
-    cat > "${JUNIT_FILE}" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="claude-ci" tests="${tests}" failures="${failures}">
-${testcases}
-</testsuite>
-EOF
-}
+PHASE_CASES="  <testcase name=\"${PHASE_PREFIX} Phase: wait for blocking jobs\" time=\"${PHASE_WAIT_DURATION}\"/>
+  <testcase name=\"${PHASE_PREFIX} Phase: analysis\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
+
+TIMEOUT_CASES=""
+FAILURE_COUNT=0
+TIMEOUT_TEST_COUNT=0
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
-    TIMEOUT_CASE="  <testcase name=\"${TESTCASE_NAME}\">
+    TIMEOUT_TEST_COUNT=1
+    FAILURE_COUNT=1
+    TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\">
     <failure message=\"Claude timed out after 2 hours\">Claude exceeded the 2 hour time limit and had to be nudged to wrap up.</failure>
   </testcase>"
 
     HAS_REPORT=false
     find "${WORKDIR}" -name "payload-analysis-*.html" -quit | grep -q . && HAS_REPORT=true
 
+    PHASE_CASES="${PHASE_CASES}
+  <testcase name=\"${PHASE_PREFIX} Phase: recovery nudge\" time=\"${PHASE_NUDGE_DURATION}\"/>"
+
     if [[ "${NUDGE_EXIT}" -eq 0 ]] && [[ "${HAS_REPORT}" == "true" ]]; then
         # Flake: timed out but recovered after nudge
-        RECOVERY_CASE="  <testcase name=\"${TESTCASE_NAME} (recovery)\"/>"
-        generate_junit "${TIMEOUT_CASE}
-${RECOVERY_CASE}" "1" "2"
+        TIMEOUT_TEST_COUNT=2
+        TIMEOUT_CASES="${TIMEOUT_CASES}
+  <testcase name=\"${TIMEOUT_TESTCASE} (recovery)\" time=\"${PHASE_NUDGE_DURATION}\"/>"
     else
         # Hard failure: nudge also failed
-        NUDGE_CASE="  <testcase name=\"${TESTCASE_NAME} (recovery)\">
+        TIMEOUT_TEST_COUNT=2
+        FAILURE_COUNT=2
+        TIMEOUT_CASES="${TIMEOUT_CASES}
+  <testcase name=\"${TIMEOUT_TESTCASE} (recovery)\" time=\"${PHASE_NUDGE_DURATION}\">
     <failure message=\"Claude failed to recover after nudge\">Claude was nudged to wrap up but did not produce a report (exit code: ${NUDGE_EXIT}).</failure>
   </testcase>"
-        generate_junit "${TIMEOUT_CASE}
-${NUDGE_CASE}" "2" "2"
     fi
 else
-    # No timeout — single passing test
-    generate_junit "  <testcase name=\"${TESTCASE_NAME}\"/>" "0" "1"
+    TIMEOUT_TEST_COUNT=1
+    TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
 fi
+
+TEST_COUNT=$(( 2 + TIMEOUT_TEST_COUNT ))
+cat > "${JUNIT_FILE}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="claude-ci" tests="${TEST_COUNT}" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
+${PHASE_CASES}
+${TIMEOUT_CASES}
+</testsuite>
+EOF
 
 echo "JUnit XML written to ${JUNIT_FILE}"
 
