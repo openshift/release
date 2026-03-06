@@ -57,8 +57,11 @@ tests:
   as: on-demand-e2e
   steps:
     post:
-    - as: e2e-teardown
-      commands: ./ci/nightly.sh --teardown
+    - as: pre-merge-teardown
+      commands: |-
+        export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
+        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
+        uv run --no-cache ci/pre-merge.py --teardown
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-nightly-static-creds
@@ -69,11 +72,11 @@ tests:
           cpu: 100m
           memory: 200Mi
     test:
-    - as: e2e
+    - as: pre-merge
       commands: |-
         export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
         export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
-        ./ci/nightly.sh
+        uv run --no-cache ci/pre-merge.py
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-nightly-static-creds
