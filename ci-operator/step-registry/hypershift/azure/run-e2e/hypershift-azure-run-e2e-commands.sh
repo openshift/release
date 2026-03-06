@@ -136,7 +136,7 @@ fi
 #if [[ "${CI_TESTS_RUN:-}" == "TestCiliumConnectivity" ]];then
 AZURE_NETWORK_TYPE="--network-type=Other"
 
-export CILIUM_VERSION="1.14.5"
+export CILIUM_VERSION="1.15.1"
 
 rm -rf /tmp/test-e2e
 oc image extract quay.io/wewang58/test-e2e:cilium --confirm --path /:/tmp/
