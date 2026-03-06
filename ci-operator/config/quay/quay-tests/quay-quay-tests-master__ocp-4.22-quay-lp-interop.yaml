@@ -1,10 +1,10 @@
 base_images:
   cli:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: cli
   upi-installer:
-    name: "4.21"
+    name: "4.22"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -18,7 +18,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.21"
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -27,14 +27,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay-e2e-tests-quay314-ocp421-lp-interop-aws
-  cron: 0 23 31 2 *
+- as: cr-quay-e2e-tests-aws
+  cron: 0 3,15 * * *
   steps:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_TYPE: m5.4xlarge
-      CSO_CHANNEL: stable-3.14
+      CSO_CHANNEL: stable-3.16
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
@@ -44,28 +44,68 @@ tests:
               {"step": "quay-tests-*", "failure_type": "all", "classification":  "Test Failure", "jira_assignee": "!default", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
             ]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/cr/lp-interop.json
-      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.21-lp","self-managed-lp","quay-lp"]'
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/cr/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","self-managed-lp","quay-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dyan@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: PROJQUAY
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       MAP_TESTS: "true"
-      OCP_VERSION: "4.21"
-      QBO_CHANNEL: stable-3.14
-      QUAY_OPERATOR_CHANNEL: stable-3.14
-      QUAY_VERSION: "3.14"
+      OCP_VERSION: "4.22"
+      QBO_CHANNEL: stable-3.16
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_VERSION: "3.16"
       REPORT_TO_DR: "true"
       REPORTPORTAL_CMP: Quay-lp-interop
       USER_TAGS: |
         scenario quay
+    post:
+    - ref: mpiit-data-router-reporter
     test:
     - ref: quay-tests-deploy-quay-aws-s3
     - ref: quay-tests-test-quay-e2e
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
-    - ref: mpiit-data-router-reporter
     workflow: firewatch-cucushift-installer-rehearse-aws-ipi
-- as: quay-e2e-tests-quay316-ocp421-aws-s3
+- as: aws-fips
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      CSO_CHANNEL: stable-3.16
+      FIPS_ENABLED: "true"
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "enable-*", "failure_type": "all", "classification": "Other", "jira_project": "PROJQUAY", "jira_assignee": "!default", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "quay-tests-deploy-*", "failure_type": "all", "classification": "Quay deployment", "jira_project": "PROJQUAY", "jira_assignee": "!default", "group": {"name": "lp-tests", "priority": 1}, "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "quay-tests-*", "failure_type": "all", "classification": "Test Failure", "jira_project": "PROJQUAY", "jira_assignee": "!default", "group": {"name": "lp-tests", "priority": 2}, "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","self-managed-lp","fips","quay-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: dyan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      MAP_TESTS: "true"
+      QBO_CHANNEL: stable-3.16
+      QUAY_OPERATOR_CHANNEL: stable-3.16
+      QUAY_VERSION: "3.16"
+      REPORT_TO_DR: "true"
+      REPORTPORTAL_CMP: Quay-lp-interop
+      USER_TAGS: |
+        scenario quay
+    post:
+    - ref: mpiit-data-router-reporter
+    test:
+    - ref: quay-tests-deploy-quay-aws-s3
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: firewatch-cucushift-installer-rehearse-aws-ipi
+- as: quay-e2e-tests-quay316-ocp422-aws-s3
   cron: '@yearly'
   steps:
     cluster_profile: aws-quay-qe
@@ -91,4 +131,4 @@ zz_generated_metadata:
   branch: master
   org: quay
   repo: quay-tests
-  variant: ocp-4.21-quay-cr
+  variant: ocp-4.22-quay-lp-interop
