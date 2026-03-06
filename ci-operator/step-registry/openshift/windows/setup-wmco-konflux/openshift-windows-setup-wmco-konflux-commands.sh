@@ -12,6 +12,12 @@ function get_ocp_version() {
 
 function get_latest_wmco_index_image() {
   local version ocp_tag image_url
+  # Allow override via env var for pinning to a specific digest
+  if [ -n "${WMCO_INDEX_IMAGE:-}" ]; then
+    echo "${WMCO_INDEX_IMAGE}"
+    return
+  fi
+
   version=$(get_ocp_version)
   ocp_tag="release-${version//./-}" # e.g., release-4-18
 
