@@ -82,20 +82,7 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 ```
 
 ### Environment Variables
-
-| Variable                   | Default Value            | Description                                                                 | Validation               |
-| -------------------------- | ------------------------ | --------------------------------------------------------------------------- | ------------------------ |
-| `OCP_VERSION`              | Files for 4 OCP versions are pregenerated | OpenShift Container Platform version. Supports `X.Y` (latest), `X.Y.Z` (specific), or `X.Y.Z-rc.N`/`X.Y.Z-ec.N` (candidate). | If a specific version doesn't exist, error out.
-| `OCP_CHANNEL`              | `fast`                   | OCP release channel. Default is `fast` because it contains all versions that could become `stable`.  Further explanation below | `stable`, `fast`, `candidate`, or `eus` |
-| `AWS_REGION_OVERRIDE`      | `us-east-2`              | AWS region for testing                                                      | Any valid AWS region     |
-| `CUSTOM_AZURE_REGION`      | `eastus`                 | Azure region for testing                                                    | Any valid Azure region   |
-| `OSC_CATALOG_TAG`          | `latest`                 | Defaults to `:latest`. Actual tag resolved at runtime by `env-cm` step. Can override with specific version tag (e.g., `1.11.1-1766149846`) or SHA | repo tag or SHA          |
-| `INSTALL_KATA_RPM`         | `true`                   | Whether to install Kata RPM                                                 | `true` or `false`        |
-| `KATA_RPM_VERSION`         | `3.17.0-3.rhaos4.19.el9` | Kata RPM version (when `INSTALL_KATA_RPM=true`)                             | RPM version format       |
-| `PROW_RUN_TYPE`            | `candidate`              | Prow job run type                                                           | `candidate` or `release` |
-| `SLEEP_DURATION`           | `0h`                     | Time to keep cluster alive after tests.  For manual testing.                | 0-12 followed by 'h'     |
-| `TEST_RELEASE_TYPE`        | `Pre-GA`                 | Release type for testing                                                    | `Pre-GA` or `GA`         |
-| `TEST_TIMEOUT`             | `90`                     | Test timeout in minutes                                                     | Numeric value            |
+Run the script with no arguments or an invalid command to see full environment variable usage (descriptions, defaults, and validation). Example: `ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh` or `$0 invalidcommand`
 
 ### Pre-GA vs GA Configuration
 <!-- COMMIT Use actual variable names in sections -->
