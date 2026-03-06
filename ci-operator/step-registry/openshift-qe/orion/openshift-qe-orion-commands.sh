@@ -5,6 +5,10 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
 if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
     # Get current worker count (excluding infra and workload nodes)
@@ -158,10 +162,32 @@ if [[ -n "${CHANGE_POINT_REPOS}" ]]; then
     EXTRA_FLAGS+=" --github-repos ${CHANGE_POINT_REPOS}"
 fi
 
+# pull_number input variable is required and 
+# it must be set as $PULL_NUMBER OR 0 to get compared against periodic runs.
+pull_number=''
+if [[ "${JOB_TYPE}" == "periodic" ]]; then
+    if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${PULL_NUMBER}" -ne 0 ]]; then
+        pull_number="${PULL_NUMBER} OR 0"
+        job_type="periodic OR pull"
+    else
+        job_type="periodic"
+    fi
+elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+    # Indicates a ci test triggered in PR against a pull request
+    pull_number="${PULL_NUMBER} OR 0"
+    job_type="periodic OR pull"
+elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
+    # Indicates a rehearsel in PR against openshift/release repo
+    job_type="periodic OR rehearse"
+fi
+
 set +e
 set -o pipefail
 FILENAME=$(basename ${ORION_CONFIG} | awk -F. '{print $1}')
-export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="periodic" 
+export es_metadata_index=${ES_METADATA_INDEX} es_benchmark_index=${ES_BENCHMARK_INDEX} VERSION=${VERSION} jobtype="${job_type}"
+if [[ -n $pull_number ]]; then
+    export pull_number=${pull_number}
+fi
 orion --node-count ${IGNORE_JOB_ITERATIONS} --config ${ORION_CONFIG} ${EXTRA_FLAGS} | tee ${ARTIFACT_DIR}/${FILENAME}.txt
 orion_exit_status=$?
 set -e
