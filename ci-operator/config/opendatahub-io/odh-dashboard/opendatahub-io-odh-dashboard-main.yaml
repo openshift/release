@@ -19,6 +19,9 @@ images:
 - context_dir: .
   dockerfile_path: ./packages/mlflow/Dockerfile.workspace
   to: odh-mod-arch-mlflow-image
+- context_dir: .
+  dockerfile_path: ./packages/eval-hub/Dockerfile.workspace
+  to: odh-mod-arch-eval-hub-image
 promotion:
   to:
   - namespace: opendatahub-io
@@ -115,6 +118,22 @@ tests:
       SOURCE_IMAGE_REF: odh-mod-arch-mlflow-image
     env:
       IMAGE_REPO: odh-mod-arch-mlflow
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-eval-hub-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-eval-hub-image
+    env:
+      IMAGE_REPO: odh-mod-arch-eval-hub
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-eval-hub-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-eval-hub-image
+    env:
+      IMAGE_REPO: odh-mod-arch-eval-hub
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
