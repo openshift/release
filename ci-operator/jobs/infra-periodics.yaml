@@ -2168,6 +2168,9 @@ periodics:
       - --bw-allow-unused=dptp/quay.io/multi-arch
       - --kubeconfig-dir=/etc/build-farm-credentials
       - --kubeconfig-suffix=config
+      - --enable-gsm=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gcp-credentials/key.json
       command:
       - /usr/bin/ci-secret-bootstrap
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-bootstrap_latest
@@ -2184,11 +2187,23 @@ periodics:
         name: config-volume
       - mountPath: /etc/ci-secret-bootstrap
         name: ci-secret-bootstrap
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gcp-credentials
+        name: gcp-sa-key
+        readOnly: true
     serviceAccountName: secret-bootstrap
     volumes:
     - configMap:
         name: ci-secret-bootstrap
       name: ci-secret-bootstrap
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - name: gcp-sa-key
+      secret:
+        secretName: gsm-secrets-reconciler-sa-credentials
     - name: build-farm-credentials
       secret:
         secretName: config-updater
