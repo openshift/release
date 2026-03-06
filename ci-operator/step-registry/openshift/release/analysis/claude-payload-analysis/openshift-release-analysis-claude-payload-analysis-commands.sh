@@ -91,6 +91,7 @@ timeout 7200 claude \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || CLAUDE_EXIT=$?
 
 # If Claude timed out (exit 124), nudge it to wrap up with a shorter timeout
+NUDGE_EXIT=0
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo ""
     echo "Claude timed out after 2 hours. Nudging to wrap up..."
@@ -101,8 +102,52 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         --output-format stream-json \
         --max-turns 20 \
         -p "I think you got stuck and hit the timeout. Please wrap up your analysis now with whatever data you have collected so far. Generate the required report artifacts immediately. Note you timed out in the report." \
-        --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-output.log" || true
+        --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-output.log" || NUDGE_EXIT=$?
 fi
+
+# Generate JUnit XML for timeout tracking
+JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-ci.xml"
+TESTCASE_NAME="[sig-claude] Claude should complete in a reasonable time"
+
+generate_junit() {
+    local testcases="$1"
+    local failures="$2"
+    local tests="$3"
+    cat > "${JUNIT_FILE}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="claude-ci" tests="${tests}" failures="${failures}">
+${testcases}
+</testsuite>
+EOF
+}
+
+if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+    TIMEOUT_CASE="  <testcase name=\"${TESTCASE_NAME}\">
+    <failure message=\"Claude timed out after 2 hours\">Claude exceeded the 2 hour time limit and had to be nudged to wrap up.</failure>
+  </testcase>"
+
+    HAS_REPORT=false
+    find "${WORKDIR}" -name "payload-analysis-*.html" -quit | grep -q . && HAS_REPORT=true
+
+    if [[ "${NUDGE_EXIT}" -eq 0 ]] && [[ "${HAS_REPORT}" == "true" ]]; then
+        # Flake: timed out but recovered after nudge
+        RECOVERY_CASE="  <testcase name=\"${TESTCASE_NAME} (recovery)\"/>"
+        generate_junit "${TIMEOUT_CASE}
+${RECOVERY_CASE}" "1" "2"
+    else
+        # Hard failure: nudge also failed
+        NUDGE_CASE="  <testcase name=\"${TESTCASE_NAME} (recovery)\">
+    <failure message=\"Claude failed to recover after nudge\">Claude was nudged to wrap up but did not produce a report (exit code: ${NUDGE_EXIT}).</failure>
+  </testcase>"
+        generate_junit "${TIMEOUT_CASE}
+${NUDGE_CASE}" "2" "2"
+    fi
+else
+    # No timeout — single passing test
+    generate_junit "  <testcase name=\"${TESTCASE_NAME}\"/>" "0" "1"
+fi
+
+echo "JUnit XML written to ${JUNIT_FILE}"
 
 # Copy HTML report(s) to artifact directory
 echo "Copying reports to artifact directory..."
