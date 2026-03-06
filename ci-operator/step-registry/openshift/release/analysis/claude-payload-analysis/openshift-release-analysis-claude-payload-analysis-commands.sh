@@ -81,47 +81,32 @@ echo "Installing must-gather plugin..."
 claude plugin install must-gather@ai-helpers
 echo "must-gather plugin installed."
 
+CLAUDE_EXIT=0
 timeout 7200 claude \
     --model "${CLAUDE_MODEL}" \
     --allowedTools "Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill" \
     --output-format stream-json \
     --max-turns 100 \
     -p "/ci:analyze-payload ${PAYLOAD_TAG}" \
-    --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || true
+    --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || CLAUDE_EXIT=$?
+
+# If Claude timed out (exit 124), nudge it to wrap up with a shorter timeout
+if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+    echo ""
+    echo "Claude timed out after 2 hours. Nudging to wrap up..."
+    timeout 900 claude \
+        --model "${CLAUDE_MODEL}" \
+        --continue \
+        --allowedTools "Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill" \
+        --output-format stream-json \
+        --max-turns 20 \
+        -p "I think you got stuck and hit the timeout. Please wrap up your analysis now with whatever data you have collected so far. Generate the required report artifacts immediately. Note you timed out in the report." \
+        --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-output.log" || true
+fi
 
 # Copy HTML report(s) to artifact directory
 echo "Copying reports to artifact directory..."
 find "${WORKDIR}" -name "payload-analysis-*.html" -exec cp {} "${ARTIFACT_DIR}/" \;
-
-# Analyze cost from claude stream-json output
-echo "=== Cost Analysis ==="
-CLAUDE_LOG="${ARTIFACT_DIR}/claude-output.log"
-if [ -f "${CLAUDE_LOG}" ]; then
-    # Extract token usage from the result message in stream-json output
-    # The final result message contains cumulative usage stats
-    # Use python to parse the result line since it may contain control chars that break jq
-    COST_JSON=$(grep '"type":"result"' "${CLAUDE_LOG}" | tail -1 | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    cost = d.get('total_cost_usd', 0)
-    usage = d.get('modelUsage', {})
-    print(f'Total cost: \${cost:.4f}')
-    for model, u in usage.items():
-        print(f'  {model}: input={u[\"inputTokens\"]} output={u[\"outputTokens\"]} cache_read={u[\"cacheReadInputTokens\"]} cache_create={u[\"cacheCreationInputTokens\"]} cost=\${u[\"costUSD\"]:.4f}')
-    summary = {'payload': '${PAYLOAD_TAG}', 'total_cost_usd': cost, 'modelUsage': usage}
-    with open('${ARTIFACT_DIR}/cost-summary.json', 'w') as f:
-        json.dump(summary, f, indent=2)
-except Exception as e:
-    print(f'Failed to parse cost data: {e}')
-" 2>&1 || true)
-    echo "${COST_JSON}"
-    if [ -f "${ARTIFACT_DIR}/cost-summary.json" ]; then
-        echo "Cost summary written to ${ARTIFACT_DIR}/cost-summary.json"
-    fi
-else
-    echo "No claude output log found, skipping cost analysis."
-fi
 
 # Check if we produced a report
 if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
