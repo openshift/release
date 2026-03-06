@@ -70,6 +70,22 @@ tests:
       resources:
         requests:
           cpu: 100m
+- as: sonarcloud-post-submit
+  postsubmit: true
+  steps:
+    test:
+    - as: test
+      commands: |
+        export SELF="make -f /opt/build-harness/Makefile.prow"
+        make -f /opt/build-harness/Makefile.prow sonar/go/prow
+      credentials:
+      - mount_path: /etc/sonarcloud/
+        name: acm-sonarcloud-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:
