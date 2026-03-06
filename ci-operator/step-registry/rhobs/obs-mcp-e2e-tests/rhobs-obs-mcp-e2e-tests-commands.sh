@@ -10,7 +10,7 @@ sleep 3
 export OBS_MCP_URL=http://localhost:9100
 
 # Run tests
-make test-e2e
+make test-e2e && make test-e2e-openshift
 TEST_EXIT=$?
 
 # Stop port-forward using saved PID
