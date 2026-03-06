@@ -1,44 +1,68 @@
 # Sandboxed Containers Operator - Prowjob Configuration Generator
 
-This directory has a script to generate OpenShift CI prowjob configuration files for the Sandboxed Containers Operator with validation and error handling.
+`sandboxed-containers-operator-create-prowjob-commands.sh` generates prowjob configuration files for the Sandboxed Containers Operator with validation and error handling.  The existing files should not be edited directly.  `sandboxed-containers-operator-create-prowjob-commands.sh` can also be used to run prowjobs with Gangway, like Konflux
 
 ## Overview
 
-The `sandboxed-containers-operator-create-prowjob-commands.sh` script creates prowjob configuration files for the sandboxed containers operator CI pipeline. It supports both Pre-GA (development) and GA (production) release types with parameter validation.
+The `sandboxed-containers-operator-create-prowjob-commands.sh` script creates prowjob configuration files.  These prowjobs contain variations of provider/workload combinations.  We will start with [Creating Prowjobs](#creating-prowjobs) and [Running Prowjobs](#running-prowjobs).  More detail starts in [General Usage](#general-usage).
 
-## Commands
+## Creating Prowjobs
+`sandboxed-containers-operator-create-prowjob-commands.sh update_templates` regenerates all exising prowjobs with the script defaults, these jobs are used directly by Konflux.  It is preferred to make all changes in the script and not make changes in existing prowjobs.  Also see [Update Templates](#update-templates)
 
-The script supports the following commands:
+`sandboxed-containers-operator-create-prowjob-commands.sh create` creates a yaml file in the current directory. Environment variables alter the yaml output. `create` is used by `update_templates` also.
 
-- `create` - Create prowjob configuration files
-- `run` - Run one prowjob from YAML (requires job YAML file and exactly one job name)
+## Running Prowjobs
+### Konflux and Gangway
+You cannot login to Gangway created clusters by design.  They are useful for rerunning tests launched from Konflux without creating a new build.  ex: infrastructure issues prevent the test from starting
 
-### Command Usage
-
+Either use an existing YAMLFILE or `create` a new YAMLFILE in the current directory.  From this YAMLFILE, we can `run` to create a cluster on PROVIDER and run the WORKLOAD tests using the Gangway API.  You will need a Prow API token as explained in the [Gangway](#gangway) section
 ```bash
-# Show help
-./sandboxed-containers-operator-create-prowjob-commands.sh
+sandboxed-containers-operator-create-prowjob-commands.sh run <YAMLFILE> <PROVIDER-ipi-WORKLOAD>
 ```
+ Konflux modifies a copy of the template files and uses Gangway to launch tests.
 
-## Files
+### Interactive
+1. Create a branch `git checkout -b BRANCH` in the repo.
+2. `create` the YAMLFILE in the current directory with your ENV changes.  We want the cluster to stay around for 6 hours after the tests finish.
+   ```bash
+    SLEEP_DURATION=6h OCP_VERSION=4.21 TEST_RELEASE_TYPE=Pre-GA `sandboxed-containers-operator-create-prowjob-commands.sh create`
+    ```
+    `sandboxed-containers-operator-create-prowjob-commands.sh create` output has directions to mv the file, add to git and run a series of make commands.  Don't follow them yet
+3. You need modify the YAMLFILE to allow interaction
+   ```bash
+   sed -ie 's/restrict_network_access: false/restrict_network_access: true/ ' YAMLFILE
+   ```
+**NOTE: this will prevent the RPM upload if you need to install one!**  You will need to upload the RPM to the nodes and install them after the kataconfig is installed.  It will also make the automated tests invalid
 
-- `sandboxed-containers-operator-create-prowjob-commands.sh` - Main script to generate prowjob configurations
-- The output file is created in the current directory and named `openshift-sandboxed-containers-operator-devel__downstream-${PROW_RUN_TYPE}${OCP_VERSION}.yaml`
-  - `PROW_RUN_TYPE` is based on `TEST_RELEASE_TYPE`. It is `candidate` for `Pre-GA` and `release` otherwise
-- If the output file exists, it will be moved to a `.backup` file
+4. Now follow the directions to mv the file, add to git, run make commands
+5. `git status -uno` and git add any changed files
+6. `git commit -m '[DEBUG] [DO NOT MERGE]'`
+7. `git push --set-upstream origin BRANCH`
+8. Go to the PR and interact with it
 
-## Key Features
+#### Interactive in the PR
+The openshift-ci-robot will list a number of test names you can can with `/pj-rehearse`
 
-- Different behavior for Pre-GA vs GA releases
-- Uses `:latest` tag by default for catalog images
-  - The actual latest tag (X.Y.Z-epoch_time format) is resolved at runtime by the `env-cm` step
-  - This ensures jobs always use the most recent catalog image when they run
-- Generated files are not merged
-  - /PJ-REHEARSE in the PR to run prowjobs
+If I created a prowjob as above, I will have a series like
+```bash
+periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidateOCP_VERSION-PROVIDER-ipi-WORKLOAD
+```
+Launch with
+```bash
+/pj-rehearse periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate421-aws-ipi-peerpods
+```
+This will launch the tests that konflux's run does.  But you can get interactive access to the cluster.
 
-## Usage
+#### Interactive Cluster Access
+In the PR, you will see a _pending check_ that looks like `ci/rehearse/periodic-ci-openshift-sandboxed-containers..` that is a URL to the **Spyglass** page for the prowjob.  This page has all the logs and artifacts for your prowjob.  In the **Build Log** section, you will see _Using namespace_ followed by a URL.  This is the undercluster that is building your cluster.  It will log you into the undercluster.  Under **Inventory** you will see a pod for every step in the prowjob that has finished and the current running one.  While it is running, the `PROVIDER-ipi-WORKLOAD-openshift-extended-test` pod will show the output of the test in its log.
 
-### Basic Usage
+Further under **Inventory** are secrets.  The `PROVIDER-ipi-WORKLOAD` secret will eventually have the `kubeadmin-password` and `kubeconfig` files you can reveal and copy.  This usually happends while the tests are running.
+
+Once you have the credentials you can login to the cluster.  However, you should only observe until the tests finish.  The pod `PROVIDER_ipi-WORKLOAD-cucushift-installer-wait` will appear and stay running for `SLEEP_DURATION` hours.  Then the pod will end and prow will deprovision.  You can login to the pod and terminate the sleep loop early.  You can only make the pod last 12 hours.
+
+
+## General Usage
+### Basic Usage of `sandboxed-containers-operator-create-prowjob-commands.sh`
 
 Ensure you are in the __release__ directory of your fork of the [Prow repo](https://github.com/openshift/release)
 The script uses environment variables exclusively for configuration:
@@ -74,6 +98,7 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 | `TEST_TIMEOUT`             | `90`                     | Test timeout in minutes                                                     | Numeric value            |
 
 ### Pre-GA vs GA Configuration
+<!-- COMMIT Use actual variable names in sections -->
 
 #### Pre-GA (Development) Mode
 - Uses `:latest` tag for catalog images by default
@@ -146,6 +171,7 @@ ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed
 The `create-prowjob` script uses `:latest` as the default tag. The actual latest tag is resolved at **runtime** by the `env-cm` step when the job executes.
 
 ### How It Works
+<!-- COMMIT remove this section -->
 1. **At config generation time**: `CATALOG_SOURCE_IMAGE` is set to `quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest`
 2. **At job runtime**: The `env-cm` step checks the tag:
    - If the tag is `:latest`, it queries the Quay API to find the most recent `X.Y.Z-unix_epoch` tag
@@ -157,27 +183,7 @@ The `create-prowjob` script uses `:latest` as the default tag. The actual latest
 4. **Source**: `quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc`
 
 
-## Run Command
-
-The `run` command triggers a single ProwJob from a generated YAML configuration file. You must specify exactly one job name (the `as` value from the tests in the YAML, e.g. `azure-ipi-kata`, `aws-ipi-peerpods`). This command requires a valid Prow API token.
-
-### Run Command Usage
-
-```bash
-# Run one job from a YAML file (exactly one job name required)
-./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml azure-ipi-kata
-```
-
-### Create Yaml for Run
-Use the **create** command to create a yaml file in the current directory.  Modify it for your case.  Follow Option A in the output directions
-
-### Viewing the Run in Spyglass
-Go to [Prow configured jobs](https://prow.ci.openshift.org/configured-jobs/)
-Scroll down to *sandboxed-containers-operator* and click on it
-Search for the prow job you specified (ex aws-ipi-peerpods) and click on _Details_
-Click on _History_
-You will be taken to a list of the **Build** numbers, etc.  Your job should be at the top.  Clicking on that will show you the Spyglass of your job with the build log, artifacts, etc.
-This URL is used by **dig&shift** for reporting and analysis.  It will look something like [this](https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/openshift_release/75051/rehearse-75051-periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate421-azure-ipi-kata/2024178159888371712)
+## Gangway
 
 ### Run Command Features
 
@@ -187,13 +193,37 @@ This URL is used by **dig&shift** for reporting and analysis.  It will look some
 - **API Integration**: Uses the Prow/Gangway API to trigger the job.
 - **Job Status Monitoring**: Provides job ID and status information.
 
-### Run Command Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `PROW_API_TOKEN` | Yes | Prow API authentication token |
+### Gangway `PROW_API_TOKEN`
 
-## Generated Test Matrix
+To trigger ProwJobs via Gangway, you need a token for authentication. Tokens can be retrieved through the UI of the app.ci cluster at [OpenShift Console](https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com).
+
+Tf the app.ci cluster context is already configured:
+```bash
+oc whoami -t
+```
+
+Set `PROW_API_TOKEN` to the token
+
+```bash
+export PROW_API_TOKEN=your_token_here
+```
+
+For complete information about triggering ProwJobs via REST, including permanent tokens for automation, see the [OpenShift CI documentation](https://docs.ci.openshift.org/docs/how-tos/triggering-prowjobs-via-rest/#obtaining-an-authentication-token).
+
+The `run` command triggers a single ProwJob from a generated YAML configuration file. You must specify exactly one job name (the `as` value from the tests in the YAML, e.g. `azure-ipi-kata`, `aws-ipi-peerpods`). This command requires a valid Prow API token.
+
+### Spyglass
+#### Viewing the Run's URL
+Go to [Prow configured jobs](https://prow.ci.openshift.org/configured-jobs/)
+Scroll down to *sandboxed-containers-operator* and click on it
+Search for the prow job you specified (ex aws-ipi-peerpods) and click on _Details_
+Click on _History_
+You will be taken to a list of the **Build** numbers, etc.  Your job should be at the top.  Clicking on that will show you the Spyglass of your job with the build log, artifacts, etc.
+This URL is used by **dig&shift** for reporting and analysis.  It will look something like [this](https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/openshift_release/75051/rehearse-75051-periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate421-azure-ipi-kata/2024178159888371712)
+
+
+## Update Templates
 
 The script generates configuration for 5 test scenarios:
 
@@ -212,7 +242,7 @@ Each test includes:
 ## Output and Next Steps
 
 ### Generated Files
-- **File Name**: `openshift-sandboxed-containers-operator-devel__downstream-{PROW_RUN_TYPE}{OCP_VERSION}.yaml`
+- **File Name**: `openshift-sandboxed-containers-operator-devel__downstream-{PROW_RUN_TYPE}{OCP**_VERSION**}.yaml`
 - **Location**: Current directory
 - **Backup**: Existing files are backed up with `.backup` extension
 
@@ -283,25 +313,3 @@ yq eval '.' openshift-sandboxed-containers-operator-devel__downstream-candidate4
 - **Required**: `curl`, `jq`, `awk`, `sort`, `head`
 - **Optional**: `yq` (for YAML syntax validation)
 - **Network**: Access to `quay.io` API endpoints
-
-## Prow API Token
-
-To trigger ProwJobs via the REST API, you need an authentication token. Each SSO user is entitled to obtain a personal authentication token.
-
-### Obtaining a Token
-
-Tokens can be retrieved through the UI of the app.ci cluster at [OpenShift Console](https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com). Alternatively, if the app.ci cluster context is already configured, you may execute:
-
-```bash
-oc whoami -t
-```
-
-### Using the Token
-
-Once you have obtained a token, set it as an environment variable:
-
-```bash
-export PROW_API_TOKEN=your_token_here
-```
-
-For complete information about triggering ProwJobs via REST, including permanent tokens for automation, see the [OpenShift CI documentation](https://docs.ci.openshift.org/docs/how-tos/triggering-prowjobs-via-rest/#obtaining-an-authentication-token).
