@@ -630,6 +630,9 @@ CONFIG = {
     'amd-gpu-quota-slice': {
         '10.1.178.14': 1,
     },
+    'aws-osp-qe-quota-slice': {
+        'us-east-1': 10,
+    },
 }
 
 for i in range(2,7):
