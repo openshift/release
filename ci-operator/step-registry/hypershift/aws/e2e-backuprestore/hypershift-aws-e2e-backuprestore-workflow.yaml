@@ -1,0 +1,28 @@
+workflow:
+  as: hypershift-aws-e2e-backuprestore
+  documentation: |-
+    The HyperShift aws e2e-backuprestore workflow executes backup and restore
+    tests against a new ephemeral HyperShift cluster on AWS using OADP.
+
+    It provisions a management cluster, installs HyperShift, creates a hosted
+    cluster, installs the OADP operator with AWS-specific configuration, runs
+    backup/restore E2E tests, and then runs a minimal conformance suite.
+
+    The control plane is hosted on a dedicated standalone OCP cluster running
+    HyperShift in the `osd-hypershift` AWS account and is destroyed after tests
+    complete.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create
+    test:
+    - ref: operatorhub-subscribe-oadp-operator
+    - ref: hypershift-aws-oadp-setup
+    - chain: hypershift-e2e-backuprestore
+    post:
+    - chain: hypershift-dump
+    - ref: hypershift-aws-oadp-destroy
+    - chain: hypershift-aws-destroy
+    - chain: hypershift-destroy-nested-management-cluster
