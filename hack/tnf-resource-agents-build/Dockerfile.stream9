@@ -1,0 +1,18 @@
+# Local test: build resource-agents RPM on CentOS Stream 9 (same deps as CI step).
+# Build with: podman build -f hack/Dockerfile.stream9 -t localhost/tnf-resource-agents-build:stream9 .
+FROM quay.io/centos/centos:stream9
+RUN dnf config-manager --set-enabled crb || true
+RUN dnf install -y epel-release || dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm
+RUN dnf install -y git autoconf automake docbook-style-xsl glib2-devel libqb-devel make rpm-build perl python3-devel libnet-devel python3-pyroute2 libxslt systemd which
+ARG RESOURCE_AGENTS_REPO=https://github.com/ClusterLabs/resource-agents
+ARG RESOURCE_AGENTS_REF=main
+RUN git clone --depth 1 "${RESOURCE_AGENTS_REPO}" /tmp/resource-agents-build \
+    && git -C /tmp/resource-agents-build fetch origin "${RESOURCE_AGENTS_REF}" \
+    && git -C /tmp/resource-agents-build checkout FETCH_HEAD
+WORKDIR /tmp/resource-agents-build
+RUN RPM_VERSION=$(git rev-parse --short HEAD 2>/dev/null || echo "0") \
+    && autoreconf --install --force \
+    && ./configure \
+    && make rpm VERSION="${RPM_VERSION}"
+RUN find . -name 'resource-agents-*.rpm' ! -name '*debug*' ! -name '*.src.rpm' | head -1 | xargs -I{} cp {} /tmp/resource-agents.rpm
+RUN test -f /tmp/resource-agents.rpm && rpm -qip /tmp/resource-agents.rpm

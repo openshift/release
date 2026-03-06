@@ -1,0 +1,33 @@
+ref:
+  as: baremetalds-two-node-fencing-update-rhcos-resource-agents
+  from: nested-podman
+  nested_podman: true
+  commands: baremetalds-two-node-fencing-update-rhcos-resource-agents-commands.sh
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  env:
+  - name: RESOURCE_AGENT_SOURCE
+    default: "RHCOS"
+    documentation: |-
+      RHCOS: report installed resource-agents version via oc debug node and exit.
+      REPO: build resource-agents from git, build custom RHCOS image, apply MachineConfig.
+  - name: RESOURCE_AGENTS_REPO
+    default: "https://github.com/ClusterLabs/resource-agents"
+    documentation: |-
+      Git URL for resource-agents. Used when RESOURCE_AGENT_SOURCE=REPO.
+  - name: RESOURCE_AGENTS_REF
+    default: "main"
+    documentation: |-
+      Git ref (branch, tag, or SHA) to build. Used when RESOURCE_AGENT_SOURCE=REPO.
+      RPM version is derived from this ref.
+  documentation: |-
+    TNF (Two-Node Fencing) step. When RESOURCE_AGENT_SOURCE=RHCOS (default), runs oc debug node
+    on the first ready node to report resource-agents version; does not fail on timeout.
+    When RESOURCE_AGENT_SOURCE=REPO, builds resource-agents RPM from repo, builds custom RHCOS
+    image with rpm-ostree replace, pushes to mirror, applies MachineConfig, waits for rollout.
+    Must run after cluster deployment (workflow-specific). Release image and version from clusterversion.
+    Jobs must add base_images.nested-podman and capabilities.nested-podman. For REPO, set pull secret,
+    CUSTOM_OS_MIRROR_REGISTRY, CUSTOM_OS_IMAGE_REPO. Push uses CLUSTER_PROFILE_DIR/quay-custom-rhcos-secret
+    when present. Pushes with unique timestamp tag per job; post step deletes this job's tag and tags older than 24h.

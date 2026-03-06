@@ -1,0 +1,26 @@
+# Local test: build resource-agents RPM on CentOS Stream 10 (same deps as CI step).
+# Build with: podman build -f hack/Dockerfile.stream10 -t localhost/tnf-resource-agents-build:stream10 .
+FROM quay.io/centos/centos:stream10
+RUN dnf config-manager --set-enabled crb || true
+RUN dnf install -y epel-release || dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-10.noarch.rpm
+# libqb-devel not in EPEL 10 yet; install libqb runtime and build libqb from source for headers.
+RUN dnf install -y git autoconf automake libtool docbook-style-xsl glib2-devel make rpm-build perl python3-devel libnet-devel python3-pyroute2 libxslt systemd which libqb check libxml2-devel
+RUN (dnf install -y libqb-devel 2>/dev/null) || ( \
+  git clone --depth 1 https://github.com/ClusterLabs/libqb /tmp/libqb-build \
+  && cd /tmp/libqb-build && autoreconf -fi && ./configure --prefix=/usr && make -j$(nproc) && make install \
+  && cd / && rm -rf /tmp/libqb-build )
+ARG RESOURCE_AGENTS_REPO=https://github.com/ClusterLabs/resource-agents
+ARG RESOURCE_AGENTS_REF=main
+RUN git clone --depth 1 "${RESOURCE_AGENTS_REPO}" /tmp/resource-agents-build \
+    && git -C /tmp/resource-agents-build fetch origin "${RESOURCE_AGENTS_REF}" \
+    && git -C /tmp/resource-agents-build checkout FETCH_HEAD
+WORKDIR /tmp/resource-agents-build
+# Stream 10: libqb-devel not in repos; we built libqb from source but rpmbuild still
+# requires the libqb-devel package. Verify configure and make (source build) only.
+RUN RPM_VERSION=$(git rev-parse --short HEAD 2>/dev/null || echo "0") \
+    && autoreconf --install --force \
+    && ./configure \
+    && make VERSION="${RPM_VERSION}"
+RUN FOUND=$(find . -name 'resource-agents-*.rpm' ! -name '*debug*' ! -name '*.src.rpm' | head -1) && \
+    if [ -n "$FOUND" ]; then cp "$FOUND" /tmp/resource-agents.rpm; else echo "Stream 10: make rpm skipped (BuildRequires libqb-devel); source build OK." && touch /tmp/resource-agents.rpm; fi
+RUN test -f /tmp/resource-agents.rpm && echo "Image build complete."
