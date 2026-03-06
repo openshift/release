@@ -84,23 +84,22 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 ### Environment Variables
 Run the script with no arguments or an invalid command to see full environment variable usage (descriptions, defaults, and validation). Example: `ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh` or `$0 invalidcommand`
 
-### Pre-GA vs GA Configuration
-<!-- COMMIT Use actual variable names in sections -->
+### Pre-GA vs GA Configuration (`TEST_RELEASE_TYPE`)
 
-#### Pre-GA (Development) Mode
+#### Pre-GA (Development) Mode (`OSC_CATALOG_TAG`)
 - Uses `:latest` tag for catalog images by default
   - The `env-cm` step resolves the actual latest tag (X.Y.Z-epoch_time format) at runtime
   - This ensures jobs always test against the most recent build
 - Creates `brew-catalog` source with the resolved catalog tag
 
-#### GA (Production) Mode
+#### GA (Production) Mode (`TEST_RELEASE_TYPE=GA`)
 - Uses `redhat-operators` catalog source with GA images
 
-### OCP Release Channels
+### OCP Release Channels (`OCP_CHANNEL`)
 
 The `OCP_CHANNEL` variable determines which OpenShift release channel to use.  Use `candidate` for rc/ec versions
 
-#### Channel Comparison
+#### Channel Comparison (`OCP_CHANNEL` values)
 
 | Channel | Pre-Release | Use Case |
 |---------|-------------|----------|
@@ -111,25 +110,23 @@ The `OCP_CHANNEL` variable determines which OpenShift release channel to use.  U
 
 ### Advanced Configuration Examples
 
-#### Pre-GA Development Testing
+#### Pre-GA Development Testing (`TEST_RELEASE_TYPE`, `OCP_VERSION`)
 ```bash
 # Test latest development builds
 TEST_RELEASE_TYPE=Pre-GA \
-PROW_RUN_TYPE=candidate \
 OCP_VERSION=4.18 \
 ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
-#### GA Production Testing
+#### GA Production Testing (`TEST_RELEASE_TYPE`, `OCP_VERSION`)
 ```bash
 # Test production releases
 TEST_RELEASE_TYPE=GA \
-PROW_RUN_TYPE=release \
 OCP_VERSION=4.19 \
 ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
-#### Custom Regions and Timeouts
+#### Custom Regions and Timeouts (`AWS_REGION_OVERRIDE`, `CUSTOM_AZURE_REGION`, `SLEEP_DURATION`, `TEST_TIMEOUT`)
 ```bash
 # Extended testing with custom regions
 AWS_REGION_OVERRIDE=us-west-2 \
@@ -139,7 +136,7 @@ TEST_TIMEOUT=120 \
 ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
-#### Kata RPM Testing
+#### Kata RPM Testing (`INSTALL_KATA_RPM`, `KATA_RPM_VERSION`)
 ```bash
 # Test without Kata RPM installation
 INSTALL_KATA_RPM=false \
@@ -229,7 +226,7 @@ Each test includes:
 ## Output and Next Steps
 
 ### Generated Files
-- **File Name**: `openshift-sandboxed-containers-operator-devel__downstream-{PROW_RUN_TYPE}{OCP**_VERSION**}.yaml`
+- **File Name**: `openshift-sandboxed-containers-operator-devel__downstream-candidate{OCP**_VERSION**}.yaml` or `openshift-sandboxed-containers-operator-devel__downstream-release-{OCP**_VERSION**}.yaml`
 - **Location**: Current directory
 - **Backup**: Existing files are backed up with `.backup` extension
 
