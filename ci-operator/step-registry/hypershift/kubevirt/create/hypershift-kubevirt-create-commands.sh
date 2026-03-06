@@ -215,7 +215,9 @@ else
 fi
 
 echo "Waiting for cluster to become available"
-sleep 5h
+
+
+echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
 echo "Cluster became available, creating kubeconfig"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
