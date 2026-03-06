@@ -194,8 +194,7 @@ validate_and_set_defaults() {
     fi
 }
 
-# Function to show usage
-# Continuation indent = length(MUST_GATHER_ON_FAILURE_ONLY) + 1 = 28 spaces
+
 show_usage() {
     echo "Usage: $0 <command>"
     echo ""
@@ -490,17 +489,22 @@ EOF
     echo "Option B - Submit configuration to CI:"
     echo "1. Review the created configuration file:"
     echo "   cat ${OUTPUT_FILE}"
+    echo "2. Modify the file to allow "
+    echo "   sed -ie 's/restrict_network_access: false/restrict_network_access: true/ ' ${OUTPUT_FILE}"
+    echo "**NOTE: this will prevent the RPM upload if you need to install one!**"
+    echo "You will need to upload the RPM to the nodes and install them after the kataconfig is installed."
+    echo "It will also make the automated tests invalid"
     echo ""
-    echo "2. Move it to the appropriate directory:"
+    echo "3. Move it to the appropriate directory:"
     echo "mv ${OUTPUT_FILE} ci-operator/config/openshift/sandboxed-containers-operator/"
     echo ""
-    echo "3. Add to git:"
+    echo "4. Add to git:"
     echo "git add ci-operator/config/openshift/sandboxed-containers-operator/${OUTPUT_FILE}"
     echo ""
-    echo "4. Generate and update CI configuration before creating PR:"
+    echo "5. Generate and update CI configuration before creating PR:"
     echo "make ci-operator-config && make registry-metadata && make prow-config && make jobs && make update"
     echo ""
-    echo "5. git add changes, commit and push to PR"
+    echo "6. git add changes, commit and push to PR"
     echo ""
 }
 
