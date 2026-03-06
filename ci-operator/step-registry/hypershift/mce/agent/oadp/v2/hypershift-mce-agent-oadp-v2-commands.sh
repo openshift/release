@@ -45,7 +45,14 @@ spec:
 
 EOF
 
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+# When guest OLM catalog placement is used, OADP is installed on the hosted cluster
+# (nested_kubeconfig). Keep using nested_kubeconfig so all OADP resources (secret,
+# DPA, Backup, Restore) are created on the same cluster where the OADP operator runs.
+# Fall back to the management cluster kubeconfig when nested_kubeconfig is not present.
+if [[ ! -f "${SHARED_DIR}/nested_kubeconfig" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+fi
+
 cat <<EOF > /tmp/miniocred
 [default]
 aws_access_key_id=admin
@@ -89,7 +96,7 @@ spec:
         - csi
       customPlugins:
         - name: hypershift-oadp-plugin
-          image: quay.io/redhat-user-workloads/crt-redhat-acm-tenant/hypershift-oadp-plugin-main:latest
+          image: quay.io/hypershift/hypershift-oadp-plugin:latest
   snapshotLocations:
     - velero:
         config:
@@ -154,7 +161,9 @@ spec:
 EOF
 oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed backup/hc-clusters-hosted-backup -n openshift-adp
 
-oc delete hostedcluster -n local-cluster "${CLUSTER_NAME}"
+# HostedCluster is a management cluster resource; always use the management kubeconfig
+# to delete and wait for it, regardless of where OADP is installed.
+KUBECONFIG="${SHARED_DIR}/kubeconfig" oc delete hostedcluster -n local-cluster "${CLUSTER_NAME}"
 
 cat <<EOF | oc apply -f -
 apiVersion: velero.io/v1
@@ -181,7 +190,8 @@ spec:
 EOF
 
 oc wait --timeout=45m --for=jsonpath='{.status.phase}'=Completed restore/hc-clusters-hosted-restore -n openshift-adp
-oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
+# HostedCluster availability must be checked against the management cluster.
+KUBECONFIG="${SHARED_DIR}/kubeconfig" oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 echo "Wait HostedCluster ready..."
 until \
@@ -191,6 +201,7 @@ until \
     sleep 1s
 done
 oc get pod -A > "${ARTIFACT_DIR}/hostedcluster pods"
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+# Backup and Restore objects live on the hosted cluster (openshift-adp); collect them
+# using the current kubeconfig (nested_kubeconfig when guest OLM placement is active).
 oc get backup -n openshift-adp hc-clusters-hosted-backup -o yaml > "${ARTIFACT_DIR}/backup.yaml"
 oc get restore hc-clusters-hosted-restore -n openshift-adp  -o yaml > "${ARTIFACT_DIR}/restore.yaml"
