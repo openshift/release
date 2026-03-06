@@ -1,0 +1,17 @@
+chain:
+  as: hypershift-e2e-backuprestore
+  steps:
+  - as: tests
+    cli: latest
+    commands: |-
+      export E2E_HOSTED_CLUSTER_NAME=$(cat ${SHARED_DIR}/cluster-name)
+      export E2E_HOSTED_CLUSTER_NAMESPACE=clusters
+      bin/test-backuprestore --ginkgo.v --ginkgo.junit-report=${ARTIFACT_DIR}/junit_backuprestore_report.xml --ginkgo.label-filter="backup-restore" --ginkgo.fail-fast=true --ginkgo.timeout=2h
+    timeout: 2h30m
+    grace_period: 5m
+    from: hypershift-tests
+    resources:
+      requests:
+        cpu: "1"
+        memory: 200Mi
+  - chain: hypershift-conformance
