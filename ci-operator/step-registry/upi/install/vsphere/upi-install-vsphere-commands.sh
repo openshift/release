@@ -60,6 +60,11 @@ echo "install-config.yaml"
 echo "-------------------"
 cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret\|auth" | tee ${ARTIFACT_DIR}/install-config.yaml
 
+INSTALLER_BINARY="openshift-install"
+
+echo "=============== openshift-install version =============="
+${INSTALLER_BINARY} version
+
 # Copy variables.ps1 to artifacts directory for debugging
 echo "variables.ps1"
 echo "-------------------"
@@ -324,7 +329,7 @@ function gather_console_and_bootstrap() {
     # state snapshot was created by Terraform v0.12.24, which is newer than current v0.12.20; upgrade to Terraform v0.12.24 or greater to work with this state"
     # move the state temporarily
     mv "${installer_dir}/terraform.tfstate" "${installer_dir}/terraform.tfstate.backup"
-    openshift-install --log-level debug --dir="${installer_dir}" gather bootstrap --key "${SSH_PRIV_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS[@]}"
+    ${INSTALLER_BINARY} --log-level debug --dir="${installer_dir}" gather bootstrap --key "${SSH_PRIV_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS[@]}"
     mv "${installer_dir}/terraform.tfstate.backup" "${installer_dir}/terraform.tfstate"
 
     echo "$(date -u --rfc-3339=seconds) - Copy log-bundle to artifacts directory..."
@@ -474,7 +479,7 @@ fi
 
 ## Monitor for `bootstrap-complete`
 echo "$(date -u --rfc-3339=seconds) - Monitoring for bootstrap to complete"
-openshift-install --dir="${installer_dir}" wait-for bootstrap-complete &
+${INSTALLER_BINARY} --dir="${installer_dir}" wait-for bootstrap-complete &
 
 set +e
 wait "$!"
@@ -500,7 +505,7 @@ echo "$(date -u --rfc-3339=seconds) - Monitoring for cluster completion..."
 
 # When using line-buffering there is a potential issue that the buffer is not filled (or no new line) and this waits forever
 # or in our case until the four hour CI timer is up.
-openshift-install --dir="${installer_dir}" wait-for install-complete 2>&1 | stdbuf -o0 grep -v password &
+${INSTALLER_BINARY} --dir="${installer_dir}" wait-for install-complete 2>&1 | stdbuf -o0 grep -v password &
 
 set +e
 wait "$!"
