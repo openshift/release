@@ -148,23 +148,11 @@ KATA_RPM_VERSION=3.18.0-3.rhaos4.20.el9 \
 ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
-## Catalog Tag Discovery
-
-### Runtime Tag Resolution
+### CATALOG_SOURCE_IMAGE Tag Resolution
 
 The `create-prowjob` script uses `:latest` as the default tag. The actual latest tag is resolved at **runtime** by the `env-cm` step when the job executes.
 
-### How It Works
-<!-- COMMIT remove this section -->
-1. **At config generation time**: `CATALOG_SOURCE_IMAGE` is set to `quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest`
-2. **At job runtime**: The `env-cm` step checks the tag:
-   - If the tag is `:latest`, it queries the Quay API to find the most recent `X.Y.Z-unix_epoch` tag
-   - If the tag is anything else (specific version or SHA), it is passed through unchanged
-3. **Supported tag formats**:
-   - `latest` - resolved to newest `X.Y.Z-unix_epoch` tag at runtime
-   - `X.Y.Z-unix_epoch` (e.g., `1.11.1-1766149846`) - passed through unchanged
-   - SHA (e.g., `sha256:abc123...` or short SHA) - passed through unchanged
-4. **Source**: `quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc`
+It can be overridden with any other valid tag
 
 
 ## Gangway
