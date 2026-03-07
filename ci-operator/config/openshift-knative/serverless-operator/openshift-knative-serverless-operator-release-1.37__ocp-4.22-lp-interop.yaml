@@ -133,7 +133,7 @@ resources:
       memory: 200Mi
 tests:
 - always_run: false
-  as: operator-e2e-interop-aws-ocp422
+  as: cr-operator-e2e-aws
   cron: 0 3,15 * * *
   steps:
     cluster_profile: aws-cspi-qe
@@ -142,18 +142,46 @@ tests:
       FIREWATCH_CONFIG: |
         {
           "failure_rules":
-            [
+             [
               {"step": "knative-eventing-kafka-broker-e2e", "failure_type": "test_failure", "classification": "knative-eventing-kafka-broker-e2e Test Failure", "jira_additional_labels": ["!default","interop-tests"], "jira_assignee": "!default"},
               {"step": "knative-serving-eventing-e2e", "failure_type": "test_failure", "classification": "knative-serving-eventing-e2e Test Failure", "jira_additional_labels": ["!default","interop-tests"], "jira_assignee": "!default"},
               {"step": "operator-e2e", "failure_type": "test_failure", "classification": "operator-e2e Test Failure", "jira_additional_labels": ["!default","interop-tests"], "jira_assignee": "!default"},
               {"step": "knative-*", "failure_type": "pod_failure", "classification": "knative Test Execution", "jira_additional_labels": ["!default","interop-tests"], "jira_assignee": "!default"},
               {"step": "operator-e2e", "failure_type": "pod_failure", "classification": "operator-e2e Test Execution", "jira_additional_labels": ["!default","interop-tests"], "jira_assignee": "!default"}
-            ]
+             ]
         }
-      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/cr/lp-interop.json
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/cr/lp-interop.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","self-managed-lp","serverless-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: maschmid@redhat.com
       FIREWATCH_DEFAULT_JIRA_PROJECT: SRVCOM
+      OCP_VERSION: "4.22"
+      REPORT_TO_DR: "true"
+      REPORTPORTAL_CMP: Serverless-lp-interop
+      USER_TAGS: |
+        scenario serverless
+    workflow: firewatch-ipi-aws-cr
+- always_run: false
+  as: aws-fips
+  cron: 0 23 31 2 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+             [
+              {"step": "knative-eventing-kafka-broker-e2e", "failure_type": "test_failure", "classification": "knative-eventing-kafka-broker-e2e Test Failure", "jira_project": "SRVCOM", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "knative-serving-eventing-e2e", "failure_type": "test_failure", "classification": "knative-serving-eventing-e2e Test Failure", "jira_project": "SRVCOM", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "operator-e2e", "failure_type": "test_failure", "classification": "operator-e2e Test Failure", "jira_project": "SRVCOM", "jira_assignee": "!default", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "knative-*", "failure_type": "pod_failure", "classification": "knative Test Execution", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "operator-e2e", "failure_type": "pod_failure", "classification": "operator-e2e Test Execution", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/main/firewatch-base-configs/aws-ipi/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","self-managed-lp","serverless-lp","fips"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: maschmid@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       OCP_VERSION: "4.22"
       REPORT_TO_DR: "true"
       REPORTPORTAL_CMP: Serverless-lp-interop
@@ -246,4 +274,4 @@ zz_generated_metadata:
   branch: release-1.37
   org: openshift-knative
   repo: serverless-operator
-  variant: ocp-4.22-lp-interop-cr
+  variant: ocp-4.22-lp-interop
