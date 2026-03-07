@@ -96,30 +96,35 @@ oc wait --for=condition=Ready pod/tls-scanner -n "${NAMESPACE}" --timeout=5m || 
     exit 1
 }
 
-echo "Waiting for scan to complete..."
-# Poll logs until scan completes (don't use -f which waits for container exit)
+echo "Streaming scanner logs (live)..."
+oc logs -f pod/tls-scanner -n "${NAMESPACE}" &
+LOGS_PID=$!
+
+echo "Waiting for scan to finish (artifacts appear when scan completes, pod stays alive 120s for collection)..."
 while true; do
-    if oc logs pod/tls-scanner -n "${NAMESPACE}" 2>/dev/null | grep -q "Scan complete"; then
+    phase=$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+    if [[ "$phase" == "Succeeded" || "$phase" == "Failed" ]]; then
         break
     fi
-    # Show progress
-    echo "  Scan still running..."
-    sleep 30
+    if oc exec pod/tls-scanner -n "${NAMESPACE}" -- test -f /results/output.log 2>/dev/null; then
+        if oc exec pod/tls-scanner -n "${NAMESPACE}" -- grep -q "Scan complete" /results/output.log 2>/dev/null; then
+            echo "Scan complete detected, collecting artifacts..."
+            break
+        fi
+    fi
+    sleep 15
 done
 
-echo "Scan completed. Fetching full logs..."
-oc logs pod/tls-scanner -n "${NAMESPACE}" || true
-
-echo "Copying artifacts (container still alive in sleep phase)..."
+echo "Copying artifacts..."
 oc cp "${NAMESPACE}/tls-scanner:/results/." "${SCANNER_ARTIFACT_DIR}/" || echo "Warning: Failed to copy some artifacts"
 
-# Copy JUnit XML to root artifact dir for Spyglass (pattern: artifacts/junit*.xml)
 if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
     cp "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" "${ARTIFACT_DIR}/junit_tls_scan.xml"
     echo "JUnit results copied to ${ARTIFACT_DIR}/junit_tls_scan.xml for Spyglass"
 fi
 
-# Wait for pod to complete
+wait $LOGS_PID 2>/dev/null || true
+
 oc wait --for=jsonpath='{.status.phase}'=Succeeded pod/tls-scanner -n "${NAMESPACE}" --timeout=4h || {
     echo "Scanner did not complete successfully"
     oc describe pod/tls-scanner -n "${NAMESPACE}"
