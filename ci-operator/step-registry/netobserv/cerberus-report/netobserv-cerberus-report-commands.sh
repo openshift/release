@@ -4,6 +4,42 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "====> Waiting for Cerberus observer pod to complete"
+
+# Wait for the redhat-chaos-cerberus pod to complete before collecting report
+# The cerberus cleanup function creates files on EXIT, so we need to wait for completion
+timeout=300
+elapsed=0
+while [ $elapsed -lt $timeout ]; do
+    # Look for pods with redhat-chaos-cerberus in the name across all namespaces
+    cerberus_pods=$(oc get pods --all-namespaces --no-headers 2>/dev/null | grep "redhat-chaos-cerberus" || true)
+
+    if [[ -z "$cerberus_pods" ]]; then
+        echo "No Cerberus observer pods found - assuming cleanup already completed"
+        break
+    fi
+
+    # Check if any cerberus pods are still running
+    running_pods=$(echo "$cerberus_pods" | grep -v "Completed\|Succeeded\|Failed\|Error" || true)
+
+    if [[ -z "$running_pods" ]]; then
+        echo "All Cerberus observer pods have completed"
+        echo "$cerberus_pods"
+        break
+    fi
+
+    echo "Waiting for Cerberus observer pods to complete... (${elapsed}s elapsed)"
+    echo "$running_pods"
+    sleep 10
+    elapsed=$((elapsed + 10))
+done
+
+if [ $elapsed -ge $timeout ]; then
+    echo "WARNING: Timed out waiting for Cerberus pods to complete after ${timeout}s"
+    echo "Proceeding with report collection anyway..."
+fi
+
+echo ""
 echo "====> Collecting Cerberus failure report"
 
 # First try to read from SHARED_DIR (preferred method)
