@@ -24,8 +24,10 @@ function mapTestsForComponentReadiness() {
         results_file="${1}"
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
+            export cmp="${REPORTPORTAL_CMP}--"
+            
             echo "Mapping Test Suite Name To: ${REPORTPORTAL_CMP}"
-            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name |= sub("^(.*)$", env(REPORTPORTAL_CMP) + "${1}")' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
+            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name |= sub("^(.*)$", env(cmp) + "${1}")' $results_file || echo "Warning: yq failed for ${results_file}, debug manually" >&2
         fi
     fi
 }
