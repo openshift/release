@@ -25,7 +25,7 @@ function mapTestsForComponentReadiness() {
         echo "Patching Tests Result File: ${results_file}"
         if [ -f "${results_file}" ]; then
             echo "Mapping Test Suite Name To: ${REPORTPORTAL_CMP}"
-            yq eval -px -ox -iI0 '.testsuites.testsuite[]."+@name"=env(REPORTPORTAL_CMP)' "$results_file" 2>/dev/null || yq eval -px -ox -iI0 '.testsuites.testsuite."+@name"=env(REPORTPORTAL_CMP)' "$results_file"
+            yq eval -px -ox -iI0 '.testsuites.testsuite.+@name |= sub("^(.*)$", env(REPORTPORTAL_CMP) + "${1}")' $results_file 2>/dev/null || yq eval -px -ox -iI0 '.testsuites.testsuite[].+@name |= sub("^(.*)$", env(REPORTPORTAL_CMP) + "${1}")' $results_file
         fi
     fi
 }
