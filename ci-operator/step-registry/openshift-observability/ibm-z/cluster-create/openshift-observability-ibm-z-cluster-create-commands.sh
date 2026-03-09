@@ -15,7 +15,7 @@ IP_JUMPHOST=128.168.131.115
 CLUSTER_VARS_PATH="/root/ocp-cluster-ibmcloud/ibmcloud-openshift-provisioning/cluster-vars"
 SSH_KEY_PATH="/tmp/id_rsa"
 
-# ...existing code...
+
 # --- VERIFY KEY ---
 # Check if the private key file exists and is readable
 if [[ ! -f "$PRIVATE_KEY_FILE" ]]; then
@@ -26,13 +26,32 @@ if [[ ! -r "$PRIVATE_KEY_FILE" ]]; then
     echo "Error: Private key file is not readable: $PRIVATE_KEY_FILE" >&2
     exit 1
 fi
-# ...existing code...
+
 
 
 # --- PREPARE SSH KEY ---
-# Copy the (read-only) secret to a writable location, then normalize it there
-wrapped_tmp="${SSH_KEY_PATH}.wrapped"
-# ensure wrapped_tmp is removed on exit
+# Copy the (read-only) secret to a writable location
+# (removed wrapped_tmp usage)
+
+cp -f "$PRIVATE_KEY_FILE" "$SSH_KEY_PATH" || { echo "Error: failed to copy $PRIVATE_KEY_FILE to $SSH_KEY_PATH" >&2; exit 1; }
+
+if [[ ! -f "$SSH_KEY_PATH" ]]; then
+    echo "Error: SSH key not found at $SSH_KEY_PATH" >&2
+    exit 1
+fi
+
+# Set strict permissions for SSH (600 is safe and commonly used)
+chmod 0600 "$SSH_KEY_PATH"
+
+# Validate private key (if ssh-keygen exists)
+if command -v ssh-keygen >/dev/null 2>&1; then
+    if ! ssh-keygen -y -f "$SSH_KEY_PATH" >/dev/null 2>&1; then
+        echo "Error: private key at $SSH_KEY_PATH is invalid or requires a passphrase" >&2
+        exit 1
+    fi
+fi
+
+
 
 
 chmod 0600 "$SSH_KEY_PATH"
