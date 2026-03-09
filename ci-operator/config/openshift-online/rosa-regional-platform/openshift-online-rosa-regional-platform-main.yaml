@@ -41,9 +41,21 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    pre:
+    - as: provision
+      commands: ./ci/nightly.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     test:
     - as: e2e
-      commands: ./ci/nightly.sh
+      commands: ./ci/e2e-tests.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-nightly-static-creds
@@ -61,7 +73,22 @@ tests:
       commands: |-
         export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
         export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
-        uv run --no-cache ci/pre-merge.py --teardown
+        ./ci/nightly.sh --teardown
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    pre:
+    - as: pre-merge
+      commands: |-
+        export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
+        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
+        ./ci/nightly.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-nightly-static-creds
@@ -72,11 +99,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     test:
-    - as: pre-merge
-      commands: |-
-        export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
-        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
-        uv run --no-cache ci/pre-merge.py
+    - as: e2e
+      commands: ./ci/e2e-tests.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-nightly-static-creds
