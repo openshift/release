@@ -471,7 +471,7 @@ CONFIG = {
         'us-east-1': 10,
     },
     'hypershift-hive-quota-slice': {
-        'default': 10,
+        'default': 20,
     },
     'aws-virtualization-quota-slice': {
         'us-east-1': 5,
