@@ -10,46 +10,74 @@ PATCH="${SHARED_DIR}/zones.yaml.patch"
 GCP_REGION="${LEASED_RESOURCE}"
 ZONES_COUNT=3
 
-function join_by { local IFS="$1"; shift; echo "$*"; }
+echo "$(date -u --rfc-3339=seconds) - INFO: ZONES_EXCLUSION_PATTERN '${ZONES_EXCLUSION_PATTERN}'"
+echo "$(date -u --rfc-3339=seconds) - INFO: COMPUTE_ZONES '${COMPUTE_ZONES}'"
+echo "$(date -u --rfc-3339=seconds) - INFO: COMPUTE_NODE_TYPE '${COMPUTE_NODE_TYPE}'"
+echo "$(date -u --rfc-3339=seconds) - INFO: CONTROL_PLANE_ZONES '${CONTROL_PLANE_ZONES}'"
+echo "$(date -u --rfc-3339=seconds) - INFO: CONTROL_PLANE_NODE_TYPE '${CONTROL_PLANE_NODE_TYPE}'"
 
 function get_zones_from_region() {
-  # Get all zones from the region, filtering out AI zones
-  mapfile -t AVAILABILITY_ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)' | grep -v '\-ai[0-9]' | shuf)
+  if [[ -n "${ZONES_EXCLUSION_PATTERN}" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - INFO: Filtering zones by the exclusion pattern '${ZONES_EXCLUSION_PATTERN}'"
+    mapfile -t AVAILABILITY_ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)' | grep -v "${ZONES_EXCLUSION_PATTERN}" | shuf)
+  else
+    mapfile -t AVAILABILITY_ZONES < <(gcloud compute zones list --filter="region:${GCP_REGION} AND status:UP" --format='value(name)' | shuf)
+  fi
   
-  # Take the first ZONES_COUNT zones
+  echo "$(date -u --rfc-3339=seconds) - INFO: Take the first ${ZONES_COUNT} zones"
   ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
   ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
-  echo "GCP region: ${GCP_REGION} (zones: ${ZONES_STR})"
+  echo "$(date -u --rfc-3339=seconds) - INFO: GCP region: ${GCP_REGION} (zones: ${ZONES_STR})"
 }
+
+function join_by { local IFS="$1"; shift; echo "$*"; }
 
 function get_zones_by_machine_type() {
   local machine_type=$1
 
-  # Get all zones that support this machine type
+  if [[ -z "${machine_type}" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - INFO: Nothing to do for empty machine type"
+    return
+  fi
+
+  echo "$(date -u --rfc-3339=seconds) - INFO: Get all zones supporting the machine type '${machine_type}'"
   mapfile -t AVAILABILITY_ZONES < <(gcloud compute machine-types list --filter="zone~${GCP_REGION} AND name=${machine_type}" --format='value(zone)')
+  if [[ ${#AVAILABILITY_ZONES[@]} -eq 0 ]]; then
+    echo "$(date -u --rfc-3339=seconds) - INFO: Failed to find any zone in region '${GCP_REGION}' supporting the machine type '${machine_type}'"
+    return
+  fi
+  echo "$(date -u --rfc-3339=seconds) - INFO: [${machine_type}] the initial AVAILABILITY_ZONES '${AVAILABILITY_ZONES[*]}'"
   
-  # Filter out AI zones if this is not an AI machine type (AI types start with "a2-")
-  if [[ ! "${machine_type}" =~ ^a2- ]]; then
-    # Filter out zones containing "-ai" followed by a digit (e.g., us-central1-ai1a)
+  if [[ -n "${ZONES_EXCLUSION_PATTERN}" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - INFO: Filtering zones by the exclusion pattern '${ZONES_EXCLUSION_PATTERN}'"
     local filtered_zones=()
+    set +e
     for zone in "${AVAILABILITY_ZONES[@]}"; do
-      if [[ ! "${zone}" =~ -ai[0-9] ]]; then
+      echo "${zone}" | grep -q "${ZONES_EXCLUSION_PATTERN}"
+      if [[ $? -ne 0 ]]; then
         filtered_zones+=("${zone}")
+      else
+        echo "$(date -u --rfc-3339=seconds) - INFO: Skipped zone '${zone}'"
       fi
     done
-    # Only use filtered zones if we found non-AI zones, otherwise use all zones
+    set -e
+
+    # Only use filtered zones if we found non-PATTERN-matching zones, otherwise use all zones
     if [[ ${#filtered_zones[@]} -gt 0 ]]; then
       AVAILABILITY_ZONES=("${filtered_zones[@]}")
+    else
+      echo "$(date -u --rfc-3339=seconds) - ERROR: Failed to find zones NOT matching the pattern, abort."
+      exit 1
     fi
   fi
   
-  # Shuffle zones randomly to spread load across zones instead of always picking alphabetically first
+  echo "$(date -u --rfc-3339=seconds) - INFO: Shuffle zones randomly to spread load across zones instead of always picking alphabetically first"
   mapfile -t AVAILABILITY_ZONES < <(printf '%s\n' "${AVAILABILITY_ZONES[@]}" | shuf)
   
-  # Take the first ZONES_COUNT zones
+  echo "$(date -u --rfc-3339=seconds) - INFO: Take the first ${ZONES_COUNT} zones"
   ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
   ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
-  echo "[${machine_type}] GCP region: ${GCP_REGION} (zones: ${ZONES_STR})"
+  echo "$(date -u --rfc-3339=seconds) - INFO: [${machine_type}] GCP region: ${GCP_REGION} (zones: ${ZONES_STR})"
 }
 
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
@@ -62,11 +90,24 @@ then
 fi
 
 ZONES_STR=""
+MACHINE_TYPE=""
 if [[ -n "${COMPUTE_ZONES}" ]]; then
   ZONES_STR="${COMPUTE_ZONES}"
 elif [[ -n "${COMPUTE_NODE_TYPE}" ]]; then
-  get_zones_by_machine_type "${COMPUTE_NODE_TYPE}"
+  MACHINE_TYPE="${COMPUTE_NODE_TYPE}"
+elif [[ -n "${ZONES_EXCLUSION_PATTERN}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - INFO: Extracting compute node type from install-config"
+  MACHINE_TYPE=$(yq-go r "${CONFIG}" compute[0].platform.gcp.type)
+  if [[ -z "${MACHINE_TYPE}" ]]; then
+    MACHINE_TYPE=$(yq-go r "${CONFIG}" platform.gcp.defaultMachinePlatform.type)
+  fi
 fi
+get_zones_by_machine_type "${MACHINE_TYPE}"
+if [[ -z "${ZONES_STR}" ]] && [[ -n "${ZONES_EXCLUSION_PATTERN}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - INFO: Found no zone for machine type '${MACHINE_TYPE}', possibly a custom machine type. Filtering among all zones instead..."
+  get_zones_from_region
+fi
+
 if [[ -n "${ZONES_STR}" ]]; then
   cat >> "${PATCH}" << EOF
 compute:
@@ -75,17 +116,30 @@ compute:
     gcp:
       zones: ${ZONES_STR}
 EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+else
+  echo "$(date -u --rfc-3339=seconds) - INFO: Skipped setting zones for compute"
 fi
 
 ZONES_STR=""
+MACHINE_TYPE=""
 if [[ -n "${CONTROL_PLANE_ZONES}" ]]; then
   ZONES_STR="${CONTROL_PLANE_ZONES}"
 elif [[ -n "${CONTROL_PLANE_NODE_TYPE}" ]]; then
-  get_zones_by_machine_type "${CONTROL_PLANE_NODE_TYPE}"
-else
-  # If no zones are set, get standard zones from the region (excluding AI zones)
+  MACHINE_TYPE="${CONTROL_PLANE_NODE_TYPE}"
+elif [[ -n "${ZONES_EXCLUSION_PATTERN}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - INFO: Extracting control-plane node type from install-config"
+  MACHINE_TYPE=$(yq-go r "${CONFIG}" controlPlane.platform.gcp.type)
+  if [[ -z "${MACHINE_TYPE}" ]]; then
+    MACHINE_TYPE=$(yq-go r "${CONFIG}" platform.gcp.defaultMachinePlatform.type)
+  fi
+fi
+get_zones_by_machine_type "${MACHINE_TYPE}"
+if [[ -z "${ZONES_STR}" ]] && [[ -n "${ZONES_EXCLUSION_PATTERN}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - INFO: Found no zone for machine type '${MACHINE_TYPE}', possibly a custom machine type. Filtering among all zones instead..."
   get_zones_from_region
-fi  
+fi
+
 if [[ -n "${ZONES_STR}" ]]; then
   cat >> "${PATCH}" << EOF
 controlPlane:
@@ -94,10 +148,15 @@ controlPlane:
     gcp:
       zones: ${ZONES_STR}
 EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+else
+  echo "$(date -u --rfc-3339=seconds) - INFO: Skipped setting zones for controlPlane"
 fi
 
-yq-go m -x -i "${CONFIG}" "${PATCH}"
+yq-go r "${CONFIG}" platform
 yq-go r "${CONFIG}" compute
 yq-go r "${CONFIG}" controlPlane
 
-rm "${PATCH}"
+if [ -f "${PATCH}" ]; then
+  rm "${PATCH}"
+fi
