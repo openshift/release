@@ -3,8 +3,8 @@
 set -o errexit
 set +o nounset
 
-if [[ "${SKIP_SEND_ALERT}" == "true" ]]; then
-  echo "SKIP_SEND_ALERT is set to true, skipping alert."
+if [[ "${MULTISTAGE_PARAM_OVERRIDE_SKIP_SEND_ALERT}" == "true" ]]; then
+  echo "SKIP_SEND_ALERT override is set to true, skipping alert."
   exit 0
 fi
 
