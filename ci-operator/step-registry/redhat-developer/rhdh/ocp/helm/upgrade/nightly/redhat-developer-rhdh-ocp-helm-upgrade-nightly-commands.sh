@@ -1,16 +1,43 @@
 #!/bin/bash
 
 echo "========== Repository, Branch, and PR Variables =========="
-GITHUB_ORG_NAME="${GITHUB_ORG_NAME:-redhat-developer}"
+GITHUB_ORG_NAME="redhat-developer"
 echo "GITHUB_ORG_NAME: $GITHUB_ORG_NAME"
-GITHUB_REPOSITORY_NAME="${GITHUB_REPOSITORY_NAME:-rhdh}"
+GITHUB_REPOSITORY_NAME="rhdh"
 echo "GITHUB_REPOSITORY_NAME: $GITHUB_REPOSITORY_NAME"
-RELEASE_BRANCH_NAME="${RELEASE_BRANCH_NAME:-$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')}"
+RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 echo "RELEASE_BRANCH_NAME: $RELEASE_BRANCH_NAME"
-GIT_PR_NUMBER="${GIT_PR_NUMBER:-$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')}"
+GIT_PR_NUMBER=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[0].number')
 echo "GIT_PR_NUMBER: $GIT_PR_NUMBER"
-TAG_NAME="${TAG_NAME:-}"
-export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER TAG_NAME
+TAG_NAME=""
+QUAY_REPO=""
+export GITHUB_ORG_NAME GITHUB_REPOSITORY_NAME RELEASE_BRANCH_NAME GIT_PR_NUMBER TAG_NAME QUAY_REPO
+
+echo "========== Gangway API Overrides =========="
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_ORG_NAME}" ]]; then
+    GITHUB_ORG_NAME="${MULTISTAGE_PARAM_OVERRIDE_GITHUB_ORG_NAME}"
+    echo "Override applied: GITHUB_ORG_NAME=${GITHUB_ORG_NAME}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_REPOSITORY_NAME}" ]]; then
+    GITHUB_REPOSITORY_NAME="${MULTISTAGE_PARAM_OVERRIDE_GITHUB_REPOSITORY_NAME}"
+    echo "Override applied: GITHUB_REPOSITORY_NAME=${GITHUB_REPOSITORY_NAME}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_RELEASE_BRANCH_NAME}" ]]; then
+    RELEASE_BRANCH_NAME="${MULTISTAGE_PARAM_OVERRIDE_RELEASE_BRANCH_NAME}"
+    echo "Override applied: RELEASE_BRANCH_NAME=${RELEASE_BRANCH_NAME}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}" ]]; then
+    GIT_PR_NUMBER="${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}"
+    echo "Override applied: GIT_PR_NUMBER=${GIT_PR_NUMBER}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_TAG_NAME}" ]]; then
+    TAG_NAME="${MULTISTAGE_PARAM_OVERRIDE_TAG_NAME}"
+    echo "Override applied: TAG_NAME=${TAG_NAME}"
+fi
+if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_QUAY_REPO}" ]]; then
+    QUAY_REPO="${MULTISTAGE_PARAM_OVERRIDE_QUAY_REPO}"
+    echo "Override applied: QUAY_REPO=${QUAY_REPO}"
+fi
 
 echo "========== Workdir Setup =========="
 export HOME WORKSPACE
@@ -83,7 +110,7 @@ git config --global user.name "rhdh-qe"
 git config --global user.email "rhdh-qe@redhat.com"
 
 echo "========== PR Branch Handling =========="
-if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
+if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]] && [[ -z "${MULTISTAGE_PARAM_OVERRIDE_TAG_NAME}" ]]; then
     # If executed as PR check of the repository, switch to PR branch.
     git fetch origin pull/"${GIT_PR_NUMBER}"/head:PR"${GIT_PR_NUMBER}"
     git checkout PR"${GIT_PR_NUMBER}"

@@ -3,6 +3,22 @@
 set +o errexit
 set +o nounset
 
+# Skip data router reporting when job was triggered via Gangway API with overrides
+OVERRIDE_VARS=(
+  "${MULTISTAGE_PARAM_OVERRIDE_QUAY_REPO}"
+  "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_ORG_NAME}"
+  "${MULTISTAGE_PARAM_OVERRIDE_GITHUB_REPOSITORY_NAME}"
+  "${MULTISTAGE_PARAM_OVERRIDE_RELEASE_BRANCH_NAME}"
+  "${MULTISTAGE_PARAM_OVERRIDE_GIT_PR_NUMBER}"
+  "${MULTISTAGE_PARAM_OVERRIDE_TAG_NAME}"
+)
+for override in "${OVERRIDE_VARS[@]}"; do
+  if [[ -n "${override}" ]]; then
+    echo "Gangway API override detected, skipping data router reporting."
+    exit 0
+  fi
+done
+
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 export RELEASE_BRANCH_NAME
 
