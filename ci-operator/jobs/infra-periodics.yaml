@@ -30,7 +30,7 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 30 7 * * 1-5
   decorate: true
   labels:
@@ -90,7 +90,37 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
-  cluster: build06
+  cluster: build05
+  cron: 30 7 * * 1-5
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-build05-upgrade
+  reporter_config:
+    slack:
+      channel: '#ops-testplatform'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed which indicates that the upgrade of
+        `build05` has not been completed over 24 hours. Please check if anything blocks
+        the process.
+  spec:
+    containers:
+    - args:
+      - adm
+      - upgrade
+      - --to-latest
+      command:
+      - /usr/bin/oc
+      image: quay-proxy.ci.openshift.org/openshift/ci:ocp_4.17_cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+    serviceAccountName: upgrader
+- agent: kubernetes
+  cluster: build02
   cron: 30 7 * * 1-5
   decorate: true
   labels:
@@ -120,7 +150,7 @@ periodics:
           cpu: 500m
     serviceAccountName: upgrader
 - agent: kubernetes
-  cluster: build07
+  cluster: build02
   cron: 30 7 * * 1-5
   decorate: true
   labels:
@@ -1239,7 +1269,7 @@ periodics:
   spec:
     containers:
     - args:
-      - --upstream-branch=master
+      - --upstream-branch=main
       - --github-token-path=/etc/github/oauth
       - --github-endpoint=http://ghproxy
       - --github-endpoint=https://api.github.com
@@ -2138,8 +2168,16 @@ periodics:
       - --bw-allow-unused=dptp/quay.io/multi-arch
       - --kubeconfig-dir=/etc/build-farm-credentials
       - --kubeconfig-suffix=config
+      - --enable-gsm=true
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
+      - --gsm-credentials-file=/etc/gcp-credentials/key.json
       command:
       - /usr/bin/ci-secret-bootstrap
+      env:
+      - name: GCP_PROJECT_ID
+        value: openshift-ci-secrets
+      - name: GCP_PROJECT_NUMBER
+        value: "384486694155"
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-bootstrap_latest
       imagePullPolicy: Always
       name: ci-secret-bootstrap
@@ -2154,11 +2192,23 @@ periodics:
         name: config-volume
       - mountPath: /etc/ci-secret-bootstrap
         name: ci-secret-bootstrap
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
+      - mountPath: /etc/gcp-credentials
+        name: gcp-sa-key
+        readOnly: true
     serviceAccountName: secret-bootstrap
     volumes:
     - configMap:
         name: ci-secret-bootstrap
       name: ci-secret-bootstrap
+    - configMap:
+        name: gsm-config
+      name: gsm-config
+    - name: gcp-sa-key
+      secret:
+        secretName: gsm-secrets-reconciler-sa-credentials
     - name: build-farm-credentials
       secret:
         secretName: config-updater

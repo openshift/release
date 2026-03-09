@@ -471,7 +471,7 @@ CONFIG = {
         'us-east-1': 10,
     },
     'hypershift-hive-quota-slice': {
-        'default': 20,
+        'default': 10,
     },
     'aws-virtualization-quota-slice': {
         'us-east-1': 5,
@@ -629,6 +629,9 @@ CONFIG = {
     },
     'amd-gpu-quota-slice': {
         '10.1.178.14': 1,
+    },
+    'aws-osp-qe-quota-slice': {
+        'us-east-1': 10,
     },
 }
 

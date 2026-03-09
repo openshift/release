@@ -6,19 +6,19 @@ base_images:
   stolostron_builder_go1.24-linux:
     name: builder
     namespace: stolostron
-    tag: go1.24-linux
+    tag: go1.25-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.23-linux
+    tag: go1.25-linux
 images:
 - dockerfile_path: Dockerfile.prow
   from: base
   inputs:
     stolostron_builder_go1.24-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.25-linux
   to: prometheus
 promotion:
   to:
@@ -34,7 +34,7 @@ resources:
 test_binary_build_commands: "true"
 tests:
 - as: vendor
-  commands: go mod vendor && make unused && git diff --exit-code
+  commands: GOWORK=off go mod vendor && make unused && git diff --exit-code
   container:
     from: src
 - as: common-test
