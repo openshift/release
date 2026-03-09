@@ -218,30 +218,133 @@ tests:
     from: yamllint
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: e2e-aws-ovn
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(baremetal|libvirt|openstack))|(^cluster-api/providers/([^a]|a[^w]|aw[^s]).*/)|(/agent/)
   steps:
-    cluster_profile: aws-4
-    env:
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      USER_TAGS: |
-        keyA valueA
-        key2 value2
-        keySpecial v@lu3-Special_.:/=+
-        keyD valueD spaces
-    workflow: openshift-e2e-aws
-- always_run: false
-  as: e2e-aws-ovn-techpreview
-  optional: true
+    cluster_profile: openshift-org-aws
+    test:
+    - as: e2e
+      commands: |
+        source "$LEASE_PROXY_CLIENT_SH"
+
+        echo "CLUSTER_PROFILE_SET_NAME: $CLUSTER_PROFILE_SET_NAME"
+        echo "CLUSTER_PROFILE_NAME: $CLUSTER_PROFILE_NAME"
+        echo "LEASED_RESOURCE: $LEASED_RESOURCE"
+
+        printf -- '\n---\n\n'
+
+        echo "Acquiring 2 leases of type aws-2-quota-slice"
+        names=$(lease__acquire --store=false -t aws-2-quota-slice -c 2)
+        echo "$names acquired"
+
+        echo "Releasing $names"
+        lease__release -n "$names"
+        echo "$names released"
+
+        printf -- '\n---\n\n'
+
+        echo "Acquiring and storing a lease of type aws-3-quota-slice"
+        names=$(lease__acquire -t aws-3-quota-slice)
+        echo "$names acquired"
+
+        printf -- '\n---\n\n'
+
+        ec=0
+        echo "Trying to acquire a lease of an invalid type"
+        names=$(lease__acquire -t foobar) || ec=$?
+        if [ $ec -ne 0 ]; then
+          echo "error: $names"
+          echo "exit code: $ec"
+        fi
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+    post:
+    - as: leases-cleanup
+      commands: |
+        source "$LEASE_PROXY_CLIENT_SH"
+        echo "Releasing the following stored leases:"
+        cat "${SHARED_DIR}/leases"
+
+        ec=0
+        result=$(lease__release_stored) || ec=$?
+
+        printf -- '\n---\n\n'
+
+        if [ $ec -eq 0 ]; then
+          echo "Leases have been released"
+        else
+          echo "Releasing error: $result"
+        fi
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+- as: e2e-aws-ovn-techpreview
   steps:
-    cluster_profile: aws-3
-    env:
-      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
-      FEATURE_SET: TechPreviewNoUpgrade
-      USER_TAGS: |
-        keyA valueA
-        keyB valueB
-        keyC valueC
-    workflow: openshift-e2e-aws
+    cluster_profile: openshift-org-aws
+    test:
+    - as: e2e
+      commands: |
+        source "$LEASE_PROXY_CLIENT_SH"
+
+        echo "CLUSTER_PROFILE_SET_NAME: $CLUSTER_PROFILE_SET_NAME"
+        echo "CLUSTER_PROFILE_NAME: $CLUSTER_PROFILE_NAME"
+        echo "LEASED_RESOURCE: $LEASED_RESOURCE"
+
+        printf -- '\n---\n\n'
+
+        echo "Acquiring 2 leases of type aws-4-quota-slice"
+        names=$(lease__acquire --store=false -t aws-4-quota-slice -c 2)
+        echo "$names acquired"
+
+        echo "Releasing $names"
+        lease__release -n "$names"
+        echo "$names released"
+
+        printf -- '\n---\n\n'
+
+        echo "Acquiring and storing a lease of type aws-5-quota-slice"
+        names=$(lease__acquire -t aws-5-quota-slice)
+        echo "$names acquired"
+
+        printf -- '\n---\n\n'
+
+        ec=0
+        echo "Trying to acquire a lease of an invalid type"
+        names=$(lease__acquire -t foobar) || ec=$?
+        if [ $ec -ne 0 ]; then
+          echo "error: $names"
+          echo "exit code: $ec"
+        fi
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
+    post:
+    - as: leases-cleanup
+      commands: |
+        source "$LEASE_PROXY_CLIENT_SH"
+        echo "Releasing the following stored leases:"
+        cat "${SHARED_DIR}/leases"
+
+        ec=0
+        result=$(lease__release_stored) || ec=$?
+
+        printf -- '\n---\n\n'
+
+        if [ $ec -eq 0 ]; then
+          echo "Leases have been released"
+        else
+          echo "Releasing error: $result"
+        fi
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 64Mi
 - always_run: false
   as: e2e-aws-ovn-devpreview
   optional: true
