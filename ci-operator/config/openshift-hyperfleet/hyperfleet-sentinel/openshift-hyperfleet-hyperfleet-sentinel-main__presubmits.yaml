@@ -33,25 +33,33 @@ tests:
   capabilities:
   - nested-podman
   commands: |
-    # Start podman API service in background for testcontainers-go
-    # The nested-podman image provides podman but doesn't start the API service
+    set -euo pipefail
+    export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
+    PODMAN_PID=""
+    cleanup() {
+        if [[ -n "$PODMAN_PID" ]]; then
+            kill "$PODMAN_PID" 2>/dev/null || true
+            wait "$PODMAN_PID" 2>/dev/null || true
+        fi
+    }
+    trap cleanup EXIT
+
     podman system service --time=0 &
     PODMAN_PID=$!
-    sleep 2
-    # Configure testcontainers-go to work with podman
-    # See: https://github.com/testcontainers/testcontainers-go/issues/2952
+
+    # Wait for the podman socket to be available
     SOCKET_PATH=$(podman info --format '{{.Host.RemoteSocket.Path}}')
-    export DOCKER_HOST="unix://$SOCKET_PATH"
-    export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
+    for i in $(seq 1 30); do
+        [ -S "$SOCKET_PATH" ] && break
+        sleep 1
+    done
+
     export TESTCONTAINERS_RYUK_DISABLED=true
+    export PATH=$PATH:$(go env GOPATH)/bin
+
     # Run integration tests
     make generate
     make test-integration
-    # Cleanup: stop podman service to allow job to complete
-    TEST_EXIT_CODE=$?
-    kill $PODMAN_PID 2>/dev/null || true
-    wait $PODMAN_PID 2>/dev/null || true
-    exit $TEST_EXIT_CODE
   container:
     from: podman-test
   nested_podman: true
