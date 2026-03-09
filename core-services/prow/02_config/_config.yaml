@@ -302,6 +302,7 @@ moonraker:
 owners_dir_denylist:
   default:
   - vendor/.*
+pipeline: {}
 plank:
   default_decoration_config_entries:
   - config:
@@ -351,10 +352,10 @@ plank:
             memory: 250Mi
       timeout: 8h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260217-999e46ca7
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260217-999e46ca7
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260217-999e46ca7
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260217-999e46ca7
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260304-f92e22b4d
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260304-f92e22b4d
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260304-f92e22b4d
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260304-f92e22b4d
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -402,6 +403,9 @@ plank:
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
       timeout: 23h0m0s
     repo: openshift/open-telemetry-opentelemetry-operator
+  - config:
+      timeout: 4h0m0s
+    repo: opendatahub-io/opendatahub-operator
   - config:
       gcs_configuration:
         bucket: qe-private-deck
@@ -572,6 +576,18 @@ plank:
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 pod_namespace: ci
+presets:
+- env: null
+  labels:
+    presets.ci.openshift.io/registry-pull: "true"
+  volumeMounts:
+  - mountPath: /etc/pull-secret
+    name: pull-secret
+    readOnly: true
+  volumes:
+  - name: pull-secret
+    secret:
+      secretName: registry-pull-credentials
 prowjob_default_entries:
 - cluster: '*'
   config:

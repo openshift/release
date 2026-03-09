@@ -630,6 +630,9 @@ CONFIG = {
     'amd-gpu-quota-slice': {
         '10.1.178.14': 1,
     },
+    'aws-osp-qe-quota-slice': {
+        'us-east-1': 10,
+    },
 }
 
 for i in range(2,7):
@@ -736,6 +739,13 @@ for typeName, data in sorted(CONFIG.items()):
             else:
                 resource['names'].append(name)
     config['resources'].append(resource)
+
+# XXX: For testing purposes only, remove ASAP.
+config['resources'].append({
+    'type': 'openshift-org-aws-quota-slice',
+    'state': 'free',
+    'names': ['aws--us-east-1--openshift-org-aws-quota-slice-00','aws-2--us-east-2--openshift-org-aws-quota-slice-01']
+})
 
 with open('_boskos.yaml', 'w') as f:
     f.write('# generated with generate-boskos.py; do not edit directly\n')

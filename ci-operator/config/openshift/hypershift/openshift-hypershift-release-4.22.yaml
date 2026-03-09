@@ -122,10 +122,11 @@ resources:
       memory: 200Mi
   unit:
     limits:
-      memory: 4Gi
+      cpu: 4000m
+      memory: 8Gi
     requests:
       cpu: 4000m
-      memory: 2.5Gi
+      memory: 8Gi
   verify:
     limits:
       cpu: 4000m
@@ -219,8 +220,8 @@ tests:
   steps:
     cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-v2
-- as: e2e-azure-self-managed
-  optional: true
+- always_run: false
+  as: e2e-azure-self-managed
   skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
   steps:
     cluster_profile: hypershift-azure
@@ -482,6 +483,19 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-421
     workflow: hypershift-aws-reqserving-e2e
+- as: periodic-jira-agent
+  cron: 30 8 * * 1
+  steps:
+    env:
+      JIRA_AGENT_MAX_ISSUES: "1"
+    workflow: hypershift-jira-agent
+- as: periodic-review-agent
+  cron: 0 8-23/3 * * 1-5
+  steps:
+    env:
+      REVIEW_AGENT_BATCH_ONLY: "true"
+      REVIEW_AGENT_MAX_PRS: "10"
+    workflow: hypershift-review-agent
 - always_run: false
   as: address-review-comments
   optional: true
