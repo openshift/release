@@ -740,6 +740,13 @@ for typeName, data in sorted(CONFIG.items()):
                 resource['names'].append(name)
     config['resources'].append(resource)
 
+# XXX: For testing purposes only, remove ASAP.
+config['resources'].append({
+    'type': 'openshift-org-aws-quota-slice',
+    'state': 'free',
+    'names': ['aws--us-east-1--openshift-org-aws-quota-slice-00','aws-2--us-east-2--openshift-org-aws-quota-slice-01']
+})
+
 with open('_boskos.yaml', 'w') as f:
     f.write('# generated with generate-boskos.py; do not edit directly\n')
     yaml.dump(config, f, default_flow_style=False)
