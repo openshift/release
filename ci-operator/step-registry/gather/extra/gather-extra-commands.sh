@@ -741,12 +741,20 @@ wait
 mkdir -p ${ARTIFACT_DIR}/junit/
 
 if openshift-tests e2e-analysis --help &>/dev/null; then
-    echo "Post e2e-analysis check for the cluster"
-    if [[ -f "${SHARED_DIR}/install-duration.log" ]]; then
-      echo "Found install-duration.log, it will be used for collecting install durations"
-      cat "${SHARED_DIR}/install-duration.log"
+    INSTALL_EXIT_CODE=0
+    if [[ -f "${SHARED_DIR}/install-status.txt" ]]; then
+        INSTALL_EXIT_CODE=$(tail -n1 "${SHARED_DIR}/install-status.txt" | awk '{print $1}')
     fi
-    openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+    if [[ "$INSTALL_EXIT_CODE" ==  0 ]]; then
+        echo "Post e2e-analysis check for the cluster"
+        if [[ -f "${SHARED_DIR}/install-duration.log" ]]; then
+            echo "Found install-duration.log, it will be used for collecting install durations"
+            cat "${SHARED_DIR}/install-duration.log"
+        fi
+        openshift-tests e2e-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+    else
+        echo "Install failed, skipping post e2e-analysis check"
+    fi
 else
     # C2S/SC2S proxy can not access internet
     if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
