@@ -34,12 +34,55 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-- as: unit-and-gencheck
+- as: unit
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.3
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: unit
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export BUILD_WITH_CONTAINER=0 && \
+          cd /work && \
+          entrypoint \
+          make -e T=-v build racetest binaries-test"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: gencheck
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.28-2cff97d3b27d82d78c5d4e468a467f520cf2fbf3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
     test:
@@ -80,25 +123,6 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 1h0m0s
-    - as: unit
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export BUILD_WITH_CONTAINER=0 && \
-          cd /work && \
-          entrypoint \
-          make -e T=-v build racetest binaries-test"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 3h0m0s
     workflow: servicemesh-istio-e2e-profile
 - as: integ-helm
   steps:
