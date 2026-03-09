@@ -308,7 +308,8 @@ BRANCH=$(yq-v4 eval '.BRANCH' "${SHARED_DIR}/powervc-conf.yaml")
 CLOUD=$(yq-v4 eval '.CLOUD' "${SHARED_DIR}/powervc-conf.yaml")
 CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervc-conf.yaml")
 COMPUTE_NODE_TYPE=$(yq-v4 eval '.COMPUTE_NODE_TYPE' "${SHARED_DIR}/powervc-conf.yaml")
-FLAVOR=$(yq-v4 eval '.FLAVOR' "${SHARED_DIR}/powervc-conf.yaml")
+BASTION_FLAVOR=$(yq-v4 eval '.BASTION_FLAVOR' "${SHARED_DIR}/powervc-conf.yaml")
+CLUSTER_FLAVOR=$(yq-v4 eval '.CLUSTER_FLAVOR' "${SHARED_DIR}/powervc-conf.yaml")
 LEASED_RESOURCE=$(yq-v4 eval '.LEASED_RESOURCE' "${SHARED_DIR}/powervc-conf.yaml")
 NETWORK_NAME=$(yq-v4 eval '.NETWORK_NAME' "${SHARED_DIR}/powervc-conf.yaml")
 SERVER_IP=$(yq-v4 eval '.SERVER_IP' "${SHARED_DIR}/powervc-conf.yaml")
@@ -320,7 +321,8 @@ export BRANCH
 export CLOUD
 export CLUSTER_NAME
 export COMPUTE_NODE_TYPE
-export FLAVOR
+export BASTION_FLAVOR
+export CLUSTER_FLAVOR
 export LEASED_RESOURCE
 export NETWORK_NAME
 
