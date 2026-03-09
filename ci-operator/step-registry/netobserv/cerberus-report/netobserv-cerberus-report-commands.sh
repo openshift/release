@@ -43,35 +43,29 @@ echo ""
 echo "====> Collecting Cerberus failure report"
 
 # First try to read from SHARED_DIR (preferred method)
-if [[ -f "${SHARED_DIR}/cerberus_history.json" ]]; then
-    echo "Found cerberus_history.json in SHARED_DIR"
-    cp "${SHARED_DIR}/cerberus_history.json" "${ARTIFACT_DIR}/${CERBERUS_REPORT_FILE}"
-    echo "Successfully collected report file from SHARED_DIR"
-else
-    echo "cerberus_history.json not found in SHARED_DIR, trying to collect from pod..."
 
-    # Fallback: Get the pod name from the test namespace
-    pods=$(oc get pods -n "${TEST_NAMESPACE}" --no-headers 2>/dev/null || true)
 
-    if [[ -z "$pods" ]]; then
-        echo "ERROR: No pods found in namespace ${TEST_NAMESPACE} and no file in SHARED_DIR"
-        exit 1
-    fi
+# Fallback: Get the pod name from the test namespace
+pods=$(oc get pods -n "${TEST_NAMESPACE}" --no-headers 2>/dev/null || true)
 
-    CREATED_POD_NAME=$(oc get pods -n "${TEST_NAMESPACE}" --no-headers | awk '{print $1}' | head -n 1)
-    echo "Found pod: ${CREATED_POD_NAME} in namespace ${TEST_NAMESPACE}"
-
-    # Copy the cerberus_history.json file from the pod to ARTIFACT_DIR
-    echo "Copying /tmp/cerberus_history.json from pod to ${ARTIFACT_DIR}/${CERBERUS_REPORT_FILE}"
-    if ! oc cp -n "${TEST_NAMESPACE}" "${CREATED_POD_NAME}:/tmp/cerberus_history.json" "${ARTIFACT_DIR}/${CERBERUS_REPORT_FILE}"; then
-        echo "ERROR: Failed to copy cerberus_history.json from pod"
-        echo "Checking if file exists in pod..."
-        oc exec -n "${TEST_NAMESPACE}" "${CREATED_POD_NAME}" -- ls -la /tmp/ || true
-        exit 1
-    fi
-
-    echo "Successfully collected report file from pod"
+if [[ -z "$pods" ]]; then
+    echo "ERROR: No pods found in namespace ${TEST_NAMESPACE}"
+    exit 1
 fi
+
+CREATED_POD_NAME=$(oc get pods -n "${TEST_NAMESPACE}" --no-headers | awk '{print $1}' | head -n 1)
+echo "Found pod: ${CREATED_POD_NAME} in namespace ${TEST_NAMESPACE}"
+
+# Copy the cerberus_history.json file from the pod to ARTIFACT_DIR
+echo "Copying /tmp/cerberus_history.json from pod to ${ARTIFACT_DIR}/${CERBERUS_REPORT_FILE}"
+if ! oc cp -n "${TEST_NAMESPACE}" "${CREATED_POD_NAME}:/tmp/cerberus_history.json" "${ARTIFACT_DIR}/${CERBERUS_REPORT_FILE}"; then
+    echo "ERROR: Failed to copy cerberus_history.json from pod"
+    echo "Checking if file exists in pod..."
+    oc exec -n "${TEST_NAMESPACE}" "${CREATED_POD_NAME}" -- ls -la /tmp/ || true
+    exit 1
+fi
+
+echo "Successfully collected report file from pod"
 
 echo ""
 echo "====> Analyzing Cerberus failure report"
