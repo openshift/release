@@ -41,7 +41,7 @@ data="{
   \"kind\": \"cluster\"
 }"
 
-clusters_json=$(curl -ks -u "${un}":"${pw}" -X POST ${api_ep} -H "Content-Type: application/json" -d @-<<<"${data}")
+clusters_json=$(curl -ks --max-time 30 --retry 3 --retry-delay 10 -u "${un}":"${pw}" -X POST ${api_ep} -H "Content-Type: application/json" -d @-<<<"${data}")
 # Find PE by prism_element_host in vault
 pe_uuid=$(echo "${clusters_json}" | jq ".entities[] | select (.spec.resources.network.external_ip == \"${prism_element_host}\") | .metadata.uuid" | head -n 1)
 pe_name=$(echo "${clusters_json}" | jq ".entities[] | select (.spec.resources.network.external_ip == \"${prism_element_host}\") | .spec.name" | head -n 1)
@@ -71,7 +71,7 @@ if [[ ! -z "${one_net_mode_network_name:-}" ]]; then
   subnet_name="${one_net_mode_network_name}"
 fi
 
-subnets_json=$(curl -ks -u "${un}":"${pw}" -X POST ${api_ep} -H "Content-Type: application/json" -d @-<<<"${data}")
+subnets_json=$(curl -ks --max-time 30 --retry 3 --retry-delay 10 -u "${un}":"${pw}" -X POST ${api_ep} -H "Content-Type: application/json" -d @-<<<"${data}")
 subnet_uuid=$(echo "${subnets_json}" | jq ".entities[] | select (.spec.name == \"${subnet_name}\") | .metadata.uuid ")
 
 if [[ -z "${subnet_uuid}" ]]; then

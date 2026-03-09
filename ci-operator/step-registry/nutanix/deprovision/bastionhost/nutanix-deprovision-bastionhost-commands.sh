@@ -24,6 +24,10 @@ function delete_vm() {
 }
 
 # shellcheck source=/dev/null
+if [[ ! -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - nutanix_context.sh not found, cluster was not provisioned, skipping..."
+  exit 0
+fi
 source "${SHARED_DIR}/nutanix_context.sh"
 
 ENCODED_CREDS="$(echo -n "${NUTANIX_USERNAME}:${NUTANIX_PASSWORD}" | base64)"
