@@ -130,5 +130,3 @@ ansible-playbook playbooks/ran/hub-sno-configure-kustomize-plugin.yml -i ./inven
 # configure gitops
 ansible-playbook playbooks/ran/hub-sno-configure-gitops.yml -i ./inventories/ocp-deployment/build-inventory.py \
     --extra-vars "kubeconfig=${KUBECONFIG_PATH} gitlab_repo_url=${GITLAB_REPO_URL}" -vv
-
-
