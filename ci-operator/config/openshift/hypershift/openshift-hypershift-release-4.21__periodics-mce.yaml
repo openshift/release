@@ -218,18 +218,27 @@ tests:
         NUM_EXTRA_WORKERS=3
         PROVISIONING_NETWORK_PROFILE=Disabled
         REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      EXTRA_ARGS: --olm-catalog-placement=guest
       KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
       KONFLUX_DEPLOY_OPERATORS: "true"
       LVM_OPERATOR_SUB_CHANNEL: stable-4.21
       LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
       MCE_VERSION: "2.11"
       METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
-      OADP_OPERATOR_SUB_CHANNEL: stable-1.4
+      OADP_OPERATOR_SUB_CHANNEL: stable
       OADP_OPERATOR_SUB_SOURCE: qe-app-registry
+      TEST_SKIPS: |
+        \[sig-storage\] CSI\|
+        \[sig-storage\] In-tree Volumes\|
+        \[sig-storage\] PersistentVolumes-local\|
+        \[OCPFeatureGate:NetworkSegmentation\]\|
+        \[sig-builds\]\|
+        \[sig-node\] Managed cluster should verify that nodes have no unexpected reboots
     test:
     - ref: hypershift-mce-agent-minio
     - ref: operatorhub-subscribe-oadp-operator
-    - ref: hypershift-mce-agent-oadp-v2
+    - ref: hypershift-mce-agent-oadp-v2-setup
+    - chain: hypershift-e2e-backuprestore
     - chain: hypershift-conformance
     workflow: hypershift-mce-agent-metal3-conformance
 - as: e2e-kubevirt-metal-ovn
