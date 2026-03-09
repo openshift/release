@@ -10,9 +10,37 @@ echo "Installing Hive operator using pre-merge image..."
 HIVE_IMAGE="${HIVE_IMAGE:-${HIVE_OPERATOR_IMAGE}}"
 echo "Using Hive image: ${HIVE_IMAGE}"
 
+# Clean up any existing Hive installation to avoid leader election conflicts
+echo "Cleaning up any existing Hive installation..."
+if oc get namespace hive &>/dev/null; then
+  echo "Found existing hive namespace, deleting..."
+  oc delete namespace hive --timeout=3m || {
+    echo "WARNING: Namespace deletion timed out or failed, attempting force cleanup..."
+    # Remove finalizers if namespace is stuck
+    oc get namespace hive -o json | jq '.spec.finalizers = []' | oc replace --raw /api/v1/namespaces/hive/finalize -f - || true
+    sleep 5
+  }
+  # Wait for namespace to be fully deleted
+  echo "Waiting for namespace deletion to complete..."
+  WAIT_COUNT=0
+  while oc get namespace hive &>/dev/null && [ $WAIT_COUNT -lt 30 ]; do
+    sleep 2
+    WAIT_COUNT=$((WAIT_COUNT + 1))
+  done
+  if oc get namespace hive &>/dev/null; then
+    echo "WARNING: Hive namespace still exists after cleanup attempt"
+  else
+    echo "Hive namespace successfully deleted"
+  fi
+fi
+
+# Clean up any stale leader election leases
+echo "Cleaning up any stale leader election resources..."
+oc delete lease hive-operator-leader -n hive --ignore-not-found=true || true
+
 # Create hive namespace
 echo "Creating hive namespace..."
-oc create namespace hive || true
+oc create namespace hive
 
 # Create CRDs
 echo "Creating Hive CRDs..."
@@ -195,6 +223,32 @@ EOF
 echo "Waiting for Hive operator deployment to be available..."
 oc wait --for=condition=Available --timeout=10m deployment/hive-operator -n hive
 
+# Verify operator acquired leadership
+echo "Verifying Hive operator acquired leadership..."
+sleep 15
+LEADER_CHECK_COUNT=0
+LEADER_ACQUIRED=false
+while [ $LEADER_CHECK_COUNT -lt 12 ]; do
+  if oc logs -n hive deployment/hive-operator --tail=50 | grep -q "successfully acquired lease\|became leader"; then
+    echo "Hive operator successfully acquired leadership"
+    LEADER_ACQUIRED=true
+    break
+  fi
+  if oc logs -n hive deployment/hive-operator --tail=50 | grep -q "current leader:" | grep -v "attempting to acquire"; then
+    echo "WARNING: Another leader detected, waiting..."
+  fi
+  sleep 5
+  LEADER_CHECK_COUNT=$((LEADER_CHECK_COUNT + 1))
+done
+
+if [ "$LEADER_ACQUIRED" = false ]; then
+  echo "WARNING: Could not confirm operator leadership acquisition"
+  echo "Recent operator logs:"
+  oc logs -n hive deployment/hive-operator --tail=50 || true
+  echo "Leader election lease status:"
+  oc get lease -n hive -o yaml || true
+fi
+
 # Create HiveConfig to initialize Hive
 echo "Creating HiveConfig..."
 cat <<EOF | oc apply -f -
@@ -242,11 +296,44 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
 done
 
 if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+  echo "========================================="
   echo "ERROR: Timeout waiting for Hive CRDs to be created"
-  echo "Available Hive CRDs:"
+  echo "========================================="
+
+  echo ""
+  echo "=== Available Hive CRDs ==="
   oc get crds | grep hive || echo "No Hive CRDs found"
-  echo "Hive operator logs:"
+
+  echo ""
+  echo "=== Hive Namespace Pods ==="
+  oc get pods -n hive -o wide || true
+
+  echo ""
+  echo "=== Hive Operator Pod Status ==="
+  oc describe pods -n hive -l app=hive-operator || true
+
+  echo ""
+  echo "=== Hive Deployments ==="
+  oc get deployments -n hive || true
+
+  echo ""
+  echo "=== Recent Hive Namespace Events ==="
+  oc get events -n hive --sort-by='.lastTimestamp' | tail -30 || true
+
+  echo ""
+  echo "=== Leader Election Lease Status ==="
+  oc get lease -n hive -o yaml || true
+
+  echo ""
+  echo "=== HiveConfig Status ==="
+  oc get hiveconfig hive -o yaml || true
+
+  echo ""
+  echo "=== Hive Operator Logs (last 100 lines) ==="
   oc logs -n hive deployment/hive-operator --tail=100 || true
+
+  echo ""
+  echo "========================================="
   exit 1
 fi
 
