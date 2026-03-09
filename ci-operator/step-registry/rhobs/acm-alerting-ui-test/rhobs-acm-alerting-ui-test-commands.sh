@@ -7,8 +7,10 @@ set -o pipefail
 # The script will enable UIPlugin and add test alerts first, then start cypress test.
 # We use '|| true' on the final cypress command to ensure that the script does not exit with 1.
 
+export CYPRESS_COO_NAMESPACE="${CYPRESS_COO_NAMESPACE}"
+echo "--- CI Check: The value of CYPRESS_COO_NAMESPACE from the environment is: ${CYPRESS_COO_NAMESPACE} ---"
 echo "--- Applying UIPlugin CR to integrate ACM observability into the console ---"
-cat <<EOF | oc apply -f -
+cat <<EOF | oc apply -n "${CYPRESS_COO_NAMESPACE}" -f -
 apiVersion: observability.openshift.io/v1alpha1
 kind: UIPlugin
 metadata:
