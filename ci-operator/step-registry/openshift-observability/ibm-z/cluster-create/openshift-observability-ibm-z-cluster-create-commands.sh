@@ -33,25 +33,9 @@ fi
 # Copy the (read-only) secret to a writable location, then normalize it there
 wrapped_tmp="${SSH_KEY_PATH}.wrapped"
 # ensure wrapped_tmp is removed on exit
-# trap 'rm -f "$wrapped_tmp"' EXIT
 
-if grep -qE 'BEGIN .*PRIVATE KEY' "$PRIVATE_KEY_FILE" >/dev/null 2>&1; then
-    # Secret already contains a header/footer — copy as-is to writable path
-    cp -f "$PRIVATE_KEY_FILE" "$SSH_KEY_PATH"
-else
-    # Wrap the raw key content with BEGIN/END markers into a temporary file, then copy it
-    {
-      printf '%s\n' "-----BEGIN OPENSSH PRIVATE KEY-----"
-      cat "$PRIVATE_KEY_FILE"
-      printf '%s\n' "-----END OPENSSH PRIVATE KEY-----"
-    } > "$wrapped_tmp"
-    # copy the wrapped file into the final SSH_KEY_PATH (avoids writing to the mounted secret)
-    cp -f "$wrapped_tmp" "$SSH_KEY_PATH"
-    # explicit cleanup instead of trap (avoids using trap which requires grace_period)
-    rm -f "$wrapped_tmp"
-fi
-# ...existing code...
 
+chmod 0600 "$SSH_KEY_PATH"
 # --- SSH CONFIGURATION ---
 # Use a bash array to avoid word-splitting problems and force only this identity
 SSH_ARGS=( -i "$SSH_KEY_PATH" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null )
