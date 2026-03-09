@@ -10,4 +10,5 @@ export SUBSCRIPTION_ID; SUBSCRIPTION_ID=$(cat "${CLUSTER_PROFILE_DIR}/subscripti
 export AZURE_TOKEN_CREDENTIALS=prod
 
 unset GOFLAGS
+make install-tools
 make -C tooling/secret-sync test-decrypt
