@@ -278,6 +278,37 @@ tests:
       CHECK_MOD_LIST: "false"
     test:
     - ref: go-verify-deps
+- as: tests-extension
+  run_if_changed: ^(tests-extension/)
+  steps:
+    test:
+    - as: sanity
+      commands: |
+        cd tests-extension
+        make verify
+        make build
+        make verify-metadata
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+- always_run: false
+  as: e2e-aws-ovn-tests-ext
+  optional: true
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        cd tests-extension
+        make build
+        ./bin/cluster-ingress-operator-tests-ext run-suite ingress/parallel
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-ovn
 zz_generated_metadata:
   branch: release-4.22
   org: openshift
