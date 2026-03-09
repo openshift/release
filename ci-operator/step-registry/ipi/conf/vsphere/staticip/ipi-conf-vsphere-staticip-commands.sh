@@ -42,7 +42,9 @@ if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | 
 fi
 
 # We expect this to have the correct number of addresses.  If we are short, we need to exit here with meaningful message.
-if jq -e --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses | length < 11' "${SUBNETS_CONFIG}"; then
+# Required: 1 bootstrap + CONTROL_PLANE_REPLICAS + COMPUTE_NODE_REPLICAS, with bootstrap at index 4
+required_addresses=$((5 + CONTROL_PLANE_REPLICAS + COMPUTE_NODE_REPLICAS))
+if jq -e --argjson REQ "$required_addresses" --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses | length < $REQ' "${SUBNETS_CONFIG}"; then
   echo "SUBNETS.JSON does not contain enough addresses. This workflow is expected to be a single-tenant lease. Please check lease / network type."
   cat "${SUBNETS_CONFIG}"
   exit 1
@@ -66,7 +68,7 @@ EOF
         - ${dns_server}
 EOF
 
-  for n in {5..7}; do
+  for ((n = 5; n < 5 + CONTROL_PLANE_REPLICAS; n++)); do
     cat >>"${STATIC_IPS}" <<EOF
     - role: control-plane
       networkDevice:
@@ -78,7 +80,8 @@ EOF
 EOF
   done
 
-  for n in {8..10}; do
+  compute_start=$((5 + CONTROL_PLANE_REPLICAS))
+  for ((n = compute_start; n < compute_start + COMPUTE_NODE_REPLICAS; n++)); do
     cat >>"${STATIC_IPS}" <<EOF
     - role: compute
       networkDevice:
