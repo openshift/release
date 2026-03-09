@@ -2,6 +2,42 @@
 
 set -euxo pipefail
 
+# Validate required environment variables
+if [ -z "${HIVE_CLUSTER_NAME:-}" ]; then
+  echo "ERROR: HIVE_CLUSTER_NAME environment variable is not set"
+  exit 1
+fi
+
+if [ -z "${CLUSTER_PROFILE_DIR:-}" ]; then
+  echo "ERROR: CLUSTER_PROFILE_DIR environment variable is not set"
+  exit 1
+fi
+
+if [ -z "${SHARED_DIR:-}" ]; then
+  echo "ERROR: SHARED_DIR environment variable is not set"
+  exit 1
+fi
+
+# Validate required files exist in CLUSTER_PROFILE_DIR
+echo "Validating required credential files..."
+REQUIRED_FILES=(
+  "ibmcloud-api-key"
+  "pull-secret"
+  "ssh-privatekey"
+  "ssh-publickey"
+)
+
+for file in "${REQUIRED_FILES[@]}"; do
+  if [ ! -f "${CLUSTER_PROFILE_DIR}/${file}" ]; then
+    echo "ERROR: Required file '${file}' not found in ${CLUSTER_PROFILE_DIR}"
+    echo "Available files:"
+    ls -la "${CLUSTER_PROFILE_DIR}/" || true
+    exit 1
+  fi
+done
+
+echo "All required files validated successfully"
+
 # Create namespace for the cluster
 NAMESPACE="${HIVE_CLUSTER_NAME}"
 oc create namespace "${NAMESPACE}"
@@ -172,9 +208,6 @@ stringData:
 type: Opaque
 EOF
 
-# Re-enable command echo
-set -x
-
 # Create manifests secret from all generated manifests
 echo "Creating manifests secret..."
 oc create secret generic ibmcloud-manifests \
@@ -183,22 +216,33 @@ oc create secret generic ibmcloud-manifests \
 
 echo "CCO manifests created successfully"
 
-# Get the latest ClusterImageSet for the current release
-CLUSTER_IMAGESET_NAME="$(
-  oc get clusterimagesets.hive.openshift.io \
-    -o jsonpath='{.items[*].metadata.name}' \
-    | tr ' ' '\n' \
-    | grep "^img4\." \
-    | sort -V \
-    | tail -n 1
-)"
+# Re-enable command echo after secret creation
+set -x
+
+# Get the ClusterImageSet name created in the previous step
+if [ ! -f "${SHARED_DIR}/clusterimageset-name" ]; then
+  echo "ERROR: ClusterImageSet name file not found at ${SHARED_DIR}/clusterimageset-name"
+  echo "Listing available ClusterImageSets..."
+  oc get clusterimagesets.hive.openshift.io || echo "No ClusterImageSets found"
+  exit 1
+fi
+
+CLUSTER_IMAGESET_NAME="$(cat "${SHARED_DIR}/clusterimageset-name")"
 
 if [ -z "${CLUSTER_IMAGESET_NAME}" ]; then
-  echo "ERROR: No ClusterImageSet found"
+  echo "ERROR: ClusterImageSet name is empty"
   exit 1
 fi
 
 echo "Using ClusterImageSet: ${CLUSTER_IMAGESET_NAME}"
+
+# Verify the ClusterImageSet exists
+if ! oc get clusterimageset "${CLUSTER_IMAGESET_NAME}" &>/dev/null; then
+  echo "ERROR: ClusterImageSet ${CLUSTER_IMAGESET_NAME} does not exist"
+  echo "Available ClusterImageSets:"
+  oc get clusterimagesets.hive.openshift.io
+  exit 1
+fi
 
 OCP_RELEASE_IMAGE="$(
   oc get clusterimageset "${CLUSTER_IMAGESET_NAME}" \

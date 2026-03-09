@@ -210,22 +210,64 @@ spec:
     - PreserveOnDelete
 EOF
 
-# Wait for Hive CRDs to be established
+# Wait for Hive operator to create all CRDs after processing HiveConfig
+echo "Waiting for Hive operator to create all required CRDs..."
+RETRY_COUNT=0
+MAX_RETRIES=60  # 5 minutes with 5 second intervals
+
+while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+  MISSING_CRDS=""
+
+  # Check for each required CRD
+  if ! oc get crd clusterimagesets.hive.openshift.io &>/dev/null; then
+    MISSING_CRDS="${MISSING_CRDS} clusterimagesets.hive.openshift.io"
+  fi
+
+  if ! oc get crd clusterdeployments.hive.openshift.io &>/dev/null; then
+    MISSING_CRDS="${MISSING_CRDS} clusterdeployments.hive.openshift.io"
+  fi
+
+  if ! oc get crd machinepools.hive.openshift.io &>/dev/null; then
+    MISSING_CRDS="${MISSING_CRDS} machinepools.hive.openshift.io"
+  fi
+
+  if [ -z "$MISSING_CRDS" ]; then
+    echo "All required Hive CRDs are now available"
+    break
+  fi
+
+  echo "Still waiting for CRDs:${MISSING_CRDS} (attempt $((RETRY_COUNT + 1))/${MAX_RETRIES})"
+  sleep 5
+  RETRY_COUNT=$((RETRY_COUNT + 1))
+done
+
+if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+  echo "ERROR: Timeout waiting for Hive CRDs to be created"
+  echo "Available Hive CRDs:"
+  oc get crds | grep hive || echo "No Hive CRDs found"
+  echo "Hive operator logs:"
+  oc logs -n hive deployment/hive-operator --tail=100 || true
+  exit 1
+fi
+
+# Now wait for CRDs to be fully established
 echo "Waiting for Hive CRDs to be established..."
-oc wait --for condition=established --timeout=5m \
+oc wait --for=condition=established --timeout=2m \
   crd/clusterimagesets.hive.openshift.io \
   crd/clusterdeployments.hive.openshift.io \
-  crd/machinepools.hive.openshift.io || {
-    echo "Warning: Some CRDs may not be available yet"
-    oc get crds | grep hive
-  }
+  crd/machinepools.hive.openshift.io
 
 # Wait for Hive controllers to start
-echo "Waiting for Hive controllers to start..."
-sleep 30
+echo "Waiting for Hive controllers deployment..."
+oc wait --for=condition=Available --timeout=5m deployment/hive-controllers -n hive || {
+  echo "Warning: hive-controllers deployment not available yet, checking status..."
+  oc get deployments -n hive
+  oc get pods -n hive
+}
 
 # Verify Hive components are running
 echo "Verifying Hive installation..."
+oc get deployments -n hive
 oc get pods -n hive
 
 echo "Hive operator installed successfully!"

@@ -9,6 +9,17 @@ if [ -z "${RELEASE_IMAGE_LATEST:-}" ]; then
   exit 1
 fi
 
+# Verify ClusterImageSet CRD exists before proceeding
+echo "Verifying ClusterImageSet CRD is available..."
+if ! oc get crd clusterimagesets.hive.openshift.io &>/dev/null; then
+  echo "ERROR: ClusterImageSet CRD not found"
+  echo "This usually means the Hive operator hasn't finished initializing."
+  echo "Available Hive CRDs:"
+  oc get crds | grep hive || echo "No Hive CRDs found"
+  exit 1
+fi
+
+echo "ClusterImageSet CRD is available"
 echo "Creating ClusterImageSet for release: ${RELEASE_IMAGE_LATEST}"
 
 # Extract version from release image (e.g., 4.21.0-nightly)
