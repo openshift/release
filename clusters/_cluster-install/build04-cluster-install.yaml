@@ -1,0 +1,32 @@
+clusterName: build04
+provision:
+  gcp:
+    cloudFormationTemplates:
+    - stackName: build04-iam
+      templateBody: /home/user/workbench/build04/cloudformation/iam.cf
+      parameters:
+      - key: BaseDomain
+        value: gcp.ci.openshift.org
+      - key: ProvisionUserName
+        value: build04-robot-provision
+      - key: GroupName
+        value: ci-robot-provision
+      capabilities: ['CAPABILITY_NAMED_IAM']
+    - stackName: build04-vpc
+      templateBody: /home/user/workbench/build04/cloudformation/vpc.yaml
+      parameters:
+      - key: BaseName
+        value: build04
+      capabilities: ['CAPABILITY_IAM']
+onboard:
+  osd: false
+  hosted: false
+  unmanaged: false
+  useTokenFileInKubeconfig: true
+  certificate:
+    imageRegistryPublicHost: registry.build04.ci.openshift.org
+  multiarch: true
+  multiarchBuilderController:
+    skip: true
+  cloudCredential:
+    gcp: {}

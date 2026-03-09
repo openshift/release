@@ -1,0 +1,32 @@
+clusterName: build02
+provision:
+  gcp:
+    cloudFormationTemplates:
+    - stackName: build02-iam
+      templateBody: /home/user/workbench/build02/cloudformation/iam.cf
+      parameters:
+      - key: BaseDomain
+        value: gcp.ci.openshift.org
+      - key: ProvisionUserName
+        value: build02-robot-provision
+      - key: GroupName
+        value: ci-robot-provision
+      capabilities: ['CAPABILITY_NAMED_IAM']
+    - stackName: build02-vpc
+      templateBody: /home/user/workbench/build02/cloudformation/vpc.yaml
+      parameters:
+      - key: BaseName
+        value: build02
+      capabilities: ['CAPABILITY_IAM']
+onboard:
+  osd: false
+  hosted: false
+  unmanaged: false
+  useTokenFileInKubeconfig: true
+  certificate:
+    imageRegistryPublicHost: registry.build02.ci.openshift.org
+  multiarch: true
+  multiarchBuilderController:
+    skip: true
+  cloudCredential:
+    gcp: {}

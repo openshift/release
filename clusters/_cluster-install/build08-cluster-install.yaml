@@ -1,0 +1,32 @@
+clusterName: build08
+provision:
+  gcp:
+    cloudFormationTemplates:
+    - stackName: build08-iam
+      templateBody: /home/user/workbench/build08/cloudformation/iam.cf
+      parameters:
+      - key: BaseDomain
+        value: gcp.ci.openshift.org
+      - key: ProvisionUserName
+        value: build08-robot-provision
+      - key: GroupName
+        value: ci-robot-provision
+      capabilities: ['CAPABILITY_NAMED_IAM']
+    - stackName: build08-vpc
+      templateBody: /home/user/workbench/build08/cloudformation/vpc.yaml
+      parameters:
+      - key: BaseName
+        value: build08
+      capabilities: ['CAPABILITY_IAM']
+onboard:
+  osd: false
+  hosted: false
+  unmanaged: false
+  useTokenFileInKubeconfig: true
+  multiarch: true
+  multiarchBuilderController:
+    skip: true
+  certificate:
+    imageRegistryPublicHost: registry.build08.ci.openshift.org
+  cloudCredential:
+    gcp: {}

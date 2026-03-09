@@ -1,0 +1,33 @@
+clusterName: build09
+credentialsMode: Manual
+provision:
+  aws:
+    cloudFormationTemplates:
+    - stackName: build09-iam
+      templateBody: /home/user/workbench/build09/cloudformation/iam.cf
+      parameters:
+      - key: BaseDomain
+        value: ci.devcluster.openshift.com
+      - key: ProvisionUserName
+        value: build09-robot-provision
+      - key: GroupName
+        value: ci-robot-provision
+      capabilities: ['CAPABILITY_NAMED_IAM']
+    - stackName: build09-vpc
+      templateBody: /home/user/workbench/build09/cloudformation/vpc.yaml
+      parameters:
+      - key: BaseName
+        value: build09
+      capabilities: ['CAPABILITY_IAM']
+onboard:
+  osd: false
+  hosted: false
+  unmanaged: false
+  useTokenFileInKubeconfig: true
+  multiarch: true
+  multiarchBuilderController:
+    skip: true
+  certificate:
+    imageRegistryPublicHost: registry.build09.ci.openshift.org
+  cloudCredential:
+    aws: {}
