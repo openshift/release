@@ -13,6 +13,8 @@ set -o pipefail
 #      domain.
 # VSPHERE_MULTI_NETWORKS - Configures script to create a unique subnet for each
 #      failure domain.
+# POOL_SELECTOR - Specifies pool selector labels as comma-separated key=value
+#      pairs (e.g., "vcf=true,region=us-east").
 ################################################################################
 
 if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
@@ -254,19 +256,29 @@ if [[ "${PROW_JOB_TYPE}" == "presubmit" ]]; then
 fi
 
 # Handle POOL_SELECTOR if provided (parse once and use for all leases)
+# Supports multiple key=value pairs separated by commas, e.g., "vcf=true,region=us-east"
 poolSelector=""
 if [ -n "${POOL_SELECTOR:-}" ]; then
-  # Parse POOL_SELECTOR in format "key=value"
-  if [[ "${POOL_SELECTOR}" =~ ^([^=]+)=([^=]+)$ ]]; then
-    selector_key="${BASH_REMATCH[1]}"
-    selector_value="${BASH_REMATCH[2]}"
-    poolSelector="poolSelector:
+  # Split by comma and process each key=value pair
+  IFS=',' read -ra selector_pairs <<< "${POOL_SELECTOR}"
+
+  poolSelector="poolSelector:"
+  for pair in "${selector_pairs[@]}"; do
+    # Trim whitespace from pair
+    pair=$(echo "${pair}" | xargs)
+
+    # Parse each pair in format "key=value"
+    if [[ "${pair}" =~ ^([^=]+)=([^=]+)$ ]]; then
+      selector_key="${BASH_REMATCH[1]}"
+      selector_value="${BASH_REMATCH[2]}"
+      poolSelector="${poolSelector}
     ${selector_key}: \"${selector_value}\""
-    log "setting poolSelector with ${selector_key}=${selector_value}"
-  else
-    log "ERROR: POOL_SELECTOR must be in format 'key=value', got: ${POOL_SELECTOR}"
-    exit 1
-  fi
+      log "setting poolSelector with ${selector_key}=${selector_value}"
+    else
+      log "ERROR: Each POOL_SELECTOR pair must be in format 'key=value', got: ${pair}"
+      exit 1
+    fi
+  done
 fi
 
 if [[ -n "${VSPHERE_BASTION_LEASED_RESOURCE:-}" ]]; then
