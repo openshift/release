@@ -107,7 +107,7 @@ fi
 echo "Copy automation repo to local $SHARED_DIR"
 mkdir $SHARED_DIR/repos
 ssh -i $SSH_PKEY $COMMON_SSH_ARGS ${BASTION_USER}@${BASTION_IP} \
-    "tar --exclude='.git' -czf - -C /home/${BASTION_USER} ansible-automation" | tar -xzf - -C $SHARED_DIR/repos/
+    "tar --exclude='.git' -czf - -C /tmp ansible-automation" | tar -xzf - -C $SHARED_DIR/repos/
 
 cd $SHARED_DIR/repos/ansible-automation
 
