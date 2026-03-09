@@ -5,32 +5,6 @@ if [ ${RUN_ORION} == false ]; then
   exit 0
 fi
 
-# UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
-if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
-    # Get current worker count (excluding infra and workload nodes)
-    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
-    echo "Current worker count: $current_worker_count"
-
-    # Determine scale prefix based on worker count
-    if [[ $current_worker_count -ge 200 ]]; then
-        scale_prefix="large-scale"
-    elif [[ $current_worker_count -ge 100 ]]; then
-        scale_prefix="med-scale"
-    elif [[ $current_worker_count -ge 20 ]]; then
-        scale_prefix="small-scale"
-    else
-        scale_prefix="trt-external-payload"
-    fi
-
-    # Select orion config based on UDN layer mode
-    if [[ "${ENABLE_LAYER_3}" == "false" ]]; then
-        export ORION_CONFIG="examples/${scale_prefix}-udn-l2.yaml"
-    else
-        export ORION_CONFIG="examples/${scale_prefix}-udn-l3.yaml"
-    fi
-    echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
-fi
-
 python --version
 pushd /tmp
 python -m virtualenv ./venv_qe
@@ -52,10 +26,6 @@ if [[ -n "${PULL_NUMBER-}" ]] && [[ "${REPO_NAME}" == "orion" ]]; then
 fi
 
 pip install -r requirements.txt
-
-if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
 
 case "$ES_TYPE" in
   qe)
@@ -88,6 +58,36 @@ esac
 export ES_SERVER
 
 pip install .
+
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+# UDN density: auto-select ORION_CONFIG based on worker count and L2/L3 mode
+if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
+    # Get current worker count (excluding infra and workload nodes)
+    current_worker_count=$(oc get node -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --no-headers | grep -c Ready)
+    echo "Current worker count: $current_worker_count"
+
+    # Determine scale prefix based on worker count
+    if [[ $current_worker_count -ge 200 ]]; then
+        scale_prefix="large-scale"
+    elif [[ $current_worker_count -ge 100 ]]; then
+        scale_prefix="med-scale"
+    elif [[ $current_worker_count -ge 20 ]]; then
+        scale_prefix="small-scale"
+    else
+        scale_prefix="trt-external-payload"
+    fi
+
+    # Select orion config based on UDN layer mode
+    if [[ "${ENABLE_LAYER_3}" == "false" ]]; then
+        export ORION_CONFIG="examples/${scale_prefix}-udn-l2.yaml"
+    else
+        export ORION_CONFIG="examples/${scale_prefix}-udn-l3.yaml"
+    fi
+    echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
+fi
 
 # Print Orion version
 orion_version=$(orion --version 2>&1)
