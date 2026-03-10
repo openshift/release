@@ -150,6 +150,12 @@ rules:
   - "*"
   verbs:
   - "*"
+- apiGroups:
+  - "config.openshift.io"
+  resources:
+  - "*"
+  verbs:
+  - "*"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
