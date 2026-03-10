@@ -886,6 +886,10 @@ resources:
     requests:
       cpu: "1"
       memory: 1Gi
+  unit:
+    requests:
+      cpu: "4"
+      memory: 4Gi
 test_binary_build_commands: make race-install
 tests:
 - as: unit
@@ -906,7 +910,7 @@ tests:
 - as: integration
   commands: make integration
   container:
-    from: test-bin
+    from: bin
   node_architecture: arm64
 - always_run: false
   as: e2e
@@ -1014,7 +1018,7 @@ tests:
       - mount_path: /etc/kubeconfigs
         name: cluster-init
         namespace: ci
-      from: test-bin
+      from: bin
       resources:
         requests:
           cpu: 100m
@@ -1022,7 +1026,7 @@ tests:
 - as: checkconfig
   commands: make validate-checkconfig
   container:
-    from: test-bin
+    from: bin
   node_architecture: arm64
 - as: validate-vendor
   commands: make validate-vendor
@@ -1030,9 +1034,10 @@ tests:
     from: src
   node_architecture: arm64
 - as: frontend-checks
-  commands: make verify-frontend-format frontend-checks
+  commands: make cmd/pod-scaler/frontend/dist/dummy cmd/repo-init/frontend/dist/dummy
+    verify-frontend-format frontend-checks
   container:
-    from: test-bin
+    from: bin
   node_architecture: arm64
 - as: lint
   commands: make lint
