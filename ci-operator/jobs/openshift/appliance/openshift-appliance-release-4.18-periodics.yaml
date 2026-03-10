@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build11
+  cluster: build09
   cron: 45 19 19 2 *
   decorate: true
   decoration_config:
@@ -27,9 +27,17 @@ periodics:
       - --target=e2e-sno-dualstack-dhcp-periodic
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -73,7 +81,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
+  cluster: build09
   cron: 40 21 7,24 * *
   decorate: true
   decoration_config:
@@ -96,9 +104,17 @@ periodics:
       - --target=publish
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

@@ -44,22 +44,6 @@ resources:
       devices.kubevirt.io/kvm: "1"
       ephemeral-storage: 40Gi
       memory: 3Gi
-  rhcos-9next-build-test-metal:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      ephemeral-storage: 40Gi
-      memory: 3Gi
-  rhcos-9next-build-test-qemu:
-    limits:
-      devices.kubevirt.io/kvm: "1"
-    requests:
-      cpu: 2000m
-      devices.kubevirt.io/kvm: "1"
-      ephemeral-storage: 40Gi
-      memory: 3Gi
   rhcos-10-build-test-metal:
     limits:
       devices.kubevirt.io/kvm: "1"
@@ -119,44 +103,46 @@ tests:
 - as: rhcos-9-build-test-qemu
   capabilities:
   - kvm
-  commands: /src/ci/prow-entrypoint.sh rhcos-9-build-test-qemu
+  commands: |
+    REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson /src/ci/prow-entrypoint.sh rhcos-9-build-test-qemu
   container:
     from: build-image
+  secret:
+    mount_path: /var/run/secrets/ci-pull-credentials
+    name: ci-pull-credentials
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: rhcos-9-build-test-metal
   capabilities:
   - kvm
-  commands: /src/ci/prow-entrypoint.sh rhcos-9-build-test-metal
+  commands: |
+    REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson /src/ci/prow-entrypoint.sh rhcos-9-build-test-metal
   container:
     from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: rhcos-9next-build-test-qemu
-  capabilities:
-  - kvm
-  commands: /src/ci/prow-entrypoint.sh rhcos-9next-build-test-qemu
-  container:
-    from: build-image
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: rhcos-9next-build-test-metal
-  capabilities:
-  - kvm
-  commands: /src/ci/prow-entrypoint.sh rhcos-9next-build-test-metal
-  container:
-    from: build-image
+  secret:
+    mount_path: /var/run/secrets/ci-pull-credentials
+    name: ci-pull-credentials
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: rhcos-10-build-test-qemu
   capabilities:
   - kvm
-  commands: /src/ci/prow-entrypoint.sh rhcos-10-build-test-qemu
+  commands: |
+    REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson /src/ci/prow-entrypoint.sh rhcos-10-build-test-qemu
   container:
     from: build-image
+  secret:
+    mount_path: /var/run/secrets/ci-pull-credentials
+    name: ci-pull-credentials
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: rhcos-10-build-test-metal
   capabilities:
   - kvm
-  commands: /src/ci/prow-entrypoint.sh rhcos-10-build-test-metal
+  commands: |
+    REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson /src/ci/prow-entrypoint.sh rhcos-10-build-test-metal
   container:
     from: build-image
+  secret:
+    mount_path: /var/run/secrets/ci-pull-credentials
+    name: ci-pull-credentials
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: scos-9-build-test-qemu
   capabilities:

@@ -11,7 +11,6 @@ then
 fi
 
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-export IMAGE_KUBEVIRT_CAPI_PROVIDER="registry.ci.openshift.org/ocp/4.18:cluster-api-provider-kubevirt"
 
 OPERATOR_IMAGE=${HYPERSHIFT_RELEASE_LATEST}
 

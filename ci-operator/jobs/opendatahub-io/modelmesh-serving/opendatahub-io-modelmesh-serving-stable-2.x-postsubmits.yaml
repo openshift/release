@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^stable-2\.x$
-    cluster: build04
+    cluster: build08
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -64,7 +64,7 @@ postsubmits:
     always_run: false
     branches:
     - ^stable-2\.x$
-    cluster: build04
+    cluster: build08
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -83,9 +83,17 @@ postsubmits:
         - --target=stable-2x-image-mirror
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -123,7 +131,7 @@ postsubmits:
     always_run: false
     branches:
     - ^stable-2\.x$
-    cluster: build04
+    cluster: build08
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -142,9 +150,17 @@ postsubmits:
         - --target=upstream-version-image-mirror
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

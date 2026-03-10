@@ -136,11 +136,23 @@ tests:
   as: azure-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
       WINDOWS_SERVER_VERSION: "2019"
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-azure-ovn-hybrid
+- always_run: false
+  as: azure-e2e-operator-2025
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: azure4
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      WINDOWS_SERVER_VERSION: "2025"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-azure-ovn-hybrid
@@ -157,6 +169,19 @@ tests:
     - ref: windows-e2e-operator-test
     workflow: ipi-gcp-ovn-hybrid
 - always_run: false
+  as: gcp-e2e-operator-2025
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      WINDOWS_SERVER_VERSION: "2025"
+      WMCO_DEPLOY_NAMESPACE: alternate-wmco-namespace
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-gcp-ovn-hybrid
+- always_run: false
   as: vsphere-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
@@ -164,8 +189,18 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
-- as: vsphere-e2e-ccm-install
+- as: vsphere-e2e-operator-fips
   cron: 0 9 * * 1
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FIPS_ENABLED: "true"
+      VM_TEMPLATE: windows-golden-images/windows-server-2022-template-ipv6-disabled-fips
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- as: vsphere-e2e-ccm-install
+  cron: 38 14 * * 2
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -175,7 +210,7 @@ tests:
   as: azure-e2e-upgrade
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure4
     test:
     - as: install
       cli: latest

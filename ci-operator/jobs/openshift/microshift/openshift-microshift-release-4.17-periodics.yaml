@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build11
+  cluster: build01
   cron: 35 7 14,26 * *
   decorate: true
   decoration_config:
@@ -27,9 +27,17 @@ periodics:
       - --target=clusterbot
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -73,7 +81,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build09
   cron: 35 3 10,28 * *
   decorate: true
   decoration_config:
@@ -105,9 +113,17 @@ periodics:
       - --target=publish-release-notes
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -142,7 +158,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build10
+  cluster: build09
   cron: 0 4 * * 1,4
   decorate: true
   decoration_config:
@@ -174,9 +190,17 @@ periodics:
       - --target=rebase-on-nightlies
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

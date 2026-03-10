@@ -36,7 +36,7 @@ fi
 DEPLOYMENT_STATUS=0
 CRITICAL_FAILURE=false
 
-SETUP_SCRIPT_TIMEOUT="${SETUP_SCRIPT_TIMEOUT:-900}"
+SETUP_SCRIPT_TIMEOUT="${SETUP_SCRIPT_TIMEOUT:-1800}"
 
 OPERATOR_REPO="${OPERATOR_REPO:-https://github.com/trusted-execution-clusters/operator.git}"
 OPERATOR_BRANCH="${OPERATOR_BRANCH:-main}"
@@ -267,17 +267,20 @@ if flock -w "${LOCK_TIMEOUT}" $LOCK_FD; then
 
   # Create marker file with job information
   # Use atomic write: write to temp file, then rename
-  cat > "${LOCK_FILE}.holder.tmp" << HOLDERINFO
-LOCK_HOLDER_ID=${LOCK_HOLDER_ID}
-LOCK_ACQUIRED_AT=$(date -u +'%Y-%m-%d_%H:%M:%S_UTC')
-LOCK_PID=$$
-HOLDERINFO
+  SCRIPT_PID=$BASHPID
+  {
+    echo "LOCK_HOLDER_ID=${LOCK_HOLDER_ID}"
+    echo "LOCK_ACQUIRED_AT=$(date -u +'%Y-%m-%d_%H:%M:%S_UTC')"
+    echo "LOCK_PID=${SCRIPT_PID}"
+  } > "${LOCK_FILE}.holder.tmp"
 
   # Atomic rename to ensure file is complete when it appears
   mv "${LOCK_FILE}.holder.tmp" "${LOCK_FILE}.holder"
 
   # Save our PID for cleanup script (atomic write)
-  echo "$$" > "${LOCK_FILE}.pid.tmp"
+  SCRIPT_PID=$BASHPID
+  printf "%s\n" "${SCRIPT_PID}" > "${LOCK_FILE}.pid.tmp"
+  sync  # Ensure data is written to disk
   mv "${LOCK_FILE}.pid.tmp" "${LOCK_FILE}.pid"
 
   echo "[INFO] Lock holder info saved"
@@ -791,7 +794,10 @@ CURRENT_COMMIT_SHORT=$(git rev-parse --short HEAD)
 
 echo "[SUCCESS] Repository cloned to ${WORK_DIR}"
 echo "[INFO] Current commit: ${CURRENT_COMMIT_SHORT} (${CURRENT_COMMIT})"
+# Temporarily disable pipefail to avoid SIGPIPE from head closing the pipe early
+set +o pipefail
 echo "[INFO] Commit message: $(git log -1 --pretty=%B | head -1)"
+set -o pipefail
 
 # Adapt Kind Config for External Access
 echo "[INFO] Adapting kind configuration for external access..."

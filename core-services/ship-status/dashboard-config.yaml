@@ -5,6 +5,10 @@ components:
     sub_components:
       - name: "Deck"
         description: "Dashboard for Prow"
+        long_description: "Deck serves the main web UI for Prow at https://prow.ci.openshift.org/. It provides a comprehensive dashboard for viewing ProwJob status, test results, job history, and live logs. The interface allows developers to search jobs, view PR checks, and monitor CI health across all repositories."
+        documentation_url: "https://docs.prow.k8s.io/docs/components/core/deck/"
+        tags:
+          - "ci-frontend"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -12,6 +16,10 @@ components:
         requires_confirmation: false
       - name: "Deck-Internal"
         description: "Internal Prow dashboard"
+        long_description: "Deck-Internal provides a separate instance of the Prow web UI for internal-only access. It serves the same functionality as the public Deck but is protected by authentication and serves content not suitable for public viewing. This includes private test results and internal job configurations."
+        documentation_url: "https://docs.prow.k8s.io/docs/components/core/deck/"
+        tags:
+          - "ci-frontend"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -19,6 +27,10 @@ components:
         requires_confirmation: false
       - name: "QE-Private-Deck"
         description: "QE private Prow dashboard"
+        long_description: "QE-Private-Deck is a dedicated Prow web UI instance for the QE team. It provides access to QE-specific test jobs, private test results, and specialized QE workflows that should not be exposed on the public dashboard."
+        documentation_url: "https://docs.prow.k8s.io/docs/components/core/deck/"
+        tags:
+          - "ci-frontend"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -26,6 +38,10 @@ components:
         requires_confirmation: false
       - name: "Crier"
         description: "Reports job status to GitHub"
+        long_description: "Crier is a reporting controller that watches ProwJobs and pushes status updates to various platforms including GitHub (status checks and comments), Slack (notifications), and GCS (artifact storage). It is responsible for keeping GitHub PR checks up-to-date as jobs progress."
+        documentation_url: "https://docs.prow.k8s.io/docs/components/core/crier/"
+        tags:
+          - "ci-automation"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -33,6 +49,10 @@ components:
         requires_confirmation: false
       - name: "Sinker"
         description: "Cleans up completed Prow jobs"
+        long_description: "Sinker automatically cleans up old ProwJob objects and their associated Kubernetes resources once they have completed and aged past configured retention periods. This prevents resource exhaustion and keeps the cluster clean."
+        documentation_url: "https://docs.prow.k8s.io/docs/components/core/sinker/"
+        tags:
+          - "ci-infrastructure"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -40,6 +60,10 @@ components:
         requires_confirmation: false
       - name: "Prow-Controller-Manager"
         description: "Manages ProwJobs lifecycle"
+        long_description: "Prow-Controller-Manager contains multiple controllers including Plank and the job scheduler that manage job queuing and prioritization. It is the core orchestrator that translates ProwJob custom resources into actual test execution across build farm clusters."
+        documentation_url: "https://docs.prow.k8s.io/docs/components/core/prow-controller-manager/"
+        tags:
+          - "ci-infrastructure"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -47,6 +71,10 @@ components:
         requires_confirmation: false
       - name: "Tide"
         description: "Automated merging of PRs"
+        long_description: "Tide automatically merges pull requests that meet configured criteria (required labels, passing tests, approvals). It batches PRs together to test them in combination before merging, preventing breakage when multiple changes land simultaneously. Tide maintains merge queues per repository and handles automatic retesting when required."
+        documentation_url: "https://docs.prow.k8s.io/docs/components/core/tide/"
+        tags:
+          - "ci-automation"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -54,6 +82,10 @@ components:
         requires_confirmation: true
       - name: "Gangway"
         description: "Job execution API"
+        long_description: "Gangway exposes a REST API that allows authenticated users to trigger ProwJobs programmatically without going through GitHub events. It is used by the CI CLI tools, release controllers, and automated processes that need to start CI jobs."
+        documentation_url: "https://docs.prow.k8s.io/docs/components/optional/gangway/"
+        tags:
+          - "ci-api"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -61,6 +93,9 @@ components:
         requires_confirmation: false
       - name: "GCSWeb"
         description: "GCS artifact browser"
+        long_description: "GCSWeb provides a web-based file browser for Google Cloud Storage buckets containing CI test artifacts, logs, and build outputs. Developers use it to access detailed test results, console logs, junit XML files, and other artifacts generated during test execution."
+        tags:
+          - "ci-api"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -68,6 +103,10 @@ components:
         requires_confirmation: false
       - name: "GHProxy"
         description: "GitHub API proxy/cache"
+        long_description: "GHProxy sits between Prow components and the GitHub API, providing response caching and rate limit management. It reduces GitHub API consumption by serving cached responses and intelligently throttles requests to stay within API limits."
+        documentation_url: "https://docs.prow.k8s.io/docs/components/core/ghproxy/"
+        tags:
+          - "ci-infrastructure"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -75,6 +114,10 @@ components:
         requires_confirmation: false
       - name: "Hook"
         description: "Webhook handler"
+        long_description: "Hook receives GitHub webhooks (pull requests, issues, comments, etc.) and dispatches them to appropriate Prow plugins for processing. It integrates with external services like Bugzilla, Jira, and Slack, and handles chat-ops commands like /test, /retest, and /approve."
+        documentation_url: "https://docs.prow.k8s.io/docs/components/core/hook/"
+        tags:
+          - "ci-automation"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -89,6 +132,10 @@ components:
     sub_components:
       - name: "Leasing-Server"
         description: "Boskos leasing server"
+        long_description: "The Boskos Leasing-Server manages allocation, acquisition, and release of cloud resource quota slices across multiple providers. Tests request quota slices from Boskos, which tracks resource states and ensures resources are properly recycled after use."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "resource-management"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -96,6 +143,10 @@ components:
         requires_confirmation: false
       - name: "AWS"
         description: "AWS cloud account"
+        long_description: "Provides access to Amazon Web Services cloud resources for provisioning and testing OpenShift clusters."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "aws"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -103,6 +154,10 @@ components:
         requires_confirmation: false
       - name: "AWS-2"
         description: "AWS-2 cloud account"
+        long_description: "Provides additional AWS quota capacity to support increased testing load."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "aws"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -110,6 +165,10 @@ components:
         requires_confirmation: false
       - name: "AWS-3"
         description: "AWS-3 cloud account"
+        long_description: "Provides additional AWS quota capacity to support increased testing load."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "aws"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -117,6 +176,10 @@ components:
         requires_confirmation: false
       - name: "AWS-4"
         description: "AWS-4 cloud account"
+        long_description: "Provides additional AWS quota capacity to support increased testing load."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "aws"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -124,6 +187,10 @@ components:
         requires_confirmation: false
       - name: "AWS-5"
         description: "AWS-5 cloud account"
+        long_description: "Provides additional AWS quota capacity to support increased testing load."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "aws"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -131,6 +198,10 @@ components:
         requires_confirmation: false
       - name: "GCP"
         description: "GCP cloud account"
+        long_description: "Provides access to Google Cloud Platform resources for provisioning and testing OpenShift clusters."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "gcp"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -138,6 +209,10 @@ components:
         requires_confirmation: false
       - name: "GCP-2"
         description: "GCP-2 cloud account"
+        long_description: "Provides additional GCP quota capacity to support increased testing load."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "gcp"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -145,6 +220,10 @@ components:
         requires_confirmation: false
       - name: "GCP-3"
         description: "GCP-3 cloud account"
+        long_description: "Provides additional GCP quota capacity to support increased testing load."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "gcp"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -152,6 +231,10 @@ components:
         requires_confirmation: false
       - name: "Azure-2"
         description: "Azure-2 cloud account"
+        long_description: "Provides access to Microsoft Azure cloud resources for provisioning and testing OpenShift clusters."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "azure"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -159,6 +242,10 @@ components:
         requires_confirmation: false
       - name: "Azure4"
         description: "Azure4 cloud account"
+        long_description: "Provides additional Azure quota capacity to support increased testing load."
+        documentation_url: "https://docs.ci.openshift.org/docs/architecture/quota-and-leases/"
+        tags:
+          - "azure"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -173,6 +260,10 @@ components:
     sub_components:
       - name: "PJ-Rehearse-Plugin"
         description: "PR ProwJob rehearsal plugin"
+        long_description: "PJ-Rehearse-Plugin allows developers to test CI job configuration changes before merging them to the release repository. When triggered via GitHub comments (/test pj-rehearse), it simulates how jobs would execute with proposed configuration changes by creating temporary rehearsal jobs."
+        documentation_url: "https://docs.ci.openshift.org/how-tos/contributing-openshift-release/#rehearsals"
+        tags:
+          - "ci-automation"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -180,6 +271,10 @@ components:
         requires_confirmation: false
       - name: "Retester"
         description: "Automatic test retrigger"
+        long_description: "Retester monitors failed CI jobs and automatically retriggers them based on configurable policies to handle flaky tests. It maintains per-repository and per-organization policies that define retry limits to prevent excessive retesting while improving CI reliability by automatically handling transient failures."
+        documentation_url: "https://docs.ci.openshift.org/architecture/retester/"
+        tags:
+          - "ci-automation"
         monitoring:
           frequency: 5m
           component_monitor: "app-ci-component-monitor"
@@ -197,6 +292,10 @@ components:
     sub_components:
       - name: "Sippy"
         description: "The non-auth variant of Sippy"
+        long_description: "Sippy is the main CI analysis platform providing comprehensive dashboards for visualizing test results, cluster health metrics, and CI trends. It processes job artifacts and test data to identify patterns, track test reliability, and surface regressions. Includes Component Readiness, which uses statistical analysis to determine if OpenShift is ready to ship by comparing current test results against stable releases. Available publicly at https://sippy.dptools.openshift.org/ and provides release-specific views, job run intervals, and historical trend analysis."
+        documentation_url: "https://docs.ci.openshift.org/release-oversight/tooling/#sippy"
+        tags:
+          - "ci-analytics"
         monitoring:
           frequency: 5m
           component_monitor: "dpcr-component-monitor"
@@ -204,6 +303,10 @@ components:
         requires_confirmation: false
       - name: "Sippy-Auth"
         description: "The auth variant of Sippy"
+        long_description: "Sippy-Auth provides the same CI analysis capabilities as the public Sippy instance, including Component Readiness for release readiness assessment, but with authentication required for access. This allows for mutating API requests in order to triage regressions and file bugs."
+        documentation_url: "https://docs.ci.openshift.org/release-oversight/tooling/#sippy"
+        tags:
+          - "ci-analytics"
         monitoring:
           frequency: 5m
           component_monitor: "dpcr-component-monitor"
@@ -211,6 +314,10 @@ components:
         requires_confirmation: false
       - name: "Sippy Chat"
         description: "AI Chatbot within Sippy"
+        long_description: "Sippy Chat is an integrated AI chatbot that helps developers investigate and understand CI failures. It can analyze test results, cluster metrics, and job artifacts to provide intelligent insights about what went wrong and potential root causes."
+        documentation_url: "https://source.redhat.com/departments/products_and_global_engineering/openshift_development/openshift_wiki/sippy_chat_user_guide"
+        tags:
+          - "ci-analytics"
         monitoring:
           frequency: 5m
           component_monitor: "dpcr-component-monitor"
@@ -219,3 +326,49 @@ components:
     owners:
       - rover_group: "openshift-technical-release-team"
       - service_account: "system:serviceaccount:ship-status:dpcr-component-monitor"
+  - name: "Errata Reliability"
+    description: "Services maintained by the Errata Reliability Team"
+    ship_team: "ERT"
+    slack_reporting:
+      - channel: "#alerts-ocp-ert"
+        severity: "Down"
+    sub_components:
+      - name: "MCP Server"
+        description: "Release tests MCP server for AI agent workflows"
+        monitoring:
+          frequency: 30s
+          component_monitor: "ert-component-monitor"
+          auto_resolve: true
+        requires_confirmation: false
+    owners:
+      - rover_group: "ocp-errata-reliability-team"
+      - service_account: "system:serviceaccount:ship-status:ert-component-monitor"
+
+tags:
+- name: "ci-frontend"
+  description: "User-facing web interfaces for viewing CI jobs and test results"
+  color: "#0066CC"
+- name: "ci-automation"
+  description: "Automated workflow components for PR merging and notifications"
+  color: "#9933FF"
+- name: "ci-infrastructure"
+  description: "Core infrastructure components managing job lifecycle and cleanup"
+  color: "#FF6600"
+- name: "ci-api"
+  description: "API services and artifact access interfaces"
+  color: "#00CCCC"
+- name: "aws"
+  description: "AWS cloud account quota slices managed by Boskos"
+  color: "#FF9900"
+- name: "gcp"
+  description: "Google Cloud Platform quota slices managed by Boskos"
+  color: "#4285F4"
+- name: "azure"
+  description: "Microsoft Azure cloud quota slices managed by Boskos"
+  color: "#0089D6"
+- name: "resource-management"
+  description: "Dynamic resource allocation and lifecycle management"
+  color: "#996633"
+- name: "ci-analytics"
+  description: "CI data analysis and visualization platforms"
+  color: "#6600CC"

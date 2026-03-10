@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build11
+  cluster: build02
   cron: 30 9 * * *
   decorate: true
   decoration_config:
@@ -13,20 +13,39 @@ periodics:
     ci-operator.openshift.io/variant: e2e
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hyperfleet-hyperfleet-e2e-main-e2e-hyperfleet-e2e-nightly
+  name: periodic-ci-openshift-hyperfleet-hyperfleet-e2e-main-e2e-hyperfleet-e2e-test-workflow-nightly
+  reporter_config:
+    slack:
+      channel: '#hyperfleet-e2e-status'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}}:white_check_mark:{{else}}:x:{{end}}
+        *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+        · <https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/{{.Spec.Job}}|View
+        history>'
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
-      - --target=hyperfleet-e2e-nightly
+      - --target=hyperfleet-e2e-test-workflow-nightly
       - --variant=e2e
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build11
+    cluster: build01
     context: ci/prow/ci-index
     decorate: true
     decoration_config:
@@ -60,7 +60,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build11
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -116,7 +116,7 @@ presubmits:
     branches:
     - ^release-4\.9$
     - ^release-4\.9-
-    cluster: build10
+    cluster: build01
     context: ci/prow/operator-e2e
     decorate: true
     decoration_config:
@@ -139,9 +139,17 @@ presubmits:
         - --target=operator-e2e
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

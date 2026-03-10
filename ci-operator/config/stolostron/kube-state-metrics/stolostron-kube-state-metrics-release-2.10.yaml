@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.18-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.18-linux
 build_root:
   image_stream_tag:
     name: builder
@@ -15,10 +11,6 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.prow
   from: base
-  inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: kube-state-metrics
 promotion:
   to:
@@ -67,8 +59,7 @@ tests:
         export OSCI_COMPONENT_NAME="kube-state-metrics"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

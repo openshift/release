@@ -3,8 +3,8 @@ This step deploys the Istio control plane using the Sail Operator in an OpenShif
 
 ## Required Parameters
 - `KUBECONFIG`: Path to the kubeconfig file for the target OpenShift cluster.
-- `ISTIO_CONTROL_PLANE_MODE`: The mode of the Istio control plane to deploy, only allowed value is `ambient` and `sidecar`. The default is `sidecar`.
-- `SAIL_OPERATOR_CHANNEL`: The channel of the Sail Operator to use in the subscription. Default is `1.28-nightly` to ensure compatibility with the latest Istio versions from master branch in the Sail Operator.
+- `ISTIO_CONTROL_PLANE_MODE`: The mode of the Istio control plane to deploy, only allowed value is `ambient` and `sidecar`.
+- `SAIL_OPERATOR_CHANNEL`: The channel of the Sail Operator to use in the subscription. Set it to the current nightly channel (e.g. `1.29-nightly`) to ensure compatibility with the latest Istio versions from master branch in the Sail Operator.
 - `SKIP_CREATE_TEST_RESOURCES`: Needs to be set to `'true'`, skips the creation of test resources during the deployment. This means that the cluster will be created but Masitra namespace and pods will not be created. This Maistra pods are used for OSSM tests specifically.
 
 ## Step Overview
@@ -14,7 +14,7 @@ This step deploys the Istio control plane using the Sail Operator in an OpenShif
 4. **Debug Information**: Finally, the step lists all pods in all namespaces for debugging purposes.
 
 ## Usage
-To use this step in your CI/CD pipeline, include it in your job configuration and provide the required parameters. Make sure to adjust the `SAIL_OPERATOR_CHANNEL` if you need a specific version of the Sail Operator, the recommended is to use the default channel for latest features and fixes.
+To use this step in your CI/CD pipeline, include it in your job configuration and provide the required parameters. Make sure to adjust the `SAIL_OPERATOR_CHANNEL` if you need a specific version of the Sail Operator, it is recommended to use the latest nightly channel for latest features and fixes.
 
 ## Example
 ```yaml

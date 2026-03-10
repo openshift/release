@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.17-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.17-linux
 build_root:
   image_stream_tag:
     name: builder
@@ -15,10 +11,6 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.prow
   from: base
-  inputs:
-    stolostron_builder_go1.17-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: kube-rbac-proxy
 resources:
   '*':
@@ -72,8 +64,7 @@ tests:
         export OSCI_COMPONENT_NAME="kube-rbac-proxy"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

@@ -4,7 +4,6 @@ import yaml
 
 
 CONFIG = {
-
     'aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'us-east-1': 50,
@@ -114,6 +113,9 @@ CONFIG = {
     'aws-restricted-qe-quota-slice': {
         'us-east-1': 5,
         'ap-northeast-1': 5,
+    },
+    'aws-eusc-quota-slice': {
+        'eusc-de-east-1': 5,
     },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
@@ -256,9 +258,12 @@ CONFIG = {
     },
     'aro-hcp-prod-quota-slice': {
         'default': 10
-  },
+    },
     'aro-hcp-dev-quota-slice': {
         'default': 15,
+    },
+    'aro-hcp-dev-global-pipeline-quota-slice': {
+        'default': 1,
     },
     'aro-hcp-test-msi-containers-dev': {},
     'aro-hcp-test-msi-containers-int': {},
@@ -401,13 +406,13 @@ CONFIG = {
         'eu-west-1': 8,
         'eu-west-2': 8
     },
-    'hypershift-quota-slice': {
-        'default': 50,
-    },
     'hypershift-aws-quota-slice': {
         'default': 30,
     },
     'hypershift-aks-quota-slice': {
+        'default': 20,
+    },
+    'hypershift-azure-quota-slice': {
         'default': 20,
     },
     'hypershift-gcp-quota-slice': {
@@ -468,7 +473,7 @@ CONFIG = {
         'us-east-1': 10,
     },
     'hypershift-hive-quota-slice': {
-        'default': 10,
+        'default': 20,
     },
     'aws-virtualization-quota-slice': {
         'us-east-1': 5,
@@ -624,9 +629,11 @@ CONFIG = {
     'metal-redhat-gs-quota-slice': {
         'default': 1,
     },
-    'rosa-regional-platform-int-quota-slice': {
-        'us-east-1': 15,
-        'us-east-2': 15,
+    'amd-gpu-quota-slice': {
+        '10.1.178.14': 1,
+    },
+    'aws-osp-qe-quota-slice': {
+        'us-east-1': 10,
     },
 }
 
@@ -709,8 +716,18 @@ for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
 
-
-
+CLUSTER_PROFILE_SETS_CONFIG = {
+    'openshift-org-aws': {
+        'aws': {
+            'install': 16,
+            'quota': CONFIG['aws-quota-slice'],
+        },
+        'aws-2': {
+            'install': 16,
+            'quota': CONFIG['aws-2-quota-slice'],
+        },
+    }
+}
 
 config = {
     'resources': [],
@@ -735,6 +752,50 @@ for typeName, data in sorted(CONFIG.items()):
                 resource['names'].append(name)
     config['resources'].append(resource)
 
+def cluster_profile_set_resources(clusterProfileSets):
+    def profile_set_resource(profileSet, profileSetData):
+        cps_resource = {
+            'type': f'{profileSet}-quota-slice',
+            'state': 'free',
+            'names': [],
+        }
+
+        max_count = sum(map(lambda profileData: sum(profileData['regions'].values()) if 'regions' in profileData else 0, profileSetData.values()))
+        width = len(str(max_count-1))
+        counter = 0
+        for profile, profileData in sorted(profileSetData.items()):
+            if not 'quota' in profileData:
+                continue
+            for region, regionCount in sorted(profileData['quota'].items()):
+                cps_resource['names'].extend([f'{profile}--{region}--quota-slice-{counter+i:0>{width}}' for i in range(regionCount)])
+                counter += regionCount
+
+        yield cps_resource
+
+    def install_resource(profileSet, profile, profileData):
+        if not 'install' in profileData:
+            return
+
+        install_resource = {
+            'type': f'{profileSet}--{profile}--install-quota-slice',
+            'state': 'free'
+        }
+        installCount = profileData['install']
+        width = len(str(installCount-1))
+        install_resource['names'] = [f'{profileSet}--{profile}--install-quota-slice-{i:0>{width}}' for i in range(installCount)]
+        yield install_resource
+
+    resources = []
+    for profileSet, profileSetData in sorted(clusterProfileSets.items()):
+        resources.extend(profile_set_resource(profileSet, profileSetData))
+        for profile, profileData in sorted(profileSetData.items()):
+            resources.extend(install_resource(profileSet, profile, profileData))
+
+    return resources
+
+config['resources'].extend(cluster_profile_set_resources(CLUSTER_PROFILE_SETS_CONFIG))
+
 with open('_boskos.yaml', 'w') as f:
     f.write('# generated with generate-boskos.py; do not edit directly\n')
     yaml.dump(config, f, default_flow_style=False)
+

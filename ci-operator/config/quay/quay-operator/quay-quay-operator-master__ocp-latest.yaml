@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.13"
+    name: "4.20"
     namespace: ocp
     tag: cli
   ubi:
@@ -11,7 +11,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-9-golang-1.24-openshift-4.20
 images:
 - dockerfile_path: Dockerfile
   from: ubi
@@ -32,7 +32,7 @@ operator:
     context_dir: bundle/
     dockerfile_path: Dockerfile
   substitutions:
-  - pullspec: quay.io/projectquay/quay-operator:v3.6.1
+  - pullspec: quay.io/projectquay/quay-operator:v3.99.0-dev
     with: quay-operator
 promotion:
   to:
@@ -43,7 +43,7 @@ promotion:
 releases:
   latest:
     integration:
-      name: "4.13"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -51,16 +51,22 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: verify-deps
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    test:
+    - ref: go-verify-deps
 - as: e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     cluster_profile: aws-3
     dependencies:
       OO_INDEX: ci-index-quay
     env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
+      COMPUTE_NODE_TYPE: m5.4xlarge
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: '!create'
-      OO_PACKAGE: quay-operator
+      OO_PACKAGE: project-quay
       OO_TARGET_NAMESPACES: '!all'
     post:
     - ref: quay-gather
@@ -70,15 +76,38 @@ tests:
     - ref: quay-install-odf-operator
     - ref: optional-operators-subscribe
     - ref: quay-install-quay
-    - ref: quay-create-admin
+    - as: quay-create-admin
+      commands: |
+        set -euo pipefail
+
+        echo "Getting Quay registry endpoint..." >&2
+        registryEndpoint="$(oc -n quay get quayregistry quay -o jsonpath='{.status.registryEndpoint}')"
+
+        echo "Creating admin user via initialization API..." >&2
+        response="$(curl -sk --retry 30 --retry-delay 10 --retry-all-errors \
+          -X POST "$registryEndpoint/api/v1/user/initialize" \
+          --header 'Content-Type: application/json' \
+          --data '{"username": "admin", "password": "p@ssw0rd", "email": "admin@localhost.local", "access_token": false}')"
+
+        if echo "$response" | grep -q '"username"'; then
+          echo "Admin user created successfully" >&2
+        else
+          echo "Failed to create admin user: $response" >&2
+          exit 1
+        fi
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     test:
     - as: tests
       commands: |
         set -eux
         registryEndpoint="$(oc -n quay get quayregistry quay -o jsonpath='{.status.registryEndpoint}')"
         registry="${registryEndpoint#https://}"
-        oc registry login --registry "$registry" --auth-basic "admin:p@ssw0rd"
-        oc image mirror --insecure=true quay.io/projectquay/quay:latest "$registry/admin/quay"
+        oc registry login --registry "$registry" --auth-basic "admin:p@ssw0rd" --insecure --to=/tmp/authfile
+        oc image mirror --insecure=true -a /tmp/authfile quay.io/projectquay/quay:latest "$registry/admin/quay"
       from: src-oc
       resources:
         requests:
