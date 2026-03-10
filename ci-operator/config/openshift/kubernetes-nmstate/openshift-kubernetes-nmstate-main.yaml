@@ -117,6 +117,39 @@ tests:
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-handler
+- always_run: false
+  as: e2e-conformance-ovn-ipv4
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE="OVNKubernetes"
+        MIRROR_IMAGES=false
+      TEST_SUITE: openshift/conformance/parallel
+    test:
+    - ref: kubernetes-nmstate-e2e-install
+    - ref: baremetalds-e2e-test
+    workflow: kubernetes-nmstate-e2e-handler
+- as: e2e-conformance-ovn-ipv4-nightly-periodic
+  capabilities:
+  - intranet
+  cron: '@daily'
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE="OVNKubernetes"
+        MIRROR_IMAGES=false
+      TEST_SUITE: openshift/conformance/parallel
+    test:
+    - ref: kubernetes-nmstate-e2e-install
+    - ref: baremetalds-e2e-test
+    workflow: kubernetes-nmstate-e2e-handler
 - as: verify-deps
   steps:
     env:
