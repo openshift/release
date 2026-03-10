@@ -80,7 +80,7 @@ function reformat_report {
 yarn install || true
 yarn add --dev typescript || true
 yarn add --dev cypress-failed-log || true
-yarn add --dev @cypress/grep || true
+yarn add --dev @cypress/grep@4.1.0 || true
 yarn global add regctl || true
 
 #Finally Copy the Junit Testing XML files and Screenshots to /tmp/artifacts
