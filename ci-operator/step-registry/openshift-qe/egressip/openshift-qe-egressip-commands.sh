@@ -15,7 +15,7 @@ ssh ${SSH_ARGS} root@${bastion} "
    podman stop $(podman ps | grep nginxecho | awk '{ print $1 }') || echo 'No containers to stop'
    podman rm $(podman ps -a | grep nginxecho | awk '{ print $1 }') || echo 'No containers to delete'
    for port in {9002..9020}; do
-      podman run --network=host -d -e LISTEN_PORT=$port quay.io/cloud-bulldozer/nginxecho:latest
+      podman run --network=host -d -e LISTEN_PORT=\$port quay.io/cloud-bulldozer/nginxecho:latest
    done
 "
 
