@@ -164,7 +164,7 @@ fi
 
 # pull_number input variable is required and 
 # it must be set as $PULL_NUMBER OR 0 to get compared against periodic runs.
-pull_number=''
+pull_number='0'
 if [[ "${JOB_TYPE}" == "periodic" ]]; then
     if [[ -n "${PULL_NUMBER:-}" ]] && [[ "${PULL_NUMBER}" -ne 0 ]]; then
         pull_number="${PULL_NUMBER} OR 0"
@@ -176,6 +176,10 @@ elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${P
     # Indicates a ci test triggered in PR against a pull request
     pull_number="${PULL_NUMBER} OR 0"
     job_type="periodic OR pull"
+elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
+    # Indicates a rehearse job triggered from a PR
+    pull_number="${PULL_NUMBER} OR 0"
+    job_name="rehearse OR pull"
 elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
     # Indicates a rehearsel in PR against openshift/release repo
     job_type="periodic OR rehearse"
