@@ -12,8 +12,18 @@ if [[ ! -f "${CLUSTER_PROFILE_DIR}/leases" ]]; then
   exit 1
 fi
 
-# ensure hostname can be found
-HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
+# ensure hostname can be found (yq-v4 may not be in older libvirt-installer images)
+if command -v yq-v4 &> /dev/null; then
+  HOSTNAME="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${CLUSTER_PROFILE_DIR}/leases")"
+else
+  HOSTNAME="$(awk -v key="${LEASED_RESOURCE}" '
+    $0 ~ "\"" key "\"" " *:" { in_lease=1; next }
+    in_lease && /^  hostname:/ {
+      sub(/^[^:]*:[ \t]*"?/, ""); sub(/"?[ \t]*$/, ""); print; exit
+    }
+    in_lease && /^[^ ]/ { exit }
+  ' "${CLUSTER_PROFILE_DIR}/leases")"
+fi
 if [[ -z "${HOSTNAME}" ]]; then
   echo "Couldn't retrieve hostname from lease config"
   exit 1
