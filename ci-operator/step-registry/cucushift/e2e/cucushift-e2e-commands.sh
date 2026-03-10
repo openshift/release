@@ -446,7 +446,8 @@ EOF
 
 
 PARALLEL_CUCUMBER_OPTIONS='--verbose-process-command --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number'
-CUCUSHIFT_FORCE_SKIP_TAGS="not @customer
+if [[ -z "${CUCUSHIFT_FORCE_SKIP_TAGS:-}" ]] ; then
+    CUCUSHIFT_FORCE_SKIP_TAGS="not @customer
         and not @flaky
         and not @inactive
         and not @prod-only
@@ -455,7 +456,8 @@ CUCUSHIFT_FORCE_SKIP_TAGS="not @customer
         and not @stage-only
         and not @upgrade-check
         and not @upgrade-prepare
-"
+    "
+fi
 if [[ -z "$E2E_RUN_TAGS" ]] ; then
     export E2E_RUN_TAGS="$CUCUSHIFT_FORCE_SKIP_TAGS"
 else

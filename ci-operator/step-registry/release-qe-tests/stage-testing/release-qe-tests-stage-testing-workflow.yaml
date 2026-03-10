@@ -5,12 +5,27 @@ workflow:
     pre:
     - chain: upi-aws-pre
     - ref: enable-qe-catalogsource
+    - ref: idp-htpasswd
+    - ref: cucushift-pre
     test:
     - ref: openshift-extended-test
     - ref: openshift-e2e-test-qe-report
+    - ref: cucushift-e2e
     post:
     - chain: upi-aws-post
     env:
+      # cucushift-e2e env
+      E2E_RUN_TAGS: "@stage-only"
+      CUCUSHIFT_FORCE_SKIP_TAGS: |-
+        not @customer
+        and not @flaky
+        and not @inactive
+        and not @prod-only
+        and not @qeci
+        and not @security
+        and not @upgrade-check
+        and not @upgrade-prepare
+      # openshift-extended-test env
       FILTERS_ADDITIONAL: ""
       TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;Stagerun&;~ProdrunOnly&;~VMonly&;~CPaasrunOnly&;~MicroShiftOnly&
       TEST_IMPORTANCE: all
@@ -18,4 +33,5 @@ workflow:
       TEST_TIMEOUT: "35"
   documentation: |-
     Stage testing workflow for OCP releases. Provisions an AWS UPI cluster,
-    runs ginkgo stage tests with Stagerun scenario filters, and reports results.
+    runs ginkgo stage tests with Stagerun scenario filters, cucushift e2e tests
+    including @stage-only scenarios, and reports results.
