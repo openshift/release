@@ -31,7 +31,7 @@ GCP_REGION="$(<"${SHARED_DIR}/gcp-region")"
 # - Must start with a letter (prefix with 'ci')
 # - Max 30 chars total, longest suffix is "-cloud-controller" (17 chars)
 # - So infra-id max is 13 chars: 2 (prefix) + 11 (hash) = 13
-CLUSTER_NAME="ci$(echo -n $PROW_JOB_ID|sha256sum|cut -c-11)"
+CLUSTER_NAME="ci$(echo -n "${PROW_JOB_ID}"|sha256sum|cut -c-11)"
 
 # Save hosted cluster name early so destroy step can clean up if we fail partway through
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/hosted-cluster-name"
@@ -116,6 +116,12 @@ CLOUDCONTROLLER_SA=$(awk -F'"' '/"cloud-controller"/{print $4}' "${IAM_OUTPUT}")
 STORAGE_SA=$(awk -F'"' '/"gcp-pd-csi"/{print $4}' "${IAM_OUTPUT}")
 IMAGEREGISTRY_SA=$(awk -F'"' '/"image-registry"/{print $4}' "${IAM_OUTPUT}")
 
+if [[ -z "${PROJECT_NUMBER}" || -z "${POOL_ID}" || -z "${PROVIDER_ID}" || -z "${CONTROLPLANE_SA}" || -z "${NODEPOOL_SA}" || -z "${CLOUDCONTROLLER_SA}" || -z "${STORAGE_SA}" || -z "${IMAGEREGISTRY_SA}" ]]; then
+    echo "ERROR: Failed to parse WIF configuration from IAM output"
+    cat "${IAM_OUTPUT}"
+    exit 1
+fi
+
 # Save to SHARED_DIR for run-e2e step
 echo "${PROJECT_NUMBER}" > "${SHARED_DIR}/wif-project-number"
 echo "${POOL_ID}" > "${SHARED_DIR}/wif-pool-id"
@@ -148,6 +154,12 @@ cat "${INFRA_OUTPUT}"
 # Using awk instead of jq (jq not available in hypershift-operator image)
 HC_VPC_NAME=$(awk -F'"' '/"networkName"/{print $4}' "${INFRA_OUTPUT}")
 HC_SUBNET_NAME=$(awk -F'"' '/"subnetName"/{print $4}' "${INFRA_OUTPUT}")
+
+if [[ -z "${HC_VPC_NAME}" || -z "${HC_SUBNET_NAME}" ]]; then
+    echo "ERROR: Failed to parse network configuration from infra output"
+    cat "${INFRA_OUTPUT}"
+    exit 1
+fi
 
 # Save HC-specific network info to SHARED_DIR
 echo "${HC_VPC_NAME}" > "${SHARED_DIR}/hc-vpc-name"

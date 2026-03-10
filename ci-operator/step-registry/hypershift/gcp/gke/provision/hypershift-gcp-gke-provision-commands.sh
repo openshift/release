@@ -66,7 +66,10 @@ gcloud services enable \
     cloudresourcemanager.googleapis.com \
     --project="${HC_PROJECT_ID}"
 
-# Wait for API enablement to propagate
+# GCP API enablement is eventually consistent: gcloud services enable returns
+# immediately but API calls may fail briefly. 30s is empirically sufficient.
+# If this becomes flaky, consider polling actual API calls to verify serving
+# readiness rather than just enablement state.
 echo "Waiting for API enablement to propagate..."
 sleep 30
 
