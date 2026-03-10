@@ -3,6 +3,8 @@
 Test script to verify validation in GCP Secret Manager names.
 """
 
+# pylint: disable=E0401, C0413
+
 import click
 
 from ..util import validate_collection, validate_secret_name, validate_group_name
