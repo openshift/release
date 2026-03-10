@@ -66,7 +66,7 @@ spec:
    resources: {}
 EOF
 
-oc wait StorageCluster/ocs-storagecluster -n openshift-storage --for=condition=Available --timeout=15m
+oc wait StorageCluster/ocs-storagecluster -n openshift-storage --for=condition=Available --timeout=30m
 
 # Setting ocs-storagecluster-ceph-rbd the default storage class
 for item in $(oc get sc --no-headers | awk '{print $1}'); do
