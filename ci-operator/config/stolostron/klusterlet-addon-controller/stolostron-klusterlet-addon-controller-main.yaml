@@ -21,12 +21,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.21"
+      name: "4.22"
       namespace: ocp
 resources:
   '*':
@@ -46,31 +46,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^\.tekton/|\.rhtap$|^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: sonar-pre-submit
-  commands: |
-    export XDG_CACHE_HOME="/tmp"
-    export XDG_CONFIG_HOME="/tmp/xdg_config"
-    export SONAR_GO_TEST_ARGS="./..."
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export XDG_CACHE_HOME="/tmp"
-    export XDG_CONFIG_HOME="/tmp/xdg_config"
-    export SONAR_GO_TEST_ARGS="./..."
-    export SELF="make -f /opt/build-harness/Makefile.prow"
-    make -f /opt/build-harness/Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: pr-image-mirror
   steps:
     dependencies:

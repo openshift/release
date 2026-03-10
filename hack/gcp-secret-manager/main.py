@@ -26,4 +26,4 @@ cli.add_command(get_service_account)
 
 
 if __name__ == "__main__":
-    cli()
+    cli(prog_name="secret-manager")

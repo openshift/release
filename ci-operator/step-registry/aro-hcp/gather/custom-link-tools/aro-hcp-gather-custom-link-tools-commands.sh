@@ -2,6 +2,11 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace 
+set -o xtrace
 
-test/aro-hcp-tests custom-link-tools --timing-input ${SHARED_DIR} --output ${ARTIFACT_DIR}/
+export AZURE_TOKEN_CREDENTIALS=prod
+
+test/aro-hcp-tests custom-link-tools \
+  --timing-input "${SHARED_DIR}" \
+  --output "${ARTIFACT_DIR}/" \
+  --rendered-config "${SHARED_DIR}/config.yaml"

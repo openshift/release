@@ -30,7 +30,7 @@ tests:
   cron: 0 7 * * *
   steps:
     post:
-    - as: teardown
+    - as: e2e-teardown
       commands: ./ci/nightly.sh --teardown
       credentials:
       - mount_path: /var/run/rosa-credentials
@@ -41,12 +41,69 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    test:
-    - as: nightly
+    pre:
+    - as: provision
       commands: ./ci/nightly.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
         name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: e2e
+      commands: ./ci/e2e-tests.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-nightly-static-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- always_run: false
+  as: on-demand-e2e
+  steps:
+    post:
+    - as: pre-merge-teardown
+      commands: |-
+        export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
+        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
+        ./ci/nightly.sh --teardown
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-ephemeral-static-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    pre:
+    - as: pre-merge
+      commands: |-
+        export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
+        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
+        ./ci/nightly.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-ephemeral-static-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: e2e
+      commands: ./ci/e2e-tests.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-ephemeral-static-creds
         namespace: test-credentials
       from: src
       resources:
@@ -61,7 +118,7 @@ tests:
       commands: ./ci/nightly-resources-janitor.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-nightly-static-creds
+        name: rosa-regional-platform-ephemeral-static-creds
         namespace: test-credentials
       from: src
       resources:

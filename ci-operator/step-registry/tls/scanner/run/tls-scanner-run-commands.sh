@@ -62,7 +62,7 @@ spec:
     - -c
     - |
       mkdir -p /results
-      /usr/local/bin/tls-scanner ${SCANNER_ARGS} \
+      /usr/local/bin/tls-scanner -j 4 ${SCANNER_ARGS} \
         --json-file /results/results.json \
         --csv-file /results/results.csv \
         --junit-file /results/junit_tls_scan.xml \
@@ -70,6 +70,13 @@ spec:
       echo "Scan complete. Exit code: \$?"
       # Keep pod alive for artifact collection
       sleep 120
+    resources:
+      requests:
+        cpu: "4"
+        memory: 4Gi
+      limits:
+        cpu: "4"
+        memory: 4Gi
     securityContext:
       privileged: true
       runAsUser: 0

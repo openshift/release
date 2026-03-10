@@ -15,12 +15,13 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v1.0.2"
+	TAG="v1.2.0"
 	echo "Installing PowerVC-Tool version ${TAG}"
-	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
-	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
-	tar xzvf ${TOOL_TAR}
-	mv PowerVC-Tool /tmp/bin/
+	MACHINE=$(uname -m)
+	if [ "${MACHINE}" == "x86_64" ]; then MACHINE="amd64"; fi
+	TOOL_BIN="ocp-ipi-powervc-linux-${MACHINE}"
+	curl --location --output /tmp/bin/PowerVC-Tool https://github.com/IBM/ocp-ipi-powervc/releases/download/${TAG}/${TOOL_BIN}
+	chmod ugo+x /tmp/bin/PowerVC-Tool
 
 	TAG="v4.49.2"
 	echo "Installing yq-v4 version ${TAG}"
@@ -307,7 +308,8 @@ BRANCH=$(yq-v4 eval '.BRANCH' "${SHARED_DIR}/powervc-conf.yaml")
 CLOUD=$(yq-v4 eval '.CLOUD' "${SHARED_DIR}/powervc-conf.yaml")
 CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervc-conf.yaml")
 COMPUTE_NODE_TYPE=$(yq-v4 eval '.COMPUTE_NODE_TYPE' "${SHARED_DIR}/powervc-conf.yaml")
-FLAVOR=$(yq-v4 eval '.FLAVOR' "${SHARED_DIR}/powervc-conf.yaml")
+BASTION_FLAVOR=$(yq-v4 eval '.BASTION_FLAVOR' "${SHARED_DIR}/powervc-conf.yaml")
+CLUSTER_FLAVOR=$(yq-v4 eval '.CLUSTER_FLAVOR' "${SHARED_DIR}/powervc-conf.yaml")
 LEASED_RESOURCE=$(yq-v4 eval '.LEASED_RESOURCE' "${SHARED_DIR}/powervc-conf.yaml")
 NETWORK_NAME=$(yq-v4 eval '.NETWORK_NAME' "${SHARED_DIR}/powervc-conf.yaml")
 SERVER_IP=$(yq-v4 eval '.SERVER_IP' "${SHARED_DIR}/powervc-conf.yaml")
@@ -319,7 +321,8 @@ export BRANCH
 export CLOUD
 export CLUSTER_NAME
 export COMPUTE_NODE_TYPE
-export FLAVOR
+export BASTION_FLAVOR
+export CLUSTER_FLAVOR
 export LEASED_RESOURCE
 export NETWORK_NAME
 

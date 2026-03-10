@@ -33,15 +33,30 @@ tests:
   capabilities:
   - nested-podman
   commands: |
+    set -euo pipefail
     export DOCKER_HOST=$(podman info --format 'unix://{{.Host.RemoteSocket.Path}}')
+    PODMAN_PID=""
+    cleanup() {
+        if [[ -n "$PODMAN_PID" ]]; then
+            kill "$PODMAN_PID" 2>/dev/null || true
+            wait "$PODMAN_PID" 2>/dev/null || true
+        fi
+    }
+    trap cleanup EXIT
+
     podman system service --time=0 &
     PODMAN_PID=$!
-    # Ensure podman service is always stopped when the script exits,
-    # even if make hangs or a test panics (HYPERFLEET-625).
-    trap 'kill $PODMAN_PID 2>/dev/null || true; wait $PODMAN_PID 2>/dev/null || true' EXIT
-    sleep 2
+
+    # Wait for the podman socket to be available
+    SOCKET_PATH=$(podman info --format '{{.Host.RemoteSocket.Path}}')
+    for i in $(seq 1 30); do
+        [ -S "$SOCKET_PATH" ] && break
+        sleep 1
+    done
+
     export TESTCONTAINERS_RYUK_DISABLED=true
     export PATH=$PATH:$(go env GOPATH)/bin
+
     make generate
     make test-integration
   container:
