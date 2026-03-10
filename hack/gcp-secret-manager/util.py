@@ -47,10 +47,21 @@ def ensure_authentication():
 
 
 def validate_collection(_ctx, _param, value):
-    if not re.fullmatch("[a-z0-9-]*", value):
-        invalid_chars = set(re.findall(r"[^a-z0-9-]", value))
+    if "__" in value:
         raise click.BadParameter(
-            f"May only contain lowercase letters, numbers or dashes. Invalid characters: {', '.join(repr(c) for c in sorted(invalid_chars))}"
+            "Cannot contain double underscores (__), which are reserved as delimiters"
+        )
+
+    if value.startswith("_"):
+        raise click.BadParameter("Cannot start with an underscore")
+
+    if value.endswith("_"):
+        raise click.BadParameter("Cannot end with an underscore")
+
+    if not re.fullmatch(r"[a-z0-9-]([a-z0-9-_]*[a-z0-9-])?|[a-z0-9-]", value):
+        invalid_chars = set(re.findall(r"[^a-z0-9-_]", value))
+        raise click.BadParameter(
+            f"May only contain lowercase letters, numbers, dashes, or an underscore. Invalid characters: {', '.join(repr(c) for c in sorted(invalid_chars))}"
         )
     return value
 
@@ -64,10 +75,23 @@ def validate_secret_name(_ctx, _param, value):
         raise click.ClickException(
             f"The name '{UPDATER_SA_SECRET_NAME}' is reserved for internal use and cannot be used as a secret name."
         )
-    if not re.fullmatch("[A-Za-z0-9-]+", value):
-        invalid_chars = set(re.findall(r"[^A-Za-z0-9-]", value))
+
+    if "__" in value:
         raise click.BadParameter(
-            f"May only contain letters, numbers or dashes. Invalid characters: {', '.join(repr(c) for c in sorted(invalid_chars))}"
+            "Cannot contain double underscores (__), which are reserved as delimiters"
+        )
+
+    if value.startswith("_"):
+        raise click.BadParameter("Cannot start with an underscore")
+
+    if value.endswith("_"):
+        raise click.BadParameter("Cannot end with an underscore")
+
+    # Allow single char OR multi-char with underscores in middle only
+    if not re.fullmatch(r"[A-Za-z0-9-]([A-Za-z0-9-_]*[A-Za-z0-9-])?|[A-Za-z0-9-]", value):
+        invalid_chars = set(re.findall(r"[^A-Za-z0-9-_]", value))
+        raise click.BadParameter(
+            f"May only contain letters, numbers, dashes, or an underscore. Invalid characters: {', '.join(repr(c) for c in sorted(invalid_chars))}"
         )
     if len(value) > SECRET_NAME_MAX_LENGTH:
         raise click.BadParameter(f"Secret name must be less than {SECRET_NAME_MAX_LENGTH} characters.")
@@ -80,6 +104,7 @@ def validate_group_name(_ctx, _param, value):
     - Required (cannot be empty)
     - Can contain single underscores (_)
     - Cannot contain double underscores (__)
+    - Cannot start or end with underscore
     - Can contain forward slashes (/) for hierarchy
     - Only lowercase letters, numbers, dashes, underscores, slashes
     """
@@ -88,15 +113,20 @@ def validate_group_name(_ctx, _param, value):
 
     if "__" in value:
         raise click.BadParameter(
-            "Group name cannot contain double underscores (__). "
-            "Use forward slashes (/) for nested groups."
+            "Cannot contain double underscores (__), which are reserved as delimiters"
         )
+
+    if value.startswith("_"):
+        raise click.BadParameter("Cannot start with an underscore")
+
+    if value.endswith("_"):
+        raise click.BadParameter("Cannot end with an underscore")
 
     # Allow: a-z, 0-9, -, _, /
     if not re.fullmatch(r"[a-z0-9_/-]+", value):
         invalid_chars = set(re.findall(r"[^a-z0-9_/-]", value))
         raise click.BadParameter(
-            f"May only contain lowercase letters, numbers, dashes, one underscore, or slashes. "
+            f"May only contain lowercase letters, numbers, dashes, an underscore, or slashes. "
             f"Invalid characters: {', '.join(repr(c) for c in sorted(invalid_chars))}"
         )
 
