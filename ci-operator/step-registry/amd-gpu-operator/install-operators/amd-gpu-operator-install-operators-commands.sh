@@ -65,6 +65,7 @@ version_channel: stable
 
 operators:
   install: true
+  gpu_operator_version: "${GPU_OPERATOR_VERSION:-1.4}"
   machine_config_role: "${MACHINE_CONFIG_ROLE}"
   driver_version: "${AMD_DRIVER_VERSION:-30.20.1}"
   enable_metrics: true
