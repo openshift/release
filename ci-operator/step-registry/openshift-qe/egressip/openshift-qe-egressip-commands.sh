@@ -5,6 +5,20 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
+SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
+bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
+
+# Create the "external servers" in the bastion host
+ssh ${SSH_ARGS} root@${bastion} "
+   set -e
+   set -o pipefail
+   podman stop $(podman ps | grep nginxecho | awk '{ print $1 }') || echo 'No containers to stop'
+   podman rm $(podman ps -a | grep nginxecho | awk '{ print $1 }') || echo 'No containers to delete'
+   for port in {9002..9020}; do
+      podman run --network=host -d -e LISTEN_PORT=$port quay.io/cloud-bulldozer/nginxecho:latest
+   done
+"
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -56,3 +70,11 @@ if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     metrics_folder_name=$(find . -maxdepth 1 -type d -name 'collected-metric*' | head -n 1)
     cp -r "${metrics_folder_name}" "${ARTIFACT_DIR}/"
 fi
+
+# Cleanup the "external servers" in the bastion host
+ssh ${SSH_ARGS} root@${bastion} "
+   set -e
+   set -o pipefail
+   podman stop $(podman ps | grep nginxecho | awk '{ print $1 }')
+   podman rm $(podman ps -a | grep nginxecho | awk '{ print $1 }')
+"
