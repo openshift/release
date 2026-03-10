@@ -59,6 +59,7 @@ version_channel: ${VERSION_CHANNEL:-stable}
 
 operators:
   install: false
+  gpu_operator_version: "${GPU_OPERATOR_VERSION:-1.4}"
   machine_config_role: worker
   driver_version: "30.20.1"
   enable_metrics: true
