@@ -179,7 +179,7 @@ elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" =~ ^pull* ]] && [[ -n "${P
 elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]] && [[ -n "${PULL_NUMBER:-}" ]]; then
     # Indicates a rehearse job triggered from a PR
     pull_number="${PULL_NUMBER} OR 0"
-    job_name="rehearse OR pull"
+    job_type="rehearse OR pull"
 elif [[ "${JOB_TYPE}" == "presubmit" && "${JOB_NAME}" == *rehearse* ]]; then
     # Indicates a rehearsel in PR against openshift/release repo
     job_type="periodic OR rehearse"
