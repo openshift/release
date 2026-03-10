@@ -47,6 +47,9 @@ def ensure_authentication():
 
 
 def validate_collection(_ctx, _param, value):
+    if value == "":
+        return value
+
     if "__" in value:
         raise click.BadParameter(
             "Cannot contain double underscores (__), which are reserved as delimiters"

@@ -42,7 +42,7 @@ REQUEST_INFO = "request-information"
     type=str,
     callback=validate_collection,
 )
-@click.argument("path", required=True, callback=validate_path)
+@click.argument("secret_path", required=True, callback=validate_path, metavar="SECRET_PATH")
 @click.option(
     "-f",
     "--from-file",
@@ -53,11 +53,13 @@ REQUEST_INFO = "request-information"
 @click.option(
     "-l", "--from-literal", default="", help="Secret data as string input.", type=str
 )
-def create(collection: str, path: str, from_file: str, from_literal: str):
+def create(collection: str, secret_path: str, from_file: str, from_literal: str):
     """Create a new secret in the specified collection.
 
-    The secret PATH should be in the format 'group/field' where:
+    The SECRET_PATH should be in the format 'group/field' where:
+
     - group: Organizes related secrets (can be hierarchical: 'aws/prod')
+
     - field: The specific secret name (e.g., 'username', 'password')
 
     Example: secret-manager create -c my-collection aws/password -l "secret value"
@@ -74,17 +76,17 @@ def create(collection: str, path: str, from_file: str, from_literal: str):
     client = secretmanager.SecretManagerServiceClient()
 
     index_secrets = get_secrets_from_index(client, collection)
-    path_normalized = path.replace("/", "__")
+    path_normalized = secret_path.replace("/", "__")
     if path_normalized in index_secrets:
         raise click.ClickException(
-            f"Secret '{path}' already exists."
+            f"Secret '{secret_path}' already exists."
         )
 
-    secret_id_normalized = get_secret_name(collection, path)
+    secret_id_normalized = get_secret_name(collection, secret_path)
     try:
         client.get_secret(name=client.secret_path(PROJECT_ID, secret_id_normalized))
         raise click.ClickException(
-            f"Secret '{path}' already exists."
+            f"Secret '{secret_path}' already exists."
         )
     except NotFound:
         pass  # Secret doesn't exist in GCP - this is good
@@ -114,11 +116,11 @@ def create(collection: str, path: str, from_file: str, from_literal: str):
             payload=SecretPayload(data=create_payload(from_file, from_literal)),
         )
         update_index_secret(client, collection, index_secrets + [path_normalized])
-        click.echo(f"Secret '{path}' created successfully.")
+        click.echo(f"Secret '{secret_path}' created successfully.")
     except Exception as e:
         raise click.ClickException(
-            f"Failed to create secret '{path}': {e}. "
-            f"If the secret is in an inconsistent state, run 'delete -c {collection} {path}', then try again."
+            f"Failed to create secret '{secret_path}': {e}. "
+            f"If the secret is in an inconsistent state, run 'delete -c {collection} {secret_path}', then try again."
         ) from e
 
 

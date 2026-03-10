@@ -25,7 +25,7 @@ from util import (
     type=str,
     callback=validate_collection,
 )
-@click.argument("path", required=True, callback=validate_path)
+@click.argument("secret_path", required=True, callback=validate_path, metavar="SECRET_PATH")
 @click.option(
     "-f",
     "--from-file",
@@ -36,10 +36,10 @@ from util import (
 @click.option(
     "-l", "--from-literal", default="", help="Secret data as string input.", type=str
 )
-def update(collection: str, path: str, from_file: str, from_literal: str):
+def update(collection: str, secret_path: str, from_file: str, from_literal: str):
     """Update an existing secret.
 
-    The secret PATH format is 'group/field' (e.g., 'aws/password').
+    The SECRET_PATH should be in the format 'group/field' (e.g., 'aws/password').
     """
 
     ensure_authentication()
@@ -47,10 +47,10 @@ def update(collection: str, path: str, from_file: str, from_literal: str):
     client = secretmanager.SecretManagerServiceClient()
 
     # Check if secret exists in both index and GSM
-    path_normalized = path.replace("/", "__")
+    path_normalized = secret_path.replace("/", "__")
     index_secrets = get_secrets_from_index(client, collection)
     secret_in_index = path_normalized in index_secrets
-    full_secret_path = client.secret_path(PROJECT_ID, get_secret_name(collection, path))
+    full_secret_path = client.secret_path(PROJECT_ID, get_secret_name(collection, secret_path))
     try:
         client.get_secret(request={"name": full_secret_path})
         secret_in_gsm = True
@@ -60,19 +60,19 @@ def update(collection: str, path: str, from_file: str, from_literal: str):
     # Simple existence checks - tell user to delete/recreate if inconsistent
     if not secret_in_index and not secret_in_gsm:
         raise click.ClickException(
-            f"Secret '{path}' does not exist in collection '{collection}'."
+            f"Secret '{secret_path}' does not exist in collection '{collection}'."
         )
 
     if secret_in_index and not secret_in_gsm:
         raise click.ClickException(
-            f"Secret '{path}' is in inconsistent state. "
-            f"Run 'delete -c {collection} {path}', then 'create' to fix."
+            f"Secret '{secret_path}' is in inconsistent state. "
+            f"Run 'delete -c {collection} {secret_path}', then 'create' to fix."
         )
 
     if not secret_in_index and secret_in_gsm:
         raise click.ClickException(
-            f"Secret '{path}' is in inconsistent state (GSM only). "
-            f"Run 'delete -c {collection} {path}', then 'create' to fix."
+            f"Secret '{secret_path}' is in inconsistent state (GSM only). "
+            f"Run 'delete -c {collection} {secret_path}', then 'create' to fix."
         )
 
     # Secret exists in both places - proceed with the update
@@ -81,12 +81,12 @@ def update(collection: str, path: str, from_file: str, from_literal: str):
             parent=full_secret_path,
             payload=SecretPayload(data=create_payload(from_file, from_literal)),
         )
-        click.echo(f"Secret '{path}' updated successfully.")
+        click.echo(f"Secret '{secret_path}' updated successfully.")
     except PermissionDenied:
         raise click.ClickException(
             f"You don't have permission to update secrets in collection '{collection}'"
         )
     except Exception as e:
         raise click.ClickException(
-            f"Failed to update secret '{path}': {e}."
+            f"Failed to update secret '{secret_path}': {e}."
         )
