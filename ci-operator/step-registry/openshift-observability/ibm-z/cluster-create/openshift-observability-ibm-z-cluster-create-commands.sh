@@ -62,14 +62,14 @@ SSH_ARGS=( -i "$SSH_KEY_PATH" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHo
 # --- REMOTE COMMAND ---
 # Note: The variables CLUSTER_VERSION, CLUSTER_NAME, and PULL_SECRET_FILE
 # must be set in the environment for this to work.
-SSH_CMD=$(cat <<'EOF'
+SSH_CMD=$(cat <<EOF
 set -e
 # Append values directly to cluster-vars
 {
   echo "CLUSTER_VERSION='${CLUSTER_VERSION}'"
   echo "CLUSTER_NAME='${CLUSTER_NAME}'"
   echo "PULL_SECRET_FILE='${PULL_SECRET_FILE}'"
-} >> "$CLUSTER_VARS_PATH"
+} >> "${CLUSTER_VARS_PATH}"
 
 cd /root/ocp-cluster-ibmcloud/ibmcloud-openshift-provisioning
 ./create-cluster.sh
