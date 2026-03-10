@@ -206,7 +206,7 @@ process_change_point() {
     # Determine the path to prowjob.json based on prow ENV variables
     case "${JOB_TYPE:-}" in
         presubmit)
-            if [[ -n "${REPO_OWNER:-}" && -n "${REPO_NAME:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" ]]; then
+            if [[ -n "${REPO_OWNER:-}" && -n "${REPO_NAME:-}" && -n "${PULL_NUMBER:-}" && -n "${JOB_NAME:-}" && -n "${BUILD_ID:-}" && "${JOB_NAME}" != *rehearse* ]]; then
                 GCS_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/prowjob.json"
             fi
             ;;
