@@ -7,7 +7,14 @@ set -o pipefail
 # The script will enable UIPlugin and add test alerts first, then start cypress test.
 # We use '|| true' on the final cypress command to ensure that the script does not exit with 1.
 
-export CYPRESS_COO_NAMESPACE="${CYPRESS_COO_NAMESPACE}"
+# List of variables to check.
+vars=(
+  CYPRESS_SKIP_COO_INSTALL
+  CYPRESS_COO_NAMESPACE
+  CYPRESS_COO_UI_INSTALL
+  CYPRESS_SESSION
+)
+
 echo "--- CI Check: The value of CYPRESS_COO_NAMESPACE from the environment is: ${CYPRESS_COO_NAMESPACE} ---"
 echo "--- Applying UIPlugin CR to integrate ACM observability into the console ---"
 cat <<EOF | oc apply -n "${CYPRESS_COO_NAMESPACE}" -f -
