@@ -194,36 +194,15 @@ tests:
         KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         export KUBECONFIG
         CTX_HUB_CLUSTER=$(kubectl config current-context)
-        # Extract hub cluster info from JSON
-        HUB_API_URL=$(jq -r '.api_url' "${SHARED_DIR}/hub-1.json") &>/dev/null
-        TEMP_CA_FILE=$(mktemp)
-        # Writing hub's CA to a temp file
-        kubectl get cm kube-root-ca.crt -n kube-public -o jsonpath='{.data.ca\.crt}' >"${TEMP_CA_FILE}"
         clusteradm init --wait --context "${CTX_HUB_CLUSTER}" &>/dev/null
-        set +x
-        HUB_TOKEN=$(clusteradm get token --context "${CTX_HUB_CLUSTER}")
-        IS_HUB_TOKEN=true
-        if [[ -z ${HUB_TOKEN} ]]; then
-          echo "Error: Failed to get hub token..."
-          echo "Skipping join..."
-          IS_HUB_TOKEN=false
-        fi
-        set -x
+        joincmd=$(clusteradm get token --context "${CTX_HUB_CLUSTER}" | grep clusteradm) &>/dev/null
         declare -A CSR_CREATED=()
         for ((i = 1; i <= ${CLUSTERPOOL_MANAGED_COUNT}; i++)); do
-          if $IS_HUB_TOKEN && [[ -n ${SHARED_DIR} ]] && [[ -f "${SHARED_DIR}/managed-${i}.json" ]]; then
+          if [[ -n ${SHARED_DIR} ]] && [[ -f "${SHARED_DIR}/managed-${i}.json" ]]; then
             export KUBECONFIG="${SHARED_DIR}/managed-${i}.kc"
             CTX_MANAGED_CLUSTER=$(kubectl config current-context)
             echo "Join managed-${i} to hub"
-            set +x
-            clusteradm join \
-              --hub-token "${HUB_TOKEN}" \
-              --hub-apiserver "${HUB_API_URL}" \
-              --wait \
-              --cluster-name "managed-${i}" \
-              --context "${CTX_MANAGED_CLUSTER}" \
-              --ca-file "$TEMP_CA_FILE"
-            set -x
+            $(echo ${joincmd} --force-internal-endpoint-lookup --wait --context ${CTX_MANAGED_CLUSTER} | sed "s/<cluster_name>/managed-${i}/g")
             CSR_CREATED[$i]=$i
           fi
         done
@@ -232,7 +211,7 @@ tests:
         echo "Waiting for CSR from each managed cluster..."
         for j in {1..60}; do
           for ((i = 1; i <= ${CLUSTERPOOL_MANAGED_COUNT}; i++)); do
-            if $IS_HUB_TOKEN && [[ -n ${CSR_CREATED[$i]} ]] && kubectl get csr --context "${CTX_HUB_CLUSTER}" 2>/dev/null | grep -q "managed-${i}"; then
+            if [[ -n ${CSR_CREATED[$i]} ]] && kubectl get csr --context "${CTX_HUB_CLUSTER}" 2>/dev/null | grep -q "managed-${i}"; then
               unset "CSR_CREATED[$i]"
               clusteradm accept --clusters "managed-${i}" --context "${CTX_HUB_CLUSTER}" &>/dev/null
             fi
