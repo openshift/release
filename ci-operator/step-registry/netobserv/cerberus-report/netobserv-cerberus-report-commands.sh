@@ -42,14 +42,10 @@ fi
 echo ""
 echo "====> Collecting Cerberus failure report"
 
-# First try to read from SHARED_DIR (preferred method)
-
-
-# Fallback: Get the pod name from the test namespace
 pods=$(oc get pods -n "${TEST_NAMESPACE}" --no-headers 2>/dev/null || true)
 
 if [[ -z "$pods" ]]; then
-    echo "ERROR: No pods found in namespace ${TEST_NAMESPACE}"
+    echo "ERROR: No cerberus pods found in namespace ${TEST_NAMESPACE}"
     exit 1
 fi
 
@@ -112,7 +108,7 @@ echo "====> Checking for NetObserv component failures"
 
 NETOBSERV_FAILURES=$(jq -r '
   .history.failures
-  | map(select(.component | startswith("netobserv")))
+  | map(select(.component | contains("netobserv")))
   | group_by(.component)
   | map({
       component: .[0].component,
@@ -131,7 +127,7 @@ if [[ "${NETOBSERV_COUNT}" -gt 0 ]]; then
     echo "====> Detailed NetObserv Failure Report"
     jq -r '
       .history.failures
-      | map(select(.component | startswith("netobserv")))
+      | map(select(.component | contains("netobserv")))
       | group_by(.component)
       | .[]
       | "Component: \(.[0].component)\nFailures:\n" + (
