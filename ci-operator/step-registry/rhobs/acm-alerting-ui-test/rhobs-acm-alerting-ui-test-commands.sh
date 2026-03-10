@@ -15,7 +15,16 @@ vars=(
   CYPRESS_SESSION
 )
 
-echo "--- CI Check: The value of CYPRESS_COO_NAMESPACE from the environment is: ${CYPRESS_COO_NAMESPACE} ---"
+# Loop through each variable.
+for var in "${vars[@]}"; do
+  if [[ -z "${!var}" ]]; then
+    unset "$var"
+    echo "Unset variable: $var"
+  else
+    echo "$var is set to '${!var}'"
+  fi
+done
+
 echo "--- Applying UIPlugin CR to integrate ACM observability into the console ---"
 cat <<EOF | oc apply -n "${CYPRESS_COO_NAMESPACE}" -f -
 apiVersion: observability.openshift.io/v1alpha1
