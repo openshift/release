@@ -19,6 +19,10 @@ base_images:
     name: "4.17"
     namespace: ocp
     tag: tools
+  ubi9:
+    name: ubi
+    namespace: ocp
+    tag: "9"
   upi-installer:
     name: "4.17"
     namespace: ocp
@@ -90,7 +94,7 @@ images:
     RUN set -x && \
         curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
         curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="alsa-lib gtk2-devel gtk3-devel httpd-tools libnotify-devel libXScrnSaver nodejs nss openssh-clients xorg-x11-server-Xvfb yarn" && \
+        PACKAGES="alsa-lib gtk2-devel gtk3-devel httpd-tools libnotify-devel libXScrnSaver nodejs nss openssh-clients wget xorg-x11-server-Xvfb yarn" && \
         yum -y install --setopt=tsflags=nodocs $PACKAGES && \
         declare -A YQ_HASH=([amd64]='6c911103e0dcc54e2ba07e767d2d62bcfc77452b39ebaee45b1c46f062f4fd26' \
                             [arm64]='95092e8b5332890c46689679b5e4360d96873c025ad8bafd961688f28ea434c7') && \
@@ -100,9 +104,9 @@ images:
         echo "${YQ_HASH[$arch]} */usr/local/bin/yq" | sha256sum --strict --status --check && \
         chmod +x /usr/local/bin/yq && \
         wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
-        rpm -ivh ./google-chrome-stable_current_*.rpm && rm -f ./google-chrome-stable_current_*.rpm && \
+        yum install -y ./google-chrome-stable_current_*.rpm && rm -f ./google-chrome-stable_current_*.rpm && \
         yum clean all && rm -rf /var/cache/yum/* /tmp/*
-  from: tools
+  from: ubi9
   to: tests-private-baseui
 - dockerfile_literal: |
     FROM src AS builder
