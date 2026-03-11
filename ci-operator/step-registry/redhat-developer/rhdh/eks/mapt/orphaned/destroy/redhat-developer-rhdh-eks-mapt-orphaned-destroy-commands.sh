@@ -37,7 +37,7 @@ failed_count=0
 echo "[INFO] 📋 Found ${total} S3 top-level folders to process"
 
 # Create files to track results
-SUCCESSFUL_DESTROYS="${ARTIFACT_DIR}/successful_destroys.txt"
+SUCCESSFUL_DESTROYS="${SHARED_DIR}/successful_destroys.txt"
 FAILED_DESTROYS="${ARTIFACT_DIR}/failed_destroys.txt"
 touch "${SUCCESSFUL_DESTROYS}"
 touch "${FAILED_DESTROYS}"
@@ -81,21 +81,7 @@ echo "[INFO]Total processed: ${total}"
 echo "[INFO]Successful: ${success_count}"
 echo "[INFO]Failed: ${failed_count}"
 
-# Batch delete successfully destroyed folders from S3
-if [ "${success_count}" -gt 0 ]; then
-  echo "[INFO] 🗑️ Deleting ${success_count} successfully destroyed folders from S3 bucket..."
-
-  while IFS= read -r folder; do
-    if [ -n "$folder" ]; then
-      echo "[INFO] 🗑️ Deleting s3://${AWS_S3_BUCKET}/${folder}/..."
-      aws s3 rm "s3://${AWS_S3_BUCKET}/${folder}/" --recursive
-    fi
-  done < "${SUCCESSFUL_DESTROYS}"
-
-  echo "[SUCCESS] ✅ Successfully deleted all folders from S3"
-else
-  echo "[INFO] 🫙 No folders to delete from S3"
-fi
+cp "${SUCCESSFUL_DESTROYS}" "${ARTIFACT_DIR}/successful_destroys.txt"
 
 echo "[SUCCESS] ✅ Finished processing all ${total} MAPT folders"
 
