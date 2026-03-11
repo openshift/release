@@ -2,6 +2,7 @@
 
 set -o nounset
 set -o pipefail
+declare mac
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
