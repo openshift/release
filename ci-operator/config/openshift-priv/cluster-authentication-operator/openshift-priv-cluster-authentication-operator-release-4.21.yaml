@@ -52,7 +52,7 @@ tests:
     from: src
 - as: e2e-agnostic
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-agnostic-ipv6
@@ -81,7 +81,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-agnostic-upgrade
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: e2e-console-login
   steps:
@@ -181,6 +181,25 @@ tests:
     make test-operator-integration
   container:
     from: src
+- always_run: false
+  as: e2e-gcp-operator-encryption-kms
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-kms)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-kms JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-4.21
   org: openshift-priv

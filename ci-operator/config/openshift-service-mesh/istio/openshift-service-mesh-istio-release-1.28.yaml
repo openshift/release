@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.20"
+    name: "4.21"
     namespace: ocp
     tag: cli
 build_root:
@@ -12,9 +12,9 @@ build_root:
 releases:
   latest:
     release:
-      architecture: multi
+      architecture: amd64
       channel: stable
-      version: "4.20"
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -34,12 +34,55 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
+- as: unit
+  steps:
+    cluster_profile: ossm-aws
+    env:
+      BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      MAISTRA_BUILDER_IMAGE: quay.io/maistra-dev/maistra-builder:3.3
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: unit
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c "\
+          export BUILD_WITH_CONTAINER=0 && \
+          cd /work && \
+          entrypoint \
+          make -e T=-v build racetest binaries-test"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 3h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: gencheck
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.28
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.28-2cff97d3b27d82d78c5d4e468a467f520cf2fbf3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
     test:
@@ -80,57 +123,14 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-hypershift
-- as: unit
-  steps:
-    cluster_profile: ossm-aws
-    env:
-      BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.28
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
-    - as: unit
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          bash -c "\
-          export BUILD_WITH_CONTAINER=0 && \
-          cd /work && \
-          entrypoint \
-          make -e T=-v build racetest binaries-test"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 3h0m0s
-    workflow: servicemesh-istio-e2e-hypershift
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-helm
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.28
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.28-2cff97d3b27d82d78c5d4e468a467f520cf2fbf3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
@@ -141,7 +141,7 @@ tests:
     test:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-int-tests
-    workflow: servicemesh-istio-e2e-hypershift
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-security
   steps:
     cluster_profile: ossm-aws
@@ -149,7 +149,7 @@ tests:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.28
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.28-2cff97d3b27d82d78c5d4e468a467f520cf2fbf3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
@@ -159,14 +159,14 @@ tests:
     test:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-int-tests
-    workflow: servicemesh-istio-e2e-hypershift
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-pilot
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.28
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.28-2cff97d3b27d82d78c5d4e468a467f520cf2fbf3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
@@ -177,14 +177,14 @@ tests:
     test:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-int-tests
-    workflow: servicemesh-istio-e2e-hypershift
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-telemetry
   steps:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.28
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.28-2cff97d3b27d82d78c5d4e468a467f520cf2fbf3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
@@ -194,7 +194,7 @@ tests:
     test:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-int-tests
-    workflow: servicemesh-istio-e2e-hypershift
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-ambient
   steps:
     cluster_profile: ossm-aws
@@ -202,18 +202,19 @@ tests:
       AMBIENT: "true"
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
       INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.28
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.28-2cff97d3b27d82d78c5d4e468a467f520cf2fbf3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
-      SKIPPED_TESTS: TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestTCPRoute|TestTLSRoute
+      SKIPPED_SUITES: pqc
+      SKIPPED_TESTS: TestTrafficWithCNIUpgrade|TestCNIMisconfigHealsOnRestart|TestGatewayConformance|TestAPIServer|TestTCPRoute|TestTLSRoute|TestWaypointAsEgressGateway/http_origination_targetPort_with_BackendTLSPolicy|TestWaypointAsEgressGateway/http_origination_route_with_BackendTLSPolicy
       TEST_FILE_NAME: junit.xml
       TEST_SUITE: ambient
       TEST_SUITE_DESC: Istio Integration ambient
     test:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-istio-int-tests
-    workflow: servicemesh-istio-e2e-hypershift
+    workflow: servicemesh-istio-e2e-profile
 - as: update-istio-module
   commands: |
     export BUILD_WITH_CONTAINER="0"

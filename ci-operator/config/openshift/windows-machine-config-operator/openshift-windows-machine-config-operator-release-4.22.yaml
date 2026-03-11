@@ -136,7 +136,7 @@ tests:
   as: azure-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
@@ -148,7 +148,7 @@ tests:
   as: azure-e2e-operator-2025
   cron: 0 2 * * 1
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
@@ -189,8 +189,18 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
-- as: vsphere-e2e-ccm-install
+- as: vsphere-e2e-operator-fips
   cron: 0 9 * * 1
+  steps:
+    cluster_profile: vsphere-connected-2
+    env:
+      FIPS_ENABLED: "true"
+      VM_TEMPLATE: windows-golden-images/windows-server-2022-template-ipv6-disabled-fips
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- as: vsphere-e2e-ccm-install
+  cron: 38 14 * * 2
   steps:
     cluster_profile: vsphere-elastic
     test:
@@ -200,7 +210,7 @@ tests:
   as: azure-e2e-upgrade
   skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     test:
     - as: install
       cli: latest

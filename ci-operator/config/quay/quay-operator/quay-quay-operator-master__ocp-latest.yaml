@@ -1,8 +1,12 @@
 base_images:
   cli:
-    name: "4.13"
+    name: "4.20"
     namespace: ocp
     tag: cli
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
   ubi:
     name: ubi
     namespace: ocp
@@ -11,7 +15,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-9-golang-1.24-openshift-4.20
 images:
 - dockerfile_path: Dockerfile
   from: ubi
@@ -26,24 +30,31 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: src-oc
+- dockerfile_literal: |
+    FROM quay.io/projectquay/quay:3.16.2
+  to: quay-app
 operator:
   bundles:
   - as: quay
     context_dir: bundle/
-    dockerfile_path: Dockerfile
   substitutions:
-  - pullspec: quay.io/projectquay/quay-operator:v3.6.1
+  - pullspec: quay.io/projectquay/quay-operator:v3.99.0-dev
     with: quay-operator
+  - pullspec: quay.io/projectquay/quay:v3.99.0-dev
+    with: quay-app
+  - pullspec: quay.io/projectquay/quay:latest
+    with: quay-app
 promotion:
   to:
   - excluded_images:
+    - quay-app
     - src-oc
     namespace: quay
     tag: latest
 releases:
   latest:
     integration:
-      name: "4.13"
+      name: "4.20"
       namespace: ocp
 resources:
   '*':
@@ -51,17 +62,25 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: verify-deps
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+  steps:
+    test:
+    - ref: go-verify-deps
 - as: e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     cluster_profile: aws-3
     dependencies:
       OO_INDEX: ci-index-quay
     env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      DEST_REPO: admin/quay:latest
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: '!create'
-      OO_PACKAGE: quay-operator
+      OO_PACKAGE: project-quay
       OO_TARGET_NAMESPACES: '!all'
+      SOURCE_IMAGE: quay.io/projectquay/quay:latest
     post:
     - ref: quay-gather
     - chain: ipi-aws-post
@@ -70,21 +89,160 @@ tests:
     - ref: quay-install-odf-operator
     - ref: optional-operators-subscribe
     - ref: quay-install-quay
-    - ref: quay-create-admin
+    - ref: quay-create-admin-user
     test:
-    - as: tests
+    - ref: quay-test-mirror-image
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: e2e-upgrade
+  optional: true
+  steps:
+    cluster_profile: aws-3
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+    post:
+    - ref: quay-gather
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: quay-install-odf-operator
+    - as: install-stable
+      cli: latest
       commands: |
-        set -eux
-        registryEndpoint="$(oc -n quay get quayregistry quay -o jsonpath='{.status.registryEndpoint}')"
-        registry="${registryEndpoint#https://}"
-        oc registry login --registry "$registry" --auth-basic "admin:p@ssw0rd"
-        oc image mirror --insecure=true quay.io/projectquay/quay:latest "$registry/admin/quay"
-      from: src-oc
+        set -exuo pipefail
+        NS="openshift-operators"
+        PACKAGE="project-quay"
+
+        CHANNEL="$(oc get packagemanifest "$PACKAGE" -o jsonpath='{.status.defaultChannel}')"
+        echo "Using channel: $CHANNEL"
+
+        STABLE_BUNDLE="$(oc get packagemanifest "$PACKAGE" \
+          -o jsonpath='{.status.channels[?(@.name=="'"$CHANNEL"'")].currentCSVDesc.relatedImages[0]}')"
+
+        if [[ -z "$STABLE_BUNDLE" || "$STABLE_BUNDLE" == "null" ]]; then
+          echo "Failed to resolve bundle image from packagemanifest"
+          exit 1
+        fi
+
+        echo "Installing stable quay-operator bundle: $STABLE_BUNDLE"
+        operator-sdk run bundle --timeout=10m --security-context-config restricted \
+          -n "$NS" "$STABLE_BUNDLE"
+        echo "Waiting for stable quay-operator deployment..."
+        oc wait --timeout=10m --for condition=Available -n "$NS" \
+          deployment/quay-operator-tng
+        echo "Stable quay-operator installed"
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    - ref: quay-install-quay
+    - ref: quay-create-admin-user
+    - ref: quay-test-mirror-image
+    - as: upgrade-operator
+      cli: latest
+      commands: |
+        set -exuo pipefail
+        NS="openshift-operators"
+        echo "Upgrading quay-operator to CI-built bundle..."
+        operator-sdk run bundle-upgrade --timeout=10m --security-context-config restricted \
+          -n "$NS" "$OO_BUNDLE"
+        echo "Waiting for upgraded quay-operator deployment..."
+        oc wait --timeout=10m --for condition=Available -n "$NS" \
+          deployment/quay-operator-tng
+        echo "Operator deployment ready, waiting for QuayRegistry to reconcile..."
+        elapsed=0
+        timeout=900
+        stable_count=0
+        required_stable=3
+        while [ "$elapsed" -lt "$timeout" ]; do
+          available="$(oc -n quay get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
+          if [ "$available" = "True" ]; then
+            stable_count=$((stable_count + 1))
+            if [ "$stable_count" -ge "$required_stable" ]; then
+              echo "QuayRegistry stable (${elapsed}s, ${stable_count} consecutive checks)"
+              break
+            fi
+            echo "[${elapsed}s] QuayRegistry available (stability check ${stable_count}/${required_stable})"
+            sleep 30
+            elapsed=$((elapsed + 30))
+            continue
+          fi
+          if [ "$stable_count" -gt 0 ]; then
+            echo "[${elapsed}s] QuayRegistry flipped back to unavailable, resetting stability count"
+            stable_count=0
+          fi
+          blocked="$(oc -n quay get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="RolloutBlocked")].message}' 2>/dev/null || true)"
+          all_pods="$(oc -n quay get pods --no-headers 2>/dev/null || true)"
+          pods_ready=$(echo "$all_pods" | awk '$2 ~ /^([0-9]+)\/\1$/ && $3 == "Running" {c++} $3 == "Completed" {c++} END {print c+0}')
+          pods_total=$(echo "$all_pods" | grep -c . || echo 0)
+          not_ready=$(echo "$all_pods" | awk '!($2 ~ /^([0-9]+)\/\1$/ && $3 == "Running") && $3 != "Completed" {printf "%s(%s %s) ", $1, $2, $3}' || true)
+          echo "[${elapsed}s] Pods: ${pods_ready}/${pods_total} ready | ${blocked:-progressing...}"
+          if [ -n "$not_ready" ]; then
+            echo "  Not ready: ${not_ready}"
+            echo "$all_pods" | grep CrashLoopBackOff | awk '{print $1}' \
+              | while read -r pod; do
+                  last_log=$(oc -n quay logs "$pod" --tail=1 2>/dev/null || true)
+                  [ -n "$last_log" ] && echo "  $pod: $last_log"
+                done || true
+          fi
+          sleep 30
+          elapsed=$((elapsed + 30))
+        done
+        if [ "$elapsed" -ge "$timeout" ]; then
+          echo "Timed out waiting for QuayRegistry (${timeout}s)"
+          oc -n quay get quayregistry quay -o yaml 2>/dev/null || true
+          oc -n quay get pods -o wide || true
+          exit 1
+        fi
+        registryEndpoint="$(oc -n quay get quayregistry quay -o jsonpath='{.status.registryEndpoint}')"
+        echo "Checking Quay health endpoint..."
+        http_code=$(curl -sk --retry 18 --retry-delay 10 --retry-connrefused \
+          -o /dev/null -w '%{http_code}' "${registryEndpoint}/health/instance")
+        if [ "$http_code" != "200" ]; then
+          echo "Health check failed (HTTP $http_code)"
+          exit 1
+        fi
+        echo "Quay health check passed"
+        echo "Upgrade complete"
+      dependencies:
+      - env: OO_BUNDLE
+        name: quay
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: post-upgrade-test
+      commands: |
+        set -euo pipefail
+        export HOME="${HOME:-/tmp/home}"
+        export XDG_RUNTIME_DIR="${HOME}/run"
+        mkdir -p "${XDG_RUNTIME_DIR}/containers"
+        QUAY_PASSWORD="$(cat "${SHARED_DIR}/quay-admin-password")"
+        registryEndpoint="$(oc -n quay get quayregistry quay -o jsonpath='{.status.registryEndpoint}')"
+        registry="${registryEndpoint#https://}"
+        oc registry login --registry "$registry" --auth-basic "admin:${QUAY_PASSWORD}" --to="${XDG_RUNTIME_DIR}/containers/auth.json"
+        for attempt in $(seq 1 5); do
+          echo "Image mirror attempt $attempt/5..."
+          if oc image mirror --insecure=true -a "${XDG_RUNTIME_DIR}/containers/auth.json" \
+            registry.access.redhat.com/ubi9/ubi-micro:latest "$registry/admin/smoke-test:latest" \
+            --filter-by-os=linux/amd64 --keep-manifest-list=false; then
+            echo "Image mirror succeeded"
+            exit 0
+          fi
+          echo "Attempt $attempt failed, retrying in 30s..."
+          sleep 30
+        done
+        echo "Image mirror failed after 5 attempts"
+        exit 1
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: quay

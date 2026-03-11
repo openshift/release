@@ -1,0 +1,204 @@
+base_images:
+  ocm-cli:
+    name: ocm-cli
+    namespace: ci
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: build-farm-114nodes
+  cron: 0 4 1-7,15-21 * 1
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      BUILD_FARM_EXTRA_FLAGS: --alerting=false
+      CHANNEL_GROUP: nightly
+      CLUSTER_TAGS: TicketId:731
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "true"
+      INDEX_ENABLED: "true"
+      KUBE_BURNER_VERSION: 1.11.2
+      MIN_REPLICAS: "18"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.22"
+      REPLICAS: "114"
+    test:
+    - chain: openshift-qe-build-farm
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
+- always_run: false
+  as: cluster-density-v2-249nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --timeout=6h
+      CHANNEL_GROUP: nightly
+      CLUSTER_TAGS: TicketId:731
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "false"
+      GC_METRICS: "false"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      MUST_GATHER_TIMEOUT: 90m
+      OPENSHIFT_VERSION: "4.22"
+      REPLICAS: "249"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: rosa-aws-sts
+- always_run: false
+  as: control-plane-120nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale
+    env:
+      CHANNEL_GROUP: nightly
+      CLUSTER_TAGS: TicketId:731
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "false"
+      GC_METRICS: "false"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.22"
+      REPLICAS: "120"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: rosa-aws-sts
+- always_run: false
+  as: control-plane-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      CHANNEL_GROUP: nightly
+      CLUSTER_TAGS: TicketId:731
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "false"
+      GC_METRICS: "false"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.22"
+      READY_WAIT_TIMEOUT: 30m
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-control-plane
+    workflow: rosa-aws-sts
+- always_run: false
+  as: data-path-9nodes
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "6"
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      CONFIG: config/standard-classic-rosa.yml
+      ENABLE_AUTOSCALING: "false"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.22"
+    test:
+    - ref: openshift-qe-workers-scale
+    - ref: openshift-qe-perfscale-aws-data-path-sg
+    - chain: openshift-qe-data-path-tests
+    workflow: rosa-aws-sts
+- always_run: false
+  as: node-density-heavy-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "false"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.22"
+      READY_WAIT_TIMEOUT: 30m
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-node-density-heavy
+    workflow: rosa-aws-sts
+- always_run: false
+  as: node-density-cni-24nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "21"
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "false"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.22"
+      READY_WAIT_TIMEOUT: 30m
+    test:
+    - ref: openshift-qe-workers-scale
+    - chain: openshift-qe-node-density-cni
+    workflow: rosa-aws-sts
+- always_run: false
+  as: conc-builds-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "false"
+      INDEX_ENABLED: "true"
+      MP_LABELS: concurrent-builds=enabled
+      MP_MACHINE_TYPE: m6i.xlarge
+      MP_REPLICAS: "3"
+      MP_TAINTS: test=test:PreferNoSchedule
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.22"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "3"
+    test:
+    - ref: rosa-conf-machine-pool
+    - chain: openshift-qe-conc-builds
+    workflow: rosa-aws-sts
+- always_run: false
+  as: control-plane-3nodes
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m6i.xlarge
+      ENABLE_AUTOSCALING: "false"
+      GC_METRICS: "false"
+      INDEX_ENABLED: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.22"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "3"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-qe-perfscale-ci
+  variant: rosa-4.22-nightly-x86

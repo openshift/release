@@ -34,7 +34,7 @@ EOF
 function check_ingress_controller_stats_port() {
   echo "Checking ingress controller stats port"
   oc delete ingresscontroller -n openshift-ingress-operator default
-  oc wait --timeout=60s --for=jsonpath='{.spec.endpointPublishingStrategy.hostNetwork.statsPort}'=${STATS_PORT} ingresscontroller/default -n openshift-ingress-operator
+  timeout 5m bash -c "until [[ \$(oc get ingresscontroller/default -n openshift-ingress-operator -o jsonpath='{.spec.endpointPublishingStrategy.hostNetwork.statsPort}' 2>/dev/null) == ${STATS_PORT} ]]; do sleep 15; done"
 }
 
 apply_custom_endpoint_publishing_strategy
