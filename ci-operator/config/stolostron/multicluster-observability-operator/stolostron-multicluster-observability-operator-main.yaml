@@ -190,18 +190,19 @@ tests:
         echo "GRAFANA_DASHBOARD_LOADER_IMAGE_REF=$GRAFANA_DASHBOARD_LOADER_IMAGE_REF"
         echo "METRICS_COLLECTOR_IMAGE_REF=$METRICS_COLLECTOR_IMAGE_REF"
         echo "RBAC_QUERY_PROXY_IMAGE_REF=$RBAC_QUERY_PROXY_IMAGE_REF"
-        CTX_HUB_CLUSTER=$(kubectl --kubeconfig="${SHARED_DIR}/hub-1.kc" config current-context)
-        clusteradm init --wait --context "${CTX_HUB_CLUSTER}"
-        joincmd=$(clusteradm get token --context "${CTX_HUB_CLUSTER}" | grep clusteradm)
+        CTX_HUB_CLUSTER=$(KUBECONFIG=${SHARED_DIR}/hub-1.kc oc config current-context)
+        echo "CTX_HUB_CLUSTER=$CTX_HUB_CLUSTER"
+        CTX_MANAGED_CLUSTER=$(KUBECONFIG=${SHARED_DIR}/managed-1.kc oc config current-context)
+        echo "CTX_MANAGED_CLUSTER=$CTX_MANAGED_CLUSTER"
+        KUBECONFIG=${SHARED_DIR}/hub-1.kc clusteradm init --wait --context "${CTX_HUB_CLUSTER}"
+        joincmd=$(KUBECONFIG=${SHARED_DIR}/hub-1.kc clusteradm get token --context "${CTX_HUB_CLUSTER}" | grep clusteradm)
         if [[ -n ${SHARED_DIR} ]] && [[ -f "${SHARED_DIR}/managed-1.json" ]]; then
-          CTX_MANAGED_CLUSTER=$(kubectl --kubeconfig="${SHARED_DIR}/managed-1.kc" config current-context)
           echo "Join managed-1 to hub"
-          $(echo ${joincmd} --force-internal-endpoint-lookup --wait --context ${CTX_MANAGED_CLUSTER} | sed "s/<cluster_name>/managed/g") &>/dev/null
-        fi
+          KUBECONFIG=${SHARED_DIR}/managed-1.kc $(echo ${joincmd} --force-internal-endpoint-lookup --wait --context ${CTX_MANAGED_CLUSTER} | sed "s/<cluster_name>/managed/g") &>/dev/null        fi
         echo "Waiting for CSR from managed cluster..."
-        clusteradm accept --clusters "managed" --context "${CTX_HUB_CLUSTER}" --wait 2>/dev/null
+        KUBECONFIG=${SHARED_DIR}/hub-1.kc clusteradm accept --clusters "managed" --context "${CTX_HUB_CLUSTER}" --wait 2>/dev/null
         # Checking that managed clusters were successfully added
-        kubectl get managedcluster --context "${CTX_HUB_CLUSTER}"
+        KUBECONFIG=${SHARED_DIR}/hub-1.kc kubectl get managedcluster --context "${CTX_HUB_CLUSTER}"
         export SELF="make"
         set -o pipefail
         make e2e-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
