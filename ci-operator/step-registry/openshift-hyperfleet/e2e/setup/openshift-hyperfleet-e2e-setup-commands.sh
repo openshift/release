@@ -30,6 +30,7 @@ echo "${NAMESPACE_NAME}" > "${SHARED_DIR}/namespace_name"
 cp -r /e2e/ /tmp/
 cd "/tmp/e2e/deploy-scripts/"
 cp .env.example .env
+sleep 1800
 source .env
 ./deploy-clm.sh --action install --namespace $NAMESPACE_NAME
 
