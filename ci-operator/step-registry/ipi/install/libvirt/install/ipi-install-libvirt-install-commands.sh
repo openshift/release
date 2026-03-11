@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+sleep 10
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
