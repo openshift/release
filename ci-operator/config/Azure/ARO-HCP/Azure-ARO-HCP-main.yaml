@@ -38,9 +38,14 @@ images:
         dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm && \
         mkdir -p /etc/yum.repos.art/ci/ && \
         ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/ && \
-        dnf install -y azure-cli fuse-overlayfs && \
+        dnf install -y azure-cli && \
         az bicep install && mv ~/.azure/bin/bicep /usr/local/bin && \
         dnf clean all
+    RUN chmod -R g=u /home && \
+        chmod g=u /etc/subuid /etc/subgid && \
+        setcap cap_setuid+ep /usr/bin/newuidmap && \
+        setcap cap_setgid+ep /usr/bin/newgidmap
+    USER 1000
   from: nested-podman-src
   to: svc-build
 - build_args:
