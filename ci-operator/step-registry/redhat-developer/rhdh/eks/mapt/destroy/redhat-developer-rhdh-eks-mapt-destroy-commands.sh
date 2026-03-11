@@ -47,14 +47,8 @@ fi
 if [ $exit_code -eq 0 ] && ! echo "$output" | grep -qiE "(stderr|error|failed|exit status [1-9])"; then
   echo "$output"
   echo "[SUCCESS] ✅ Successfully destroyed MAPT: ${CORRELATE_MAPT}"
-
-  echo "[INFO] 🗑️ Deleting folder s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}/ from S3..."
-  aws s3 rm "s3://${AWS_S3_BUCKET}/${CORRELATE_MAPT}/" --recursive
-
-  echo "[SUCCESS] ✅ Successfully deleted folder ${CORRELATE_MAPT} from S3 bucket"
 else
   echo "$output"
   echo "[ERROR] ❌ Failed to destroy MAPT: ${CORRELATE_MAPT}"
-  echo "[WARN] ⚠️ Skipping deletion of folder ${CORRELATE_MAPT} from S3 due to destroy failure"
   exit 1
 fi
