@@ -37,92 +37,6 @@ resources:
 tests:
 - as: integration
   steps:
-    test:
-    - as: deploy-and-test
-      commands: |
-        set -euo pipefail
-
-        # --- GCP Auth ---
-        GCP_CREDENTIALS_FILE="/var/run/hyperfleet-e2e/hcm-hyperfleet-e2e.json"
-        PROJECT_ID=$(jq -r .project_id "$GCP_CREDENTIALS_FILE")
-
-        if ! which gcloud &>/dev/null; then
-          GCLOUD_TAR="google-cloud-cli-linux-x86_64.tar.gz"
-          curl -sSL -o "/tmp/$GCLOUD_TAR" "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
-          tar -xzf "/tmp/$GCLOUD_TAR" -C "$HOME"
-          export PATH="$HOME/google-cloud-sdk/bin:$PATH"
-          rm "/tmp/$GCLOUD_TAR"
-        fi
-        gcloud components install gke-gcloud-auth-plugin --quiet
-        export USE_GKE_GCLOUD_AUTH_PLUGIN=True
-        gcloud auth activate-service-account --key-file="$GCP_CREDENTIALS_FILE"
-        gcloud config set project "$PROJECT_ID"
-
-        # --- Install helm-git plugin ---
-        helm plugin install https://github.com/aslafy-z/helm-git
-
-        # --- Generate ephemeral cluster config ---
-        CI_ID="${BUILD_ID:-$(date +%s)}"
-        CI_NAME="ci-infra-${CI_ID}"
-        TF_DIR="terraform"
-
-        cat > "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend" <<EOF
-        bucket = "hyperfleet-terraform-state"
-        prefix = "ci/infra/${CI_ID}"
-        EOF
-
-        cat > "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars" <<EOF
-        developer_name             = "${CI_NAME}"
-        kubernetes_suffix          = "default"
-        cloud_provider             = "gke"
-        gcp_project_id             = "${PROJECT_ID}"
-        gcp_region                 = "us-central1"
-        gcp_zone                   = "us-central1-a"
-        gcp_network                = "hyperfleet-dev-vpc"
-        gcp_subnetwork             = "hyperfleet-dev-vpc-subnet"
-        node_count                 = 1
-        machine_type               = "e2-standard-4"
-        use_spot_vms               = true
-        enable_deletion_protection = false
-        use_pubsub                 = true
-        pubsub_topic_configs = {
-          clusters = {
-            subscribers = {
-              adapter1 = {}
-              adapter2 = {}
-            }
-            publishers = {
-              sentinel = {}
-            }
-          }
-          nodepools = {
-            subscribers = {
-              adapter3 = {}
-            }
-            publishers = {
-              sentinel = {}
-            }
-          }
-        }
-        EOF
-
-        # Store CI_ID for cleanup step
-        echo "${CI_ID}" > "${SHARED_DIR}/ci_id"
-
-        # --- Run integration test ---
-        make ci-test \
-          TF_ENV="ci-${CI_ID}" \
-          AUTO_APPROVE=-auto-approve
-      credentials:
-      - mount_path: /var/run/hyperfleet-e2e
-        name: hyperfleet-e2e
-        namespace: test-credentials
-      from: infra-tools
-      resources:
-        requests:
-          cpu: 100m
-          memory: 300Mi
-      timeout: 30m0s
     post:
     - as: cleanup
       best_effort: true
@@ -216,6 +130,92 @@ tests:
           cpu: 100m
           memory: 300Mi
       timeout: 15m0s
+    test:
+    - as: deploy-and-test
+      commands: |
+        set -euo pipefail
+
+        # --- GCP Auth ---
+        GCP_CREDENTIALS_FILE="/var/run/hyperfleet-e2e/hcm-hyperfleet-e2e.json"
+        PROJECT_ID=$(jq -r .project_id "$GCP_CREDENTIALS_FILE")
+
+        if ! which gcloud &>/dev/null; then
+          GCLOUD_TAR="google-cloud-cli-linux-x86_64.tar.gz"
+          curl -sSL -o "/tmp/$GCLOUD_TAR" "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/$GCLOUD_TAR"
+          tar -xzf "/tmp/$GCLOUD_TAR" -C "$HOME"
+          export PATH="$HOME/google-cloud-sdk/bin:$PATH"
+          rm "/tmp/$GCLOUD_TAR"
+        fi
+        gcloud components install gke-gcloud-auth-plugin --quiet
+        export USE_GKE_GCLOUD_AUTH_PLUGIN=True
+        gcloud auth activate-service-account --key-file="$GCP_CREDENTIALS_FILE"
+        gcloud config set project "$PROJECT_ID"
+
+        # --- Install helm-git plugin ---
+        helm plugin install https://github.com/aslafy-z/helm-git
+
+        # --- Generate ephemeral cluster config ---
+        CI_ID="${BUILD_ID:-$(date +%s)}"
+        CI_NAME="ci-infra-${CI_ID}"
+        TF_DIR="terraform"
+
+        cat > "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend" <<EOF
+        bucket = "hyperfleet-terraform-state"
+        prefix = "ci/infra/${CI_ID}"
+        EOF
+
+        cat > "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars" <<EOF
+        developer_name             = "${CI_NAME}"
+        kubernetes_suffix          = "default"
+        cloud_provider             = "gke"
+        gcp_project_id             = "${PROJECT_ID}"
+        gcp_region                 = "us-central1"
+        gcp_zone                   = "us-central1-a"
+        gcp_network                = "hyperfleet-dev-vpc"
+        gcp_subnetwork             = "hyperfleet-dev-vpc-subnet"
+        node_count                 = 1
+        machine_type               = "e2-standard-4"
+        use_spot_vms               = true
+        enable_deletion_protection = false
+        use_pubsub                 = true
+        pubsub_topic_configs = {
+          clusters = {
+            subscribers = {
+              adapter1 = {}
+              adapter2 = {}
+            }
+            publishers = {
+              sentinel = {}
+            }
+          }
+          nodepools = {
+            subscribers = {
+              adapter3 = {}
+            }
+            publishers = {
+              sentinel = {}
+            }
+          }
+        }
+        EOF
+
+        # Store CI_ID for cleanup step
+        echo "${CI_ID}" > "${SHARED_DIR}/ci_id"
+
+        # --- Run integration test ---
+        make ci-test \
+          TF_ENV="ci-${CI_ID}" \
+          AUTO_APPROVE=-auto-approve
+      credentials:
+      - mount_path: /var/run/hyperfleet-e2e
+        name: hyperfleet-e2e
+        namespace: test-credentials
+      from: infra-tools
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
+      timeout: 30m0s
 zz_generated_metadata:
   branch: main
   org: openshift-hyperfleet
