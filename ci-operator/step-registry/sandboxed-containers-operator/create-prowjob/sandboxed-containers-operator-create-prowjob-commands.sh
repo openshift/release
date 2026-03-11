@@ -389,7 +389,7 @@ zz_generated_metadata:
   branch: devel
   org: openshift
   repo: sandboxed-containers-operator
-  variant: downstream-${PROW_RUN_TYPE}
+  variant: downstream-${PROW_RUN_TYPE}${OCP_PROWJOB_VERSION}
 EOF
 
     # Validate the generated file
@@ -607,6 +607,10 @@ command_update_templates() {
 	INSTALL_KATA_RPM=false TEST_RELEASE_TYPE=GA "$(dirname "${BASH_SOURCE[0]}")"/sandboxed-containers-operator-create-prowjob-commands.sh create
 	mv openshift-sandboxed-containers-operator-devel__downstream-candidate*.yaml "${target_dir}/openshift-sandboxed-containers-operator-devel__downstream-candidate.yaml"
 	mv openshift-sandboxed-containers-operator-devel__downstream-release*.yaml "${target_dir}/openshift-sandboxed-containers-operator-devel__downstream-release.yaml"
+	# Need to fix the variant because it was generated with the OCP version
+	sed -i "s/\(^\s\+variant: downstream-\)\(release\|candidate\)[0-9]*/\1\2/" \
+	      "${target_dir}/openshift-sandboxed-containers-operator-devel__downstream-candidate.yaml" \
+              "${target_dir}/openshift-sandboxed-containers-operator-devel__downstream-release.yaml"
 	echo
 	echo "Review the changes by 'git diff', then run 'make ci-operator-config && make jobs'"
 }
