@@ -43,8 +43,10 @@ fi
 
 if [[ $WORKLOAD == "cluster-density-v2" ]]; then
     current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
-    iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
-    export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
+    # Use awk for fractional multiplier support; result is truncated to int
+    iteration_multiplier=$ITERATION_MULTIPLIER_ENV
+    ITERATIONS=$(awk "BEGIN {printf \"%d\", $iteration_multiplier * $current_worker_count}")
+    export ITERATIONS
     EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE}" ./run.sh &> "${ARTIFACT_DIR}/$WORKLOAD-run.log" &
 fi
 
