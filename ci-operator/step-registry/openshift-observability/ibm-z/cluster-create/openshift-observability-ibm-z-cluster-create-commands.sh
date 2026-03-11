@@ -4,7 +4,8 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-export HOME=${HOME:-/tmp}
+# --- FIX SSH HOME ---
+export HOME="${HOME:-/tmp}"
 mkdir -p "$HOME/.ssh"
 chmod 700 "$HOME/.ssh"
 
@@ -37,9 +38,8 @@ fi
 # --- PREPARE SSH KEY ---
 echo "Preparing SSH key..."
 
-# set strict permissions
-cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
-chmod 400 "$SSH_KEY_PATH"
+cp -f "$PRIVATE_KEY_FILE" "$SSH_KEY_PATH"
+chmod 600 "$SSH_KEY_PATH"
 
 # ensure key file exists and is non-empty
 if [[ ! -s "$SSH_KEY_PATH" ]]; then
@@ -47,13 +47,20 @@ if [[ ! -s "$SSH_KEY_PATH" ]]; then
     exit 1
 fi
 
-# --- DEBUG: print SSH key file info and contents (no ssh-keygen) ---
+# --- VERIFY KEY TYPE ---
+echo "Verifying SSH key..."
+if command -v ssh-keygen >/dev/null 2>&1; then
+    ssh-keygen -lf "$SSH_KEY_PATH" || {
+        echo "Invalid SSH key format in $SSH_KEY_PATH" >&2
+        exit 1
+    }
+else
+    echo "ssh-keygen not available, skipping verification"
+fi
+
+# --- DEBUG INFO ---
 echo "SSH key file info:"
 ls -l "$SSH_KEY_PATH" || true
-echo "SSH key raw contents (be careful with secrets):"
-sed -n '1,200p' "$SSH_KEY_PATH" || true
-
-
 
 # --- SSH CONFIGURATION ---
 SSH_ARGS=(
@@ -70,6 +77,7 @@ SSH_ARGS=(
 SSH_CMD=$(cat <<EOF
 set -e
 mkdir -p "$(dirname "${CLUSTER_VARS_PATH}")"
+
 cat > "${CLUSTER_VARS_PATH}" <<EOV
 CLUSTER_VERSION='${CLUSTER_VERSION}'
 CLUSTER_NAME='${CLUSTER_NAME}'
@@ -89,8 +97,10 @@ fi
 
 # --- EXECUTE SSH COMMAND ---
 echo "Connecting to ${SSH_USER}@${IP_JUMPHOST} and starting cluster creation..."
+
 if ! ssh "${SSH_ARGS[@]}" "${SSH_USER}@${IP_JUMPHOST}" "$SSH_CMD"; then
     echo "SSH failed, retrying with verbose output for debugging..." >&2
+
     ssh -vvv "${SSH_ARGS[@]}" "${SSH_USER}@${IP_JUMPHOST}" "$SSH_CMD" || {
         echo "SSH failed after verbose attempt" >&2
         exit 1
@@ -98,4 +108,3 @@ if ! ssh "${SSH_ARGS[@]}" "${SSH_USER}@${IP_JUMPHOST}" "$SSH_CMD"; then
 fi
 
 echo "Cluster creation initiated successfully."
-```// filepath:
