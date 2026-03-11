@@ -37,16 +37,15 @@ fi
 # --- PREPARE SSH KEY ---
 echo "Preparing SSH key..."
 
-
+# set strict permissions
+cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
+chmod 400 "$SSH_KEY_PATH"
 
 # ensure key file exists and is non-empty
 if [[ ! -s "$SSH_KEY_PATH" ]]; then
     echo "Error: SSH key was not created at $SSH_KEY_PATH" >&2
     exit 1
 fi
-
-# set strict permissions
-chmod 600 "$SSH_KEY_PATH"
 
 # --- DEBUG: print SSH key file info and contents (no ssh-keygen) ---
 echo "SSH key file info:"
