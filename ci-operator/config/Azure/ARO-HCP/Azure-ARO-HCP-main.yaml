@@ -238,6 +238,28 @@ tests:
       env: LEASED_MSI_CONTAINERS
       resource_type: aro-hcp-test-msi-containers-prod
     workflow: aro-hcp-e2e
+- as: exporter-image
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  run_if_changed: ^tooling/aro-hcp-exporter/
+  steps:
+    env:
+      DEPLOY_ENV: dev
+    test:
+    - ref: aro-hcp-exporter
+- as: exporter-push
+  capabilities:
+  - nested-podman
+  nested_podman: true
+  postsubmit: true
+  run_if_changed: ^tooling/aro-hcp-exporter/
+  steps:
+    cluster_profile: aro-hcp-dev
+    env:
+      DEPLOY_ENV: dev
+    test:
+    - ref: aro-hcp-exporter
 - always_run: true
   as: e2e-parallel
   skip_if_only_changed: ^(?:action\.yml|CODEOWNERS|docs/|LICENSE|(?:generate-repo|generate-tag|get-digest|get-tag-sha|svc-deploy)\.sh|\.(?:bingo|cursor|devcontainer|github|vscode)/|\.(?:editorconfig|gitattributes|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml)$|\.md$)$
