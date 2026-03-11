@@ -190,18 +190,14 @@ tests:
         echo "GRAFANA_DASHBOARD_LOADER_IMAGE_REF=$GRAFANA_DASHBOARD_LOADER_IMAGE_REF"
         echo "METRICS_COLLECTOR_IMAGE_REF=$METRICS_COLLECTOR_IMAGE_REF"
         echo "RBAC_QUERY_PROXY_IMAGE_REF=$RBAC_QUERY_PROXY_IMAGE_REF"
-        KUBECONFIG="${SHARED_DIR}/hub-1.kc"
-        export KUBECONFIG
-        CTX_HUB_CLUSTER=$(kubectl config current-context)
+        CTX_HUB_CLUSTER=$(kubectl --kubeconfig="${SHARED_DIR}/hub-1.kc" config current-context)
         clusteradm init --wait --context "${CTX_HUB_CLUSTER}"
-        joincmd=$(clusteradm get token --context "${CTX_HUB_CLUSTER}" | grep clusteradm) 2>/dev/null
+        joincmd=$(clusteradm get token --context "${CTX_HUB_CLUSTER}" | grep clusteradm)
         if [[ -n ${SHARED_DIR} ]] && [[ -f "${SHARED_DIR}/managed-1.json" ]]; then
-          export KUBECONFIG="${SHARED_DIR}/managed-1.kc"
-          CTX_MANAGED_CLUSTER=$(kubectl config current-context)
+          CTX_MANAGED_CLUSTER=$(kubectl --kubeconfig="${SHARED_DIR}/managed-1.kc" config current-context)
           echo "Join managed-1 to hub"
           $(echo ${joincmd} --force-internal-endpoint-lookup --wait --context ${CTX_MANAGED_CLUSTER} | sed "s/<cluster_name>/managed/g") &>/dev/null
         fi
-        export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         echo "Waiting for CSR from managed cluster..."
         clusteradm accept --clusters "managed" --context "${CTX_HUB_CLUSTER}" --wait 2>/dev/null
         # Checking that managed clusters were successfully added
