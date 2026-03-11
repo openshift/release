@@ -1,0 +1,40 @@
+chain:
+  as: cucushift-installer-rehearse-baremetalds-ipi-ovn-external-kubevirt-provision
+  steps:
+  # Phase 1: Provision BM management cluster (includes enable-qe-catalogsource)
+  - chain: cucushift-installer-rehearse-baremetalds-ipi-ofcir-provision
+  # Phase 2: Setup LVM on management cluster for etcd storage (uses /dev/vda)
+  - chain: hypershift-mce-agent-lvm
+  # Phase 3: Install MCE on management cluster (manages HyperShift operator)
+  - ref: hypershift-mce-install
+  - ref: deploy-konflux-operator
+  # Phase 4: Create Cluster A as MCE agent-based HCP on management cluster
+  #   Includes: OS images config, AgentServiceConfig, DNS config, hosted cluster creation,
+  #   proxy config, Metal3 worker provisioning, QE catalogsource, MetalLB, and health checks
+  - chain: hypershift-mce-agent-metal3-create
+  # Phase 5: Switch to Cluster A kubeconfig
+  - ref: cucushift-installer-rehearse-baremetalds-ipi-ovn-external-kubevirt-provision-switch-guest-kubeconfig
+  # Phase 6: Install LVM on Cluster A (uses /dev/vdb, provides lvms-vg1)
+  - ref: cucushift-installer-rehearse-baremetalds-ipi-ovn-external-kubevirt-provision-guest-lvm
+  # Phase 7: Install ODF on Cluster A (uses /dev/vda, provides ocs-storagecluster-ceph-rbd
+  #   with RWX support for KubeVirt VM root disks and live migration)
+  - chain: hypershift-kubevirt-baremetalds-odf
+  # Phase 8: Install KubeVirt on Cluster A
+  - ref: hypershift-kubevirt-install
+  # Phase 9: Create external infra kubeconfig on Cluster A
+  - ref: cucushift-installer-rehearse-baremetalds-ipi-ovn-external-kubevirt-provision-setup-guest-infra
+  # Phase 10: Restore management kubeconfig
+  - ref: cucushift-installer-rehearse-baremetalds-ipi-ovn-external-kubevirt-provision-restore-mgmt-kubeconfig
+  # Phase 11: Create Cluster B (KubeVirt HCP) with external infra from Cluster A
+  - ref: cucushift-installer-rehearse-baremetalds-ipi-ovn-external-kubevirt-provision-create-external-guest
+  documentation: |-
+    Provision chain for KubeVirt external infrastructure on bare metal.
+    Phase 1: Provisions a BM management cluster with QE catalog sources.
+    Phase 2: Installs LVM on mgmt cluster for etcd storage (lvms-vg1 on /dev/vda).
+    Phase 3: Installs MCE (Multicluster Engine) which manages the HyperShift operator.
+    Phase 4: Creates Cluster A as an MCE agent-based HCP (includes MetalLB, AgentServiceConfig,
+    and QE catalogsource for Cluster A).
+    Phase 5-8: Switches to Cluster A, installs LVM (on /dev/vdb), ODF (on /dev/vda for
+    RWX Ceph RBD storage), and KubeVirt operator.
+    Phase 9-10: Creates external infra kubeconfig on Cluster A and restores mgmt kubeconfig.
+    Phase 11: Creates Cluster B (KubeVirt HCP) whose worker VMs run on Cluster A.
