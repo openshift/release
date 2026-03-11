@@ -32,11 +32,16 @@ images:
         source_path: /go/src/github.com/Azure/ARO-HCP
   to: nested-podman-src
 - dockerfile_literal: |
-    FROM src
+    FROM nested-podman-src
     USER root
-    WORKDIR /go/src/github.com/Azure/ARO-HCP
-    RUN dnf install -y podman && dnf clean all
-  from: src
+    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
+        dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm && \
+        mkdir -p /etc/yum.repos.art/ci/ && \
+        ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/ && \
+        dnf install -y azure-cli && \
+        az bicep install && mv ~/.azure/bin/bicep /usr/local/bin && \
+        dnf clean all
+  from: nested-podman-src
   to: svc-build
 - build_args:
   - name: PLATFORM
