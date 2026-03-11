@@ -16,6 +16,7 @@ function populate_artifact_dir() {
     ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
 }
 
+
 function prepare_next_steps() {
   #Save exit code for must-gather to generate junit
   echo "$?" > "${SHARED_DIR}/install-status.txt"
