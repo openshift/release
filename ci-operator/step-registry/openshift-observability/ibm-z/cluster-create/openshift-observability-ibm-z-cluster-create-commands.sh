@@ -37,7 +37,7 @@ fi
 # --- PREPARE SSH KEY ---
 echo "Preparing SSH key..."
 
-# detect any private key header (supports multiple key types)
+# If the secret already contains a header, copy it; otherwise reconstruct an OpenSSH key
 if grep -qE 'BEGIN .*PRIVATE KEY' "$PRIVATE_KEY_FILE"; then
     echo "Key already contains a header/footer; copying to $SSH_KEY_PATH"
     cp -f "$PRIVATE_KEY_FILE" "$SSH_KEY_PATH"
@@ -70,6 +70,32 @@ if ! ssh-keygen -y -f "$SSH_KEY_PATH" >/dev/null 2>&1; then
     exit 1
 fi
 
+# --- DEBUG INFO: show created key, derived public key and fingerprint ---
+echo "SSH key created at $SSH_KEY_PATH:"
+ls -l "$SSH_KEY_PATH" || true
+
+if ssh-keygen -y -f "$SSH_KEY_PATH" > "${SSH_KEY_PATH}.pub" 2>/dev/null; then
+    echo "Derived public key:"
+    cat "${SSH_KEY_PATH}.pub"
+    echo "Private key fingerprint:"
+    ssh-keygen -lf "$SSH_KEY_PATH" || true
+else
+    echo "Warning: failed to derive public key from $SSH_KEY_PATH" >&2
+fi
+
+# Quick non-interactive auth probe (no password fallback)
+echo "Probing SSH auth to ${SSH_USER}@${IP_JUMPHOST}..."
+if ssh -o BatchMode=yes -i "$SSH_KEY_PATH" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${IP_JUMPHOST}" 'echo AUTH_OK' >/tmp/ssh_probe.out 2>&1; then
+    echo "Auth probe succeeded"
+else
+    echo "Auth probe failed; SSH verbose output below:" >&2
+    cat /tmp/ssh_probe.out || true
+    echo "Retrying verbose SSH for debug (will not retry cluster creation)..." >&2
+    ssh -vvv -o BatchMode=yes -i "$SSH_KEY_PATH" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${SSH_USER}@${IP_JUMPHOST}" || true
+    echo "Ensure the derived public key above is present in ${SSH_USER}@${IP_JUMPHOST}:/home/${SSH_USER}/.ssh/authorized_keys or /root/.ssh/authorized_keys and permissions are 700/600."
+    exit 1
+fi
+
 # --- SSH CONFIGURATION ---
 SSH_ARGS=(
   -i "$SSH_KEY_PATH"
@@ -82,7 +108,6 @@ SSH_ARGS=(
 )
 
 # --- REMOTE COMMAND ---
-# Expand local variables into the remote command so the remote sees the correct CLUSTER_VARS_PATH
 SSH_CMD=$(cat <<EOF
 set -e
 mkdir -p "$(dirname "${CLUSTER_VARS_PATH}")"
@@ -105,7 +130,6 @@ fi
 
 # --- EXECUTE SSH COMMAND ---
 echo "Connecting to ${SSH_USER}@${IP_JUMPHOST} and starting cluster creation..."
-
 if ! ssh "${SSH_ARGS[@]}" "${SSH_USER}@${IP_JUMPHOST}" "$SSH_CMD"; then
     echo "SSH failed, retrying with verbose output for debugging..." >&2
     ssh -vvv "${SSH_ARGS[@]}" "${SSH_USER}@${IP_JUMPHOST}" "$SSH_CMD" || {
@@ -115,3 +139,4 @@ if ! ssh "${SSH_ARGS[@]}" "${SSH_USER}@${IP_JUMPHOST}" "$SSH_CMD"; then
 fi
 
 echo "Cluster creation initiated successfully."
+```// filepath:
