@@ -18,3 +18,5 @@ make -C config render-partial-config \
   CONFIG_OUTPUT="${SHARED_DIR}/config.yaml"
 
 cp "${SHARED_DIR}/config.yaml" "${ARTIFACT_DIR}/config.yaml"
+
+date -u +"%Y-%m-%dT%H:%M:%SZ" > "${SHARED_DIR}/write-config-timestamp-rfc3339"
