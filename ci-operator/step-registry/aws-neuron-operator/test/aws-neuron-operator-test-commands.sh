@@ -5,6 +5,17 @@ set -o pipefail
 
 echo "Starting AWS Neuron operator E2E tests"
 
+if ! command -v oc &>/dev/null; then
+    echo "oc not found, downloading OpenShift client..."
+    curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+        | tar xzf - -C /usr/local/bin oc kubectl 2>/dev/null || true
+    if command -v oc &>/dev/null; then
+        echo "oc installed: $(oc version --client 2>/dev/null || echo 'ok')"
+    else
+        echo "WARNING: failed to install oc"
+    fi
+fi
+
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 mkdir -p "${ARTIFACT_DIR}"
 
