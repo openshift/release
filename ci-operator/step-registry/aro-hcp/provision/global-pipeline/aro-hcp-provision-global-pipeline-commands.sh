@@ -64,7 +64,7 @@ unset GOFLAGS
 # Keep shared/global infra updates in this job so they run under the same
 # Boskos lease and cannot race with each other.
 # Run global first so post-global shared dependencies exist before add-ons.
-make -o tooling/templatize/templatize pipeline/Global DEPLOY_ENV="${DEPLOY_ENV}" EXTRA_ARGS="--region ${LOCATION}"
+make -o tooling/templatize/templatize pipeline/Global DEPLOY_ENV="${DEPLOY_ENV}" EXTRA_ARGS="--region ${LOCATION} --step-cache-dir="
 
 #-# DEV ACR CUSTOMIZATIONS #-#
 
@@ -107,7 +107,7 @@ yq eval -n "
 echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
 cat "${OVERRIDE_CONFIG_FILE}"
 
-make -o tooling/templatize/templatize pipeline/Log.Infra DEPLOY_ENV="${DEPLOY_ENV}" OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE}" EXTRA_ARGS="--region ${KUSTO_LOCATION}"
+make -o tooling/templatize/templatize pipeline/Log.Infra DEPLOY_ENV="${DEPLOY_ENV}" OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE}" EXTRA_ARGS="--region ${KUSTO_LOCATION} --step-cache-dir="
 
 # Ensure kusto persist tag is set
 KUSTO_RESOURCE_GROUP="$(resolve_config_from_templatize "kusto.rg" "${KUSTO_LOCATION}")"
