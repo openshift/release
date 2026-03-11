@@ -1,18 +1,13 @@
 #!/bin/bash
 set -eux -o pipefail; shopt -s inherit_errexit
 
-workerNodes=$(oc get nodes -l node-role.kubernetes.io/worker --no-headers | awk '{print $1}')
-workerCount=$(echo "${workerNodes}" | wc -l)
+workerNodes=$(oc get nodes -l node-role.kubernetes.io/worker= --no-headers | awk '{print $1}')
 
-CreateDirectoryOnNode() {
+function CreateDirectoryOnNode () {
   typeset node="${1}"; (($#)) && shift
   typeset dir="${1}"; (($#)) && shift
-  
-  if oc debug -n default "node/${node}" -- chroot /host mkdir -p "${dir}" >/dev/null; then
-    return 0
-  else
-    return 1
-  fi
+
+  oc debug -n default "node/${node}" -- chroot /host mkdir -p "${dir}"
 
   true
 }
