@@ -12,25 +12,16 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.24-linux
+    tag: go1.25-linux
 images:
 - dockerfile_path: build/Dockerfile.prow
   from: base
-  inputs:
-    stolostron_builder_go1.24-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: multiclusterhub-operator
 - dockerfile_path: build/Dockerfile.test.prow
-  inputs:
-    stolostron_builder_go1.24-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.24-linux
   to: multiclusterhub-operator-tests
 promotion:
   to:
-  - disabled: true
-    name: "2.16"
+  - name: "2.16"
     namespace: stolostron
 resources:
   '*':
@@ -106,8 +97,7 @@ tests:
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src
@@ -132,8 +122,7 @@ tests:
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

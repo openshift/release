@@ -11,10 +11,6 @@ base_images:
     name: 4.13-priv
     namespace: ocp-private
     tag: hypershift-tests
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
 binary_build_commands: make build BUILD_TAGS=clusterapi
 build_root:
   from_repository: true
@@ -22,18 +18,10 @@ canonical_go_repository: k8s.io/autoscaler
 images:
 - dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: cluster-autoscaler
 - context_dir: vertical-pod-autoscaler
   dockerfile_path: Dockerfile.rhel
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: vertical-pod-autoscaler
 promotion:
   to:
@@ -142,7 +130,7 @@ tests:
   as: e2e-hypershift
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: release-4.12

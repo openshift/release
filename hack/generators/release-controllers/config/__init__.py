@@ -49,23 +49,28 @@ class Config:
         self.rc_deployment_domain = 'apps.ci.l2s4.p1.openshiftapps.com'
         self.rc_release_domain = 'svc.ci.openshift.org'
         self.rc_deployment_namespace = 'ci'
-        self.arches = ('x86_64', 's390x', 'ppc64le', 'arm64', 'multi', 'multi-2')
+        self.arches = ('x86_64', 's390x', 'ppc64le', 'arm64', 'multi')
         self.paths = RCPaths(git_clone_dir)
         self.releases = self._get_releases()
         self.scos_releases = self._get_scos_releases()
         self.rpc_release_namespace = "ocp"
 
     def _get_releases(self):
-        releases = []
+        releases = set()
 
-        # Collect the 4.x releases...
-        for name in self.paths.path_ci_operator_jobs_release.glob('openshift-release-release-4.*-periodics.yaml'):
-            bn = os.path.splitext(os.path.basename(name))[0]  # e.g. openshift-release-release-4.4-periodics
-            major_minor = bn.split('-')[-2]  # 4.4
-            releases.append(major_minor)
+        # Collect the 4.x and 5.x releases...
+        for major in ('4', '5'):
+            for name in self.paths.path_ci_operator_jobs_release.glob(f'openshift-release-release-{major}.*-periodics.yaml'):
+                bn = os.path.splitext(os.path.basename(name))[0]  # e.g. openshift-release-release-4.4-periodics
+                major_minor = bn.split('-')[-2]  # 4.4
+                releases.add(major_minor)
 
-        releases.sort()  # Glob does provide any guarantees on ordering, so force an order by sorting.
-        return releases
+        # Hardcoded releases to generate resources before periodics are established.
+        # These can be removed once the corresponding periodics files exist.
+        releases.add('4.23')
+        releases.add('5.0')
+
+        return sorted(releases)  # Glob does not provide any guarantees on ordering, so force an order by sorting.
 
     def _get_scos_releases(self):
         releases = []

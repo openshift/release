@@ -1,7 +1,7 @@
 binary_build_commands: make terraform-init
 build_root:
   image_stream_tag:
-    name: gcp-hcp-infra-terraform
+    name: gcp-hcp-infra-base
     namespace: ci
     tag: latest
   use_build_cache: true
@@ -23,6 +23,11 @@ tests:
     from: src
 - as: check-orphan-modules
   commands: make check-orphan-modules
+  container:
+    from: src
+- as: check-generated-files
+  commands: export UV_CACHE_DIR=/tmp/.uv-cache UV_PYTHON_INSTALL_DIR=/tmp/.uv-python
+    UV_NO_PROGRESS=true && make check-generated-files
   container:
     from: src
 - as: generate-bin

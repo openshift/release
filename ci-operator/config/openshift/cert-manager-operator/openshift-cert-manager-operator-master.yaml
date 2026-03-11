@@ -7,27 +7,23 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.39.2
-  ocp_builder_rhel-9-golang-1.25-openshift-4.21:
-    name: builder
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
+  upi-installer:
+    name: "4.20"
     namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.21
+    tag: upi-installer
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/ci/Dockerfile
   from: base-rhel9
-  inputs:
-    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
   to: cert-manager-operator
 - dockerfile_path: images/ci/operand.Dockerfile
   from: base-rhel9
-  inputs:
-    ocp_builder_rhel-9-golang-1.25-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.21
   to: cert-manager
 operator:
   bundles:
@@ -61,11 +57,6 @@ tests:
     make verify -k --warn-undefined-variables
   container:
     from: src
-- as: verify-deps
-  commands: |
-    make verify-deps -k --warn-undefined-variables
-  container:
-    from: src
 - as: unit
   commands: |
     make test --warn-undefined-variables
@@ -93,21 +84,17 @@ tests:
     version: "4.20"
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    dependencies:
-      OO_BUNDLE: cert-manager-operator-bundle
-    env:
-      OO_INSTALL_MODE: AllNamespaces
-      OO_INSTALL_NAMESPACE: cert-manager-operator
-      OO_SECURITY_CONTEXT: restricted
     test:
     - as: install
       cli: latest
       commands: |
-        oc -n cert-manager-operator rollout status deployment cert-manager-operator-controller-manager
+        oc create namespace cert-manager-operator
+        operator-sdk run bundle --timeout=10m --security-context-config=restricted --install-mode=AllNamespaces -n cert-manager-operator "$OO_BUNDLE" --verbose
+        oc wait --for condition=Available -n cert-manager-operator deployment cert-manager-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: cert-manager-operator-bundle
-      from: src
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
@@ -119,7 +106,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-operator-sdk-generic-claim
+    workflow: generic-claim
 - as: e2e-operator-tech-preview
   optional: true
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -163,6 +150,28 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-aws-proxy
+- always_run: false
+  as: e2e-operator-aws-upi-proxy
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {AWS} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-upi-proxy
 - always_run: false
   as: e2e-operator-aws-sts
   optional: true
@@ -229,6 +238,50 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: e2e-operator-azure-ovn
+  optional: true
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {Azure} && CredentialsMode: isSubsetOf {Mint}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-azure-ovn
+- always_run: false
+  as: e2e-operator-azure-workload-identity
+  optional: true
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: test
+      cli: latest
+      commands: |
+        E2E_GINKGO_LABEL_FILTER='"Platform: isSubsetOf {Azure} && CredentialsMode: isSubsetOf {Manual}"' make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -18,7 +18,7 @@ def _add_redirect_resources(gendoc):
             'host': f'openshift-release{context.suffix}.svc.ci.openshift.org',
             'tls': {
                 'insecureEdgeTerminationPolicy': 'Redirect',
-                'termination': 'Edge'
+                'termination': 'edge'
             },
             'to': {
                 'kind': 'Service',
@@ -144,7 +144,7 @@ def _add_files_cache_redirect_resources(gendoc):
             'host': f'{context.fc_api_url}',
             'tls': {
                 'insecureEdgeTerminationPolicy': 'Redirect',
-                'termination': 'Edge'
+                'termination': 'edge'
             },
             'to': {
                 'kind': 'Service',

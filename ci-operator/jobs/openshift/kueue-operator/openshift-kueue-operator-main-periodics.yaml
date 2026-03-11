@@ -24,9 +24,17 @@ periodics:
       - --target=perfscale-kueue-operator-9nodes
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -70,17 +78,26 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
+  cron: 26 0 * * *
   decorate: true
   extra_refs:
   - base_ref: main
     org: openshift
     repo: kueue-operator
   labels:
+    capability/arm64: arm64
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  minimum_interval: 96h
   name: periodic-ci-openshift-kueue-operator-main-test-e2e-4-18
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
   spec:
     containers:
     - args:
@@ -92,9 +109,17 @@ periodics:
       - --target=test-e2e-4-18
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -135,17 +160,26 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
+  cron: 27 1 * * *
   decorate: true
   extra_refs:
   - base_ref: main
     org: openshift
     repo: kueue-operator
   labels:
+    capability/arm64: arm64
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  minimum_interval: 96h
   name: periodic-ci-openshift-kueue-operator-main-test-e2e-4-19
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
   spec:
     containers:
     - args:
@@ -157,9 +191,17 @@ periodics:
       - --target=test-e2e-4-19
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -200,19 +242,28 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build05
+  cluster: build10
+  cron: 32 0 * * *
   decorate: true
   extra_refs:
   - base_ref: main
     org: openshift
     repo: kueue-operator
   labels:
+    capability/arm64: arm64
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  minimum_interval: 96h
-  name: periodic-ci-openshift-kueue-operator-main-test-e2e-4-19-arm64
+  name: periodic-ci-openshift-kueue-operator-main-test-e2e-4-20-arm64
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
   spec:
     containers:
     - args:
@@ -221,12 +272,20 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=test-e2e-4-19-arm64
+      - --target=test-e2e-4-20-arm64
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -271,6 +330,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
+  cron: 52 2 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -281,8 +341,15 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  minimum_interval: 96h
-  name: periodic-ci-openshift-kueue-operator-main-test-e2e-4-19-fips
+  name: periodic-ci-openshift-kueue-operator-main-test-e2e-4-20-fips
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
   spec:
     containers:
     - args:
@@ -291,12 +358,20 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=test-e2e-4-19-fips
+      - --target=test-e2e-4-20-fips
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -341,6 +416,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
+  cron: 10 2 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -351,8 +427,15 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  minimum_interval: 96h
-  name: periodic-ci-openshift-kueue-operator-main-test-e2e-4-19-hypershift
+  name: periodic-ci-openshift-kueue-operator-main-test-e2e-4-20-hypershift
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
   spec:
     containers:
     - args:
@@ -361,12 +444,20 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=test-e2e-4-19-hypershift
+      - --target=test-e2e-4-20-hypershift
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -410,7 +501,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build10
+  cron: 37 23 * * *
   decorate: true
   extra_refs:
   - base_ref: main
@@ -422,8 +514,15 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: gcp
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  minimum_interval: 96h
   name: periodic-ci-openshift-kueue-operator-main-test-e2e-disconnected
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
   spec:
     containers:
     - args:
@@ -435,9 +534,17 @@ periodics:
       - --target=test-e2e-disconnected
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -481,17 +588,26 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
+  cron: 54 22 * * *
   decorate: true
   extra_refs:
   - base_ref: main
     org: openshift
     repo: kueue-operator
   labels:
+    capability/arm64: arm64
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  minimum_interval: 96h
   name: periodic-ci-openshift-kueue-operator-main-test-e2e-downstream-4-20
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
   spec:
     containers:
     - args:
@@ -503,9 +619,17 @@ periodics:
       - --target=test-e2e-downstream-4-20
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -546,17 +670,272 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   decorate: true
   extra_refs:
   - base_ref: main
     org: openshift
     repo: kueue-operator
   labels:
+    capability/arm64: arm64
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   minimum_interval: 96h
+  name: periodic-ci-openshift-kueue-operator-main-test-e2e-downstream-4-20-disruptive
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=test-e2e-downstream-4-20-disruptive
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build10
+  cron: 55 23 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: kueue-operator
+  labels:
+    capability/arm64: arm64
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kueue-operator-main-test-e2e-downstream-4-21
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=test-e2e-downstream-4-21
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build10
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: kueue-operator
+  labels:
+    capability/arm64: arm64
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  minimum_interval: 96h
+  name: periodic-ci-openshift-kueue-operator-main-test-e2e-downstream-4-21-disruptive
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=test-e2e-downstream-4-21-disruptive
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build10
+  cron: 59 3 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: kueue-operator
+  labels:
+    capability/arm64: arm64
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-kueue-operator-main-test-e2e-upstream-4-20
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
   spec:
     containers:
     - args:
@@ -568,9 +947,99 @@ periodics:
       - --target=test-e2e-upstream-4-20
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: hive-hive-credentials
+      secret:
+        secretName: hive-hive-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build10
+  cron: 58 2 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: kueue-operator
+  labels:
+    capability/arm64: arm64
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-kueue-operator-main-test-e2e-upstream-4-21
+  reporter_config:
+    slack:
+      channel: '#forum-node-jira'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs> {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=test-e2e-upstream-4-21
+      command:
+      - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
+      image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+      imagePullPolicy: Always
+      name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

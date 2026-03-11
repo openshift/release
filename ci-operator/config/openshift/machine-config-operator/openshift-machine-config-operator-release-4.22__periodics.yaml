@@ -7,18 +7,6 @@ base_images:
     name: nested-podman
     namespace: ci
     tag: latest
-  ocp_4.22_base-rhel9:
-    name: "4.22"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.24-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.24-openshift-4.22
-  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
   upi-installer:
     name: "4.22"
     namespace: ocp
@@ -27,16 +15,6 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel7
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-8-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.22
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: machine-config-operator
 releases:
   initial:
@@ -94,6 +72,7 @@ tests:
   capabilities:
   - intranet
   cron: 0 6 */3 * *
+  shard_count: 2
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -103,6 +82,7 @@ tests:
   capabilities:
   - intranet
   cron: 0 6 */3 * *
+  shard_count: 2
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -112,6 +92,7 @@ tests:
   capabilities:
   - intranet
   cron: 0 6 */3 * *
+  shard_count: 2
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -119,7 +100,7 @@ tests:
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-aws-mco-disruptive-techpreview
   interval: 24h
-  shard_count: 2
+  shard_count: 3
   steps:
     cluster_profile: aws-3
     env:
@@ -128,7 +109,7 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-azure-mco-disruptive-techpreview
   interval: 24h
-  shard_count: 2
+  shard_count: 3
   steps:
     cluster_profile: azure4
     env:
@@ -137,7 +118,7 @@ tests:
     workflow: openshift-e2e-azure
 - as: e2e-gcp-mco-disruptive-techpreview
   interval: 24h
-  shard_count: 2
+  shard_count: 3
   steps:
     cluster_profile: gcp
     env:
@@ -145,18 +126,20 @@ tests:
       TEST_SUITE: openshift/machine-config-operator/disruptive
     workflow: openshift-e2e-gcp
 - as: e2e-vsphere-mco-disruptive-techpreview
-  cron: 0 8 * * *
-  shard_count: 2
+  cron: 31 2 * * *
   steps:
     cluster_profile: vsphere-elastic
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/machine-config-operator/disruptive
+    test:
+    - ref: openshift-e2e-test-longrun
     workflow: openshift-e2e-vsphere
 - as: e2e-metal-ipi-ovn-ipv4-mco-disruptive-techpreview
   capabilities:
   - intranet
   cron: 0 8 * * *
+  shard_count: 3
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -169,6 +152,7 @@ tests:
   capabilities:
   - intranet
   cron: 0 8 * * *
+  shard_count: 3
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -181,6 +165,7 @@ tests:
   capabilities:
   - intranet
   cron: 0 8 * * *
+  shard_count: 3
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -213,13 +198,15 @@ tests:
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-upgrade
 - as: e2e-vsphere-mco-tp-longduration
-  interval: 168h
+  cron: 41 23 * * 0
   steps:
     cluster_profile: vsphere-elastic
     env:
       COMPUTE_NODE_REPLICAS: "2"
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SUITE: openshift/machine-config-operator/longduration
+    test:
+    - chain: mco-e2e-test
     workflow: openshift-e2e-vsphere
 - as: e2e-aws-mco-fips-proxy-longduration
   interval: 168h
@@ -230,6 +217,8 @@ tests:
       FIPS_ENABLED: "true"
       TEST_SKIPS: ""
       TEST_SUITE: openshift/machine-config-operator/longduration
+    test:
+    - chain: mco-e2e-test
     workflow: openshift-e2e-aws-proxy
 - as: e2e-aws-ovn-day1-ocl
   capabilities:
@@ -248,6 +237,14 @@ tests:
     - ref: mco-check-day1-enable-ocl
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
+- as: update-amis
+  cron: 0 0 1 * *
+  steps:
+    env:
+      CHERRY_PICK_BRANCHES: release-4.21 release-4.20 release-4.19
+      EXPECTED_RELEASE_VERSION: "4.22"
+    test:
+    - ref: mco-automation-update-amis
 zz_generated_metadata:
   branch: release-4.22
   org: openshift

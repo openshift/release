@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
-  cluster: build09
-  cron: 20 0 * * *
+  cluster: build04
+  cron: 20 1 * * *
   decorate: true
   extra_refs:
   - base_ref: release-ocm-2.12
@@ -22,9 +22,17 @@ periodics:
       - --target=mirror-nightly-image
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -59,8 +67,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
-  cron: 17 3 * * *
+  cluster: build04
+  cron: 40 1 * * *
   decorate: true
   extra_refs:
   - base_ref: release-ocm-2.12
@@ -81,9 +89,17 @@ periodics:
       - --target=mirror-nightly-image-controller
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

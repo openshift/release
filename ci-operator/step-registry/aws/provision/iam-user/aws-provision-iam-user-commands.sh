@@ -120,3 +120,6 @@ if [ -f "${POLICY_FILE_CCOCTL}" ]; then
 else
 	echo "User permission policy file for ccoctl not found. Skipping user creation"
 fi
+
+# Wait 2 minutes to ensure the user is available.
+sleep 120

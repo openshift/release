@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build05
-  cron: 00 00 * * 0-5
+  cron: 0 1 * * 0-5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -39,9 +39,17 @@ periodics:
       - --target=e2e-ibio-periodic
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -86,7 +94,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build05
-  cron: 00 00 * * 0-5
+  cron: 45 1 * * 0-5
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -124,9 +132,17 @@ periodics:
       - --target=ibio-reinstall-periodic
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

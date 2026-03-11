@@ -12,7 +12,7 @@ build_root:
 releases:
   latest:
     release:
-      architecture: multi
+      architecture: amd64
       channel: stable
       version: "4.20"
 resources:
@@ -86,7 +86,7 @@ tests:
     --cmd=./ossm/merge_upstream.sh
   container:
     from: src
-  cron: 00 0,3,6,9,12,15,18,21 * * 1-5
+  cron: 00 1,7,11,15,19,23 * * 1-5
   secrets:
   - mount_path: /creds-github
     name: ossm-github-simple-job
@@ -96,18 +96,19 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
+      HUB: quay.io/sail-dev
       INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-1.26
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.26-512a1e34a2bc63dd3c54ddcba27df1bcf95e7360
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       REPORT_TO_REPORT_PORTAL: "true"
       TEST_FILE_NAME: report.xml
-      TEST_SUITE: Sail Operator e2e
+      TEST_SUITE_DESC: Sail Operator e2e
       XDG_CACHE_HOME: /tmp/cache
     test:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-sail-operator-e2e-ocp
-    workflow: servicemesh-istio-e2e-hypershift
+    workflow: servicemesh-istio-e2e-profile
 - as: e2e-ocp-arm
   skip_if_only_changed: ^(docs/.*\.md$)|(^[^/]*\.md$)|(^\.github/.*$)
   steps:
@@ -115,14 +116,15 @@ tests:
     env:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      HUB: quay.io/sail-dev
       INSTALLATION_METHOD: helm
-      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.26-80a1b41acf1fe5b60c2b49153f6d3f9ed3a82a0d
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:release-1.26-512a1e34a2bc63dd3c54ddcba27df1bcf95e7360
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       OCP_ARCH: arm64
       REPORT_TO_REPORT_PORTAL: "true"
       TEST_FILE_NAME: report.xml
-      TEST_SUITE: Sail Operator e2e
+      TEST_SUITE_DESC: Sail Operator e2e
       XDG_CACHE_HOME: /tmp/cache
     test:
     - ref: servicemesh-sail-operator-copy-src
@@ -134,14 +136,14 @@ tests:
     cluster_profile: ossm-aws
     env:
       BASE_DOMAIN: servicemesh.devcluster.openshift.com
-      MAISTRA_BUILDER_IMAGE: quay-proxy.ci.openshift.org/openshift/ci:ci_maistra-builder_upstream-master
+      MAISTRA_BUILDER_IMAGE: gcr.io/istio-testing/build-tools:master-eebcdda8856e2d4f528991d27d4808880cce4c52
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
     test:
     - ref: servicemesh-sail-operator-copy-src
     - ref: servicemesh-sail-operator-scorecard
-    workflow: servicemesh-istio-e2e-hypershift
+    workflow: servicemesh-istio-e2e-profile
 zz_generated_metadata:
   branch: release-3.1
   org: openshift-service-mesh

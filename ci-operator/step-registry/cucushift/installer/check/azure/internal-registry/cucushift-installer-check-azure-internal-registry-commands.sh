@@ -16,7 +16,8 @@ function field_check() {
 
     local expected_value=$1 actual_value=$2
 
-    if [[ "${expected_value}" == "${actual_value}" ]]; then
+    #shellcheck disable=SC2076
+    if [[ "${expected_value}" == "${actual_value}" ]] || [[ " ${expected_value} " =~ " ${actual_value} " ]]; then
         echo "Get expected value!"
         return 0
     else
@@ -71,10 +72,12 @@ fi
 
 vnet_resource_group=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.networkResourceGroupName')
 vnet_name=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.virtualNetwork')
-vnet_subnet_name=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.controlPlaneSubnet')
+master_subnet=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.controlPlaneSubnet')
+worker_subnet=$(yq-go r "${INSTALL_CONFIG}" 'platform.azure.computeSubnet')
+vnet_subnet_name="${worker_subnet} or ${master_subnet}"
 if [[ -z "${vnet_resource_group}" ]]; then
     vnet_name="${INFRA_ID}-vnet"
-    vnet_subnet_name="${INFRA_ID}-master-subnet"
+    vnet_subnet_name="${INFRA_ID}-master-subnet or ${INFRA_ID}-worker-subnet"
 fi
 image_registry_sa_name=$(az storage account list -g ${RESOURCE_GROUP} --query '[].name' -otsv | grep imageregistry)
 image_registry_private_endpoint=$(az network private-endpoint list -g ${RESOURCE_GROUP} --query '[].name' -otsv)

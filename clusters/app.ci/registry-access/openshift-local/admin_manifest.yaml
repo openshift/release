@@ -1,0 +1,65 @@
+# this is the Namespace in which your ServiceAccount will live
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
+    openshift.io/description: Run OpenShift locally
+    openshift.io/display-name: OpenShift-Local
+  name: openshift-local
+---
+# this is the ServiceAccount whose credentials you will use
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: openshift-local
+---
+# this grants your ServiceAccount rights to pull images
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: openshift-local-image-puller-binding
+  # the namespace from which you will pull images
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: openshift-local
+    name: image-puller
+---
+# this adds the admins to the project.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: openshift-local-viewer-binding
+  namespace: openshift-local
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: openshift-local-admins
+    namespace: openshift-local
+---
+# this grants the right to read the ServiceAccount's credentials and pull
+# images to the admins.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: openshift-local-admins-binding
+  namespace: openshift-local
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: openshift-local-admins
+    namespace: openshift-local

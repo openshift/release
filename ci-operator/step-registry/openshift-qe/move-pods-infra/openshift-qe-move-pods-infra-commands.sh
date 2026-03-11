@@ -552,12 +552,20 @@ node_arch=$(echo $node_arch | tr -s " " "\n"| sort|uniq -u)
 ######################################################################################
 #             CHANGE BELOW VARIABLE IF YOU WANT TO SET DIFFERENT VALUE               #
 ######################################################################################
-#IF_MOVE_INGRESS IF_MOVE_REGISTRY IF_MOVE_MONITORING can be override if you want to disable moving
-#ingress/registry/monitoring
+# IF_MOVE_INGRESS IF_MOVE_REGISTRY IF_MOVE_MONITORING can be override if you want to disable moving
+# ingress/registry/monitoring
+#
+# OPENSHIFT_PROMETHEUS_RETENTION_PERIOD, OPENSHIFT_PROMETHEUS_STORAGE_SIZE, and
+# OPENSHIFT_ALERTMANAGER_STORAGE_SIZE can be overriden in order to tweak
+# Prometheus/Alertmanager settings.
 
-export OPENSHIFT_PROMETHEUS_RETENTION_PERIOD=15d
-export OPENSHIFT_PROMETHEUS_STORAGE_SIZE=100Gi
-export OPENSHIFT_ALERTMANAGER_STORAGE_SIZE=2Gi
+OPENSHIFT_PROMETHEUS_RETENTION_PERIOD=${OPENSHIFT_PROMETHEUS_RETENTION_PERIOD:-15d}
+OPENSHIFT_PROMETHEUS_STORAGE_SIZE=${OPENSHIFT_PROMETHEUS_STORAGE_SIZE:-100Gi}
+OPENSHIFT_ALERTMANAGER_STORAGE_SIZE=${OPENSHIFT_ALERTMANAGER_STORAGE_SIZE:-2Gi}
+
+export OPENSHIFT_PROMETHEUS_RETENTION_PERIOD
+export OPENSHIFT_PROMETHEUS_STORAGE_SIZE
+export OPENSHIFT_ALERTMANAGER_STORAGE_SIZE
 
 case ${platform_type} in
 	aws)

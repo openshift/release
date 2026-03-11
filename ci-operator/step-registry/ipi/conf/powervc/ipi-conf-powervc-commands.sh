@@ -15,12 +15,13 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.5.2"
+	TAG="v1.2.0"
 	echo "Installing PowerVC-Tool version ${TAG}"
-	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
-	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
-	tar xzvf ${TOOL_TAR}
-	mv PowerVC-Tool /tmp/bin/
+	MACHINE=$(uname -m)
+	if [ "${MACHINE}" == "x86_64" ]; then MACHINE="amd64"; fi
+	TOOL_BIN="ocp-ipi-powervc-linux-${MACHINE}"
+	curl --location --output /tmp/bin/PowerVC-Tool https://github.com/IBM/ocp-ipi-powervc/releases/download/${TAG}/${TOOL_BIN}
+	chmod ugo+x /tmp/bin/PowerVC-Tool
 
 	TAG="v4.49.2"
 	echo "Installing yq-v4 version ${TAG}"
@@ -33,9 +34,9 @@ function install_required_tools() {
 	fi
 
 	mkdir -p ${HOME}/.config/openstack/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/clouds.yaml ${HOME}/.config/openstack/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/clouds.yaml ${HOME}/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/ocp-ci-ca.pem ${HOME}/
+	cp ${SECRETS_DIR}/clouds.yaml ${HOME}/.config/openstack/
+	cp ${SECRETS_DIR}/clouds.yaml ${HOME}/
+	cp ${SECRETS_DIR}/ocp-ci-ca.pem ${HOME}/
 
 	which PowerVC-Tool
 	which jq
@@ -50,6 +51,14 @@ function install_required_tools() {
 echo "ARCH=${ARCH}"
 echo "BRANCH=${BRANCH}"
 echo "LEASED_RESOURCE=${LEASED_RESOURCE}"
+
+export SECRETS_DIR=/var/run/powervc-ipi-cicd-secrets/powervc-creds
+if [ ! -d "${SECRETS_DIR}" ]
+then
+	echo "Error: ${SECRETS_DIR} directory does not exist!"
+	exit 1
+fi
+ls -l ${SECRETS_DIR}/ || true
 
 if [[ -z "${LEASED_RESOURCE}" ]]
 then
@@ -73,8 +82,6 @@ else
 	CLUSTER_NAME="p-${LEASED_RESOURCE}"
 fi
 echo "CLUSTER_NAME=${CLUSTER_NAME}"
-
-ls -l /var/run/powervc-ipi-cicd-secrets/powervc-creds/ || true
 
 install_required_tools
 
@@ -113,23 +120,36 @@ export POWERVC_SHARED_CREDENTIALS_FILE
 cat > "${SHARED_DIR}/powervc-conf.yaml" << EOF
 ARCH: ${ARCH}
 BASE_DOMAIN: ${BASE_DOMAIN}
+BASTION_FLAVOR: ${BASTION_FLAVOR}
 BASTION_IMAGE_NAME: ${BASTION_IMAGE_NAME}
 BRANCH: ${BRANCH}
 CLOUD: ${CLOUD}
+CLUSTER_FLAVOR: ${CLUSTER_FLAVOR}
 CLUSTER_NAME: ${CLUSTER_NAME}
 COMPUTE_NODE_TYPE: ${COMPUTE_NODE_TYPE}
-FLAVOR: ${FLAVOR}
 LEASED_RESOURCE: ${LEASED_RESOURCE}
 NETWORK_NAME: ${NETWORK_NAME}
 RHCOS_IMAGE_NAME: ${RHCOS_IMAGE_NAME}
 SERVER_IP: ${SERVER_IP}
 EOF
 
-#POWERVC_USER_ID=$(cat "/var/run/powervc-ipi-cicd-secrets/powervc-creds/POWERVC_USER_ID")
+#POWERVC_USER_ID=$(cat "${SECRETS_DIR}/POWERVC_USER_ID")
 
 # Workaround for this error as clouds.yaml is also here
 #   NewServiceClient returns error unable to load clouds.yaml: no clouds.yml file found: file does not exist
 cd /tmp/
+
+echo "Running PowerVC-Tool check-alive..."
+PowerVC-Tool \
+	check-alive \
+	--serverIP "${SERVER_IP}" \
+	--shouldDebug true
+RC=$?
+if [ ${RC} -gt 0 ]
+then
+	echo "Error: PowerVC-Tool check-alive --serverIP ${SERVER_IP} --shouldDebug true"
+	exit ${RC}
+fi
 
 SUBNET_ID=$(openstack --os-cloud=${CLOUD} network show "${NETWORK_NAME}" --format shell | grep ^subnets | sed -e "s,^[^']*',," -e "s,'.*$,,")
 if [ -z "${SUBNET_ID}" ]
@@ -147,21 +167,22 @@ openstack \
 openstack \
 	--os-cloud=${CLOUD} \
 	keypair create \
-	--public-key "${CLUSTER_PROFILE_DIR}/ssh-publickey" \
+	--public-key "${SECRETS_DIR}/ssh-publickey" \
 	"${CLUSTER_NAME}-key"
 
 echo "Running PowerVC-Tool create-bastion..."
-echo "CLOUD=${CLOUD}"
-echo "CLUSTER_NAME=${CLUSTER_NAME}"
-echo "FLAVOR=${FLAVOR}"
+echo "BASTION_FLAVOR=${BASTION_FLAVOR}"
 echo "BASTION_IMAGE_NAME=${BASTION_IMAGE_NAME}"
+echo "CLOUD=${CLOUD}"
+echo "CLUSTER_FLAVOR=${CLUSTER_FLAVOR}"
+echo "CLUSTER_NAME=${CLUSTER_NAME}"
 echo "NETWORK_NAME=${NETWORK_NAME}"
 
 PowerVC-Tool \
 	create-bastion \
 	--cloud "${CLOUD}" \
 	--bastionName "${CLUSTER_NAME}" \
-	--flavorName "${FLAVOR}" \
+	--flavorName "${BASTION_FLAVOR}" \
 	--imageName "${BASTION_IMAGE_NAME}" \
 	--networkName "${NETWORK_NAME}" \
 	--sshKeyName "${CLUSTER_NAME}-key" \
@@ -172,7 +193,7 @@ PowerVC-Tool \
 RC=$?
 if [ ${RC} -gt 0 ]
 then
-	echo "Error: PowerVC-Tool create-bastion --cloud ${CLOUD} --bastionName ${CLUSTER_NAME} --flavorName ${FLAVOR} --imageName ${BASTION_IMAGE_NAME} --networkName ${NETWORK_NAME} --sshKeyName ${CLUSTER_NAME}-key --domainName ${BASE_DOMAIN} --enableHAProxy true --shouldDebug true"
+	echo "Error: PowerVC-Tool create-bastion --cloud ${CLOUD} --bastionName ${CLUSTER_NAME} --flavorName ${BASTION_FLAVOR} --imageName ${BASTION_IMAGE_NAME} --networkName ${NETWORK_NAME} --sshKeyName ${CLUSTER_NAME}-key --domainName ${BASE_DOMAIN} --enableHAProxy true --shouldDebug true"
 	exit ${RC}
 fi
 
@@ -234,7 +255,7 @@ platform:
     cloud: ${CLOUD}
     clusterOSImage: ${RHCOS_IMAGE_NAME}
     defaultMachinePlatform:
-      type: ${FLAVOR}
+      type: ${CLUSTER_FLAVOR}
     ingressVIPs:
     - ${VIP_INGRESS}
     controlPlanePort:

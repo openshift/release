@@ -87,19 +87,49 @@ else
 	exit 1
 fi
 
+# Determine the node service accounts to use
 # The node service accounts are InfraID plus -m (master) or -w (worker).
 # Ref: https://github.com/openshift/installer/blob/main/pkg/infrastructure/gcp/clusterapi/iam.go#L30
 INFRA_ID=$(jq -r .infraID ${SHARED_DIR}/metadata.json)
+CONFIG="${SHARED_DIR}/install-config.yaml"
+
+# Determine master node service account
+# Default to InfraID-based service account
 MASTER_NODE_SA="${INFRA_ID}-m@${SA_SUFFIX}"
+
+# Override with custom service account if specified in install-config.yaml
+CUSTOM_CONTROL_PLANE_SA=""
+if [ -f "${CONFIG}" ]; then
+	CUSTOM_CONTROL_PLANE_SA=$(yq-go r "${CONFIG}" 'controlPlane.platform.gcp.serviceAccount' 2>/dev/null || echo "")
+fi
+
+if [ -n "${CUSTOM_CONTROL_PLANE_SA}" ] && [ "${CUSTOM_CONTROL_PLANE_SA}" != "null" ]; then
+	MASTER_NODE_SA="${CUSTOM_CONTROL_PLANE_SA}"
+	logger "INFO" "Using master node service account from install-config.yaml: ${MASTER_NODE_SA}"
+fi
+
+# Determine worker node service account
+# Default to InfraID-based service account
 WORKER_NODE_SA="${INFRA_ID}-w@${SA_SUFFIX}"
+
+# Override with custom service account if specified in install-config.yaml
+CUSTOM_COMPUTE_SA=""
+if [ -f "${CONFIG}" ]; then
+	CUSTOM_COMPUTE_SA=$(yq-go r "${CONFIG}" 'compute[0].platform.gcp.serviceAccount' 2>/dev/null || echo "")
+fi
+
+if [ -n "${CUSTOM_COMPUTE_SA}" ] && [ "${CUSTOM_COMPUTE_SA}" != "null" ]; then
+	WORKER_NODE_SA="${CUSTOM_COMPUTE_SA}"
+	logger "INFO" "Using worker node service account from install-config.yaml: ${WORKER_NODE_SA}"
+fi
 
 # Grant scoped serviceAccountUser role for node service accounts
 SA_USER_ROLE="roles/iam.serviceAccountUser"
 logger "INFO" "Granting ${SA_USER_ROLE} for node service accounts: ${MASTER_NODE_SA}, ${WORKER_NODE_SA}"
 CMD="gcloud iam service-accounts add-iam-policy-binding \"${MASTER_NODE_SA}\" --project=\"${GOOGLE_PROJECT_ID}\" --member=\"serviceAccount:${SERVICE_ACCOUNT_EMAIL}\" --role=\"${SA_USER_ROLE}\" --condition=None"
-run_command "${CMD}"
+backoff "${CMD}"
 CMD="gcloud iam service-accounts add-iam-policy-binding \"${WORKER_NODE_SA}\" --project=\"${GOOGLE_PROJECT_ID}\" --member=\"serviceAccount:${SERVICE_ACCOUNT_EMAIL}\" --role=\"${SA_USER_ROLE}\" --condition=None"
-run_command "${CMD}"
+backoff "${CMD}"
 
 # Remove project-level serviceAccountUser role from the binding created by the installer
 logger "INFO" "Removing ${SA_USER_ROLE} from project-level binding for ${SERVICE_ACCOUNT_EMAIL}"

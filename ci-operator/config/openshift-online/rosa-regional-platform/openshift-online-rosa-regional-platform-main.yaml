@@ -1,0 +1,146 @@
+build_root:
+  project_image:
+    dockerfile_path: ci/Containerfile
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.21"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: terraform-validate
+  commands: ./ci/terraform-validate.sh
+  container:
+    from: src
+- as: helm-lint
+  commands: ./ci/helm-lint.sh
+  container:
+    from: src
+- as: check-rendered-files
+  commands: ./ci/check-rendered-files.sh
+  container:
+    from: src
+- as: nightly-ephemeral
+  cron: 0 7 * * *
+  steps:
+    post:
+    - as: teardown-ephemeral
+      commands: ./ci/nightly.sh --teardown
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-ephemeral-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    pre:
+    - as: provision-ephemeral
+      commands: ./ci/nightly.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-ephemeral-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: e2e
+      commands: ./ci/e2e-tests.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-ephemeral-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: nightly-integration
+  cron: 0 7 * * *
+  steps:
+    test:
+    - as: e2e
+      commands: ./ci/e2e-tests.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-integration-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- always_run: false
+  as: on-demand-e2e
+  steps:
+    post:
+    - as: teardown-ephemeral
+      commands: |-
+        export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
+        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
+        ./ci/nightly.sh --teardown
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-ephemeral-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    pre:
+    - as: provision-ephemeral
+      commands: |-
+        export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
+        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
+        ./ci/nightly.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-ephemeral-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: e2e
+      commands: ./ci/e2e-tests.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-ephemeral-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: ephemeral-resources-janitor
+  cron: 0 12 * * 0
+  steps:
+    test:
+    - as: ephemeral-resources-janitor
+      commands: ./ci/ephemeral-resources-janitor.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-ephemeral-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-regional-platform

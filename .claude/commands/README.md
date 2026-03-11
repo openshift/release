@@ -12,6 +12,41 @@ See detailed documentation below.
 
 ---
 
+### `/rehearse-debug-cluster` - Add Debug Reference and Rehearse Changes
+
+**Purpose**: Automated workflow to add wait reference to a test configuration and trigger CI rehearsal.
+
+**Usage**:
+```bash
+/rehearse-debug-cluster <config_name> <release>
+```
+
+**Parameters**:
+- `config_name` (required): Test configuration name (e.g., "baremetalds-ipi-ovn-dualstack-primaryv6-f7")
+- `release` (required): Release version (e.g., "4.21")
+
+**Example**:
+```bash
+/rehearse-debug-cluster baremetalds-ipi-ovn-dualstack-primaryv6-f7 4.21
+```
+
+**What it does**:
+1. Creates a new branch named `debug-cluster-<config_name>`
+2. Finds the target configuration file in `ci-operator/config/openshift/openshift-tests-private/`
+3. Adds `- ref: wait` after the `-chain` line in the test block
+4. Commits, pushes, and creates a PR to openshift/release with title `debug-cluster-<config_name>`
+5. Waits for the openshift-ci-robot REHEARSALNOTIFIER comment
+6. Extracts the test name and posts the `/pj-rehearse` comment to trigger rehearsal
+
+**Output**:
+- PR URL
+- Test name
+- Rehearsal trigger confirmation
+
+This command runs fully automated without prompting between steps.
+
+---
+
 ### `/migrate-variant-periodics` - Migrate Periodic Job Configurations
 
 **Purpose**: Migrate OpenShift periodic CI job definitions from one release version to another by copying and transforming YAML configuration files.

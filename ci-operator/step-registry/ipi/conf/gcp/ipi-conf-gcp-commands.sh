@@ -24,32 +24,36 @@ fi
 # be active savings plans targeting this machine class.
 master_type=""
 control_plane_arch="${CONTROL_ARCH:-${OCP_ARCH}}"
-case "${SIZE_VARIANT}" in
-  "xlarge")
-    master_type_suffix="standard-32"
-  ;;
-  "large")
-    master_type_suffix="standard-16"
-  ;;
-  "compact")
-    master_type_suffix="standard-8"
-  ;;
-  *)
-    if [[ "${control_plane_arch}" == "arm64" ]]; then
-      master_type_suffix="standard-4"
-    else
-      # Temporary test to see if this helps the consistent high CPU alerts and random test failures
-      master_type_suffix="custom-6-16384"
-      # TODO: remove if block and revert master_type_suffix back to standard if/when we switch back to standard
-      # custom sizes are not supported by arm64 VMs
-    fi
-  ;;
-esac
+if [[ -n "${CONTROL_PLANE_NODE_TYPE}" ]]; then
+  master_type="${CONTROL_PLANE_NODE_TYPE}"
+else
+  case "${SIZE_VARIANT}" in
+    "xlarge")
+      master_type_suffix="standard-32"
+    ;;
+    "large")
+      master_type_suffix="standard-16"
+    ;;
+    "compact")
+      master_type_suffix="standard-8"
+    ;;
+    *)
+      if [[ "${control_plane_arch}" == "arm64" ]]; then
+        master_type_suffix="standard-4"
+      else
+        # Temporary test to see if this helps the consistent high CPU alerts and random test failures
+        master_type_suffix="custom-6-16384"
+        # TODO: remove if block and revert master_type_suffix back to standard if/when we switch back to standard
+        # custom sizes are not supported by arm64 VMs
+      fi
+    ;;
+  esac
 
-if [[ "${control_plane_arch}" == "amd64" ]]; then
-  master_type="e2-${master_type_suffix}"
-elif [[ "${control_plane_arch}" == "arm64" ]]; then
-  master_type="t2a-${master_type_suffix}"
+  if [[ "${control_plane_arch}" == "amd64" ]]; then
+    master_type="e2-${master_type_suffix}"
+  elif [[ "${control_plane_arch}" == "arm64" ]]; then
+    master_type="t2a-${master_type_suffix}"
+  fi
 fi
 
 compute_arch="${COMPUTE_ARCH:-${OCP_ARCH}}"
@@ -60,7 +64,6 @@ if [[ -z "${COMPUTE_NODE_TYPE}" ]]; then
     COMPUTE_NODE_TYPE="e2-custom-6-16384"
   fi
 fi
-
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}

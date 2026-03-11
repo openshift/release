@@ -59,6 +59,8 @@ declare -a MIRRORED_IMAGES=(
   "registry.k8s.io/etcd:3.5.16-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-16-0-ExW1ETJqOZa6gx2F"
   # new image coming in k8s 1.30.5. This should be removed once k8s is bumped in openshift/origin too (or https://issues.redhat.com/browse/TRT-1942 is fixed)
   "registry.k8s.io/etcd:3.5.15-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-15-0-W7c5qq4cz4EE20EQ"
+  # new image coming in k8s 1.35.1
+  "registry.k8s.io/e2e-test-images/sample-device-plugin:1.7 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-registry-k8s-io-e2e-test-images-sample-device-plugin-1-7-ULwza-sZKxhdAQs1"
 )
 
 function run-oc-image-mirror() {
@@ -304,8 +306,13 @@ function upgrade() {
 }
 
 function suite() {
-    if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/auth/external-oidc") ]]; then
-        TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
+    HYPERVISOR_ARGS=()
+    if [[ -n "${HYPERVISOR_IP:-}" ]]; then
+        HYPERVISOR_ARGS=("--with-hypervisor-json={\"hypervisorIP\":\"${HYPERVISOR_IP}\", \"sshUser\":\"${HYPERVISOR_SSH_USER}\", \"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}")
+    fi
+
+    if [[ -n "${TEST_SKIPS}" && ("${TEST_SUITE}" == "openshift/conformance/parallel" || "${TEST_SUITE}" == "openshift/auth/external-oidc" || "${TEST_SUITE}" ==  "openshift/two-node") ]]; then
+        TESTS="$(openshift-tests run "${TEST_SUITE}" --dry-run --provider "${TEST_PROVIDER}" "${HYPERVISOR_ARGS[@]}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
         echo "Skipping tests:" &&
         echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; } &&
@@ -314,18 +321,11 @@ function suite() {
     fi
 
     set -x
-    if [[ -n "${HYPERVISOR_IP:-}" ]]; then
-        openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
-            --provider "${TEST_PROVIDER:-}" \
-            --with-hypervisor-json="{\"hypervisorIP\":\"${HYPERVISOR_IP}\", \"sshUser\":\"${HYPERVISOR_SSH_USER}\", \"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}" \
-            -o "${ARTIFACT_DIR}/e2e.log" \
-            --junit-dir "${ARTIFACT_DIR}/junit"
-    else
-        openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
-            --provider "${TEST_PROVIDER:-}" \
-            -o "${ARTIFACT_DIR}/e2e.log" \
-            --junit-dir "${ARTIFACT_DIR}/junit"
-    fi
+    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+        --provider "${TEST_PROVIDER:-}" \
+        "${HYPERVISOR_ARGS[@]}" \
+        -o "${ARTIFACT_DIR}/e2e.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit"
     set +x
 }
 

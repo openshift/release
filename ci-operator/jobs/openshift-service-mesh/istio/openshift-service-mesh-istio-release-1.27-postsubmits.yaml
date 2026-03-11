@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-1\.27$
-    cluster: build03
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -12,6 +12,14 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-openshift-service-mesh-istio-release-1.27-update-istio-module
+    reporter_config:
+      slack:
+        channel: '#team-ossm-release-maintenance'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
     spec:
       containers:
       - args:
@@ -22,9 +30,17 @@ postsubmits:
         - --target=update-istio-module
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

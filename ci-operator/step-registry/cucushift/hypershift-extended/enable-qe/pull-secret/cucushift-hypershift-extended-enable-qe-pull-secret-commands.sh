@@ -135,11 +135,6 @@ rm /tmp/global-pull-secret.json
 echo "{\"spec\":{\"pullSecret\":{\"name\":\"$CLUSTER_NAME-pull-secret-new\"}}}" > /tmp/patch.json
 oc patch hostedclusters -n "$HYPERSHIFT_NAMESPACE" "$CLUSTER_NAME" --type=merge -p="$(cat /tmp/patch.json)"
 
-echo "Make sure all nodepools are in healthy status after rolling out"
-oc wait nodepool -n "$HYPERSHIFT_NAMESPACE" --all --for='condition=UpdatingConfig=True' --timeout=15m
-oc wait nodepool -n "$HYPERSHIFT_NAMESPACE" --all --for='condition=UpdatingConfig=False' --timeout=30m
-oc wait nodepool -n "$HYPERSHIFT_NAMESPACE" --all --for='condition=AllNodesHealthy=True' --timeout=30m
-
 echo "check day-2 pull-secret update"
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 RETRIES=45

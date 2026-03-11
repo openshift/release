@@ -1,12 +1,4 @@
 base_images:
-  ocp_4.22_base-rhel9:
-    name: 4.22-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.22
   openstack-installer:
     name: 4.22-priv
     namespace: ocp-private
@@ -44,31 +36,10 @@ build_root:
 canonical_go_repository: github.com/openshift/sriov-network-operator
 images:
 - dockerfile_path: Dockerfile.ocp
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: sriov-network-operator
 - dockerfile_path: Dockerfile.sriov-network-config-daemon.ocp
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: sriov-network-config-daemon
 - dockerfile_path: Dockerfile.webhook.ocp
-  inputs:
-    ocp_4.22_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.22:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.22:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22
   to: sriov-network-webhook
 - dockerfile_path: bundleci.Dockerfile
   to: sriov-network-operator-bundle
@@ -335,6 +306,61 @@ tests:
           memory: 200Mi
       timeout: 4h0m0s
     workflow: telco5g-sno-ztp-cnf
+- as: operator-e2e-sriov-sno
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-operator-bundle
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
+      OO_PACKAGE: sriov-network-operator
+      OO_TARGET_NAMESPACES: '!install'
+    post:
+    - ref: telco5g-delete-interface
+    test:
+    - ref: telco5g-add-interface
+    - as: start-sriov-operator
+      cli: latest
+      commands: |
+        oc apply -f - <<EOF
+        apiVersion: sriovnetwork.openshift.io/v1
+        kind: SriovOperatorConfig
+        metadata:
+          name: default
+          namespace: openshift-sriov-network-operator
+        spec:
+          enableInjector: true
+          enableOperatorWebhook: true
+          logLevel: 2
+        EOF
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    - as: e2e-validation
+      commands: |
+        export JUNIT_OUTPUT="$ARTIFACT_DIR"
+        ln -s ${ARTIFACT_DIR}/unit_report.xml ${ARTIFACT_DIR}/junit.xml
+        make test-e2e-validation-only
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-conformance
+      commands: |
+        export JUNIT_OUTPUT="$ARTIFACT_DIR"
+        ln -s ${ARTIFACT_DIR}/unit_report.xml ${ARTIFACT_DIR}/junit.xml
+        make test-e2e-conformance
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: optional-operators-ci-aws-sno
 zz_generated_metadata:
   branch: release-4.22
   org: openshift-priv

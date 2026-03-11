@@ -2,16 +2,12 @@ workflow:
   as: aro-hcp-e2e
   steps:
     allow_best_effort_post_steps: true
-    leases:
-    - resource_type: aro-hcp-test-tenant-quota-slice
-      env: TEST_TENANT_LEASED_RESOURCE
-    # disabled for now as it's not being used and it's blocking all E2E runs
-    # - resource_type: aro-hcp-test-tenant-msi-quota-slice
-    #   env: MSI_LEASED_RESOURCE
-    #   count: 10
+    pre:
+      - ref: aro-hcp-write-config
     test:
       - ref: aro-hcp-test-persistent
     post:
       - ref: aro-hcp-gather-test-visualization
+      - ref: aro-hcp-gather-custom-link-tools
   documentation: |-
     The ARO HCP e2e workflow runs the full end-to-end suite against an existing environment.

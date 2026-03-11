@@ -124,3 +124,6 @@ else
   exit 1
 fi
 echo "$(date) Finished deleting cluster"
+# Some hypershift jobs use the idp-htpasswd step which creates this secret in the hypershift hostedclusters' namespace
+# So need to clean up this secret
+[ -f "${SHARED_DIR}/htpasswd-secret-name" ] && oc delete secret/"$(< "${SHARED_DIR}/htpasswd-secret-name")" -n clusters || true

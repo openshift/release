@@ -60,8 +60,8 @@ fi
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 function cleanup() {
-    echo "Requesting risk analysis for test failures in this job run from sippy:"
-    openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+    #echo "Requesting risk analysis for test failures in this job run from sippy:"
+    #openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
 
     echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
 }
@@ -309,11 +309,21 @@ function suite() {
         TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
     fi &&
 
+    # Determine max parallel tests if not already specified in TEST_ARGS
+    MAX_PARALLEL_ARGS="" &&
+    if [[ ! "${TEST_ARGS:-}" =~ --max-parallel-tests ]]; then
+        if [[ "${TEST_SUITE}" =~ serial ]]; then
+            MAX_PARALLEL_ARGS="--max-parallel-tests 1"
+        else
+            MAX_PARALLEL_ARGS="--max-parallel-tests 15"
+        fi
+    fi &&
+
     set -x &&
     openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
-        --max-parallel-tests 15 \
+        ${MAX_PARALLEL_ARGS} \
         --junit-dir "${ARTIFACT_DIR}/junit" &
     wait "$!" &&
     set +x

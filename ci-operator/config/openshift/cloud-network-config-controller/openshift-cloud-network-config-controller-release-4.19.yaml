@@ -7,27 +7,12 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.19_base-rhel9:
-    name: "4.19"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
 binary_build_commands: make build
 build_root:
   from_repository: true
 canonical_go_repository: openshift/cloud-network-config-controller
 images:
 - dockerfile_path: Dockerfile
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: cloud-network-config-controller
 promotion:
   to:
@@ -102,7 +87,7 @@ tests:
     workflow: openshift-ci-security
 - as: hypershift-e2e-aks
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aks
     env:
       AUTH_THROUGH_CERTS: "true"
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"

@@ -3,10 +3,6 @@ base_images:
     name: automation-flavors
     namespace: stackrox
     tag: openshift-4-stable
-  ubi-minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
 build_root:
   image_stream_tag:
     name: apollo-ci
@@ -14,10 +10,9 @@ build_root:
     tag: stackrox-ui-test-0.4.9
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.19"
+    release:
+      channel: stable
+      version: 4.20.8
 resources:
   '*':
     requests:
@@ -32,8 +27,8 @@ tests:
     cluster_profile: aws-stackrox
     env:
       BASE_DOMAIN: perfscale.rox.systems
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --timeout=8h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
       COMPUTE_NODE_REPLICAS: "24"
-      EXTRA_FLAGS: --churn-duration=20m --timeout=8h --metrics-profile metrics-aggregated.yml,https://raw.githubusercontent.com/stackrox/stackrox/refs/heads/master/tests/performance/scale/config/metrics-acs.yml
       PODS_PER_NODE: "240"
       ROX_SCANNER_V4_ENABLED: "true"
       SCANNER_V4_MATCHER_READINESS: vulnerability

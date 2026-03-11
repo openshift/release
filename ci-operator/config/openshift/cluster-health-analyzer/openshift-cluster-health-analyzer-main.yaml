@@ -2,7 +2,10 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.22
+    tag: rhel-9-release-golang-1.25-openshift-4.21
+images:
+- dockerfile_path: Dockerfile
+  to: cluster-health-analyzer
 resources:
   '*':
     limits:
@@ -13,14 +16,29 @@ resources:
 tests:
 - as: lint
   commands: |
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make lint
+    GOFLAGS="-mod=readonly" GOLANGCI_LINT_CACHE=/tmp/golangci-cache make lint
   container:
     from: src
 - as: unit
   commands: |
-    make test
+    GOFLAGS="-mod=readonly" make test
   container:
     from: src
+- always_run: true
+  as: e2e-integration
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-1
+    owner: obs
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.21"
+  steps:
+    test:
+    - ref: cluster-health-analyzer
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift

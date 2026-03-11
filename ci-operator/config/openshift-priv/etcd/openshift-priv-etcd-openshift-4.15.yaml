@@ -7,27 +7,12 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.9_base:
-    name: 4.9-priv
-    namespace: ocp-private
-    tag: base
-  ocp_builder_rhel-9-etcd-golang-1.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-etcd-golang-1.19
 binary_build_commands: GOFLAGS=-mod=readonly make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: go.etcd.io/etcd
 images:
 - dockerfile_path: Dockerfile.rhel
-  inputs:
-    ocp_4.9_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.9:base
-    ocp_builder_rhel-9-etcd-golang-1.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-etcd-golang-1.19
   to: etcd
 promotion:
   to:
@@ -79,13 +64,13 @@ tests:
   as: e2e-hypershift
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - always_run: false
   as: e2e-hypershift-conformance
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 zz_generated_metadata:
   branch: openshift-4.15

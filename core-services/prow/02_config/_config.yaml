@@ -78,6 +78,13 @@ deck:
       - apahim
       - cblecker
       - liangquanLi930
+  - repo: openshift-hyperfleet/hyperfleet-e2e
+    rerun_auth_configs:
+      github_team_slugs:
+      - org: openshift-hyperfleet
+        slug: hyperfleet
+      - org: openshift
+        slug: test-platform
   - repo: openshift/verification-tests
     rerun_auth_configs:
       github_team_slugs:
@@ -180,7 +187,6 @@ deck:
       openshift-hyperfleet/hyperfleet-sentinel: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-kni/eco-ci-cd-private: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-online/access-transparency-service: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
-      openshift-online/gcp-hcp: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-priv: https://gcsweb-private-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/cucushift: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/distributed-tracing-qe: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
@@ -296,6 +302,7 @@ moonraker:
 owners_dir_denylist:
   default:
   - vendor/.*
+pipeline: {}
 plank:
   default_decoration_config_entries:
   - config:
@@ -345,10 +352,10 @@ plank:
             memory: 250Mi
       timeout: 8h0m0s
       utility_images:
-        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20251223-f0341d7b5
-        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20251223-f0341d7b5
-        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20251223-f0341d7b5
-        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20251223-f0341d7b5
+        clonerefs: us-docker.pkg.dev/k8s-infra-prow/images/clonerefs:v20260304-f92e22b4d
+        entrypoint: us-docker.pkg.dev/k8s-infra-prow/images/entrypoint:v20260304-f92e22b4d
+        initupload: us-docker.pkg.dev/k8s-infra-prow/images/initupload:v20260304-f92e22b4d
+        sidecar: us-docker.pkg.dev/k8s-infra-prow/images/sidecar:v20260304-f92e22b4d
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -397,6 +404,9 @@ plank:
       timeout: 23h0m0s
     repo: openshift/open-telemetry-opentelemetry-operator
   - config:
+      timeout: 4h0m0s
+    repo: opendatahub-io/opendatahub-operator
+  - config:
       gcs_configuration:
         bucket: qe-private-deck
         mediaTypes:
@@ -419,13 +429,6 @@ plank:
           log: text/plain
       gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
     repo: openshift-online/access-transparency-service
-  - config:
-      gcs_configuration:
-        bucket: qe-private-deck
-        mediaTypes:
-          log: text/plain
-      gcs_credentials_secret: gce-sa-credentials-gcs-qe-private-deck
-    repo: openshift-online/gcp-hcp
   - config:
       gcs_configuration:
         bucket: qe-private-deck
@@ -501,7 +504,6 @@ plank:
     openshift-hyperfleet/hyperfleet-sentinel: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-kni/eco-ci-cd-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-online/access-transparency-service: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
-    openshift-online/gcp-hcp: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-priv/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
@@ -515,7 +517,7 @@ plank:
     ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{if
     eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
     if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.BuildID}}/
-  max_concurrency: 1750
+  max_concurrency: 2000
   max_goroutines: 20
   max_revivals: 3
   pod_pending_timeout: 30m0s
@@ -552,9 +554,6 @@ plank:
     openshift-online/access-transparency-service: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
-    openshift-online/gcp-hcp: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
-      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
-      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift-priv: '[Full PR test history](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
@@ -577,6 +576,18 @@ plank:
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 pod_namespace: ci
+presets:
+- env: null
+  labels:
+    presets.ci.openshift.io/registry-pull: "true"
+  volumeMounts:
+  - mountPath: /etc/pull-secret
+    name: pull-secret
+    readOnly: true
+  volumes:
+  - name: pull-secret
+    secret:
+      secretName: registry-pull-credentials
 prowjob_default_entries:
 - cluster: '*'
   config:
@@ -680,6 +691,8 @@ tide:
       opendatahub-io:
         repos:
           odh-dashboard:
+            required-if-present-contexts:
+            - Tests
             skip-unknown-contexts: true
       openshift:
         repos:
@@ -754,7 +767,6 @@ tide:
     openshift-hyperfleet/hyperfleet-broker: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-hyperfleet/hyperfleet-sentinel: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-kni/eco-ci-cd-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
-    openshift-online/gcp-hcp: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift-priv/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr

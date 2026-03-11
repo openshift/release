@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-4\.14$
-    cluster: build06
+    cluster: build09
     decorate: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
@@ -62,7 +62,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-4\.14$
-    cluster: build06
+    cluster: build09
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -124,7 +124,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-4\.14$
-    cluster: build06
+    cluster: build09
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -144,9 +144,17 @@ postsubmits:
         - --variant=mce
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

@@ -9,6 +9,7 @@ set -o nounset
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
+[ -z "${AGENT_ISO}" ] && { echo "\$AGENT_ISO is not filled. Failing."; exit 1; }
 [ ! -f "${SHARED_DIR}/proxy-conf.sh" ] && { echo "Proxy conf file is not found. Failing."; exit 1; }
 
 source "${SHARED_DIR}/proxy-conf.sh"
@@ -42,10 +43,10 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
    transfer_protocol_type=$(echo "$bmhost" | jq -r '.transfer_protocol_type // ""')
    if [ "${transfer_protocol_type}" == "cifs" ]; then
      IP_ADDRESS="$(dig +short "${AUX_HOST}")"
-     iso_path="${IP_ADDRESS}/isos/agent-ove.x86_64.iso"
+     iso_path="${IP_ADDRESS}/isos/${AGENT_ISO}"
    else
      # Assuming HTTP or HTTPS
-     iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/agent-ove.x86_64.iso"
+     iso_path="${transfer_protocol_type:-http}://${AUX_HOST}/${AGENT_ISO}"
    fi
    mount_virtual_media "${host}" "${iso_path}"
 

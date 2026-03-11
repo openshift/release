@@ -1,23 +1,16 @@
 base_images:
-  ocp_4.21_base-rhel9:
-    name: "4.22"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
 build_root:
   from_repository: true
 images:
-- inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
-  to: cluster-dns-operator
+- to: cluster-dns-operator
 promotion:
   to:
   - name: "4.22"
@@ -46,6 +39,11 @@ tests:
   commands: make test
   container:
     from: src
+- as: e2e-hypershift
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift-aws
+    workflow: hypershift-aws-e2e-external
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:

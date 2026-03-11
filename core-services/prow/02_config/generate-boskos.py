@@ -4,7 +4,6 @@ import yaml
 
 
 CONFIG = {
-
     'aws-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
         'us-east-1': 50,
@@ -115,6 +114,9 @@ CONFIG = {
         'us-east-1': 5,
         'ap-northeast-1': 5,
     },
+    'aws-eusc-quota-slice': {
+        'eusc-de-east-1': 5,
+    },
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
@@ -187,6 +189,11 @@ CONFIG = {
         'eastus': 8,
         'westus2': 8
     },
+    'azure-cnv-devops-quota-slice': {
+        'northcentralus': 10,
+        'southcentralus': 10,
+        'centralus': 10
+    },
     'azure-perfscale-quota-slice': {
         'northcentralus': 10,
         'southcentralus': 10,
@@ -247,16 +254,16 @@ CONFIG = {
         'default': 1,
     },
     'aro-hcp-stg-quota-slice': {
-        'default': 3,
+        'default': 5,
     },
     'aro-hcp-prod-quota-slice': {
-        'default': 3,
+        'default': 10
     },
     'aro-hcp-dev-quota-slice': {
-        'default': 10,
+        'default': 15,
     },
-    'aro-hcp-test-tenant-quota-slice': {
-        'default': 10,
+    'aro-hcp-dev-global-pipeline-quota-slice': {
+        'default': 1,
     },
     'aro-hcp-test-msi-containers-dev': {},
     'aro-hcp-test-msi-containers-int': {},
@@ -327,9 +334,7 @@ CONFIG = {
     'libvirt-s390x-amd64-quota-slice': {
         'libvirt-s390x-amd64-0-0': 1
     },
-    'libvirt-s390x-vpn-quota-slice': {
-        'libvirt-s390x-0-1': 1
-    },
+    'libvirt-s390x-vpn-quota-slice': {},
     'libvirt-ppc64le-s2s-quota-slice':{},
     'metal-quota-slice': {
         # Wild guesses.  We'll see when we hit quota issues
@@ -367,12 +372,8 @@ CONFIG = {
     'openstack-vh-mecha-central-quota-slice': {
         'default': 3,
     },
-    'openstack-vh-mecha-az0-quota-slice': {
-        'default': 3,
-    },
     'openstack-vh-bm-rhos-quota-slice': {
         'openstack-vh-mecha-central': 3,
-        'openstack-vh-mecha-az0': 3,
         'openstack-hwoffload': 3,
     },
     'openstack-ppc64le-quota-slice': {},
@@ -405,8 +406,17 @@ CONFIG = {
         'eu-west-1': 8,
         'eu-west-2': 8
     },
-    'hypershift-quota-slice': {
-        'default': 50,
+    'hypershift-aws-quota-slice': {
+        'default': 30,
+    },
+    'hypershift-aks-quota-slice': {
+        'default': 20,
+    },
+    'hypershift-azure-quota-slice': {
+        'default': 20,
+    },
+    'hypershift-gcp-quota-slice': {
+        'default': 10,
     },
     'powervc-1-quota-slice': {
         'default': 4,
@@ -463,7 +473,7 @@ CONFIG = {
         'us-east-1': 10,
     },
     'hypershift-hive-quota-slice': {
-        'default': 10,
+        'default': 20,
     },
     'aws-virtualization-quota-slice': {
         'us-east-1': 5,
@@ -619,14 +629,29 @@ CONFIG = {
     'metal-redhat-gs-quota-slice': {
         'default': 1,
     },
+    'amd-gpu-quota-slice': {
+        '10.1.178.14': 1,
+    },
+    'aws-osp-qe-quota-slice': {
+        'us-east-1': 10,
+    },
 }
 
 for i in range(2,7):
     for j in range(2):
         CONFIG['libvirt-s390x-{}-quota-slice'.format(j+1)]['libvirt-s390x-{}-{}'.format(i, j)] = 1
+
+for i in range(3):
+    for j in range(4):
+        CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
+del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-0']
+del CONFIG['libvirt-s390x-vpn-quota-slice']['libvirt-s390x-2-1']
+
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-{}-{}'.format(i, j)] = 1
+# Reserve one for internal debugging use
+del CONFIG['libvirt-ppc64le-s2s-quota-slice']['libvirt-ppc64le-s2s-0-3']
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 
@@ -681,16 +706,36 @@ for i in range(4):
 for i in range(4):
     CONFIG['powervs-7-quota-slice']['lon06-powervs-7-quota-slice-{}'.format(i)] = 1
 
-for i in range(2):
+for i in range(4):
     CONFIG['powervs-8-quota-slice']['fran-powervs-8-quota-slice-{}'.format(i)] = 1
 
-for i in range(120):
+for i in range(300):
     CONFIG['aro-hcp-test-msi-containers-dev']['aro-hcp-test-msi-containers-dev-{}'.format(i)] = 1
+for i in range(150):
     CONFIG['aro-hcp-test-msi-containers-int']['aro-hcp-test-msi-containers-int-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-stg']['aro-hcp-test-msi-containers-stg-{}'.format(i)] = 1
     CONFIG['aro-hcp-test-msi-containers-prod']['aro-hcp-test-msi-containers-prod-{}'.format(i)] = 1
 
-
+CLUSTER_PROFILE_SETS_CONFIG = {
+    'openshift-org-aws': {
+        'aws': {
+            'install': 16,
+            'quota': CONFIG['aws-quota-slice'],
+        },
+        'aws-2': {
+            'install': 16,
+            'quota': CONFIG['aws-2-quota-slice'],
+        },
+    },
+    'openshift-org-azure': {
+        'azure-2': {
+            'quota': CONFIG['azure-2-quota-slice'],
+        },
+        'azure4': {
+            'quota': CONFIG['azure4-quota-slice'],
+        },
+    }
+}
 
 config = {
     'resources': [],
@@ -715,6 +760,50 @@ for typeName, data in sorted(CONFIG.items()):
                 resource['names'].append(name)
     config['resources'].append(resource)
 
+def cluster_profile_set_resources(clusterProfileSets):
+    def profile_set_resource(profileSet, profileSetData):
+        cps_resource = {
+            'type': f'{profileSet}-quota-slice',
+            'state': 'free',
+            'names': [],
+        }
+
+        max_count = sum(map(lambda profileData: sum(profileData['regions'].values()) if 'regions' in profileData else 0, profileSetData.values()))
+        width = len(str(max_count-1))
+        counter = 0
+        for profile, profileData in sorted(profileSetData.items()):
+            if not 'quota' in profileData:
+                continue
+            for region, regionCount in sorted(profileData['quota'].items()):
+                cps_resource['names'].extend([f'{profile}--{region}--quota-slice-{counter+i:0>{width}}' for i in range(regionCount)])
+                counter += regionCount
+
+        yield cps_resource
+
+    def install_resource(profileSet, profile, profileData):
+        if not 'install' in profileData:
+            return
+
+        install_resource = {
+            'type': f'{profileSet}--{profile}--install-quota-slice',
+            'state': 'free'
+        }
+        installCount = profileData['install']
+        width = len(str(installCount-1))
+        install_resource['names'] = [f'{profileSet}--{profile}--install-quota-slice-{i:0>{width}}' for i in range(installCount)]
+        yield install_resource
+
+    resources = []
+    for profileSet, profileSetData in sorted(clusterProfileSets.items()):
+        resources.extend(profile_set_resource(profileSet, profileSetData))
+        for profile, profileData in sorted(profileSetData.items()):
+            resources.extend(install_resource(profileSet, profile, profileData))
+
+    return resources
+
+config['resources'].extend(cluster_profile_set_resources(CLUSTER_PROFILE_SETS_CONFIG))
+
 with open('_boskos.yaml', 'w') as f:
     f.write('# generated with generate-boskos.py; do not edit directly\n')
     yaml.dump(config, f, default_flow_style=False)
+

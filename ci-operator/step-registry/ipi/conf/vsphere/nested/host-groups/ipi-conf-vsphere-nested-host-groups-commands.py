@@ -13,18 +13,19 @@ except ImportError:
     log("linter not available, run outside of CI")
 
 shared_dir = os.environ.get("SHARED_DIR")
-namespace = os.environ["NAMESPACE"]
+namespace = os.environ.get("NAMESPACE")
+unique_hash = os.environ.get("UNIQUE_HASH")
 
-cluster_name=f"{namespace}"
+cluster_name=f"{namespace}-{unique_hash}"
 
 platform_spec = f"""platform:
   vsphere:
     vcenters:
-      - server: {cluster_name}-1
+      - server: {cluster_name}-vc
         datacenters:
         - cidatacenter-nested-0
     failureDomains:
-      - server: {cluster_name}-1
+      - server: {cluster_name}-vc
         name: "zone-1"
         zone: "zone-1"
         region: "region-1"
@@ -38,7 +39,7 @@ platform_spec = f"""platform:
           networks:
             - "VM Network"
           hostGroup: zone-1
-      - server: {cluster_name}-1
+      - server: {cluster_name}-vc
         name: "zone-2"
         zone: "zone-2"
         region: "region-1"

@@ -1,38 +1,8 @@
-binary_build_commands: GO_COMPLIANCE_INFO=0 make build
-build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
-images:
-- dockerfile_literal: |
-    FROM src
-    RUN cat /etc/dnf/dnf.conf || true
-    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc
-    RUN dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm
-    RUN ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/
-    RUN dnf install -y azure-cli libicu
-    COPY /src /opt/app-root/src/github.com/Azure
-    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-    USER root
-    RUN az bicep install
-    RUN mkdir -p /usr/local/bin
-    RUN az aks install-cli --install-location /usr/local/bin/kubectl --kubelogin-install-location /usr/local/bin/kubelogin
-    RUN export GOPATH=/opt/app-root && \
-        mkdir -p $GOPATH/bin && \
-        export GOFLAGS='-mod=readonly' && \
-        make install-tools && \
-        make -C tooling/templatize templatize && \
-        make -C test/ aro-hcp-tests
-    # Ensure all tools are in PATH
-    ENV PATH="/usr/local/bin:/opt/app-root/bin:$PATH"
-  from: src
-  inputs:
-    src:
-      paths:
-      - destination_dir: src
-        source_path: /go/src/github.com/Azure/ARO-HCP
-  to: aro-hcp-e2e-tools
+base_images:
+  aro-hcp-e2e-tools:
+    name: aro-hcp-e2e-tools
+    namespace: aro-hcp
+    tag: latest
 releases:
   latest:
     release:
@@ -48,13 +18,18 @@ resources:
       cpu: 1000m
       memory: 4Gi
 tests:
+- as: delete-expired-kusto-role-assignments
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aro-hcp-dev
+    test:
+    - ref: aro-hcp-deprovision-kusto-role-assignments
 - as: delete-expired-development-resource-groups
   cron: 7,37 * * * *
   steps:
     cluster_profile: aro-hcp-dev
     env:
       CLEANUP_MODE: no-rp
-      INCLUDE_LOCATION: westus3
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: delete-expired-integration-resource-groups
@@ -73,8 +48,6 @@ tests:
   cron: 7,37 * * * *
   steps:
     cluster_profile: aro-hcp-prod
-    env:
-      EXCLUDE_LOCATION: westus3
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
 - as: integration-e2e-parallel
@@ -82,24 +55,42 @@ tests:
   steps:
     cluster_profile: aro-hcp-int
     env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: int
       ARO_HCP_SUITE_NAME: integration/parallel
       LOCATION: uksouth
+    leases:
+    - count: 20
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-int
     workflow: aro-hcp-e2e
 - as: stage-e2e-parallel
   cron: 0 2 * * *
   steps:
     cluster_profile: aro-hcp-stg
     env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: stg
       ARO_HCP_SUITE_NAME: stage/parallel
       LOCATION: uksouth
+    leases:
+    - count: 30
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-stg
     workflow: aro-hcp-e2e
 - as: prod-e2e-parallel
   cron: 0 2 * * *
   steps:
     cluster_profile: aro-hcp-prod
     env:
+      ARO_HCP_CLOUD: public
+      ARO_HCP_DEPLOY_ENV: prod
       ARO_HCP_SUITE_NAME: prod/parallel
       LOCATION: uksouth
+    leases:
+    - count: 15
+      env: LEASED_MSI_CONTAINERS
+      resource_type: aro-hcp-test-msi-containers-prod
     workflow: aro-hcp-e2e
 zz_generated_metadata:
   branch: main

@@ -1,0 +1,159 @@
+base_images:
+  ansible:
+    name: "4.22"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.22"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  hypershift-tests:
+    name: hypershift-tests
+    namespace: hypershift
+    tag: latest
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.22"
+  tools:
+    name: "4.22"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.22"
+    namespace: ocp
+    tag: upi-installer
+  vsphere-ci-python:
+    name: vsphere-python
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.22.0-0
+        stream: 4-dev-preview
+        upper: 4.23.0-0
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: aws-ipi-byo-route53-f28
+  cron: 14 0 4 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - ref: cucushift-upgrade-setedge-rollback
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
+- as: aws-ipi-ovn-hypershift-inplace-f28
+  cron: 3 9 29 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --node-upgrade-type=inplace
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift-rollback
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: azure-aks-hypershift-byo-vnet-replace-guest-f28
+  cron: 24 18 29 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift-rollback
+    workflow: cucushift-installer-rehearse-azure-aks-hypershift-byo-vnet-guest
+- as: azure-upi-f28
+  cron: 32 20 2 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    test:
+    - ref: cucushift-upgrade-setedge-rollback
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-azure-upi
+- as: baremetal-ipi-ovn-ipv4-f28
+  capabilities:
+  - intranet
+  cron: 52 17 5 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-metal-ci.arm.eng.rdu2.redhat.com
+      DISCONNECTED: "false"
+      RESERVE_BOOTSTRAP: "false"
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+    - ref: cucushift-upgrade-setedge-rollback
+    - ref: cucushift-chainupgrade-toimage
+    workflow: baremetal-lab-ipi
+- as: gcp-ipi-ovn-ipsec-f28
+  cron: 13 11 16 * *
+  steps:
+    cluster_profile: gcp-qe
+    test:
+    - ref: cucushift-upgrade-setedge-rollback
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+- as: ibmcloud-ipi-f28
+  cron: 36 22 24 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    test:
+    - ref: cucushift-upgrade-setedge-rollback
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+- as: nutanix-ipi-boot-categories-project-f28
+  cluster: build01
+  cron: 44 7 24 * *
+  steps:
+    cluster_profile: nutanix-qe
+    test:
+    - ref: cucushift-upgrade-setedge-rollback
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-nutanix-ipi-boot-categories-project
+- as: vsphere-upi-f28
+  cron: 1 3 29 * *
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - ref: cucushift-upgrade-setedge-rollback
+    - ref: cucushift-chainupgrade-toimage
+    workflow: cucushift-installer-rehearse-vsphere-upi
+zz_generated_metadata:
+  branch: release-4.22
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-rollback-nightly

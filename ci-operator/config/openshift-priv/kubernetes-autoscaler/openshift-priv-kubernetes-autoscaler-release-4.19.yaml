@@ -7,18 +7,6 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.19_base-rhel9:
-    name: 4.19-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.23-openshift-4.19
-  openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.23-openshift-4.19
   tests-private:
     name: tests-private
     namespace: ci
@@ -29,23 +17,9 @@ build_root:
 canonical_go_repository: k8s.io/autoscaler
 images:
 - dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    ocp_builder_rhel-9-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19
   to: cluster-autoscaler
 - context_dir: vertical-pod-autoscaler
   dockerfile_path: Dockerfile.openshift
-  inputs:
-    ocp_4.19_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.19:base-rhel9
-    openshift_release_rhel-9-release-golang-1.23-openshift-4.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.23-openshift-4.19
   to: vertical-pod-autoscaler
 promotion:
   to:
@@ -155,7 +129,7 @@ tests:
 - as: e2e-hypershift
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - always_run: false
   as: e2e-aws-periodic-pre

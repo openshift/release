@@ -1,0 +1,81 @@
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.6"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.6"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-ovn
+  cron: 25 3 13 */12 *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-gcp-upgrade
+  cron: 34 15 16 */12 *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
+- as: e2e-azure-upgrade
+  cron: 45 11 27 */12 *
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
+- as: e2e-aws
+  cron: 21 1 7 */12 *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-gcp
+  cron: 27 6 27 */12 *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-ovn
+  cron: 24 5 11 */12 *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-aws-upgrade-rollback
+  cron: 13 2 25 */12 *
+  steps:
+    cluster_profile: aws-2
+    env:
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    workflow: openshift-upgrade-aws
+- as: e2e-aws-sdn-multitenant
+  cron: 16 19 26 */12 *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-sdn-multi
+- as: e2e-aws-serial
+  cron: 48 22 19 */12 *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: e2e-azure
+  cron: 14 3 18 */12 *
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-ovn
+  cron: 25 23 26 */12 *
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-ovn
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: ci-4.6

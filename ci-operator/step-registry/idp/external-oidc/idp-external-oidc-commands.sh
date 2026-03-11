@@ -76,7 +76,7 @@ function configure_external_oidc () {
 
     OIDC_PROVIDERS_UPPER_FIELD=$(echo '{}' | jq "$OIDC_PROVIDERS_UPPER_FIELD = $(< $SHARED_DIR/oidcProviders.json)")
     [ "$IS_HYPERSHIFT_ENV" == "no" ] && OIDC_PROVIDERS_UPPER_FIELD=$(jq '.spec.webhookTokenAuthenticator = null' <<< "$OIDC_PROVIDERS_UPPER_FIELD")
-    oc create -f "$SHARED_DIR"/oidcProviders-secret-configmap.yaml -n "$MIDDLE_NAMESPACE"
+    oc apply -f "$SHARED_DIR"/oidcProviders-secret-configmap.yaml -n "$MIDDLE_NAMESPACE"
 
     # This step can be applied in both OCP CI jobs and HyperShift hosted cluster CI jobs.
     # Note: for HyperShift hosted cluster CI jobs, oidcProviders must be configured in day-1. The corresponding workflow is

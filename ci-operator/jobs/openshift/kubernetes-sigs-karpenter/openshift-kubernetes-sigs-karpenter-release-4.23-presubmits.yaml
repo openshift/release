@@ -5,12 +5,12 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
+    cluster: build09
     context: ci/prow/e2e-hypershift
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: hypershift
-      ci-operator.openshift.io/cloud-cluster-profile: hypershift
+      ci-operator.openshift.io/cloud: hypershift-aws
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kubernetes-sigs-karpenter-release-4.23-e2e-hypershift
@@ -27,9 +27,17 @@ presubmits:
         - --target=e2e-hypershift
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -78,7 +86,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
+    cluster: build09
     context: ci/prow/images
     decorate: true
     labels:
@@ -132,7 +140,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
+    cluster: build09
     context: ci/prow/unit
     decorate: true
     labels:
@@ -149,9 +157,17 @@ presubmits:
         - --target=unit
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -185,7 +201,7 @@ presubmits:
     branches:
     - ^release-4\.23$
     - ^release-4\.23-
-    cluster: build07
+    cluster: build09
     context: ci/prow/verify
     decorate: true
     labels:
@@ -202,9 +218,17 @@ presubmits:
         - --target=verify
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

@@ -223,16 +223,6 @@ aws --region "$REGION" ec2 describe-availability-zones --filters Name=opt-in-sta
 export REGION
 yq-v4 eval -i '.platform.aws.region = env(REGION)' "${CONFIG}"
 
-# Patch ARCH
-if [ "${ARCH}" == "" ]; then
-  yq-v4 eval -i '.controlPlane.architecture = "amd64"' "${CONFIG}"
-  yq-v4 eval -i '.controlPlane.architecture = "amd64"' "${CONFIG}"
-else
-  export ARCH
-  yq-v4 eval -i '.controlPlane.architecture = env(ARCH)' "${CONFIG}"
-  yq-v4 eval -i '.controlPlane.architecture = env(ARCH)' "${CONFIG}"
-fi
-
 # Patch instance type
 if [[ ${CONTROL_PLANE_INSTANCE_TYPE} != "" ]]; then
   export CONTROL_PLANE_INSTANCE_TYPE

@@ -123,6 +123,11 @@ then
   MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
   MUST_GATHER_IMAGE=${MUST_GATHER_IMAGE:-""}
   oc get nodes -l kubernetes.io/arch=ppc64le -o yaml > "${ARTIFACT_DIR}"/nodes_with_ppc64le.txt || true
+
+  # Download the MCO sanitizer binary from mirror
+  curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+  chmod +x /tmp/mco-sanitize
+
   mkdir -p ${ARTIFACT_DIR}/must-gather-ppc64le
   oc adm must-gather \
       --node-selector=kubernetes.io/arch=ppc64le \
@@ -130,7 +135,14 @@ then
       --timeout=$MUST_GATHER_TIMEOUT \
       --dest-dir ${ARTIFACT_DIR}/must-gather-ppc64le > ${ARTIFACT_DIR}/must-gather-ppc64le/must-gather-ppc64le.log \
       || true
-  find "${ARTIFACT_DIR}/must-gather-ppc64le" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
+  
+  
+  # Sanitize MCO resources to remove sensitive information.
+  # If the sanitizer fails, fall back to manual redaction.
+  if ! /tmp/mco-sanitize --input="${ARTIFACT_DIR}/must-gather-ppc64le"; then
+    find "${ARTIFACT_DIR}/must-gather-ppc64le" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
+  fi   
+  
   tar -czC "${ARTIFACT_DIR}/must-gather-ppc64le" -f "${ARTIFACT_DIR}/must-gather-ppc64le.tar.gz" .
   rm -rf "${ARTIFACT_DIR}"/must-gather-ppc64le
 

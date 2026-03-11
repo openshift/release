@@ -890,6 +890,20 @@ stringData:
 type: Opaque
 EOF
 
+# Sets up the chrony machineconfig for the worker nodes
+CHRONY_WORKER_YAML="${SHARED_DIR}/99-chrony-worker.yaml"
+if [ -f "${CHRONY_WORKER_YAML}" ]; then
+  echo "Saving ${CHRONY_WORKER_YAML} to the install directory..."
+  cp ${CHRONY_WORKER_YAML} "${dir}/manifests"
+fi
+
+# Sets up the chrony machineconfig for the master nodes
+CHRONY_MASTER_YAML="${SHARED_DIR}/99-chrony-master.yaml"
+if [ -f "${CHRONY_MASTER_YAML}" ]; then
+  echo "Saving ${CHRONY_MASTER_YAML} to the install directory..."
+  cp ${CHRONY_MASTER_YAML} "${dir}/manifests"
+fi
+
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
 echo "Will include manifests:"

@@ -110,6 +110,8 @@ spec:
       value: "${PULL_PULL_SHA:-}"
     - name: PULL_HEAD_REF
       value: "${PULL_HEAD_REF:-}"
+    - name: HUB
+      value: "${HUB:-}"
     volumeMounts:
     - mountPath: /lib/modules
       name: modules

@@ -1,17 +1,17 @@
 # Sandboxed Containers Operator - Prowjob Configuration Generator
 
-This directory contains a robust script to generate OpenShift CI prowjob configuration files for the Sandboxed Containers Operator with comprehensive validation and error handling.
+This directory has a script to generate OpenShift CI prowjob configuration files for the Sandboxed Containers Operator with validation and error handling.
 
 ## Overview
 
-The `sandboxed-containers-operator-create-prowjob-commands.sh` script creates prowjob configuration files for the sandboxed containers operator CI pipeline. It supports both Pre-GA (development) and GA (production) release types with intelligent catalog source management and comprehensive parameter validation.
+The `sandboxed-containers-operator-create-prowjob-commands.sh` script creates prowjob configuration files for the sandboxed containers operator CI pipeline. It supports both Pre-GA (development) and GA (production) release types with parameter validation.
 
 ## Commands
 
 The script supports the following commands:
 
 - `create` - Create prowjob configuration files
-- `run` - Run prowjobs from YAML configuration
+- `run` - Run one prowjob from YAML (requires job YAML file and exactly one job name)
 
 ### Command Usage
 
@@ -29,12 +29,12 @@ The script supports the following commands:
 
 ## Key Features
 
-- Automatically queries Quay API for latest catalog tags
-  - If the tag is in X.Y.Z-epoch_time, it is used as the expected version of OSC and Trustee
 - Different behavior for Pre-GA vs GA releases
+- Uses `:latest` tag by default for catalog images
+  - The actual latest tag (X.Y.Z-epoch_time format) is resolved at runtime by the `env-cm` step
+  - This ensures jobs always use the most recent catalog image when they run
 - Generated files are not merged
   - /PJ-REHEARSE in the PR to run prowjobs
-
 
 ## Usage
 
@@ -61,29 +61,41 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 
 | Variable                   | Default Value            | Description                                                                 | Validation               |
 | -------------------------- | ------------------------ | --------------------------------------------------------------------------- | ------------------------ |
-| `OCP_VERSION`              | `4.19`                   | OpenShift Container Platform version                                        | Format: X.Y (e.g., 4.19) |
+| `OCP_VERSION`              | Files for 4 OCP versions are pregenerated | OpenShift Container Platform version. Supports `X.Y` (latest), `X.Y.Z` (specific), or `X.Y.Z-rc.N`/`X.Y.Z-ec.N` (candidate). | If a specific version doesn't exist, error out.
+| `OCP_CHANNEL`              | `fast`                   | OCP release channel. Default is `fast` because it contains all versions that could become `stable`.  Further explanation below | `stable`, `fast`, `candidate`, or `eus` |
 | `AWS_REGION_OVERRIDE`      | `us-east-2`              | AWS region for testing                                                      | Any valid AWS region     |
 | `CUSTOM_AZURE_REGION`      | `eastus`                 | Azure region for testing                                                    | Any valid Azure region   |
-| `OSC_CATALOG_TAG`          | derived latest           | Can be overridden.  Also sets EXPECTED_OSC_VERSION                          | repo tag                 |
-| `TRUSTEE_CATALOG_TAG`      | derived latest           | Can be overridden.  Also sets EXPECTED_TRUSTEE_VERSION                      | repo tag                 |
-| `EXPECTED_OSC_VERSION`     | `1.10.1`                 | Derived from X.Y.X-epoch_time catalog tag or OSC_CATALOG_TAG                | Semantic version format  |
+| `OSC_CATALOG_TAG`          | `latest`                 | Defaults to `:latest`. Actual tag resolved at runtime by `env-cm` step. Can override with specific version tag (e.g., `1.11.1-1766149846`) or SHA | repo tag or SHA          |
 | `INSTALL_KATA_RPM`         | `true`                   | Whether to install Kata RPM                                                 | `true` or `false`        |
 | `KATA_RPM_VERSION`         | `3.17.0-3.rhaos4.19.el9` | Kata RPM version (when `INSTALL_KATA_RPM=true`)                             | RPM version format       |
 | `PROW_RUN_TYPE`            | `candidate`              | Prow job run type                                                           | `candidate` or `release` |
-| `SLEEP_DURATION`           | `0h`                     | Time to keep cluster alive after tests                                      | 0-12 followed by 'h'     |
+| `SLEEP_DURATION`           | `0h`                     | Time to keep cluster alive after tests.  For manual testing.                | 0-12 followed by 'h'     |
 | `TEST_RELEASE_TYPE`        | `Pre-GA`                 | Release type for testing                                                    | `Pre-GA` or `GA`         |
 | `TEST_TIMEOUT`             | `90`                     | Test timeout in minutes                                                     | Numeric value            |
 
 ### Pre-GA vs GA Configuration
 
 #### Pre-GA (Development) Mode
-- Automatically queries Quay API for latest OSC catalog tags of development branch
-  - OSC searches for X.Y.Z-epoch_time tag
-- Creates `brew-catalog` source with latest catalog tag
-  - if catalog tag is X.Y.Z-, the expected version of the operator is set
+- Uses `:latest` tag for catalog images by default
+  - The `env-cm` step resolves the actual latest tag (X.Y.Z-epoch_time format) at runtime
+  - This ensures jobs always test against the most recent build
+- Creates `brew-catalog` source with the resolved catalog tag
 
 #### GA (Production) Mode
 - Uses `redhat-operators` catalog source with GA images
+
+### OCP Release Channels
+
+The `OCP_CHANNEL` variable determines which OpenShift release channel to use.  Use `candidate` for rc/ec versions
+
+#### Channel Comparison
+
+| Channel | Pre-Release | Use Case |
+|---------|-------------|----------|
+| `candidate` | Yes (RC/EC) | Pre-release testing |
+| `fast`      | No | **Default** - has all versions except `candidate` |
+| `stable`    | No | version tested for upgrades |
+| `eus`       | No | Long-term support |
 
 ### Advanced Configuration Examples
 
@@ -129,33 +141,51 @@ ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed
 
 ## Catalog Tag Discovery
 
-### OSC Catalog Tags
-- **Pattern**: `X.Y[.Z]-epoch_time` (e.g., `1.10.1-1755502791`, `1.10-1234567890`)
-- **Source**: `quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc`
-- **Method**: Quay API with pagination (max 20 pages)
-- **Fallback**: `1.10.1-1755502791`
+### Runtime Tag Resolution
+
+The `create-prowjob` script uses `:latest` as the default tag. The actual latest tag is resolved at **runtime** by the `env-cm` step when the job executes.
+
+### How It Works
+1. **At config generation time**: `CATALOG_SOURCE_IMAGE` is set to `quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest`
+2. **At job runtime**: The `env-cm` step checks the tag:
+   - If the tag is `:latest`, it queries the Quay API to find the most recent `X.Y.Z-unix_epoch` tag
+   - If the tag is anything else (specific version or SHA), it is passed through unchanged
+3. **Supported tag formats**:
+   - `latest` - resolved to newest `X.Y.Z-unix_epoch` tag at runtime
+   - `X.Y.Z-unix_epoch` (e.g., `1.11.1-1766149846`) - passed through unchanged
+   - SHA (e.g., `sha256:abc123...` or short SHA) - passed through unchanged
+4. **Source**: `quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc`
+
 
 ## Run Command
 
-The `run` command allows you to trigger ProwJobs from a generated YAML configuration file. This command requires a valid Prow API token.
+The `run` command triggers a single ProwJob from a generated YAML configuration file. You must specify exactly one job name (the `as` value from the tests in the YAML, e.g. `azure-ipi-kata`, `aws-ipi-peerpods`). This command requires a valid Prow API token.
 
 ### Run Command Usage
 
 ```bash
-# Run all jobs from a YAML file
-./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml
-
-# Run specific jobs from a YAML file
-./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml azure-ipi-kata aws-ipi-peerpods
+# Run one job from a YAML file (exactly one job name required)
+./sandboxed-containers-operator-create-prowjob-commands.sh run /path/to/job_yaml.yaml azure-ipi-kata
 ```
+
+### Create Yaml for Run
+Use the **create** command to create a yaml file in the current directory.  Modify it for your case.  Follow Option A in the output directions
+
+### Viewing the Run in Spyglass
+Go to [Prow configured jobs](https://prow.ci.openshift.org/configured-jobs/)
+Scroll down to *sandboxed-containers-operator* and click on it
+Search for the prow job you specified (ex aws-ipi-peerpods) and click on _Details_
+Click on _History_
+You will be taken to a list of the **Build** numbers, etc.  Your job should be at the top.  Clicking on that will show you the Spyglass of your job with the build log, artifacts, etc.
+This URL is used by **dig&shift** for reporting and analysis.  It will look something like [this](https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/openshift_release/75051/rehearse-75051-periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate421-azure-ipi-kata/2024178159888371712)
 
 ### Run Command Features
 
-- **Job Name Generation**: Automatically constructs job names using the pattern `periodic-ci-{org}-{repo}-{branch}-{variant}-{job_suffix}`
-- **Metadata Extraction**: Extracts organization, repository, branch, and variant from the YAML file's `zz_generated_metadata` section
-- **API Integration**: Uses the Prow/Gangway API to trigger jobs
-- **Job Status Monitoring**: Provides job IDs and status information
-- **Flexible Job Selection**: Can run all jobs or specific jobs by name
+- **Exactly one job**: You must provide the job YAML file and exactly one job name; neither more nor fewer are allowed.
+- **Job Name Generation**: Constructs the full job name as `periodic-ci-{org}-{repo}-{branch}-{variant}-{job_name}`.
+- **Metadata Extraction**: Extracts organization, repository, branch, and variant from the YAML file's `zz_generated_metadata` section.
+- **API Integration**: Uses the Prow/Gangway API to trigger the job.
+- **Job Status Monitoring**: Provides job ID and status information.
 
 ### Run Command Environment Variables
 
@@ -222,13 +252,20 @@ The script includes comprehensive validation:
 ## Troubleshooting
 
 ### Catalog Tag Discovery Issues
+
+Tag resolution happens at runtime in the `env-cm` step. To troubleshoot:
+
 ```bash
 # Test connectivity to Quay API
 curl -sf "https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc/tag/?limit=10&page=1"
 
-# Check for matching tags manually
+# Check for matching tags manually (X.Y.Z-unix_epoch format)
 curl -s "https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc/tag/" | \
-  jq '.tags[] | select(.name | test("^[0-9]+\\.[0-9]+(\\.[0-9]+)?-[0-9]+$")) | .name'
+  jq -r '.tags[] | select(.name | test("^[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]+$")) | "\(.start_ts) \(.name)"' | \
+  sort -nr | head -5
+
+# Override with a specific tag if needed
+OSC_CATALOG_TAG=1.11.1-1766149846 ./sandboxed-containers-operator-create-prowjob-commands.sh create
 ```
 
 ### YAML Validation

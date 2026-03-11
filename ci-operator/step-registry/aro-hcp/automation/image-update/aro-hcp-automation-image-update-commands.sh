@@ -6,7 +6,7 @@ set -o pipefail
 # ============================================================================
 # SECURITY WARNING: This script handles sensitive credentials
 # ============================================================================
-# - GitHub tokens (GITHUB_TOKEN)
+# - GitHub App credentials (App ID + private key)
 # - Azure credentials (AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID)
 # - Slack webhook URLs
 #
@@ -27,7 +27,8 @@ trap 'set +o xtrace' DEBUG
 VERBOSITY=${VERBOSITY:-1}
 
 # Internal variables (not configurable via ref.yaml)
-readonly IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.txt"
+readonly IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.md"
+readonly IMAGE_UPDATER_OUTPUT_FORMAT="markdown"
 
 # Logging functions with timestamps and severity levels
 log() { echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] ${*}"; }
@@ -92,18 +93,17 @@ for cmd in "${required_tools[@]}"; do
 done
 debug "precheck: all required tools are present"
 
-# Configuration: Load GitHub token from file
-debug "cfg: loading GitHub token"
-if [[ ! -f "${GITHUB_TOKEN_PATH}" ]]; then
-  error "github: token file not found at ${GITHUB_TOKEN_PATH}"
+# Configuration: Validate GitHub App credentials
+debug "cfg: validating GitHub App credentials"
+if [[ ! -f "${GITHUB_APP_ID_PATH}" ]]; then
+  error "github: App ID file not found at ${GITHUB_APP_ID_PATH}"
 fi
+if [[ ! -f "${GITHUB_APP_KEY_PATH}" ]]; then
+  error "github: App private key file not found at ${GITHUB_APP_KEY_PATH}"
+fi
+debug "cfg: GitHub App credentials validated successfully"
 
-# Security: Load token without printing it
-GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
-readonly GITHUB_TOKEN
-debug "cfg: GitHub token loaded successfully (content redacted)"
-
-# Git: Configure git user and email for commits
+# Git: Configure git user and email for local commits
 debug "git: configure git user and email"
 git config user.name "${GITHUB_PR_USER}"
 git config user.email "${GITHUB_PR_EMAIL}"
@@ -130,31 +130,22 @@ export AZURE_CLIENT_SECRET
 AZURE_TENANT_ID="$(cat "${AZURE_CREDENTIALS_DIR}/tenant")"
 readonly AZURE_TENANT_ID
 export AZURE_TENANT_ID
+export AZURE_TOKEN_CREDENTIALS=prod
 
 debug "azure: authentication configured successfully (credentials redacted)"
 
 # Image Updater: Build and run the image-updater tool
-debug "image: change to tooling/image-updater directory"
-cd tooling/image-updater
-
-debug "image: build image-updater binary"
-run make build
-
 info "image: fetching the latest image digests for all components"
-if [[ ${VERBOSITY-0} -ge 2 ]]; then
-  ./image-updater update --verbosity 1 --config config.yaml | tee "${IMAGE_UPDATER_OUTPUT}"
-else
-  ./image-updater update --config config.yaml > "${IMAGE_UPDATER_OUTPUT}"
-fi
-
-debug "image: return to root directory"
-cd ../..
+make image-updater OUTPUT_FILE="${IMAGE_UPDATER_OUTPUT}" OUTPUT_FORMAT="${IMAGE_UPDATER_OUTPUT_FORMAT}"
 
 # Check if there are any changes from image updates
 if [[ $(git status --porcelain) == "" ]]; then
   info "image: no new digests found for any component images"
   notify "⚠️ Image digest updater job completed but no new digests found for any component images. Please check prow at ${PROW_JOB_URL}"
   exit 0
+else 
+  info "image: new digests found for some component images"
+  if [[ ${VERBOSITY-0} -ge 1 ]]; then cat ${IMAGE_UPDATER_OUTPUT}; echo; fi
 fi
 
 # Git: Commit updated image digests
@@ -165,16 +156,17 @@ git commit --all --quiet --message "chore: execute image-updater for all compone
 info "acm: rendering ACM helm-charts"
 run make -C acm helm-charts
 
+# Render helm chart
+debug "acm: running yaml formatting and updating helm fixtures"
+run make yamlfmt
+run make update-helm-fixtures
+
 # Check if helm chart rendering produced changes
 if [[ $(git status --porcelain) != "" ]]; then
-  debug "acm: running yaml formatting and updating helm fixtures"
-  run make yamlfmt
-  run make update-helm-fixtures
-
   info "git: committing rendered helm charts"
   git commit --all --quiet --message "chore: render ACM helm-charts"
 else
-  info "acm: no changes to helm charts"
+  info "acm: no changes after helm chart rendering and formatting"
 fi
 
 # Configuration: Materialize final configuration
@@ -194,7 +186,9 @@ info "git: creating the pull request"
 # Temporarily disable errexit to capture exit code
 set +o errexit
 run /usr/bin/prcreator \
-  -github-token-path="${GITHUB_TOKEN_PATH}" \
+  -github-app-id="$(cat "${GITHUB_APP_ID_PATH}")" \
+  -github-app-private-key-path="${GITHUB_APP_KEY_PATH}" \
+  -pr-source-mode=branch \
   -organization="${GITHUB_REPO_ORG}" \
   -repo="${GITHUB_REPO_NAME}" \
   -branch="${GITHUB_REPO_BRANCH}" \
@@ -218,7 +212,7 @@ if [[ ${prcreator_exit_code} -ne 0 ]]; then
   error "github: prcreator command failed with exit code ${prcreator_exit_code}"
 fi
 
-# GitHub: Poll for PR creation with exponential backoff
+# GitHub: Poll for PR with exponential backoff
 info "github: checking for existing PR"
 
 readonly PR_CHECK_MAX_ATTEMPTS=${PR_CHECK_MAX_ATTEMPTS:-8}
@@ -227,11 +221,8 @@ SLEEP_TIME=10  # Start with 10 seconds
 for ((i=1; i<=PR_CHECK_MAX_ATTEMPTS; i++)); do
   debug "github: attempting to find PR (attempt ${i} of ${PR_CHECK_MAX_ATTEMPTS})"
 
-  # Security: Use authenticated API call with silent mode to prevent token exposure
-  PR_URL=$(curl -f -s -H "Authorization: token ${GITHUB_TOKEN}" \
-    "https://api.github.com/repos/Azure/ARO-HCP/pulls?per_page=100" 2>/dev/null | \
-    jq -r ".[] | select(.user.login == \"${GITHUB_PR_USER}\" and .title == \"${GITHUB_PR_TITLE}\") | .html_url" | \
-    head -1)
+  PR_URL=$(curl -s "https://api.github.com/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/pulls?state=open&per_page=100" 2>/dev/null | \
+    jq -r ".[] | select(.title == \"${GITHUB_PR_TITLE}\") | .html_url" | head -1)
 
   if [[ -n "${PR_URL}" ]]; then
     info "github: PR found at ${PR_URL}"
@@ -252,7 +243,7 @@ done
 # Slack: Send notification based on PR creation result
 info "slack: sending notification for PR creation"
 if [[ -z "${PR_URL}" ]]; then
-  notify "❌ Image digest updater job failed, no PR found after ${PR_CHECK_MAX_ATTEMPTS} attempts. Please check prow$ at ${PROW_JOB_URL}"
+  notify "❌ Image digest updater job failed, no PR found after ${PR_CHECK_MAX_ATTEMPTS} attempts. Please check prow at ${PROW_JOB_URL}"
   error "github: No PR found after ${PR_CHECK_MAX_ATTEMPTS} attempts"
 fi
 

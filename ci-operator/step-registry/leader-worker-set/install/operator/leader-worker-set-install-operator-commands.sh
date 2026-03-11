@@ -1,8 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
-set -u
-set -o pipefail
+set -euo pipefail
 
 function timestamp() {
     date -u --rfc-3339=seconds
@@ -32,23 +30,22 @@ function wait_for_state() {
 
     echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to exist..."
     for _ in {1..30}; do
-        oc get ${object} --selector="${selector}" -n=${namespace} |& grep -ivE "(no resources found|not found)" && break || sleep 5
+        oc get "${object}" --selector="${selector}" -n="${namespace}" |& grep -ivE "(no resources found|not found)" && break || sleep 5
     done
 
     echo "Waiting for '${object}' in namespace '${namespace}' with selector '${selector}' to become '${state}'..."
-    oc wait --for=${state} --timeout=${timeout} ${object} --selector="${selector}" -n="${namespace}"
+    oc wait --for="${state}" --timeout="${timeout}" "${object}" --selector="${selector}" -n="${namespace}"
     return $?
 }
 
 function subscribe_operator () {
     echo "Checking if the PackageManifest exists in the CatalogSource before installing the operator..."
-    local max_retries=6
-    local retry_interval=20
+    local max_retries=12
+    local retry_interval=5
     local retry_count=0
 
     while [[ $retry_count -lt $max_retries ]]; do
-        output=$(oc get packagemanifest -n openshift-marketplace -l=catalog=$CS_CATSRC_NAME --field-selector=metadata.name=leader-worker-set  2>&1)
-        if [[ $? -eq 0 ]] && ! echo "$output" | grep -q "No resources found"; then
+        if output=$(oc get packagemanifest -n openshift-marketplace -l=catalog=$CS_CATSRC_NAME --field-selector=metadata.name=leader-worker-set 2>&1) && ! echo "$output" | grep -q "No resources found"; then
             echo "PackageManifest found, proceeding with installation..."
             break
         fi

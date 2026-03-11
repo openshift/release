@@ -15,12 +15,13 @@ function install_required_tools() {
 	PATH=${PATH}:/tmp/bin
 	export PATH
 
-	TAG="v0.5.2"
+	TAG="v1.2.0"
 	echo "Installing PowerVC-Tool version ${TAG}"
-	TOOL_TAR="PowerVC-Tool-${TAG}-linux-amd64.tar.gz"
-	curl --location --output /tmp/${TOOL_TAR} https://github.com/hamzy/PowerVC-Tool/releases/download/${TAG}/${TOOL_TAR}
-	tar xzvf ${TOOL_TAR}
-	mv PowerVC-Tool /tmp/bin/
+	MACHINE=$(uname -m)
+	if [ "${MACHINE}" == "x86_64" ]; then MACHINE="amd64"; fi
+	TOOL_BIN="ocp-ipi-powervc-linux-${MACHINE}"
+	curl --location --output /tmp/bin/PowerVC-Tool https://github.com/IBM/ocp-ipi-powervc/releases/download/${TAG}/${TOOL_BIN}
+	chmod ugo+x /tmp/bin/PowerVC-Tool
 
 	TAG="v4.49.2"
 	echo "Installing yq-v4 version ${TAG}"
@@ -82,9 +83,9 @@ function install_required_tools() {
 	done
 
 	mkdir -p ${HOME}/.config/openstack/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/clouds.yaml ${HOME}/.config/openstack/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/clouds.yaml ${HOME}/
-	cp /var/run/powervc-ipi-cicd-secrets/powervc-creds/ocp-ci-ca.pem ${HOME}/
+	cp ${SECRETS_DIR}/clouds.yaml ${HOME}/.config/openstack/
+	cp ${SECRETS_DIR}/clouds.yaml ${HOME}/
+	cp ${SECRETS_DIR}/ocp-ci-ca.pem ${HOME}/
 
 	which PowerVC-Tool
 	which jq
@@ -243,16 +244,30 @@ function dump_resources() {
 
 	if [ -f "${DIR}/metadata.json" ]
 	then
+		# Fix:
+		# Load Balancer: Error: addServerKnownHosts returns error open /tmp/.ssh/known_hosts: no such file or directory
+		mkdir -p ${HOME}/.ssh
+		touch ${HOME}/.ssh/known_hosts
+
+		# Fix:
+		# No user exists for uid 1003320000
+		if ! grep -q ":$(id -u):" /etc/passwd
+		then
+			if [ -w /etc/passwd ]
+			then
+				echo "test:x:$(id -u):$(id -u):test:/tmp:/sbin/nologin" >> /etc/passwd
+			fi
+		fi
+
 		PowerVC-Tool \
 			watch-create \
 			--cloud "${CLOUD}" \
 			--baseDomain "ipi-ppc64le.cis.ibm.net" \
-			--cisInstanceCRN "${CRN}" \
 			--metadata "${DIR}/metadata.json" \
-			--bastionUsername "cloud-user" \
-			--bastionRsa "${SSH_PRIV_KEY_PATH}" \
 			--kubeconfig "${DIR}/auth/kubeconfig" \
-			--shouldDebug true
+			--bastionUsername "cloud-user" \
+			--bastionRsa "${SSH_PRIV_KEY_FILE}" \
+			--shouldDebug false
 	else
 		echo "Could not find ${DIR}/metadata.json for watch-create"
 	fi
@@ -274,8 +289,16 @@ export DIR
 mkdir -p "${DIR}"
 cp "${SHARED_DIR}/install-config.yaml" "${DIR}/"
 
-IBMCLOUD_API_KEY=$(cat "/var/run/powervc-ipi-cicd-secrets/powervc-creds/IBMCLOUD_API_KEY")
-#POWERVC_USER_ID=$(cat "/var/run/powervc-ipi-cicd-secrets/powervc-creds/POWERVC_USER_ID")
+export SECRETS_DIR=/var/run/powervc-ipi-cicd-secrets/powervc-creds
+if [ ! -d "${SECRETS_DIR}" ]
+then
+	echo "Error: ${SECRETS_DIR} directory does not exist!"
+	exit 1
+fi
+ls -l ${SECRETS_DIR}/ || true
+
+IBMCLOUD_API_KEY=$(cat "${SECRETS_DIR}/IBMCLOUD_API_KEY")
+#POWERVC_USER_ID=$(cat "${SECRETS_DIR}/POWERVC_USER_ID")
 
 install_required_tools
 
@@ -285,7 +308,8 @@ BRANCH=$(yq-v4 eval '.BRANCH' "${SHARED_DIR}/powervc-conf.yaml")
 CLOUD=$(yq-v4 eval '.CLOUD' "${SHARED_DIR}/powervc-conf.yaml")
 CLUSTER_NAME=$(yq-v4 eval '.CLUSTER_NAME' "${SHARED_DIR}/powervc-conf.yaml")
 COMPUTE_NODE_TYPE=$(yq-v4 eval '.COMPUTE_NODE_TYPE' "${SHARED_DIR}/powervc-conf.yaml")
-FLAVOR=$(yq-v4 eval '.FLAVOR' "${SHARED_DIR}/powervc-conf.yaml")
+BASTION_FLAVOR=$(yq-v4 eval '.BASTION_FLAVOR' "${SHARED_DIR}/powervc-conf.yaml")
+CLUSTER_FLAVOR=$(yq-v4 eval '.CLUSTER_FLAVOR' "${SHARED_DIR}/powervc-conf.yaml")
 LEASED_RESOURCE=$(yq-v4 eval '.LEASED_RESOURCE' "${SHARED_DIR}/powervc-conf.yaml")
 NETWORK_NAME=$(yq-v4 eval '.NETWORK_NAME' "${SHARED_DIR}/powervc-conf.yaml")
 SERVER_IP=$(yq-v4 eval '.SERVER_IP' "${SHARED_DIR}/powervc-conf.yaml")
@@ -297,11 +321,12 @@ export BRANCH
 export CLOUD
 export CLUSTER_NAME
 export COMPUTE_NODE_TYPE
-export FLAVOR
+export BASTION_FLAVOR
+export CLUSTER_FLAVOR
 export LEASED_RESOURCE
 export NETWORK_NAME
 
-export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+export SSH_PRIV_KEY_FILE=${SECRETS_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 #export POWERVC_USER_ID
@@ -325,7 +350,7 @@ destroy_resources
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
 mkdir -p ~/.ssh
-cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
+cp "${CLUSTER_PROFILE_DIR}/*" ~/.ssh/
 
 date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 

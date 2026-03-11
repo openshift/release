@@ -64,4 +64,5 @@ fi
 
 export EXTRA_FLAGS
 
-./run.sh
+# Hardcoding workers-scale ES_INDEX as its only used by OCP perfscale team for now.
+ES_INDEX="workers-scale-results" ./run.sh

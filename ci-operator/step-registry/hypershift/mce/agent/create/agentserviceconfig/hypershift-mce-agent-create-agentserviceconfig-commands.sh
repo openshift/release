@@ -73,6 +73,43 @@ $( [ "${DISCONNECTED}" = "true" ] && echo \
 END
 }
 
+# See https://issues.redhat.com/browse/OCPQE-31328
+# Specific images need to be pulled from stage registry as they're no longer available in Brew.
+function deploy_image_digest_mirror_set() {
+  local mirror=${1:?mirror is required}
+  oc apply -f - <<END
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: mirror-config-agentserviceconfig
+  namespace: ${ASSISTED_NAMESPACE}
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - ${mirror}/rhel8/postgresql-12
+    source: registry.redhat.io/rhel8/postgresql-12
+  - mirrors:
+    - ${mirror}/rhel9/postgresql-13
+    source: registry.redhat.io/rhel9/postgresql-13
+END
+}
+
+function set_cluster_auth_stage() {
+  local mirror=${1:?mirror is required}
+  local registry_creds
+
+  echo "Setting cluster authentication for stage proxy registry"
+  oc extract secret/pull-secret -n openshift-config --confirm --to /tmp
+
+  registry_creds=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
+
+  jq --argjson a "{\"${mirror}\": {\"auth\": \"$registry_creds\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+
+  oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/new-dockerconfigjson
+
+  echo "Proxy registry authentication configured"
+}
+
 function deploy_mirror_config_map() {
   if [ "${DISCONNECTED}" = "true" ]; then
     oc get configmap -n openshift-config user-ca-bundle -o json | \
@@ -94,7 +131,7 @@ $( [ "${DISCONNECTED}" = "true" ] && cat /tmp/ca-bundle-crt)
 
     # Check if ImageDigestMirrorSet exists and has items
     $(if [[ $(oc get ImageDigestMirrorSet -o name 2>/dev/null | wc -l) -gt 0 ]]; then
-      echo "$(oc get imagedigestmirrorset -o json | jq -rc '.items[].spec.mirrors[] | [.mirror, .source]')" | \
+      echo "$(oc get imagedigestmirrorset -o json | jq -rc '.items[].spec.imageDigestMirrors[] | [.mirrors[0], .source]')" | \
         while read row; do
           row=$(echo ${row} | tr -d '[]"');
           source=$(echo ${row} | cut -d',' -f2);
@@ -162,6 +199,17 @@ EOF
     mirror_rhcos_image="${MIRROR_BASE_URL}/$(echo ${OS_IMAGES} | jq -r ".[$i].url" | cut -d / -f 4-)"
     OS_IMAGES=$(echo ${OS_IMAGES} | jq ".[$i].url=\"${mirror_rhcos_image}\"")
   done
+fi
+
+if [ "${DISCONNECTED}" = "true" ]; then
+  if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
+    echo "Mirror registry URL file not found"
+    exit 1
+  fi
+  mirror_registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+  mirror_registry_stage_url="${mirror_registry_url//5000/6003}"
+  set_cluster_auth_stage "${mirror_registry_stage_url}"
+  deploy_image_digest_mirror_set "${mirror_registry_stage_url}"
 fi
 
 deploy_mirror_config_map

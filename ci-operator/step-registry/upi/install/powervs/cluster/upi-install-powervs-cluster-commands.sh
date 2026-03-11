@@ -140,7 +140,9 @@ function download_automation_code() {
         && curl -L https://github.com/prb112/ocp4-upi-powervs/archive/refs/heads/terraform-1.76.2-updates.tar.gz \
             -o "${IBMCLOUD_HOME}"/ocp.tar.gz \
         && tar -xzf "${IBMCLOUD_HOME}"/ocp.tar.gz \
-        && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-terraform-1.76.2-updates" "${IBMCLOUD_HOME}"/ocp4-upi-powervs
+        && mv "${IBMCLOUD_HOME}/ocp4-upi-powervs-terraform-1.76.2-updates" "${IBMCLOUD_HOME}"/ocp4-upi-powervs \
+        && sed -i '/default_kernel_options[[:space:]]*=/s/=.*/= []/' \
+            "${IBMCLOUD_HOME}/ocp4-upi-powervs/modules/5_install/install.tf"
     echo "Down ... Downloading the head for ocp-upi-powervs"
 }
 
@@ -319,6 +321,7 @@ ibm_cloud_tgw              = "${WORKSPACE_NAME}-tg"
 dns_forwarders = "161.26.0.10; 161.26.0.11"
 
 kdump_enable = false
+rhcos_pre_kernel_options   =  ["loglevel=7"]
 EOF
 
     cp "${IBMCLOUD_HOME}"/ocp-install-dir/var-multi-arch-upi.tfvars "${SHARED_DIR}"/var-multi-arch-upi.tfvars
@@ -429,12 +432,30 @@ function build_upi_cluster() {
     scp -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}"/ocp4-upi-powervs/data/id_rsa "${IBMCLOUD_HOME}"/ocp-install-dir/kubeconfig root@"${BASTION_PUBLIC_IP}":~/.kube/config
     echo "Done copying kubeconfig to bastion location ~/.kube/config"
 
+    # Output the preinstall kargs files to check for mpath configuration
+    echo "=== Checking preinstall-worker-kargs.yaml for mpath configuration ==="
+    ssh -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}/ocp4-upi-powervs/data/id_rsa" root@"${BASTION_PUBLIC_IP}" "cat /root/openstack-upi/manifests/preinstall-worker-kargs.yaml" || echo "preinstall-worker-kargs.yaml not found"
+    echo "=== Checking preinstall-master-kargs.yaml for mpath configuration ==="
+    ssh -oStrictHostKeyChecking=no -i "${IBMCLOUD_HOME}/ocp4-upi-powervs/data/id_rsa" root@"${BASTION_PUBLIC_IP}" "cat /root/openstack-upi/manifests/preinstall-master-kargs.yaml" || echo "preinstall-master-kargs.yaml not found"
+
     if [ ! -f "${SHARED_DIR}"/kubeconfig ]
     then
         echo "kubeconfig not found install failed"
         exit 7
     fi
     echo "Done copying the kubeconfig"
+
+    # Create powervs-config.json for e2e tests
+    echo "Creating powervs-config.json for e2e tests"
+
+    # Get the IBM Cloud user ID from account information
+    POWERVS_USER_ID=$(ibmcloud account show --output json | jq -r '.account_id')
+    echo "IBM Cloud User ID: ${POWERVS_USER_ID}"
+
+    cat > "${SHARED_DIR}/powervs-config.json" << EOF
+{"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${RESOURCE_GROUP}"}
+EOF
+    echo "powervs-config.json created successfully"
 }
 
 ############################################################

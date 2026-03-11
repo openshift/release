@@ -79,3 +79,23 @@ fi
 
 echo "Manifest file stored at ${MANIFEST_LOCATION} with content:"
 cat "${MANIFEST_LOCATION}"
+
+# Process DISABLED_CSI_CAPABILITIES if set
+if [[ -n "${DISABLED_CSI_CAPABILITIES:-}" ]]; then
+    echo "Processing DISABLED_CSI_CAPABILITIES: ${DISABLED_CSI_CAPABILITIES}"
+
+    # Iterate over each capability to disable
+    for cap in ${DISABLED_CSI_CAPABILITIES}; do
+        # Check if the capability exists in the manifest
+        if grep -q "^[[:space:]]*${cap}:" "${MANIFEST_LOCATION}"; then
+            echo "Disabling capability: ${cap}"
+            # Replace "capability: true" or "capability: false" with "capability: false"
+            sed -i "s/^\([[:space:]]*${cap}:\).*/\1 false/" "${MANIFEST_LOCATION}"
+        else
+            echo "Capability ${cap} not found in manifest, skipping"
+        fi
+    done
+
+    echo "Updated manifest file after disabling capabilities:"
+    cat "${MANIFEST_LOCATION}"
+fi

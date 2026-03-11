@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build11
+  cluster: build06
   cron: 30 15 26 6 *
   decorate: true
   extra_refs:
@@ -24,9 +24,17 @@ periodics:
       - --target=e2e-aws-ovn-clusternetwork-cidr-expansion
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -70,7 +78,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build11
+  cluster: build06
   cron: 14 7 25 5 *
   decorate: true
   extra_refs:
@@ -94,9 +102,17 @@ periodics:
       - --target=e2e-aws-ovn-subnet-configs
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

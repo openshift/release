@@ -103,6 +103,7 @@ acl authenticated proxy_auth REQUIRED
 acl CONNECT method CONNECT
 http_access allow authenticated
 http_port 3128
+https_port 3129 cert=/etc/squid/server_domain.crt key=/etc/squid/server_domain.pem cafile=/etc/squid/client_ca.crt
 cache deny all
 ${proxy_dns_config}
 EOF
@@ -145,6 +146,9 @@ fi
 PROXY_CREDENTIAL_CONTENT="$(echo -e ${PROXY_CREDENTIAL_ARP1} | base64 -w0)"
 PROXY_CONFIG_CONTENT=$(cat ${workdir}/squid.conf | base64 -w0)
 PROXY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/squid.service | sed 's/\"/\\"/g')
+PROXY_CRT_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.crt" | base64 -w0)
+PROXY_KEY_CONTENT=$(cat "/var/run/vault/mirror-registry/server_domain.pem" | base64 -w0)
+PROXY_CA_CONTENT=$(cat "/var/run/vault/mirror-registry/client_ca.crt" | base64 -w0)
 
 # proxy ignition
 proxy_ignition_patch=$(mktemp)
@@ -163,6 +167,27 @@ cat > "${proxy_ignition_patch}" << EOF
         "path": "/srv/squid/etc/squid.conf",
         "contents": {
           "source": "data:text/plain;base64,${PROXY_CONFIG_CONTENT}"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/srv/squid/etc/server_domain.crt",
+        "contents": {
+          "source": "data:text/plain;base64,${PROXY_CRT_CONTENT}"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/srv/squid/etc/server_domain.pem",
+        "contents": {
+          "source": "data:text/plain;base64,${PROXY_KEY_CONTENT}"
+        },
+        "mode": 420
+      },
+      {
+        "path": "/srv/squid/etc/client_ca.crt",
+        "contents": {
+          "source": "data:text/plain;base64,${PROXY_CA_CONTENT}"
         },
         "mode": 420
       },

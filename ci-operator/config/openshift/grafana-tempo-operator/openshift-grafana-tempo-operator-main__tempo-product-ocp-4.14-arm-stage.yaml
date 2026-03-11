@@ -45,10 +45,12 @@ tests:
 - as: tempo-stage-tests
   cron: 0 0 30 2 *
   steps:
-    cluster_profile: gcp-observability
+    cluster_profile: azure-observability
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
       OCP_ARCH: arm64
       OPERATORS: |
         [
@@ -70,7 +72,7 @@ tests:
         operator-sdk run bundle --timeout=10m --security-context-config restricted -n openshift-tempo-operator "$MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE"
         oc wait --for condition=Available -n openshift-tempo-operator deployment tempo-operator-controller
       env:
-      - default: ""
+      - default: quay.io/redhat-user-workloads/rhosdt-tenant/tempo/tempo-bundle@sha256:90d1a71febb6cac99b64fc4863bcb66b11aa18c30dad93b244aca3290c3574e0
         name: MULTISTAGE_PARAM_OVERRIDE_TEMPO_INDEX_IMAGE
       from: operator-sdk
       resources:
@@ -79,7 +81,7 @@ tests:
           memory: 400Mi
     - ref: install-operators
     - ref: distributed-tracing-tests-tempo-stage
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    workflow: cucushift-installer-rehearse-azure-ipi
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -15,14 +15,6 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.16_base-rhel9:
-    name: "4.16"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.21-openshift-4.16
   tools:
     name: "4.16"
     namespace: ocp
@@ -33,19 +25,8 @@ build_root:
 images:
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: tools
-  inputs:
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
-  inputs:
-    ocp_4.16_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.16:base-rhel9
-    ocp_builder_rhel-9-golang-1.21-openshift-4.16:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.21-openshift-4.16
   to: hello-openshift
 promotion:
   to:
@@ -426,14 +407,6 @@ tests:
   steps:
     cluster_profile: vsphere-elastic
     workflow: openshift-e2e-vsphere-etcd-scaling
-- always_run: false
-  as: e2e-vsphere-ovn-dualstack-primaryv6
-  optional: true
-  steps:
-    cluster_profile: vsphere-elastic
-    env:
-      IP_FAMILIES: DualStackIPv6Primary
-    workflow: openshift-e2e-vsphere-ovn-dualstack
 - always_run: false
   as: e2e-aws-etcd-recovery
   optional: true

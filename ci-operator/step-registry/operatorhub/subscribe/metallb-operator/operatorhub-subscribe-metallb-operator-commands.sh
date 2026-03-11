@@ -4,6 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Check if a custom redhat-operators CatalogSource was created and use it
+if [[ -f "${SHARED_DIR}/redhat_operators_catalog_source_name" ]]; then
+  CUSTOM_CATALOG_SOURCE=$(cat "${SHARED_DIR}/redhat_operators_catalog_source_name")
+  echo "Found custom CatalogSource name: ${CUSTOM_CATALOG_SOURCE}"
+  METALLB_OPERATOR_SUB_SOURCE="${CUSTOM_CATALOG_SOURCE}"
+  
+  # Also derive the channel from the CatalogSource name if not explicitly set or using default
+  # CatalogSource name format: redhat-operators-v4-20 -> extract version -> stable
+  if [[ "${METALLB_OPERATOR_SUB_CHANNEL}" == "stable" ]]; then
+    # MetalLB uses "stable" channel, not version-specific, so we keep it as is
+    echo "MetalLB uses 'stable' channel, keeping it unchanged"
+  fi
+fi
+
 if [[ -z "${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
   echo "ERROR: INSTALL_NAMESPACE is not defined"
   exit 1

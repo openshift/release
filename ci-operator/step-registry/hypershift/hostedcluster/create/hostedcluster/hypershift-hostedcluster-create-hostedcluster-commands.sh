@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail -x
+set -euo pipefail
 
 echo HyperShift CLI version
 /usr/bin/hypershift version
@@ -19,6 +19,28 @@ echo "Is multiarch image: ${MULTI_ARCH_IMAGE}"
 
 echo "Set KUBECONFIG to management cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
+cp "$KUBECONFIG" "${SHARED_DIR}/mgmt_kubeconfig" # idp-htpasswd step needs
+
+# Copy token file if kubeconfig references one
+CURRENT_CONTEXT=$(oc config current-context)
+if [[ -n "${CURRENT_CONTEXT}" ]]; then
+  CURRENT_USER=$(oc config view -o jsonpath="{.contexts[?(@.name==\"${CURRENT_CONTEXT}\")].context.user}")
+  if [[ -n "${CURRENT_USER}" ]]; then
+    TOKEN_FILE=$(oc config view -o jsonpath="{.users[?(@.name==\"${CURRENT_USER}\")].user.tokenFile}")
+    if [[ -n "${TOKEN_FILE}" ]]; then
+      # tokenFile is just a basename, relative to the directory containing KUBECONFIG
+      KUBECONFIG_DIR=$(dirname "${KUBECONFIG}")
+      TOKEN_FILE_PATH="${KUBECONFIG_DIR}/${TOKEN_FILE}"
+      if [[ -f "${TOKEN_FILE_PATH}" ]]; then
+        cp "${TOKEN_FILE_PATH}" "${SHARED_DIR}/${TOKEN_FILE}"
+        echo "Copied token file to the SHARED_DIR"
+      else
+        echo "Error: Token file not found"
+        exit 1
+      fi
+    fi
+  fi
+fi
 
 if [[ "${PLATFORM}" == "aws" ]]; then
   AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -57,6 +79,8 @@ CLUSTER_NAME=${HASH:0:20}
 INFRA_ID=${HASH:20:5}
 echo "Using cluster name $CLUSTER_NAME and infra id $INFRA_ID"
 echo "CLUSTER_NAME=$CLUSTER_NAME" > ${SHARED_DIR}/hosted_cluster.txt
+echo "$CLUSTER_NAME" > ${SHARED_DIR}/cluster-name # idp-htpasswd step needs
+echo "clusters" > ${SHARED_DIR}/hypershift-clusters-namespace # idp-htpasswd step needs
 echo "INFRA_ID=$INFRA_ID" >> ${SHARED_DIR}/hosted_cluster.txt
 
 if [[ -f ${SHARED_DIR}/pull-secret-build-farm.json ]]; then
@@ -221,6 +245,8 @@ bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} > $
 
 # Data for cluster bot.
 # The kubeadmin-password secret is reconciled only after the kas is available so we will wait up to 5 minutes for it to become available
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x # Always disable tracing due to below lines printing protected stuff, in case this script happens to enable tracing again in future
 echo "Retrieving kubeadmin password"
 for _ in {1..50}; do
   kubeadmin_pwd=`oc get secret --namespace=clusters ${CLUSTER_NAME}-kubeadmin-password --template='{{.data.password}}' | base64 -d` || true
@@ -232,6 +258,7 @@ for _ in {1..50}; do
     break
   fi
 done
+$WAS_TRACING && set -x
 
 if [[ ! -f ${SHARED_DIR}/kubeadmin-password ]]; then
   echo "Failed to get kubeadmin password for the cluster"
@@ -250,5 +277,8 @@ until \
 done
 
 # Data for cluster bot.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x # Always disable tracing due to below lines printing cluster urls, in case this script happens to enable tracing again in future
 echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+$WAS_TRACING && set -x
 KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "created-at=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"

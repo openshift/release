@@ -21,9 +21,17 @@ postsubmits:
         - --target=fast-forward
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -138,9 +146,17 @@ postsubmits:
         - --target=pr-merge-image-mirror
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -175,39 +191,68 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
+    always_run: true
     branches:
     - ^main$
     cluster: build08
     decorate: true
+    decoration_config:
+      skip_cloning: true
     labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: branch-ci-stolostron-submariner-addon-main-sonarcloud
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stolostron-submariner-addon-main-sonarcloud-post-submit
     spec:
       containers:
       - args:
-        - -f
-        - Makefile.prow
-        - sonar/go/prow
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=sonarcloud-post-submit
         command:
-        - make
+        - ci-operator
         env:
-        - name: ARTIFACT_DIR
-          value: $(ARTIFACTS)
-        - name: SELF
-          value: make -f Makefile.prow
-        image: quay-proxy.ci.openshift.org/openshift/ci:stolostron_builder_go1.24-linux
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
-            cpu: 100m
-            memory: 200Mi
+            cpu: 10m
         volumeMounts:
-        - mountPath: /etc/sonarcloud
-          name: acm-sonarcloud-token
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: acm-sonarcloud-token
+      - name: ci-pull-credentials
         secret:
-          secretName: acm-sonarcloud-token
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator

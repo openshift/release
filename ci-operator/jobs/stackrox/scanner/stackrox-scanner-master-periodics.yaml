@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build03
+  cluster: build09
   cron: 0 */3 * * *
   decorate: true
   decoration_config:
@@ -22,9 +22,17 @@ periodics:
       - --target=hourly-e2e-tests
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -53,7 +61,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build09
   cron: 0 */3 * * *
   decorate: true
   decoration_config:
@@ -75,9 +83,17 @@ periodics:
       - --target=hourly-slim-e2e-tests
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

@@ -89,12 +89,30 @@ if [[ "$DISCONNECTED" == "true" ]]; then
   RELEASE_IMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
 fi
 
+if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_CPO_IMAGE" ]]; then
+    OVERRIDE_CPO_IMAGE="$MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_CPO_IMAGE"
+fi
+
+if [[ -n "${OVERRIDE_CPO_IMAGE}" ]]; then
+  EXTRA_ARGS+=" --annotations=hypershift.openshift.io/control-plane-operator-image=${OVERRIDE_CPO_IMAGE} "
+fi
+
 if [[ -n "${HYPERSHIFT_NETWORK_TYPE}" ]]; then
   EXTRA_ARGS+=" --network-type=${HYPERSHIFT_NETWORK_TYPE} "
 fi
 
 if [ ! -f "${SHARED_DIR}/id_rsa.pub" ] && [ -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" ]; then
   cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${SHARED_DIR}/id_rsa.pub"
+fi
+
+echo "Create file for --image-content-sources"
+curl -L https://github.com/mikefarah/yq/releases/download/v4.50.1/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+# Give IDMS priority over ICSP by appending the ICSP to the IDMS file.
+if oc get imagedigestmirrorset &>/dev/null; then
+  oc get imagedigestmirrorset -oyaml | /tmp/yq '.items[].spec.imageDigestMirrors' > "${SHARED_DIR}/mgmt_icsp.yaml"
+fi
+if oc get imagecontentsourcepolicy &>/dev/null; then
+  oc get imagecontentsourcepolicy -oyaml | /tmp/yq '.items[].spec.repositoryDigestMirrors' >> "${SHARED_DIR}/mgmt_icsp.yaml"
 fi
 
 eval "/tmp/${HYPERSHIFT_NAME} create cluster agent ${EXTRA_ARGS} \

@@ -3,26 +3,11 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: latest
-  ocp_4.17_base-rhel9:
-    name: "4.17"
-    namespace: ocp
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.22-openshift-4.17
 binary_build_commands: make build
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
-  inputs:
-    ocp_4.17_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.17:base-rhel9
-    ocp_builder_rhel-9-golang-1.22-openshift-4.17:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.22-openshift-4.17
   to: cluster-csi-snapshot-controller-operator
 promotion:
   to:
@@ -70,7 +55,7 @@ tests:
   as: e2e-hypershift-conformance
   optional: true
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: verify-deps
   steps:

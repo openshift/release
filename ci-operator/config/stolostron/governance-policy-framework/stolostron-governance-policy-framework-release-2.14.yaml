@@ -8,7 +8,7 @@ build_root:
 images:
 - additional_architectures:
   - arm64
-  dockerfile_path: Dockerfile.e2etest
+  dockerfile_path: build/Dockerfile.e2etest
   from: base
   optional: true
   to: grc-policy-framework-tests
@@ -46,16 +46,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-clusterpool
-- as: latest-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: grc-policy-framework-tests
-    env:
-      IMAGE_REPO: grc-policy-framework-tests
-      IMAGE_TAG: latest-2.14
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
@@ -71,8 +61,7 @@ tests:
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
       credentials:
-      - collection: ""
-        mount_path: /etc/github
+      - mount_path: /etc/github
         name: acm-cicd-github
         namespace: test-credentials
       from: src

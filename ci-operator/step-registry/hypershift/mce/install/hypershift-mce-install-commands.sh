@@ -22,6 +22,10 @@ if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION" ]]; then
     MCE_VERSION="$MULTISTAGE_PARAM_OVERRIDE_MCE_VERSION"
 fi
 
+if [[ -n "$MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HO_IMAGE" ]]; then
+    OVERRIDE_HO_IMAGE="$MULTISTAGE_PARAM_OVERRIDE_OVERRIDE_HO_IMAGE"
+fi
+
 echo "$MCE_VERSION"
 
 MCE_CATALOG_PATH="acm-d/mce-custom-registry"
@@ -253,29 +257,36 @@ echo "hypershift is running! Waiting for the pods to become ready"
 
 oc wait deployment operator -n hypershift --for condition=Available=True --timeout=5m
 
-echo "Configuring the hosting service cluster"
-oc create secret generic hypershift-operator-oidc-provider-s3-credentials --from-file=credentials=/etc/hypershift-pool-aws-credentials/credentials --from-literal=bucket=hypershift-ci-oidc --from-literal=region=us-east-1 -n local-cluster
-oc label secret hypershift-operator-oidc-provider-s3-credentials -n local-cluster cluster.open-cluster-management.io/backup=true
-# wait for Configuring the hosting service cluster
-_configReady=0
-trap - ERR
-set +e
-for ((i=1; i<=10; i++)); do
+HUB_CLUSTER_ARCH=$(oc get nodes -o jsonpath='{.items[0].status.nodeInfo.architecture}')
+if [ "$HUB_CLUSTER_ARCH" != "s390x" ]; then
+  echo "Cluster architecture is $HUB_CLUSTER_ARCH. Proceeding..."
+  echo "Configuring the hosting service cluster"
+  oc create secret generic hypershift-operator-oidc-provider-s3-credentials --from-file=credentials=/etc/hypershift-pool-aws-credentials/credentials --from-literal=bucket=hypershift-ci-oidc --from-literal=region=us-east-1 -n local-cluster
+  oc label secret hypershift-operator-oidc-provider-s3-credentials -n local-cluster cluster.open-cluster-management.io/backup=true
+
+  # wait for Configuring the hosting service cluster
+  _configReady=0
+  trap - ERR
+  set +e
+  for ((i=1; i<=30; i++)); do
   oc get configmap -n kube-public oidc-storage-provider-s3-config
-  if [ $? -eq 0 ]; then
-    _configReady=1
-    break
+    if [ $? -eq 0 ]; then
+      _configReady=1
+      break
+    fi
+    echo "Waiting on Configuring the hosting service cluster"
+    sleep 30
+  done
+  set -e
+  trap 'exit_with_failure' ERR
+  if [ $_configReady -eq 0 ]; then
+    echo "Configuring error"
+    exit 1
   fi
-  echo "Waiting on Configuring the hosting service cluster"
-  sleep 30
-done
-set -e
-trap 'exit_with_failure' ERR
-if [ $_configReady -eq 0 ]; then
-  echo "Configuring error"
-  exit 1
+  echo "Configuring the hosting service cluster Succeeded!"
+else
+  echo "Cluster architecture is s390x. Skipping this section."
 fi
-echo "Configuring the hosting service cluster Succeeded!"
 
 # export icsp for hypershift hostedcluster if needed
 oc get imagecontentsourcepolicy -oyaml > /tmp/mgmt_icsp.yaml && yq-go r /tmp/mgmt_icsp.yaml 'items[*].spec.repositoryDigestMirrors' -  | sed  '/---*/d' > ${SHARED_DIR}/mgmt_icsp.yaml

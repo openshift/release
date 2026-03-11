@@ -58,15 +58,73 @@ function check_console_uri() {
     local node_list=$1 ret=0 console_screenshot_blob serial_console_log_blob
 
     for node in ${node_list}; do
-        console_screenshot_blob=$(az vm boot-diagnostics get-boot-log-uris --name ${node} -g ${RESOURCE_GROUP} --query consoleScreenshotBlobUri -otsv)
-        serial_console_log_blob=$(az vm boot-diagnostics get-boot-log-uris --name ${node} -g ${RESOURCE_GROUP} --query serialConsoleLogBlobUri -otsv)
-        if [[ -z "${console_screenshot_blob}" ]] || [[ -z "${serial_console_log_blob}" ]]; then
-            echo "ERROR: failed to get console screenshot blob uri or serial console log uri on node ${node}!"
-            run_command "az vm boot-diagnostics get-boot-log-uris --name ${node} -g ${RESOURCE_GROUP}"
-            ret=1
+        if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+            # Azure Stack Hub (2019-03-01-hybrid profile) only has get-boot-log, not get-boot-log-uris
+            echo "Checking boot diagnostics log on Azure Stack Hub node ${node}..."
+            boot_log=$(az vm boot-diagnostics get-boot-log --name ${node} -g ${RESOURCE_GROUP} 2>&1)
+            exit_code=$?
+
+            if [[ $exit_code -eq 0 ]]; then
+                echo "INFO: boot diagnostics accessible on node ${node}"
+            elif echo "${boot_log}" | grep -q "BlobNotFound"; then
+                # BlobNotFound is expected for VMs that haven't generated logs yet (healthy VMs)
+                echo "INFO: boot diagnostics configured on node ${node} (blob not yet generated - this is normal for healthy VMs)"
+                echo "Verifying boot diagnostics by checking for screenshot blob..."
+                vm_id=$(az vm show --name ${node} --resource-group ${RESOURCE_GROUP} --query "vmId" -o tsv 2>&1)
+                if [[ $? -ne 0 ]]; then
+                    echo "ERROR: failed to get VM ID for node ${node}"
+                    echo "Error: ${vm_id}"
+                    ret=1
+                    continue
+                fi
+
+                storage_uri=$(az vm show --name ${node} --resource-group ${RESOURCE_GROUP} --query "diagnosticsProfile.bootDiagnostics.storageUri" -o tsv 2>&1)
+                if [[ $? -ne 0 ]] || [[ -z "${storage_uri}" ]]; then
+                    echo "ERROR: failed to get storage URI for node ${node}"
+                    echo "Error: ${storage_uri}"
+                    ret=1
+                    continue
+                fi
+
+                # Extract storage account name from URI (e.g., https://storageaccount.blob.example.com -> storageaccount)
+                storage_account=$(echo "${storage_uri}" | sed 's|https://||' | sed 's|\..*||')
+
+                # Container name pattern: bootdiagnostics-{first 9 chars of VM name without dashes}-{VM_ID}
+                vm_name_normalized=$(echo "${node}" | tr -d '-')
+                container_name="bootdiagnostics-${vm_name_normalized:0:9}-${vm_id}"
+
+                echo "Checking container: ${container_name} in storage account: ${storage_account}"
+
+                # List blobs and check for screenshot.bmp
+                blob_list=$(az storage blob list --account-name "${storage_account}" --container-name "${container_name}" --query "[?ends_with(name, '.screenshot.bmp')].name" -o tsv 2>&1)
+                blob_exit_code=$?
+
+                if [[ $blob_exit_code -eq 0 ]] && [[ -n "${blob_list}" ]]; then
+                    echo "INFO: boot diagnostics screenshot blob found for node ${node}: ${blob_list}"
+                else
+                    echo "ERROR: boot diagnostics screenshot blob not found for node ${node}"
+                    echo "Storage account: ${storage_account}, Container: ${container_name}"
+                    if [[ $blob_exit_code -ne 0 ]]; then
+                        echo "Error output: ${blob_list}"
+                    fi
+                    ret=1
+                fi
+            else
+                echo "ERROR: failed to get boot diagnostics log on node ${node}!"
+                echo "Error output: ${boot_log}"
+                ret=1
+            fi
         else
-            echo "INFO: console blob uri check passed on node ${node}"
-        fi
+            console_screenshot_blob=$(az vm boot-diagnostics get-boot-log-uris --name ${node} -g ${RESOURCE_GROUP} --query consoleScreenshotBlobUri -otsv)
+            serial_console_log_blob=$(az vm boot-diagnostics get-boot-log-uris --name ${node} -g ${RESOURCE_GROUP} --query serialConsoleLogBlobUri -otsv)
+            if [[ -z "${console_screenshot_blob}" ]] || [[ -z "${serial_console_log_blob}" ]]; then
+                echo "ERROR: failed to get console screenshot blob uri or serial console log uri on node ${node}!"
+                run_command "az vm boot-diagnostics get-boot-log-uris --name ${node} -g ${RESOURCE_GROUP}"
+                ret=1
+            else
+                echo "INFO: console blob uri check passed on node ${node}"
+            fi
+	fi
     done
 
     return $ret

@@ -59,7 +59,7 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
 - as: mirror-nightly-image
-  cron: '@daily'
+  cron: 00 16 * * 4
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-agent
@@ -123,15 +123,14 @@ tests:
 - as: subsystem-test-periodic
   capabilities:
   - intranet
-  cron: 00 11 * * 6,5
+  cron: 00 23 * * 4
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-ofcir-agent
-- always_run: false
-  as: e2e-ai-operator-ztp
+- as: e2e-ai-operator-ztp
   capabilities:
   - intranet
-  pipeline_run_if_changed: ^(hack/.*|pkg/.*|src/.*|scripts/.*|vendor/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|\.dockerignore)$
+  skip_if_only_changed: \.md$|^(?:.*/)?(?:\.gitignore|.tekton/.*|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     dependencies:

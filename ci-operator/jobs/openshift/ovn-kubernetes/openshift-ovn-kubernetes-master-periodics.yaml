@@ -1,10 +1,8 @@
 periodics:
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 0 0 */2 * *
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -26,9 +24,17 @@ periodics:
       - --target=e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -72,11 +78,9 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build07
+  cluster: build10
   cron: 0 0 */2 * *
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -98,9 +102,17 @@ periodics:
       - --target=e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -147,8 +159,6 @@ periodics:
   cluster: build09
   cron: 0 0 * * *
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -170,9 +180,17 @@ periodics:
       - --target=e2e-ibmcloud-ipi-ovn-periodic
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
-  cluster: build09
-  cron: 45 1 * * *
+  cluster: build04
+  cron: 0 0 * * *
   decorate: true
   extra_refs:
   - base_ref: master
@@ -10,7 +10,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.20"
+    job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-installer-master-edge-mirror-nightly-image
   spec:
@@ -24,9 +24,17 @@ periodics:
       - --variant=edge
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m
@@ -61,8 +69,8 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build09
-  cron: 58 2 * * *
+  cluster: build04
+  cron: 20 0 * * *
   decorate: true
   extra_refs:
   - base_ref: master
@@ -71,7 +79,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.20"
+    job-release: "4.22"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-installer-master-edge-mirror-nightly-image-controller
   spec:
@@ -85,9 +93,17 @@ periodics:
       - --variant=edge
       command:
       - ci-operator
+      env:
+      - name: HTTP_SERVER_IP
+        valueFrom:
+          fieldRef:
+            fieldPath: status.podIP
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
       imagePullPolicy: Always
       name: ""
+      ports:
+      - containerPort: 8080
+        name: http
       resources:
         requests:
           cpu: 10m

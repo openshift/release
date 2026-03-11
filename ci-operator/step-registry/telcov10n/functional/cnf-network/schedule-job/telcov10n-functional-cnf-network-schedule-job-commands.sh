@@ -17,10 +17,10 @@ fi
 
 
 # Date of the first event
-if [ "$VERSION" = "4.15" ] || [ "$VERSION" = "4.17" ]; then
-  FIRST_EVENT_DATE="2025-08-27"
-elif [ "$VERSION" = "4.16" ]|| [ "$VERSION" = "4.18" ]; then
-  FIRST_EVENT_DATE="2025-09-03"
+if [ "$VERSION" = "4.17" ] || [ "$VERSION" = "4.19" ]; then
+  FIRST_EVENT_DATE="2026-02-04"
+elif [ "$VERSION" = "4.18" ] || [ "$VERSION" = "4.20" ]; then
+  FIRST_EVENT_DATE="2026-02-11"
 else
   exit 0
 fi

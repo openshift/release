@@ -26,7 +26,7 @@ K8S_CLUSTER_URL=$(oc whoami --show-server)
 echo "K8S_CLUSTER_URL: $K8S_CLUSTER_URL"
 
 echo "Note: This cluster will be automatically deleted 4 hours after being claimed."
-echo "To debug issues or log in to the cluster manually, use the script: .ibm/pipelines/ocp-cluster-claim-login.sh"
+echo "To debug issues or log in to the cluster manually, use the script: .ci/pipelines/ocp-cluster-claim-login.sh"
 
 echo "========== Cluster Service Account and Token Management =========="
 oc create serviceaccount tester-sa-2 -n default
@@ -79,7 +79,7 @@ PR_CHANGESET=$(git diff --name-only $RELEASE_BRANCH_NAME)
 echo "Changeset: $PR_CHANGESET"
 
 # Check if changes are exclusively within the specified directories
-DIRECTORIES_TO_CHECK=".ibm|e2e-tests|docs|.claude|.cursor|.rulesync|.vscode"
+DIRECTORIES_TO_CHECK=".ci|e2e-tests|docs|.claude|.cursor|.rulesync|.vscode"
 ONLY_IN_DIRS=true
 
 for change in $PR_CHANGESET; do
@@ -103,12 +103,12 @@ if [[ "$JOB_NAME" == rehearse-* || "$JOB_TYPE" == "periodic" ]]; then
     fi
     echo "TAG_NAME: $TAG_NAME"
 elif [[ "$ONLY_IN_DIRS" == "true" && "$JOB_TYPE" == "presubmit" ]];then
+    QUAY_REPO="rhdh-community/rhdh"
     if [ "${RELEASE_BRANCH_NAME}" != "main" ]; then
-        QUAY_REPO="rhdh/rhdh-hub-rhel9"
-        # Get branch a specific tag name (e.g., 'release-1.5' becomes '1.5')
-        TAG_NAME="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+        # Get branch version (e.g., 'release-1.5' becomes '1.5') and prefix with 'next-'
+        VERSION="$(echo $RELEASE_BRANCH_NAME | cut -d'-' -f2)"
+        TAG_NAME="next-${VERSION}"
     else
-        QUAY_REPO="rhdh-community/rhdh"
         TAG_NAME="next"
     fi
     echo "INFO: Bypassing PR image build wait, using tag: ${TAG_NAME}"
@@ -148,8 +148,9 @@ fi
 
 echo "========== Current branch =========="
 echo "Current branch: $(git branch --show-current)"
-echo "Using Image: ${QUAY_REPO}:${TAG_NAME}"
+IMAGE_SHA=$(curl -s "https://quay.io/api/v1/repository/${QUAY_REPO}/tag/?specificTag=${TAG_NAME}" | jq -r '.tags[0].manifest_digest')
+echo "Using image: ${QUAY_REPO}:${TAG_NAME}, with digest: ${IMAGE_SHA}"
 
 echo "========== Test Execution =========="
 echo "Executing openshift-ci-tests.sh"
-bash ./.ibm/pipelines/openshift-ci-tests.sh
+bash ./.ci/pipelines/openshift-ci-tests.sh

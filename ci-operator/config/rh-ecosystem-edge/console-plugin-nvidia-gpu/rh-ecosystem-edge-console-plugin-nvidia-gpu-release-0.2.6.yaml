@@ -1,0 +1,37 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.22-builder-multi-openshift-4.18
+images:
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile
+  to: console-plugin-nvidia-gpu
+promotion:
+  to:
+  - name: release-0.2.6
+    namespace: edge-infrastructure
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: console-plugin-nvidia-gpu
+    env:
+      IMAGE_REPO: console-plugin-nvidia-gpu
+      IMAGE_TAG: release-0.2.6
+      KEEP_MANIFEST_LIST: "true"
+    test:
+    - ref: assisted-baremetal-images-publish
+zz_generated_metadata:
+  branch: release-0.2.6
+  org: rh-ecosystem-edge
+  repo: console-plugin-nvidia-gpu

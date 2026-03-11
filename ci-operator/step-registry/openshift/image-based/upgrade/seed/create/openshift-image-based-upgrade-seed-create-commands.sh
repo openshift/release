@@ -83,11 +83,14 @@ fi
 echo "${SEED_IMAGE_TAG}" > "${SHARED_DIR}/seed_tag"
 echo "${SEED_VM_NAME}" > "${SHARED_DIR}/seed_vm_name"
 
-# Check if we should replace the pipeline OLM LCA bundle pull spec with a promoted one
-# that's hosted on quay. This is required for the IBIO CI jobs that use the seed
+# Check if we should replace the pipeline pull specs with promoted ones
+# that are hosted on quay. This is required for the IBIO CI jobs that use the seed
 # images generated from this script.
 if [[ ! -z "${OO_BUNDLE_OVERRIDE}" ]]; then
   OO_BUNDLE=$OO_BUNDLE_OVERRIDE
+fi
+if [[ ! -z "${RECERT_IMAGE_OVERRIDE}" ]]; then
+  RECERT_IMAGE=$RECERT_IMAGE_OVERRIDE
 fi
 
 echo "Creating seed script..."
@@ -104,6 +107,7 @@ export SEED_RELEASE_IMAGE="${RELEASE_IMAGE}"
 export RECERT_IMAGE="${RECERT_IMAGE}"
 export SEED_FLOATING_TAG="${SEED_FLOATING_TAG}"
 export REGISTRY_AUTH_FILE="${BACKUP_SECRET_FILE}"
+export IP_STACK="${IP_STACK}"
 # Default capacity is 140GB and disk pressure is observed, which leads to pods
 # pending, both during installation and e2e tests.
 export DISK_GB=200

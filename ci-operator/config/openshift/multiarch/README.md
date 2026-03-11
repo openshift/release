@@ -27,10 +27,10 @@ The architectures will be represented in single character arrangements, with the
 ### Job Name Examples
 * `periodic-ci-openshift-multiarch-master-nightly-4.17-ocp-e2e-gcp-ovn-multi-x-ax`
   * e2e tests run in gcp using the multi payload with `x86_64` control plane and mixed `arm64` and `x86_64` compute nodes.
-* `periodic-ci-openshift-multiarch-master-nightly-4.17-ocp-e2e-gcp-ovn-multi-day-0-x-ax`
-  * e2e tests run in gcp using the multi payload with `x86_64` control plane and mixed `arm64` and `x86_64` compute nodes at deployment time (nodes not added later).
+* `periodic-ci-openshift-multiarch-master-nightly-4.17-ocp-e2e-gcp-ovn-multi-day-0-a-x`
+  * e2e tests run in gcp using the multi payload with `arm64` control plane and `x86_64` compute nodes at deployment time (no additional nodes added later).
 * `periodic-ci-openshift-multiarch-master-nightly-4.17-ocp-e2e-ibmcloud-ovn-multi-x-xz`
-  * e2e tests run in ibmcloud using the multi payload with `x86_64` control plane and mixed `s390x` and `x86_64` compute nodes.
+  * e2e tests run in ibmcloud using the multi payload with `x86_64` control plane and mixed `s390x` and `x86_64` compute nodes (additional nodes are added after initial deployment).
 * `periodic-ci-openshift-multiarch-master-nightly-4.17-ocp-e2e-gcp-ovn-multi-a-a`
   * e2e tests run in gcp using the multi payload with `arm64` control plane and compute nodes
 * `periodic-ci-openshift-multiarch-master-nightly-4.17-ocp-e2e-ovn-powervs-capi-multi-p-p`

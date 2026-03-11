@@ -25,9 +25,17 @@ postsubmits:
         - --target=copy-artifacts-gcs
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -74,7 +82,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-1\.24$
-    cluster: build05
+    cluster: build06
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -82,6 +90,14 @@ postsubmits:
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
     name: branch-ci-openshift-service-mesh-proxy-release-1.24-update-istio
+    reporter_config:
+      slack:
+        channel: '#team-ossm-release-maintenance'
+        job_states_to_report:
+        - failure
+        - error
+        report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+          <{{.Status.URL}}|View logs>'
     spec:
       containers:
       - args:
@@ -92,9 +108,17 @@ postsubmits:
         - --target=update-istio
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m

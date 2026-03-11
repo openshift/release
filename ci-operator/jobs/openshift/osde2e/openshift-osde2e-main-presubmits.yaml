@@ -13,7 +13,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-osde2e-main-code-quality-checks
     rerun_command: /test code-quality-checks
-    skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+    skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|(.*\.md)|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
     spec:
       containers:
       - args:
@@ -23,9 +23,17 @@ presubmits:
         - --target=code-quality-checks
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -67,7 +75,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-osde2e-main-hypershift-pr-check
     rerun_command: /test hypershift-pr-check
-    skip_if_only_changed: ^(?:docs|\.github|\.tekton|scripts|test)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
     spec:
       containers:
       - args:
@@ -80,9 +87,17 @@ presubmits:
         - --target=hypershift-pr-check
         command:
         - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
+        ports:
+        - containerPort: 8080
+          name: http
         resources:
           requests:
             cpu: 10m
@@ -128,4 +143,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )hypershift-pr-check,?($|\s.*)
+    trigger: (?m)^/test( | .* )(hypershift-pr-check|remaining-required),?($|\s.*)

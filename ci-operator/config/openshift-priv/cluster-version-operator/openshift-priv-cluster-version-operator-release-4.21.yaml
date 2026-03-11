@@ -11,14 +11,6 @@ base_images:
     name: hypershift-tests
     namespace: hypershift
     tag: latest
-  ocp_4.21_base-rhel9:
-    name: 4.21-priv
-    namespace: ocp-private
-    tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.21
   tests-private:
     name: tests-private
     namespace: ci
@@ -32,13 +24,6 @@ build_root:
 canonical_go_repository: github.com/openshift/cluster-version-operator
 images:
 - dockerfile_path: Dockerfile.rhel
-  inputs:
-    ocp_4.21_base-rhel9:
-      as:
-      - registry.ci.openshift.org/ocp/4.21:base-rhel9
-    ocp_builder_rhel-9-golang-1.24-openshift-4.21:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21
   to: cluster-version-operator
 promotion:
   to:
@@ -124,12 +109,12 @@ tests:
 - as: e2e-hypershift-conformance
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-conformance
 - as: e2e-hypershift
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: hypershift
+    cluster_profile: hypershift-aws
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-ovn-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

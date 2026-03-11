@@ -69,6 +69,10 @@ set -x # log the MG commands
 echo "Running sandboxed containers operator must-gather..."
 mkdir -p ${ARTIFACT_DIR}/must-gather-osc
 
+# Download the MCO sanitizer binary from mirror
+curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+chmod +x /tmp/mco-sanitize
+
 # Run must-gather with the sandboxed containers operator image
 oc --insecure-skip-tls-verify adm must-gather \
     --timeout="$MUST_GATHER_TIMEOUT" \
@@ -76,8 +80,11 @@ oc --insecure-skip-tls-verify adm must-gather \
     --image="$MUST_GATHER_IMAGE" \
     > "${ARTIFACT_DIR}/must-gather-osc/must-gather.log"
 
-# Redact sensitive information from machine config files
-find "${ARTIFACT_DIR}/must-gather-osc" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
+# Sanitize MCO resources to remove sensitive information.
+# If the sanitizer fails, fall back to manual redaction.
+if ! /tmp/mco-sanitize --input="${ARTIFACT_DIR}/must-gather-osc"; then
+  find "${ARTIFACT_DIR}/must-gather-osc" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "$1" && mv "$1" "$1.redacted"' _ {} \;
+fi                                                                                                                     
 
 # Create compressed archive
 tar -czC "${ARTIFACT_DIR}/must-gather-osc" -f "${ARTIFACT_DIR}/must-gather-osc.tar.gz" .

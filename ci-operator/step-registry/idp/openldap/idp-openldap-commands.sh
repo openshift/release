@@ -132,7 +132,10 @@ function configure_openldap() {
 
     echo "Creating a secret from the updated temporary init.ldif file"
     oc create secret generic ldap-init-ldif --from-file=init.ldif="$temp_ldif" -n ldap
-    oc adm policy add-scc-to-user anyuid -z default -n ldap
+
+    echo "Creating dedicated service account for OpenLDAP"
+    oc create serviceaccount openldap-sa -n ldap
+    oc adm policy add-scc-to-user anyuid -z openldap-sa -n ldap
 
     #Set ldap root password Secret
     LDAP_SECRET=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 12 | head -n 1 || true)
@@ -155,6 +158,7 @@ spec:
       labels:
         app: ldap
     spec:
+      serviceAccountName: openldap-sa
       containers:
       - name: ldap
         image: quay.io/openshifttest/ldap:multiarch

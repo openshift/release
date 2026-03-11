@@ -1,0 +1,40 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.21-openshift-4.18
+images:
+- dockerfile_path: Containerfile
+  to: dpf-ci
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- always_run: false
+  as: sanity
+  capabilities:
+  - intranet
+  cluster: build05
+  restrict_network_access: false
+  steps:
+    test:
+    - ref: dpf-hypervisor-sanity-existing
+  timeout: 1h0m0s
+- always_run: false
+  as: deploy-cluster
+  capabilities:
+  - intranet
+  cluster: build05
+  restrict_network_access: false
+  steps:
+    test:
+    - ref: dpf-hypervisor-deploy-cluster
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: openshift-dpf

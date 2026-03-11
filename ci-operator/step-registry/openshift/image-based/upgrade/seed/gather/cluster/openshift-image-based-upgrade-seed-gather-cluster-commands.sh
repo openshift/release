@@ -24,9 +24,18 @@ cat <<EOF > ${SHARED_DIR}/gather_seed_cluster.sh
 set -euo pipefail
 
 cd ${remote_workdir}
-oc --kubeconfig ${seed_kubeconfig} adm must-gather --dest-dir=./must-gather-cluster-${SEED_VM_NAME}
-find "./must-gather-cluster-${SEED_VM_NAME}" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "\$1" && mv "\$1" "\$1.redacted"' _ {} \;
 
+# Download the MCO sanitizer binary from mirror
+curl -sL "https://mirror.openshift.com/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
+chmod +x /tmp/mco-sanitize
+
+oc --kubeconfig ${seed_kubeconfig} adm must-gather --dest-dir=./must-gather-cluster-${SEED_VM_NAME}
+
+# Sanitize MCO resources to remove sensitive information.
+# If the sanitizer fails, fall back to manual redaction.
+if ! /tmp/mco-sanitize --input="./must-gather-cluster-${SEED_VM_NAME}"; then
+  find "./must-gather-cluster-${SEED_VM_NAME}" -type f -path '*/cluster-scoped-resources/machineconfiguration.openshift.io/*' -exec sh -c 'echo "REDACTED" > "\$1" && mv "\$1" "\$1.redacted"' _ {} \;
+fi  
 
 tar cvaf must-gather-cluster-${SEED_VM_NAME}.tar.gz ./must-gather-cluster-${SEED_VM_NAME}
 EOF

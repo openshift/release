@@ -3,7 +3,7 @@
 set -euo pipefail
 
 function check_cm_operator() {
-    echo "Checking the persence of the cert-manager Operator as prerequisite..."
+    echo "Checking the presence of the cert-manager Operator as prerequisite..."
     if ! oc wait deployment/cert-manager-operator-controller-manager -n cert-manager-operator --for=condition=Available --timeout=0; then
         echo "The cert-manager Operator is not installed or unavailable. Skipping rest of steps..."
         exit 0

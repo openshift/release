@@ -314,13 +314,13 @@ images:
   to: prcreator
 - additional_architectures:
   - arm64
-  context_dir: images/autoconfigbrancher/
+  context_dir: images/auto-config-brancher/
   from: os
   inputs:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go/bin/autoconfigbrancher
+        source_path: /go/bin/auto-config-brancher
       - destination_dir: .
         source_path: /go/bin/config-brancher
       - destination_dir: .
@@ -346,7 +346,7 @@ images:
       - destination_dir: .
         source_path: /go/bin/rebalancer
   to: auto-config-brancher
-- context_dir: images/prowjobdispatcher
+- context_dir: images/prow-job-dispatcher
   from: os
   inputs:
     bin:
@@ -358,7 +358,7 @@ images:
   to: prow-job-dispatcher
 - additional_architectures:
   - arm64
-  context_dir: images/autotestgridgenerator/
+  context_dir: images/auto-testgrid-generator/
   from: os
   inputs:
     bin:
@@ -366,7 +366,7 @@ images:
       - destination_dir: .
         source_path: /go/bin/testgrid-config-generator
       - destination_dir: .
-        source_path: /go/bin/autotestgridgenerator
+        source_path: /go/bin/auto-testgrid-generator
   to: auto-testgrid-generator
 - additional_architectures:
   - arm64
@@ -562,13 +562,13 @@ images:
   to: private-org-peribolos-sync
 - additional_architectures:
   - arm64
-  context_dir: images/autoperibolossync/
+  context_dir: images/auto-peribolos-sync/
   from: os
   inputs:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go/bin/autoperibolossync
+        source_path: /go/bin/auto-peribolos-sync
       - destination_dir: .
         source_path: /go/bin/private-org-peribolos-sync
   to: auto-peribolos-sync
@@ -886,6 +886,10 @@ resources:
     requests:
       cpu: "1"
       memory: 1Gi
+  unit:
+    requests:
+      cpu: "4"
+      memory: 4Gi
 test_binary_build_commands: make race-install
 tests:
 - as: unit
@@ -906,17 +910,11 @@ tests:
 - as: integration
   commands: make integration
   container:
-    from: test-bin
+    from: bin
   node_architecture: arm64
-- always_run: false
-  as: integration-optional-test
-  commands: make integration
-  container:
-    from: test-bin
-  node_architecture: arm64
-  pipeline_skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - always_run: false
   as: e2e
+  pipeline_run_if_changed: ^(cmd/(ci-operator|ci-operator-configresolver|pod-scaler|gsm-secret-sync|ci-secret-generator|ci-secret-bootstrap)/|pkg/|test/e2e/|Makefile|go\.(mod|sum)$)
   steps:
     test:
     - as: e2e
@@ -930,36 +928,28 @@ tests:
         LOCAL_REGISTRY_DNS=image-registry.openshift-image-registry.svc:5000 \
         make e2e
       credentials:
-      - collection: ""
-        mount_path: /auth
+      - mount_path: /auth
         name: ci-operator
         namespace: test-credentials
-      - collection: ""
-        mount_path: /tmp/pull-secret
+      - mount_path: /tmp/pull-secret
         name: registry-pull-credentials
         namespace: test-credentials
-      - collection: ""
-        mount_path: /etc/push-secret
+      - mount_path: /etc/push-secret
         name: registry-push-credentials-ci-central
         namespace: test-credentials
-      - collection: ""
-        mount_path: /tmp/import-secret
+      - mount_path: /tmp/import-secret
         name: ci-pull-credentials
         namespace: test-credentials
-      - collection: ""
-        mount_path: /tmp/gcs
+      - mount_path: /tmp/gcs
         name: gce-sa-credentials-gcs-publisher
         namespace: test-credentials
-      - collection: test-platform-infra
-        mount_path: /tmp/gcp-creds
+      - mount_path: /tmp/gcp-creds
         name: gsm-e2e-test-sa-key
         namespace: test-credentials
-      - collection: ""
-        mount_path: /tmp/hive
+      - mount_path: /tmp/hive
         name: hive-hive-credentials
         namespace: test-credentials
-      - collection: ""
-        mount_path: /secrets/manifest-tool
+      - mount_path: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         namespace: test-credentials
       env:
@@ -990,28 +980,22 @@ tests:
       commands: |
         GCS_CREDENTIALS_FILE=/tmp/gcs/service-account.json REMOTE_REGISTRY_SECRET_DIR=/tmp/import-secret LOCAL_REGISTRY_SECRET_DIR=/tmp/pull-secret KUBECONFIG=/auth/kubeconfig MANIFEST_TOOL_SECRET=/secrets/manifest-tool/.dockerconfigjson LOCAL_REGISTRY_DNS=image-registry.openshift-image-registry.svc:5000 make e2e TAGS=e2e_framework,optional_operators
       credentials:
-      - collection: ""
-        mount_path: /auth
+      - mount_path: /auth
         name: ci-operator
         namespace: test-credentials
-      - collection: ""
-        mount_path: /tmp/pull-secret
+      - mount_path: /tmp/pull-secret
         name: ci-pull-credentials
         namespace: test-credentials
-      - collection: ""
-        mount_path: /etc/push-secret
+      - mount_path: /etc/push-secret
         name: registry-push-credentials-ci-central
         namespace: test-credentials
-      - collection: ""
-        mount_path: /tmp/import-secret
+      - mount_path: /tmp/import-secret
         name: ci-pull-credentials
         namespace: test-credentials
-      - collection: ""
-        mount_path: /tmp/gcs
+      - mount_path: /tmp/gcs
         name: gce-sa-credentials-gcs-publisher
         namespace: test-credentials
-      - collection: ""
-        mount_path: /secrets/manifest-tool
+      - mount_path: /secrets/manifest-tool
         name: manifest-tool-local-pusher
         namespace: test-credentials
       from: test-bin
@@ -1031,11 +1015,10 @@ tests:
         export KUBECONFIG_SUFFIX=config
         make check-breaking-changes
       credentials:
-      - collection: ""
-        mount_path: /etc/kubeconfigs
+      - mount_path: /etc/kubeconfigs
         name: cluster-init
         namespace: ci
-      from: test-bin
+      from: bin
       resources:
         requests:
           cpu: 100m
@@ -1043,7 +1026,7 @@ tests:
 - as: checkconfig
   commands: make validate-checkconfig
   container:
-    from: test-bin
+    from: bin
   node_architecture: arm64
 - as: validate-vendor
   commands: make validate-vendor
@@ -1051,9 +1034,10 @@ tests:
     from: src
   node_architecture: arm64
 - as: frontend-checks
-  commands: make verify-frontend-format frontend-checks
+  commands: make cmd/pod-scaler/frontend/dist/dummy cmd/repo-init/frontend/dist/dummy
+    verify-frontend-format frontend-checks
   container:
-    from: test-bin
+    from: bin
   node_architecture: arm64
 - as: lint
   commands: make lint
