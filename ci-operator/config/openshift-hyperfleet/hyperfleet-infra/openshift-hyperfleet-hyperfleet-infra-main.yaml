@@ -1,0 +1,43 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.25-openshift-4.22
+images:
+- dockerfile_literal: |
+    FROM src
+    COPY src/ /opt/app-root/src
+    WORKDIR /opt/app-root/src/hyperfleet-infra
+    USER root
+    RUN yum -y install --setopt=skip_missing_names_on_install=False \
+      shellcheck \
+      unzip \
+      && yum clean all
+    RUN curl -fsSL -o /tmp/get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 \
+      && chmod +x /tmp/get_helm.sh && /tmp/get_helm.sh && rm /tmp/get_helm.sh
+    RUN TERRAFORM_VERSION=1.9.8 \
+      && curl -fsSL -o /tmp/terraform.zip "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" \
+      && unzip -o /tmp/terraform.zip -d /usr/local/bin/ && rm /tmp/terraform.zip
+  from: src
+  inputs:
+    src:
+      paths:
+      - destination_dir: src
+        source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-infra
+  to: infra-tools
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: validate
+  commands: |
+    helm plugin install https://github.com/aslafy-z/helm-git
+    make ci-dry-run BROKER_TYPE=rabbitmq
+  container:
+    from: infra-tools
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-infra
