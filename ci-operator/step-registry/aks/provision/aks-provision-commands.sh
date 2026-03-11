@@ -220,6 +220,7 @@ spec:
             - "3"
             - "4"
             - "5"
+            - "6"
 $(if [[ -n "$ZONE_VALUES" ]]; then
 cat <<ZONES
         - key: topology.kubernetes.io/zone
