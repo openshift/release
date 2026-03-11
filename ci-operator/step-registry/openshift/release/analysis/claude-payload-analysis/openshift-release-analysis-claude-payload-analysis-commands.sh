@@ -48,11 +48,15 @@ while true; do
     FAILED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Failed")] | length')
     SUCCEEDED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Succeeded")] | length')
     TOTAL=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[]] | length')
+    # Guard against release controller race: jobs may briefly report as Succeeded before being dispatched
+    NOT_STARTED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.url == null or .value.url == "")] | length')
 
     ELAPSED_MIN=$((ELAPSED / 60))
     echo "[Poll #${POLL_COUNT} | ${ELAPSED_MIN}m elapsed] Blocking jobs: ${SUCCEEDED}/${TOTAL} succeeded, ${PENDING} pending, ${FAILED} failed"
 
-    if [[ "${PENDING}" -eq 0 ]]; then
+    if [[ "${NOT_STARTED}" -gt 0 ]]; then
+        echo "  ${NOT_STARTED} job(s) have no prow URL yet, waiting for them to be dispatched..."
+    elif [[ "${PENDING}" -eq 0 ]]; then
         echo ""
         if [[ "${FAILED}" -eq 0 ]]; then
             echo "All ${TOTAL} blocking jobs succeeded. No analysis needed."
