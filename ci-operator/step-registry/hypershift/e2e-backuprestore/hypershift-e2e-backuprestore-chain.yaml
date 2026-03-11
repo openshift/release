@@ -4,6 +4,16 @@ chain:
   - as: tests
     cli: latest
     commands: |-
+      # Build the hypershift CLI binary from source
+      echo "Cloning hypershift repository..."
+      git clone --depth 1 https://github.com/openshift/hypershift.git /tmp/hypershift-src
+      echo "Building hypershift CLI..."
+      cd /tmp/hypershift-src
+      GOWORK=off go build -o /tmp/hypershift-cli/hypershift .
+      export PATH="/tmp/hypershift-cli:${PATH}"
+      hypershift version
+      cd /hypershift
+
       export E2E_HOSTED_CLUSTER_NAME=$(cat ${SHARED_DIR}/cluster-name)
       export E2E_HOSTED_CLUSTER_NAMESPACE=clusters
       bin/test-backuprestore --ginkgo.v --ginkgo.junit-report=${ARTIFACT_DIR}/junit_backuprestore_report.xml --ginkgo.label-filter="backup-restore" --ginkgo.fail-fast=true --ginkgo.timeout=2h
