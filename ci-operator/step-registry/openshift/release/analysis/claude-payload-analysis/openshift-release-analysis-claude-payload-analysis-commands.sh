@@ -21,6 +21,7 @@ STREAM=$(echo "${PAYLOAD_TAG}" | grep -oP '\d+\.\d+\.\d+-\d+\.\K[a-z]+')
 RELEASE_CONTROLLER_URL="https://amd64.ocp.releases.ci.openshift.org"
 STREAM_NAME="${VERSION}.0-0.${STREAM}"
 API_URL="${RELEASE_CONTROLLER_URL}/api/v1/releasestream/${STREAM_NAME}/release/${PAYLOAD_TAG}"
+PAYLOAD_URL="${RELEASE_CONTROLLER_URL}/releasestream/${STREAM_NAME}/release/${PAYLOAD_TAG}"
 
 echo "Version: ${VERSION}, Stream: ${STREAM}"
 echo "Release API: ${API_URL}"
@@ -55,6 +56,28 @@ while true; do
         echo ""
         if [[ "${FAILED}" -eq 0 ]]; then
             echo "All ${TOTAL} blocking jobs succeeded. No analysis needed."
+
+            RETRIED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.retries > 0)] | length')
+            TOTAL_RETRIES=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.retries > 0) | .value.retries] | add // 0')
+
+            # Send Slack notification for accepted payload
+            if [ -f "${SLACK_WEBHOOK_URL}" ]; then
+                WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
+
+                RETRY_INFO=""
+                if [[ "${RETRIED}" -gt 0 ]]; then
+                    RETRY_INFO=" ${RETRIED} job(s) needed ${TOTAL_RETRIES} total retries."
+                fi
+
+                SLACK_TEXT=":green-check: *Payload Accepted for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
+
+All ${TOTAL} blocking jobs succeeded.${RETRY_INFO}"
+
+                jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
+                    curl -sf -X POST -H 'Content-type: application/json' -d @- \
+                    "${WEBHOOK}" || echo "Warning: Failed to send Slack notification."
+            fi
+
             exit 0
         fi
         echo "All blocking jobs have completed. ${FAILED}/${TOTAL} failed. Starting analysis..."
@@ -198,7 +221,7 @@ if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
     if [ -f "${SLACK_WEBHOOK_URL}" ]; then
         WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
 
-        SLACK_TEXT=":claude-thinking: *Payload Analysis*
+        SLACK_TEXT=":claude-thinking: *Payload Analysis for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
 
 ${SUMMARY:-No summary available.}
 
