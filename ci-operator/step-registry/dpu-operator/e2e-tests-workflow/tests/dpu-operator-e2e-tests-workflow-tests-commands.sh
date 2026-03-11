@@ -69,8 +69,8 @@ _json_get() {
 
 get_nameservers() {
     local DNS_DATA
-    local URL1="https://github.com/openshift/release/blob/master/clusters/build-clusters/common_managed/dns.yaml"
-    local URL='https://raw.githubusercontent.com/openshift/release/refs/heads/master/clusters/build-clusters/common_managed/dns.yaml'
+    local URL1="https://github.com/openshift/release/blob/main/clusters/build-clusters/common_managed/dns.yaml"
+    local URL='https://raw.githubusercontent.com/openshift/release/refs/heads/main/clusters/build-clusters/common_managed/dns.yaml'
 
     DNS_DATA="$(curl --fail -s -L "$URL")" || die "get_nameservers: cannot download $URL1"
 
