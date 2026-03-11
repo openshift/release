@@ -29,6 +29,8 @@ echo "${NAMESPACE_NAME}" > "${SHARED_DIR}/namespace_name"
 # copy the deploy scripts to /tmp to avoid any potential permission issue when running deploy-clm.sh
 cp -r /e2e/ /tmp/
 cd "/tmp/e2e/deploy-scripts/"
+cp .env.example .env
+source .env
 ./deploy-clm.sh --action install --namespace $NAMESPACE_NAME
 
 log "=== Checking all deployed resources ==="
@@ -43,12 +45,33 @@ done
 log "SUCCESS: All pods are Running and deployment is healthy"
 
 
-EXTERNAL_IP=$(kubectl get svc hyperfleet-api -n $NAMESPACE_NAME -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+API_EXTERNAL_IP=$(kubectl get svc hyperfleet-api -n $NAMESPACE_NAME -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+if [[ -z "${API_EXTERNAL_IP}" ]]; then
+  log "ERROR: Failed to resolve Hyperfleet API external IP. Is the LoadBalancer ready?"
+  exit 1
+fi
 
-export HYPERFLEET_API_URL=http://${EXTERNAL_IP}:8000
+MAESTRO_EXTERNAL_IP=$(kubectl get svc maestro -n maestro -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+if [[ -z "${MAESTRO_EXTERNAL_IP}" ]]; then
+  log "ERROR: Failed to resolve Maestro external IP. Is the LoadBalancer ready?"
+  exit 1
+fi
+
+export HYPERFLEET_API_URL=http://${API_EXTERNAL_IP}:8000
 echo "${HYPERFLEET_API_URL}" > "${SHARED_DIR}/hyperfleet_api_url"
 
+export MAESTRO_URL=http://${MAESTRO_EXTERNAL_IP}:8000
+echo "${MAESTRO_URL}" > "${SHARED_DIR}/maestro_url"
+
+
 log "=== Checking Hyperfleet API accessibility ==="
-curl -X GET ${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/
+if ! curl -f -X GET ${HYPERFLEET_API_URL}/api/hyperfleet/v1/clusters/; then
+  log "ERROR: Hyperfleet API is not accessible at ${HYPERFLEET_API_URL}"
+  exit 1
+fi
 
-
+log "=== Checking Maestro API accessibility ==="
+if ! curl -f -X GET ${MAESTRO_URL}/api/maestro/v1/consumers; then
+  log "ERROR: Maestro API is not accessible at ${MAESTRO_URL}"
+  exit 1
+fi
