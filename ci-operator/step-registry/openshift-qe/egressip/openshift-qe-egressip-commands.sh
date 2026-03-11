@@ -12,8 +12,8 @@ bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
-   podman stop $(podman ps | grep nginxecho | awk '{ print $1 }') || echo 'No containers to stop'
-   podman rm $(podman ps -a | grep nginxecho | awk '{ print $1 }') || echo 'No containers to delete'
+   podman ps -q --filter ancestor=quay.io/cloud-bulldozer/nginxecho | xargs -r podman stop
+   podman ps -aq --filter ancestor=quay.io/cloud-bulldozer/nginxecho | xargs -r podman rm
    for port in {9002..9020}; do
       podman run --network=host -d -e LISTEN_PORT=\$port quay.io/cloud-bulldozer/nginxecho:latest
    done
@@ -75,6 +75,6 @@ fi
 ssh ${SSH_ARGS} root@${bastion} "
    set -e
    set -o pipefail
-   podman stop $(podman ps | grep nginxecho | awk '{ print $1 }')
-   podman rm $(podman ps -a | grep nginxecho | awk '{ print $1 }')
+   podman ps -q --filter ancestor=quay.io/cloud-bulldozer/nginxecho | xargs -r podman stop
+   podman ps -aq --filter ancestor=quay.io/cloud-bulldozer/nginxecho | xargs -r podman rm
 "
