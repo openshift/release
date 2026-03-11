@@ -33,7 +33,7 @@ tests:
     env:
       BASE_DOMAIN: observability.azure.devcluster.openshift.com
       CYPRESS_COO_NAMESPACE: coo
-      MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE: quay.io/redhat-user-workloads/cluster-observabilit-tenant/cluster-observability-operator/coo-fbc-v4-21@sha256:338c963ac8b54ca0b9f08aaeb76ca7c7108078ef90cc4277660388fcbbed98f4
+      MULTISTAGE_PARAM_OVERRIDE_COO_INDEX_IMAGE: brew.registry.redhat.io/rh-osbs/iib@sha256:4ffa46288ff9744a3f23aa8eb19c9a40a37420e756891df491244ff0aca8c1d6
       OPERATORS: |
         [
             {"name": "cluster-observability-operator", "source": "coo-catalogsource", "channel": "stable", "install_namespace": "coo", "target_namespaces": "", "operator_group":"coo-og"},
@@ -42,6 +42,7 @@ tests:
             {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.15", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"},
             {"name": "lightspeed-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-lightspeed", "target_namespaces": "openshift-lightspeed", "operator_group": "openshift-lightspeed"}
         ]
+      TIMEOUT: +8 hours
     test:
     - ref: rhobs-konflux-catalogsource
     - ref: rhobs-acm-patch-node
@@ -51,7 +52,18 @@ tests:
     - ref: rhobs-acm-alerting-ui-test
     - ref: distributed-tracing-tests-tracing-ui-integration
     - ref: rhobs-obo-test-harness
+    - ref: wait
     workflow: cucushift-installer-rehearse-azure-ipi
+- as: aws-ipi-disc-priv-f28-coo
+  cron: 37 13 27 * *
+  steps:
+    cluster_profile: azure-observability
+    env:
+      BASE_DOMAIN: observability.azure.devcluster.openshift.com
+      TIMEOUT: +8 hours
+    test:
+    - ref: wait
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 zz_generated_metadata:
   branch: main
   org: rhobs
