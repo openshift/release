@@ -30,16 +30,26 @@ export WORKLOAD=network-policy
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
-iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
-export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
+# On a freshly deployed environment, we am getting high and inconsistent latency for the first time. However the later runs giving us the consistent latency. So adding a dry run with 20 iterations to stabilize the environment before running the scale iterations to have consistent latency.
+export ITERATIONS=20
 
-export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE} --pods-per-namespace ${PODS_PER_NAMESPACE} --netpol-per-namespace ${NETPOL_PER_NAMESPACE} --local-pods ${LOCAL_PODS} --single-ports ${SINGLE_PORTS} --port-ranges ${PORT_RANGES} --remotes-namespaces ${REMOTE_NAMESPACES} --remotes-pods ${REMOTE_PODS} --cidrs ${CIDR}"
+export EXTRA_FLAGS
+
+./run.sh
+
+sleep 60
 
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
     EXTRA_FLAGS+=" --local-indexing"
 fi
-EXTRA_FLAGS+=" --gc-metrics=true --profile-type=${PROFILE_TYPE} --pods-per-namespace ${PODS_PER_NAMESPACE} --netpol-per-namespace ${NETPOL_PER_NAMESPACE} --local-pods ${LOCAL_PODS} --single-ports ${SINGLE_PORTS} --port-ranges ${PORT_RANGES} --remotes-namespaces ${REMOTE_NAMESPACES} --remotes-pods ${REMOTE_PODS} --cidrs ${CIDR}"
-export EXTRA_FLAGS
+
+export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
+
+iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
+export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
+
+EXTRA_FLAGS+=" --netpol-ready-threshold=$NETPOL_READY_THRESHOLD"
 
 ./run.sh
 
