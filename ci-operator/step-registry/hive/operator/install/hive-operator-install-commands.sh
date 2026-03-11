@@ -123,6 +123,12 @@ rules:
   verbs:
   - "*"
 - apiGroups:
+  - "apiregistration.k8s.io"
+  resources:
+  - "*"
+  verbs:
+  - "*"
+- apiGroups:
   - "hive.openshift.io"
   resources:
   - "*"
