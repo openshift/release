@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "====> Waiting for Cerberus observer pod to complete"
+echo "====> Waiting for Cerberus observer pod to complete and file to be ready"
 
 # Wait for the redhat-chaos-cerberus pod to complete before collecting report
 # The cerberus cleanup function creates files on EXIT, so we need to wait for completion
@@ -15,7 +15,7 @@ while [ $elapsed -lt $timeout ]; do
     cerberus_pods=$(oc get pods --all-namespaces --no-headers 2>/dev/null | grep "redhat-chaos-cerberus" || true)
 
     if [[ -z "$cerberus_pods" ]]; then
-        echo "No Cerberus observer pods found - assuming cleanup already completed"
+        echo "No Cerberus observer pods found - checking if file was already copied to observer pod"
         break
     fi
 
@@ -25,6 +25,8 @@ while [ $elapsed -lt $timeout ]; do
     if [[ -z "$running_pods" ]]; then
         echo "All Cerberus observer pods have completed"
         echo "$cerberus_pods"
+        echo "Waiting additional time for cleanup trap to finish copying files..."
+        sleep 15
         break
     fi
 
@@ -42,15 +44,41 @@ fi
 echo ""
 echo "====> Collecting Cerberus failure report"
 
+# Find the observer pod in TEST_NAMESPACE
 pods=$(oc get pods -n "${TEST_NAMESPACE}" --no-headers 2>/dev/null || true)
 
 if [[ -z "$pods" ]]; then
-    echo "ERROR: No cerberus pods found in namespace ${TEST_NAMESPACE}"
+    echo "ERROR: No pods found in namespace ${TEST_NAMESPACE}"
+    echo "The observer pod should have been created by the observer-start step"
     exit 1
 fi
 
 CREATED_POD_NAME=$(oc get pods -n "${TEST_NAMESPACE}" --no-headers | awk '{print $1}' | head -n 1)
-echo "Found pod: ${CREATED_POD_NAME} in namespace ${TEST_NAMESPACE}"
+echo "Found observer pod: ${CREATED_POD_NAME} in namespace ${TEST_NAMESPACE}"
+
+# Wait for the file to exist in the observer pod (cerberus cleanup copies it there)
+echo "Waiting for cerberus_history.json to be available in observer pod..."
+file_timeout=60
+file_elapsed=0
+file_exists=false
+
+while [ $file_elapsed -lt $file_timeout ]; do
+    if oc exec -n "${TEST_NAMESPACE}" "${CREATED_POD_NAME}" -- test -f /tmp/cerberus_history.json 2>/dev/null; then
+        echo "File cerberus_history.json found in observer pod"
+        file_exists=true
+        break
+    fi
+    echo "Waiting for file... (${file_elapsed}s elapsed)"
+    sleep 5
+    file_elapsed=$((file_elapsed + 5))
+done
+
+if [[ "$file_exists" == "false" ]]; then
+    echo "ERROR: cerberus_history.json not found in observer pod after ${file_timeout}s"
+    echo "Checking pod contents:"
+    oc exec -n "${TEST_NAMESPACE}" "${CREATED_POD_NAME}" -- ls -la /tmp/ || true
+    exit 1
+fi
 
 # Copy the cerberus_history.json file from the pod to ARTIFACT_DIR
 echo "Copying /tmp/cerberus_history.json from pod to ${ARTIFACT_DIR}/${CERBERUS_REPORT_FILE}"
