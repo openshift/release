@@ -26,15 +26,27 @@ tests:
   commands: ./ci/check-rendered-files.sh
   container:
     from: src
-- as: nightly
+- as: nightly-ephemeral
   cron: 0 7 * * *
   steps:
     post:
-    - as: e2e-teardown
+    - as: teardown-ephemeral
       commands: ./ci/nightly.sh --teardown
       credentials:
       - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-nightly-static-creds
+        name: rosa-regional-platform-ephemeral-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    pre:
+    - as: provision-ephemeral
+      commands: ./ci/nightly.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-ephemeral-creds
         namespace: test-credentials
       from: src
       resources:
@@ -43,10 +55,25 @@ tests:
           memory: 200Mi
     test:
     - as: e2e
-      commands: ./ci/nightly.sh
+      commands: ./ci/e2e-tests.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-nightly-static-creds
+        name: rosa-regional-platform-ephemeral-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: nightly-integration
+  cron: 0 7 * * *
+  steps:
+    test:
+    - as: e2e
+      commands: ./ci/e2e-tests.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-integration-creds
         namespace: test-credentials
       from: src
       resources:
@@ -57,14 +84,29 @@ tests:
   as: on-demand-e2e
   steps:
     post:
-    - as: pre-merge-teardown
+    - as: teardown-ephemeral
       commands: |-
         export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
         export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
-        uv run --no-cache ci/pre-merge.py --teardown
+        ./ci/nightly.sh --teardown-fire-and-forget
       credentials:
       - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-nightly-static-creds
+        name: rosa-regional-platform-ephemeral-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    pre:
+    - as: provision-ephemeral
+      commands: |-
+        export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
+        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
+        ./ci/nightly.sh
+      credentials:
+      - mount_path: /var/run/rosa-credentials
+        name: rosa-regional-platform-ephemeral-creds
         namespace: test-credentials
       from: src
       resources:
@@ -72,29 +114,26 @@ tests:
           cpu: 100m
           memory: 200Mi
     test:
-    - as: pre-merge
-      commands: |-
-        export REPOSITORY_URL=$(curl -s "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/pulls/${PULL_NUMBER}" | jq -r '.head.repo.clone_url')
-        export REPOSITORY_BRANCH="${PULL_HEAD_REF}"
-        uv run --no-cache ci/pre-merge.py
+    - as: e2e
+      commands: ./ci/e2e-tests.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-nightly-static-creds
+        name: rosa-regional-platform-ephemeral-creds
         namespace: test-credentials
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: nightly-resources-janitor
+- as: ephemeral-resources-janitor
   cron: 0 12 * * 0
   steps:
     test:
-    - as: nightly-resources-janitor
-      commands: ./ci/nightly-resources-janitor.sh
+    - as: ephemeral-resources-janitor
+      commands: ./ci/ephemeral-resources-janitor.sh
       credentials:
       - mount_path: /var/run/rosa-credentials
-        name: rosa-regional-platform-nightly-static-creds
+        name: rosa-regional-platform-ephemeral-creds
         namespace: test-credentials
       from: src
       resources:

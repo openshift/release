@@ -31,6 +31,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocp_4.10_cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
   rhel-7:
     name: builder
     namespace: ocp
@@ -49,6 +53,10 @@ images:
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci
   from: rhel-7
+  inputs:
+    ocp_4.10_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.10:cli
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
   from: base
@@ -190,19 +198,19 @@ tests:
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-azure-shared-vpc
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-sharednetwork
 - always_run: false
   as: e2e-azure-resourcegroup
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-resourcegroup
 - always_run: false
   as: e2e-aws-upgrade
@@ -232,7 +240,7 @@ tests:
   as: e2e-azure-upi
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-upi
 - always_run: false
   as: e2e-aws-workers-rhel8

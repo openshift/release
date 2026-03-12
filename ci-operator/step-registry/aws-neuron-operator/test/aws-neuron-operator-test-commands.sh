@@ -5,6 +5,17 @@ set -o pipefail
 
 echo "Starting AWS Neuron operator E2E tests"
 
+if ! command -v oc &>/dev/null; then
+    echo "oc not found, downloading OpenShift client..."
+    curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+        | tar xzf - -C /usr/local/bin oc kubectl 2>/dev/null || true
+    if command -v oc &>/dev/null; then
+        echo "oc installed: $(oc version --client 2>/dev/null || echo 'ok')"
+    else
+        echo "WARNING: failed to install oc"
+    fi
+fi
+
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 mkdir -p "${ARTIFACT_DIR}"
 
@@ -33,6 +44,34 @@ fi
 
 cd /home/testuser || exit 1
 
+dump_debug_info() {
+    local phase="${1:-unknown}"
+    local dump_dir="${ARTIFACT_DIR}/debug-${phase}"
+    mkdir -p "${dump_dir}"
+    echo "=== Collecting debug info for ${phase} ==="
+
+    oc get modules.kmm.sigs.x-k8s.io -A -o yaml > "${dump_dir}/kmm-modules.yaml" 2>&1 || true
+    oc get pods -A -o wide > "${dump_dir}/all-pods.txt" 2>&1 || true
+    oc get pods -n openshift-kmm -o wide > "${dump_dir}/kmm-pods.txt" 2>&1 || true
+    oc get daemonsets -A -o wide > "${dump_dir}/daemonsets.txt" 2>&1 || true
+    oc get events -A --sort-by='.lastTimestamp' > "${dump_dir}/events.txt" 2>&1 || true
+    oc get nodes -o json | jq '.items[].status.images[] | select(.names[] | test("neuron"))' > "${dump_dir}/node-neuron-images.json" 2>&1 || true
+    oc describe nodes > "${dump_dir}/nodes-describe.txt" 2>&1 || true
+    oc get csv -A > "${dump_dir}/csvs.txt" 2>&1 || true
+    oc get subscriptions -A -o yaml > "${dump_dir}/subscriptions.yaml" 2>&1 || true
+
+    oc logs -n openshift-kmm -l app.kubernetes.io/component=kmm --tail=500 > "${dump_dir}/kmm-operator-logs.txt" 2>&1 || true
+
+    local neuron_ns
+    neuron_ns=$(oc get pods -A -o json 2>/dev/null | jq -r '.items[] | select(.metadata.name | test("neuron")) | .metadata.namespace' | head -1 || true)
+    if [[ -n "${neuron_ns}" ]]; then
+        oc logs -n "${neuron_ns}" -l app.kubernetes.io/name=aws-neuron-operator --tail=500 > "${dump_dir}/neuron-operator-logs.txt" 2>&1 || true
+        oc get all -n "${neuron_ns}" -o wide > "${dump_dir}/neuron-ns-resources.txt" 2>&1 || true
+    fi
+
+    echo "=== Debug info collected in ${dump_dir} ==="
+}
+
 export ECO_TEST_FEATURES="${ECO_TEST_FEATURES:-neuron}"
 export ECO_TEST_LABELS="${ECO_TEST_LABELS:-neuron}"
 
@@ -50,6 +89,7 @@ ginkgo --label-filter="${ECO_TEST_LABELS} && vllm" \
     --junit-report=junit_neuron_vllm.xml \
     --output-dir="${ARTIFACT_DIR}" \
     ./tests/hw-accel/neuron/... || TEST_EXIT_CODE=$?
+dump_debug_info "phase1-vllm"
 
 echo "=== Phase 2: Metrics tests ==="
 ginkgo --label-filter="${ECO_TEST_LABELS} && metrics" \
@@ -58,6 +98,7 @@ ginkgo --label-filter="${ECO_TEST_LABELS} && metrics" \
     --junit-report=junit_neuron_metrics.xml \
     --output-dir="${ARTIFACT_DIR}" \
     ./tests/hw-accel/neuron/... || TEST_EXIT_CODE=$?
+dump_debug_info "phase2-metrics"
 
 echo "=== Phase 3: Upgrade tests ==="
 ginkgo --label-filter="${ECO_TEST_LABELS} && upgrade" \
@@ -66,6 +107,7 @@ ginkgo --label-filter="${ECO_TEST_LABELS} && upgrade" \
     --junit-report=junit_neuron_upgrade.xml \
     --output-dir="${ARTIFACT_DIR}" \
     ./tests/hw-accel/neuron/... || TEST_EXIT_CODE=$?
+dump_debug_info "phase3-upgrade"
 
 # Write operator version after tests (operator is deployed during test execution)
 NEURON_CSV=$(oc get csv -A -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -i neuron | head -1 || echo "")

@@ -3,6 +3,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v2.10.1
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
@@ -34,16 +38,21 @@ resources:
       memory: 200Mi
   lint:
     limits:
-      memory: 4Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
 - as: lint
   commands: |
-    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make lint
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --timeout=10m
   container:
-    from: src
+    clone: true
+    from: golangci-lint
+  timeout: 15m0s
 - as: unit
   commands: |
     export COVER_PROFILE=./unit_coverage.out
@@ -62,7 +71,7 @@ tests:
 - as: e2e-agnostic-upgrade
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: insights-operator-e2e-tests
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
