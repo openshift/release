@@ -1,0 +1,24 @@
+workflow:
+  as: release-qe-tests-stage-testing
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-aws-pre
+    - ref: enable-qe-catalogsource
+    test:
+    - ref: openshift-extended-test
+    - ref: openshift-e2e-test-qe-report
+    - ref: cucushift-e2e
+    post:
+    - chain: ipi-aws-post
+    env:
+      FILTERS_ADDITIONAL: ""
+      TEST_FILTERS: ~DisconnectedOnly&;~Disruptive&;Stagerun&;~ProdrunOnly&;~VMonly&;~CPaasrunOnly&;~MicroShiftOnly&
+      TEST_IMPORTANCE: all
+      TEST_SCENARIOS: Stagerun
+      TEST_TIMEOUT: "30"
+  documentation: |-
+    Stage testing workflow for OCP releases. Provisions an AWS IPI cluster,
+    enables QE catalogsource, runs openshift-extended-test with Stagerun
+    scenario filters, reports results via openshift-e2e-test-qe-report,
+    and executes cucushift-e2e tests.
