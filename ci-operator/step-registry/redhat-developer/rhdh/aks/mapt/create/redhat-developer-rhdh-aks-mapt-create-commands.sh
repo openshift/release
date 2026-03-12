@@ -26,19 +26,9 @@ function cleanup() {
   if [ $exit_code -eq 0 ] && ! echo "$output" | grep -qiE "(stderr|error|failed|exit status [1-9])"; then
     echo "$output"
     echo "[SUCCESS] ✅ Successfully destroyed MAPT: ${CORRELATE_MAPT}"
-
-    echo "[INFO] 🗑️ Deleting folder ${CORRELATE_MAPT}/ from Azure Blob Storage..."
-    az storage blob delete-batch \
-      --source "${AZURE_STORAGE_BLOB}" \
-      --account-name "${AZURE_STORAGE_ACCOUNT}" \
-      --account-key "${AZURE_STORAGE_KEY}" \
-      --pattern "${CORRELATE_MAPT}/*"
-
-    echo "[SUCCESS] ✅ Successfully deleted folder ${CORRELATE_MAPT} from blob container"
   else
     echo "$output"
     echo "[ERROR] ❌ Failed to destroy MAPT: ${CORRELATE_MAPT}"
-    echo "[WARN] ⚠️ Skipping deletion of folder ${CORRELATE_MAPT} from Azure Blob Storage due to destroy failure"
     exit 1
   fi
 }
