@@ -9,9 +9,12 @@ set +o xtrace
 echo "Pushing aro-hcp-exporter image to ACR..."
 
 # Azure login using cluster profile credentials
-export AZURE_CLIENT_ID; AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
-export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
-export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
+export AZURE_CLIENT_ID
+AZURE_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/client-id")
+export AZURE_TENANT_ID
+AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
+export AZURE_CLIENT_SECRET
+AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
 
 az login --service-principal \
   -u "${AZURE_CLIENT_ID}" \
@@ -19,29 +22,15 @@ az login --service-principal \
   --tenant "${AZURE_TENANT_ID}" \
   --output none
 
-# Resolve ACR target using templatize
-cd tooling/aro-hcp-exporter
-make -o ../../tooling/templatize/templatize /tmp/env.*.mk 2>/dev/null || true
+echo "CI-built image: ${ARO_HCP_EXPORTER}"
 
-# Source the generated env file to get ARO_HCP_IMAGE_ACR and image repo
-ENV_FILE=$(find /tmp -maxdepth 1 -name 'env.*.mk' -print -quit)
-if [[ -z "${ENV_FILE}" ]]; then
-  echo "ERROR: templatize env file not found"
-  exit 1
-fi
-# shellcheck source=/dev/null
-source "${ENV_FILE}"
+# TODO: Remove after ARO-HCP oc_mirror branch merges to main
+git remote add upstream https://github.com/Azure/ARO-HCP.git || true
+git fetch upstream oc_mirror
+git checkout upstream/oc_mirror -- tooling/aro-hcp-exporter/Makefile
 
-ACR_NAME="${ARO_HCP_IMAGE_ACR}"
-ACR_REGISTRY="${ACR_NAME}.azurecr.io"
-IMAGE_REPO="${ARO_HCP_EXPORTER_IMAGE_REPOSITORY}"
-IMAGE_TAG="$(git rev-parse --short=7 HEAD)"
-
-# Login to ACR
-az acr login --name "${ACR_NAME}"
-
-# The CI-built image is available via the ARO_HCP_EXPORTER env var
-echo "Copying ${ARO_HCP_EXPORTER} to ${ACR_REGISTRY}/${IMAGE_REPO}:${IMAGE_TAG}"
-oc image mirror "${ARO_HCP_EXPORTER}" "${ACR_REGISTRY}/${IMAGE_REPO}:${IMAGE_TAG}"
-
-echo "Image pushed successfully to ${ACR_REGISTRY}/${IMAGE_REPO}:${IMAGE_TAG}"
+# Use the Makefile acr-push target which resolves ACR coordinates
+# via setup-templatize-env.mk and pushes using oc image mirror
+make -C tooling/aro-hcp-exporter acr-push \
+  DEPLOY_ENV="${DEPLOY_ENV}" \
+  SOURCE_IMAGE="${ARO_HCP_EXPORTER}"
