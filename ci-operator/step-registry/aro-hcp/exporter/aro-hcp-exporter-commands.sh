@@ -24,11 +24,12 @@ cd tooling/aro-hcp-exporter
 make -o ../../tooling/templatize/templatize /tmp/env.*.mk 2>/dev/null || true
 
 # Source the generated env file to get ARO_HCP_IMAGE_ACR and image repo
-ENV_FILE=$(ls /tmp/env.*.mk 2>/dev/null | head -1)
+ENV_FILE=$(find /tmp -maxdepth 1 -name 'env.*.mk' -print -quit)
 if [[ -z "${ENV_FILE}" ]]; then
   echo "ERROR: templatize env file not found"
   exit 1
 fi
+# shellcheck source=/dev/null
 source "${ENV_FILE}"
 
 ACR_NAME="${ARO_HCP_IMAGE_ACR}"
