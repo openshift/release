@@ -31,6 +31,12 @@ FAILED_COMMITS=""
 for commit in ${COMMITS}; do
     MSG=$(git log -1 --format="%B" "${commit}")
     SHORT=$(git log -1 --format="%h %s" "${commit}")
+    AUTHOR=$(git log -1 --format="%an" "${commit}")
+
+    if [ "${AUTHOR}" = "openshift-bot" ] || [ "${AUTHOR}" = "openshift-art-build-bot" ]; then
+        echo "SKIP: ${SHORT} (bot commit)"
+        continue
+    fi
 
     MISSING_VERSION=false
     MISSING_SECRETS=false
