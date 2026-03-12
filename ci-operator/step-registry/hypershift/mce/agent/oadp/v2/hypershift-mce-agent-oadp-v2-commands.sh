@@ -101,6 +101,10 @@ EOF
 oc wait --timeout=20m --for=condition=Reconciled DataProtectionApplication/dpa-sample -n openshift-adp
 oc wait --timeout=20m --all --for=jsonpath='{.status.phase}'=Available backupStorageLocation -n openshift-adp
 
+# DEBUG: sleep for live debugging — remove before merging
+echo "DEBUG: DPA and BSL are ready. Sleeping 2h for interactive debugging — connect to management cluster now"
+sleep 2h
+
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
 cat <<EOF | oc apply -f -
 apiVersion: velero.io/v1
