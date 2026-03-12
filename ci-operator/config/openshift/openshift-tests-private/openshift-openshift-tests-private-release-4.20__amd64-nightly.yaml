@@ -123,18 +123,16 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- as: olmv1-benchmark-test
+- as: test-cluster-gcp
   capabilities:
   - intranet
   cron: 0 0,4,8 * * *
   steps:
-    allow_skip_on_success: true
     cluster_profile: gcp-qe
     env:
       VERSION: "4.20"
     test:
-    - ref: olmv1-performance
-    - ref: openshift-qe-orion-olmv1
+    - ref: wait
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: aws-c2s-ipi-disc-priv-fips-f14
   cron: 15 18 4,18 * *
@@ -271,17 +269,14 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: idp-external-oidc-entraid-aws
-- as: aws-ipi-f14-longduration-hive-remaining
-  cron: 12 15 12,26 * *
+- as: aws-ipi-test-cluster
+  cron: 17 2 6,13,20,29 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      FILTERS_ADDITIONAL: ~CPaasrunOnly&;~HiveSDRosa&;~HiveSpec&
-      TEST_SCENARIOS: Cluster_Operator
-      TEST_TIMEOUT: "90"
     test:
-    - ref: openshift-extended-test-longduration
+    - ref: wait
     workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-f14-longduration-hive-sd-rosa
   cron: 14 7 6,22 * *
