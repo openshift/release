@@ -17,9 +17,9 @@ function set-cluster-version-spec-update-service() {
     fi
 
     if [[ "${jsonpath_flag}" == "true" ]]; then
-        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.version}")"
+        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o "jsonpath={.metadata.version}")"
     else
-        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" | grep -oP '(?<=^  Version:  ).*$')"
+        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep -oP '(?<=^  Version:  ).*$')"
     fi
     echo "Release payload version: ${payload_version}"
 
@@ -47,13 +47,13 @@ function set-cluster-version-spec-update-service() {
     # and fall back to manifest-declared architecture
     local payload_arch
     if [[ "${jsonpath_flag}" == "true" ]]; then
-        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"
+        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"
         if [[ -z "${payload_arch}" ]]; then
             echo 'Payload architecture not found in .metadata.metadata["release.openshift.io/architecture"], using .config.architecture'
-            payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.config.architecture}")"
+            payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" -o "jsonpath={.config.architecture}")"
         fi
     else
-        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" | grep "^OS/Arch: " | cut -d/ -f3)"
+        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep "^OS/Arch: " | cut -d/ -f3)"
     fi
     local payload_arch_param
     if [[ -n "${payload_arch}" ]]; then
