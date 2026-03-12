@@ -100,15 +100,18 @@ cleanup_ssh() {
   # Kill the SOCKS proxy running on the jumphost
   ssh ${SSH_ARGS} root@${jumphost} "pkill -f 'ssh root@${bastion} -fNT -D'" 2>/dev/null || true
   # Kill local SSH processes
-  pkill ssh
+  pkill ssh || true
 }
 
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)
 
-# Generate a random port between 10000-65535 for SOCKS proxy
-SOCKS_PORT=$((RANDOM % 55536 + 10000))
+# Generate a random port between 10000-32767 for SOCKS proxy (avoid ephemeral port range 32768-60999)
+SOCKS_PORT=$((RANDOM % 22768 + 10000))
+
+# Clean up any stale SOCKS proxy SSH processes from previous runs
+cleanup_ssh
 
 # Step 1: Start SOCKS proxy on jumphost connecting to bastion (runs in background on jumphost)
 ssh ${SSH_ARGS} root@${jumphost} "ssh root@${bastion} -fNT -D 0.0.0.0:${SOCKS_PORT}" &
