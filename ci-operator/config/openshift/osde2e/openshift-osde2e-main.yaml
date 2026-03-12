@@ -37,14 +37,12 @@ tests:
     export CONFIGS="hypershift"
     export CHANNEL="stable"
     export SHARED_DIR="tmp/"
-    export SKIP_MUST_GATHER="true"
-    export SKIP_DESTROY_CLUSTER="true"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-credentials"
 
     go mod tidy
     make build
     echo "Provisioning and running e2e commands"
-    out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+    out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --skip-destroy-cluster --skip-must-gather
 
     echo "Copying cluster ID for krknai commands."
     if [[ ! -f "${SHARED_DIR}/cluster-id" ]];
@@ -53,7 +51,7 @@ tests:
         exit 1
     fi
     echo "Running krknai commands"
-    DRY_RUN=true SKIP_DESTROY_CLUSTER=false out/osde2e krkn-ai --configs "${CONFIGS}" --secret-locations "${SECRET_LOCATIONS}" --cluster-id "$(cat "${SHARED_DIR}/cluster-id")"
+    DRY_RUN=true out/osde2e krkn-ai --configs "${CONFIGS}" --secret-locations "${SECRET_LOCATIONS}" --cluster-id "$(cat "${SHARED_DIR}/cluster-id")"
     echo "Finished osde2e pr checks on ROSA hypershift."
   container:
     from: src
