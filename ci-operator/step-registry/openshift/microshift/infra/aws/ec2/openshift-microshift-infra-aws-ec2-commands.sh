@@ -57,29 +57,6 @@ REGION=""
 stack_name="microshift-$(cat /proc/sys/kernel/random/uuid)"
 cf_tpl_file="${SHARED_DIR}/${NAMESPACE}-cf-tpl.yaml"
 
-if "${SRC_FROM_GIT}"; then
-  branch=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
-  # MicroShift repo is recent enough to use main instead of master.
-  if [ "${branch}" == "master" ]; then
-    branch="main"
-  fi
-  CLONEREFS_OPTIONS=$(jq -n --arg branch "${branch}" '{
-    "src_root": "/go",
-    "log":"/dev/null",
-    "git_user_name": "ci-robot",
-    "git_user_email": "ci-robot@openshift.io",
-    "fail": true,
-    "refs": [
-      {
-        "org": "openshift",
-        "repo": "microshift",
-        "base_ref": $branch,
-        "workdir": true
-      }
-    ]
-  }')
-  export CLONEREFS_OPTIONS
-fi
 # To clone a private branch for testing cross-repository source changes, comment
 # out the 'ci_clone_src' function call and add the following commands instead.
 #
@@ -87,7 +64,7 @@ fi
 # GBRN=mybranch
 # git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
 #
-ci_clone_src
+ci_clone_src "${SRC_FROM_GIT}"
 src_path="/go/src/github.com/openshift/microshift"
 
 cp "${src_path}"/scripts/aws/cf-gen.yaml "${cf_tpl_file}"
