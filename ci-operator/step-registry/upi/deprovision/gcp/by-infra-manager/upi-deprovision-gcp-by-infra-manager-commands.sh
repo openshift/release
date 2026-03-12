@@ -6,9 +6,9 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-if test -f "/var/lib/openshift-install/upi/gcp/01_vpc/01_vpc.tf"; then
+if ! test -f "/var/lib/openshift-install/upi/gcp/01_vpc/01_vpc.tf"; then
 
-  echo "$(date -u --rfc-3339=seconds) - INFO: infra-manager resource files found, so infra-manager is preferred."
+  echo "$(date -u --rfc-3339=seconds) - INFO: infra-manager resource files not found, nothing to do."
   exit 0
 
 fi
@@ -72,6 +72,22 @@ function version_check() {
   return ${ret}
 }
 
+function run_command() {
+  local CMD="$1"
+  echo "$(date -u --rfc-3339=seconds) - Running command: ${CMD}"
+  eval "${CMD}"
+}
+
+# UPI resources directory names
+UPI_RESOURCE_DIR_VPC="01_vpc"
+UPI_RESOURCE_DIR_INFRA_DNS_PRIV_ZONE="02_dns"
+UPI_RESOURCE_DIR_INFRA_INTERNAL_LB="02_lb_int"
+UPI_RESOURCE_DIR_INFRA_EXTERNAL_LB="02_lb_ext"
+UPI_RESOURCE_DIR_SECURITY="03_security"
+UPI_RESOURCE_DIR_BOOTSTRAP="04_bootstrap"
+UPI_RESOURCE_DIR_CONTROL_PLANE="05_control_plane"
+UPI_RESOURCE_DIR_WORKER="06_worker"
+
 echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
 if version_check "4.12"; then
   GCLOUD_SDK_VERSION="563"
@@ -99,7 +115,7 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/xpn_creds.
   gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_XPN_KEYFILE_JSON}"
   GOOGLE_CLOUD_XPN_SA=$(jq -r .client_email "${GOOGLE_CLOUD_XPN_KEYFILE_JSON}")
 fi
-export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/gce.json"
+export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/installer-qe-upi-admin.json"
 gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}"
 gcloud config set project "$(jq -r .gcp.projectID "${SHARED_DIR}/metadata.json")"
 
@@ -115,6 +131,7 @@ BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
 BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
 CLUSTER_NAME="$(jq -r .clusterName "${SHARED_DIR}/metadata.json")"
 INFRA_ID="$(jq -r .infraID "${SHARED_DIR}/metadata.json")"
+REGION="$(jq -r .gcp.region "${SHARED_DIR}/metadata.json")"
 PRIVATE_ZONE_NAME="${INFRA_ID}-private-zone"
 
 ### Read XPN config, if exists
@@ -144,12 +161,9 @@ fi
 
 # Delete the bootstrap resources, but expect it to error.
 set +e
-if [[ -f "${SHARED_DIR}/04_bootstrap_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting bootstrap resources (errors when bootstrap-complete)..."
-  source "${SHARED_DIR}/04_bootstrap_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/04_bootstrap_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting bootstrap resources (errors when bootstrap-complete)..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_BOOTSTRAP//_/-} --location=${REGION}"
+run_command "${CMD}"
 set -e
 
 # Delete XPN DNS entries
@@ -197,59 +211,31 @@ set -e
 # Delete other resources of the cluster, but expect it to error.
 echo "$(date -u --rfc-3339=seconds) - FYI Below deletions may error because the resources are expected to be deleted during 'ipi-deprovision-deprovision' already."
 set +e
-if [[ -f "${SHARED_DIR}/06_worker_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting compute/worker machines..."
-  source "${SHARED_DIR}/06_worker_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/06_worker_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting compute/worker machines..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_WORKER//_/-} --location=${REGION}"
+run_command "${CMD}"
 
-if [[ -f "${SHARED_DIR}/05_control_plane_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting control-plane machines..."
-  source "${SHARED_DIR}/05_control_plane_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/05_control_plane_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting control-plane machines..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_CONTROL_PLANE//_/-} --location=${REGION}"
+run_command "${CMD}"
 
-if [[ -f "${SHARED_DIR}/03_firewall_rules_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting firewall-rules..."
-  source "${SHARED_DIR}/03_firewall_rules_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/03_firewall_rules_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting firewall-rules and IAM service accounts..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_SECURITY//_/-} --location=${REGION}"
+run_command "${CMD}"
 
-if [[ -f "${SHARED_DIR}/03_iam_sa_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting control-plane and compute/worker service accounts..."
-  source "${SHARED_DIR}/03_iam_sa_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/03_iam_sa_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting external load balancer resources..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_INFRA_EXTERNAL_LB//_/-} --location=${REGION}"
+run_command "${CMD}"
 
-if [[ -f "${SHARED_DIR}/02_external_lb_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting external load balancer resources..."
-  source "${SHARED_DIR}/02_external_lb_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/02_external_lb_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting internal load balancer resources..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_INFRA_INTERNAL_LB//_/-} --location=${REGION}"
+run_command "${CMD}"
 
-if [[ -f "${SHARED_DIR}/02_internal_lb_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting internal load balancer resources..."
-  source "${SHARED_DIR}/02_internal_lb_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/02_internal_lb_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting DNS private zone..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_INFRA_DNS_PRIV_ZONE//_/-} --location=${REGION}"
+run_command "${CMD}"
 
-if [[ -f "${SHARED_DIR}/02_dns_priv_zone_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting DNS private zone..."
-  source "${SHARED_DIR}/02_dns_priv_zone_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/02_dns_priv_zone_deprovision.sh' not found, skipped..."
-fi
-
-if [[ -f "${SHARED_DIR}/01_vpc_deprovision.sh" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Deleting VPC..."
-  source "${SHARED_DIR}/01_vpc_deprovision.sh"
-else
-  echo "$(date -u --rfc-3339=seconds) - '${SHARED_DIR}/01_vpc_deprovision.sh' not found, skipped..."
-fi
+echo "$(date -u --rfc-3339=seconds) - Deleting VPC..."
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_VPC//_/-} --location=${REGION}"
+run_command "${CMD}"
 set -e

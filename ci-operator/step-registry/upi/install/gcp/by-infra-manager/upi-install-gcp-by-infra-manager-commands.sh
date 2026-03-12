@@ -10,7 +10,11 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 
 if test -f "/var/lib/openshift-install/upi/gcp/01_vpc/01_vpc.tf"; then
 
-  echo "$(date -u --rfc-3339=seconds) - INFO: infra-manager resource files found, so infra-manager is preferred."
+  echo "$(date -u --rfc-3339=seconds) - INFO: infra-manager resource files found from 'upi-installer' !"
+
+else
+
+  echo "$(date -u --rfc-3339=seconds) - INFO: infra-manager resource files not found, nothing to do."
   exit 0
 
 fi
@@ -89,62 +93,40 @@ function short_wait()
   sleep "${seconds}s"
 }
 
+function infra_manager_debug()
+{
+  local -r deployment_name="$1"; shift
+  local -r cmd_ret="$1"; shift
+  local CMD
+
+  set +e
+  echo "$(date -u --rfc-3339=seconds) - Debugging for infrastructure manager deployment '${deployment_name}' (${cmd_ret})"
+  CMD="gcloud infra-manager deployments describe ${deployment_name} --location=${REGION}"
+  run_command "${CMD}"
+  set -e
+
+  echo "$(date -u --rfc-3339=seconds) - Should exit for command code '${cmd_ret}'"
+  exit ${cmd_ret}
+}
+
 function run_command() {
   local CMD="$1"
   echo "$(date -u --rfc-3339=seconds) - Running command: ${CMD}"
   eval "${CMD}"
 }
 
-# resources deprovision script filename
-# FYI the create_X function will populate the deprovision script file
-VPC_DEPROVISION_SCRIPTS="${SHARED_DIR}/01_vpc_deprovision.sh"
-EXTERNAL_LB_DEPROVISION_SCRIPTS="${SHARED_DIR}/02_external_lb_deprovision.sh"
-INTERNAL_LB_DEPROVISION_SCRIPTS="${SHARED_DIR}/02_internal_lb_deprovision.sh"
-DNS_PRIV_ZONE_DEPROVISION_SCRIPTS="${SHARED_DIR}/02_dns_priv_zone_deprovision.sh"
-FIREWALL_RULES_DEPROVISION_SCRIPTS="${SHARED_DIR}/03_firewall_rules_deprovision.sh"
-IAM_SA_DEPROVISION_SCRIPTS="${SHARED_DIR}/03_iam_sa_deprovision.sh"
-BOOTSTRAP_DEPROVISION_SCRIPTS="${SHARED_DIR}/04_bootstrap_deprovision.sh"
-CONTROL_PLANE_DEPROVISION_SCRIPTS="${SHARED_DIR}/05_control_plane_deprovision.sh"
-WORKER_DEPROVISION_SCRIPTS="${SHARED_DIR}/06_worker_deprovision.sh"
-
 function create_vpc()
 {
-  local -r infra_id="$1"; shift
-  local -r region="$1"; shift
   local -r subnet1_cidr="$1"; shift
   local -r subnet2_cidr="$1"; shift
-  local -r deprovision_commands_file="$1"
-  local CMD=""
+  local CMD="" cmd_ret=0
 
-  # create network
-  CMD="gcloud compute networks create ${infra_id}-network --subnet-mode=custom"
-  run_command "${CMD}"
-
-  # create subnets
-  CMD="gcloud compute networks subnets create ${infra_id}-master-subnet --network=${infra_id}-network --range=${subnet1_cidr} --region=${region}"
-  run_command "${CMD}"
-  CMD="gcloud compute networks subnets create ${infra_id}-worker-subnet --network=${infra_id}-network --range=${subnet2_cidr} --region=${region}"
-  run_command "${CMD}"
-
-  # create router
-  CMD="gcloud compute routers create ${infra_id}-router --network=${infra_id}-network --region=${region}"
-  run_command "${CMD}"
-
-  # create nats
-  CMD="gcloud compute routers nats create ${infra_id}-nat-master --router=${infra_id}-router --auto-allocate-nat-external-ips --nat-custom-subnet-ip-ranges=${infra_id}-master-subnet --region=${region}"
-  run_command "${CMD}"
-  CMD="gcloud compute routers nats create ${infra_id}-nat-worker --router=${infra_id}-router --auto-allocate-nat-external-ips --nat-custom-subnet-ip-ranges=${infra_id}-worker-subnet --region=${region}"
-  run_command "${CMD}"
-
-  # for deprovision
-  cat > "${deprovision_commands_file}" << EOF
-gcloud compute routers nats delete -q ${infra_id}-nat-master --router ${infra_id}-router --region ${region}
-gcloud compute routers nats delete -q ${infra_id}-nat-worker --router ${infra_id}-router --region ${region}
-gcloud compute routers delete -q ${infra_id}-router --region ${region}
-gcloud compute networks subnets delete -q ${infra_id}-master-subnet --region ${region}
-gcloud compute networks subnets delete -q ${infra_id}-worker-subnet --region ${region}
-gcloud compute networks delete -q ${infra_id}-network
-EOF
+  CMD="gcloud infra-manager deployments apply ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_VPC//_/-} --location=${REGION} --input-values=infra_id=${INFRA_ID},project=${PROJECT_NAME},region=${REGION},master_subnet_cidr=${subnet1_cidr},worker_subnet_cidr=${subnet2_cidr} --project=${PROJECT_NAME} --service-account=${INSTALL_SERVICE_ACCOUNT}"
+  CMD="${CMD} ${SOURCE_OPTIONS}/${UPI_RESOURCE_DIR_VPC}"
+  run_command "${CMD}" || cmd_ret=$?
+  if [ $cmd_ret -ne 0 ]; then
+    infra_manager_debug "${CLUSTER_NAME}-${UPI_RESOURCE_DIR_VPC//_/-}" "${REGION}" $cmd_ret
+  fi
 }
 
 echo "$(date -u --rfc-3339=seconds) - Configuring gcloud..."
@@ -174,9 +156,10 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/xpn_creds.
   gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_XPN_KEYFILE_JSON}"
   GOOGLE_CLOUD_XPN_SA=$(jq -r .client_email "${GOOGLE_CLOUD_XPN_KEYFILE_JSON}")
 fi
-export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/gce.json"
+export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/installer-qe-upi-admin.json"
 gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}"
 gcloud config set project "$(jq -r .gcp.projectID "${SHARED_DIR}/metadata.json")"
+INSTALL_SERVICE_ACCOUNT="projects/$(jq -r .gcp.projectID ${SHARED_DIR}/metadata.json)/serviceAccounts/$(jq -r .client_email ${GOOGLE_CLOUD_KEYFILE_JSON})"
 
 echo "$(date -u --rfc-3339=seconds) - Copying config from shared dir..."
 dir=/tmp/installer
@@ -189,7 +172,22 @@ cp -t "${dir}" \
 cp -t "${dir}/auth" \
     "${SHARED_DIR}/kubeadmin-password" \
     "${SHARED_DIR}/kubeconfig"
+cp -t "${dir}" -r \
+    "/var/lib/openshift-install/upi/${CLUSTER_TYPE}"
 tar -xzf "${SHARED_DIR}/.openshift_install_state.json.tgz"
+
+# UPI resources directory names
+UPI_RESOURCE_DIR_VPC="01_vpc"
+UPI_RESOURCE_DIR_INFRA_DNS_PRIV_ZONE="02_dns"
+UPI_RESOURCE_DIR_INFRA_INTERNAL_LB="02_lb_int"
+UPI_RESOURCE_DIR_INFRA_EXTERNAL_LB="02_lb_ext"
+UPI_RESOURCE_DIR_SECURITY="03_security"
+UPI_RESOURCE_DIR_BOOTSTRAP="04_bootstrap"
+UPI_RESOURCE_DIR_CONTROL_PLANE="05_control_plane"
+UPI_RESOURCE_DIR_WORKER="06_worker"
+
+GCP_UPI_SOURCE_FILES_DIR="${dir}/gcp"
+SOURCE_OPTIONS="--local-source=${GCP_UPI_SOURCE_FILES_DIR}"
 
 function backoff() {
     local attempt=0
@@ -226,6 +224,7 @@ CLUSTER_NAME="$(jq -r .clusterName metadata.json)"
 INFRA_ID="$(jq -r .infraID metadata.json)"
 PROJECT_NAME="$(jq -r .gcp.projectID metadata.json)"
 REGION="$(jq -r .gcp.region metadata.json)"
+
 ## Available zones and instance zones might be different in region for arm64 machines
 mapfile -t AVAILABILITY_ZONES < <(gcloud compute regions describe "${REGION}" --format=json | jq -r '.zones[]' | cut -d "/" -f9)
 mapfile -t MASTER_INSTANCE_ZONES < <(gcloud compute machine-types list --filter="zone:(${REGION}) AND name=(${CONTROL_PLANE_NODE_TYPE})" --format=json | jq -r '.[].zone')
@@ -233,9 +232,6 @@ mapfile -t MASTER_ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${MASTER_INSTANCE_Z
 for index in {0..2}; do
   eval ZONE_${index}=${MASTER_ZONES[index]}
 done
-
-MASTER_IGNITION="$(cat master.ign)"
-WORKER_IGNITION="$(cat worker.ign)"
 
 echo "Using infra_id: ${INFRA_ID}"
 
@@ -273,7 +269,7 @@ elif [[ -f "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
   CONTROL_SUBNET="$(gcloud compute networks subnets describe "${CLUSTER_NAME}-master-subnet" "--region=${REGION}" --format json | jq -r .selfLink)"
   COMPUTE_SUBNET="$(gcloud compute networks subnets describe "${CLUSTER_NAME}-worker-subnet" "--region=${REGION}" --format json | jq -r .selfLink)"
 else
-  create_vpc "${INFRA_ID}" "${REGION}" "${MASTER_SUBNET_CIDR}" "${WORKER_SUBNET_CIDR}" "${VPC_DEPROVISION_SCRIPTS}"
+  create_vpc "${MASTER_SUBNET_CIDR}" "${WORKER_SUBNET_CIDR}"
   short_wait 3
 
   ## Configure VPC variables
@@ -284,117 +280,47 @@ fi
 
 function create_external_lb()
 {
-  local -r infra_id="$1"; shift
-  local -r region="$1"; shift
-  local -r deprovision_commands_file="$1"
-  local CMD address_selflink hc_selflink tp_selflink
+  local CMD cmd_ret=0
 
-  # create address
-  CMD="gcloud compute addresses create ${infra_id}-cluster-public-ip --region=${region}"
-  run_command "${CMD}"
+  CMD="gcloud infra-manager deployments apply ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_INFRA_EXTERNAL_LB//_/-} --location=${REGION} --input-values=infra_id=${INFRA_ID},project=${PROJECT_NAME},region=${REGION} --project=${PROJECT_NAME} --service-account=${INSTALL_SERVICE_ACCOUNT}"
+  CMD="${CMD} ${SOURCE_OPTIONS}/${UPI_RESOURCE_DIR_INFRA_EXTERNAL_LB}"
+  run_command "${CMD}" || cmd_ret=$?
+  if [ $cmd_ret -ne 0 ]; then
+    infra_manager_debug "${CLUSTER_NAME}-${UPI_RESOURCE_DIR_INFRA_EXTERNAL_LB//_/-}" "${REGION}" $cmd_ret
+  fi
   short_wait
-  address_selflink=$(gcloud compute addresses describe ${infra_id}-cluster-public-ip --region=${region} --format=json | jq -r .selfLink)
-
-  # create http-health-check
-  CMD="gcloud compute http-health-checks create ${infra_id}-api-http-health-check --port=6080 --request-path=\"/readyz\""
-  run_command "${CMD}"
-  short_wait
-  hc_selflink=$(gcloud compute http-health-checks describe ${infra_id}-api-http-health-check --format=json | jq -r .selfLink)
-
-  # create target-pool
-  CMD="gcloud compute target-pools create ${infra_id}-api-target-pool --http-health-check=${hc_selflink} --region=${region}"
-  run_command "${CMD}"
-  short_wait
-  tp_selflink=$(gcloud compute target-pools describe ${infra_id}-api-target-pool --region=${region} --format=json | jq -r .selfLink)
-
-  # create forwarding-rule
-  CMD="gcloud compute forwarding-rules create ${infra_id}-api-forwarding-rule --region=${region} --address=${address_selflink} --target-pool=${tp_selflink} --port-range=6443"
-  run_command "${CMD}"
-  short_wait
-
-  # for deprovision
-  cat > "${deprovision_commands_file}" << EOF
-gcloud compute forwarding-rules delete -q ${infra_id}-api-forwarding-rule --region=${region}
-gcloud compute target-pools delete -q ${infra_id}-api-target-pool --region=${region}
-gcloud compute http-health-checks delete -q ${infra_id}-api-http-health-check
-gcloud compute addresses delete -q ${infra_id}-cluster-public-ip --region=${region}
-EOF
 }
 
 function create_internal_lb()
 {
-  local -r infra_id="$1"; shift
-  local -r region="$1"; shift
+  local -r cluster_network="$1"; shift
   local -r control_subnet="$1"; shift
-  local -r deprovision_commands_file="$1"; shift
-  local -r zones=("$@")
-  local CMD address_selflink hc_selflink bs_selflink
+  local -r zone_0="$1"; shift
+  local -r zone_1="$1"; shift
+  local -r zone_2="$1"; shift
+  local CMD cmd_ret=0
 
-  # create internal address
-  CMD="gcloud compute addresses create ${infra_id}-cluster-ip --region=${region} --subnet=${control_subnet}"
-  run_command "${CMD}"
+  CMD="gcloud infra-manager deployments apply ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_INFRA_INTERNAL_LB//_/-} --location=${REGION} --input-values=infra_id=${INFRA_ID},project=${PROJECT_NAME},region=${REGION},cluster_network=${cluster_network},control_subnet=${control_subnet},zone_0=${zone_0},zone_1=${zone_1},zone_2=${zone_2} --project=${PROJECT_NAME} --service-account=${INSTALL_SERVICE_ACCOUNT}"
+  CMD="${CMD} ${SOURCE_OPTIONS}/${UPI_RESOURCE_DIR_INFRA_INTERNAL_LB}"
+  run_command "${CMD}" || cmd_ret=$?
+  if [ $cmd_ret -ne 0 ]; then
+    infra_manager_debug "${CLUSTER_NAME}-${UPI_RESOURCE_DIR_INFRA_INTERNAL_LB//_/-}" "${REGION}" $cmd_ret
+  fi
   short_wait
-  address_selflink=$(gcloud compute addresses describe ${infra_id}-cluster-ip --region=${region} --format=json | jq -r .selfLink)
-
-  # create health-check
-  CMD="gcloud compute health-checks create https ${infra_id}-api-internal-health-check --port=6443 --request-path=\"/readyz\""
-  run_command "${CMD}"
-  short_wait
-  hc_selflink=$(gcloud compute health-checks describe ${infra_id}-api-internal-health-check --format=json | jq -r .selfLink)
-
-  # create backend-service
-  CMD="gcloud compute backend-services create ${infra_id}-api-internal --region=${region} --protocol=TCP --load-balancing-scheme=INTERNAL --health-checks=${hc_selflink} --timeout=120"
-  run_command "${CMD}"
-  short_wait
-  bs_selflink=$(gcloud compute backend-services describe ${infra_id}-api-internal --region=${region} --format=json | jq -r .selfLink)
-
-  # create instance-groups
-  for zone in "${zones[@]}"; do
-    CMD="gcloud compute instance-groups unmanaged create ${infra_id}-master-${zone}-ig --zone=${zone}"
-    run_command "${CMD}"
-    short_wait
-    CMD="gcloud compute instance-groups unmanaged set-named-ports ${infra_id}-master-${zone}-ig --zone=${zone} --named-ports=ignition:22623,https:6443"
-    run_command "${CMD}"
-    short_wait
-    #CMD="gcloud compute backend-services add-backend ${infra_id}-api-internal --region=${region} --instance-group=${infra_id}-master-${zone}-ig --instance-group-zone=${zone}"
-    #run_command "${CMD}"
-  done
-
-  # create forwarding-rule
-  CMD="gcloud compute forwarding-rules create ${infra_id}-api-internal-forwarding-rule --region=${region} --load-balancing-scheme=INTERNAL --ports=6443,22623 --backend-service=${bs_selflink} --address=${address_selflink} --subnet=${control_subnet}"
-  run_command "${CMD}"
-  short_wait
-
-  # for deprovision
-  cat > "${deprovision_commands_file}" << EOF
-gcloud compute forwarding-rules delete -q ${infra_id}-api-internal-forwarding-rule --region=${region}
-gcloud compute backend-services delete -q ${infra_id}-api-internal --region=${region}
-gcloud compute health-checks delete -q https ${infra_id}-api-internal-health-check
-gcloud compute addresses delete -q ${infra_id}-cluster-ip --region=${region}
-EOF
-  for zone in "${zones[@]}"; do
-    cat >> "${deprovision_commands_file}" << EOF
-gcloud compute instance-groups unmanaged delete -q ${infra_id}-master-${zone}-ig --zone=${zone}
-EOF
-  done
 }
 
 function create_dns_private_zone()
 {
-  local -r infra_id="$1"; shift
   local -r cluster_domain="$1"; shift
   local -r cluster_network="$1"; shift
-  local -r deprovision_commands_file="$1"
-  local CMD
+  local CMD cmd_ret=0
 
-  CMD="gcloud dns managed-zones create ${infra_id}-private-zone --dns-name=${cluster_domain}. --visibility=private --networks=${cluster_network} --description=${infra_id}-private-zone"
-  run_command "${CMD}"
-  short_wait
-
-  # for deprovision
-  cat > "${deprovision_commands_file}" << EOF
-gcloud dns managed-zones delete -q ${infra_id}-private-zone
-EOF
+  CMD="gcloud infra-manager deployments apply ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_INFRA_DNS_PRIV_ZONE//_/-} --location=${REGION} --input-values=infra_id=${INFRA_ID},project=${PROJECT_NAME},region=${REGION},cluster_domain=${cluster_domain},cluster_network=${cluster_network} --project=${PROJECT_NAME} --service-account=${INSTALL_SERVICE_ACCOUNT}"
+  CMD="${CMD} ${SOURCE_OPTIONS}/${UPI_RESOURCE_DIR_INFRA_DNS_PRIV_ZONE}"
+  run_command "${CMD}" || cmd_ret=$?
+  if [ $cmd_ret -ne 0 ]; then
+    infra_manager_debug "${CLUSTER_NAME}-${UPI_RESOURCE_DIR_INFRA_DNS_PRIV_ZONE//_/-}" "${REGION}" $cmd_ret
+  fi
 }
 
 ## Create DNS entries and load balancers
@@ -404,16 +330,16 @@ if [[ -v IS_XPN ]]; then
   PRIVATE_ZONE_NAME="${HOST_PROJECT_PRIVATE_ZONE_NAME}"
 else
   PRIVATE_ZONE_NAME="${INFRA_ID}-private-zone"
-  create_dns_private_zone "${INFRA_ID}" "${CLUSTER_NAME}.${BASE_DOMAIN}" "${CLUSTER_NETWORK}" "${DNS_PRIV_ZONE_DEPROVISION_SCRIPTS}"
+  create_dns_private_zone "${CLUSTER_NAME}.${BASE_DOMAIN}" "${CLUSTER_NETWORK}"
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Creating internal load balancer resources..."
-create_internal_lb "${INFRA_ID}" "${REGION}" "${CONTROL_SUBNET}" "${INTERNAL_LB_DEPROVISION_SCRIPTS}" "${ZONE_0}" "${ZONE_1}" "${ZONE_2}"
+create_internal_lb "${CLUSTER_NETWORK}" "${CONTROL_SUBNET}" "${ZONE_0}" "${ZONE_1}" "${ZONE_2}"
 if [[ "${PUBLISH}" == "Internal" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Publish is '${PUBLISH}', so deploying a private cluster..."
 else
   echo "$(date -u --rfc-3339=seconds) - Creating external load balancer resources..."
-  create_external_lb "${INFRA_ID}" "${REGION}" "${EXTERNAL_LB_DEPROVISION_SCRIPTS}"
+  create_external_lb
 fi
 
 ## Configure infra variables
@@ -442,63 +368,20 @@ if [[ "${PUBLISH}" != "Internal" ]]; then
   gcloud dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
 fi
 
-function create_iam_sa()
+function create_firewall_rules_and_iam_sa()
 {
-  local -r infra_id="$1"; shift
-  local -r deprovision_commands_file="$1"
-  local CMD sa1_email sa2_email
-
-  CMD="gcloud iam service-accounts create ${infra_id}-m --display-name=${infra_id}-master-node"
-  run_command "${CMD}"
-  short_wait
-  sa1_email=$(gcloud iam service-accounts list --filter='email~${infra_id}-m' --format='value(email)')
-
-  CMD="gcloud iam service-accounts create ${infra_id}-w --display-name=${infra_id}-worker-node"
-  run_command "${CMD}"
-  short_wait
-  sa2_email=$(gcloud iam service-accounts list --filter='email~${infra_id}-w' --format='value(email)')
-
-  # for deprovision
-  cat > "${deprovision_commands_file}" << EOF
-gcloud iam service-accounts delete -q ${sa1_email}
-gcloud iam service-accounts delete -q ${sa2_email}
-EOF
-}
-
-function create_firewall_rules()
-{
-  local -r infra_id="$1"; shift
   local -r cluster_network="$1"; shift
   local -r network_cidr="$1"; shift
   local -r allowed_external_cidr="$1"; shift
-  local -r deprovision_commands_file="$1"
-  local CMD
+  local CMD cmd_ret=0
 
-  CMD="gcloud compute firewall-rules create ${infra_id}-bootstrap-in-ssh --network=${cluster_network} --allow=tcp:22 --source-ranges=${allowed_external_cidr} --target-tags=${infra_id}-bootstrap"
-  run_command "${CMD}"
-
-  CMD="gcloud compute firewall-rules create ${infra_id}-api --network=${cluster_network} --allow=tcp:6443 --source-ranges=${allowed_external_cidr} --target-tags=${infra_id}-master"
-  run_command "${CMD}"
-
-  CMD="gcloud compute firewall-rules create ${infra_id}-health-checks --network=${cluster_network} --allow=tcp:6080,tcp:6443,tcp:22624 --source-ranges=35.191.0.0/16,130.211.0.0/22,209.85.152.0/22,209.85.204.0/22 --target-tags=${infra_id}-master"
-  run_command "${CMD}"
-
-  CMD="gcloud compute firewall-rules create ${infra_id}-etcd --network=${cluster_network} --allow=tcp:2379-2380 --source-tags=${infra_id}-master --target-tags=${infra_id}-master"
-  run_command "${CMD}"
-
-  CMD="gcloud compute firewall-rules create ${infra_id}-control-plane --network=${cluster_network} --allow=tcp:10257,tcp:10259,tcp:22623 --source-tags=${infra_id}-master,${infra_id}-worker --target-tags=${infra_id}-master"
-  run_command "${CMD}"
-
-  CMD="gcloud compute firewall-rules create ${infra_id}-internal-network --network=${cluster_network} --allow=icmp,tcp:22 --source-ranges=${network_cidr} --target-tags=${infra_id}-master,${infra_id}-worker"
-  run_command "${CMD}"
-
-  CMD="gcloud compute firewall-rules create ${infra_id}-internal-cluster --network=${cluster_network} --allow=udp:4789,udp:6081,udp:500,udp:4500,esp,tcp:9000-9999,udp:9000-9999,tcp:10250,tcp:30000-32767,udp:30000-32767 --source-tags=${infra_id}-master,${infra_id}-worker --target-tags=${infra_id}-master,${infra_id}-worker"
-  run_command "${CMD}"
-
-  # for deprovision
-  cat > "${deprovision_commands_file}" << EOF
-gcloud compute firewall-rules delete -q ${infra_id}-bootstrap-in-ssh ${infra_id}-api ${infra_id}-health-checks ${infra_id}-etcd ${infra_id}-control-plane ${infra_id}-internal-network ${infra_id}-internal-cluster
-EOF
+  CMD="gcloud infra-manager deployments apply ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_SECURITY//_/-} --location=${REGION} --input-values=infra_id=${INFRA_ID},project=${PROJECT_NAME},region=${REGION},cluster_network=${cluster_network},network_cidr=${network_cidr},allowed_external_cidr=${allowed_external_cidr} --project=${PROJECT_NAME} --service-account=${INSTALL_SERVICE_ACCOUNT}"
+  CMD="${CMD} ${SOURCE_OPTIONS}/${UPI_RESOURCE_DIR_SECURITY}"
+  run_command "${CMD}" || cmd_ret=$?
+  if [ $cmd_ret -ne 0 ]; then
+    infra_manager_debug "${CLUSTER_NAME}-${UPI_RESOURCE_DIR_SECURITY//_/-}" "${REGION}" $cmd_ret
+  fi
+  short_wait
 }
 
 ## Create firewall rules and IAM roles
@@ -509,8 +392,7 @@ if [[ -v IS_XPN ]]; then
   MASTER_SERVICE_ACCOUNT="${HOST_PROJECT_CONTROL_SERVICE_ACCOUNT}"
   WORKER_SERVICE_ACCOUNT="${HOST_PROJECT_COMPUTE_SERVICE_ACCOUNT}"
 else
-  create_iam_sa "${INFRA_ID}" "${IAM_SA_DEPROVISION_SCRIPTS}"
-  create_firewall_rules "${INFRA_ID}" "${CLUSTER_NETWORK}" "${NETWORK_CIDR}" "0.0.0.0/0" "${FIREWALL_RULES_DEPROVISION_SCRIPTS}"
+  create_firewall_rules_and_iam_sa "${CLUSTER_NETWORK}" "${NETWORK_CIDR}" "0.0.0.0/0"
 
   ## Configure security variables
   MASTER_SERVICE_ACCOUNT="$(gcloud iam service-accounts list --filter "email~^${INFRA_ID}-m@${PROJECT_NAME}." --format json | jq -r '.[0].email')"
@@ -526,14 +408,6 @@ else
 
   backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/compute.viewer" 1> /dev/null
   backoff gcloud projects add-iam-policy-binding "${PROJECT_NAME}" --member "serviceAccount:${WORKER_SERVICE_ACCOUNT}" --role "roles/storage.admin" 1> /dev/null
-fi
-
-## Generate a service-account-key for signing the bootstrap.ign url
-gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}"
-if [[ -v IS_XPN ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Save the key id for final deletion (XPN scenario)..."
-  private_key_id=$(jq -r .private_key_id service-account-key.json)
-  echo "${private_key_id}" > "${SHARED_DIR}/xpn_sa_key_id"
 fi
 
 ## Create the cluster image.
@@ -557,65 +431,53 @@ echo "Using CLUSTER_IMAGE=${CLUSTER_IMAGE}"
 
 ## Upload the bootstrap.ign to a new bucket
 echo "$(date -u --rfc-3339=seconds) - Uploading the bootstrap.ign to a new bucket..."
-gsutil mb "gs://${INFRA_ID}-bootstrap-ignition"
-gsutil cp bootstrap.ign "gs://${INFRA_ID}-bootstrap-ignition/"
+gcloud storage buckets create "gs://${INFRA_ID}-bootstrap-ignition"
+gcloud storage cp bootstrap.ign "gs://${INFRA_ID}-bootstrap-ignition/"
+gcloud storage ls "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign"
 
-BOOTSTRAP_IGN="$(gsutil signurl -d 1h service-account-key.json "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign" | grep "^gs:" | awk '{print $5}')"
+## Generate a service-account-key for signing the bootstrap.ign url
+CMD="gcloud iam service-accounts keys create service-account-key.json --iam-account=${MASTER_SERVICE_ACCOUNT}"
+run_command "${CMD}"
+if [[ -v IS_XPN ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Save the key id for final deletion (XPN scenario)..."
+  private_key_id=$(jq -r .private_key_id service-account-key.json)
+  echo "${private_key_id}" > "${SHARED_DIR}/xpn_sa_key_id"
+fi
+
+BOOTSTRAP_IGN="$(gcloud storage sign-url --duration=1h --private-key-file=service-account-key.json "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign" | grep "^signed_url:" | awk '{print $2}')"
 
 function create_bootstrap_resources()
 {
-  local -r infra_id="$1"; shift
-  local -r region="$1"; shift
   local -r zone="$1"; shift
-  local -r control_subnet="$1"; shift
+  local -r cluster_network="$1"; shift
+  local -r machine_subnet="$1"; shift
   local -r cluster_image="$1"; shift
-  local -r node_type="$1"; shift
+  local -r machine_type="$1"; shift
   local -r root_volume_size="$1"; shift
   local -r ignition="$1"; shift
   local -r publish_policy="$1"; shift
-  local -r deprovision_commands_file="$1"
-  local CMD public_ip
+  local CMD boolean_publish_policy cmd_ret=0
 
-  # create address
-  if [[ "${publish_policy}" != "Internal" ]]; then
-    CMD="gcloud compute addresses create ${infra_id}-bootstrap-public-ip --region=${region}"
-    run_command "${CMD}"
-    short_wait
-    public_ip=$(gcloud compute addresses describe ${infra_id}-bootstrap-public-ip --region=${region} --format=json | jq -r .address)
+  # It will be a public cluster by default, i.e. "publish: External". 
+  boolean_publish_policy=true
+  if [[ "${publish_policy}" == "Internal" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - INFO: It will be a private cluster, i.e. \"publish: Internal\"."
+    boolean_publish_policy=false
   fi
 
-  CMD="gcloud compute instances create ${infra_id}-bootstrap --boot-disk-size=${root_volume_size}GB --image=${cluster_image} --metadata=^#^user-data='{\"ignition\":{\"config\":{\"replace\":{\"source\":\"${ignition}\"}},\"version\":\"3.2.0\"}}' --machine-type=${node_type} --zone=${zone} --tags=${infra_id}-master,${infra_id}-bootstrap --subnet=${control_subnet}"
-  if [[ "${publish_policy}" != "Internal" ]]; then
-    CMD="${CMD} --address=${public_ip}"
-  else
-    CMD="${CMD} --no-address"
+  CMD="gcloud infra-manager deployments apply ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_BOOTSTRAP//_/-} --location=${REGION} --input-values=infra_id=${INFRA_ID},project=${PROJECT_NAME},region=${REGION},zone=${zone},cluster_network='${cluster_network}',subnet='${machine_subnet}',image='${cluster_image}',machine_type=${machine_type},root_volume_size=${root_volume_size},bootstrap_ign='${ignition}',is_public_cluster=${boolean_publish_policy} --project=${PROJECT_NAME} --service-account=${INSTALL_SERVICE_ACCOUNT}"
+  CMD="${CMD} ${SOURCE_OPTIONS}/${UPI_RESOURCE_DIR_BOOTSTRAP}"
+  run_command "${CMD}" || cmd_ret=$?
+  if [ $cmd_ret -ne 0 ]; then
+    infra_manager_debug "${CLUSTER_NAME}-${UPI_RESOURCE_DIR_BOOTSTRAP//_/-}" "${REGION}" $cmd_ret
   fi
-  run_command "${CMD}"
   short_wait
-
-  CMD="gcloud compute instance-groups unmanaged create ${infra_id}-bootstrap-ig --zone=${zone}"
-  run_command "${CMD}"
-  short_wait
-  CMD="gcloud compute instance-groups unmanaged set-named-ports ${infra_id}-bootstrap-ig --zone=${zone} --named-ports=ignition:22623,https:6443"
-  run_command "${CMD}"
-  short_wait
-
-  # for deprovision
-  cat > "${deprovision_commands_file}" << EOF
-gcloud compute instance-groups unmanaged delete -q ${infra_id}-bootstrap-ig --zone=${zone}
-gcloud compute instances delete -q ${infra_id}-bootstrap --zone=${zone}
-EOF
-  if [[ "${publish_policy}" != "Internal" ]]; then
-    cat >> "${deprovision_commands_file}" << EOF
-gcloud compute addresses delete -q ${infra_id}-bootstrap-public-ip --region=${region}
-EOF
-  fi
 }
 
 ## Launch temporary bootstrap resources
 echo "$(date -u --rfc-3339=seconds) - Launching temporary bootstrap resources..."
 ls -l "bootstrap.ign"
-create_bootstrap_resources "${INFRA_ID}" "${REGION}" "${ZONE_0}" "${CONTROL_SUBNET}" "${CLUSTER_IMAGE}" "${BOOTSTRAP_NODE_TYPE}" "128" "${BOOTSTRAP_IGN}" "${PUBLISH}" "${BOOTSTRAP_DEPROVISION_SCRIPTS}"
+create_bootstrap_resources "${ZONE_0}" "${CLUSTER_NETWORK}" "${CONTROL_SUBNET}" "${CLUSTER_IMAGE}" "${BOOTSTRAP_NODE_TYPE}" "128" "${BOOTSTRAP_IGN}" "${PUBLISH}"
 BOOTSTRAP_INSTANCE_GROUP=$(gcloud compute instance-groups list --filter="name~^${INFRA_ID}-bootstrap-" --format "value(name)")
 ## Add the bootstrap instance to the load balancers
 echo "$(date -u --rfc-3339=seconds) - Adding the bootstrap instance to the load balancers..."
@@ -634,38 +496,40 @@ else
 fi
 GATHER_BOOTSTRAP_ARGS=('--bootstrap' "${BOOTSTRAP_IP}")
 
-function create_cluster_machines()
+# debugging purpose
+cmd="gcloud compute instances list --filter=\"name~${INFRA_ID}\""
+run_command "${cmd}"
+cmd="gcloud compute addresses list --filter=\"name~${INFRA_ID}\""
+run_command "${cmd}"
+
+function create_control_plane_machines()
 {
-  local -r machine_role="$1"; shift
-  local -r infra_id="$1"; shift
   local -r machine_subnet="$1"; shift
   local -r cluster_image="$1"; shift
-  local -r node_type="$1"; shift
+  local -r machine_type="$1"; shift
   local -r root_volume_size="$1"; shift
   local -r service_account="$1"; shift
-  local -r ignition="$1"; shift
-  local -r deprovision_commands_file="$1"; shift
-  local -r zones=("$@")
-  local CMD index=0
+  local -r zone_0="$1"; shift
+  local -r zone_1="$1"; shift
+  local -r zone_2="$1"; shift
+  local CMD cmd_ret=0
 
-  for zone in "${zones[@]}"; do
-    CMD="gcloud compute instances create ${infra_id}-${machine_role}-${index} --boot-disk-size=${root_volume_size}GB --boot-disk-type=pd-ssd --image=${cluster_image} --metadata=^#^user-data='${ignition}' --machine-type=${node_type} --zone=${zone} --no-address --service-account=${service_account} --scopes=https://www.googleapis.com/auth/cloud-platform --tags=${infra_id}-${machine_role} --subnet=${machine_subnet}"
-    run_command "${CMD}"
-    short_wait
+  cp "master.ign" "${GCP_UPI_SOURCE_FILES_DIR}/${UPI_RESOURCE_DIR_CONTROL_PLANE}/"
 
-  # for deprovision
-  cat >> "${deprovision_commands_file}" << EOF
-gcloud compute instances delete -q ${infra_id}-${machine_role}-${index} --zone=${zone}
-EOF
+  CMD="gcloud infra-manager deployments apply ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_CONTROL_PLANE//_/-} --location=${REGION} --input-values=infra_id=${INFRA_ID},project=${PROJECT_NAME},region=${REGION},zone_0=${zone_0},zone_1=${zone_1},zone_2=${zone_2},subnet=${machine_subnet},image=${cluster_image},machine_type=${machine_type},disk_size=${root_volume_size},service_account_email=${service_account} --project=${PROJECT_NAME} --service-account=${INSTALL_SERVICE_ACCOUNT}"
+  CMD="${CMD} ${SOURCE_OPTIONS}/${UPI_RESOURCE_DIR_CONTROL_PLANE}"
+  run_command "${CMD}" || cmd_ret=$?
+  if [ $cmd_ret -ne 0 ]; then
+    infra_manager_debug "${CLUSTER_NAME}-${UPI_RESOURCE_DIR_CONTROL_PLANE//_/-}" "${REGION}" $cmd_ret
+  fi
+  short_wait
 
-    index=$(( $index + 1))
-  done
-
+  rm -f "${GCP_UPI_SOURCE_FILES_DIR}/${UPI_RESOURCE_DIR_CONTROL_PLANE}/master.ign"
 }
 
 ## Launch permanent control plane
 echo "$(date -u --rfc-3339=seconds) - Launching permanent control plane..."
-create_cluster_machines "master" "${INFRA_ID}" "${CONTROL_SUBNET}" "${CLUSTER_IMAGE}" "${CONTROL_PLANE_NODE_TYPE}" "128" "${MASTER_SERVICE_ACCOUNT}" "${MASTER_IGNITION}" "${CONTROL_PLANE_DEPROVISION_SCRIPTS}" "${ZONE_0}" "${ZONE_1}" "${ZONE_2}"
+create_control_plane_machines "${CONTROL_SUBNET}" "${CLUSTER_IMAGE}" "${CONTROL_PLANE_NODE_TYPE}" "128" "${MASTER_SERVICE_ACCOUNT}" "${ZONE_0}" "${ZONE_1}" "${ZONE_2}"
 
 ## Configure control plane variables
 MASTER0_IP="$(gcloud compute instances describe "${INFRA_ID}-master-0" --zone "${ZONE_0}" --format json | jq -r .networkInterfaces[0].networkIP)"
@@ -692,19 +556,12 @@ MASTER_IG_0="$(gcloud compute instance-groups list --filter "name~^${INFRA_ID}-m
 MASTER_IG_1="$(gcloud compute instance-groups list --filter "name~^${INFRA_ID}-master-${ZONE_1}-" --format "value(name)")"
 MASTER_IG_2="$(gcloud compute instance-groups list --filter "name~^${INFRA_ID}-master-${ZONE_2}-" --format "value(name)")"
 ## Add control plane instances to load balancers
-echo "$(date -u --rfc-3339=seconds) - Adding control plane instances to load balancers..."
+echo "$(date -u --rfc-3339=seconds) - Adding control plane instances to instance groups..."
 cmd="gcloud compute instance-groups unmanaged add-instances ${MASTER_IG_0} --zone=${ZONE_0} --instances=${INFRA_ID}-master-0"
 run_command "${cmd}"
 cmd="gcloud compute instance-groups unmanaged add-instances ${MASTER_IG_1} --zone=${ZONE_1} --instances=${INFRA_ID}-master-1"
 run_command "${cmd}"
 cmd="gcloud compute instance-groups unmanaged add-instances ${MASTER_IG_2} --zone=${ZONE_2} --instances=${INFRA_ID}-master-2"
-run_command "${cmd}"
-### Add control plan instances to internal load balancer backend-service
-cmd="gcloud compute backend-services add-backend ${API_INTERNAL_BACKEND_SVC} --region=${REGION} --instance-group=${MASTER_IG_0} --instance-group-zone=${ZONE_0}"
-run_command "${cmd}"
-cmd="gcloud compute backend-services add-backend ${API_INTERNAL_BACKEND_SVC} --region=${REGION} --instance-group=${MASTER_IG_1} --instance-group-zone=${ZONE_1}"
-run_command "${cmd}"
-cmd="gcloud compute backend-services add-backend ${API_INTERNAL_BACKEND_SVC} --region=${REGION} --instance-group=${MASTER_IG_2} --instance-group-zone=${ZONE_2}"
 run_command "${cmd}"
 
 if [[ "${PUBLISH}" != "Internal" ]]; then
@@ -717,12 +574,37 @@ if [[ "${PUBLISH}" != "Internal" ]]; then
   run_command "${cmd}"
 fi
 
+function create_worker_machines()
+{
+  local -r machine_subnet="$1"; shift
+  local -r cluster_image="$1"; shift
+  local -r machine_type="$1"; shift
+  local -r root_volume_size="$1"; shift
+  local -r service_account="$1"; shift
+  local -r zone_0="$1"; shift
+  local -r zone_1="$1"; shift
+  local CMD cmd_ret=0
+
+
+  cp "worker.ign" "${GCP_UPI_SOURCE_FILES_DIR}/${UPI_RESOURCE_DIR_WORKER}/"
+
+  CMD="gcloud infra-manager deployments apply ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_WORKER//_/-} --location=${REGION} --input-values=infra_id=${INFRA_ID},project=${PROJECT_NAME},region=${REGION},zone_0=${zone_0},zone_1=${zone_1},subnet=${machine_subnet},image=${cluster_image},machine_type=${machine_type},disk_size=${root_volume_size},service_account_email=${service_account} --project=${PROJECT_NAME} --service-account=${INSTALL_SERVICE_ACCOUNT}"
+  CMD="${CMD} ${SOURCE_OPTIONS}/${UPI_RESOURCE_DIR_WORKER}"
+  run_command "${CMD}" || cmd_ret=$?
+  if [ $cmd_ret -ne 0 ]; then
+    infra_manager_debug "${CLUSTER_NAME}-${UPI_RESOURCE_DIR_WORKER//_/-}" "${REGION}" $cmd_ret
+  fi
+  short_wait
+
+  rm -f "${GCP_UPI_SOURCE_FILES_DIR}/${UPI_RESOURCE_DIR_WORKER}/worker.ign"
+}
+
 ## Launch additional compute nodes
 echo "$(date -u --rfc-3339=seconds) - Launching additional compute nodes..."
 ## Available zones and instance zones might be different in region for arm64 machines
 mapfile -t WORKER_INSTANCE_ZONES < <(gcloud compute machine-types list --filter="zone:(${REGION}) AND name=(${COMPUTE_NODE_TYPE})" --format=json | jq -r '.[].zone')
 mapfile -t WORKER_ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${WORKER_INSTANCE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d)
-create_cluster_machines "worker" "${INFRA_ID}" "${COMPUTE_SUBNET}" "${CLUSTER_IMAGE}" "${COMPUTE_NODE_TYPE}" "128" "${WORKER_SERVICE_ACCOUNT}" "${WORKER_IGNITION}" "${WORKER_DEPROVISION_SCRIPTS}" "${WORKER_ZONES[(( 0 % ${#WORKER_ZONES[@]} ))]}" "${WORKER_ZONES[(( 1 % ${#WORKER_ZONES[@]} ))]}"
+create_worker_machines "${COMPUTE_SUBNET}" "${CLUSTER_IMAGE}" "${COMPUTE_NODE_TYPE}" "128" "${WORKER_SERVICE_ACCOUNT}" "${WORKER_ZONES[(( 0 % ${#WORKER_ZONES[@]} ))]}" "${WORKER_ZONES[(( 1 % ${#WORKER_ZONES[@]} ))]}"
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -732,6 +614,7 @@ create_cluster_machines "worker" "${INFRA_ID}" "${COMPUTE_SUBNET}" "${CLUSTER_IM
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
     # shellcheck disable=SC1090
+    echo "$(date -u --rfc-3339=seconds) - Enabling proxy settings..."
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
@@ -776,9 +659,11 @@ if [[ -n "${backend_service_random_id}" ]]; then
   fi
 fi
 
-gsutil rm "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign"
-gsutil rb "gs://${INFRA_ID}-bootstrap-ignition"
-source "${SHARED_DIR}/04_bootstrap_deprovision.sh"
+gcloud storage rm "gs://${INFRA_ID}-bootstrap-ignition/bootstrap.ign"
+gcloud storage buckets delete "gs://${INFRA_ID}-bootstrap-ignition"
+CMD="gcloud infra-manager deployments delete -q ${CLUSTER_NAME}-${UPI_RESOURCE_DIR_BOOTSTRAP//_/-} --location=${REGION}"
+run_command "${CMD}"
+short_wait
 
 ## Approving the CSR requests for nodes
 echo "$(date -u --rfc-3339=seconds) - Approving the CSR requests for nodes..."
