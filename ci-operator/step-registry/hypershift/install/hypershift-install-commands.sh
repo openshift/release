@@ -5,7 +5,9 @@ set -eux
 EXTRA_ARGS=""
 HCP_CLI="bin/hypershift"
 OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
-if [[ $HO_MULTI == "true" ]]; then
+if [[ -n "${HYPERSHIFT_OPERATOR_IMAGE_OVERRIDE:-}" ]]; then
+  OPERATOR_IMAGE="${HYPERSHIFT_OPERATOR_IMAGE_OVERRIDE}"
+elif [[ $HO_MULTI == "true" ]]; then
   OPERATOR_IMAGE="quay.io/acm-d/rhtap-hypershift-operator:latest"
   oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
   mkdir /tmp/hs-cli
