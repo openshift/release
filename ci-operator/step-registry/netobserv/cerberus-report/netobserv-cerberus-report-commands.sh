@@ -25,7 +25,7 @@ while [ $elapsed -lt $timeout ]; do
     if [[ -z "$running_pods" ]]; then
         echo "All Cerberus observer pods have completed"
         echo "$cerberus_pods"
-        echo "Waiting additional time for cleanup trap to finish copying files..."
+        echo "Waiting additional time for cleanup handler to finish copying files..."
         sleep 15
         break
     fi
