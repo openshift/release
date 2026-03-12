@@ -31,23 +31,12 @@ images:
       - destination_dir: src
         source_path: /go/src/github.com/Azure/ARO-HCP
   to: nested-podman-src
-- dockerfile_literal: |
-    FROM nested-podman-src
-    USER root
-    RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc && \
-        dnf install -y https://packages.microsoft.com/config/rhel/9.0/packages-microsoft-prod.rpm && \
-        mkdir -p /etc/yum.repos.art/ci/ && \
-        ln -s /etc/yum.repos.d/microsoft-prod.repo /etc/yum.repos.art/ci/ && \
-        dnf install -y azure-cli && \
-        az bicep install && mv ~/.azure/bin/bicep /usr/local/bin && \
-        dnf clean all
-    RUN chmod -R g=u /home && \
-        chmod g=u /etc/subuid /etc/subgid && \
-        setcap cap_setuid+ep /usr/bin/newuidmap && \
-        setcap cap_setgid+ep /usr/bin/newgidmap
-    USER 1000
-  from: nested-podman-src
-  to: svc-build
+- build_args:
+  - name: PLATFORM
+    value: linux/amd64
+  dockerfile_path: tooling/aro-hcp-exporter/Dockerfile
+  from: src
+  to: aro-hcp-exporter
 - build_args:
   - name: PLATFORM
     value: linux/amd64
@@ -255,20 +244,7 @@ tests:
       env: LEASED_MSI_CONTAINERS
       resource_type: aro-hcp-test-msi-containers-prod
     workflow: aro-hcp-e2e
-- as: exporter-image
-  capabilities:
-  - nested-podman
-  nested_podman: true
-  run_if_changed: ^tooling/aro-hcp-exporter/
-  steps:
-    env:
-      DEPLOY_ENV: dev
-    test:
-    - ref: aro-hcp-exporter
 - as: exporter-push
-  capabilities:
-  - nested-podman
-  nested_podman: true
   postsubmit: true
   run_if_changed: ^tooling/aro-hcp-exporter/
   steps:
