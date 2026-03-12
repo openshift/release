@@ -26,7 +26,35 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: openshift-pipelines-interop-aws-fips
+- as: cr-openshift-pipelines-interop-aws
+  cron: 0 3,15 * * *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        {
+          "failure_rules":
+            [
+              {"step": "openshift-pipelines-install", "failure_type": "all", "classification": "Operator Installation Failure", "group": {"name": "lp-tests", "priority": 1}, "jira_project": "SRVKP", "jira_assignee": "!default", "jira_component": ["QA"], "jira_priority": "major", "jira_additional_labels": ["!default","interop-tests"]},
+              {"step": "openshift-pipelines-tests", "failure_type": "all", "classification": "Test Failure", "group": {"name": "lp-tests", "priority": 1}, "jira_project": "SRVKP", "jira_assignee": "!default", "jira_component": ["QA"], "jira_priority": "major", "jira_additional_labels": ["!default","interop-tests"]}
+            ]
+        }
+      FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/cr/lp-interop.json
+      FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-lp","self-managed-lp","pipelines-lp"]'
+      FIREWATCH_DEFAULT_JIRA_ASSIGNEE: sselvan@redhat.com
+      FIREWATCH_DEFAULT_JIRA_PROJECT: SRVKP
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      MAP_TESTS: "true"
+      OCP_VERSION: "4.22"
+      REPORTPORTAL_CMP: lp-interop-OpenshiftPipelines
+      USER_TAGS: |
+        scenario pipelines
+    test:
+    - ref: openshift-pipelines-install
+    - ref: openshift-pipelines-tests
+    workflow: firewatch-ipi-aws-cr
+- as: aws-fips
   cron: 0 23 31 2 *
   steps:
     cluster_profile: aws-cspi-qe
