@@ -5,6 +5,27 @@ set -o pipefail
 
 echo "Starting AWS Neuron operator E2E tests"
 
+TOOLS_DIR="/tmp/tools"
+mkdir -p "${TOOLS_DIR}"
+export PATH="${TOOLS_DIR}:${PATH}"
+
+if ! command -v oc &>/dev/null; then
+    echo "oc not found, downloading OpenShift client..."
+    curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
+        | tar xzf - -C "${TOOLS_DIR}" oc kubectl 2>/dev/null || true
+    if command -v oc &>/dev/null; then
+        echo "oc installed: $(oc version --client 2>/dev/null || echo 'ok')"
+    else
+        echo "WARNING: failed to install oc"
+    fi
+fi
+
+if ! command -v jq &>/dev/null; then
+    echo "jq not found, downloading..."
+    curl -sL https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64 -o "${TOOLS_DIR}/jq" \
+        && chmod +x "${TOOLS_DIR}/jq" || true
+fi
+
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 mkdir -p "${ARTIFACT_DIR}"
 

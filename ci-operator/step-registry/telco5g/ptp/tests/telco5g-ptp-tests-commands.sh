@@ -154,8 +154,9 @@ spec:
           path: config.json
 
     - name: dockercfg
-      defaultMode: 384
       secret:
+        secretName: BUILDER_DOCKERCFG
+        defaultMode: 384
 '
 
   jobdefinition=$(sed "s#OPERATOR_VERSION#${PTP_UNDER_TEST_BRANCH}#" <<<"$jobdefinition")
@@ -168,7 +169,7 @@ spec:
 
   retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
   dockercgf=$(oc -n openshift-ptp get sa builder -oyaml | grep imagePullSecrets -A 1 | grep -o "builder-.*")
-  jobdefinition="${jobdefinition} secretName: ${dockercgf}"
+  jobdefinition=$(sed "s#BUILDER_DOCKERCFG#${dockercgf}#" <<<"$jobdefinition")
   echo "$jobdefinition"
   echo "$jobdefinition" | oc apply -f -
 
