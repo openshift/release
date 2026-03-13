@@ -142,7 +142,7 @@ ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
 PHASE_ANALYSIS_START=$(date +%s)
 CLAUDE_EXIT=0
-timeout 7200 claude \
+timeout 3600 claude \
     --model "${CLAUDE_MODEL}" \
     --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
@@ -158,7 +158,7 @@ NUDGE_EXIT=0
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo ""
     echo "Claude timed out after 2 hours. Nudging to wrap up..."
-    timeout 900 claude \
+    timeout 600 claude \
         --model "${CLAUDE_MODEL}" \
         --continue \
         --allowedTools "${ALLOWED_TOOLS}" \
@@ -230,13 +230,21 @@ TOTAL_DURATION=$(( PHASE_WAIT_DURATION + PHASE_ANALYSIS_DURATION + PHASE_NUDGE_D
 PHASE_CASES="  <testcase name=\"${PHASE_PREFIX} Phase: wait for blocking jobs\" time=\"${PHASE_WAIT_DURATION}\"/>
   <testcase name=\"${PHASE_PREFIX} Phase: analysis\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
 
-if [[ "${ENABLE_PAYLOAD_REVERT}" == "true" ]]; then
-    PHASE_CASES="${PHASE_CASES}
-  <testcase name=\"${PHASE_PREFIX} Phase: payload revert\" time=\"${PHASE_REVERT_DURATION}\"/>"
-fi
-
 TIMEOUT_CASES=""
 FAILURE_COUNT=0
+
+if [[ "${ENABLE_PAYLOAD_REVERT}" == "true" ]]; then
+    if [[ "${REVERT_EXIT}" -ne 0 ]]; then
+        FAILURE_COUNT=$(( FAILURE_COUNT + 1 ))
+        PHASE_CASES="${PHASE_CASES}
+  <testcase name=\"${PHASE_PREFIX} Phase: payload revert\" time=\"${PHASE_REVERT_DURATION}\">
+    <failure message=\"Payload revert failed with exit code ${REVERT_EXIT}\">Claude payload revert exited with code ${REVERT_EXIT}.</failure>
+  </testcase>"
+    else
+        PHASE_CASES="${PHASE_CASES}
+  <testcase name=\"${PHASE_PREFIX} Phase: payload revert\" time=\"${PHASE_REVERT_DURATION}\"/>"
+    fi
+fi
 TIMEOUT_TEST_COUNT=0
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
