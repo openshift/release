@@ -1,0 +1,55 @@
+ref:
+  as: openshift-release-analysis-claude-payload-agent
+  from_image:
+    namespace: ci
+    name: claude-ai-helpers
+    tag: latest
+  commands: openshift-release-analysis-claude-payload-agent-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: hypershift-team-claude-prow
+    mount_path: /var/run/claude-code-service-account
+  - namespace: test-credentials
+    name: trt-alert-slack-webhook-url
+    mount_path: /var/run/slack-webhook
+  - namespace: test-credentials
+    name: claude-payload-agent-github-token
+    mount_path: /var/run/github-token
+  - namespace: test-credentials
+    name: claude-payload-agent-jira-token
+    mount_path: /var/run/jira-token
+  env:
+  - name: PAYLOAD_TAG
+  - name: CLAUDE_CODE_USE_VERTEX
+    default: "1"
+  - name: CLOUD_ML_REGION
+    default: "us-east5"
+  - name: ANTHROPIC_VERTEX_PROJECT_ID
+    default: "itpc-gcp-hybrid-pe-eng-claude"
+  - name: GOOGLE_APPLICATION_CREDENTIALS
+    default: "/var/run/claude-code-service-account/claude-prow"
+  - name: CLAUDE_MODEL
+    default: "claude-opus-4-6"
+  - name: SLACK_WEBHOOK_URL
+    default: "/var/run/slack-webhook/url"
+  - name: GITHUB_TOKEN_PATH
+    default: "/var/run/github-token/token"
+  - name: JIRA_TOKEN_PATH
+    default: "/var/run/jira-token/token"
+  - name: JIRA_URL
+    default: "https://issues.redhat.com"
+  - name: ENABLE_PAYLOAD_REVERT
+    default: "false"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+  timeout: 12h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Analyzes rejected release payloads using Claude AI and optionally
+    stages reverts for high-confidence causes. Receives a PAYLOAD_TAG
+    from the release controller, polls until blocking jobs complete,
+    runs the analyze-payload skill to identify root causes, generates
+    an HTML report, and when ENABLE_PAYLOAD_REVERT is true, stages
+    reverts for high-confidence candidates via payload-revert.
