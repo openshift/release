@@ -114,6 +114,9 @@ tests:
       commands: |
         oc create namespace opendatahub-operator
         oc label ns opendatahub-operator security.openshift.io/scc.podSecurityLabelSync=true --overwrite
+        # Wait for the default SA to exist -- it's created asynchronously after namespace
+        # creation and operator-sdk run bundle fails immediately if it's not ready yet.
+        timeout 60 bash -c 'until oc get sa default -n opendatahub-operator 2>/dev/null; do sleep 1; done'
         operator-sdk run bundle --timeout=5m -n opendatahub-operator "$OO_BUNDLE" --verbose
         oc wait --for condition=Available -n opendatahub-operator deployment opendatahub-operator-controller-manager
       dependencies:
@@ -156,6 +159,9 @@ tests:
       commands: |
         oc create namespace redhat-ods-operator
         oc label ns redhat-ods-operator security.openshift.io/scc.podSecurityLabelSync=true --overwrite
+        # Wait for the default SA to exist -- it's created asynchronously after namespace
+        # creation and operator-sdk run bundle fails immediately if it's not ready yet.
+        timeout 60 bash -c 'until oc get sa default -n redhat-ods-operator 2>/dev/null; do sleep 1; done'
         operator-sdk run bundle --timeout=5m -n redhat-ods-operator "$OO_BUNDLE" --verbose
       dependencies:
       - env: OO_BUNDLE
