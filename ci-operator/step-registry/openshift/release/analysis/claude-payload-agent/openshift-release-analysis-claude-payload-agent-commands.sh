@@ -297,8 +297,8 @@ EOF
 echo "JUnit XML written to ${JUNIT_FILE}"
 
 # Check if we produced a report
-if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
-    echo "Analysis complete. Report(s) saved to artifact directory."
+if ls "${WORKDIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
+    echo "Analysis complete."
 
     # Ask Claude to summarize its findings for Slack
     echo "Asking Claude to summarize findings for Slack..."
