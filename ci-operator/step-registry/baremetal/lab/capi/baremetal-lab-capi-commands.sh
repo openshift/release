@@ -38,6 +38,22 @@ DIR=/tmp/CAPI
 mkdir -p "${DIR}"
 bmhlist=()
 
+# Detect OpenShift version to determine which CAPI API version to use
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d. -f1,2)
+ocp_major=$(echo "${ocp_version}" | cut -d. -f1)
+ocp_minor=$(echo "${ocp_version}" | cut -d. -f2)
+
+# Use v1beta2 for OpenShift 4.22+, v1beta1 for earlier versions
+if [[ "${ocp_major}" -eq 4 ]] && [[ "${ocp_minor}" -ge 22 ]]; then
+  capi_api_version="v1beta2"
+  use_legacy_status_path=false
+else
+  capi_api_version="v1beta1"
+  use_legacy_status_path=true
+fi
+
+echo "Detected OpenShift version: ${ocp_version}, using CAPI API version: ${capi_api_version}"
+
 echo "[INFO] Preparing the baremetalhost resource file to add with CAPI..."
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
@@ -99,7 +115,7 @@ echo "--- CAPI baremetalhosts are available ---"
 
 echo "--- Create Machine template Resource ---"
 cat > "${DIR}/Metal3MachineTemplate.yaml" <<EOF
-apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+apiVersion: infrastructure.cluster.x-k8s.io/${capi_api_version}
 kind: Metal3MachineTemplate
 metadata:
   name: "${machinetemplate}"
@@ -115,7 +131,7 @@ EOF
 
 echo "--- Create Machine Set Resource ---"
 cat > "${DIR}/Metal3MachineSet.yaml" <<EOF
-apiVersion: cluster.x-k8s.io/v1beta1
+apiVersion: cluster.x-k8s.io/${capi_api_version}
 kind: MachineSet
 metadata:
   name: "${machineset}"
@@ -141,7 +157,7 @@ spec:
          dataSecretName: worker-user-data-managed
       clusterName: "${infra_name}"
       infrastructureRef:
-        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        apiVersion: infrastructure.cluster.x-k8s.io/${capi_api_version}
         kind: Metal3MachineTemplate
         name: "${machinetemplate}"
 EOF
@@ -167,21 +183,35 @@ for bmhname in "${bmhlist[@]}"; do
 done
 
 echo "--- Waiting for available replicas ---"
-while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.v1beta2.availableReplicas}{"\n"}' | grep "${replicas}"; do
-  echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
-    sleep 30
-done
+if [[ "${use_legacy_status_path}" == "true" ]]; then
+  while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.v1beta2.availableReplicas}{"\n"}' | grep "${replicas}"; do
+    echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
+      sleep 30
+  done
+else
+  while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.availableReplicas}{"\n"}' | grep "${replicas}"; do
+    echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
+      sleep 30
+  done
+fi
 
 echo "--- Waiting for ready replicas ---"
-while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.v1beta2.readyReplicas}{"\n"}' | grep "${replicas}"; do
-  echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
-    sleep 30
-done
+if [[ "${use_legacy_status_path}" == "true" ]]; then
+  while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.v1beta2.readyReplicas}{"\n"}' | grep "${replicas}"; do
+    echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
+      sleep 30
+  done
+else
+  while ! oc get machineset.cluster.x-k8s.io -n "${capi_namespace}" -o jsonpath='{.items[0].status.readyReplicas}{"\n"}' | grep "${replicas}"; do
+    echo "${#bmhlist[@]} replicas are not available in ${machineset}. Waiting 30 seconds..."
+      sleep 30
+  done
+fi
 
 echo "--- CAPI worker nodes added successfully ---"
 for bmhname in "${bmhlist[@]}"; do
   bmhnode=$(oc get nodes -o name | grep "${bmhname}" | awk -F/ '{print $2}')
-  while ! oc get nodes "${bmhnode}" -o=jsonpath='{.status.conditions[3].status}{"\n"}' | grep "True"; do
+  while ! oc get nodes "${bmhnode}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' | grep "True"; do
     echo "Node ${bmhname} is not Ready. Waiting for 5 seconds..."
     sleep 5
   done
