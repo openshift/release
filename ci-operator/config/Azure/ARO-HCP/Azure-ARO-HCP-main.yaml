@@ -78,9 +78,6 @@ images:
     WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
     ENV GOBIN="/usr/local/bin"
     ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
-    # Install Python for grafana tests
-    RUN dnf install -y python3 && curl -fsSL https://bootstrap.pypa.io/get-pip.py | python3
-    RUN pip3 install black
     ENV GOFLAGS='-mod=readonly'
     RUN make install-tools && \
         make -C tooling/templatize templatize && \
@@ -151,6 +148,12 @@ tests:
   steps:
     test:
     - ref: aro-hcp-test-unit
+- as: secrets-validation
+  run_if_changed: ^(tooling/secret-sync|dev-infrastructure/data)/
+  steps:
+    cluster_profile: aro-hcp-dev
+    test:
+    - ref: aro-hcp-secrets-validation
 - as: verify
   steps:
     test:
