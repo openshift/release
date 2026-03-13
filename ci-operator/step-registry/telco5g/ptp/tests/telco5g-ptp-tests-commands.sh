@@ -84,6 +84,9 @@ spec:
           set -x
 
           export IMG=PTP_IMAGE
+          export DAEMON_IMG="DAEMON_IMAGE"
+          export SIDECAR_IMG="SIDECAR_IMAGE"
+
           export T5CI_VERSION="T5CI_VERSION_VAL"
           export USE_UPSTREAM="USE_UPSTREAM_VAL"
 
@@ -97,11 +100,12 @@ spec:
           cd ptp-operator
           # OCPBUGS-52327 fix build due to libresolv.so link error
           sed -i "s/\(CGO_ENABLED=\${CGO_ENABLED}\) \(GOOS=\${GOOS}\)/\1 CC=\"gcc -fuse-ld=gold\" \2/" hack/build.sh
-          if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ ]]; then
+          # For UPSTREAM use Dockerfile for upstream contents
+          if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ || "${USE_UPSTREAM:-false}" == "true" ]]; then
             sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
             make docker-build
           else
-            # Dockerfile is updated to upstream in 4.19+. Use .ocp or .ci versions
+            # Dockerfile is updated to upstream in 4.19+. Use .ocp or .ci versions for non-UPSTREAM runs
             if [ -f "Dockerfile.ocp" ]; then
               DOCKERFILE="Dockerfile.ocp"
             else
@@ -112,6 +116,27 @@ spec:
           fi
           podman push ${IMG} --tls-verify=false
           cd ..
+
+          if [[ "${USE_UPSTREAM:-false}" == "false" ]]; then
+            # If we a running a downstream run we are done
+            exit 0
+          fi
+
+          # If were running upstream we should also use the upstream daemon!
+          echo "Running on upstream main branch of linuxptp-daemon"
+          git clone --single-branch --branch main https://github.com/k8snetworkplumbingwg/linuxptp-daemon.git
+          cd linuxptp-daemon
+          IMG=${DAEMON_IMG} make image
+          podman push ${DAEMON_IMG} --tls-verify=false
+          cd ..
+
+          echo "Running on main branch of cloud-event-proxy"
+          git clone --single-branch --branch main https://github.com/redhat-cne/cloud-event-proxy.git
+          cd cloud-event-proxy
+          IMG=${SIDECAR_IMG} make podman-build
+          podman push ${SIDECAR_IMG} --tls-verify=false
+          cd ..
+
       securityContext:
         privileged: true
       volumeMounts:
@@ -129,19 +154,22 @@ spec:
           path: config.json
 
     - name: dockercfg
-      defaultMode: 384
       secret:
-      '
+        secretName: BUILDER_DOCKERCFG
+        defaultMode: 384
+'
 
   jobdefinition=$(sed "s#OPERATOR_VERSION#${PTP_UNDER_TEST_BRANCH}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#PTP_IMAGE#${IMG}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#DAEMON_IMG#${DAEMON_IMG}#" <<<"$jobdefinition")
+  jobdefinition=$(sed "s#SIDECAR_IMG#${SIDECAR_IMG}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#T5CI_VERSION_VAL#${T5CI_VERSION}#" <<<"$jobdefinition")
   jobdefinition=$(sed "s#USE_UPSTREAM_VAL#${T5CI_DEPLOY_UPSTREAM:-false}#" <<<"$jobdefinition")
   #oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged
 
   retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
   dockercgf=$(oc -n openshift-ptp get sa builder -oyaml | grep imagePullSecrets -A 1 | grep -o "builder-.*")
-  jobdefinition="${jobdefinition} secretName: ${dockercgf}"
+  jobdefinition=$(sed "s#BUILDER_DOCKERCFG#${dockercgf}#" <<<"$jobdefinition")
   echo "$jobdefinition"
   echo "$jobdefinition" | oc apply -f -
 
@@ -255,8 +283,18 @@ cd "$temp_dir" || exit 1
 echo "deploying ptp-operator on branch ${PTP_UNDER_TEST_BRANCH}"
 
 # build ptp operator and create catalog
-export IMG=image-registry.openshift-image-registry.svc:5000/openshift-ptp/ptp-operator:${T5CI_VERSION}
+
+export REGISTRY="image-registry.openshift-image-registry.svc:5000"
+export IMG="${REGISTRY}/openshift-ptp/ptp-operator:${T5CI_VERSION}"
+export DAEMON_IMG="${REGISTRY}/openshift-ptp/linuxptp-daemon:${T5CI_VERSION}"
+export SIDECAR_IMG="${REGISTRY}/openshift-ptp/cloud-event-proxy:${T5CI_VERSION}"
 build_images
+
+# Download oc
+wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+tar -zxvf openshift-client-linux.tar.gz
+sudo mv oc kubectl /usr/local/bin/
+oc version --client
 
 # deploy ptp-operator
 if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
@@ -272,7 +310,14 @@ cd ptp-operator-under-test
 grep -r "imagePullPolicy: IfNotPresent" --files-with-matches | awk '{print  "sed -i -e \"s@imagePullPolicy: IfNotPresent@imagePullPolicy: Always@g\" " $1 }' | bash
 
 # deploy ptp-operator
-make deploy
+if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
+  make deploy \
+    IMG=${IMG} \
+    LINUXPTP_DAEMON_IMAGE=${DAEMON_IMG} \
+    SIDECAR_EVENT_IMAGE=${SIDECAR_IMG}
+else
+  make deploy IMG=${IMG}
+fi
 
 # wait until the linuxptp-daemon pods are ready
 retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
