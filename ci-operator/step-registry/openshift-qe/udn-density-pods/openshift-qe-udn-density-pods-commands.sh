@@ -45,18 +45,16 @@ current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/work
 
 # The measurable run
 # Use UDN_ITERATION_MULTIPLIER if set, fall back to ITERATION_MULTIPLIER_ENV, default to 3
-# Use awk for fractional multiplier support; result is truncated to int
-iteration_multiplier=${UDN_ITERATION_MULTIPLIER:-${ITERATION_MULTIPLIER_ENV:-3}}
+iteration_multiplier=$((${UDN_ITERATION_MULTIPLIER:-${ITERATION_MULTIPLIER_ENV:-3}}))
 if [[ -n "$OVERRIDE_ITERATIONS" ]]; then
   export ITERATIONS=$OVERRIDE_ITERATIONS
 else
-  ITERATIONS=$(awk "BEGIN {printf \"%d\", $iteration_multiplier * $current_worker_count}")
-  export ITERATIONS
+  export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 fi
 
 
 export WORKLOAD=udn-density-pods
-EXTRA_FLAGS+="${KB_FLAGS} --local-indexing --layer3=${ENABLE_LAYER_3} --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
+EXTRA_FLAGS+="${KB_FLAGS} --local-indexing --layer3=${ENABLE_LAYER_3} --local-indexing --iterations=${ITERATIONS} --gc-metrics=true --pod-ready-threshold=$POD_READY_THRESHOLD --profile-type=${PROFILE_TYPE} --pprof=${PPROF}"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@$ES_HOST"
 

@@ -9,7 +9,7 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
 fi
 
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
-HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
+HUB_KUBECONFIG="/home/telcov10n/project/generated/kni-qe-99/auth/kubeconfig"
 
 # Process inventory from vault mounts
 process_inventory() {
@@ -45,6 +45,8 @@ process_inventory() {
 
     echo "Processing complete. Check \"${dest_file}\""
 }
+
+echo "SPOKE_CLUSTER=${SPOKE_CLUSTER}"
 
 echo "Create group_vars directory"
 mkdir -p "${ECO_CI_CD_INVENTORY_PATH}/group_vars"

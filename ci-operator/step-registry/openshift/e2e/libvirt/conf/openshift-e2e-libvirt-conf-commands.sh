@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 10
 echo "TEST_TYPE=${TEST_TYPE}"
 echo "BRANCH=${BRANCH}"
 echo "ARCH=${ARCH}"

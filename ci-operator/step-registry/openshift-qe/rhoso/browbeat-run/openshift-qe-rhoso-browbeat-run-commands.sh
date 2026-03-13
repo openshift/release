@@ -34,7 +34,7 @@ ssh root@${bastion} "
   export KUBECONFIG=\"${kubeconfig}\"
   export BENCHMARK=\"${WORKLOAD:-}\"
   JOB_START=\\\$(date -u +\"%Y-%m-%dT%H:%M:%SZ\")
-  rm -rf cpt-browbeat-configs
+  rm -rf cpt-browbeat-config
   git clone https://gitlab.cee.redhat.com/eng/openstack/team/performance-and-scale/cpt-browbeat-configs.git
   cd cpt-browbeat-configs
   if [ ! -f ${config_file} ]; then

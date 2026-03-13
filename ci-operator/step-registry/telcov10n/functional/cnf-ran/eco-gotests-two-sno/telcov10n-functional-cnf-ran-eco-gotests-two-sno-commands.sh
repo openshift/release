@@ -70,7 +70,6 @@ echo "Store Polarion report for reporter step"
 for suite in "${TEST_SUITES[@]}"; do
   artifact_dir="${ARTIFACT_DIR}/junit_eco_gotests_${suite}"
   if [ -f "${artifact_dir}/report_testrun.xml" ]; then
-    mv "${artifact_dir}/report_testrun.xml" "${SHARED_DIR}/polarion_testrun_${suite}.xml"
-    cp "${SHARED_DIR}/polarion_testrun_${suite}.xml" "${SHARED_DIR}/junit_${suite}_suite_test_junit.xml"
+    mv "${artifact_dir}/report_testrun.xml" "${SHARED_DIR}/report_testrun.xml"
   fi
 done

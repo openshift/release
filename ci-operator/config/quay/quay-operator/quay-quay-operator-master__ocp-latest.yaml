@@ -37,7 +37,6 @@ operator:
   bundles:
   - as: quay
     context_dir: bundle/
-    skip_building_index: true
   substitutions:
   - pullspec: quay.io/projectquay/quay-operator:v3.99.0-dev
     with: quay-operator
@@ -72,9 +71,15 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     cluster_profile: aws-3
+    dependencies:
+      OO_INDEX: ci-index-quay
     env:
       COMPUTE_NODE_TYPE: m5.4xlarge
       DEST_REPO: admin/quay:latest
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: project-quay
+      OO_TARGET_NAMESPACES: '!all'
       SOURCE_IMAGE: quay.io/projectquay/quay:latest
     post:
     - ref: quay-gather
@@ -82,12 +87,12 @@ tests:
     pre:
     - chain: ipi-aws-pre
     - ref: quay-install-odf-operator
-    - ref: quay-install-operator-bundle
+    - ref: optional-operators-subscribe
     - ref: quay-install-quay
     - ref: quay-create-admin-user
     test:
     - ref: quay-test-mirror-image
-    workflow: ipi-aws
+    workflow: optional-operators-ci-aws
 - always_run: false
   as: e2e-upgrade
   optional: true

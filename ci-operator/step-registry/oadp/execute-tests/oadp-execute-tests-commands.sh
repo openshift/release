@@ -43,9 +43,10 @@ function collect-results() {
       find "${ARTIFACT_DIR}" -type f -iname "*.xml" | while IFS= read -r result_file; do
         # Map tests if needed for related use cases
         mapTestsForComponentReadiness "${result_file}"
-        # Send modified files to shared dir for Data Router Reporter step
-        cp "${result_file}" "${SHARED_DIR}" || echo "Warning: couldn't copy ${result_file} to SHARED_DIR" >&2
       done
+
+      # Send modified files to shared dir for Data Router Reporter step
+      cp -r "${ARTIFACT_DIR}"/junit_* "${SHARED_DIR}" || echo "Warning: couldn't copy files to SHARED_DIR" >&2
     fi
 }
 
