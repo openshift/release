@@ -92,14 +92,14 @@ az deployment group create \
     --parameters "${ACR_PARAMETERS_FILE}" \
     --only-show-errors
 
-#-# KUSTO PIPELINE #-#
+#-# GEOGRAPHY PIPELINE (KUSTO) #-#
 
-# Run kusto pipeline for dev kusto instance. Kusto pipeline is part of the regional entrypoint, but management of kusto
-# is disabled for all dev cloud environments. We override and set 'kusto.manageInstance = true' to make this job the sole
-# manager of the dev kusto instance.
+# Kusto now lives in the Geography pipeline. Management is disabled by default
+# for most dev environments (including prow), so this job explicitly overrides
+# kusto.manageInstance to true and runs Geography as the single kusto manager.
 
 # Global postsubmit is the only owner of Kusto management. Override prow defaults
-# at runtime so Log.Infra does real management work in this job.
+# at runtime so Geography does real management work in this job.
 OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE:-/tmp/global-override-config-$(date +%s).yaml}"
 yq eval -n "
   .clouds.dev.environments.${DEPLOY_ENV}.defaults.kusto.manageInstance = true
@@ -107,7 +107,7 @@ yq eval -n "
 echo "Created override config at: ${OVERRIDE_CONFIG_FILE}"
 cat "${OVERRIDE_CONFIG_FILE}"
 
-make -o tooling/templatize/templatize pipeline/Log.Infra DEPLOY_ENV="${DEPLOY_ENV}" OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE}" EXTRA_ARGS="--region ${KUSTO_LOCATION} --step-cache-dir="
+make -o tooling/templatize/templatize pipeline/Geography DEPLOY_ENV="${DEPLOY_ENV}" OVERRIDE_CONFIG_FILE="${OVERRIDE_CONFIG_FILE}" EXTRA_ARGS="--region ${KUSTO_LOCATION} --step-cache-dir="
 
 # Ensure kusto persist tag is set
 KUSTO_RESOURCE_GROUP="$(resolve_config_from_templatize "kusto.rg" "${KUSTO_LOCATION}")"
