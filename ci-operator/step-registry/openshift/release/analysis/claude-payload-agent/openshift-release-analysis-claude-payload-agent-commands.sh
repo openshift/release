@@ -133,6 +133,15 @@ echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 WORKDIR=$(mktemp -d /tmp/claude-analysis-XXXXXX)
 cd "${WORKDIR}"
 
+# Ensure reports are copied to artifacts even if the script exits early
+copy_reports() {
+    echo "Copying reports to artifact directory..."
+    find "${WORKDIR}" -name "payload-analysis-*.html" -exec cp {} "${ARTIFACT_DIR}/" \;
+    find "${WORKDIR}" -name "*-autodl.json" -exec cp {} "${ARTIFACT_DIR}/" \;
+    find "${WORKDIR}" -name "payload-results-*.yaml" -exec cp {} "${ARTIFACT_DIR}/" \;
+}
+trap copy_reports EXIT TERM INT
+
 # Install the must-gather plugin for analyzing must-gather archives
 echo "Installing must-gather plugin..."
 claude plugin install must-gather@ai-helpers
@@ -169,11 +178,6 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
 fi
 PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 
-# Copy HTML report(s) to artifact directory before anything else that might fail
-echo "Copying reports to artifact directory..."
-find "${WORKDIR}" -name "payload-analysis-*.html" -exec cp {} "${ARTIFACT_DIR}/" \;
-find "${WORKDIR}" -name "*-autodl.json" -exec cp {} "${ARTIFACT_DIR}/" \;
-
 # Optionally stage reverts for high-confidence candidates
 PHASE_REVERT_START=$(date +%s)
 REVERT_EXIT=0
@@ -209,10 +213,6 @@ if [[ "${ENABLE_PAYLOAD_REVERT}" == "true" ]]; then
             -p "/ci:payload-revert ${PAYLOAD_TAG}" \
             --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-revert.log" || REVERT_EXIT=$?
 
-        # Re-copy HTML report in case payload-revert updated it
-        find "${WORKDIR}" -name "payload-analysis-*.html" -exec cp {} "${ARTIFACT_DIR}/" \;
-        # Copy updated YAML results too
-        find "${WORKDIR}" -name "payload-results-*.yaml" -exec cp {} "${ARTIFACT_DIR}/" \;
     else
         echo "Warning: No payload results YAML found. Skipping reverts."
     fi
