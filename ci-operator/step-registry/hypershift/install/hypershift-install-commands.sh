@@ -55,7 +55,8 @@ if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-cpo-overrides"
 fi
 
-EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=registry.ci.openshift.org/ocp/4.18:cluster-api-provider-kubevirt"
+OCP_VERSION="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep -oP '(?<=^  Version:  ).*$' | grep -oE '^[0-9]+\.[0-9]+')"
+EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=registry.ci.openshift.org/ocp/${OCP_VERSION}:cluster-api-provider-kubevirt"
 
 case "${CLOUD_PROVIDER}" in
   AWS)
