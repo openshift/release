@@ -7,28 +7,50 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.25-openshift-4.21
 images:
-- dockerfile_literal: |
+- additional_architectures:
+  - arm64
+  dockerfile_literal: |
     FROM src
-    RUN curl --silent --location  https://rpm.nodesource.com/setup_20.x | bash - && \
-        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo bzip2 jq python3.9" && \
+    RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash && \
+        \. "$HOME/.nvm/nvm.sh" && \
+        nvm install 24 && \
+        npm install -g yarn && \
+        PACKAGES="openssh-clients httpd-tools nodejs xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel dconf nss libXScrnSaver alsa-lib skopeo bzip2 jq python3-pip" && \
         yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-        ln -sf /usr/bin/python3.9 /usr/bin/python3  && \
-        python3 -m pip install requests  && \
-        yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+        python3 -m pip install requests && \
+        yum install -y yum-utils && \
+        yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+        cp /etc/yum.repos.d/hashicorp.repo /etc/yum.repos.art/ci/ 2>/dev/null || true && \
         yum -y install terraform xz gtk3 alsa-lib libX11-xcb && \
-        wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
-        yum install -y ./google-chrome-stable_current_x86_64.rpm && \
+        ARCH=$(uname -m) && \
+        if [ "$ARCH" = "x86_64" ]; then \
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm && \
+          yum install -y ./google-chrome-stable_current_x86_64.rpm && \
+          rm -f google-chrome-stable_current_x86_64.rpm; \
+        else \
+          yum install -y chromium-headless || \
+          yum install -y epel-release && yum install -y chromium || \
+          echo "Chromium not available via yum, skipping browser install on arm64"; \
+        fi && \
         yum clean all && rm -rf /var/cache/yum/*
-    RUN curl -Lo firefox-latest.tar.xz 'https://download.mozilla.org/?product=firefox-latest&os=linux64&lang=en-US' && \
-        tar xJf firefox-*.tar.xz && \
+    RUN ARCH=$(uname -m) && \
+        if [ "$ARCH" = "x86_64" ]; then FF_OS="linux64"; \
+        elif [ "$ARCH" = "aarch64" ]; then FF_OS="linux64-aarch64"; \
+        fi && \
+        curl -Lo firefox-latest.tar.xz "https://download.mozilla.org/?product=firefox-latest&os=${FF_OS}&lang=en-US" && \
+        tar xJf firefox-latest.tar.xz && \
         mv firefox /opt && \
         ln -s /opt/firefox/firefox /usr/local/bin/firefox && \
+        rm -f firefox-latest.tar.xz && \
         firefox -v && jq --version
     RUN VERSION="1.2.2" && \
-        curl -LO "https://github.com/oras-project/oras/releases/download/v${VERSION}/oras_${VERSION}_linux_amd64.tar.gz" && \
+        ARCH=$(uname -m) && \
+        if [ "$ARCH" = "x86_64" ]; then ORAS_ARCH="amd64"; \
+        elif [ "$ARCH" = "aarch64" ]; then ORAS_ARCH="arm64"; \
+        fi && \
+        curl -LO "https://github.com/oras-project/oras/releases/download/v${VERSION}/oras_${VERSION}_linux_${ORAS_ARCH}.tar.gz" && \
         mkdir -p oras-install/ && \
         tar -zxf oras_${VERSION}_*.tar.gz -C oras-install/ && \
         mv oras-install/oras /usr/local/bin/ && \
@@ -58,9 +80,9 @@ tests:
 - as: quay-e2e-tests-quay313-ocp416-proxy
   cron: 0 0 15 * *
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-quay-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       CSO_CHANNEL: stable-3.13
       QBO_CHANNEL: stable-3.13
