@@ -7,26 +7,42 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.21-openshift-4.16
+    tag: rhel-9-golang-1.25-openshift-4.21
 images:
-- dockerfile_literal: |
+- additional_architectures:
+  - arm64
+  dockerfile_literal: |
     FROM src
-    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
-        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
-        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib skopeo podman jq" && \
+    RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash && \
+        \. "$HOME/.nvm/nvm.sh" && \
+        nvm install 24 && \
+        npm install -g yarn && \
+        PACKAGES="openssh-clients httpd-tools nodejs xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel dconf nss libXScrnSaver alsa-lib skopeo podman jq" && \
         yum install --setopt=tsflags=nodocs -y $PACKAGES && \
-        yum install -y yum-utils && yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+        yum install -y yum-utils && \
+        yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+        cp /etc/yum.repos.d/hashicorp.repo /etc/yum.repos.art/ci/ 2>/dev/null || true && \
         yum -y install terraform && \
         jq --version && \
         yum clean all && rm -rf /var/cache/yum/*
-    RUN curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    RUN ARCH=$(uname -m) && \
+        curl -s "https://awscli.amazonaws.com/awscli-exe-linux-${ARCH}.zip" -o "awscliv2.zip" && \
         unzip -q awscliv2.zip && \
         ./aws/install && \
-        rm -rf awscliv2.zip aws &&\
+        rm -rf awscliv2.zip aws && \
         aws --version
-    RUN curl -Lk -o /usr/bin/yq https://github.com/mikefarah/yq/releases/download/v4.18.1/yq_linux_amd64 && chmod +x /usr/bin/yq && \
+    RUN ARCH=$(uname -m) && \
+        if [ "$ARCH" = "x86_64" ]; then YQ_ARCH="amd64"; \
+        elif [ "$ARCH" = "aarch64" ]; then YQ_ARCH="arm64"; \
+        fi && \
+        curl -Lk -o /usr/bin/yq "https://github.com/mikefarah/yq/releases/download/v4.18.1/yq_linux_${YQ_ARCH}" && \
+        chmod +x /usr/bin/yq && \
         yq --version && \
-        curl -Lk -o /usr/bin/roxctl https://mirror.openshift.com/pub/rhacs/assets/latest/bin/Linux/roxctl && \
+        if [ "$ARCH" = "x86_64" ]; then \
+          curl -Lk -o /usr/bin/roxctl "https://mirror.openshift.com/pub/rhacs/assets/latest/bin/Linux/roxctl"; \
+        elif [ "$ARCH" = "aarch64" ]; then \
+          curl -Lk -o /usr/bin/roxctl "https://mirror.openshift.com/pub/rhacs/assets/latest/bin/Linux/roxctl-arm64"; \
+        fi && \
         chmod +x /usr/bin/roxctl
     ENV HOME="/tmp"
   from: src
@@ -53,7 +69,7 @@ tests:
 - as: quay-omr-tests-omr-ocp416-disconnected
   cron: 0 12 * * 5
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-quay-qe
     post:
     - chain: quay-tests-aws-ipi-disconnected-private-deprovision
     test:
