@@ -5,12 +5,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/e2e-agnostic-operator
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-version-operator-main-e2e-agnostic-operator
@@ -86,12 +86,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/e2e-agnostic-operator-devpreview
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-version-operator-main-e2e-agnostic-operator-devpreview
@@ -167,12 +167,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/e2e-agnostic-operator-techpreview
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-version-operator-main-e2e-agnostic-operator-techpreview
@@ -247,12 +247,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/e2e-agnostic-ovn
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-version-operator-main-e2e-agnostic-ovn
@@ -328,16 +328,16 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/e2e-agnostic-ovn-techpreview-serial
+    cluster: build02
+    context: ci/prow/e2e-agnostic-ovn-techpreview-serial-1of3
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cluster-version-operator-main-e2e-agnostic-ovn-techpreview-serial
-    rerun_command: /test e2e-agnostic-ovn-techpreview-serial
+    name: pull-ci-openshift-cluster-version-operator-main-e2e-agnostic-ovn-techpreview-serial-1of3
+    rerun_command: /test e2e-agnostic-ovn-techpreview-serial-1of3
     skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -345,6 +345,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 3 --shard-id 1"
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-agnostic-ovn-techpreview-serial
@@ -403,18 +404,182 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-agnostic-ovn-techpreview-serial,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-agnostic-ovn-techpreview-serial-1of3,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
+    context: ci/prow/e2e-agnostic-ovn-techpreview-serial-2of3
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-version-operator-main-e2e-agnostic-ovn-techpreview-serial-2of3
+    rerun_command: /test e2e-agnostic-ovn-techpreview-serial-2of3
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 3 --shard-id 2"
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agnostic-ovn-techpreview-serial
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agnostic-ovn-techpreview-serial-2of3,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/e2e-agnostic-ovn-techpreview-serial-3of3
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-version-operator-main-e2e-agnostic-ovn-techpreview-serial-3of3
+    rerun_command: /test e2e-agnostic-ovn-techpreview-serial-3of3
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --multi-stage-param=SHARD_ARGS="--shard-count 3 --shard-id 3"
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-agnostic-ovn-techpreview-serial
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agnostic-ovn-techpreview-serial-3of3,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
     context: ci/prow/e2e-agnostic-ovn-upgrade-into-change
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-version-operator-main-e2e-agnostic-ovn-upgrade-into-change
@@ -490,12 +655,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/e2e-agnostic-ovn-upgrade-into-change-techpreview
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-version-operator-main-e2e-agnostic-ovn-upgrade-into-change-techpreview
@@ -570,12 +735,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/e2e-agnostic-ovn-upgrade-out-of-change
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure4
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-version-operator-main-e2e-agnostic-ovn-upgrade-out-of-change
@@ -651,12 +816,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/e2e-agnostic-ovn-upgrade-out-of-change-techpreview
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: azure4
-      ci-operator.openshift.io/cloud-cluster-profile: azure-2
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-version-operator-main-e2e-agnostic-ovn-upgrade-out-of-change-techpreview
@@ -731,7 +896,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build07
     context: ci/prow/e2e-aws-ovn-techpreview
     decorate: true
     labels:
@@ -893,7 +1058,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/e2e-hypershift
     decorate: true
     labels:
@@ -974,7 +1139,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/e2e-hypershift-conformance
     decorate: true
     labels:
@@ -1055,7 +1220,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/gofmt
     decorate: true
     labels:
@@ -1117,7 +1282,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/images
     decorate: true
     labels:
@@ -1171,7 +1336,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/lint
     decorate: true
     labels:
@@ -1232,7 +1397,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build07
     context: ci/prow/okd-scos-e2e-aws-ovn
     decorate: true
     decoration_config:
@@ -1317,7 +1482,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/okd-scos-images
     decorate: true
     decoration_config:
@@ -1375,7 +1540,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     labels:
@@ -1437,7 +1602,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/verify-deps
     decorate: true
     labels:
@@ -1505,7 +1670,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/verify-update
     decorate: true
     labels:
@@ -1567,7 +1732,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build02
     context: ci/prow/verify-yaml
     decorate: true
     labels:

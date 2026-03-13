@@ -84,12 +84,14 @@ images:
     ENV GOFLAGS='-mod=readonly'
     RUN make install-tools && \
         make -C tooling/templatize templatize && \
-        make -C test/ aro-hcp-tests prow-job-executor
+        make -C test/ aro-hcp-tests prow-job-executor && \
+        go clean -cache -modcache && \
+        rm -f go.work.sum
     RUN mkdir -p "$(go env GOROOT)" && chmod -R 777 "$(go env GOROOT)"
     RUN mkdir -p "$(go env GOPATH)" && chmod -R 777 "$(go env GOPATH)"
     RUN mkdir -p "$(go env GOCACHE)" && chmod -R 777 "$(go env GOCACHE)"
     RUN mkdir -p "$(go env GOBIN)" && chmod -R 777 "$(go env GOBIN)"
-    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP && rm -f go.work.sum
+    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
   from: src
   inputs:
     src:
@@ -246,6 +248,19 @@ tests:
       ARO_HCP_DEPLOY_ENV: prow
       LOCATION: westus3
     workflow: aro-hcp-local-e2e
+- as: global-pipeline-postsubmit
+  postsubmit: true
+  run_if_changed: ^(?:config/config\.yaml|observability/observability\.yaml|dev-infrastructure/.*)$
+  steps:
+    cluster_profile: aro-hcp-dev
+    env:
+      LOCATION: westus3
+    leases:
+    - count: 1
+      env: LEASED_GLOBAL_PIPELINE_RESOURCE
+      resource_type: aro-hcp-dev-global-pipeline-quota-slice
+    test:
+    - ref: aro-hcp-provision-global-pipeline
 zz_generated_metadata:
   branch: main
   org: Azure

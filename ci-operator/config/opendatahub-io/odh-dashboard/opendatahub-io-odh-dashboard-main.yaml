@@ -22,6 +22,12 @@ images:
 - context_dir: .
   dockerfile_path: ./packages/eval-hub/Dockerfile.workspace
   to: odh-mod-arch-eval-hub-image
+- context_dir: .
+  dockerfile_path: ./packages/automl/Dockerfile.workspace
+  to: odh-mod-arch-automl-image
+- context_dir: .
+  dockerfile_path: ./packages/autorag/Dockerfile.workspace
+  to: odh-mod-arch-autorag-image
 promotion:
   to:
   - namespace: opendatahub-io
@@ -134,6 +140,38 @@ tests:
       SOURCE_IMAGE_REF: odh-mod-arch-eval-hub-image
     env:
       IMAGE_REPO: odh-mod-arch-eval-hub
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-automl-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-automl-image
+    env:
+      IMAGE_REPO: odh-mod-arch-automl
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-automl-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-automl-image
+    env:
+      IMAGE_REPO: odh-mod-arch-automl
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-autorag-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-autorag-image
+    env:
+      IMAGE_REPO: odh-mod-arch-autorag
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-autorag-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-autorag-image
+    env:
+      IMAGE_REPO: odh-mod-arch-autorag
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
