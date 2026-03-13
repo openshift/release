@@ -144,26 +144,33 @@ if [ ${#STUCK_DELL_NODES[@]} -gt 0 ]; then
     podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PSWD --clear-jobs --force
     sleep 30
 
-    echo "Recovery: waiting for Redfish ComputerSystem ready on $i"
+    echo "Recovery: waiting for BIOS attributes to become accessible on $i"
     # Disable tracing due to password handling
     [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
     set +x
-    for attempt in $(seq 1 40); do
-      response=$(curl -sk -u "$USER:$PSWD" \
+    for attempt in $(seq 1 20); do
+      bios_response=$(curl -sk -u "$USER:$PSWD" \
         -H "Content-Type: application/json" -H "Accept: application/json" \
-        "https://mgmt-$i/redfish/v1/Systems")
-      count=$(echo "$response" | jq -r '.["Members@odata.count"] // 0')
-      if [ "$count" -ge 1 ]; then
-        echo "ComputerSystem ready for $i"
+        "https://mgmt-$i/redfish/v1/Systems/System.Embedded.1/Bios")
+      boot_mode=$(echo "$bios_response" | jq -r '.Attributes.BootMode // empty')
+      if [ -n "$boot_mode" ]; then
+        echo "BIOS attributes accessible for $i (BootMode=$boot_mode)"
         break
       fi
-      echo "Waiting for ComputerSystem ready on $i (attempt $attempt/40)..."
+      echo "Waiting for BIOS attributes on $i (attempt $attempt/20)..."
       sleep 15
     done
     $WAS_TRACING && set -x
 
     echo "Recovery: setting boot device on $i"
-    podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PSWD -i config/idrac_interfaces.yml -t foreman
+    for attempt in $(seq 1 3); do
+      if podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PSWD -i config/idrac_interfaces.yml -t foreman; then
+        echo "Boot device set successfully for $i"
+        break
+      fi
+      echo "Boot device set failed for $i (attempt $attempt/3), retrying in 60s..."
+      sleep 60
+    done
 
     echo "Recovery: rebooting $i"
     podman run quay.io/quads/badfish:latest --reboot-only -H mgmt-$i -u $USER -p $PSWD
