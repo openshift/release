@@ -56,30 +56,7 @@ fi
 EOF
 chmod +x /tmp/install.sh
 
-if "${SRC_FROM_GIT}"; then
-  branch=$(echo ${JOB_SPEC} | jq -r '.refs.base_ref')
-  # MicroShift repo is recent enough to use main instead of master.
-  if [ "${branch}" == "master" ]; then
-    branch="main"
-  fi
-  CLONEREFS_OPTIONS=$(jq -n --arg branch "${branch}" '{
-    "src_root": "/go",
-    "log":"/dev/null",
-    "git_user_name": "ci-robot",
-    "git_user_email": "ci-robot@openshift.io",
-    "fail": true,
-    "refs": [
-      {
-        "org": "openshift",
-        "repo": "microshift",
-        "base_ref": $branch,
-        "workdir": true
-      }
-    ]
-  }')
-  export CLONEREFS_OPTIONS
-fi
-ci_clone_src
+ci_clone_src "${SRC_FROM_GIT}"
 
 REBASE_TO=""
 # RELEASE_IMAGE_LATEST is always set by the release-controller, whether this is
