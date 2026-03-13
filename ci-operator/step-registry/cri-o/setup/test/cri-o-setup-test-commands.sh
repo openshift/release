@@ -15,28 +15,21 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
     cd "\${SOURCE_DIR}/contrib/test/ci"
     ansible-playbook setup-main.yml --connection=local -vvv
-    ANSIBLE_EXIT_CODE=\$?
     sudo rm -rf "\${SOURCE_DIR}"
-    exit \${ANSIBLE_EXIT_CODE}
 EOF
-
-if [ $? -ne 0 ]; then
-    echo "ERROR: Ansible playbook failed, not creating base image"
-    exit 1
-fi
 
 echo "Ansible playbook succeeded, creating base image..."
 currentDate=$(date +'%s')
 gcloud compute instances stop ${instance_name} --zone=${ZONE}
 disk_name=$(gcloud compute instances describe ${instance_name} --zone=${ZONE} --format='get(disks[0].source)')
 
-gcloud compute images create crio-setup-${currentDate} \
+gcloud compute images create ${IMAGE_FAMILY}-${currentDate} \
     --source-disk="${disk_name}" \
-    --family="crio-setup" \
+    --family="${IMAGE_FAMILY}" \
     --source-disk-zone=${ZONE} \
     --project="openshift-node-devel"
 # Delete images older than 2 weeks
-images=$(gcloud compute images list --project="openshift-node-devel" --filter="family:crio-setup AND creationTimestamp<$(date -d '2 weeks ago' +%Y-%m-%dT%H:%M:%SZ)" --format="value(name)")
+images=$(gcloud compute images list --project="openshift-node-devel" --filter="family:${IMAGE_FAMILY} AND creationTimestamp<$(date -d '2 weeks ago' +%Y-%m-%dT%H:%M:%SZ)" --format="value(name)")
 if [ -n "$images" ]; then
     echo "The following images will be deleted:"
     echo "$images"
