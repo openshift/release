@@ -32,7 +32,10 @@ git fetch upstream oc_mirror
 git checkout upstream/oc_mirror -- tooling/aro-hcp-exporter/Makefile
 
 # Resolve image variables from Makefile (uses templatize internally)
-eval "$(make --no-print-directory -C tooling/aro-hcp-exporter print-image-vars DEPLOY_ENV="${DEPLOY_ENV}")"
+IMAGE_VARS_FILE="/tmp/image-vars.env"
+make -C tooling/aro-hcp-exporter print-image-vars DEPLOY_ENV="${DEPLOY_ENV}" OUTPUT_FILE="${IMAGE_VARS_FILE}"
+# shellcheck source=/dev/null
+source "${IMAGE_VARS_FILE}"
 
 echo "Resolved ACR: ${ARO_HCP_IMAGE_ACR}"
 echo "Resolved image: ${ARO_HCP_EXPORTER_TAGGED_IMAGE}"
@@ -44,6 +47,11 @@ IMAGE_TAG="$(git rev-parse --short=7 HEAD)"
 TARGET_IMAGE="${ACR_REGISTRY}/test-imani-aro-hcp-exporter:${IMAGE_TAG}"
 
 echo "Target ACR image (test): ${TARGET_IMAGE}"
+
+# Set writable runtime dir for registry auth
+export XDG_RUNTIME_DIR="/tmp/run"
+mkdir -p "${XDG_RUNTIME_DIR}/containers"
+mkdir -p "${HOME}/.docker"
 
 # Authenticate to CI registry (source)
 oc registry login
