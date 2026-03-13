@@ -290,12 +290,6 @@ export DAEMON_IMG="${REGISTRY}/openshift-ptp/linuxptp-daemon:${T5CI_VERSION}"
 export SIDECAR_IMG="${REGISTRY}/openshift-ptp/cloud-event-proxy:${T5CI_VERSION}"
 build_images
 
-# Download oc
-wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
-tar -zxvf openshift-client-linux.tar.gz
-mv oc kubectl /usr/local/bin/
-oc version --client
-
 # deploy ptp-operator
 if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
   echo "Running on upstream main branch"
