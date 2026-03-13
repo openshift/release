@@ -89,6 +89,14 @@ if [[ -n "${ENABLE_LAYER_3:-}" ]]; then
     echo "Selected ORION_CONFIG: $ORION_CONFIG (scale: $scale_prefix)"
 fi
 
+VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+export VERSION
+
+# Unset proxy so we can pip install, reach sippy, etc.
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
+fi
+
 # Print Orion version
 orion_version=$(orion --version 2>&1)
 orion_version_exit=$?
@@ -123,8 +131,6 @@ if [[ -n "$ORION_CONFIG" ]]; then
     fi
 fi
 
-VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
-export VERSION
 # Only pass --ack for custom ACK URLs. Orion auto-loads ack/all_ack.yaml when present (unless --no-default-ack).
 if [[ -n "$ACK_FILE" ]] && [[ "$ACK_FILE" =~ ^https?:// ]]; then
     ackFilePath="$ARTIFACT_DIR/$(basename ${ACK_FILE})"
