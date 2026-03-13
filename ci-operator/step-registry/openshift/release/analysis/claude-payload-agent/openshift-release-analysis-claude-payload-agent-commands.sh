@@ -4,7 +4,33 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Starting claude-payload-analysis for payload: ${PAYLOAD_TAG}"
+echo "Starting claude-payload-agent for payload: ${PAYLOAD_TAG}"
+
+# Load secrets with xtrace disabled to prevent leaking credentials in logs
+set +x
+if [ -f "${GITHUB_TOKEN_PATH}" ]; then
+    export GITHUB_TOKEN
+    GITHUB_TOKEN=$(cat "${GITHUB_TOKEN_PATH}")
+    echo "GitHub token loaded."
+else
+    echo "Warning: GitHub token not found at ${GITHUB_TOKEN_PATH}. Revert operations will not be available."
+fi
+
+if [ -f "${SLACK_WEBHOOK_URL}" ]; then
+    SLACK_WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
+    echo "Slack webhook loaded."
+else
+    SLACK_WEBHOOK=""
+    echo "Warning: Slack webhook not found at ${SLACK_WEBHOOK_URL}. Notifications will be skipped."
+fi
+
+JIRA_TOKEN=""
+if [ -f "${JIRA_TOKEN_PATH}" ]; then
+    JIRA_TOKEN=$(cat "${JIRA_TOKEN_PATH}")
+    echo "Jira token loaded."
+else
+    echo "Warning: Jira token not found at ${JIRA_TOKEN_PATH}. Jira operations will not be available."
+fi
 
 # Install gcloud CLI for GCS artifact access (no root required)
 echo "Installing gcloud CLI..."
@@ -25,6 +51,7 @@ PAYLOAD_URL="${RELEASE_CONTROLLER_URL}/releasestream/${STREAM_NAME}/release/${PA
 
 echo "Version: ${VERSION}, Stream: ${STREAM}"
 echo "Release API: ${API_URL}"
+echo "Automatic reverts enabled: ${ENABLE_PAYLOAD_REVERT}"
 
 # Poll until all blocking jobs have finished (no Pending jobs remain).
 # We can't wait for the payload to reach terminal state because this
@@ -65,9 +92,7 @@ while true; do
             TOTAL_RETRIES=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.retries > 0) | .value.retries] | add // 0')
 
             # Send Slack notification for accepted payload
-            if [ -f "${SLACK_WEBHOOK_URL}" ]; then
-                WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
-
+            if [[ -n "${SLACK_WEBHOOK}" ]]; then
                 RETRY_INFO=""
                 if [[ "${RETRIED}" -gt 0 ]]; then
                     RETRY_INFO=" ${RETRIED} job(s) needed ${TOTAL_RETRIES} total retries."
@@ -77,9 +102,10 @@ while true; do
 
 All ${TOTAL} blocking jobs succeeded.${RETRY_INFO}"
 
+                set +x
                 jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
                     curl -sf -X POST -H 'Content-type: application/json' -d @- \
-                    "${WEBHOOK}" || echo "Warning: Failed to send Slack notification."
+                    "${SLACK_WEBHOOK}" || echo "Warning: Failed to send Slack notification."
             fi
 
             exit 0
@@ -107,16 +133,29 @@ echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 WORKDIR=$(mktemp -d /tmp/claude-analysis-XXXXXX)
 cd "${WORKDIR}"
 
+# Ensure reports are copied to artifacts even if the script exits early
+copy_reports() {
+    if [[ -d "${WORKDIR:-}" ]]; then
+        echo "Copying reports to artifact directory..."
+        find "${WORKDIR}" -name "payload-analysis-*.html" -exec cp {} "${ARTIFACT_DIR}/" \; || true
+        find "${WORKDIR}" -name "*-autodl.json" -exec cp {} "${ARTIFACT_DIR}/" \; || true
+        find "${WORKDIR}" -name "payload-results-*.yaml" -exec cp {} "${ARTIFACT_DIR}/" \; || true
+    fi
+}
+trap copy_reports EXIT TERM INT
+
 # Install the must-gather plugin for analyzing must-gather archives
 echo "Installing must-gather plugin..."
 claude plugin install must-gather@ai-helpers
 echo "must-gather plugin installed."
 
+ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
+
 PHASE_ANALYSIS_START=$(date +%s)
 CLAUDE_EXIT=0
-timeout 7200 claude \
+timeout 3600 claude \
     --model "${CLAUDE_MODEL}" \
-    --allowedTools "Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill" \
+    --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
     --max-turns 100 \
     -p "/ci:analyze-payload ${PAYLOAD_TAG}" \
@@ -130,10 +169,10 @@ NUDGE_EXIT=0
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo ""
     echo "Claude timed out after 2 hours. Nudging to wrap up..."
-    timeout 900 claude \
+    timeout 600 claude \
         --model "${CLAUDE_MODEL}" \
         --continue \
-        --allowedTools "Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill" \
+        --allowedTools "${ALLOWED_TOOLS}" \
         --output-format stream-json \
         --max-turns 20 \
         -p "I think you got stuck and hit the timeout. Please wrap up your analysis now with whatever data you have collected so far. Generate the required report artifacts immediately. Note you timed out in the report." \
@@ -141,22 +180,73 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
 fi
 PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
 
-# Copy HTML report(s) to artifact directory before anything else that might fail
-echo "Copying reports to artifact directory..."
-find "${WORKDIR}" -name "payload-analysis-*.html" -exec cp {} "${ARTIFACT_DIR}/" \;
-find "${WORKDIR}" -name "*-autodl.json" -exec cp {} "${ARTIFACT_DIR}/" \;
+# Optionally stage reverts for high-confidence candidates
+PHASE_REVERT_START=$(date +%s)
+REVERT_EXIT=0
+if [[ "${ENABLE_PAYLOAD_REVERT}" == "true" ]]; then
+    if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+        echo "Warning: Automatic reverts enabled but no GitHub token is available. Skipping reverts."
+    elif ls "${WORKDIR}"/payload-results-*.yaml 1>/dev/null 2>&1; then
+        echo ""
+        echo "=== Staging reverts for high-confidence candidates ==="
+
+        # Configure Jira MCP server for creating TRT issues
+        REVERT_ALLOWED_TOOLS="${ALLOWED_TOOLS}"
+        if [[ -n "${JIRA_TOKEN}" ]]; then
+            echo "Configuring Jira MCP server..."
+            set +x
+            claude mcp add \
+                -e JIRA_URL="${JIRA_URL}" \
+                -e JIRA_PERSONAL_TOKEN="${JIRA_TOKEN}" \
+                --transport stdio \
+                jira -- uvx mcp-atlassian@0.21.0
+            echo "Jira MCP server configured."
+            REVERT_ALLOWED_TOOLS="${REVERT_ALLOWED_TOOLS} mcp__jira__*"
+        else
+            echo "Warning: No Jira token available. TRT issues will not be created."
+        fi
+
+        timeout 3600 claude \
+            --model "${CLAUDE_MODEL}" \
+            --continue \
+            --allowedTools "${REVERT_ALLOWED_TOOLS}" \
+            --output-format stream-json \
+            --max-turns 50 \
+            -p "/ci:payload-revert ${PAYLOAD_TAG}" \
+            --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-revert.log" || REVERT_EXIT=$?
+
+    else
+        echo "Warning: No payload results YAML found. Skipping reverts."
+    fi
+else
+    echo "Automatic reverts not enabled. Skipping revert stage."
+fi
+PHASE_REVERT_DURATION=$(( $(date +%s) - PHASE_REVERT_START ))
 
 # Generate JUnit XML for timeout and phase duration tracking
 JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-ci.xml"
 PHASE_PREFIX="[sig-claude]"
 TIMEOUT_TESTCASE="${PHASE_PREFIX} Claude should complete in a reasonable time"
-TOTAL_DURATION=$(( PHASE_WAIT_DURATION + PHASE_ANALYSIS_DURATION + PHASE_NUDGE_DURATION ))
+TOTAL_DURATION=$(( PHASE_WAIT_DURATION + PHASE_ANALYSIS_DURATION + PHASE_NUDGE_DURATION + PHASE_REVERT_DURATION ))
 
 PHASE_CASES="  <testcase name=\"${PHASE_PREFIX} Phase: wait for blocking jobs\" time=\"${PHASE_WAIT_DURATION}\"/>
   <testcase name=\"${PHASE_PREFIX} Phase: analysis\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
 
 TIMEOUT_CASES=""
 FAILURE_COUNT=0
+
+if [[ "${ENABLE_PAYLOAD_REVERT}" == "true" ]]; then
+    if [[ "${REVERT_EXIT}" -ne 0 ]]; then
+        FAILURE_COUNT=$(( FAILURE_COUNT + 1 ))
+        PHASE_CASES="${PHASE_CASES}
+  <testcase name=\"${PHASE_PREFIX} Phase: payload revert\" time=\"${PHASE_REVERT_DURATION}\">
+    <failure message=\"Payload revert failed with exit code ${REVERT_EXIT}\">Claude payload revert exited with code ${REVERT_EXIT}.</failure>
+  </testcase>"
+    else
+        PHASE_CASES="${PHASE_CASES}
+  <testcase name=\"${PHASE_PREFIX} Phase: payload revert\" time=\"${PHASE_REVERT_DURATION}\"/>"
+    fi
+fi
 TIMEOUT_TEST_COUNT=0
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
@@ -191,7 +281,11 @@ else
     TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
 fi
 
-TEST_COUNT=$(( 2 + TIMEOUT_TEST_COUNT ))
+PHASE_COUNT=2
+if [[ "${ENABLE_PAYLOAD_REVERT}" == "true" ]]; then
+    PHASE_COUNT=3
+fi
+TEST_COUNT=$(( PHASE_COUNT + TIMEOUT_TEST_COUNT ))
 cat > "${JUNIT_FILE}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="claude-ci" tests="${TEST_COUNT}" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
@@ -203,41 +297,38 @@ EOF
 echo "JUnit XML written to ${JUNIT_FILE}"
 
 # Check if we produced a report
-if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
-    echo "Analysis complete. Report(s) saved to artifact directory."
+if ls "${WORKDIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
+    echo "Analysis complete."
+else
+    echo "Warning: No HTML report was generated."
+    exit 1
+fi
 
-    # Ask Claude to summarize its findings for Slack
-    echo "Asking Claude to summarize findings for Slack..."
-    SUMMARY=$(claude \
-        --model "${CLAUDE_MODEL}" \
-        --continue \
-        --output-format text \
-        --max-turns 1 \
-        -p "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
-        2>/dev/null) || SUMMARY=""
+# Send Slack summary including analysis and any revert actions
+if [ "${JOB_TYPE:-}" = "presubmit" ]; then
+    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+else
+    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
+fi
 
-    # Send Slack notification
-    if [ "${JOB_TYPE:-}" = "presubmit" ]; then
-        PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
-    else
-        PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
-    fi
-    if [ -f "${SLACK_WEBHOOK_URL}" ]; then
-        WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
+echo "Asking Claude to summarize findings for Slack..."
+SUMMARY=$(claude \
+    --model "${CLAUDE_MODEL}" \
+    --continue \
+    --output-format text \
+    --max-turns 1 \
+    -p "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If any revert PRs were opened, include their URLs as links for Slack. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
+    2>/dev/null) || SUMMARY=""
 
-        SLACK_TEXT=":claude-thinking: *Payload Analysis for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
+if [[ -n "${SLACK_WEBHOOK}" ]]; then
+    SLACK_TEXT=":claude-thinking: *Payload Analysis for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
 
 ${SUMMARY:-No summary available.}
 
 <${PROW_JOB_URL}|:point_right: View Full Analysis Report>"
 
-        jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
-            curl -sf -X POST -H 'Content-type: application/json' -d @- \
-            "${WEBHOOK}" || echo "Warning: Failed to send Slack notification."
-    else
-        echo "Slack webhook file not found at ${SLACK_WEBHOOK_URL}, skipping notification."
-    fi
-else
-    echo "Warning: No HTML report was generated."
-    exit 1
+    set +x
+    jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
+        curl -sf -X POST -H 'Content-type: application/json' -d @- \
+        "${SLACK_WEBHOOK}" || echo "Warning: Failed to send Slack notification."
 fi
