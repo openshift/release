@@ -13,6 +13,8 @@ instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
 timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
     cd "\${SOURCE_DIR}/contrib/test/ci"
+    # Add libpathrs-devel to Fedora packages for testing
+    sed -i '/- crun-wasm$/a\      # required for building runc with libpathrs support.\n      - libpathrs-devel' system-packages.yml
     ansible-playbook setup-main.yml --connection=local -vvv
     ANSIBLE_EXIT_CODE=\$?
     sudo rm -rf "\${SOURCE_DIR}"
