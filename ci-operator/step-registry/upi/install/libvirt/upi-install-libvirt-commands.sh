@@ -275,6 +275,19 @@ if [ -f "${CHRONY_MASTER_YAML}" ]; then
   cp ${CHRONY_MASTER_YAML} "${INSTALL_DIR}/manifests"
 fi
 
+# Check for the master mcp yaml config, and save it in the installation directory
+MCP_MASTER_YAML="${SHARED_DIR}/manifest_master.machineconfigpool.yaml"
+if [[ -f "${MCP_MASTER_YAML}" ]]; then
+  echo "Saving ${MCP_MASTER_YAML} to the install manifests directory..."
+  cp ${MCP_MASTER_YAML} "${INSTALL_DIR}/manifests/"
+fi
+
+# Check for the worker mcp yaml config, and save it in the installation directory
+MCP_WORKER_YAML="${SHARED_DIR}/manifest_worker.machineconfigpool.yaml"
+if [[ -f "${MCP_WORKER_YAML}" ]]; then
+  echo "Saving ${MCP_WORKER_YAML} to the install manifests directory..."
+  cp ${MCP_WORKER_YAML} "${INSTALL_DIR}/manifests/"
+fi
 # Check for the etcd on ramdisk yaml config, and save it in the installation directory
 ETCD_RAMDISK_YAML="${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml"
 if [ -f "${ETCD_RAMDISK_YAML}" ]; then
