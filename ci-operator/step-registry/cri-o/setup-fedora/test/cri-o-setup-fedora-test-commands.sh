@@ -29,18 +29,15 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     force: yes
 
 - name: build libpathrs
-  shell: cargo cbuild --release
+  shell: /usr/bin/cargo cbuild --release
   args:
     chdir: "/tmp/libpathrs"
-  environment:
-    PATH: "{{ ansible_env.HOME }}/.cargo/bin:{{ ansible_env.PATH }}"
 
 - name: install libpathrs
-  shell: cargo cinstall --release --prefix=/usr --libdir=/usr/lib64
+  become: yes
+  shell: /usr/bin/cargo cinstall --release --prefix=/usr --libdir=/usr/lib64
   args:
     chdir: "/tmp/libpathrs"
-  environment:
-    PATH: "{{ ansible_env.HOME }}/.cargo/bin:{{ ansible_env.PATH }}"
 
 - name: cleanup libpathrs source
   file:
