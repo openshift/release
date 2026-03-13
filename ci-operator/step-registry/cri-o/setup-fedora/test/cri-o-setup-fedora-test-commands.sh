@@ -14,9 +14,17 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
     cd "\${SOURCE_DIR}/contrib/test/ci"
     ansible-playbook setup-main.yml --connection=local -vvv
+    ANSIBLE_EXIT_CODE=\$?
     sudo rm -rf "\${SOURCE_DIR}"
+    exit \${ANSIBLE_EXIT_CODE}
 EOF
 
+if [ $? -ne 0 ]; then
+    echo "ERROR: Ansible playbook failed, not creating base image"
+    exit 1
+fi
+
+echo "Ansible playbook succeeded, creating base image..."
 currentDate=$(date +'%s')
 gcloud compute instances stop ${instance_name} --zone=${ZONE}
 disk_name=$(gcloud compute instances describe ${instance_name} --zone=${ZONE} --format='get(disks[0].source)')
