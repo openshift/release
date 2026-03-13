@@ -31,6 +31,26 @@ git remote add upstream https://github.com/Azure/ARO-HCP.git || true
 git fetch upstream oc_mirror
 git checkout upstream/oc_mirror -- tooling/aro-hcp-exporter/Makefile
 
-make -C tooling/aro-hcp-exporter acr-push \
-  DEPLOY_ENV="${DEPLOY_ENV}" \
-  SOURCE_IMAGE="${ARO_HCP_EXPORTER}"
+# Resolve image variables from Makefile (uses templatize internally)
+eval "$(make --no-print-directory -C tooling/aro-hcp-exporter print-image-vars DEPLOY_ENV="${DEPLOY_ENV}")"
+
+echo "Resolved ACR: ${ARO_HCP_IMAGE_ACR}"
+echo "Resolved image: ${ARO_HCP_EXPORTER_TAGGED_IMAGE}"
+
+# Push to test repo instead of the resolved target
+ACR_NAME="${ARO_HCP_IMAGE_ACR}"
+ACR_REGISTRY="${ACR_NAME}.azurecr.io"
+IMAGE_TAG="$(git rev-parse --short=7 HEAD)"
+TARGET_IMAGE="${ACR_REGISTRY}/test-imani-aro-hcp-exporter:${IMAGE_TAG}"
+
+echo "Target ACR image (test): ${TARGET_IMAGE}"
+
+# Authenticate to CI registry (source)
+oc registry login
+
+# Authenticate to ACR (destination) without Docker daemon
+ACR_TOKEN=$(az acr login --name "${ACR_NAME}" --expose-token --output tsv --query accessToken)
+oc registry login --registry "${ACR_REGISTRY}" --auth-basic="00000000-0000-0000-0000-000000000000:${ACR_TOKEN}"
+
+oc image mirror "${ARO_HCP_EXPORTER}" "${TARGET_IMAGE}"
+echo "Image pushed successfully to ${TARGET_IMAGE}"
