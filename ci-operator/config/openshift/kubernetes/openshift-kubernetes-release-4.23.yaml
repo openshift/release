@@ -301,13 +301,13 @@ tests:
   as: e2e-azure
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-agnostic-ovn-cmd
   optional: true
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     env:
       TEST_SUITE: openshift/test-cmd
     workflow: openshift-e2e-azure
@@ -338,7 +338,7 @@ tests:
 - as: e2e-azure-ovn-upgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
   steps:
-    cluster_profile: azure-2
+    cluster_profile: openshift-org-azure
     workflow: openshift-upgrade-azure
 - as: e2e-aws-ovn-downgrade
   run_if_changed: ^(openshift-hack/images/hyperkube/.*|)$
@@ -370,6 +370,19 @@ tests:
 - as: k8s-e2e-conformance-aws
   steps:
     cluster_profile: aws-4
+    test:
+    - as: test
+      cli: latest
+      commands: openshift-hack/conformance-k8s.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: k8s-conformance
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
     test:
     - as: test
       cli: latest
@@ -458,7 +471,11 @@ tests:
   as: e2e-openstack-csi-manila
   optional: true
   steps:
-    cluster_profile: openstack-vh-mecha-central
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      MANILA_SHARE_NETWORK_ID: b4b69cfe-b06e-4b01-ac34-4faa4bf94503
     workflow: openshift-e2e-openstack-csi-manila
 - as: e2e-aws-ovn-cgroupsv2
   steps:
@@ -501,6 +518,13 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-external-aws
+- as: e2e-aws-hpa
+  cron: 0 5 * * 1
+  steps:
+    cluster_profile: aws-2
+    env:
+      TEST_SUITE: kubernetes/autoscaling/hpa
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.23
   org: openshift

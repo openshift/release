@@ -35,6 +35,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.48.0
+  ocp_4.10_cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
 build_root:
   from_repository: true
 images:
@@ -67,6 +71,11 @@ images:
     # Cache dir must be accessible when running the integration tests
     RUN mkdir /.cache -m 0777
   from: src
+  inputs:
+    ocp_4.10_cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
   to: src-oc
 promotion:
   to:
@@ -266,20 +275,20 @@ tests:
 - as: e2e-azure-ovn
   run_if_changed: azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure
 - always_run: false
   as: e2e-azure-ovn-shared-vpc
   optional: true
   run_if_changed: azure
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-sharednetwork
 - always_run: false
   as: e2e-azure-ovn-resourcegroup
   optional: true
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-resourcegroup
 - always_run: false
   as: e2e-aws-ovn-upgrade
@@ -314,7 +323,7 @@ tests:
 - as: e2e-azure-ovn-upi
   run_if_changed: ^(upi/(azure|azurestack)/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
-    cluster_profile: azure4
+    cluster_profile: openshift-org-azure
     workflow: openshift-e2e-azure-upi
 - always_run: false
   as: e2e-aws-ovn-workers-rhel8

@@ -21,6 +21,7 @@ STREAM=$(echo "${PAYLOAD_TAG}" | grep -oP '\d+\.\d+\.\d+-\d+\.\K[a-z]+')
 RELEASE_CONTROLLER_URL="https://amd64.ocp.releases.ci.openshift.org"
 STREAM_NAME="${VERSION}.0-0.${STREAM}"
 API_URL="${RELEASE_CONTROLLER_URL}/api/v1/releasestream/${STREAM_NAME}/release/${PAYLOAD_TAG}"
+PAYLOAD_URL="${RELEASE_CONTROLLER_URL}/releasestream/${STREAM_NAME}/release/${PAYLOAD_TAG}"
 
 echo "Version: ${VERSION}, Stream: ${STREAM}"
 echo "Release API: ${API_URL}"
@@ -32,6 +33,8 @@ MAX_WAIT=36000 # 10 hours in seconds
 POLL_INTERVAL=300  # 5 minutes
 ELAPSED=0
 POLL_COUNT=0
+
+PHASE_WAIT_START=$(date +%s)
 
 echo ""
 echo "=== Waiting for all blocking jobs to complete before analysis ==="
@@ -45,14 +48,40 @@ while true; do
     FAILED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Failed")] | length')
     SUCCEEDED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.state == "Succeeded")] | length')
     TOTAL=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[]] | length')
+    # Guard against release controller race: jobs may briefly report as Succeeded before being dispatched
+    NOT_STARTED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.url == null or .value.url == "")] | length')
 
     ELAPSED_MIN=$((ELAPSED / 60))
     echo "[Poll #${POLL_COUNT} | ${ELAPSED_MIN}m elapsed] Blocking jobs: ${SUCCEEDED}/${TOTAL} succeeded, ${PENDING} pending, ${FAILED} failed"
 
-    if [[ "${PENDING}" -eq 0 ]]; then
+    if [[ "${NOT_STARTED}" -gt 0 ]]; then
+        echo "  ${NOT_STARTED} job(s) have no prow URL yet, waiting for them to be dispatched..."
+    elif [[ "${PENDING}" -eq 0 ]]; then
         echo ""
         if [[ "${FAILED}" -eq 0 ]]; then
             echo "All ${TOTAL} blocking jobs succeeded. No analysis needed."
+
+            RETRIED=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.retries > 0)] | length')
+            TOTAL_RETRIES=$(echo "${RELEASE_JSON}" | jq '[.results.blockingJobs // {} | to_entries[] | select(.value.retries > 0) | .value.retries] | add // 0')
+
+            # Send Slack notification for accepted payload
+            if [ -f "${SLACK_WEBHOOK_URL}" ]; then
+                WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
+
+                RETRY_INFO=""
+                if [[ "${RETRIED}" -gt 0 ]]; then
+                    RETRY_INFO=" ${RETRIED} job(s) needed ${TOTAL_RETRIES} total retries."
+                fi
+
+                SLACK_TEXT=":green-check: *Payload Accepted for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
+
+All ${TOTAL} blocking jobs succeeded.${RETRY_INFO}"
+
+                jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
+                    curl -sf -X POST -H 'Content-type: application/json' -d @- \
+                    "${WEBHOOK}" || echo "Warning: Failed to send Slack notification."
+            fi
+
             exit 0
         fi
         echo "All blocking jobs have completed. ${FAILED}/${TOTAL} failed. Starting analysis..."
@@ -70,6 +99,8 @@ while true; do
     sleep ${POLL_INTERVAL}
 done
 
+PHASE_WAIT_DURATION=$(( $(date +%s) - PHASE_WAIT_START ))
+
 # Run Claude to analyze the payload
 echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 
@@ -81,47 +112,95 @@ echo "Installing must-gather plugin..."
 claude plugin install must-gather@ai-helpers
 echo "must-gather plugin installed."
 
+PHASE_ANALYSIS_START=$(date +%s)
+CLAUDE_EXIT=0
 timeout 7200 claude \
     --model "${CLAUDE_MODEL}" \
     --allowedTools "Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill" \
     --output-format stream-json \
     --max-turns 100 \
     -p "/ci:analyze-payload ${PAYLOAD_TAG}" \
-    --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || true
+    --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || CLAUDE_EXIT=$?
 
-# Copy HTML report(s) to artifact directory
+PHASE_ANALYSIS_DURATION=$(( $(date +%s) - PHASE_ANALYSIS_START ))
+
+# If Claude timed out (exit 124), nudge it to wrap up with a shorter timeout
+PHASE_NUDGE_START=$(date +%s)
+NUDGE_EXIT=0
+if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+    echo ""
+    echo "Claude timed out after 2 hours. Nudging to wrap up..."
+    timeout 900 claude \
+        --model "${CLAUDE_MODEL}" \
+        --continue \
+        --allowedTools "Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill" \
+        --output-format stream-json \
+        --max-turns 20 \
+        -p "I think you got stuck and hit the timeout. Please wrap up your analysis now with whatever data you have collected so far. Generate the required report artifacts immediately. Note you timed out in the report." \
+        --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-output.log" || NUDGE_EXIT=$?
+fi
+PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
+
+# Copy HTML report(s) to artifact directory before anything else that might fail
 echo "Copying reports to artifact directory..."
 find "${WORKDIR}" -name "payload-analysis-*.html" -exec cp {} "${ARTIFACT_DIR}/" \;
+find "${WORKDIR}" -name "*-autodl.json" -exec cp {} "${ARTIFACT_DIR}/" \;
 
-# Analyze cost from claude stream-json output
-echo "=== Cost Analysis ==="
-CLAUDE_LOG="${ARTIFACT_DIR}/claude-output.log"
-if [ -f "${CLAUDE_LOG}" ]; then
-    # Extract token usage from the result message in stream-json output
-    # The final result message contains cumulative usage stats
-    # Use python to parse the result line since it may contain control chars that break jq
-    COST_JSON=$(grep '"type":"result"' "${CLAUDE_LOG}" | tail -1 | python3 -c "
-import sys, json
-try:
-    d = json.load(sys.stdin)
-    cost = d.get('total_cost_usd', 0)
-    usage = d.get('modelUsage', {})
-    print(f'Total cost: \${cost:.4f}')
-    for model, u in usage.items():
-        print(f'  {model}: input={u[\"inputTokens\"]} output={u[\"outputTokens\"]} cache_read={u[\"cacheReadInputTokens\"]} cache_create={u[\"cacheCreationInputTokens\"]} cost=\${u[\"costUSD\"]:.4f}')
-    summary = {'payload': '${PAYLOAD_TAG}', 'total_cost_usd': cost, 'modelUsage': usage}
-    with open('${ARTIFACT_DIR}/cost-summary.json', 'w') as f:
-        json.dump(summary, f, indent=2)
-except Exception as e:
-    print(f'Failed to parse cost data: {e}')
-" 2>&1 || true)
-    echo "${COST_JSON}"
-    if [ -f "${ARTIFACT_DIR}/cost-summary.json" ]; then
-        echo "Cost summary written to ${ARTIFACT_DIR}/cost-summary.json"
+# Generate JUnit XML for timeout and phase duration tracking
+JUNIT_FILE="${ARTIFACT_DIR}/junit_claude-ci.xml"
+PHASE_PREFIX="[sig-claude]"
+TIMEOUT_TESTCASE="${PHASE_PREFIX} Claude should complete in a reasonable time"
+TOTAL_DURATION=$(( PHASE_WAIT_DURATION + PHASE_ANALYSIS_DURATION + PHASE_NUDGE_DURATION ))
+
+PHASE_CASES="  <testcase name=\"${PHASE_PREFIX} Phase: wait for blocking jobs\" time=\"${PHASE_WAIT_DURATION}\"/>
+  <testcase name=\"${PHASE_PREFIX} Phase: analysis\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
+
+TIMEOUT_CASES=""
+FAILURE_COUNT=0
+TIMEOUT_TEST_COUNT=0
+
+if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+    TIMEOUT_TEST_COUNT=1
+    FAILURE_COUNT=1
+    TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\">
+    <failure message=\"Claude timed out after 2 hours\">Claude exceeded the 2 hour time limit and had to be nudged to wrap up.</failure>
+  </testcase>"
+
+    HAS_REPORT=false
+    find "${WORKDIR}" -name "payload-analysis-*.html" -quit | grep -q . && HAS_REPORT=true
+
+    PHASE_CASES="${PHASE_CASES}
+  <testcase name=\"${PHASE_PREFIX} Phase: recovery nudge\" time=\"${PHASE_NUDGE_DURATION}\"/>"
+
+    if [[ "${NUDGE_EXIT}" -eq 0 ]] && [[ "${HAS_REPORT}" == "true" ]]; then
+        # Flake: timed out but recovered after nudge
+        TIMEOUT_TEST_COUNT=2
+        TIMEOUT_CASES="${TIMEOUT_CASES}
+  <testcase name=\"${TIMEOUT_TESTCASE} (recovery)\" time=\"${PHASE_NUDGE_DURATION}\"/>"
+    else
+        # Hard failure: nudge also failed
+        TIMEOUT_TEST_COUNT=2
+        FAILURE_COUNT=2
+        TIMEOUT_CASES="${TIMEOUT_CASES}
+  <testcase name=\"${TIMEOUT_TESTCASE} (recovery)\" time=\"${PHASE_NUDGE_DURATION}\">
+    <failure message=\"Claude failed to recover after nudge\">Claude was nudged to wrap up but did not produce a report (exit code: ${NUDGE_EXIT}).</failure>
+  </testcase>"
     fi
 else
-    echo "No claude output log found, skipping cost analysis."
+    TIMEOUT_TEST_COUNT=1
+    TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\"/>"
 fi
+
+TEST_COUNT=$(( 2 + TIMEOUT_TEST_COUNT ))
+cat > "${JUNIT_FILE}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="claude-ci" tests="${TEST_COUNT}" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
+${PHASE_CASES}
+${TIMEOUT_CASES}
+</testsuite>
+EOF
+
+echo "JUnit XML written to ${JUNIT_FILE}"
 
 # Check if we produced a report
 if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
@@ -146,9 +225,9 @@ if ls "${ARTIFACT_DIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
     if [ -f "${SLACK_WEBHOOK_URL}" ]; then
         WEBHOOK=$(cat "${SLACK_WEBHOOK_URL}")
 
-        SLACK_TEXT=":this_is_fine::alert-siren: *Rejected Payload Analysis* :alert-siren::this_is_fine:
+        SLACK_TEXT=":claude-thinking: *Payload Analysis for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
 
-:robot_face: ${SUMMARY:-No summary available.}
+${SUMMARY:-No summary available.}
 
 <${PROW_JOB_URL}|:point_right: View Full Analysis Report>"
 
