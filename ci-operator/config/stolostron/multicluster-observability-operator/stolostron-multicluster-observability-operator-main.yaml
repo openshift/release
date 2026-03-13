@@ -193,24 +193,28 @@ tests:
         
         export KUBECONFIG="${SHARED_DIR}/hub-1.kc"
         CTX_HUB_CLUSTER=$(oc config current-context)
-        clusteradm init --wait --context "${CTX_HUB_CLUSTER}" > /dev/null 2>&1
-        TEMP_CA_FILE=$(mktemp)
-        # Writing hub's CA to a temp file
-        kubectl get cm kube-root-ca.crt -n kube-public -o jsonpath='{.data.ca\.crt}' >"${TEMP_CA_FILE}"
-        [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
-        set +x
-        joincmd=$(clusteradm get token --context "${CTX_HUB_CLUSTER}" | grep clusteradm)
-        if [[ -n ${SHARED_DIR} ]] && [[ -f "${SHARED_DIR}/managed-1.json" ]]; then
-          echo "Join managed-1 to hub"
-          CTX_MANAGED_CLUSTER=$(KUBECONFIG=${SHARED_DIR}/managed-1.kc oc config current-context)
-          KUBECONFIG="${SHARED_DIR}/managed-1.kc" $(echo ${joincmd} --wait --ca-file "$TEMP_CA_FILE" --context ${CTX_MANAGED_CLUSTER} | sed "s/<cluster_name>/managed/g")      
-        fi
-        $WAS_TRACING && set -x
+        oc create namespace managed --dry-run=client -o yaml | oc apply -f -
 
-        echo "Waiting for CSR from managed cluster..."
-        clusteradm accept --clusters "managed" --context "${CTX_HUB_CLUSTER}" --wait 2>/dev/null
-        # Checking that managed clusters were successfully added
-        kubectl get managedcluster --context "${CTX_HUB_CLUSTER}"
+        cat <<EOF | oc apply -f -
+        apiVersion: cluster.open-cluster-management.io/v1
+        kind: ManagedCluster
+        metadata:
+          name: managed
+          labels:
+            cloud: auto-detect
+            vendor: auto-detect
+        spec:
+          hubAcceptsClient: true
+        EOF
+
+        oc create secret generic auto-import-secret \
+          -n managed \
+          --from-file=kubeconfig="${SHARED_DIR}/managed-1.kc" \
+          --dry-run=client -o yaml | oc apply -f -
+        oc wait managedcluster managed \
+          --for=condition=ManagedClusterConditionAvailable=True \
+          --timeout=300s
+        oc get managedcluster --context "${CTX_HUB_CLUSTER}"
         export SELF="make"
         set -o pipefail
         make e2e-tests 2>&1 | tee ${ARTIFACT_DIR}/e2e_tests_out.log
