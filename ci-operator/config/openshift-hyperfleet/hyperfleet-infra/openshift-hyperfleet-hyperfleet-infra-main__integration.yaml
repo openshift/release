@@ -68,46 +68,14 @@ tests:
         if [ "$CI_ID" != "unknown" ]; then
           TF_DIR="terraform"
 
-          # Regenerate config files (not shared across containers)
-          cat > "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend" <<EOF
-        bucket = "hyperfleet-terraform-state"
-        prefix = "ci/infra/${CI_ID}"
-        EOF
+          # Regenerate config files from template (not shared across containers)
+          cp "${TF_DIR}/envs/gke/dev-prow.tfbackend" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend"
+          sed -i "s|^prefix.*|prefix = \"ci/infra/${CI_ID}\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend"
 
-          cat > "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars" <<EOF
-        developer_name             = "ci-infra-${CI_ID}"
-        kubernetes_suffix          = "default"
-        cloud_provider             = "gke"
-        gcp_project_id             = "${PROJECT_ID}"
-        gcp_region                 = "us-central1"
-        gcp_zone                   = "us-central1-a"
-        gcp_network                = "hyperfleet-dev-vpc"
-        gcp_subnetwork             = "hyperfleet-dev-vpc-subnet"
-        node_count                 = 1
-        machine_type               = "e2-standard-4"
-        use_spot_vms               = true
-        enable_deletion_protection = false
-        use_pubsub                 = true
-        pubsub_topic_configs = {
-          clusters = {
-            subscribers = {
-              adapter1 = {}
-              adapter2 = {}
-            }
-            publishers = {
-              sentinel = {}
-            }
-          }
-          nodepools = {
-            subscribers = {
-              adapter3 = {}
-            }
-            publishers = {
-              sentinel = {}
-            }
-          }
-        }
-        EOF
+          cp "${TF_DIR}/envs/gke/dev-prow.tfvars" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+          sed -i "s|^developer_name.*|developer_name = \"ci-infra-${CI_ID}\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+          sed -i "s|^kubernetes_suffix.*|kubernetes_suffix = \"default\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+          sed -i "s|^enable_deletion_protection.*|enable_deletion_protection = false|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
 
           # Retrieve cluster credentials for uninstall
           (cd "$TF_DIR" && terraform init -backend-config="envs/gke/ci-${CI_ID}.tfbackend") || true
@@ -159,45 +127,14 @@ tests:
         CI_NAME="ci-infra-${CI_ID}"
         TF_DIR="terraform"
 
-        cat > "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend" <<EOF
-        bucket = "hyperfleet-terraform-state"
-        prefix = "ci/infra/${CI_ID}"
-        EOF
+        # Copy from existing template and override CI-specific values
+        cp "${TF_DIR}/envs/gke/dev-prow.tfbackend" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend"
+        sed -i "s|^prefix.*|prefix = \"ci/infra/${CI_ID}\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend"
 
-        cat > "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars" <<EOF
-        developer_name             = "${CI_NAME}"
-        kubernetes_suffix          = "default"
-        cloud_provider             = "gke"
-        gcp_project_id             = "${PROJECT_ID}"
-        gcp_region                 = "us-central1"
-        gcp_zone                   = "us-central1-a"
-        gcp_network                = "hyperfleet-dev-vpc"
-        gcp_subnetwork             = "hyperfleet-dev-vpc-subnet"
-        node_count                 = 1
-        machine_type               = "e2-standard-4"
-        use_spot_vms               = true
-        enable_deletion_protection = false
-        use_pubsub                 = true
-        pubsub_topic_configs = {
-          clusters = {
-            subscribers = {
-              adapter1 = {}
-              adapter2 = {}
-            }
-            publishers = {
-              sentinel = {}
-            }
-          }
-          nodepools = {
-            subscribers = {
-              adapter3 = {}
-            }
-            publishers = {
-              sentinel = {}
-            }
-          }
-        }
-        EOF
+        cp "${TF_DIR}/envs/gke/dev-prow.tfvars" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+        sed -i "s|^developer_name.*|developer_name = \"${CI_NAME}\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+        sed -i "s|^kubernetes_suffix.*|kubernetes_suffix = \"default\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+        sed -i "s|^enable_deletion_protection.*|enable_deletion_protection = false|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
 
         # Store CI_ID for cleanup step
         echo "${CI_ID}" > "${SHARED_DIR}/ci_id"
