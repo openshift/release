@@ -2,7 +2,11 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+
+# Add timestamps to xtrace output for easier CI debugging
+export PS4='+ $(date -Is) '
 set -x
+
 cat /etc/os-release
 oc config view
 oc projects
