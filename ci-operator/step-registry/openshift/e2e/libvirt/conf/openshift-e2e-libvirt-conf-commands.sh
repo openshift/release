@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+sleep 10
 echo "TEST_TYPE=${TEST_TYPE}"
 echo "BRANCH=${BRANCH}"
 echo "ARCH=${ARCH}"
@@ -467,7 +467,7 @@ if [ "${TEST_TYPE}" == "conformance-parallel" ] && [[ "${CLUSTER_TYPE}" =~ ${HET
 "[sig-network][Feature:tuning] pod sysctls should not affect node [apigroup:k8s.cni.cncf.io] [Suite:openshift/conformance/parallel]"
 EOF
 fi
-
+sleep 10
 if [ -f "${SHARED_DIR}/excluded_tests" ]; then
     echo "Skipping following tests from suite..."
     cat ${SHARED_DIR}/excluded_tests
