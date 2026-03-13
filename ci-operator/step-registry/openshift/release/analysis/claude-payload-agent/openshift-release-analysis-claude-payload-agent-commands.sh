@@ -299,36 +299,36 @@ echo "JUnit XML written to ${JUNIT_FILE}"
 # Check if we produced a report
 if ls "${WORKDIR}"/payload-analysis-*.html 1>/dev/null 2>&1; then
     echo "Analysis complete."
+else
+    echo "Warning: No HTML report was generated."
+    exit 1
+fi
 
-    # Ask Claude to summarize its findings for Slack
-    echo "Asking Claude to summarize findings for Slack..."
-    SUMMARY=$(claude \
-        --model "${CLAUDE_MODEL}" \
-        --continue \
-        --output-format text \
-        --max-turns 1 \
-        -p "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
-        2>/dev/null) || SUMMARY=""
+# Send Slack summary including analysis and any revert actions
+if [ "${JOB_TYPE:-}" = "presubmit" ]; then
+    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+else
+    PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
+fi
 
-    # Send Slack notification
-    if [ "${JOB_TYPE:-}" = "presubmit" ]; then
-        PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
-    else
-        PROW_JOB_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
-    fi
-    if [[ -n "${SLACK_WEBHOOK}" ]]; then
-        SLACK_TEXT=":claude-thinking: *Payload Analysis for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
+echo "Asking Claude to summarize findings for Slack..."
+SUMMARY=$(claude \
+    --model "${CLAUDE_MODEL}" \
+    --continue \
+    --output-format text \
+    --max-turns 1 \
+    -p "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If any revert PRs were opened, include their URLs as links for Slack. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
+    2>/dev/null) || SUMMARY=""
+
+if [[ -n "${SLACK_WEBHOOK}" ]]; then
+    SLACK_TEXT=":claude-thinking: *Payload Analysis for <${PAYLOAD_URL}|${PAYLOAD_TAG}>*
 
 ${SUMMARY:-No summary available.}
 
 <${PROW_JOB_URL}|:point_right: View Full Analysis Report>"
 
-        set +x
-        jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
-            curl -sf -X POST -H 'Content-type: application/json' -d @- \
-            "${SLACK_WEBHOOK}" || echo "Warning: Failed to send Slack notification."
-    fi
-else
-    echo "Warning: No HTML report was generated."
-    exit 1
+    set +x
+    jq -n --arg text "$SLACK_TEXT" '{text: $text}' | \
+        curl -sf -X POST -H 'Content-type: application/json' -d @- \
+        "${SLACK_WEBHOOK}" || echo "Warning: Failed to send Slack notification."
 fi
