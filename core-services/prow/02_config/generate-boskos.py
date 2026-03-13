@@ -729,9 +729,11 @@ CLUSTER_PROFILE_SETS_CONFIG = {
     },
     'openshift-org-azure': {
         'azure-2': {
+            'install': 32,
             'quota': CONFIG['azure-2-quota-slice'],
         },
         'azure4': {
+            'install': 32,
             'quota': CONFIG['azure4-quota-slice'],
         },
     }
