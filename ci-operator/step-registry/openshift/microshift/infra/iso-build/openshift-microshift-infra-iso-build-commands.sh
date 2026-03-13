@@ -37,7 +37,7 @@ chmod +x /tmp/iso.sh
 # out the 'ci_clone_src' function call and add the following commands instead.
 #
 GUSR=vanhalenar
-GBRN=dual-lane-new
+GBRN=dual-lane
 git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
 #
 # ci_clone_src
