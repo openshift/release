@@ -135,10 +135,12 @@ cd "${WORKDIR}"
 
 # Ensure reports are copied to artifacts even if the script exits early
 copy_reports() {
-    echo "Copying reports to artifact directory..."
-    find "${WORKDIR}" -name "payload-analysis-*.html" -exec cp {} "${ARTIFACT_DIR}/" \;
-    find "${WORKDIR}" -name "*-autodl.json" -exec cp {} "${ARTIFACT_DIR}/" \;
-    find "${WORKDIR}" -name "payload-results-*.yaml" -exec cp {} "${ARTIFACT_DIR}/" \;
+    if [[ -d "${WORKDIR:-}" ]]; then
+        echo "Copying reports to artifact directory..."
+        find "${WORKDIR}" -name "payload-analysis-*.html" -exec cp {} "${ARTIFACT_DIR}/" \; || true
+        find "${WORKDIR}" -name "*-autodl.json" -exec cp {} "${ARTIFACT_DIR}/" \; || true
+        find "${WORKDIR}" -name "payload-results-*.yaml" -exec cp {} "${ARTIFACT_DIR}/" \; || true
+    fi
 }
 trap copy_reports EXIT TERM INT
 
