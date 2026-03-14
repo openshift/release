@@ -108,15 +108,40 @@ tests:
     allow_skip_on_success: true
     pre:
     - ref: ipi-install-rbac
+    - as: cluster-preflight-health-check
+      cli: latest
+      commands: |
+        # Clusters from Hive pools may have been hibernated. After resume,
+        # kube-controller-manager needs time to sync its informer caches before
+        # controllers (like the ServiceAccount controller) start processing events.
+        # Hive declares the cluster "ready" as soon as the API server responds,
+        # which can be minutes before kcm is fully operational.
+        echo "Running cluster preflight health check..."
+        oc wait --for=condition=Ready node --all --timeout=300s
+        echo "All nodes ready."
+        oc create namespace ci-preflight
+        if ! timeout 300 bash -c 'until oc get sa default -n ci-preflight &>/dev/null; do sleep 2; done'; then
+          echo "FATAL: Cluster preflight health check failed."
+          echo "ServiceAccount controller not operational after 5 minutes."
+          echo "Cluster has not fully initialized after hibernation resume."
+          oc get nodes -o wide || true
+          oc get co || true
+          exit 1
+        fi
+        echo "Cluster preflight health check passed."
+        oc delete namespace ci-preflight --wait=false
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 10m0s
     test:
     - as: install
       cli: latest
       commands: |
         oc create namespace opendatahub-operator
         oc label ns opendatahub-operator security.openshift.io/scc.podSecurityLabelSync=true --overwrite
-        # Wait for the default SA to exist -- it's created asynchronously after namespace
-        # creation and operator-sdk run bundle fails immediately if it's not ready yet.
-        timeout 60 bash -c 'until oc get sa default -n opendatahub-operator 2>/dev/null; do sleep 1; done'
         operator-sdk run bundle --timeout=5m -n opendatahub-operator "$OO_BUNDLE" --verbose
         oc wait --for condition=Available -n opendatahub-operator deployment opendatahub-operator-controller-manager
       dependencies:
@@ -127,6 +152,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+      timeout: 10m0s
     - as: e2e
       cli: latest
       commands: |
@@ -153,15 +179,40 @@ tests:
     allow_skip_on_success: true
     pre:
     - ref: ipi-install-rbac
+    - as: cluster-preflight-health-check
+      cli: latest
+      commands: |
+        # Clusters from Hive pools may have been hibernated. After resume,
+        # kube-controller-manager needs time to sync its informer caches before
+        # controllers (like the ServiceAccount controller) start processing events.
+        # Hive declares the cluster "ready" as soon as the API server responds,
+        # which can be minutes before kcm is fully operational.
+        echo "Running cluster preflight health check..."
+        oc wait --for=condition=Ready node --all --timeout=300s
+        echo "All nodes ready."
+        oc create namespace ci-preflight
+        if ! timeout 300 bash -c 'until oc get sa default -n ci-preflight &>/dev/null; do sleep 2; done'; then
+          echo "FATAL: Cluster preflight health check failed."
+          echo "ServiceAccount controller not operational after 5 minutes."
+          echo "Cluster has not fully initialized after hibernation resume."
+          oc get nodes -o wide || true
+          oc get co || true
+          exit 1
+        fi
+        echo "Cluster preflight health check passed."
+        oc delete namespace ci-preflight --wait=false
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 10m0s
     test:
     - as: install
       cli: latest
       commands: |
         oc create namespace redhat-ods-operator
         oc label ns redhat-ods-operator security.openshift.io/scc.podSecurityLabelSync=true --overwrite
-        # Wait for the default SA to exist -- it's created asynchronously after namespace
-        # creation and operator-sdk run bundle fails immediately if it's not ready yet.
-        timeout 60 bash -c 'until oc get sa default -n redhat-ods-operator 2>/dev/null; do sleep 1; done'
         operator-sdk run bundle --timeout=5m -n redhat-ods-operator "$OO_BUNDLE" --verbose
       dependencies:
       - env: OO_BUNDLE
@@ -171,6 +222,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+      timeout: 10m0s
     - as: e2e
       cli: latest
       commands: |
