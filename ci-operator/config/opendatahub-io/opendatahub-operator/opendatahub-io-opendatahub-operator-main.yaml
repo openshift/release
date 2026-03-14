@@ -117,12 +117,12 @@ tests:
         # Hive declares the cluster "ready" as soon as the API server responds,
         # which can be minutes before kcm is fully operational.
         echo "Running cluster preflight health check..."
-        oc wait --for=condition=Ready node --all --timeout=300s
+        oc wait --for=condition=Ready node --all --timeout=240s
         echo "All nodes ready."
         oc create namespace ci-preflight
-        if ! timeout 300 bash -c 'until oc get sa default -n ci-preflight &>/dev/null; do sleep 2; done'; then
+        if ! timeout 270 bash -c 'until oc get sa default -n ci-preflight &>/dev/null; do sleep 2; done'; then
           echo "FATAL: Cluster preflight health check failed."
-          echo "ServiceAccount controller not operational after 5 minutes."
+          echo "ServiceAccount controller not operational after 4.5 minutes."
           echo "Cluster has not fully initialized after hibernation resume."
           oc get nodes -o wide || true
           oc get co || true
@@ -143,7 +143,7 @@ tests:
         oc create namespace opendatahub-operator
         oc label ns opendatahub-operator security.openshift.io/scc.podSecurityLabelSync=true --overwrite
         operator-sdk run bundle --timeout=5m -n opendatahub-operator "$OO_BUNDLE" --verbose
-        oc wait --for condition=Available -n opendatahub-operator deployment opendatahub-operator-controller-manager
+        oc wait --for condition=Available --timeout=3m -n opendatahub-operator deployment opendatahub-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: opendatahub-operator-bundle
@@ -188,12 +188,12 @@ tests:
         # Hive declares the cluster "ready" as soon as the API server responds,
         # which can be minutes before kcm is fully operational.
         echo "Running cluster preflight health check..."
-        oc wait --for=condition=Ready node --all --timeout=300s
+        oc wait --for=condition=Ready node --all --timeout=240s
         echo "All nodes ready."
         oc create namespace ci-preflight
-        if ! timeout 300 bash -c 'until oc get sa default -n ci-preflight &>/dev/null; do sleep 2; done'; then
+        if ! timeout 270 bash -c 'until oc get sa default -n ci-preflight &>/dev/null; do sleep 2; done'; then
           echo "FATAL: Cluster preflight health check failed."
-          echo "ServiceAccount controller not operational after 5 minutes."
+          echo "ServiceAccount controller not operational after 4.5 minutes."
           echo "Cluster has not fully initialized after hibernation resume."
           oc get nodes -o wide || true
           oc get co || true
