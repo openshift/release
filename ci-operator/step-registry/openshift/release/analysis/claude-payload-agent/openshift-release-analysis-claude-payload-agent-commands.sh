@@ -24,12 +24,20 @@ else
     echo "Warning: Slack webhook not found at ${SLACK_WEBHOOK_URL}. Notifications will be skipped."
 fi
 
-JIRA_TOKEN=""
-if [ -f "${JIRA_TOKEN_PATH}" ]; then
-    JIRA_TOKEN=$(cat "${JIRA_TOKEN_PATH}")
-    echo "Jira token loaded."
+JIRA_API_TOKEN=""
+if [ -f "${JIRA_API_TOKEN_PATH}" ]; then
+    JIRA_API_TOKEN=$(cat "${JIRA_API_TOKEN_PATH}")
+    echo "Jira API token loaded."
 else
-    echo "Warning: Jira token not found at ${JIRA_TOKEN_PATH}. Jira operations will not be available."
+    echo "Warning: Jira API token not found at ${JIRA_API_TOKEN_PATH}. Jira operations will not be available."
+fi
+
+JIRA_USERNAME=""
+if [ -f "${JIRA_USERNAME_PATH}" ]; then
+    JIRA_USERNAME=$(cat "${JIRA_USERNAME_PATH}")
+    echo "Jira username loaded."
+else
+    echo "Warning: Jira username not found at ${JIRA_USERNAME_PATH}. Jira operations will not be available."
 fi
 
 # Install gcloud CLI for GCS artifact access (no root required)
@@ -133,13 +141,20 @@ echo "Invoking Claude to analyze payload ${PAYLOAD_TAG}..."
 WORKDIR=$(mktemp -d /tmp/claude-analysis-XXXXXX)
 cd "${WORKDIR}"
 
-# Ensure reports are copied to artifacts even if the script exits early
+# Ensure reports and session logs are copied to artifacts even if the script exits early
 copy_reports() {
     if [[ -d "${WORKDIR:-}" ]]; then
         echo "Copying reports to artifact directory..."
         find "${WORKDIR}" -name "payload-analysis-*.html" -exec cp {} "${ARTIFACT_DIR}/" \; || true
         find "${WORKDIR}" -name "*-autodl.json" -exec cp {} "${ARTIFACT_DIR}/" \; || true
         find "${WORKDIR}" -name "payload-results-*.yaml" -exec cp {} "${ARTIFACT_DIR}/" \; || true
+    fi
+
+    # Archive the full Claude session directory (including subagent logs) for session continuation.
+    CLAUDE_HOME="/home/claude/.claude"
+    if [[ -d "${CLAUDE_HOME}/projects" ]]; then
+        echo "Archiving Claude session logs..."
+        tar -czf "${ARTIFACT_DIR}/claude-sessions.tar.gz" -C "${CLAUDE_HOME}" projects/ 2>/dev/null || true
     fi
 }
 trap copy_reports EXIT TERM INT
@@ -151,6 +166,10 @@ echo "must-gather plugin installed."
 
 ALLOWED_TOOLS="Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
 
+SYSTEM_PROMPT="You are a diligent senior OpenShift release engineer triaging failures.
+
+**CRITICAL**: You have many ci, must-gather, and jira skills at your disposal. You MUST load the relevant skills using the Skill tool BEFORE you begin any work. Do NOT improvise or guess. This applies equally to subagents: instruct every subagent to review its available skills and load the appropriate ones before beginning its investigation. A subagent that does not load a skill will produce shallow, unreliable analysis."
+
 PHASE_ANALYSIS_START=$(date +%s)
 CLAUDE_EXIT=0
 timeout 3600 claude \
@@ -158,6 +177,7 @@ timeout 3600 claude \
     --allowedTools "${ALLOWED_TOOLS}" \
     --output-format stream-json \
     --max-turns 100 \
+    --append-system-prompt "${SYSTEM_PROMPT}" \
     -p "/ci:analyze-payload ${PAYLOAD_TAG}" \
     --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-output.log" || CLAUDE_EXIT=$?
 
@@ -168,7 +188,7 @@ PHASE_NUDGE_START=$(date +%s)
 NUDGE_EXIT=0
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo ""
-    echo "Claude timed out after 2 hours. Nudging to wrap up..."
+    echo "Claude timed out. Nudging to wrap up..."
     timeout 600 claude \
         --model "${CLAUDE_MODEL}" \
         --continue \
@@ -192,18 +212,19 @@ if [[ "${ENABLE_PAYLOAD_REVERT}" == "true" ]]; then
 
         # Configure Jira MCP server for creating TRT issues
         REVERT_ALLOWED_TOOLS="${ALLOWED_TOOLS}"
-        if [[ -n "${JIRA_TOKEN}" ]]; then
+        if [[ -n "${JIRA_API_TOKEN}" ]] && [[ -n "${JIRA_USERNAME}" ]]; then
             echo "Configuring Jira MCP server..."
             set +x
             claude mcp add \
                 -e JIRA_URL="${JIRA_URL}" \
-                -e JIRA_PERSONAL_TOKEN="${JIRA_TOKEN}" \
+                -e JIRA_API_TOKEN="${JIRA_API_TOKEN}" \
+                -e JIRA_USERNAME="${JIRA_USERNAME}" \
                 --transport stdio \
                 jira -- uvx mcp-atlassian@0.21.0
             echo "Jira MCP server configured."
             REVERT_ALLOWED_TOOLS="${REVERT_ALLOWED_TOOLS} mcp__jira__*"
         else
-            echo "Warning: No Jira token available. TRT issues will not be created."
+            echo "Warning: Jira API token or username not available. TRT issues will not be created."
         fi
 
         timeout 3600 claude \
@@ -253,7 +274,7 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     TIMEOUT_TEST_COUNT=1
     FAILURE_COUNT=1
     TIMEOUT_CASES="  <testcase name=\"${TIMEOUT_TESTCASE}\" time=\"${PHASE_ANALYSIS_DURATION}\">
-    <failure message=\"Claude timed out after 2 hours\">Claude exceeded the 2 hour time limit and had to be nudged to wrap up.</failure>
+    <failure message=\"Claude timed out.\">Claude exceeded the time limit and had to be nudged to wrap up.</failure>
   </testcase>"
 
     HAS_REPORT=false
@@ -316,7 +337,7 @@ SUMMARY=$(claude \
     --model "${CLAUDE_MODEL}" \
     --continue \
     --output-format text \
-    --max-turns 1 \
+    --max-turns 5 \
     -p "Write a very brief summary of your findings suitable for a Slack message. Include the payload tag and list the failed jobs. If any revert PRs were opened, include their URLs as links for Slack. Include a brief, encouraging CI-related joke or pun. Plain text only, no markdown. 2-3 sentences max." \
     2>/dev/null) || SUMMARY=""
 
