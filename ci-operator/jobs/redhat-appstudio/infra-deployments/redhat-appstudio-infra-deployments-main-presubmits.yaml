@@ -15,7 +15,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-appstudio-infra-deployments-main-appstudio-e2e-tests
     rerun_command: /test appstudio-e2e-tests
-    skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^infra-tools/|^openspec/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
+    skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^infra-tools/|^openspec/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
     spec:
       containers:
       - args:
@@ -156,6 +156,84 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )appstudio-hac-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build09
+    context: ci/prow/appstudio-konflux-disaster-recovery
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-appstudio-infra-deployments-main-appstudio-konflux-disaster-recovery
+    rerun_command: /test appstudio-konflux-disaster-recovery
+    skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^infra-tools/|^openspec/|^argo-cd-apps/.*/(.*production|staging)|^components/(authentication|hac-pact-broker|konflux-ci|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=appstudio-konflux-disaster-recovery
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )appstudio-konflux-disaster-recovery,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
