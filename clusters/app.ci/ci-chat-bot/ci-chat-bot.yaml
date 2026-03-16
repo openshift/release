@@ -3,14 +3,14 @@ kind: ClusterRole
 metadata:
   name: ci-chat-bot
 rules:
-- apiGroups:
-  - prow.k8s.io
-  resources:
-  - prowjobs
-  verbs:
-  - get
-  - list
-  - watch
+  - apiGroups:
+      - prow.k8s.io
+    resources:
+      - prowjobs
+    verbs:
+      - get
+      - list
+      - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -21,9 +21,9 @@ roleRef:
   kind: ClusterRole
   name: ci-chat-bot
 subjects:
-- kind: ServiceAccount
-  name: ci-chat-bot
-  namespace: ci
+  - kind: ServiceAccount
+    name: ci-chat-bot
+    namespace: ci
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -31,14 +31,14 @@ metadata:
   name: ci-chat-bot-development-read
   namespace: ocp
 rules:
-- apiGroups:
-  - image.openshift.io
-  resources:
-  - imagestreams
-  verbs:
-  - get
-  - list
-  - watch
+  - apiGroups:
+      - image.openshift.io
+    resources:
+      - imagestreams
+    verbs:
+      - get
+      - list
+      - watch
 ---
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -50,9 +50,9 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   name: ci-chat-bot-development-read
 subjects:
-- apiGroup: rbac.authorization.k8s.io
-  kind: Group
-  name: openshift-cluster-bot-developers
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: openshift-cluster-bot-developers
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -60,14 +60,14 @@ metadata:
   name: ci-chat-bot-development-read
   namespace: origin
 rules:
-- apiGroups:
-  - image.openshift.io
-  resources:
-  - imagestreams
-  verbs:
-  - get
-  - list
-  - watch
+  - apiGroups:
+      - image.openshift.io
+    resources:
+      - imagestreams
+    verbs:
+      - get
+      - list
+      - watch
 ---
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -79,9 +79,9 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   name: ci-chat-bot-development-read
 subjects:
-- apiGroup: rbac.authorization.k8s.io
-  kind: Group
-  name: openshift-cluster-bot-developers
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: openshift-cluster-bot-developers
 ---
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
@@ -89,18 +89,18 @@ metadata:
   name: ci-chat-bot-prowjob
   namespace: ci
 rules:
-- apiGroups:
-  - prow.k8s.io
-  resources:
-  - prowjobs
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - delete
-  - update
-  - patch
+  - apiGroups:
+      - prow.k8s.io
+    resources:
+      - prowjobs
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - delete
+      - update
+      - patch
 ---
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -112,12 +112,12 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   name: ci-chat-bot-prowjob
 subjects:
-- kind: ServiceAccount
-  namespace: ci
-  name: ci-chat-bot
-- apiGroup: rbac.authorization.k8s.io
-  kind: Group
-  name: openshift-cluster-bot-developers
+  - kind: ServiceAccount
+    namespace: ci
+    name: ci-chat-bot
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: openshift-cluster-bot-developers
 ---
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
@@ -125,13 +125,13 @@ metadata:
   name: ci-chat-bot-secret
   namespace: ci
 rules:
-- apiGroups: [""]
-  resources:
-  - secrets
-  verbs:
-  - get
-  - create
-  - update
+  - apiGroups: [""]
+    resources:
+      - secrets
+    verbs:
+      - get
+      - create
+      - update
 ---
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -143,12 +143,12 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   name: ci-chat-bot-secret
 subjects:
-- kind: ServiceAccount
-  namespace: ci
-  name: ci-chat-bot
-- apiGroup: rbac.authorization.k8s.io
-  kind: Group
-  name: openshift-cluster-bot-developers
+  - kind: ServiceAccount
+    namespace: ci
+    name: ci-chat-bot
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: openshift-cluster-bot-developers
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
@@ -191,9 +191,9 @@ metadata:
     app: ci-chat-bot
 spec:
   endpoints:
-  - interval: 30s
-    port: metrics
-    scheme: http
+    - interval: 30s
+      port: metrics
+      scheme: http
   selector:
     matchLabels:
       app: ci-chat-bot
@@ -225,210 +225,211 @@ spec:
     spec:
       serviceAccountName: ci-chat-bot
       volumes:
-      - configMap:
-          defaultMode: 420
+        - configMap:
+            defaultMode: 420
+            name: config
           name: config
-        name: config
-      - name: release
-        emptyDir: {}
-      - name: build-cluster-kubeconfigs
-        projected:
-          sources:
-          - secret:
-              name: ci-chat-bot-kubeconfigs
-          - secret:
-              name: ci-chat-bot-slack-app
-              items:
-                - key: sa.ci-chat-bot-mce.dpcr.config
-                  path: sa.ci-chat-bot-mce.dpcr.config
-                - key: sa.ci-chat-bot-mce.dpcr.token.txt
-                  path: sa.ci-chat-bot-mce.dpcr.token.txt
-      - name: workflows-config
-        configMap:
-          name: ci-chat-bot-workflows-config
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: jira
-        secret:
-          secretName: ci-chat-bot-slack-app
-          items:
-            - key: jira-token
-              path: jira-token
-      - name: subnet-ids
-        secret:
-          secretName: ci-chat-bot-slack-app
-          items:
-            - key: rosa-subnet-ids
-              path: rosa-subnet-ids
-      - name: billing-account-id
-        secret:
-          secretName: ci-chat-bot-slack-app
-          items:
-            - key: rosa-billing-account-id
-              path: rosa-billing-account-id
-      - name: oidc-config-id
-        secret:
-          secretName: ci-chat-bot-slack-app
-          items:
-            - key: rosa-oidc-config-id
-              path: rosa-oidc-config-id
-      - name: ocmcred
-        secret:
-          secretName: ci-chat-bot-slack-app
-          items:
-            - key: rosa-admin-ocm
-              path: rosa-admin-ocm
-      - name: runtimedir
-        emptyDir: {}
-      initContainers:
-      - name: git-sync-init
-        command:
-        - /git-sync
-        args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=main
-        - --root=/tmp/git-sync
-        - --one-time=true
-        - --depth=1
-        - --link=release
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        imagePullPolicy: Always
-        volumeMounts:
         - name: release
-          mountPath: /tmp/git-sync
-      containers:
-      - name: git-sync
-        command:
-        - /git-sync
-        args:
-        - --repo=https://github.com/openshift/release.git
-        - --ref=main
-        - --period=30s
-        - --root=/tmp/git-sync
-        - --max-failures=3
-        - --link=release
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
-        imagePullPolicy: Always
-        volumeMounts:
-        - name: release
-          mountPath: /tmp/git-sync
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "0.5"
-      - name: bot
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-chat-bot_latest
-        imagePullPolicy: Always
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8081
-          initialDelaySeconds: 3
-          periodSeconds: 3
-        readinessProbe:
-          httpGet:
-            path: /healthz/ready
-            port: 8081
-          initialDelaySeconds: 3
-          periodSeconds: 3
-        resources:
-          requests:
-            memory: "12Gi"
-            cpu: "250m"
-        volumeMounts:
-        - mountPath: /etc/config
-          name: config
-          readOnly: true
-        - name: release
-          mountPath: /var/repo
+          emptyDir: { }
         - name: build-cluster-kubeconfigs
-          mountPath: /var/build-cluster-kubeconfigs
-          readOnly: true
+          projected:
+            sources:
+              - secret:
+                  name: ci-chat-bot-kubeconfigs
+              - secret:
+                  name: ci-chat-bot-slack-app
+                  items:
+                    - key: sa.ci-chat-bot-mce.dpcr.config
+                      path: sa.ci-chat-bot-mce.dpcr.config
+                    - key: sa.ci-chat-bot-mce.dpcr.token.txt
+                      path: sa.ci-chat-bot-mce.dpcr.token.txt
         - name: workflows-config
-          mountPath: /etc/workflows-config
-          readOnly: true
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /etc/jira
-          name: jira
-          readOnly: true
-        - mountPath: /etc/ocmcred
-          name: ocmcred
-          readOnly: true
-        - mountPath: /etc/subnet-ids
-          name: subnet-ids
-          readOnly: true
-        - mountPath: /etc/oidc-config-id
-          name: oidc-config-id
-          readOnly: true
-        - mountPath: /etc/billing-account-id
-          name: billing-account-id
-          readOnly: true
-        - mountPath: /runtimedir
-          name: runtimedir
-        env:
-        - name: BOT_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: ci-chat-bot-slack-app
-              key: slack-app-bot-token
-        - name: BOT_APP_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: ci-chat-bot-slack-app
-              key: slack-app-bot-app-token
-        - name: BOT_SIGNING_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: ci-chat-bot-slack-app
-              key: slack-app-bot-signing-secret
-        - name: AWS_ACCESS_KEY_ID
-          valueFrom:
-            secretKeyRef:
-              name: ci-chat-bot-slack-app
-              key: rosa-aws-access-key-id
-        - name: AWS_SECRET_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: ci-chat-bot-slack-app
-              key: rosa-aws-secret-access-key
-        - name: GCP_SERVICE_ACCOUNT_JSON
-          valueFrom:
-            secretKeyRef:
-              name: ci-chat-bot-slack-app
-              key: gcs-service-account-key
-        - name: ORG_DATA_BUCKET
-          value: resolved-org
-        - name: OCM_CONFIG
-          value: /tmp/rosa-admin-ocm
-        - name: AWS_REGION
-          value: us-east-1
-        - name: XDG_RUNTIME_DIR
-          value: /runtimedir
-        command: ["/bin/sh"]
-        args:
-        - -c
-        - >-
-          /usr/bin/cp /etc/ocmcred/rosa-admin-ocm /tmp/rosa-admin-ocm &&
-          /usr/bin/ci-chat-bot \\
-          --prow-config=/etc/config/config.yaml \\
-          --supplemental-prow-config-dir=/etc/config \\
-          --job-config=/var/repo/release/ci-operator/jobs \\
-          --github-endpoint=http://ghproxy \\
-          --github-endpoint=https://api.github.com \\
-          --force-pr-owner=system:serviceaccount:ci:ci-chat-bot \\
-          --workflow-config-path=/etc/workflows-config/workflows-config.yaml \\
-          --kubeconfig-dir=/var/build-cluster-kubeconfigs \\
-          --kubeconfig-suffix=.config \\
-          --lease-server-credentials-file=/etc/boskos/credentials \\
-          --jira-endpoint=https://issues.redhat.com \\
-          --jira-bearer-token-file=/etc/jira/jira-token \\
-          --rosa-cluster-limit=30 \\
-          --rosa-subnetlist-path=/etc/subnet-ids/rosa-subnet-ids \\
-          --rosa-oidcConfigId-path=/etc/oidc-config-id/rosa-oidc-config-id \\
-          --rosa-billingAccount-path=/etc/billing-account-id/rosa-billing-account-id
+          configMap:
+            name: ci-chat-bot-workflows-config
+        - name: boskos
+          secret:
+            items:
+              - key: credentials
+                path: credentials
+            secretName: boskos-credentials
+        - name: jira
+          secret:
+            secretName: ci-chat-bot-slack-app
+            items:
+              - key: jira-password
+                path: jira-password
+        - name: subnet-ids
+          secret:
+            secretName: ci-chat-bot-slack-app
+            items:
+              - key: rosa-subnet-ids
+                path: rosa-subnet-ids
+        - name: billing-account-id
+          secret:
+            secretName: ci-chat-bot-slack-app
+            items:
+              - key: rosa-billing-account-id
+                path: rosa-billing-account-id
+        - name: oidc-config-id
+          secret:
+            secretName: ci-chat-bot-slack-app
+            items:
+              - key: rosa-oidc-config-id
+                path: rosa-oidc-config-id
+        - name: ocmcred
+          secret:
+            secretName: ci-chat-bot-slack-app
+            items:
+              - key: rosa-admin-ocm
+                path: rosa-admin-ocm
+        - name: runtimedir
+          emptyDir: { }
+      initContainers:
+        - name: git-sync-init
+          command:
+            - /git-sync
+          args:
+            - --repo=https://github.com/openshift/release.git
+            - --ref=main
+            - --root=/tmp/git-sync
+            - --one-time=true
+            - --depth=1
+            - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: release
+              mountPath: /tmp/git-sync
+      containers:
+        - name: git-sync
+          command:
+            - /git-sync
+          args:
+            - --repo=https://github.com/openshift/release.git
+            - --ref=main
+            - --period=30s
+            - --root=/tmp/git-sync
+            - --max-failures=3
+            - --link=release
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_git-sync_v4.3.0
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: release
+              mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
+        - name: bot
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-chat-bot_latest
+          imagePullPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 3
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+            initialDelaySeconds: 3
+            periodSeconds: 3
+          resources:
+            requests:
+              memory: "12Gi"
+              cpu: "250m"
+          volumeMounts:
+            - mountPath: /etc/config
+              name: config
+              readOnly: true
+            - name: release
+              mountPath: /var/repo
+            - name: build-cluster-kubeconfigs
+              mountPath: /var/build-cluster-kubeconfigs
+              readOnly: true
+            - name: workflows-config
+              mountPath: /etc/workflows-config
+              readOnly: true
+            - mountPath: /etc/boskos
+              name: boskos
+              readOnly: true
+            - mountPath: /etc/jira
+              name: jira
+              readOnly: true
+            - mountPath: /etc/ocmcred
+              name: ocmcred
+              readOnly: true
+            - mountPath: /etc/subnet-ids
+              name: subnet-ids
+              readOnly: true
+            - mountPath: /etc/oidc-config-id
+              name: oidc-config-id
+              readOnly: true
+            - mountPath: /etc/billing-account-id
+              name: billing-account-id
+              readOnly: true
+            - mountPath: /runtimedir
+              name: runtimedir
+          env:
+            - name: BOT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ci-chat-bot-slack-app
+                  key: slack-app-bot-token
+            - name: BOT_APP_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ci-chat-bot-slack-app
+                  key: slack-app-bot-app-token
+            - name: BOT_SIGNING_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ci-chat-bot-slack-app
+                  key: slack-app-bot-signing-secret
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ci-chat-bot-slack-app
+                  key: rosa-aws-access-key-id
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ci-chat-bot-slack-app
+                  key: rosa-aws-secret-access-key
+            - name: GCP_SERVICE_ACCOUNT_JSON
+              valueFrom:
+                secretKeyRef:
+                  name: ci-chat-bot-slack-app
+                  key: gcs-service-account-key
+            - name: ORG_DATA_BUCKET
+              value: resolved-org
+            - name: OCM_CONFIG
+              value: /tmp/rosa-admin-ocm
+            - name: AWS_REGION
+              value: us-east-1
+            - name: XDG_RUNTIME_DIR
+              value: /runtimedir
+          command: ["/bin/sh"]
+          args:
+            - -c
+            - >-
+              /usr/bin/cp /etc/ocmcred/rosa-admin-ocm /tmp/rosa-admin-ocm &&
+              /usr/bin/ci-chat-bot \\
+              --prow-config=/etc/config/config.yaml \\
+              --supplemental-prow-config-dir=/etc/config \\
+              --job-config=/var/repo/release/ci-operator/jobs \\
+              --github-endpoint=http://ghproxy \\
+              --github-endpoint=https://api.github.com \\
+              --force-pr-owner=system:serviceaccount:ci:ci-chat-bot \\
+              --workflow-config-path=/etc/workflows-config/workflows-config.yaml \\
+              --kubeconfig-dir=/var/build-cluster-kubeconfigs \\
+              --kubeconfig-suffix=.config \\
+              --lease-server-credentials-file=/etc/boskos/credentials \\
+              --jira-endpoint=https://redhat.atlassian.net \\
+              --jira-username=brawilli@redhat.com \\
+              --jira-password-file=/etc/jira/jira-password \\
+              --rosa-cluster-limit=30 \\
+              --rosa-subnetlist-path=/etc/subnet-ids/rosa-subnet-ids \\
+              --rosa-oidcConfigId-path=/etc/oidc-config-id/rosa-oidc-config-id \\
+              --rosa-billingAccount-path=/etc/billing-account-id/rosa-billing-account-id
