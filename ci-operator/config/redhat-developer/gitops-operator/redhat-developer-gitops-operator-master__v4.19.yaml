@@ -78,66 +78,16 @@ tests:
         oc get ns openshift-gitops-operator -o yaml
         if ! operator-sdk run bundle --security-context-config restricted -n openshift-gitops-operator "$OO_BUNDLE" --timeout 10m; then
           echo "=== Operator installation failed, gathering diagnostics ==="
-          echo "=== Cluster Architecture Info ==="
-          oc get nodes -o wide || true
-          echo "=== Node Architecture Details ==="
-          for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
-            echo "Node: $node"
-            oc get node "$node" -o jsonpath='{.status.nodeInfo.architecture}' && echo || true
-            oc get node "$node" -o jsonpath='{.status.nodeInfo.operatingSystem}' && echo || true
-            oc get node "$node" -o jsonpath='{.status.nodeInfo.kubeletVersion}' && echo || true
-          done
           echo "=== CSV Status ==="
           oc get csv -n openshift-gitops-operator -o yaml || true
-          echo "=== CSV Describe ==="
-          oc describe csv -n openshift-gitops-operator || true
           echo "=== Operator Pods ==="
           oc get pods -n openshift-gitops-operator -o wide || true
-          echo "=== Operator Pod Describe (Detailed) ==="
+          echo "=== Operator Pod Describe ==="
           oc describe pods -n openshift-gitops-operator || true
-          echo "=== Manager Container Logs (Current) ==="
-          oc logs -n openshift-gitops-operator -l control-plane=gitops-operator -c manager --tail=200 || true
-          echo "=== Manager Container Logs (Previous - if crashed) ==="
-          oc logs -n openshift-gitops-operator -l control-plane=gitops-operator -c manager --previous --tail=200 || true
-          echo "=== Kube-RBAC-Proxy Container Logs ==="
-          oc logs -n openshift-gitops-operator -l control-plane=gitops-operator -c kube-rbac-proxy --tail=100 || true
-          echo "=== All Container Logs ==="
+          echo "=== Operator Logs ==="
           oc logs -n openshift-gitops-operator -l control-plane=gitops-operator --all-containers=true --tail=100 || true
-          echo "=== Pod Status Details ==="
-          oc get pods -n openshift-gitops-operator -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{"  Phase: "}{.status.phase}{"\n"}{"  Node: "}{.spec.nodeName}{"\n"}{range .status.containerStatuses[*]}{"  Container: "}{.name}{" - Ready: "}{.ready}{" - Restarts: "}{.restartCount}{"\n"}{"    State: "}{.state}{"\n"}{"    Last State: "}{.lastState}{"\n"}{end}{end}' || true
-          echo "=== Container Exit Codes ==="
-          oc get pods -n openshift-gitops-operator -o json | jq -r '.items[] | select(.metadata.labels."control-plane"=="controller-manager") | .status.containerStatuses[]? | "\(.name): exitCode=\(.lastState.terminated.exitCode // .state.terminated.exitCode // "N/A"), reason=\(.lastState.terminated.reason // .state.terminated.reason // "N/A")"' || true
-          echo "=== Events (All) ==="
-          oc get events -n openshift-gitops-operator --sort-by='.lastTimestamp' || true
-          echo "=== Events (Recent, Sorted) ==="
-          oc get events -n openshift-gitops-operator --sort-by='.lastTimestamp' | tail -50 || true
-          echo "=== Deployment Status ==="
-          oc get deployment -n openshift-gitops-operator -o yaml || true
-          echo "=== Deployment Conditions ==="
-          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.status.conditions}' | jq '.' || true
-          echo "=== Images being used ==="
-          echo "Manager image:"
-          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].image}' && echo || true
-          echo "Kube-rbac-proxy image:"
-          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.spec.template.spec.containers[?(@.name=="kube-rbac-proxy")].image}' && echo || true
-          echo "=== Pod Node Assignment ==="
-          MANAGER_POD=$(oc get pod -n openshift-gitops-operator -l control-plane=gitops-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-          if [ -n "$MANAGER_POD" ]; then
-            echo "Manager pod: $MANAGER_POD"
-            NODE_NAME=$(oc get pod "$MANAGER_POD" -n openshift-gitops-operator -o jsonpath='{.spec.nodeName}' 2>/dev/null || echo "")
-            if [ -n "$NODE_NAME" ]; then
-              echo "Scheduled on node: $NODE_NAME"
-              echo "Node architecture: $(oc get node "$NODE_NAME" -o jsonpath='{.status.nodeInfo.architecture}' 2>/dev/null || echo 'unknown')"
-              echo "Node OS: $(oc get node "$NODE_NAME" -o jsonpath='{.status.nodeInfo.operatingSystem}' 2>/dev/null || echo 'unknown')"
-              echo "Node labels:"
-              oc get node "$NODE_NAME" --show-labels || true
-            fi
-          fi
-          echo "=== Security Context ==="
-          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.spec.template.spec.securityContext}' | jq '.' || true
-          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].securityContext}' | jq '.' || true
-          echo "=== Resource Limits/Requests ==="
-          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].resources}' | jq '.' || true
+          echo "=== Events ==="
+          oc get events -n openshift-gitops-operator --sort-by='.lastTimestamp' | tail -30 || true
           exit 1
         fi
         oc wait --for condition=Available -n openshift-gitops-operator deployment openshift-gitops-operator-controller-manager
@@ -151,6 +101,22 @@ tests:
           memory: 6Gi
     - as: sequential-e2e-steps
       commands: |
+        echo "=== Manager pod is up, checking if operator is reconciling default instance ==="
+        sleep 10s
+        echo "=== Check openshift-gitops namespace ==="
+        oc get namespace openshift-gitops || echo "Namespace openshift-gitops does not exist yet"
+        echo "=== GitOpsService CR (should be created automatically) ==="
+        oc get gitopsservices -A -o yaml || echo "No GitOpsService CR found"
+        echo "=== ArgoCD CRs ==="
+        oc get argocds -A -o yaml || echo "No ArgoCD CRs found"
+        echo "=== All resources in openshift-gitops namespace ==="
+        oc get all -n openshift-gitops 2>/dev/null || echo "No resources in openshift-gitops namespace"
+        echo "=== Operator Manager Logs (checking for reconciliation activity) ==="
+        oc logs -n openshift-gitops-operator -l control-plane=gitops-operator -c manager --tail=100 || true
+        echo "=== Events in openshift-gitops-operator namespace ==="
+        oc get events -n openshift-gitops-operator --sort-by='.lastTimestamp' | tail -20 || true
+        echo "=== Events in openshift-gitops namespace (if exists) ==="
+        oc get events -n openshift-gitops --sort-by='.lastTimestamp' 2>/dev/null | tail -20 || echo "No events in openshift-gitops namespace"
         scripts/openshift-CI-kuttl-tests.sh
         make e2e-tests-sequential
       from: dependencies
@@ -179,66 +145,16 @@ tests:
         oc get ns openshift-gitops-operator -o yaml
         if ! operator-sdk run bundle --security-context-config restricted -n openshift-gitops-operator "$OO_BUNDLE" --timeout 10m; then
           echo "=== Operator installation failed, gathering diagnostics ==="
-          echo "=== Cluster Architecture Info ==="
-          oc get nodes -o wide || true
-          echo "=== Node Architecture Details ==="
-          for node in $(oc get nodes -o jsonpath='{.items[*].metadata.name}'); do
-            echo "Node: $node"
-            oc get node "$node" -o jsonpath='{.status.nodeInfo.architecture}' && echo || true
-            oc get node "$node" -o jsonpath='{.status.nodeInfo.operatingSystem}' && echo || true
-            oc get node "$node" -o jsonpath='{.status.nodeInfo.kubeletVersion}' && echo || true
-          done
           echo "=== CSV Status ==="
           oc get csv -n openshift-gitops-operator -o yaml || true
-          echo "=== CSV Describe ==="
-          oc describe csv -n openshift-gitops-operator || true
           echo "=== Operator Pods ==="
           oc get pods -n openshift-gitops-operator -o wide || true
-          echo "=== Operator Pod Describe (Detailed) ==="
+          echo "=== Operator Pod Describe ==="
           oc describe pods -n openshift-gitops-operator || true
-          echo "=== Manager Container Logs (Current) ==="
-          oc logs -n openshift-gitops-operator -l control-plane=gitops-operator -c manager --tail=200 || true
-          echo "=== Manager Container Logs (Previous - if crashed) ==="
-          oc logs -n openshift-gitops-operator -l control-plane=gitops-operator -c manager --previous --tail=200 || true
-          echo "=== Kube-RBAC-Proxy Container Logs ==="
-          oc logs -n openshift-gitops-operator -l control-plane=gitops-operator -c kube-rbac-proxy --tail=100 || true
-          echo "=== All Container Logs ==="
+          echo "=== Operator Logs ==="
           oc logs -n openshift-gitops-operator -l control-plane=gitops-operator --all-containers=true --tail=100 || true
-          echo "=== Pod Status Details ==="
-          oc get pods -n openshift-gitops-operator -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{"  Phase: "}{.status.phase}{"\n"}{"  Node: "}{.spec.nodeName}{"\n"}{range .status.containerStatuses[*]}{"  Container: "}{.name}{" - Ready: "}{.ready}{" - Restarts: "}{.restartCount}{"\n"}{"    State: "}{.state}{"\n"}{"    Last State: "}{.lastState}{"\n"}{end}{end}' || true
-          echo "=== Container Exit Codes ==="
-          oc get pods -n openshift-gitops-operator -o json | jq -r '.items[] | select(.metadata.labels."control-plane"=="controller-manager") | .status.containerStatuses[]? | "\(.name): exitCode=\(.lastState.terminated.exitCode // .state.terminated.exitCode // "N/A"), reason=\(.lastState.terminated.reason // .state.terminated.reason // "N/A")"' || true
-          echo "=== Events (All) ==="
-          oc get events -n openshift-gitops-operator --sort-by='.lastTimestamp' || true
-          echo "=== Events (Recent, Sorted) ==="
-          oc get events -n openshift-gitops-operator --sort-by='.lastTimestamp' | tail -50 || true
-          echo "=== Deployment Status ==="
-          oc get deployment -n openshift-gitops-operator -o yaml || true
-          echo "=== Deployment Conditions ==="
-          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.status.conditions}' | jq '.' || true
-          echo "=== Images being used ==="
-          echo "Manager image:"
-          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].image}' && echo || true
-          echo "Kube-rbac-proxy image:"
-          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.spec.template.spec.containers[?(@.name=="kube-rbac-proxy")].image}' && echo || true
-          echo "=== Pod Node Assignment ==="
-          MANAGER_POD=$(oc get pod -n openshift-gitops-operator -l control-plane=gitops-operator -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-          if [ -n "$MANAGER_POD" ]; then
-            echo "Manager pod: $MANAGER_POD"
-            NODE_NAME=$(oc get pod "$MANAGER_POD" -n openshift-gitops-operator -o jsonpath='{.spec.nodeName}' 2>/dev/null || echo "")
-            if [ -n "$NODE_NAME" ]; then
-              echo "Scheduled on node: $NODE_NAME"
-              echo "Node architecture: $(oc get node "$NODE_NAME" -o jsonpath='{.status.nodeInfo.architecture}' 2>/dev/null || echo 'unknown')"
-              echo "Node OS: $(oc get node "$NODE_NAME" -o jsonpath='{.status.nodeInfo.operatingSystem}' 2>/dev/null || echo 'unknown')"
-              echo "Node labels:"
-              oc get node "$NODE_NAME" --show-labels || true
-            fi
-          fi
-          echo "=== Security Context ==="
-          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.spec.template.spec.securityContext}' | jq '.' || true
-          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].securityContext}' | jq '.' || true
-          echo "=== Resource Limits/Requests ==="
-          oc get deployment openshift-gitops-operator-controller-manager -n openshift-gitops-operator -o jsonpath='{.spec.template.spec.containers[?(@.name=="manager")].resources}' | jq '.' || true
+          echo "=== Events ==="
+          oc get events -n openshift-gitops-operator --sort-by='.lastTimestamp' | tail -30 || true
           exit 1
         fi
         oc wait --for condition=Available -n openshift-gitops-operator deployment openshift-gitops-operator-controller-manager
@@ -252,6 +168,22 @@ tests:
           memory: 6Gi
     - as: parallel-e2e-steps
       commands: |
+        echo "=== Manager pod is up, checking if operator is reconciling default instance ==="
+        sleep 10s
+        echo "=== Check openshift-gitops namespace ==="
+        oc get namespace openshift-gitops || echo "Namespace openshift-gitops does not exist yet"
+        echo "=== GitOpsService CR (should be created automatically) ==="
+        oc get gitopsservices -A -o yaml || echo "No GitOpsService CR found"
+        echo "=== ArgoCD CRs ==="
+        oc get argocds -A -o yaml || echo "No ArgoCD CRs found"
+        echo "=== All resources in openshift-gitops namespace ==="
+        oc get all -n openshift-gitops 2>/dev/null || echo "No resources in openshift-gitops namespace"
+        echo "=== Operator Manager Logs (checking for reconciliation activity) ==="
+        oc logs -n openshift-gitops-operator -l control-plane=gitops-operator -c manager --tail=100 || true
+        echo "=== Events in openshift-gitops-operator namespace ==="
+        oc get events -n openshift-gitops-operator --sort-by='.lastTimestamp' | tail -20 || true
+        echo "=== Events in openshift-gitops namespace (if exists) ==="
+        oc get events -n openshift-gitops --sort-by='.lastTimestamp' 2>/dev/null | tail -20 || echo "No events in openshift-gitops namespace"
         scripts/openshift-CI-kuttl-tests.sh
         make e2e-tests-parallel
       from: dependencies
