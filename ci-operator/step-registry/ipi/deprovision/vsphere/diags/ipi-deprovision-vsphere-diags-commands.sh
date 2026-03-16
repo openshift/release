@@ -164,9 +164,6 @@ function collect_diagnostic_data {
           datacenter=$(echo "$vm" | cut -d'/' -f 2)
           vm_host="$(govc vm.info -dc="${datacenter}" ${vm} | grep "Host:" | awk -F "Host:         " '{print $2}')"
           vm_ip="$(govc vm.info -dc="${datacenter}" ${vm} | grep "IP address:" | awk -F "IP address:   " '{print $2}')"
-          if [ ! -z "${vm_ip}" ]; then
-            curl -o "${ARTIFACT_DIR}/${vm_ip}.txt" http://log-gather.vmc.ci.openshift.org:8080/retrieve?node-ip=${vm_ip}
-          fi
 
           if [ ! -z "${vm_host}" ]; then
               hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
@@ -199,6 +196,10 @@ function collect_diagnostic_data {
           echo "$(date -u --rfc-3339=seconds) - capture console image from $vm"
           govc vm.console -dc="${datacenter}" -vm.ipath="${vm}" -capture "${vcenter_state}/${vmname}.png"
 
+          # Retrieve journal from log-gather (nodes push via journal-forwarder when journal-logging-enabled)
+          curl -H "node-id: ${vmname}" -o "${vcenter_state}/${vmname}-journal.log" http://log-gather.vmc.ci.openshift.org:8000 || true
+          curl -X DELETE -H "node-id: ${vmname}" http://log-gather.vmc.ci.openshift.org:8000 || true
+
           METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
           JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm}')
       done
@@ -216,9 +217,6 @@ function collect_diagnostic_data {
       bastion_vm_ip="$(govc vm.info -dc="${bastion_datacenter}" "${bastion_path}" | grep "IP address:" | awk -F "IP address:   " '{print $2}')"
       if [ -z "${bastion_vm_ip}" ] && [ -f "${SHARED_DIR}/bastion_private_address" ]; then
         bastion_vm_ip=$(< "${SHARED_DIR}/bastion_private_address")
-      fi
-      if [ -n "${bastion_vm_ip}" ]; then
-        curl -o "${ARTIFACT_DIR}/${bastion_vm_ip}.txt" "http://log-gather.vmc.ci.openshift.org:8080/retrieve?node-ip=${bastion_vm_ip}" || true
       fi
       if [ -n "${bastion_vm_host}" ]; then
         bastion_hostname=$(echo "${bastion_vm_host}" | rev | cut -d'/' -f 1 | rev)
@@ -242,6 +240,8 @@ function collect_diagnostic_data {
       govc vm.keystrokes -dc="${bastion_datacenter}" -vm.ipath="${bastion_path}" -c 0x28 || true
       echo "$(date -u --rfc-3339=seconds) - capture console image from bastion ${bastion_path}"
       govc vm.console -dc="${bastion_datacenter}" -vm.ipath="${bastion_path}" -capture "${vcenter_state}/${bastion_vmname}.png" || true
+      curl -H "node-id: ${bastion_vmname}" -o "${vcenter_state}/${bastion_vmname}-journal.log" http://log-gather.vmc.ci.openshift.org:8000 || true
+      curl -X DELETE -H "node-id: ${bastion_vmname}" http://log-gather.vmc.ci.openshift.org:8000 || true
       METRIC_FILE="${vcenter_state}/${bastion_vmname}.metrics.json"
       if [[ -f "${METRIC_FILE}" ]]; then
         JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$bastion_vmname" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm}')

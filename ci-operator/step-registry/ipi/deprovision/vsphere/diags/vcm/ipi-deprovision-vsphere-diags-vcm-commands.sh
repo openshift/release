@@ -287,7 +287,9 @@ function collect_diagnostic_data {
     while [[ $v_idx -lt $VCENTER_COUNT ]]; do
       VCENTER=$(jq -c -r '.vcenters['${v_idx}']' "$SHARED_DIR"/platform.json)
       GOVC_URL=$(echo $VCENTER | jq -r '.server')
+      # shellcheck disable=SC2034
       GOVC_USERNAME=$(echo $VCENTER | jq -r '.user')
+      # shellcheck disable=SC2034
       GOVC_PASSWORD=$(echo $VCENTER | jq -r '.password')
       if govc vm.info -dc="${bastion_datacenter}" "${bastion_path}" &>/dev/null; then
         echo "Bastion found on vCenter ${GOVC_URL}"
