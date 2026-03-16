@@ -17,45 +17,44 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     # Patch libpathrs.yml to use the official runc build script
     cat > build/libpathrs.yml << 'LIBPATHRS_PATCH'
 ---
-# Clone runc repository to access the build-libpathrs.sh script
-- name: clone runc source repo for build script
-  git:
-    repo: "https://github.com/opencontainers/runc.git"
-    dest: "/tmp/runc-libpathrs-build"
-    version: "main"
-    force: yes
-
-# Make the build script executable
-- name: make build script executable
-  file:
-    path: "/tmp/runc-libpathrs-build/script/build-libpathrs.sh"
+# Download the build-libpathrs.sh script directly
+- name: download libpathrs build script
+  get_url:
+    url: "https://raw.githubusercontent.com/opencontainers/runc/main/script/build-libpathrs.sh"
+    dest: "/tmp/build-libpathrs.sh"
     mode: '0755'
+
+# Download the lib.sh helper script required by build-libpathrs.sh
+- name: download lib.sh helper script
+  get_url:
+    url: "https://raw.githubusercontent.com/opencontainers/runc/main/script/lib.sh"
+    dest: "/tmp/lib.sh"
+    mode: '0644'
 
 # Build and install libpathrs using the runc build script
 - name: build libpathrs
   become: yes
   shell: |
-    cd /tmp/runc-libpathrs-build
-    ./script/build-libpathrs.sh 0.2.4 /usr
+    cd /tmp
+    ./build-libpathrs.sh 0.2.4 /usr
   environment:
     PATH: "/usr/local/bin:/usr/bin:/bin"
     CARGO_HOME: "{{ ansible_env.HOME }}/.cargo"
 
 # Clean up libpathrs build artifacts
-- name: cleanup libpathrs build artifacts in /tmp
+- name: cleanup libpathrs build artifacts
   file:
-    path: "/tmp/libpathrs-0.2.4.tar.xz"
+    path: "{{ item }}"
     state: absent
-
-# Clean up runc clone used for build script
-- name: cleanup runc build script repository
-  file:
-    path: "/tmp/runc-libpathrs-build"
-    state: absent
+  loop:
+    - "/tmp/libpathrs-0.2.4.tar.xz"
+    - "/tmp/libpathrs-0.2.4.tar.xz.asc"
+    - "/tmp/build-libpathrs.sh"
+    - "/tmp/lib.sh"
 LIBPATHRS_PATCH
 
     # Update system-packages.yml to add cargo dependencies for libpathrs build
-    sed -i '/- crun-wasm$/a\      # required for building libpathrs from source.\n      - rust\n      - cargo\n      - cargo-c\n      - git\n      - wget\n      - make' system-packages.yml
+    sed -i '/- crun-wasm$/a\      # required for building libpathrs from source.\n      - rust\n      - cargo\n      - cargo-c' system-packages.yml
 
     # Update setup.yml to add libpathrs build step before runc
     sed -i '/- name: clone build and install runc/i\- name: build and install libpathrs\n  include_tasks: "build/libpathrs.yml"\n  when: ansible_distribution in ['"'"'Fedora'"'"']\n' setup.yml
