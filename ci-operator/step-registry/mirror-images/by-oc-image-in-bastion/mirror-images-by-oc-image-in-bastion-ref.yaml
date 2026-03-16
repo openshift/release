@@ -1,0 +1,23 @@
+ref:
+  as: mirror-images-by-oc-image-in-bastion
+  from: upi-installer
+  timeout: 2h0m0s
+  grace_period: 10m
+  commands: mirror-images-by-oc-image-in-bastion-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    Mirror only the CI release payload to bastion registry using oc image mirror (SSH into bastion).
+    Unlike oc adm release mirror, this only mirrors the CI-internal release manifest (not quay.io components).
+    quay.io components are handled via pull-through cache (bastion:6001) at cluster runtime.
+    This works in vsphere-dis-2 where: CI pod cannot reach bastion:5000, but bastion can access
+    CI registry (build02) and its own localhost:5000.
