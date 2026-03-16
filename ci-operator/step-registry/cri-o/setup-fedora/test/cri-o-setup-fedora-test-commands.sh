@@ -14,36 +14,48 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     SOURCE_DIR="/usr/go/src/github.com/cri-o/cri-o"
     cd "\${SOURCE_DIR}/contrib/test/ci"
 
-    # Update system-packages.yml to replace libpathrs-devel with build dependencies
-    sed -i '/# required for building runc with libpathrs support\./d' system-packages.yml
-    sed -i 's/      - libpathrs-devel/      # required for building libpathrs from source.\n      - rust\n      - cargo\n      - cargo-c\n      - git/' system-packages.yml
-
-    # Create build/libpathrs.yml
-    cat > build/libpathrs.yml << 'LIBPATHRS_EOF'
+    # Patch libpathrs.yml to use the official runc build script
+    cat > build/libpathrs.yml << 'LIBPATHRS_PATCH'
 ---
-- name: clone libpathrs source repo
+# Clone runc repository to access the build-libpathrs.sh script
+- name: clone runc source repo for build script
   git:
-    repo: "https://github.com/cyphar/libpathrs.git"
-    dest: "/tmp/libpathrs"
+    repo: "https://github.com/opencontainers/runc.git"
+    dest: "/tmp/runc-libpathrs-build"
     version: "main"
     force: yes
 
-- name: build libpathrs
-  shell: /usr/bin/cargo cbuild --release
-  args:
-    chdir: "/tmp/libpathrs"
-
-- name: install libpathrs
-  become: yes
-  shell: /usr/bin/cargo cinstall --release --prefix=/usr --libdir=/usr/lib64
-  args:
-    chdir: "/tmp/libpathrs"
-
-- name: cleanup libpathrs source
+# Make the build script executable
+- name: make build script executable
   file:
-    path: "/tmp/libpathrs"
+    path: "/tmp/runc-libpathrs-build/script/build-libpathrs.sh"
+    mode: '0755'
+
+# Build and install libpathrs using the runc build script
+- name: build libpathrs
+  become: yes
+  shell: |
+    cd /tmp/runc-libpathrs-build
+    ./script/build-libpathrs.sh 0.2.4 /usr
+  environment:
+    PATH: "/usr/local/bin:/usr/bin:/bin"
+    CARGO_HOME: "{{ ansible_env.HOME }}/.cargo"
+
+# Clean up libpathrs build artifacts
+- name: cleanup libpathrs build artifacts in /tmp
+  file:
+    path: "/tmp/libpathrs-0.2.4.tar.xz"
     state: absent
-LIBPATHRS_EOF
+
+# Clean up runc clone used for build script
+- name: cleanup runc build script repository
+  file:
+    path: "/tmp/runc-libpathrs-build"
+    state: absent
+LIBPATHRS_PATCH
+
+    # Update system-packages.yml to add wget and make for libpathrs build
+    sed -i '/# required for building libpathrs from source./,/- git$/c\      # required for building libpathrs from source.\n      - rust\n      - cargo\n      - cargo-c\n      - git\n      - wget\n      - make' system-packages.yml
 
     # Update setup.yml to add libpathrs build step before runc
     sed -i '/- name: clone build and install runc/i\- name: build and install libpathrs\n  include_tasks: "build/libpathrs.yml"\n  when: ansible_distribution in ['"'"'Fedora'"'"']\n' setup.yml
