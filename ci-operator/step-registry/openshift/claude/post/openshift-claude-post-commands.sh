@@ -45,6 +45,10 @@ cat > "${ARTIFACT_DIR}/continue-session-summary.html" <<HTMLEOF
   <li>Paste the command above and press Enter</li>
   <li>Claude will download the session and help you resume the conversation</li>
 </ol>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
+<p>&nbsp;</p>
 </body>
 </html>
 HTMLEOF
