@@ -123,7 +123,7 @@ deploy_frr_external_container() {
   # create a $CLI network attached to the cluster network by attaching to the existing ostestbm bridge
   $CLI network create --driver bridge --ipam-driver=none --opt com.docker.network.bridge.name=ostestbm ostestbm_net
 
-  $CLI run -d --rm --privileged --ulimit core=-1 --network ostestbm_net --name frr --volume "$frr_config":/etc/frr quay.io/frrouting/frr:10.4.2
+  $CLI run -d --rm --privileged --ulimit core=-1 --network ostestbm_net --name frr --volume "$frr_config":/etc/frr quay.io/frrouting/frr:10.4.3
   # ipv4 forwarding is enabled by default, we only need to turn on ipv6 forwarding
   $CLI exec frr sysctl -w net.ipv6.conf.all.forwarding=1
   
