@@ -719,12 +719,19 @@ for i in range(150):
 CLUSTER_PROFILE_SETS_CONFIG = {
     'openshift-org-aws': {
         'aws': {
-            'install': 16,
             'quota': CONFIG['aws-quota-slice'],
         },
         'aws-2': {
-            'install': 16,
             'quota': CONFIG['aws-2-quota-slice'],
+        },
+        'aws-3': {
+            'quota': CONFIG['aws-3-quota-slice'],
+        },
+        'aws-4': {
+            'quota': CONFIG['aws-4-quota-slice'],
+        },
+        'aws-5': {
+            'quota': CONFIG['aws-5-quota-slice'],
         },
     },
     'openshift-org-azure': {
