@@ -23,7 +23,7 @@ cat > "${ARTIFACT_DIR}/continue-session-summary.html" <<HTMLEOF
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>🔮 Continue This Claude Session Locally ✨</title>
+<title>Continue This Claude Session Locally ✨</title>
 <style>
   body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; max-width: 960px; margin: 0 auto; padding: 3rem 2rem; }
   h1 { text-align: center; }
@@ -36,7 +36,7 @@ cat > "${ARTIFACT_DIR}/continue-session-summary.html" <<HTMLEOF
 </style>
 </head>
 <body>
-<h1>🔮 Continue This Claude Session Locally ✨</h1>
+<h1>Continue This Claude Session Locally ✨</h1>
 <p class="subtitle">Pick up right where the CI agent left off. Click below to copy.</p>
 <pre id="cmd" onclick="navigator.clipboard.writeText(this.textContent).then(()=>{this.style.borderColor='#4caf50';setTimeout(()=>this.style.borderColor='',1500)})">/ci:continue-session ${PROW_URL}</pre>
 <ol>
