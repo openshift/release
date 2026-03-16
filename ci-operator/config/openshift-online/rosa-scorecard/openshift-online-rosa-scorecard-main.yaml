@@ -1,0 +1,35 @@
+base_images:
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.buildroot
+images:
+- dockerfile_path: Containerfile
+  from: base
+  to: rosa-scorecard
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: lint
+  commands: |
+    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.62.2
+    make lint
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift-online
+  repo: rosa-scorecard
