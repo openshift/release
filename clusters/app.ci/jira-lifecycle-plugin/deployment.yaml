@@ -7,8 +7,8 @@ metadata:
   namespace: ci
 spec:
   ports:
-  - port: 80
-    targetPort: 8888
+    - port: 80
+      targetPort: 8888
   selector:
     app: jira-lifecycle-plugin
 ---
@@ -33,75 +33,76 @@ spec:
         app: jira-lifecycle-plugin
     spec:
       containers:
-      - command:
-        - /usr/bin/jira-lifecycle-plugin
-        - --endpoint=/
-        - --port=8888
-        - --config-path=/etc/config/config.yaml
-        - --github-endpoint=http://ghproxy
-        - --github-endpoint=https://api.github.com
-        - --github-graphql-endpoint=http://ghproxy/graphql
-        - --github-token-path=/etc/github/oauth
-        - --hmac-secret-file=/etc/webhook/hmac.yaml
-        - --jira-endpoint=https://issues.redhat.com
-        - --jira-bearer-token-file=/etc/jira/token
-        - --prow-config-path=/etc/prow-config/config.yaml
-        - --supplemental-prow-config-dir=/etc/prow-config
-        - --enable-bigquery
-        - --bigquery-project-id=openshift-gce-devel
-        - --bigquery-dataset-id=github_analysis_us
-        - --bigquery-secret-file=/etc/bigquery/team-crt-bigquery-verified-wri.json
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_jira-lifecycle-plugin_latest
-        name: server
-        imagePullPolicy: Always
-        livenessProbe:
-          httpGet:
-            path: /healthz
-            port: 8081
-          initialDelaySeconds: 20
-          periodSeconds: 3
-        readinessProbe:
-          httpGet:
-            path: /healthz/ready
-            port: 8081
-        resources:
-          requests:
-            memory: 2Gi
-        volumeMounts:
-        - mountPath: /etc/config
-          name: config
-          readOnly: true
-        - name: hmac
-          mountPath: /etc/webhook
-          readOnly: true
-        - name: oauth
-          mountPath: /etc/github
-          readOnly: true
-        - name: jira
-          mountPath: /etc/jira
-          readOnly: true
-        - name: prow-config
-          mountPath: /etc/prow-config
-          readOnly: true
-        - mountPath: /etc/bigquery
-          name: bigquery-token
-          readOnly: true
+        - command:
+            - /usr/bin/jira-lifecycle-plugin
+            - --endpoint=/
+            - --port=8888
+            - --config-path=/etc/config/config.yaml
+            - --github-endpoint=http://ghproxy
+            - --github-endpoint=https://api.github.com
+            - --github-graphql-endpoint=http://ghproxy/graphql
+            - --github-token-path=/etc/github/oauth
+            - --hmac-secret-file=/etc/webhook/hmac.yaml
+            - --jira-endpoint=https://redhat.atlassian.net
+            - --jira-username=brawilli@redhat.com
+            - --jira-password-file=/etc/jira/password
+            - --prow-config-path=/etc/prow-config/config.yaml
+            - --supplemental-prow-config-dir=/etc/prow-config
+            - --enable-bigquery
+            - --bigquery-project-id=openshift-gce-devel
+            - --bigquery-dataset-id=github_analysis_us
+            - --bigquery-secret-file=/etc/bigquery/team-crt-bigquery-verified-wri.json
+          image: quay-proxy.ci.openshift.org/openshift/ci:ci_jira-lifecycle-plugin_latest
+          name: server
+          imagePullPolicy: Always
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+          resources:
+            requests:
+              memory: 2Gi
+          volumeMounts:
+            - mountPath: /etc/config
+              name: config
+              readOnly: true
+            - name: hmac
+              mountPath: /etc/webhook
+              readOnly: true
+            - name: oauth
+              mountPath: /etc/github
+              readOnly: true
+            - name: jira
+              mountPath: /etc/jira
+              readOnly: true
+            - name: prow-config
+              mountPath: /etc/prow-config
+              readOnly: true
+            - mountPath: /etc/bigquery
+              name: bigquery-token
+              readOnly: true
       volumes:
-      - name: config
-        configMap:
-          name: jira-lifecycle-plugin-config
-      - name: hmac
-        secret:
-          secretName: github-webhook-credentials
-      - name: oauth
-        secret:
-          secretName: github-credentials-openshift-ci-robot
-      - name: jira
-        secret:
-          secretName: jira-token-lifecycle-plugin
-      - name: prow-config
-        configMap:
-          name: config
-      - name: bigquery-token
-        secret:
-          secretName: team-crt-bigquery-verified-wri-credentials
+        - name: config
+          configMap:
+            name: jira-lifecycle-plugin-config
+        - name: hmac
+          secret:
+            secretName: github-webhook-credentials
+        - name: oauth
+          secret:
+            secretName: github-credentials-openshift-ci-robot
+        - name: jira
+          secret:
+            secretName: jira-token-lifecycle-plugin
+        - name: prow-config
+          configMap:
+            name: config
+        - name: bigquery-token
+          secret:
+            secretName: team-crt-bigquery-verified-wri-credentials
