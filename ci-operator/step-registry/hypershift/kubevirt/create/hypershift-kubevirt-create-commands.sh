@@ -212,7 +212,7 @@ if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
     --control-plane-availability-policy "${CONTROL_PLANE_AVAILABILITY}" \
     --infra-availability-policy "${INFRA_AVAILABILITY}" \
     ${RENDER_COMMAND} > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
-
+  sleep 1800
   oc apply -f "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
 else
   # shellcheck disable=SC2086
