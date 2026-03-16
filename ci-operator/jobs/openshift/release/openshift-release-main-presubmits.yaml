@@ -1599,12 +1599,15 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-main-secret-generator-config-valid
     rerun_command: /test secret-generator-config-valid
-    run_if_changed: ^core-services/(ci-secret-generator|ci-secret-bootstrap)/_config.yaml
+    run_if_changed: ^core-services/(ci-secret-generator|ci-secret-bootstrap)/(_config|gsm-config)\.yaml
     spec:
       containers:
       - args:
         - --config=core-services/ci-secret-generator/_config.yaml
         - --bootstrap-config=core-services/ci-secret-bootstrap/_config.yaml
+        - --enable-gsm-sync=true
+        - --gsm-config=core-services/ci-secret-bootstrap/gsm-config.yaml
+        - --gsm-project-config=core-services/ci-secret-bootstrap/gsm-project-config.yaml
         - --validate-only=true
         command:
         - /usr/bin/ci-secret-generator
