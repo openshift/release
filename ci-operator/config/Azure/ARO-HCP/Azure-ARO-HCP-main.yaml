@@ -74,8 +74,7 @@ images:
 - dockerfile_literal: |
     FROM src
     USER root
-    COPY /src /opt/app-root/src/github.com/Azure
-    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    WORKDIR /go/src/github.com/Azure/ARO-HCP
     ENV GOBIN="/usr/local/bin"
     ENV PATH="$GOBIN:/usr/local/bin:/usr/bin:$PATH"
     ENV GOFLAGS='-mod=readonly'
@@ -88,19 +87,13 @@ images:
     RUN mkdir -p "$(go env GOPATH)" && chmod -R 777 "$(go env GOPATH)"
     RUN mkdir -p "$(go env GOCACHE)" && chmod -R 777 "$(go env GOCACHE)"
     RUN mkdir -p "$(go env GOBIN)" && chmod -R 777 "$(go env GOBIN)"
-    RUN chmod 777 /opt/app-root/src/github.com/Azure/ARO-HCP
+    RUN chmod 777 /go/src/github.com/Azure/ARO-HCP
   from: src
-  inputs:
-    src:
-      paths:
-      - destination_dir: src
-        source_path: /go/src/github.com/Azure/ARO-HCP
   to: aro-hcp-e2e-tools
 - dockerfile_literal: |
     FROM src
     USER root
-    COPY /src /opt/app-root/src/github.com/Azure
-    WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
+    WORKDIR /go/src/github.com/Azure/ARO-HCP
     # Install official Node.js binary from nodejs.org (pinned version)
     RUN curl -fsSL https://nodejs.org/dist/v22.5.1/node-v22.5.1-linux-x64.tar.xz | \
         tar -xJ -C /usr/local --strip-components=1 && \
@@ -108,11 +101,6 @@ images:
     # Install npm dependencies
     RUN cd api && npm ci --legacy-peer-deps
   from: src
-  inputs:
-    src:
-      paths:
-      - destination_dir: src
-        source_path: /go/src/github.com/Azure/ARO-HCP
   to: aro-hcp-api-tools
 promotion:
   to:
