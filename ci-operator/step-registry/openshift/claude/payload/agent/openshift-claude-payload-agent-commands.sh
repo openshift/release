@@ -158,7 +158,7 @@ copy_reports() {
     CLAUDE_HOME="/home/claude/.claude"
     if [[ -d "${CLAUDE_HOME}/projects" ]]; then
         echo "Archiving Claude session logs..."
-        if tar -czf "${ARTIFACT_DIR}/claude-sessions.tar.gz" -C "${CLAUDE_HOME}" projects/ 2>/dev/null; then
+        if tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${CLAUDE_HOME}" projects/ 2>/dev/null; then
             touch "${SHARED_DIR}/claude-session-available"
         fi
     fi
