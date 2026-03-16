@@ -54,8 +54,8 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
     state: absent
 LIBPATHRS_PATCH
 
-    # Update system-packages.yml to add wget and make for libpathrs build
-    sed -i '/# required for building libpathrs from source./,/- git$/c\      # required for building libpathrs from source.\n      - rust\n      - cargo\n      - cargo-c\n      - git\n      - wget\n      - make' system-packages.yml
+    # Update system-packages.yml to add cargo dependencies for libpathrs build
+    sed -i '/- crun-wasm$/a\      # required for building libpathrs from source.\n      - rust\n      - cargo\n      - cargo-c\n      - git\n      - wget\n      - make' system-packages.yml
 
     # Update setup.yml to add libpathrs build step before runc
     sed -i '/- name: clone build and install runc/i\- name: build and install libpathrs\n  include_tasks: "build/libpathrs.yml"\n  when: ansible_distribution in ['"'"'Fedora'"'"']\n' setup.yml
