@@ -1,0 +1,199 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+# post check steps after cluster installation, exit code 101 if failed,
+# save to install-post-check-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
+if [[ "${MIRROR_BIN}" != "oc-adm" ]]; then
+  echo "users specifically do not use oc-adm to run mirror"
+  exit 0
+fi
+
+if [[ "${MIRROR_IN_BASTION}" == "yes" ]]; then
+  echo "users are going to mirror images from bastion, skip this step."
+  exit 0
+fi
+
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
+}
+
+mirror_output="${SHARED_DIR}/mirror_output"
+new_pull_secret="${SHARED_DIR}/new_pull_secret"
+install_config_mirror_patch="${SHARED_DIR}/install-config-mirror.yaml.patch"
+cluster_mirror_conf_file="${SHARED_DIR}/local_registry_mirror_file.yaml"
+
+# private mirror registry host
+# <public_dns>:<port>
+MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
+    echo "File ${SHARED_DIR}/mirror_registry_url does not exist."
+    exit 1
+fi
+echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
+# Establish SSH tunnel to bastion registry (port 5000)
+# This is needed when CI pod cannot directly reach bastion:5000
+if [[ -f "${SHARED_DIR}/bastion_private_address" ]]; then
+  BASTION_IP=$(< "${SHARED_DIR}/bastion_private_address")
+  BASTION_SSH_USER=$(< "${SHARED_DIR}/bastion_ssh_user")
+  SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+  TUNNEL_LOCAL_PORT=5000
+
+  # Ensure our UID is in /etc/passwd (required for SSH)
+  if ! whoami &> /dev/null; then
+    if [[ -w /etc/passwd ]]; then
+      echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    fi
+  fi
+
+  echo "$(date -u --rfc-3339=seconds) - Establishing SSH tunnel to bastion registry..."
+  ssh -f -N \
+    -L 127.0.0.1:${TUNNEL_LOCAL_PORT}:127.0.0.1:5000 \
+    -o StrictHostKeyChecking=no \
+    -o UserKnownHostsFile=/dev/null \
+    -o ServerAliveInterval=10 \
+    -o ServerAliveCountMax=60 \
+    -o ControlMaster=no \
+    -i "${SSH_PRIV_KEY_PATH}" \
+    "${BASTION_SSH_USER}@${BASTION_IP}"
+
+  # Wait for tunnel and registry to be fully ready (check HTTP status code)
+  echo "$(date -u --rfc-3339=seconds) - Waiting for registry to be ready..."
+  for i in {1..20}; do
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 "http://127.0.0.1:${TUNNEL_LOCAL_PORT}/v2/" 2>/dev/null || echo "000")
+    if [[ "${http_code}" == "200" || "${http_code}" == "401" ]]; then
+      echo "$(date -u --rfc-3339=seconds) - Registry is ready (HTTP ${http_code}). Waiting 10s more to ensure stability..."
+      sleep 10
+      break
+    fi
+    echo "$(date -u --rfc-3339=seconds) - Registry not ready (HTTP ${http_code}), attempt ${i}/20"
+    sleep 5
+  done
+
+  # Override registry host to use local tunnel endpoint
+  MIRROR_REGISTRY_HOST="127.0.0.1:${TUNNEL_LOCAL_PORT}"
+  echo "$(date -u --rfc-3339=seconds) - Using SSH tunnel, MIRROR_REGISTRY_HOST overridden to: ${MIRROR_REGISTRY_HOST}"
+fi
+
+
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+fi
+
+echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+
+# since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
+# unset KUBECONFIG to ensure this step always interact with the build farm.
+unset KUBECONFIG
+oc registry login
+
+readable_version=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
+echo "readable_version: $readable_version"
+
+# target release
+target_release_image="${MIRROR_REGISTRY_HOST}/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
+target_release_image_repo="${target_release_image%:*}"
+target_release_image_repo="${target_release_image_repo%@sha256*}"
+# ensure mirror release image by tag name, refer to https://github.com/openshift/oc/pull/1331
+target_release_image="${target_release_image_repo}:${readable_version}"
+
+echo "target_release_image: $target_release_image"
+echo "target_release_image_repo: $target_release_image_repo"
+
+# combine custom registry credential and default pull secret
+registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
+jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+oc registry login --to "${new_pull_secret}"
+
+mirror_crd_type='icsp'
+regex_keyword_1="imageContentSources"
+if [[ "${ENABLE_IDMS}" == "yes" ]]; then
+    mirror_crd_type='idms'
+    regex_keyword_1="imageDigestSources"
+fi
+
+# set the release mirror args
+# Limit parallelism to avoid overwhelming SSH tunnel (MaxSessions default=10)
+args=(
+    --from="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+    --to-release-image="${target_release_image}"
+    --to="${target_release_image_repo}"
+    --insecure=true
+    --max-per-registry=5
+)
+
+run_command "which oc"
+run_command "oc version --client"
+
+# check whether the oc command supports extra options and add them to the args array.
+if oc adm release mirror -h | grep -q -- --keep-manifest-list; then
+    echo "Adding --keep-manifest-list to the mirror command."
+    args+=(--keep-manifest-list=true)
+else
+    echo "This version of oc does not support --keep-manifest-list, skip it."
+fi
+
+if oc adm release mirror -h | grep -q -- --print-mirror-instructions; then
+    echo "Adding --print-mirror-instructions to the mirror command."
+    args+=(--print-mirror-instructions="${mirror_crd_type}")
+else
+    echo "This version of oc does not support --print-mirror-instructions=, skip it."
+fi
+
+# For disconnected or otherwise unreachable mirrors, we want to
+# have steps use an HTTP(S) proxy to reach the mirror. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/mirror-proxy-conf.sh"
+then
+        # shellcheck disable=SC1090
+        source "${SHARED_DIR}/mirror-proxy-conf.sh"
+fi
+
+cmd="oc adm release -a '${new_pull_secret}' mirror ${args[*]} | tee '${mirror_output}'"
+
+MAX_ATTEMPTS=5
+ATTEMPTS=0
+SUCCESS=false
+while [ "${SUCCESS}" = false ] && (( ATTEMPTS++ < MAX_ATTEMPTS )); do
+  echo "Mirroring images attempt ${ATTEMPTS}/${MAX_ATTEMPTS}"
+  if run_command "$cmd"; then
+    echo "Mirroring images was successful in attempt $ATTEMPTS"
+    SUCCESS=true
+  else
+    echo "Mirroring images attempt $ATTEMPTS failed. Trying again..."
+    sleep 120
+  fi
+done
+
+if [ $SUCCESS = false ]; then
+  echo "Mirroring test images failed after $ATTEMPTS attempts, exiting ..."
+  exit 1
+fi
+
+line_num=$(grep -n "To use the new mirrored repository for upgrades" "${mirror_output}" | awk -F: '{print $1}')
+install_end_line_num=$(expr ${line_num} - 3) &&
+upgrade_start_line_num=$(expr ${line_num} + 2) &&
+sed -n "/^${regex_keyword_1}/,${install_end_line_num}p" "${mirror_output}" > "${install_config_mirror_patch}"
+sed -n "${upgrade_start_line_num},\$p" "${mirror_output}" > "${cluster_mirror_conf_file}"
+
+run_command "cat '${install_config_mirror_patch}'"
+rm -f "${new_pull_secret}"

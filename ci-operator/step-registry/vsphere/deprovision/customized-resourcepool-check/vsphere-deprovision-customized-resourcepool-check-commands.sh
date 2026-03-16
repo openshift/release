@@ -3,6 +3,10 @@ set -o errexit
 set -o nounset
 set -o pipefail
 # shellcheck source=/dev/null
+if [[ ! -f "${SHARED_DIR}/metadata.json" ]]; then
+  echo "metadata.json not found, cluster was not installed, skipping..."
+  exit 0
+fi
 source "${SHARED_DIR}/govc.sh"
 unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS

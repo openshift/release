@@ -1,0 +1,33 @@
+ref:
+  as: mirror-images-by-oc-adm-via-tunnel
+  from: upi-installer
+  timeout: 4h0m0s
+  grace_period: 10m
+  commands: mirror-images-by-oc-adm-via-tunnel-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    default: ""
+    documentation: "Used to overwrite the OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to a customized payload"
+  - name: MIRROR_BIN
+    default: "oc-adm"
+  - name: ENABLE_IDMS
+    default: "no"
+    documentation: Whether to print out IDMS, by default, it is ICSP
+  - name: MIRROR_IN_BASTION
+    default: "no"
+  credentials:
+  - namespace: test-credentials
+    name: openshift-custom-mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    Mirror release image to local image registry via SSH tunnel.
+    When bastion_private_address exists in SHARED_DIR, establishes an SSH tunnel
+    (local port 5000 -> bastion port 5000) before mirroring.
+    This is needed when the CI pod cannot directly reach the bastion registry.
