@@ -1,0 +1,37 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.23
+canonical_go_repository: github.com/migtools/oadp-vm-file-restore
+images:
+- additional_architectures:
+  - arm64
+  dockerfile_path: Dockerfile
+  to: oadp-vm-file-restore
+- additional_architectures:
+  - arm64
+  context_dir: containers/oadp-vmfr-access
+  dockerfile_path: Dockerfile
+  to: oadp-vmfr-access
+- additional_architectures:
+  - arm64
+  context_dir: containers/side-containers/sshd
+  dockerfile_path: Containerfile
+  to: oadp-vmfr-access-sshd
+promotion:
+  to:
+  - disabled: true
+    namespace: konveyor
+    tag: oadp-dev
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: oadp-dev
+  org: openshift-priv
+  repo: oadp-vm-file-restore
