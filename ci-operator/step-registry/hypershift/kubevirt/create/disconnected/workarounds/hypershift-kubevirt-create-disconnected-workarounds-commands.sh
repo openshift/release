@@ -69,14 +69,48 @@ cat "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
 oc apply -f "${LOCALPATH}/working-dir/cluster-resources/idms-oc-mirror.yaml"
 
 ###
+### workaround for https://issues.redhat.com/browse/OCPBUGS-29466
+echo "workaround for https://issues.redhat.com/browse/OCPBUGS-29466"
+mkdir -p /home/idms
+mkdir -p /home/icsp
+for i in $(oc get imageContentSourcePolicy -o name); do oc get ${i} -o yaml > /home/icsp/$(basename ${i}).yaml ; done
+for f in /home/icsp/*; do oc adm migrate icsp ${f} --dest-dir /home/idms ; done
+oc apply -f /home/idms || true
+###
+
+### workaround for https://issues.redhat.com/browse/OCPBUGS-29110
+echo "workaround for https://issues.redhat.com/browse/OCPBUGS-29110"
+oc delete pods -n hypershift -l name=operator
+sleep 180
+###
+
+### workaround for https://issues.redhat.com/browse/OCPBUGS-29494
+echo "workaround for https://issues.redhat.com/browse/OCPBUGS-29494"
+HO_OPERATOR_IMAGE="${PAYLOADIMAGE//@sha256:[^ ]*/@$(oc adm release info -a /tmp/.dockerconfigjson "$PAYLOADIMAGE" | grep hypershift | awk '{print $2}')}"
+echo "${HO_OPERATOR_IMAGE}" > /home/ho_operator_image
+###
+
+
+if [[ -z ${MCE} ]] ; then
+  ### workaround for https://issues.redhat.com/browse/OCPBUGS-32770
+  echo "workaround for https://issues.redhat.com/browse/OCPBUGS-32770"
+  CNV_PRERELEASE_VERSION=$(cat /home/cnv-prerelease-version)
+  jq -s '.[0] * .[1]' /home/pull-secret /tmp/.dockerconfigjson > /home/pull-secret-mirror
+  oc image -a /home/pull-secret-mirror mirror registry.ci.openshift.org/ocp/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt ${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt
+  echo "${mirror_registry}/${LOCALIMAGES}/${CNV_PRERELEASE_VERSION}:cluster-api-provider-kubevirt" > /home/capi_provider_kubevirt_image
+fi
 
 EOF
-
+scp "${SSHOPTS[@]}" "root@${IP}:/home/ho_operator_image" "${SHARED_DIR}/ho_operator_image"
 ### workaround for https://issues.redhat.com/browse/CNV-38194
 echo "workaround for https://issues.redhat.com/browse/CNV-38194"
 scp "${SSHOPTS[@]}" "root@${IP}:/etc/pki/ca-trust/source/anchors/registry.2.crt" "${SHARED_DIR}/registry.2.crt"
 ###
-
+### workaround for https://issues.redhat.com/browse/OCPBUGS-32770
+if [[ -z ${MCE} ]] ; then
+  echo "workaround for https://issues.redhat.com/browse/OCPBUGS-32770"
+  scp "${SSHOPTS[@]}" "root@${IP}:/home/capi_provider_kubevirt_image" "${SHARED_DIR}/capi_provider_kubevirt_image"
+fi
 
 ###
 # For some reason operator-ose-csi-external-snapshotter-rhel8 is not correctly appearing

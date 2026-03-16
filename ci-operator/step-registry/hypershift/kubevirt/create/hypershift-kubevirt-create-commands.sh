@@ -112,10 +112,23 @@ then
 
   PAYLOADIMAGE=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
   RELEASE_IMAGE="${PAYLOADIMAGE}"
+  if [ ! -f "${SHARED_DIR}/ho_operator_image" ] ; then
+      echo "Warning: Can not find ho_operator_image, abort !!!"
+      exit 1
+  fi
+  HO_OPERATOR_IMAGE=$(cat "${SHARED_DIR}/ho_operator_image")
 
+  EXTRA_ARGS="${EXTRA_ARGS} --additional-trust-bundle=${SHARED_DIR}/registry.2.crt --annotations=hypershift.openshift.io/control-plane-operator-image=${HO_OPERATOR_IMAGE} --annotations=hypershift.openshift.io/olm-catalogs-is-registry-overrides=${OLM_CATALOGS_R_OVERRIDES}"
 
-  EXTRA_ARGS="${EXTRA_ARGS} --additional-trust-bundle=${SHARED_DIR}/registry.2.crt  --annotations=hypershift.openshift.io/olm-catalogs-is-registry-overrides=${OLM_CATALOGS_R_OVERRIDES}"
-
+  ### workaround for https://issues.redhat.com/browse/OCPBUGS-32770
+  if [[ -z ${MCE} ]] ; then
+    if [ ! -f "${SHARED_DIR}/capi_provider_kubevirt_image" ] ; then
+        echo "Warning: Can not find capi_provider_kubevirt_image, abort !!!"
+        exit 1
+    fi
+    CAPI_PROVIDER_KUBEVIRT_IMAGE=$(cat "${SHARED_DIR}/capi_provider_kubevirt_image")
+    EXTRA_ARGS="${EXTRA_ARGS} --annotations=hypershift.openshift.io/capi-provider-kubevirt-image=${CAPI_PROVIDER_KUBEVIRT_IMAGE}"
+  fi
 
 fi
 
@@ -214,12 +227,9 @@ else
     --infra-availability-policy ${INFRA_AVAILABILITY} $(support_np_skew)"
 fi
 
-echo "Waiting for cluster to become available"
 
-
-echo "Waiting for cluster to become available"
-oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
 echo "Cluster became available, creating kubeconfig"
+oc wait --timeout=30m --for=condition=Available --namespace=${CLUSTER_NAMESPACE_PREFIX} "hostedcluster/${CLUSTER_NAME}"
 $HCP_CLI create kubeconfig --namespace="${CLUSTER_NAMESPACE_PREFIX}" --name="${CLUSTER_NAME}" >"${SHARED_DIR}/nested_kubeconfig"
 
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
