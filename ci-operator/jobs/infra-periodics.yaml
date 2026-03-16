@@ -2067,12 +2067,9 @@ periodics:
       - --config=/etc/ci-secret-generator/_config.yaml
       - --enable-gsm-sync=true
       - --gsm-credentials-file=/etc/gcp-credentials/key.json
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+      - --gsm-config=/etc/gsm-config/gsm-config.yaml
       - --dry-run=false
-      env:
-      - name: GCP_PROJECT_ID
-        value: openshift-ci-secrets
-      - name: GCP_PROJECT_NUMBER
-        value: "384486694155"
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-generator_latest
       imagePullPolicy: Always
       name: ci-secret-generator
@@ -2082,6 +2079,9 @@ periodics:
       volumeMounts:
       - mountPath: /etc/ci-secret-bootstrap
         name: ci-secret-bootstrap
+      - mountPath: /etc/gsm-config
+        name: gsm-config
+        readOnly: true
       - mountPath: /tmp/build-farm-credentials
         name: build-farm-credentials
         readOnly: true
@@ -2098,6 +2098,9 @@ periodics:
     - configMap:
         name: ci-secret-bootstrap
       name: ci-secret-bootstrap
+    - configMap:
+        name: gsm-config
+      name: gsm-config
     - name: build-farm-credentials
       secret:
         secretName: config-updater
@@ -2167,15 +2170,11 @@ periodics:
       - --kubeconfig-dir=/etc/build-farm-credentials
       - --kubeconfig-suffix=config
       - --enable-gsm=true
+      - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
       - --gsm-config=/etc/gsm-config/gsm-config.yaml
       - --gsm-credentials-file=/etc/gcp-credentials/key.json
       command:
       - /usr/bin/ci-secret-bootstrap
-      env:
-      - name: GCP_PROJECT_ID
-        value: openshift-ci-secrets
-      - name: GCP_PROJECT_NUMBER
-        value: "384486694155"
       image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-secret-bootstrap_latest
       imagePullPolicy: Always
       name: ci-secret-bootstrap
