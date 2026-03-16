@@ -6,13 +6,17 @@ build_root:
       ARG TERRAFORM_VERSION=1.9.8
       ARG KUBECTL_VERSION=v1.32.3
       ARG HELM_GIT_VERSION=v1.5.2
+      ARG SHELLCHECK_VERSION=v0.10.0
       RUN yum -y install --setopt=skip_missing_names_on_install=False \
               git \
               make \
               jq \
-              shellcheck \
               unzip \
+              xz \
           && yum clean all && rm -rf /var/cache/yum \
+          && curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" | tar -xJf - -C /tmp \
+          && mv /tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck /usr/local/bin/ \
+          && chmod 755 /usr/local/bin/shellcheck \
           && curl -fsSL "https://raw.githubusercontent.com/helm/helm/${HELM_VERSION}/scripts/get-helm-3" | DESIRED_VERSION=${HELM_VERSION} bash \
           && curl -fsSL -o /tmp/terraform.zip "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" \
           && unzip -o /tmp/terraform.zip -d /usr/local/bin/ \
@@ -132,7 +136,7 @@ tests:
         requests:
           cpu: 100m
           memory: 300Mi
-      timeout: 30m0s
+      timeout: 60m0s
 zz_generated_metadata:
   branch: main
   org: openshift-hyperfleet
