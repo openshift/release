@@ -4,18 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# On failure, dump operator/CRD state to artifacts for debugging
-dump_operator_state_on_failure() {
-    local exit_code=$?
-    if [[ ${exit_code} -ne 0 ]] && [[ -n "${ARTIFACT_DIR:-}" ]]; then
-        echo "Dumping operator/CRD state for debugging (step failed with exit code ${exit_code})."
-        oc get crd | grep -E 'NAME|quay' > "${ARTIFACT_DIR}/quay-crds-on-failure.txt" 2>/dev/null || true
-        oc -n "${QUAYNAMESPACE:-}" get subscription,csv,pods -o yaml > "${ARTIFACT_DIR}/quay-operator-state-on-failure.yaml" 2>/dev/null || true
-        oc -n "${QUAYNAMESPACE:-}" get quayregistry -o yaml > "${ARTIFACT_DIR}/quayregistries-on-failure.yaml" 2>/dev/null || true
-    fi
-}
-trap dump_operator_state_on_failure EXIT
-
 #Get the credentials and Email of new Quay User
 QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
 QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
@@ -61,20 +49,7 @@ EOF
 
 oc create secret generic -n "${QUAYNAMESPACE}" --from-file config.yaml=./config.yaml config-bundle-secret
 
-# Verify QuayRegistry CRD is available before creating the registry (helps debug CRD/operator issues)
-if ! oc get crd quayregistries.quay.redhat.com &>/dev/null; then
-    echo "ERROR: QuayRegistry CRD (quayregistries.quay.redhat.com) not found. Ensure deploy-operator step completed and the operator installed the CRD."
-    echo "Available CRDs containing 'quay':"
-    oc get crd | grep -E 'NAME|quay' || true
-    if [[ -n "${ARTIFACT_DIR:-}" ]]; then
-        oc -n "${QUAYNAMESPACE}" get subscription,csv,pods -o yaml > "${ARTIFACT_DIR}/quay-operator-state-no-crd.yaml" 2>/dev/null || true
-        oc get crd -o yaml > "${ARTIFACT_DIR}/all-crds.yaml" 2>/dev/null || true
-    fi
-    exit 1
-fi
-echo "QuayRegistry CRD is present (quay.redhat.com/v1)"
-
-# Deploy Quay registry, here disable monitoring component
+#Deploy Quay registry, here disable monitoring component
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
 apiVersion: quay.redhat.com/v1
