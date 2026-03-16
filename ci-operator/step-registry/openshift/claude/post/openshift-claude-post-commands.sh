@@ -18,7 +18,7 @@ else
     PROW_URL="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/${JOB_NAME}/${BUILD_ID}"
 fi
 
-cat > "${ARTIFACT_DIR}/continue-session.html" <<HTMLEOF
+cat > "${ARTIFACT_DIR}/continue-session-summary.html" <<HTMLEOF
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -277,4 +277,4 @@ function copyCommand(btn) {
 </html>
 HTMLEOF
 
-echo "Continue-session page written to ${ARTIFACT_DIR}/continue-session.html"
+echo "Continue-session page written to ${ARTIFACT_DIR}/continue-session-summary.html"
