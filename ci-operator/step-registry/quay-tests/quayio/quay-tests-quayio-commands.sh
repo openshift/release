@@ -32,9 +32,9 @@ python3 utility/quayio_test_pull_images.py -n 100 > $ARTIFACT_DIR/quay_io_pull_i
 #Clone Quay-test repo to get the local test images
 git clone https://"$GITHUB_ACCESS_TOKEN"@github.com/quay/quay-tests.git
 cd quay-tests/quay-io-tests && mkdir -p cypress/downloads && mkdir -p cypress/results 
-yarn install
+npm install
 
 export CYPRESS_QUAY_API_TOKEN="$QUAY_API_TOKEN"
 export CYPRESS_QUAY_PASSWORD="$QUAY_PASSWORD"
 export CYPRESS_QUAY_USER="$QUAY_USERNAME"
-NO_COLOR=1 yarn run all > $ARTIFACT_DIR/quayio_testing_report
+NO_COLOR=1 npm run all > $ARTIFACT_DIR/quayio_testing_report
