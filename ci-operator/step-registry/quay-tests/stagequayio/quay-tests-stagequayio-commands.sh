@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# Trigger CI re-run
 set -euo pipefail
 
 QUAY_USERNAME=$(cat /var/run/quay-qe-stagequayio-secret/username)
