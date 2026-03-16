@@ -334,11 +334,9 @@ tests:
 - as: unit
   commands: |
     cd go-controller
-    PKGS=$(go list -mod vendor -f '{{if len .TestGoFiles}} {{.ImportPath}} {{end}}' ${PKGS:-./cmd/... ./pkg/... ./hybrid-overlay/...} | xargs)
-    # these packages need running as a container for TestNewClientset
-    PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util/batching"/ }
-    PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util"/ }
-    PKGS=$PKGS make test NOROOT=TRUE
+    unset KUBERNETES_SERVICE_HOST # Unit tests expect non-K8s-pod environment; unset to match upstream CI behavior
+    unset KUBERNETES_SERVICE_PORT
+    make test NOROOT=TRUE
   container:
     from: src
 - as: lint
@@ -652,7 +650,6 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-large-cluster-density-v2
   optional: true
-  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -681,7 +678,6 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-large-node-density-cni
   optional: true
-  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -708,7 +704,6 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-xlarge-cluster-density-v2
   optional: true
-  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale
@@ -742,7 +737,6 @@ tests:
 - always_run: false
   as: ovncore-perfscale-aws-ovn-xlarge-node-density-cni
   optional: true
-  skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-ovn-perfscale

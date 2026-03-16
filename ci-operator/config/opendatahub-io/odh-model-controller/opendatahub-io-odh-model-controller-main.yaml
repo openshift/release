@@ -98,12 +98,15 @@ tests:
       commands: |
         set -euxo pipefail
         echo "ODH_MODEL_CONTROLLER_IMAGE=${ODH_MODEL_CONTROLLER_IMAGE}"
-        export ODH_MC_MANIFEST_SOURCE="$(pwd)/config/base"
 
         git clone https://github.com/opendatahub-io/kserve.git /tmp/kserve
         pushd /tmp/kserve
           git fetch --all --tags
           git checkout release-v0.15
+
+          git clone --depth 1 --branch main \
+            https://github.com/opendatahub-io/odh-model-controller.git /tmp/kserve/odh-model-controller
+          export ODH_MC_MANIFEST_SOURCE=../../odh-model-controller/config/base
 
           export GITHUB_SHA="${PULL_BASE_SHA:-stable}"
           export ODH_MODEL_CONTROLLER_IMAGE="${ODH_MODEL_CONTROLLER_IMAGE}"

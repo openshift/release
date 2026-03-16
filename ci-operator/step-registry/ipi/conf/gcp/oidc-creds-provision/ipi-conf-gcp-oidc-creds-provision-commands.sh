@@ -85,6 +85,18 @@ popd
 echo "> Output gcp credentials requests to directory: /tmp/credrequests"
 ls "/tmp/credrequests"
 
+# TODO(OCPBUGS-77845): Temporary workaround - must be reverted when the bug is resolved.
+# The cluster-api credentials request changed from feature-set to feature-gate
+# annotation, but oc adm release extract does not yet filter on feature-gate.
+# Remove the cluster-api CR when FEATURE_SET is not set.
+if [[ -z "${FEATURE_SET:-}" ]]; then
+  capi_cr="/tmp/credrequests/0000_30_cluster-api_01_credentials-request.yaml"
+  if [[ -f "${capi_cr}" ]]; then
+    echo "Removing cluster-api credentials request (feature-gate not supported by current tooling)"
+    rm -f "${capi_cr}"
+  fi
+fi
+
 ADDITIONAL_CCOCTL_ARGS=""
 if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
   ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --enable-tech-preview"
