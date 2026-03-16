@@ -28,10 +28,10 @@ python3 utility/quayio_test_push_images.py -n 20 > $ARTIFACT_DIR/stage_quay_io_p
 mkdir -p cypress/downloads
 python3 utility/quayio_test_pull_images.py -n 100 > $ARTIFACT_DIR/stage_quay_io_pull_image_report || true
 
-cd stage-quay-io-tests && mkdir -p cypress/downloads && mkdir -p cypress/results 
-yarn install
+cd stage-quay-io-tests && mkdir -p cypress/downloads && mkdir -p cypress/results
+npm install
 
 export CYPRESS_QUAY_API_TOKEN="$QUAY_API_TOKEN"
 export CYPRESS_QUAY_PASSWORD="$QUAY_PASSWORD"
 export CYPRESS_QUAY_USER="$QUAY_USERNAME"
-NO_COLOR=1 yarn run all > $ARTIFACT_DIR/stage_quayio_testing_report
+NO_COLOR=1 npm run all > $ARTIFACT_DIR/stage_quayio_testing_report
