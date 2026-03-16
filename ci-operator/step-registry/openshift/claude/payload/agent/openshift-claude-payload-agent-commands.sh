@@ -71,8 +71,6 @@ POLL_COUNT=0
 
 PHASE_WAIT_START=$(date +%s)
 
-if false; then # TEMPORARY: skip polling for testing
-
 echo ""
 echo "=== Waiting for all blocking jobs to complete before analysis ==="
 echo "Polling every $((POLL_INTERVAL / 60)) minutes (timeout: $((MAX_WAIT / 3600)) hours)"
@@ -134,8 +132,6 @@ All ${TOTAL} blocking jobs succeeded.${RETRY_INFO}"
     echo "  Next check in $((POLL_INTERVAL / 60)) minutes..."
     sleep ${POLL_INTERVAL}
 done
-
-fi # TEMPORARY: end skip polling
 
 PHASE_WAIT_DURATION=$(( $(date +%s) - PHASE_WAIT_START ))
 
