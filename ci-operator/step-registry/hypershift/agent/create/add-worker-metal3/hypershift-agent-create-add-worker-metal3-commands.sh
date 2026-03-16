@@ -15,13 +15,56 @@ if [[ -z ${AGENT_NAMESPACE} ]] ; then
 fi
 
 function gather() {
+  set +e
+
   oc get InfraEnv -n ${AGENT_NAMESPACE} ${CLUSTER_NAME} -o yaml > "${ARTIFACT_DIR}/InfraEnv.yaml"
   oc get BareMetalHost -n ${AGENT_NAMESPACE} -o yaml > "${ARTIFACT_DIR}/extra_baremetalhosts.yaml"
 
-  # Dump the network configuration
+  # Dump agent resources and their status
+  oc get agent -n ${AGENT_NAMESPACE} -o yaml > "${ARTIFACT_DIR}/agents.yaml"
+  oc get agent -n ${AGENT_NAMESPACE} -o wide > "${ARTIFACT_DIR}/agents-wide.txt"
+
+  # Dump events for the agent namespace (BMH, Agent, InfraEnv events)
+  oc get events -n ${AGENT_NAMESPACE} --sort-by='.lastTimestamp' > "${ARTIFACT_DIR}/agent-namespace-events.txt"
+
+  # Dump NodePool status
+  oc get nodepool -A -o yaml > "${ARTIFACT_DIR}/nodepools.yaml"
+
+  # Dump HostedCluster status
+  oc get hostedcluster -A -o yaml > "${ARTIFACT_DIR}/hostedclusters.yaml"
+
+  # Dump Ironic and assisted-service pod status and recent logs
+  for ns in multicluster-engine openshift-machine-api; do
+    if oc get ns "${ns}" &>/dev/null; then
+      oc get pods -n "${ns}" -o wide > "${ARTIFACT_DIR}/${ns}-pods.txt" 2>/dev/null
+      for pod in $(oc get pods -n "${ns}" --no-headers -o custom-columns=':metadata.name' 2>/dev/null | grep -E 'ironic|metal3|assisted'); do
+        oc logs -n "${ns}" "${pod}" --all-containers --tail=200 > "${ARTIFACT_DIR}/${ns}-${pod}-logs.txt" 2>/dev/null
+      done
+    fi
+  done
+
+  # Dump the network configuration and check VM power state
   ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- << 'EOF' > /tmp/net-dump.xml
 /usr/bin/virsh net-dumpxml ostestbm
 EOF
+  ssh "${SSHOPTS[@]}" "root@${IP}" 'virsh list --all' > "${ARTIFACT_DIR}/virsh-list.txt" 2>/dev/null
+
+  # Dump extra worker VM details: state, config, QEMU logs, and console output
+  ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- << 'VMEOF' > "${ARTIFACT_DIR}/extraworker-vm-details.txt" 2>&1
+for vm in $(virsh list --all --name | grep extraworker); do
+  echo "=== VM: ${vm} ==="
+  echo "--- state ---"
+  virsh domstate "${vm}" --reason 2>&1
+  echo "--- dominfo ---"
+  virsh dominfo "${vm}" 2>&1
+  echo ""
+done
+VMEOF
+  for vm_name in $(ssh "${SSHOPTS[@]}" "root@${IP}" 'virsh list --all --name 2>/dev/null' | grep extraworker); do
+    ssh "${SSHOPTS[@]}" "root@${IP}" "virsh dumpxml ${vm_name}" > "${ARTIFACT_DIR}/virsh-dumpxml-${vm_name}.xml" 2>/dev/null
+    ssh "${SSHOPTS[@]}" "root@${IP}" "cat /var/log/libvirt/qemu/${vm_name}.log 2>/dev/null | tail -200" > "${ARTIFACT_DIR}/qemu-${vm_name}.log" 2>/dev/null
+    ssh "${SSHOPTS[@]}" "root@${IP}" "cat /var/log/libvirt/qemu/${vm_name}-serial0.log 2>/dev/null" > "${ARTIFACT_DIR}/console-${vm_name}.log" 2>/dev/null
+  done
 
   # Get the list of worker IPs and check the systemd status of each worker
   while read -r worker_ip; do
@@ -30,6 +73,8 @@ ip=$1
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null core@${ip} systemctl --failed
 EOF
   done < <(grep extraworker /tmp/net-dump.xml | grep "ip='[^']*\." | sed -n "s/.*ip='\([^']*\)'.*/\1/p")
+
+  set -e
 }
 
 trap gather EXIT
