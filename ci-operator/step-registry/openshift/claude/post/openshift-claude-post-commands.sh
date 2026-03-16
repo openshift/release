@@ -24,7 +24,7 @@ cat > "${ARTIFACT_DIR}/continue-session-summary.html" <<HTMLEOF
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Continue Claude Session</title>
+<title>🔮 Continue This Claude Session Locally ✨</title>
 <style>
   :root {
     --bg: #0f172a;
@@ -46,13 +46,10 @@ cat > "${ARTIFACT_DIR}/continue-session-summary.html" <<HTMLEOF
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
+    padding: 3rem 2rem;
   }
 
-  .container { max-width: 640px; width: 100%; }
+  .container { max-width: 960px; width: 100%; margin: 0 auto; }
 
   .card {
     background: var(--surface);
