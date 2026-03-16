@@ -310,6 +310,10 @@ fi
 mkdir -p "${RESOURCE_DUMP_DIR}"
 gather_resources
 
-ssh_instances
+if [[ ! -f "${SHARED_DIR}/console.url" ]]; then
+    ssh_instances
+else
+    echo "install succeed, skipping SSH connectivity check."
+fi
 
 echo "==== IBM Cloud resource gathering completed. ========="
