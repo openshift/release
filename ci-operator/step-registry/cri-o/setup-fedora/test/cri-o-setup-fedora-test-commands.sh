@@ -20,16 +20,18 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
 # Download the build-libpathrs.sh script directly
 - name: download libpathrs build script
   get_url:
-    url: "https://raw.githubusercontent.com/opencontainers/runc/main/script/build-libpathrs.sh"
+    url: "https://raw.githubusercontent.com/opencontainers/runc/496b68a3050547ff8365fb1231b81ff8153f4359/script/build-libpathrs.sh"
     dest: "/tmp/build-libpathrs.sh"
     mode: '0755'
+    checksum: "sha256:3685397177e21430ce17b0e063c7d127ee437b64078ef9e5ce0fb816b9ac1d85"
 
 # Download the lib.sh helper script required by build-libpathrs.sh
 - name: download lib.sh helper script
   get_url:
-    url: "https://raw.githubusercontent.com/opencontainers/runc/main/script/lib.sh"
+    url: "https://raw.githubusercontent.com/opencontainers/runc/496b68a3050547ff8365fb1231b81ff8153f4359/script/lib.sh"
     dest: "/tmp/lib.sh"
     mode: '0644'
+    checksum: "sha256:ae80403a66c1b94e9d984cd790cf0226efe3df6e16c76244464d3ac215237124"
 
 # Build and install libpathrs using the runc build script
 - name: build libpathrs
@@ -43,6 +45,7 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" ${IP} -- bash - <<EOF
 
 # Clean up libpathrs build artifacts
 - name: cleanup libpathrs build artifacts
+  become: yes
   file:
     path: "{{ item }}"
     state: absent
