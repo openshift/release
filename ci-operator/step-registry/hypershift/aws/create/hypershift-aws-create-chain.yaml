@@ -205,9 +205,14 @@ chain:
       # When using np_skew (different release images), we need eval to properly handle shell operators
       if [[ -n "$RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && "$RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
         eval "${COMMAND[*]} $(support_np_skew)"
+        rc=$?
       else
         "${COMMAND[@]}"
+        rc=$?
       fi
+      echo "Create HC exited with code: $rc"
+      sleep 6h
+
 
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
@@ -285,7 +290,7 @@ chain:
       requests:
         cpu: 100m
         memory: 100Mi
-    timeout: 35m0s
+    timeout: 12h
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-awscreds
       name: hypershift-ci-jobs-awscreds
