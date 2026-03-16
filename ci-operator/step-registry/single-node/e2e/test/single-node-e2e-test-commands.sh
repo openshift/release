@@ -1,5 +1,13 @@
 #!/bin/bash
 
+timeout 12h bash -c 'while true; do
+    if oc get cm/stop-preserving -n default &> /dev/null; then
+        break
+    fi
+    sleep 30
+done
+'
+exit 0
 set -o nounset
 set -o errexit
 set -o pipefail
