@@ -41,9 +41,11 @@ if [[ $(jq -n "$oc_version < 4.16") == "true" ]]; then
 fi
 
 # Patch etcd for allowing slower disks
-if [[ "${ETCD_DISK_SPEED}" == "slow" ]]; then
+if [[ "${ETCD_DISK_SPEED:-}" == "slow" ]]; then
   info 'Patching etcd cluster operator...'
   oc patch etcd cluster --type=merge --patch '{"spec":{"controlPlaneHardwareSpeed":"Slower"}}'
   oc wait --timeout=1m --for=condition=Progressing=true co etcd 1>/dev/null # Waiting time to update to true the Progressing state of the etcd cluster
   wait_for_etcd_patch_done
+else
+  info "ETCD_DISK_SPEED is '${ETCD_DISK_SPEED:-}', skipping etcd patching (requires 'slow')"
 fi
