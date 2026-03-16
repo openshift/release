@@ -2,13 +2,37 @@ build_root:
   project_image:
     dockerfile_literal: |-
       FROM registry.access.redhat.com/ubi9/ubi
-      RUN yum install -y git make && yum clean all
-images:
-- dockerfile_path: Dockerfile.ci
-  from: src
-  to: infra-tools
+      ARG HELM_VERSION=v3.17.3
+      ARG TERRAFORM_VERSION=1.9.8
+      ARG KUBECTL_VERSION=v1.32.3
+      ARG HELM_GIT_VERSION=v1.5.2
+      RUN yum -y install --setopt=skip_missing_names_on_install=False \
+              git \
+              make \
+              jq \
+              shellcheck \
+              unzip \
+          && yum clean all && rm -rf /var/cache/yum \
+          && curl -fsSL "https://raw.githubusercontent.com/helm/helm/${HELM_VERSION}/scripts/get-helm-3" | DESIRED_VERSION=${HELM_VERSION} bash \
+          && curl -fsSL -o /tmp/terraform.zip "https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip" \
+          && unzip -o /tmp/terraform.zip -d /usr/local/bin/ \
+          && curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
+          && chmod 755 /usr/local/bin/kubectl \
+          && rm -rf /tmp/*
+      RUN helm plugin install https://github.com/aslafy-z/helm-git --version ${HELM_GIT_VERSION}
+      RUN curl -fsSL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz" | tar -xzf - -C /opt \
+          && /opt/google-cloud-sdk/install.sh \
+              --quiet \
+              --path-update=false \
+              --usage-reporting=false \
+          && /opt/google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin --quiet \
+          && rm -rf /opt/google-cloud-sdk/.install/.backup
+      ENV PATH="/opt/google-cloud-sdk/bin:${PATH}" \
+          USE_GKE_GCLOUD_AUTH_PLUGIN=True
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -17,7 +41,98 @@ tests:
   commands: |
     make ci-dry-run
   container:
-    from: infra-tools
+    from: src
+- as: integration
+  steps:
+    post:
+    - as: cleanup
+      best_effort: true
+      commands: |
+        set -uo pipefail
+
+        # --- GCP Auth ---
+        GCP_CREDENTIALS_FILE="/var/run/hyperfleet-e2e/hcm-hyperfleet-e2e.json"
+        PROJECT_ID=$(jq -r .project_id "$GCP_CREDENTIALS_FILE")
+        gcloud auth activate-service-account --key-file="$GCP_CREDENTIALS_FILE"
+        gcloud config set project "$PROJECT_ID"
+
+        # --- Cleanup ---
+        CI_ID=$(cat "${SHARED_DIR}/ci_id" 2>/dev/null || echo "unknown")
+
+        if [ "$CI_ID" != "unknown" ]; then
+          TF_DIR="terraform"
+
+          # Regenerate config files from template (not shared across containers)
+          cp "${TF_DIR}/envs/gke/dev-prow.tfbackend" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend"
+          sed -i "s|^prefix.*|prefix = \"ci/infra/${CI_ID}\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend"
+
+          cp "${TF_DIR}/envs/gke/dev-prow.tfvars" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+          sed -i "s|^developer_name.*|developer_name = \"ci-infra-${CI_ID}\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+          sed -i "s|^kubernetes_suffix.*|kubernetes_suffix = \"default\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+          sed -i "s|^enable_deletion_protection.*|enable_deletion_protection = false|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+
+          # Retrieve cluster credentials for uninstall
+          (cd "$TF_DIR" && terraform init -backend-config="envs/gke/ci-${CI_ID}.tfbackend") || true
+          eval $(cd "$TF_DIR" && terraform output -raw connect_command) || true
+
+          make ci-cleanup \
+            TF_ENV="ci-${CI_ID}" || true
+
+          # Clean up GCS state
+          gsutil rm -r "gs://hyperfleet-terraform-state/ci/infra/${CI_ID}" || true
+        fi
+      credentials:
+      - mount_path: /var/run/hyperfleet-e2e
+        name: hyperfleet-e2e
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
+      timeout: 15m0s
+    test:
+    - as: deploy-and-test
+      commands: |
+        set -euo pipefail
+
+        # --- GCP Auth ---
+        GCP_CREDENTIALS_FILE="/var/run/hyperfleet-e2e/hcm-hyperfleet-e2e.json"
+        PROJECT_ID=$(jq -r .project_id "$GCP_CREDENTIALS_FILE")
+        gcloud auth activate-service-account --key-file="$GCP_CREDENTIALS_FILE"
+        gcloud config set project "$PROJECT_ID"
+
+        # --- Generate ephemeral cluster config ---
+        CI_ID="${BUILD_ID:-$(date +%s)}"
+        CI_NAME="ci-infra-${CI_ID}"
+        TF_DIR="terraform"
+
+        # Copy from existing template and override CI-specific values
+        cp "${TF_DIR}/envs/gke/dev-prow.tfbackend" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend"
+        sed -i "s|^prefix.*|prefix = \"ci/infra/${CI_ID}\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfbackend"
+
+        cp "${TF_DIR}/envs/gke/dev-prow.tfvars" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+        sed -i "s|^developer_name.*|developer_name = \"${CI_NAME}\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+        sed -i "s|^kubernetes_suffix.*|kubernetes_suffix = \"default\"|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+        sed -i "s|^enable_deletion_protection.*|enable_deletion_protection = false|" "${TF_DIR}/envs/gke/ci-${CI_ID}.tfvars"
+
+        # Store CI_ID for cleanup step
+        echo "${CI_ID}" > "${SHARED_DIR}/ci_id"
+
+        # --- Run integration test ---
+        make ci-test \
+          TF_ENV="ci-${CI_ID}" \
+          AUTO_APPROVE=true
+      credentials:
+      - mount_path: /var/run/hyperfleet-e2e
+        name: hyperfleet-e2e
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
+      timeout: 30m0s
 zz_generated_metadata:
   branch: main
   org: openshift-hyperfleet
