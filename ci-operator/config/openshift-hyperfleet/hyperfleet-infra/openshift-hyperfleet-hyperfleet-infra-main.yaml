@@ -24,7 +24,12 @@ build_root:
           && curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
           && chmod 755 /usr/local/bin/kubectl \
           && rm -rf /tmp/*
-      ENV HELM_PLUGINS=/usr/local/share/helm/plugins
+      RUN mkdir -p /tmp/helm-home && chmod 777 /tmp/helm-home
+      ENV HOME=/tmp/helm-home \
+          HELM_CACHE_HOME=/tmp/helm-home/.cache/helm \
+          HELM_CONFIG_HOME=/tmp/helm-home/.config/helm \
+          HELM_DATA_HOME=/tmp/helm-home/.local/share/helm \
+          HELM_PLUGINS=/usr/local/share/helm/plugins
       RUN helm plugin install https://github.com/aslafy-z/helm-git --version ${HELM_GIT_VERSION}
       RUN curl -fsSL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz" | tar -xzf - -C /opt \
           && /opt/google-cloud-sdk/install.sh \
