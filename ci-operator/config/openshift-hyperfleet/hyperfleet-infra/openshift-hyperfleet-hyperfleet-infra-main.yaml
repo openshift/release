@@ -24,6 +24,7 @@ build_root:
           && curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
           && chmod 755 /usr/local/bin/kubectl \
           && rm -rf /tmp/*
+      ENV HELM_PLUGINS=/usr/local/share/helm/plugins
       RUN helm plugin install https://github.com/aslafy-z/helm-git --version ${HELM_GIT_VERSION}
       RUN curl -fsSL "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-linux-x86_64.tar.gz" | tar -xzf - -C /opt \
           && /opt/google-cloud-sdk/install.sh \
@@ -110,7 +111,7 @@ tests:
         gcloud config set project "$PROJECT_ID"
 
         # --- Generate ephemeral cluster config ---
-        CI_ID="${BUILD_ID:-$(date +%s)}"
+        CI_ID="${BUILD_ID:(-8)}"
         CI_NAME="ci-infra-${CI_ID}"
         TF_DIR="terraform"
 
