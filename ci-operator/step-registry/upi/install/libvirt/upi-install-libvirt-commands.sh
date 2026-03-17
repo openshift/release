@@ -515,7 +515,7 @@ fi
 echo "Bootstrap phase completed (success or failure)"
 
 echo "Sleeping for debugging bootstrap issues..."
-sleep 9000
+sleep 63000
 
 wait "$!"
 
