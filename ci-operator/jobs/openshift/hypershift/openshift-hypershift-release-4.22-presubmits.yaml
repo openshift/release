@@ -143,7 +143,7 @@ presubmits:
   - agent: kubernetes
     always_run: false
     annotations:
-      pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+      pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
@@ -388,7 +388,7 @@ presubmits:
   - agent: kubernetes
     always_run: false
     annotations:
-      pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+      pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
@@ -632,86 +632,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-autonode,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.22$
-    - ^release-4\.22-
-    cluster: build08
-    context: ci/prow/e2e-aws-external-oidc
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: hypershift-aws
-      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-hypershift-release-4.22-e2e-aws-external-oidc
-    rerun_command: /test e2e-aws-external-oidc
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-external-oidc
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-external-oidc,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1040,7 +960,7 @@ presubmits:
   - agent: kubernetes
     always_run: false
     annotations:
-      pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+      pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
@@ -1120,86 +1040,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-upgrade-hypershift-operator,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.22$
-    - ^release-4\.22-
-    cluster: build08
-    context: ci/prow/e2e-azure-aks-external-oidc
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: hypershift-aks
-      ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-hypershift-release-4.22-e2e-azure-aks-external-oidc
-    rerun_command: /test e2e-azure-aks-external-oidc
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-azure-aks-external-oidc
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-azure-aks-external-oidc,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1377,7 +1217,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-hypershift-release-4.22-e2e-azure-self-managed
     rerun_command: /test e2e-azure-self-managed
-    skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+    skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)
     spec:
       containers:
       - args:
@@ -1612,7 +1452,7 @@ presubmits:
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
-    cluster: build01
+    cluster: build03
     context: ci/prow/e2e-kubevirt-aws-ovn
     decorate: true
     labels:
@@ -1691,7 +1531,7 @@ presubmits:
   - agent: kubernetes
     always_run: false
     annotations:
-      pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+      pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
@@ -2259,7 +2099,7 @@ presubmits:
   - agent: kubernetes
     always_run: false
     annotations:
-      pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+      pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)
     branches:
     - ^release-4\.22$
     - ^release-4\.22-
@@ -2486,7 +2326,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-hypershift-release-4.22-security
     rerun_command: /test security
-    skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+    skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)
     spec:
       containers:
       - args:
@@ -2555,7 +2395,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-hypershift-release-4.22-unit
     rerun_command: /test unit
-    skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)
+    skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|\.cursor)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)
     spec:
       containers:
       - args:
