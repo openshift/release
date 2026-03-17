@@ -2,7 +2,7 @@ import genlib
 from config import Context
 
 
-def _add_trt_admin_cluster_role_bindings(gendoc, namespace):
+def _add_trt_admin_role_bindings(gendoc, namespace):
     gendoc.append({
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'RoleBinding',
@@ -28,7 +28,7 @@ def generate_trt_rbac(config):
         for private in (False, True):
             for arch in config.arches:
                 context = Context(config, arch, private)
-                _add_trt_admin_cluster_role_bindings(gendoc, context.is_namespace)
+                _add_trt_admin_role_bindings(gendoc, context.is_namespace)
 
         gendoc.append({
             'apiVersion': 'rbac.authorization.k8s.io/v1',
