@@ -256,11 +256,11 @@ while IFS= read -r line; do
   fi
 
   # Summary table row
-  SUMMARY_ROWS="${SUMMARY_ROWS}<tr><td><a href=\"https://issues.redhat.com/browse/${ISSUE_KEY}\">${ISSUE_KEY}</a></td><td>${ISSUE_TIMESTAMP}</td><td><span class=\"status ${STATUS_CLASS}\">${STATUS_LABEL}</span></td><td>${PR_LINK}</td><td>${ISSUE_COST}</td></tr>"
+  SUMMARY_ROWS="${SUMMARY_ROWS}<tr><td><a href=\"https://redhat.atlassian.net/browse/${ISSUE_KEY}\">${ISSUE_KEY}</a></td><td>${ISSUE_TIMESTAMP}</td><td><span class=\"status ${STATUS_CLASS}\">${STATUS_LABEL}</span></td><td>${PR_LINK}</td><td>${ISSUE_COST}</td></tr>"
 
   DETAIL_SECTIONS="${DETAIL_SECTIONS}
 <div class=\"issue-card\">
-  <h2><a href=\"https://issues.redhat.com/browse/${ISSUE_KEY}\">${ISSUE_KEY}</a> <span class=\"status ${STATUS_CLASS}\">${STATUS_LABEL}</span></h2>
+  <h2><a href=\"https://redhat.atlassian.net/browse/${ISSUE_KEY}\">${ISSUE_KEY}</a> <span class=\"status ${STATUS_CLASS}\">${STATUS_LABEL}</span></h2>
   ${TOKEN_TABLE}
 
   <h3>Phase 1: Solve</h3>
