@@ -21,10 +21,12 @@ images:
 - context_dir: .
   dockerfile_path: Dockerfiles/Dockerfile
   from: ubi
+  optional: true
   to: opendatahub-operator
 - context_dir: .
   dockerfile_path: Dockerfiles/rhoai.Dockerfile
   from: ubi
+  optional: true
   to: opendatahub-operator-rhoai
 operator:
   bundles:
@@ -52,8 +54,10 @@ resources:
       memory: 200Mi
 tests:
 - as: opendatahub-operator-pr-image-mirror
+  timeout: 45m0s
   steps:
     dependencies:
+      OO_BUNDLE: opendatahub-operator-bundle
       SOURCE_IMAGE_REF: opendatahub-operator
     env:
       IMAGE_REPO: opendatahub-operator
@@ -78,8 +82,10 @@ tests:
       IMAGE_TAG: latest
     workflow: opendatahub-io-ci-image-mirror
 - as: opendatahub-operator-rhoai-pr-image-mirror
+  timeout: 45m0s
   steps:
     dependencies:
+      OO_BUNDLE: opendatahub-operator-rhoai-bundle
       SOURCE_IMAGE_REF: opendatahub-operator-rhoai
     env:
       IMAGE_REPO: opendatahub-operator
