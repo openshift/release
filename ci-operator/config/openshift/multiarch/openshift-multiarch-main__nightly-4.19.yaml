@@ -559,10 +559,10 @@ tests:
     workflow: openshift-e2e-libvirt-vpn
 - as: ocp-fips-ovn-remote-libvirt-multi-z-z
   capabilities:
-  - sshd-bastion
+  - intranet
   cron: 0 22 * * 6
   steps:
-    cluster_profile: libvirt-s390x-2
+    cluster_profile: libvirt-s390x-vpn
     env:
       ARCH: s390x
       BRANCH: "4.19"
@@ -570,7 +570,8 @@ tests:
       FIPS_ENABLED: "true"
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-libvirt-upi-fips
+      USE_EXTERNAL_DNS: "true"
+    workflow: openshift-e2e-libvirt-vpn-fips
 - as: ocp-e2e-compact-ovn-remote-libvirt-multi-z-z
   capabilities:
   - sshd-bastion
@@ -630,34 +631,6 @@ tests:
       TEST_TYPE: conformance-parallel
       USE_RAMFS: "true"
       VOLUME_CAPACITY: 120G
-    workflow: openshift-e2e-libvirt-upi
-- as: ocp-heavy-build-ovn-remote-s2s-libvirt-ppc64le
-  capabilities:
-  - power-s2s-dns
-  cron: 0 22 * * 1,3
-  steps:
-    cluster_profile: libvirt-ppc64le-s2s
-    dependencies:
-      OPENSHIFT_INSTALL_TARGET: release:ppc64le-latest
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.19"
-      ETCD_DISK_SPEED: slow
-      TEST_TYPE: heavy-build
-      USE_RAMFS: "true"
-    workflow: openshift-e2e-libvirt-upi
-- as: ocp-heavy-build-ovn-remote-s2s-libvirt-multi-p-p
-  capabilities:
-  - power-s2s-dns
-  cron: 0 22 * * 2,4
-  steps:
-    cluster_profile: libvirt-ppc64le-s2s
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.19"
-      ETCD_DISK_SPEED: slow
-      TEST_TYPE: heavy-build
-      USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt-upi
 - as: ocp-image-ecosystem-ovn-remote-s2s-libvirt-multi-p-p
   capabilities:
