@@ -514,6 +514,11 @@ fi
 
 wait "$!"
 
+echo "Bootstrap phase completed (success or failure)"
+
+echo "Sleeping for debugging bootstrap issues..."
+sleep 9000
+
 if [ "$INSTALLER_TYPE" == "default" ]; then
   # Sleep between destroy and undefine to allow for a slight destroy lag
   echo "Deleting ${LEASED_RESOURCE}-bootstrap node..."
