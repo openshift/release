@@ -512,12 +512,12 @@ else
   ${OCPINSTALL} --dir "${INSTALL_DIR}" wait-for bootstrap-complete &
 fi
 
-wait "$!"
-
 echo "Bootstrap phase completed (success or failure)"
 
 echo "Sleeping for debugging bootstrap issues..."
 sleep 9000
+
+wait "$!"
 
 if [ "$INSTALLER_TYPE" == "default" ]; then
   # Sleep between destroy and undefine to allow for a slight destroy lag
