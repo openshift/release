@@ -96,6 +96,23 @@ case "${CLOUD_PROVIDER}" in
     if [ "${AZURE_SELF_MANAGED}" == "true" ]; then
       AZURE_MANAGED_SERVICE_ARGS=""
       # Keep external DNS enabled - domain filter is set via HYPERSHIFT_EXTERNAL_DNS_DOMAIN env var
+
+      # Enable Azure private platform support (Private Link Services) if credentials and resource group are provided.
+      # Values can come from env vars or from SHARED_DIR files written by the
+      # hypershift-azure-setup-private-link step.
+      PLS_RG="${AZURE_PLS_RESOURCE_GROUP:-}"
+      if [ -z "${PLS_RG}" ] && [ -f "${SHARED_DIR}/azure_pls_resource_group" ]; then
+        PLS_RG="$(cat "${SHARED_DIR}/azure_pls_resource_group")"
+      fi
+      PRIVATE_CREDS="${AZURE_PRIVATE_CREDS_FILE:-}"
+      if [ -z "${PRIVATE_CREDS}" ] && [ -f "${SHARED_DIR}/azure_private_link_creds_file" ]; then
+        PRIVATE_CREDS="$(cat "${SHARED_DIR}/azure_private_link_creds_file")"
+      fi
+      if [ -n "${PRIVATE_CREDS}" ] && [ -f "${PRIVATE_CREDS}" ] && [ -n "${PLS_RG}" ]; then
+        AZURE_MANAGED_SERVICE_ARGS="--private-platform=Azure \
+          --azure-private-creds=${PRIVATE_CREDS} \
+          --azure-pls-resource-group=${PLS_RG}"
+      fi
     fi
 
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
