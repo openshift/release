@@ -124,7 +124,7 @@ EOF
 
   # Wait for the app server deployment
   sleep 60
-  run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-app-server --timeout=600s
+  run_or_fail oc wait --for=condition=Available -n openshift-lightspeed deployment lightspeed-app-server --timeout=900s
   LOG_START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   COMMIT_ID=$(skopeo inspect docker://quay.io/openshift-lightspeed/lightspeed-service-api:latest | jq -r '.Labels."vcs-ref"')
   run_or_fail echo "Possible commit ID under test: $COMMIT_ID"
