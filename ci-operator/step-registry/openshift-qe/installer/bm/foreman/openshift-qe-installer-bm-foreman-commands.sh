@@ -67,6 +67,117 @@ for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$N
   fi
   podman run quay.io/quads/badfish:latest --reboot-only -H mgmt-$i -u $USER -p $PSWD
 done
+
+# Collect node lists and identify Dell vs SuperMicro
+ALL_NODES=()
+DELL_NODES=()
+for i in $(curl -sSk $OCPINV | jq -r ".nodes[$STARTING_NODE:$(($STARTING_NODE+$NUM_NODES))][].name"); do
+  ALL_NODES+=("$i")
+  if ! echo "$i" | grep -qE "(1029u|1029p|5039ms|6018r|6029p|6029r|6048p|6048r|6049p)"; then
+    DELL_NODES+=("$i")
+  fi
+done
+
+echo "All nodes: ${ALL_NODES[*]}"
+echo "Dell nodes eligible for recovery: ${DELL_NODES[*]:-none}"
+
+# Wait for all nodes to become unreachable via ping (max 3 minutes)
+echo "Waiting for nodes to become unreachable (confirming reboot)..."
+declare -A UNREACHABLE
+for attempt in $(seq 1 12); do
+  all_down=true
+  for node in "${ALL_NODES[@]}"; do
+    if [ "${UNREACHABLE[$node]:-}" = "1" ]; then
+      continue
+    fi
+    if ! ping -c 1 -W 2 "$node" &>/dev/null; then
+      echo "Node $node is now unreachable (rebooting)"
+      UNREACHABLE[$node]=1
+    else
+      all_down=false
+    fi
+  done
+  if $all_down; then
+    echo "All nodes confirmed rebooting"
+    break
+  fi
+  echo "Waiting for nodes to go down (attempt $attempt/12)..."
+  sleep 15
+done
+
+# Wait for all nodes to become reachable via ping (max 10 minutes)
+echo "Waiting for nodes to become reachable after reboot..."
+declare -A REACHABLE
+for attempt in $(seq 1 20); do
+  all_up=true
+  for node in "${ALL_NODES[@]}"; do
+    if [ "${REACHABLE[$node]:-}" = "1" ]; then
+      continue
+    fi
+    if ping -c 1 -W 2 "$node" &>/dev/null; then
+      echo "Node $node is reachable"
+      REACHABLE[$node]=1
+    else
+      all_up=false
+    fi
+  done
+  if $all_up; then
+    echo "All nodes are reachable"
+    break
+  fi
+  echo "Waiting for nodes to come up (attempt $attempt/20)..."
+  sleep 30
+done
+
+# Recovery for Dell nodes that are not reachable after 10 minutes
+STUCK_DELL_NODES=()
+for node in "${DELL_NODES[@]}"; do
+  if [ "${REACHABLE[$node]:-}" != "1" ]; then
+    STUCK_DELL_NODES+=("$node")
+  fi
+done
+
+if [ ${#STUCK_DELL_NODES[@]} -gt 0 ]; then
+  echo "Starting recovery for stuck Dell nodes: ${STUCK_DELL_NODES[*]}"
+  for i in "${STUCK_DELL_NODES[@]}"; do
+    echo "Recovery: clearing jobs on $i"
+    podman run quay.io/quads/badfish:latest -v -H mgmt-$i -u $USER -p $PSWD --clear-jobs --force
+    sleep 30
+
+    echo "Recovery: waiting for BIOS attributes to become accessible on $i"
+    # Disable tracing due to password handling
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
+    for attempt in $(seq 1 20); do
+      bios_response=$(curl -sk -u "$USER:$PSWD" \
+        -H "Content-Type: application/json" -H "Accept: application/json" \
+        "https://mgmt-$i/redfish/v1/Systems/System.Embedded.1/Bios")
+      boot_mode=$(echo "$bios_response" | jq -r '.Attributes.BootMode // empty')
+      if [ -n "$boot_mode" ]; then
+        echo "BIOS attributes accessible for $i (BootMode=$boot_mode)"
+        break
+      fi
+      echo "Waiting for BIOS attributes on $i (attempt $attempt/20)..."
+      sleep 15
+    done
+    $WAS_TRACING && set -x
+
+    echo "Recovery: setting boot device on $i"
+    for attempt in $(seq 1 3); do
+      if podman run quay.io/quads/badfish:latest -H mgmt-$i -u $USER -p $PSWD -i config/idrac_interfaces.yml -t foreman; then
+        echo "Boot device set successfully for $i"
+        break
+      fi
+      echo "Boot device set failed for $i (attempt $attempt/3), retrying in 60s..."
+      sleep 60
+    done
+
+    echo "Recovery: rebooting $i"
+    podman run quay.io/quads/badfish:latest --reboot-only -H mgmt-$i -u $USER -p $PSWD
+  done
+else
+  echo "All nodes came up successfully, no recovery needed"
+fi
 EOF
 envsubst '${FOREMAN_OS},${LAB_CLOUD},${NUM_NODES},${LAB},${QUADS_INSTANCE},${STARTING_NODE}' < /tmp/foreman-deploy.sh > /tmp/foreman-deploy_updated-$LAB_CLOUD.sh
 
@@ -121,6 +232,6 @@ ssh ${SSH_ARGS} root@${bastion} "
   set -e
   set -o pipefail
   source /tmp/foreman-deploy_updated-$LAB_CLOUD.sh
-  sleep 300
+  sleep 60
   source /tmp/foreman-wait_updated-$LAB_CLOUD.sh
 "
