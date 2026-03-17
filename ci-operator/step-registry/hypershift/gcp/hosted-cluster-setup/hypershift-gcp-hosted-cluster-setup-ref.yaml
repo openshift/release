@@ -1,0 +1,30 @@
+ref:
+  as: hypershift-gcp-hosted-cluster-setup
+  from: hypershift-operator
+  cli: latest
+  commands: hypershift-gcp-hosted-cluster-setup-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 15m0s
+  grace_period: 5m0s
+  documentation: |-
+    This step creates GCP infrastructure for hosted clusters using the hypershift CLI.
+
+    It creates:
+    1. RSA keypair for service account token signing (OIDC)
+    2. WIF infrastructure using `hypershift create iam gcp`:
+       - Workload Identity Pool and Provider
+       - Service Accounts for control plane and nodepool
+    3. Network infrastructure using `hypershift create infra gcp`:
+       - VPC and Subnet in the hosted cluster project
+
+    Prerequisites:
+    - hypershift-gcp-gke-provision step must have run (provides hosted-cluster-project-id, gcp-region)
+
+    Outputs to SHARED_DIR:
+    - wif-project-number, wif-pool-id, wif-provider-id
+    - controlplane-sa, nodepool-sa
+    - hc-vpc-name, hc-subnet-name, cluster-name
+    - sa-signing-key-path (path to private key for SA token signing)
