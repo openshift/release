@@ -69,7 +69,7 @@ def _release_admins_cluster_role(gendoc):
     })
 
 
-def _add_release_admin_cluster_role_bindings(gendoc, namespace):
+def _add_release_admin_role_bindings(gendoc, namespace):
     gendoc.append({
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'RoleBinding',
@@ -111,13 +111,12 @@ def _release_controller_developers_cluster_role(gendoc):
     })
 
 
-def _add_release_controller_developers_cluster_role_bindings(gendoc, namespace):
+def _add_release_controller_developers_cluster_role_bindings(gendoc):
     gendoc.append({
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'ClusterRoleBinding',
         'metadata': {
             'name': 'openshift-release-controller-developers-binding',
-            'namespace': namespace,
         },
         'roleRef': {
             'apiGroup': 'rbac.authorization.k8s.io',
@@ -153,7 +152,7 @@ def _release_payload_modifiers_cluster_role(gendoc):
     })
 
 
-def _add_release_payload_modifiers_cluster_role_bindings(gendoc, namespace):
+def _add_release_payload_modifiers_role_bindings(gendoc, namespace):
     gendoc.append({
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'RoleBinding',
@@ -183,6 +182,6 @@ def generate_release_admin_rbac(config):
         for private in (False, True):
             for arch in config.arches:
                 context = Context(config, arch, private)
-                _add_release_admin_cluster_role_bindings(gendoc, context.is_namespace)
-                _add_release_controller_developers_cluster_role_bindings(gendoc, context.is_namespace)
-                _add_release_payload_modifiers_cluster_role_bindings(gendoc, context.is_namespace)
+                _add_release_admin_role_bindings(gendoc, context.is_namespace)
+                _add_release_controller_developers_cluster_role_bindings(gendoc)
+                _add_release_payload_modifiers_role_bindings(gendoc, context.is_namespace)
