@@ -1,8 +1,8 @@
-build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.22
+base_images:
+  firewatch:
+    name: firewatch
+    namespace: firewatch
+    tag: main
 resources:
   '*':
     requests:
@@ -11,12 +11,71 @@ resources:
 tests:
 - as: firewatch-jira-cloud-token-validation
   cron: '@daily'
-  steps:
-    cluster_profile: aws-2
-    env:
-      FIREWATCH_JIRA_SERVER: https://redhat.atlassian.net
-    test:
-    - ref: firewatch-test-jira-token
+  container:
+    from: firewatch
+    credentials:
+    - namespace: test-credentials
+      name: firewatch-tool-jira-credentials
+      mount_path: /tmp/secrets/jira
+    commands: |
+      #!/bin/bash
+      set -o nounset
+      set -o errexit
+      set -o pipefail
+
+      export FIREWATCH_JIRA_SERVER="https://redhat.atlassian.net"
+      export FIREWATCH_JIRA_API_TOKEN_PATH="/tmp/secrets/jira/access_token"
+
+      echo "=============================================="
+      echo "Firewatch Jira Cloud Token Validation Test"
+      echo "=============================================="
+      echo ""
+
+      # Check if token file exists
+      if [ ! -f "${FIREWATCH_JIRA_API_TOKEN_PATH}" ]; then
+          echo "❌ ERROR: Jira token file not found at ${FIREWATCH_JIRA_API_TOKEN_PATH}"
+          exit 1
+      fi
+
+      echo "✓ Token file found"
+      echo ""
+
+      # Generate Jira configuration
+      echo "Step 1: Generate Jira Configuration"
+      firewatch jira-config-gen \
+          --token-path "${FIREWATCH_JIRA_API_TOKEN_PATH}" \
+          --server-url "${FIREWATCH_JIRA_SERVER}" \
+          --output-file /tmp/jira.config
+
+      echo "✓ Config generated"
+      echo ""
+
+      # Test Jira connection
+      echo "Step 2: Test Jira Connection"
+      python3 << 'EOF'
+      import sys
+      import json
+      from jira import JIRA
+
+      with open('/tmp/jira.config', 'r') as f:
+          config = json.load(f)
+
+      print(f"Testing: {config['url']}")
+
+      try:
+          jira = JIRA(server=config['url'], token_auth=config['token'])
+          myself = jira.myself()
+          print(f"✓ Authenticated as: {myself.get('displayName')}")
+
+          # Test LPINTEROP access
+          project = jira.project('LPINTEROP')
+          print(f"✓ LPINTEROP access: {project.name}")
+
+          print("\n✅ SUCCESS: Token is valid!")
+      except Exception as e:
+          print(f"❌ ERROR: {e}")
+          sys.exit(1)
+      EOF
   timeout: 10m0s
 zz_generated_metadata:
   branch: master
