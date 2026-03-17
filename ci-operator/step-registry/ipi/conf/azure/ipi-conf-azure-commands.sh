@@ -50,6 +50,8 @@ else
   AZURE_BASE_DOMAIN=$(< ${CLUSTER_PROFILE_DIR}/baseDomain)
 fi
 
+echo "${AZURE_BASE_DOMAIN}" > "${SHARED_DIR}/basedomain.txt"
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 REGION="${LEASED_RESOURCE}"
