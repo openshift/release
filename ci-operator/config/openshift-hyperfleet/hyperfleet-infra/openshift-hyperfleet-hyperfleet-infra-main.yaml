@@ -38,6 +38,7 @@ build_root:
               --usage-reporting=false \
           && /opt/google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin --quiet \
           && rm -rf /opt/google-cloud-sdk/.install/.backup
+      RUN chmod -R 777 /tmp/helm-home
       ENV PATH="/opt/google-cloud-sdk/bin:${PATH}" \
           USE_GKE_GCLOUD_AUTH_PLUGIN=True
 resources:
@@ -49,10 +50,16 @@ resources:
       memory: 200Mi
 tests:
 - as: validate
-  commands: |
-    make ci-dry-run
-  container:
-    from: src
+  steps:
+    test:
+    - as: run-validation
+      commands: |
+        make ci-dry-run
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 300Mi
 - as: integration
   steps:
     post:
