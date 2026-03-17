@@ -3587,6 +3587,28 @@ tests:
     - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
     - chain: openshift-e2e-test-netobserv-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: baremetalds-ipi-ovn-ipv4-f14-virt-netobserv-v0
+  capabilities:
+  - intranet
+  cron: 23 18 16,30 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        MIRROR_IMAGES=true
+        INSTALLER_PROXY=true
+        NETWORK_TYPE=OVNKubernetes
+      TEST_FILTERS: Network_Observability
+      TEST_IMPORTANCE: .*
+      TEST_SCENARIOS: with VMs
+      TEST_TIMEOUT: "55"
+      TIMEOUT: + 12 hours
+    test:
+    - chain: openshift-e2e-test-netobserv-prepare-bm-cluster
+    - ref: wait
+    - chain: openshift-e2e-test-netobserv-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: baremetalds-ipi-ovn-dualstack-primaryv6-f28-ipv6-netobserv
   capabilities:
   - intranet
