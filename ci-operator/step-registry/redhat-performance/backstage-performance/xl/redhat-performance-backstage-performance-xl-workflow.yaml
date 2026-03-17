@@ -1,0 +1,25 @@
+workflow:
+  as: redhat-performance-backstage-performance-xl
+  steps:
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: m6a.8xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      ZONES_COUNT: 1
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      USER_TAGS: |
+        Owner prow-sa
+        app-code PERF-015
+        service-phase dev
+        cost-center 726
+    pre:
+      - chain: ipi-aws-pre
+    test:
+      - ref: redhat-performance-backstage-performance-xl
+        timeout: 8h0m0s
+        resources:
+          requests:
+            cpu: 3000m
+            memory: 6Gi
+    post:
+      - chain: ipi-aws-post
