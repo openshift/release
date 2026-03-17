@@ -220,7 +220,7 @@ function ci_clone_src() {
     if [ "${force_clone}" == "true" ]; then
         # Force clone microshift, ignoring any existing CLONEREFS_OPTIONS
         local branch
-        branch=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
+        branch=$(echo "${JOB_SPEC}" | jq -r '.refs.base_ref // (try (.extra_refs | first | .base_ref))')
         # MicroShift repo uses main instead of master
         if [ "${branch}" == "master" ]; then
             branch="main"
