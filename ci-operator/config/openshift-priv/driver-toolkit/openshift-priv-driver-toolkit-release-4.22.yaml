@@ -9,6 +9,8 @@ canonical_go_repository: github.com/openshift/driver-toolkit
 images:
 - dockerfile_path: Dockerfile
   to: driver-toolkit
+- dockerfile_path: Dockerfile.rhel10
+  to: driver-toolkit-rhel-10
 promotion:
   to:
   - additional_images:
@@ -50,6 +52,13 @@ tests:
     cat /etc/driver-toolkit-release.json
   container:
     from: driver-toolkit
+- as: verify-image-content-dtk-for-rhel-10
+  commands: |
+    ls /manifests/01-openshift-imagestream.yaml
+    ls /manifests/image-references
+    cat /etc/driver-toolkit-release.json
+  container:
+    from: driver-toolkit-rhel-10
 - as: e2e-aws
   steps:
     cluster_profile: aws
