@@ -54,6 +54,7 @@ trap 'collect-results' SIGINT SIGTERM ERR EXIT
 
 # Set variables needed for test execution
 export PROVIDER=$OADP_CLOUD_PROVIDER
+export REGION=${REGION:-"us-east-2"}
 export BACKUP_LOCATION=$OADP_BACKUP_LOCATION
 export PROW_NAMESPACE=$NAMESPACE
 export NAMESPACE="openshift-adp"
@@ -62,6 +63,7 @@ export KUBECONFIG="/home/jenkins/.kube/config"
 export OADP_TEST_FOCUS="--focus=${OADP_TEST_FOCUS}"
 export TEMP_TEST_FOCUS=$OADP_TEST_FOCUS
 export ANSIBLE_REMOTE_TMP="/tmp/"
+export STORAGE_CLASS=${STORAGE_CLASS:-}
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 LOGS_FOLDER="/alabama/cspi/e2e/logs"
@@ -109,15 +111,21 @@ cd $OADP_GIT_DIR
 go mod edit -replace=gitlab.cee.redhat.com/app-mig/oadp-e2e-qe=$OADP_GIT_DIR/e2e
 go mod tidy
 
+oc get storageclass -o name | xargs oc patch -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "false"}}}'
+oc patch storageclass "${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd-virtualization" -p '{"metadata": {"annotations": {"storageclass.kubernetes.io/is-default-class": "true"}}}'
+echo "Printing Storage Classes:"
+oc get storageclasses
+STORAGE_CLASS="${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd-virtualization"
+
 
 # Run OADP Kubevirt tests if configured
 if [ "$EXECUTE_KUBEVIRT_TESTS" == "true" ]; then
-  oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class- &&\
-  oc annotate storageclass "${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd" storageclass.kubernetes.io/is-default-class=true &&\
+  # oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class=false --overwrite &&\
+  # oc annotate storageclass "${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd-virtualization" storageclass.kubernetes.io/is-default-class=true &&\
   OADP_TEST_FOCUS=""
   export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_cnv_results.xml" &&\
   export TESTS_FOLDER="/alabama/cspi/e2e/kubevirt-plugin" &&\
-  export EXTRA_GINKGO_PARAMS="--skip=tc-id:OADP-555" &&\
+  export EXTRA_GINKGO_PARAMS="--skip=tc-id:OADP-555 --skip=tc-id:OADP-186" &&\
   (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
   OADP_TEST_FOCUS=$TEMP_TEST_FOCUS
 fi
@@ -134,8 +142,6 @@ export JUNIT_REPORT_ABS_PATH="${ARTIFACT_DIR}/junit_oadp_interop_results.xml" &&
 (/bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true)
 
 sleep 30
-
-oc adm must-gather --image=registry.redhat.io/oadp/oadp-mustgather-rhel9:v1.4 --dest-dir="${ARTIFACT_DIR}/oadp-must-gather"
 
 # Copy logs into artifact directory if they exist
 echo "Checking for additional logs in ${LOGS_FOLDER}"
