@@ -477,14 +477,16 @@ done
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 if [ "$INSTALLER_TYPE" == "agent" ]; then
-  # openshift-install agent wait-for SSHs to the rendezvous host; ensure default key location exists
-  if [[ ! -f "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ]]; then
-    echo "ERROR: ${CLUSTER_PROFILE_DIR}/ssh-privatekey is required for agent install but not found in cluster profile"
-    exit 1
+  # openshift-install agent wait-for SSHs to the rendezvous host; ensure default key location exists (Z/s390x only)
+  if [ "$ARCH" == "s390x" ]; then
+    if [[ ! -f "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ]]; then
+      echo "ERROR: ${CLUSTER_PROFILE_DIR}/ssh-privatekey is required for agent install but not found in cluster profile"
+      exit 1
+    fi
+    mkdir -p ~/.ssh
+    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/id_rsa
+    chmod 600 ~/.ssh/id_rsa
   fi
-  mkdir -p ~/.ssh
-  cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/id_rsa
-  chmod 600 ~/.ssh/id_rsa
   restart_nodes &
   ${OCPINSTALL} --dir "${INSTALL_DIR}" agent wait-for bootstrap-complete --log-level=debug &
 else
