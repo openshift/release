@@ -41,8 +41,16 @@ check-yaml-indentation: python-help
 	hack/validate-yaml-indentation.sh .
 	@echo "YAML indentation check: PASS"
 
-check-validate-main-promotion: python-help
-	python3 hack/validate-main-promotion-guard.py
+check-validate-main-promotion:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_auto-config-brancher_latest
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm \
+		-v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" \
+		--entrypoint=/usr/bin/determinize-ci-operator \
+		quay.io/openshift/ci-public:ci_auto-config-brancher_latest \
+		--config-dir /release/ci-operator/config \
+		--validate-main-promotion \
+		--infra-periodics /release/ci-operator/jobs/infra-periodics.yaml \
+		--prow-config-dir /release/core-services/prow/02_config
 	@echo "Main promotion validation: PASS"
 
 check-core:
