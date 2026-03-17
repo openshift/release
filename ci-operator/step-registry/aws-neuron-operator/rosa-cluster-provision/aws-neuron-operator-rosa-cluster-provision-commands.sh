@@ -11,7 +11,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # a cluster due to failing to parse an empty boolean field.
 
 HOSTED_CP=${HOSTED_CP:-true}
-COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"inf2.xlarge"}
+COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"inf2.8xlarge"}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 REPLICAS=${REPLICAS:-"2"}
 CHANNEL_GROUP=${CHANNEL_GROUP:-"candidate,stable"}
