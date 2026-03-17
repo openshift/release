@@ -101,7 +101,6 @@ case "${CLOUD_PROVIDER}" in
     fi
 
     "${HCP_CLI}" install --hypershift-image="${OPERATOR_IMAGE}" \
-    --enable-conversion-webhook=false \
     ${AZURE_MANAGED_SERVICE_ARGS} \
     ${AZURE_EXTERNAL_DNS_ARGS} \
     --platform-monitoring=All \
