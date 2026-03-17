@@ -42,7 +42,6 @@ git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/githu
 #
 # ci_clone_src
 
-
 download_brew_rpms() {
     # See BREW_RPM_SOURCE variable definition in test/bin/common.sh
     src_path="/go/src/github.com/openshift/microshift"
