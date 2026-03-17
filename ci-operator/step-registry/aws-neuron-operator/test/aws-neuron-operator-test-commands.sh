@@ -5,15 +5,25 @@ set -o pipefail
 
 echo "Starting AWS Neuron operator E2E tests"
 
+TOOLS_DIR="/tmp/tools"
+mkdir -p "${TOOLS_DIR}"
+export PATH="${TOOLS_DIR}:${PATH}"
+
 if ! command -v oc &>/dev/null; then
     echo "oc not found, downloading OpenShift client..."
     curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
-        | tar xzf - -C /usr/local/bin oc kubectl 2>/dev/null || true
+        | tar xzf - -C "${TOOLS_DIR}" oc kubectl 2>/dev/null || true
     if command -v oc &>/dev/null; then
         echo "oc installed: $(oc version --client 2>/dev/null || echo 'ok')"
     else
         echo "WARNING: failed to install oc"
     fi
+fi
+
+if ! command -v jq &>/dev/null; then
+    echo "jq not found, downloading..."
+    curl -sL https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64 -o "${TOOLS_DIR}/jq" \
+        && chmod +x "${TOOLS_DIR}/jq" || true
 fi
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
@@ -68,6 +78,25 @@ dump_debug_info() {
         oc logs -n "${neuron_ns}" -l app.kubernetes.io/name=aws-neuron-operator --tail=500 > "${dump_dir}/neuron-operator-logs.txt" 2>&1 || true
         oc get all -n "${neuron_ns}" -o wide > "${dump_dir}/neuron-ns-resources.txt" 2>&1 || true
     fi
+
+    # Capture vLLM pod state across all namespaces
+    local vllm_ns
+    for vllm_ns in $(oc get namespaces -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n' | grep -i -E 'vllm|inference' || true); do
+        local ns_dir="${dump_dir}/vllm-${vllm_ns}"
+        mkdir -p "${ns_dir}"
+        oc get all -n "${vllm_ns}" -o wide > "${ns_dir}/resources.txt" 2>&1 || true
+        oc get pvc -n "${vllm_ns}" -o wide > "${ns_dir}/pvcs.txt" 2>&1 || true
+        oc get events -n "${vllm_ns}" --sort-by='.lastTimestamp' > "${ns_dir}/events.txt" 2>&1 || true
+        for pod in $(oc get pods -n "${vllm_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
+            oc describe pod -n "${vllm_ns}" "${pod}" > "${ns_dir}/${pod}-describe.txt" 2>&1 || true
+            for container in $(oc get pod -n "${vllm_ns}" "${pod}" -o jsonpath='{.spec.initContainers[*].name}' 2>/dev/null || true); do
+                oc logs -n "${vllm_ns}" "${pod}" -c "${container}" --tail=200 > "${ns_dir}/${pod}-init-${container}.log" 2>&1 || true
+            done
+            for container in $(oc get pod -n "${vllm_ns}" "${pod}" -o jsonpath='{.spec.containers[*].name}' 2>/dev/null || true); do
+                oc logs -n "${vllm_ns}" "${pod}" -c "${container}" --tail=500 > "${ns_dir}/${pod}-${container}.log" 2>&1 || true
+            done
+        done
+    done
 
     echo "=== Debug info collected in ${dump_dir} ==="
 }

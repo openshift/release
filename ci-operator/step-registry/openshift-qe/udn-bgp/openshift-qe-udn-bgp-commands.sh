@@ -31,6 +31,8 @@ bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 
 # shellcheck disable=SC2087
 ssh ${SSH_ARGS} root@"${bastion}" bash -s <<EOF
+    set -e
+    set -o pipefail
     export KUBECONFIG=/root/vmno/kubeconfig
     rm -rf ~/e2e-benchmarking
     git clone "$REPO_URL" $TAG_OPTION --depth 1

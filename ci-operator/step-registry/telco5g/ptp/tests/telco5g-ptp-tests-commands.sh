@@ -154,8 +154,9 @@ spec:
           path: config.json
 
     - name: dockercfg
-      defaultMode: 384
       secret:
+        secretName: BUILDER_DOCKERCFG
+        defaultMode: 384
 '
 
   jobdefinition=$(sed "s#OPERATOR_VERSION#${PTP_UNDER_TEST_BRANCH}#" <<<"$jobdefinition")
@@ -168,7 +169,7 @@ spec:
 
   retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
   dockercgf=$(oc -n openshift-ptp get sa builder -oyaml | grep imagePullSecrets -A 1 | grep -o "builder-.*")
-  jobdefinition="${jobdefinition} secretName: ${dockercgf}"
+  jobdefinition=$(sed "s#BUILDER_DOCKERCFG#${dockercgf}#" <<<"$jobdefinition")
   echo "$jobdefinition"
   echo "$jobdefinition" | oc apply -f -
 
@@ -289,10 +290,12 @@ export DAEMON_IMG="${REGISTRY}/openshift-ptp/linuxptp-daemon:${T5CI_VERSION}"
 export SIDECAR_IMG="${REGISTRY}/openshift-ptp/cloud-event-proxy:${T5CI_VERSION}"
 build_images
 
-# Download oc
+# Get an updated version of oc
+mkdir ~/bin
 wget https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
-tar -zxvf openshift-client-linux.tar.gz
-sudo mv oc kubectl /usr/local/bin/
+tar -zxvf openshift-client-linux.tar.gz -C ~/bin
+export PATH=$HOME/bin:$PATH
+
 oc version --client
 
 # deploy ptp-operator

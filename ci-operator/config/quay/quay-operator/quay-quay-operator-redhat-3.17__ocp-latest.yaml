@@ -3,15 +3,16 @@ base_images:
     name: "4.20"
     namespace: ocp
     tag: cli
+  operator-sdk:
+    name: "4.18"
+    namespace: origin
+    tag: operator-sdk
   ubi:
     name: ubi
     namespace: ocp
     tag: "8"
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.24-openshift-4.20
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: ubi
@@ -30,8 +31,9 @@ operator:
   bundles:
   - as: quay
     context_dir: bundle/
+    skip_building_index: true
   substitutions:
-  - pullspec: quay.io/projectquay/quay-operator:v3.6.1
+  - pullspec: quay.io/projectquay/quay-operator:v3.99.0-dev
     with: quay-operator
 promotion:
   to:
@@ -59,26 +61,20 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
   steps:
     cluster_profile: aws-3
-    dependencies:
-      OO_INDEX: ci-index-quay
     env:
       COMPUTE_NODE_TYPE: m5.4xlarge
-      OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: '!create'
-      OO_PACKAGE: quay-operator
-      OO_TARGET_NAMESPACES: '!all'
     post:
     - ref: quay-gather
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
     - ref: quay-install-odf-operator
-    - ref: optional-operators-subscribe
+    - ref: quay-install-operator-bundle
     - ref: quay-install-quay
     - ref: quay-create-admin-user
     test:
     - ref: quay-test-mirror-image
-    workflow: optional-operators-ci-aws
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: redhat-3.17
   org: quay
