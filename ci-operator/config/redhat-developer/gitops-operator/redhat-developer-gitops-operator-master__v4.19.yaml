@@ -117,6 +117,28 @@ tests:
         oc get events -n openshift-gitops-operator --sort-by='.lastTimestamp' | tail -20 || true
         echo "=== Events in openshift-gitops namespace (if exists) ==="
         oc get events -n openshift-gitops --sort-by='.lastTimestamp' 2>/dev/null | tail -20 || echo "No events in openshift-gitops namespace"
+        echo "=== Detailed Pod Status (Ready Condition Check) ==="
+        oc get pods -n openshift-gitops -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}Ready={.status.conditions[?(@.type=="Ready")].status}{"\t"}Reason={.status.conditions[?(@.type=="Ready")].reason}{"\t"}Message={.status.conditions[?(@.type=="Ready")].message}{"\n"}{end}' || true
+        echo "=== Pod Status with Wide Output ==="
+        oc get pods -n openshift-gitops -o wide || true
+        echo "=== Checking All Pods for Issues (Not Ready or CrashLoopBackOff) ==="
+        for pod in $(oc get pods -n openshift-gitops -o jsonpath='{.items[*].metadata.name}'); do
+          ready_status=$(oc get pod -n openshift-gitops $pod -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+          if [ "$ready_status" != "True" ]; then
+            echo "--- Pod $pod is NOT Ready (Status: $ready_status) ---"
+            echo "=== Describe pod: $pod ==="
+            oc describe pod -n openshift-gitops $pod || true
+            echo "=== Container Statuses for pod: $pod ==="
+            oc get pod -n openshift-gitops $pod -o jsonpath='{.status.containerStatuses[*].name}{"\n"}{.status.containerStatuses[*].ready}{"\n"}{.status.containerStatuses[*].state}{"\n"}{.status.containerStatuses[*].restartCount}{"\n"}' || true
+            echo "=== Init Container Statuses for pod: $pod ==="
+            oc get pod -n openshift-gitops $pod -o jsonpath='{.status.initContainerStatuses[*].name}{"\n"}{.status.initContainerStatuses[*].ready}{"\n"}{.status.initContainerStatuses[*].state}{"\n"}' || true
+            echo "=== Logs from pod: $pod (all containers) ==="
+            oc logs -n openshift-gitops $pod --all-containers=true --tail=100 || true
+            echo "=== Previous container logs (if any): $pod ==="
+            oc logs -n openshift-gitops $pod --all-containers=true --previous --tail=100 2>/dev/null || echo "No previous logs"
+            echo ""
+          fi
+        done
         scripts/openshift-CI-kuttl-tests.sh
         make e2e-tests-sequential
       from: dependencies
@@ -184,6 +206,28 @@ tests:
         oc get events -n openshift-gitops-operator --sort-by='.lastTimestamp' | tail -20 || true
         echo "=== Events in openshift-gitops namespace (if exists) ==="
         oc get events -n openshift-gitops --sort-by='.lastTimestamp' 2>/dev/null | tail -20 || echo "No events in openshift-gitops namespace"
+        echo "=== Detailed Pod Status (Ready Condition Check) ==="
+        oc get pods -n openshift-gitops -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}Ready={.status.conditions[?(@.type=="Ready")].status}{"\t"}Reason={.status.conditions[?(@.type=="Ready")].reason}{"\t"}Message={.status.conditions[?(@.type=="Ready")].message}{"\n"}{end}' || true
+        echo "=== Pod Status with Wide Output ==="
+        oc get pods -n openshift-gitops -o wide || true
+        echo "=== Checking All Pods for Issues (Not Ready or CrashLoopBackOff) ==="
+        for pod in $(oc get pods -n openshift-gitops -o jsonpath='{.items[*].metadata.name}'); do
+          ready_status=$(oc get pod -n openshift-gitops $pod -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "Unknown")
+          if [ "$ready_status" != "True" ]; then
+            echo "--- Pod $pod is NOT Ready (Status: $ready_status) ---"
+            echo "=== Describe pod: $pod ==="
+            oc describe pod -n openshift-gitops $pod || true
+            echo "=== Container Statuses for pod: $pod ==="
+            oc get pod -n openshift-gitops $pod -o jsonpath='{.status.containerStatuses[*].name}{"\n"}{.status.containerStatuses[*].ready}{"\n"}{.status.containerStatuses[*].state}{"\n"}{.status.containerStatuses[*].restartCount}{"\n"}' || true
+            echo "=== Init Container Statuses for pod: $pod ==="
+            oc get pod -n openshift-gitops $pod -o jsonpath='{.status.initContainerStatuses[*].name}{"\n"}{.status.initContainerStatuses[*].ready}{"\n"}{.status.initContainerStatuses[*].state}{"\n"}' || true
+            echo "=== Logs from pod: $pod (all containers) ==="
+            oc logs -n openshift-gitops $pod --all-containers=true --tail=100 || true
+            echo "=== Previous container logs (if any): $pod ==="
+            oc logs -n openshift-gitops $pod --all-containers=true --previous --tail=100 2>/dev/null || echo "No previous logs"
+            echo ""
+          fi
+        done
         scripts/openshift-CI-kuttl-tests.sh
         make e2e-tests-parallel
       from: dependencies
