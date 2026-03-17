@@ -61,6 +61,8 @@ declare -a MIRRORED_IMAGES=(
   "registry.k8s.io/etcd:3.5.15-0 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-11-registry-k8s-io-etcd-3-5-15-0-W7c5qq4cz4EE20EQ"
   # new image coming in k8s 1.35.1
   "registry.k8s.io/e2e-test-images/sample-device-plugin:1.7 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-registry-k8s-io-e2e-test-images-sample-device-plugin-1-7-ULwza-sZKxhdAQs1"
+  # nginx is switching indices in 1.35 - remove after origin 1.35 bump
+  "registry.k8s.io/e2e-test-images/nginx:1.14-4 $DEVSCRIPTS_TEST_IMAGE_REPO:e2e-18-registry-k8s-io-e2e-test-images-nginx-1-14-4-20h7A1tgJp0m0c1_"
 )
 
 function run-oc-image-mirror() {
