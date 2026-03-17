@@ -20,6 +20,18 @@ git clone https://github.com/openshift-eng/ai-helpers /tmp/ai-helpers
 echo "Cloning HyperShift repository..."
 git clone https://github.com/hypershift-community/hypershift /tmp/hypershift
 
+# Test podman build with the hypershift repo
+echo "=== Testing podman build with hypershift ==="
+podman build -t localhost/hypershift-test:latest -f /tmp/hypershift/Dockerfile /tmp/hypershift
+echo "Podman build test passed"
+podman rmi localhost/hypershift-test:latest || true
+echo "=== Podman build test complete ==="
+
+# Validate Claude CLI works
+echo "=== Testing Claude CLI ==="
+claude -p "Say hello world" --max-turns 1 --model "$CLAUDE_MODEL"
+echo "=== Claude CLI test complete ==="
+
 # Copy jira-solve command from ai-helpers to hypershift
 echo "Setting up Claude commands..."
 mkdir -p /tmp/hypershift/.claude/commands

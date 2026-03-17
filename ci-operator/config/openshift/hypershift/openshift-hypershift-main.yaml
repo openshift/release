@@ -19,6 +19,10 @@ base_images:
     name: "4.22"
     namespace: ocp
     tag: manila-csi-driver-operator-test
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
   openstack-cinder-csi-driver-operator-test:
     name: "4.22"
     namespace: ocp
@@ -32,6 +36,25 @@ images:
   to: hypershift
 - dockerfile_path: Dockerfile.e2e
   to: hypershift-tests
+- dockerfile_literal: |
+    FROM nested-podman
+    # Install GitHub CLI
+    RUN dnf install -y 'dnf-command(config-manager)' && \
+        dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo && \
+        dnf install -y gh python3 python3-pip git && \
+        dnf clean all
+    # Copy Claude CLI and config from ai-helpers image
+    COPY --from=claude-ai-helpers /home/claude/.local/bin/ /home/claude/.local/bin/
+    COPY --from=claude-ai-helpers /home/claude/.claude/ /home/claude/.claude/
+    COPY --from=claude-ai-helpers /opt/ai-helpers /opt/ai-helpers
+    # Ensure OpenShift random UID compatibility (root group)
+    RUN chown -R 1000:0 /home/claude && chmod -R g+rwx /home/claude && \
+        chown -R 1000:0 /opt/ai-helpers && chmod -R g+rwx /opt/ai-helpers
+    ENV PATH="/home/claude/.local/bin:${PATH}"
+    ENV CLAUDE_CONFIG_DIR="/home/claude/.claude"
+    RUN claude --version && gh --version && podman --version
+  from: nested-podman
+  to: claude-ai-helpers-nested-podman
 - dockerfile_literal: |
     FROM base
     RUN dnf install -y python3-pip
