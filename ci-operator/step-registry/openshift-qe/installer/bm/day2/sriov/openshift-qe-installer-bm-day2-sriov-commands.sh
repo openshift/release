@@ -44,7 +44,7 @@ metadata:
 spec:
   channel: stable
   name: sriov-network-operator
-  source: redhat-operators
+  source: ${OPERATOR_SOURCE_INDEX}
   sourceNamespace: openshift-marketplace
 EOF
 
