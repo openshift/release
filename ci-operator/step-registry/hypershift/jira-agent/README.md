@@ -68,7 +68,7 @@ flowchart TD
     Secret1 -.->|Vertex AI auth| ProcessIssue
 
     %% External Systems
-    JiraAPI[(Jira API<br/>issues.redhat.com)]:::external -.->|Return issues| QueryJira
+    JiraAPI[(Jira API<br/>redhat.atlassian.net)]:::external -.->|Return issues| QueryJira
     JiraAPI -.->|Add label| AddLabel
     ClaudeAPI[(Claude API<br/>via Vertex AI)]:::external -.->|Generate solution| ProcessIssue
     GitHubAPI[(GitHub API)]:::external -.->|Push to fork| ProcessIssue
