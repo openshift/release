@@ -1,6 +1,6 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
+.PHONY: help check check-boskos check-core check-services check-validate-main-promotion dry-core core dry-services services all update release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen 
 
 export CONTAINER_ENGINE ?= podman
 export CONTAINER_ENGINE_OPTS ?= --platform linux/amd64
@@ -22,7 +22,7 @@ help:
 
 all:  core services
 
-check: check-core check-services check-boskos check-labels check-cluster-profiles check-yaml-indentation
+check: check-core check-services check-boskos check-labels check-cluster-profiles check-yaml-indentation check-validate-main-promotion
 	@echo "Service config check: PASS"
 
 check-boskos:
@@ -40,6 +40,10 @@ check-cluster-profiles: python-help
 check-yaml-indentation: python-help
 	hack/validate-yaml-indentation.sh .
 	@echo "YAML indentation check: PASS"
+
+check-validate-main-promotion: python-help
+	python3 hack/validate-main-promotion-guard.py
+	@echo "Main promotion validation: PASS"
 
 check-core:
 	core-services/_hack/validate-core-services.sh core-services
