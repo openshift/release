@@ -486,6 +486,44 @@ EOF
   rm -f "${registry_ignition_patch}"
 done
 
+# ----------------------------------------------------------------
+# JOURNAL FORWARDER ignition
+# /var/journal-gather-forwarder/forward.sh
+# journal-forwarder.service
+# ----------------------------------------------------------------
+
+JOURNAL_FWD_SCRIPT_B64="IyEvYmluL3NoCgppZiBbICIkIyIgLWd0IDAgXTsgdGhlbgogICAgIyBXZSBoYXZlIGNvbW1hbmQgbGluZSBhcmd1bWVudHMuCiAgICAjIE91dHB1dCB0aGVtIHdpdGggbmV3bGluZXMgaW4tYmV0d2Vlbi4KICAgIHByaW50ZiAnJXNcbicgIiRAIgplbHNlCiAgICAjIE5vIGNvbW1hbmQgbGluZSBhcmd1bWVudHMuCiAgICAjIEp1c3QgcGFzcyBzdGRpbiBvbi4KICAgIGNhdApmaSB8CndoaWxlIElGUz0gcmVhZCAtciBzdHJpbmc7IGRvCiAgICBjdXJsIC1YIFBPU1QgXAogICAgIC1IICJDb250ZW50LVR5cGU6IHRleHQvcGxhaW4iIFwKICAgICAtSCAibm9kZS1pZDogJChob3N0bmFtZSkiIFwKICAgICAtZCAiJHN0cmluZyIgXAogICAgIGh0dHA6Ly9sb2ctZ2F0aGVyLnZtYy5jaS5vcGVuc2hpZnQub3JnOjgwMDAgPiAvZGV2L251bGwgMj4mMQpkb25l"
+JOURNAL_FWD_SERVICE='[Unit]\nDescription=Forwards the journal to log server\nAfter=network.target\nWants=network-online.target\n[Service]\nRestart=always\nType=simple\nRestartSec=30\nExecStart=/bin/sh -c \"stdbuf -oL journalctl -f | /var/journal-gather-forwarder/forward.sh\"\nEnvironment=\n[Install]\nWantedBy=multi-user.target'
+
+journal_ignition_patch=$(mktemp)
+cat > "${journal_ignition_patch}" << EOF
+{
+  "storage": {
+    "files": [
+      {
+        "path": "/var/journal-gather-forwarder/forward.sh",
+        "contents": {
+          "source": "data:text/plain;base64,${JOURNAL_FWD_SCRIPT_B64}"
+        },
+        "mode": 511
+      }
+    ]
+  },
+  "systemd": {
+    "units": [
+      {
+        "contents": "${JOURNAL_FWD_SERVICE}",
+        "enabled": true,
+        "name": "journal-forwarder.service"
+      }
+    ]
+  }
+}
+EOF
+
+patch_ignition_file "${bastion_ignition_file}" "${journal_ignition_patch}"
+rm -f "${journal_ignition_patch}"
+
 # update ssh keys
 tmp_keys_json=`mktemp`
 tmp_file=`mktemp`
