@@ -326,6 +326,23 @@ tests:
       CONFIG_TYPE: minimal
       MANILA_SHARE_NETWORK_ID: b4b69cfe-b06e-4b01-ac34-4faa4bf94503
     workflow: openshift-e2e-openstack-csi-manila
+- as: e2e-openstack-cinder-csi-alt
+  run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*)
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      TEST_SKIPS: should concurrently access the volume and restored snapshot from
+        pods on the same node
+    workflow: openshift-e2e-openstack-csi-cinder
+- as: e2e-openstack-manila-csi-alt
+  run_if_changed: ^(Dockerfile\.openstack-manila|assets\/overlays\/openstack-manila\/.*|pkg\/driver\/openstack-manila\/.*|pkg\/openstack-manila\/.*)
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      MANILA_SHARE_NETWORK_ID: b4b69cfe-b06e-4b01-ac34-4faa4bf94503
+    workflow: openshift-e2e-openstack-csi-manila
 - as: hypershift-e2e-openstack-aws-csi-cinder
   run_if_changed: ^(Dockerfile\.openstack-cinder|assets\/overlays\/openstack-cinder\/.*|pkg\/driver\/openstack-cinder\/.*|pkg\/openstack-cinder\/.*)
   steps:
