@@ -10,9 +10,8 @@ AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 AZURE_WORKLOAD_IDENTITIES_LOCATION="/etc/hypershift-ci-jobs-self-managed-azure-e2e/workload-identities.json"
 AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-ci-jobs-self-managed-azure-e2e/serviceaccount-signer.private"
 AZURE_OIDC_ISSUER_URL="https://smazure.blob.core.windows.net/smazure"
-AZURE_KMS_INFO_LOCATION="/etc/hypershift-ci-jobs-azurecreds/aks-kms-info.json"
-AKS_KMS_KEY="$(jq -r '."aks-kms-key"' "${AZURE_KMS_INFO_LOCATION}")"
-AKS_KMS_CREDENTIALS_SECRET="$(jq -r '."aks-kms-credentials-secret"' "${AZURE_KMS_INFO_LOCATION}")"
+AZURE_KMS_KEY="$(<"${SHARED_DIR}/azure_active_key_url")"
+AZURE_KMS_CREDENTIALS_SECRET="$(<"${SHARED_DIR}/azure_kms_secret_name")"
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
 
@@ -85,8 +84,8 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.azure-location=${HYPERSHIFT_AZURE_LOCATION} \
   --e2e.oidc-issuer-url=${AZURE_OIDC_ISSUER_URL} \
   --e2e.sa-token-issuer-private-key-path=${AZURE_SA_TOKEN_ISSUER_KEY_PATH} \
-  --e2e.azure-encryption-key-id=${AKS_KMS_KEY} \
-  --e2e.azure-kms-credentials-secret-name=${AKS_KMS_CREDENTIALS_SECRET} \
+  --e2e.azure-encryption-key-id=${AZURE_KMS_KEY} \
+  --e2e.azure-kms-credentials-secret-name=${AZURE_KMS_CREDENTIALS_SECRET} \
     ${N1_NP_VERSION_TEST_ARGS:-} \
     ${N2_NP_VERSION_TEST_ARGS:-} \
     ${EXTERNAL_DNS_ARGS:-} \
