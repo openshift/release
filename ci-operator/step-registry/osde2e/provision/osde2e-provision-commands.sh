@@ -16,8 +16,20 @@ then
     exit 1
 fi
 
+TEST_PARAMETERS="--configs ${CONFIGS} \
+--secret-locations ${SECRET_LOCATIONS} \
+--provision-only"
+
+if [[ -n ${SKIP_MUST_GATHER} ]]
+then
+  TEST_PARAMETERS="${TEST_PARAMETERS} --skip-must-gather"
+fi
+
+if [[ -n ${SKIP_DESTROY_CLUSTER} ]]
+then
+  TEST_PARAMETERS="${TEST_PARAMETERS} --skip-destroy-cluster"
+fi
+
 export REPORT_DIR="${ARTIFACT_DIR}"
 
-/osde2e test --configs "${CONFIGS}" \
---secret-locations "${SECRET_LOCATIONS}" \
---provision-only
+/osde2e test ${TEST_PARAMETERS}
