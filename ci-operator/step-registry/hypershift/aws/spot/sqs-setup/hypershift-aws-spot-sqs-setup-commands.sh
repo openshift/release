@@ -49,9 +49,10 @@ POLICY=$(cat <<EOF
 EOF
 )
 
+POLICY_ESCAPED=$(echo "${POLICY}" | jq -c . | jq -Rs .)
 aws sqs set-queue-attributes \
   --queue-url "${QUEUE_URL}" \
-  --attributes "Policy=$(echo "${POLICY}" | jq -c .)" \
+  --attributes "{\"Policy\": ${POLICY_ESCAPED}}" \
   --region "${AWS_REGION}"
 
 echo "SQS queue policy updated"
