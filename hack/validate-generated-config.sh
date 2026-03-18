@@ -24,6 +24,7 @@ cp -r "${ci_operator_dir}" "${workdir}"
 ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/ci-operator/jobs" \
 --known-infra-file infra-build-farm-periodics.yaml \
 --known-infra-file infra-periodics.yaml \
+--known-infra-file infra-periodics-migrated.yaml \
 --known-infra-file infra-image-mirroring.yaml \
 --known-infra-file infra-periodics-origin-release-images.yaml
 
